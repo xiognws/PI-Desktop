@@ -16,6 +16,7 @@ import { requestExtensionUi } from "./extensions/ui-request.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import { imageGenerationDescription, imageGenerationParameters } from "./image-generation/tool.js";
 import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
+import { rememberDescription, rememberParameters } from "./memory-tool.js";
 import { createJevClassifierTool } from "./jev-classifier-tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
@@ -235,6 +236,7 @@ import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
 import type { CustomSystemPrompt } from "./custom-system-prompt.js";
 import { projectMemoryPrompt } from "./project-memory-prompt.js";
+import { memoryContextPrefix, prependMemoryContext } from "./memory-context.js";
 import {
   pluginSkillsPrompt,
   pluginSkillsPromptSections,
@@ -2483,6 +2485,27 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       : this.agent.state.systemPrompt;
   }
 
+  /**
+   * Recall memories relevant to this prompt (ADR 0371). The block goes into
+   * the user message, not the system prompt: recall changes every turn, and a
+   * system-prompt change rewrites the provider prompt-cache prefix (ADR 0337).
+   * Best effort — `memoryContextPrefix` swallows host failures.
+   */
+  private async recalledMemoryContext(
+    input: string | RuntimePrompt,
+  ): Promise<string | undefined> {
+    // Recall belongs to execution. Plan and Goal turns declare a denial-only
+    // tool set before any host action, and a memory read there would be the
+    // first thing they do; project instructions already carry the context a
+    // planning turn needs.
+    if (this.mode !== "agent") return undefined;
+    const query = typeof input === "string" ? input : input.text;
+    return memoryContextPrefix(this.host, query, {
+      projectPath: this.projectPath,
+      sessionId: this.sessionId,
+    });
+  }
+
   private composeSystemPrompt(): string {
     const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
     const memoryPrompt = projectMemoryPrompt(this.projectMemory);
@@ -3298,6 +3321,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
         case "TodoWrite":
           return todoWriteDescription;
+        case "Remember":
+          return rememberDescription;
         case ASK_TOOL_NAME:
           return `Ask the user one or more questions. Keep each question to ${MAX_ASK_TOOL_QUESTION_CHARS} characters or fewer. Use Markdown in question text and option labels when formatting helps (for example, emphasis, inline code, or lists); the desktop card renders it safely. Plain strings and existing { label, description? } options are accepted; descriptions remain plain text and answers return the selected source label. The card always provides a custom user-input option.`;
         case "PluginScaffold":
@@ -3315,6 +3340,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     const parameters: Record<string, Parameters<typeof Type.Object>[0]> = {
       GenerateImages: imageGenerationParameters,
       TodoWrite: todoWriteParameters,
+      Remember: rememberParameters,
       Read: {
         path: pathParam(
           "Existing regular file only, never a directory; workspace-relative or explicitly approved.",
@@ -3950,6 +3976,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "BrowserPreview",
             "PluginCheck",
             "TodoWrite",
+            "Remember",
           ]
         : ["Read", "Glob", "Grep", "BrowserPreview", "Bash", "Write", "Edit"];
     if (this.mode === "agent") {
@@ -9104,13 +9131,21 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         this.keepPreflightUserMessage(incomingUserMessage);
         throw turnAbortedError("Turn aborted during extension hooks");
       }
+      const memoryPrefix = await this.recalledMemoryContext(modelInput);
       if (typeof modelInput === "string") {
-        await this.agent.prompt(modelInput);
+        await this.agent.prompt(memoryPrefix ? `${memoryPrefix}\n\n${modelInput}` : modelInput);
       } else {
         // pi's `(text, images)` form appends every image after the text; the
         // message form keeps an inline image block where the user placed it,
         // which is the same content `promptContent` already built above.
-        await this.agent.prompt(incomingUserMessage);
+        await this.agent.prompt(
+          memoryPrefix
+            ? {
+                ...incomingUserMessage,
+                content: prependMemoryContext(incomingUserMessage.content, memoryPrefix),
+              }
+            : incomingUserMessage,
+        );
       }
       await this.waitForIdleAndSteering();
       void this.extensionRunner?.emit("agent_settled", { type: "agent_settled" });

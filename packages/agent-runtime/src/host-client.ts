@@ -18,6 +18,18 @@ export interface RuntimeHost {
     params?: unknown,
     timeoutOverrideMs?: number,
   ): Promise<T>;
+  /**
+   * Durable-memory recall (ADR 0371). Optional on purpose: a host that does not
+   * implement it — an older sidecar, or a test stub that only stubs `call` —
+   * gets no memory block, and memory recall never becomes one more entry in the
+   * generic RPC sequence those callers assert on.
+   */
+  memoryRecall?(input: {
+    query: string;
+    projectPath?: string;
+    sessionId?: string;
+    limit?: number;
+  }): Promise<unknown>;
   /** Fires once when the host connection is lost; returns an unsubscribe. */
   onClose?(handler: HostCloseHandler): () => void;
   /** Host-originated notifications (tool output streams); returns an unsubscribe. */
