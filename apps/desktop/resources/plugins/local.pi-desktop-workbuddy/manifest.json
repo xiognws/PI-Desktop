@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "id": "local.pi-desktop-workbuddy",
+  "name": "pi-desktop-workbuddy",
+  "version": "1.0.7",
+  "description": "把 WorkBuddy 桌面 App 里登录过的所有账号自动并入一个模型池：你在桌面登录的每个账号都会成为池成员，某个账号被限流（429）时请求自动切到下一个可用账号。国内版与国际版各自独立成组，可同时使用。",
+  "author": "PI-Desktop port of aosi526/dsh-workbuddy-xdpool",
+  "license": "MIT",
+  "homepage": "https://github.com/aosi526/dsh-workbuddy-xdpool",
+  "repository": "https://github.com/aosi526/dsh-workbuddy-xdpool",
+  "main": "main.js",
+  "categories": [
+    "productivity"
+  ],
+  "permissions": [
+    "ui.panel",
+    "background.service",
+    "provider.register"
+  ],
+  "engines": {
+    "piDesktop": ">=0.15.0"
+  },
+  "i18n": {
+    "en": {
+      "name": "pi-desktop-workbuddy",
+      "description": "Merge every account you have signed in to in the WorkBuddy desktop app into one model pool: each sign-in becomes a pool member automatically, and when an account is rate-limited (HTTP 429) the request moves to the next available one. The domestic and international editions are separate groups and can be used at the same time.",
+      "safetyNotes": "Read-only discovery: it reuses the WorkBuddy desktop app's own saved sign-ins and never starts a separate login. It reads only the app's auth files under the local app-data folder, keeps no credential copies of its own, and sends tokens nowhere except to Tencent's own WorkBuddy/CodeBuddy endpoints. Chat requests are served from a loopback-only endpoint (127.0.0.1, fixed high port) that the plugin itself runs and that attaches the token upstream. No telemetry and no third-party server."
+    },
+    "zh-CN": {
+      "name": "pi-desktop-workbuddy",
+      "description": "把 WorkBuddy 桌面 App 里登录过的所有账号自动并入一个模型池：每个登录过的账号都会自动成为池成员；某个账号被限流（429）时，请求自动切到下一个可用账号。国内版与国际版是两组独立供应商，可同时使用。",
+      "safetyNotes": "只读发现：复用 WorkBuddy 桌面 App 自己的登录状态，不会另行发起登录。只读取本机应用数据目录下该 App 自己的登录文件，不另存任何凭据副本；令牌除发往腾讯 WorkBuddy / CodeBuddy 自己的接口外不会去任何地方。对话请求由插件在本机回环地址（127.0.0.1，固定高位端口）上运行的端点提供，令牌由该端点在上行时附加。无遥测、无第三方服务器。"
+    }
+  },
+  "safetyNotes": "Read-only discovery of the WorkBuddy desktop app's own saved sign-ins (local app-data only; no credential copies are kept). Upstream traffic goes only to Tencent WorkBuddy / CodeBuddy endpoints. Chat requests are served from a loopback-only endpoint (127.0.0.1, fixed high port) that the plugin runs and that requires either the host's key-less sentinel or this run's per-process secret. No telemetry, no third-party server.",
+  "ui": {
+    "panel": "renderer/index.html",
+    "title": {
+      "en": "pi-desktop-workbuddy",
+      "zh-CN": "pi-desktop-workbuddy"
+    },
+    "width": 760,
+    "height": 800
+  },
+  "activationEvents": [
+    "onStartup"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "xdpool.open",
+        "title": "pi-desktop-workbuddy: Open Panel",
+        "category": "Productivity",
+        "keywords": [
+          "workbuddy",
+          "pool",
+          "池",
+          "模型"
+        ]
+      },
+      {
+        "id": "xdpool.rescan",
+        "title": "pi-desktop-workbuddy: Detect Accounts Again",
+        "category": "Productivity",
+        "keywords": [
+          "workbuddy",
+          "rescan",
+          "重新检测"
+        ]
+      },
+      {
+        "id": "xdpool.resetCooldowns",
+        "title": "pi-desktop-workbuddy: Clear All Cooldowns",
+        "category": "Productivity",
+        "keywords": [
+          "workbuddy",
+          "cooldown",
+          "清除冷却"
+        ]
+      },
+      {
+        "id": "xdpool.checkin",
+        "title": "pi-desktop-workbuddy: Daily Check-in (All Accounts)",
+        "category": "Productivity",
+        "keywords": [
+          "workbuddy",
+          "checkin",
+          "签到"
+        ]
+      },
+      {
+        "id": "xdpool.doctor",
+        "title": "pi-desktop-workbuddy: Run Connection Check",
+        "category": "Productivity",
+        "keywords": [
+          "workbuddy",
+          "doctor",
+          "诊断"
+        ]
+      }
+    ],
+    "settings": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "title": "启用 pi-desktop-workbuddy",
+        "default": true,
+        "scope": "plugin"
+      },
+      {
+        "key": "distribution",
+        "type": "select",
+        "title": "账号使用方式",
+        "default": "priority",
+        "scope": "plugin",
+        "enum": [
+          {
+            "label": "优先用一个账号（用完再换下一个）",
+            "value": "priority"
+          },
+          {
+            "label": "轮流使用（把消耗均摊到每个账号）",
+            "value": "round-robin"
+          }
+        ]
+      },
+      {
+        "key": "cooldownSeconds",
+        "type": "number",
+        "title": "限流冷却时间（秒）",
+        "default": 60,
+        "scope": "plugin"
+      },
+      {
+        "key": "catalogRefreshMinutes",
+        "type": "number",
+        "title": "模型列表刷新间隔（分钟）",
+        "default": 30,
+        "scope": "plugin"
+      },
+      {
+        "key": "authFile",
+        "type": "string",
+        "title": "登录文件覆盖路径（可选，高级）",
+        "default": "",
+        "scope": "plugin"
+      },
+      {
+        "key": "modelSelection",
+        "type": "json",
+        "title": "模型选择（面板管理）",
+        "default": {},
+        "scope": "plugin"
+      }
+    ],
+    "services": [
+      {
+        "id": "provider-host",
+        "label": "pi-desktop-workbuddy provider host"
+      }
+    ]
+  },
+  "changelog": "1.0.7 — 修复 net::ERR_CONNECTION_REFUSED（宿主拿到的服务地址指向一个没人监听的端口）：\n\n原因：宿主在插件进程启动之前就从 manifest 读取服务地址，并把它缓存到该服务商那一行；只有启动应用、或把插件关掉再打开时，宿主才会重新读取 manifest 并改写这一行。此前端口一旦短暂被占（例如更名期间新旧实例并存），插件会立刻改用备用端口并把这个备用端口写进 manifest，于是宿主缓存了一个稍后不再监听的地址——插件之后回到正确端口也救不回来。\n\n1) 端口占用改为重试：首选端口（41831 / 41841）被占时先重试 6 次、每次间隔 250 毫秒（约 1.5 秒），因为「被占」几乎总是上一个实例正在退出。只有始终抢不到时才退到临时端口，本次会话仍可用。\n\n2) 发布地址固定为首选端口：manifest 里写的地址不再跟随本次实际绑定的端口，因为宿主读 manifest 的时机早于插件启动——它描述的是下一次运行的地址。\n\n3) 地址漂移会明确报出来：面板顶部与连接自检会指出「宿主缓存的地址与本插件实际提供的地址不一致」，并给出唯一有效的动作。\n\n若你正遇到该报错：把本插件关掉再打开，或重启 PI-Desktop，宿主会用正确地址改写那一行。这是宿主行为，插件无法代为触发。\n1.0.6 — 插件更名为 pi-desktop-workbuddy：\n\n1) 显示名（插件列表、设置卡片、面板标题、命令菜单、provider 分组）与包名改为 pi-desktop-workbuddy。\n\n2) 插件 id 由 local.pi-workbuddy-xdpool 改为 local.pi-desktop-workbuddy。id 是宿主识别插件的身份，因此这是一次「新插件」：旧的注册表条目与数据目录不再被使用，启动时会自动把旧 id 下保存的设置（模型选择、逐模型推理档位、使用方式）复制到新目录，旧文件保留不动以备回退。旧的两条 provider 行需在「设置 → 模型」里手工删除（若出现重复分组）。\n\n1.0.5 — 修复「保存后按钮一直停在保存中」：保存栏的按钮状态此前只在有未保存改动时才刷新，所以一次让草稿变干净的保存（例如取消勾选某个模型）会把按钮永久留在「保存中…」且禁用——数据其实已经落盘，看起来却像没保存。现在无论是否仍有改动，按钮状态都会重置。\n\n布局改为双栏：左「该服务的模型」、右「模型设置」并排（面板宽度不变），窗口窄于 720px 时自动叠成上下两栏。两栏各自滚动，编辑长列表时模型列表保持可见。\n\n保存后会明确提示一次：PI-Desktop 按服务商缓存模型列表，需要去「设置 → 模型」对本服务商点一次「设为默认」（或关掉再开启）才会同步到模型选择器。这是宿主行为，插件无法代为触发。\n\n1.0.4 — 「模型」页改为宿主同款的两个视图：先是模型列表（每行一个复选框，可逐条启用/关闭；标题带全选、「获取列表」按钮、按 ID 搜索），勾选的模型进入「模型设置」（逐条可展开编辑别名、上下文窗口与最大输出、思考等级与默认档、附件）。文案、数字格式（1M / 1.05M / 65.5K）与预设档位全部对齐 PI-Desktop 自带界面。\n\n「获取列表」会重新扫描桌面 App 的登录快照并重新拉取上游模型目录。\n\n工作面板宽度不足以并排双栏，因此列表与设置改为切换式（返回按钮回列表），而非宿主那种左右并排。\n\n1.0.3 — 新增模型编辑（面板「模型」页）：\n\n每个模型现在可以展开成一张编辑卡，字段与 PI-Desktop 自带的模型设置一致——别名、上下文窗口与最大输出（各带 128k/256k/312k/500k/1M 与 4k/8k/16k/32k/128k 预设）、思考等级（逐档勾选，并可选默认档位）、附件（图片输入）。改动先留在草稿里，点「保存」才写入并立即生效，摘要行显示 窗口 · 输出，改动过的行带「高级」徽章。\n\n「附件」里的 PDF、设为生图模型、可供 AI 自动调度、原生联网搜索四项对插件提供的模型不可用：PI-Desktop 在解析插件声明时把这三个字段固定为 None，插件无法写入。它们按原样显示但为禁用状态，悬停会说明原因，而不是做成点了没反应的假开关。\n\n1.0.2 — 宿主 0.15.3 已修复「插件 provider 声明的推理档位被丢弃」的缺陷（补丁见 upstream-patch/），因此：\n\n1) 推理（思考）等级现在可调：本插件的两个分组按上游声明的档位如实提供菜单，例如 deepseek-v4.1-flash 提供 off / low / medium / high / xhigh / max。\n\n2) 删除了为绕过该缺陷而附带的 tools/ 绕行脚本（它需要写宿主数据库、手工创建指向同一端点的重复供应商）。宿主已修复，继续用它只会让模型选择器出现重复分组。若你之前运行过，请在「设置 → 模型」里删掉那些手工添加的 WorkBuddy 供应商行。\n\n1.0.1 — 修复三个问题：\n\n1) 打开面板不再因检测而变慢：面板先用缓存内容立即渲染，检测在后台进行（标题栏显示「正在检测…」），完成后自动更新；模型目录按「模型列表刷新间隔」复用，不再每次连接都重新拉取；账号积分 / 签到改为带 TTL 的缓存。顶部「刷新」按钮仍会等待一次完整检测。\n\n2) 模型设置可正常配置并生效：回环端点现在按你在「模型」页的勾选发布 /v1/models（宿主正是从该端点发现模型），所以保存后模型选择器立即跟着变；并监听宿主的 plugin:settingsChanged，在宿主设置页改的选择也会立即应用；若保存的选择里含有已下线的模型，会忽略该失效选择并在面板提示，不再出现模型整组消失。\n\n3) 保存现在真正持久化并生效：写入结果会被校验，失败会在面板明确报错而不是假装成功；保存后立即重新应用选择并重新发布声明，重载插件后依旧保持。\n\n1.0.0 — 首个正式版。只读复用 WorkBuddy 桌面 App 的全部历史登录（自动发现、无需手动录入），把国内版与国际版各自发布成一个独立供应商分组；账号被 429 限流时自动切换到下一个健康账号（按「账号 + 模型」维度记冷却）；积分包与合计、逐账号每日签到、模型启用/图片输入/上下文上限、优先级与轮流两种使用方式、连接自检面板。"
+}

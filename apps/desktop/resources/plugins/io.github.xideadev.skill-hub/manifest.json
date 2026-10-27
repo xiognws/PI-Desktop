@@ -1,0 +1,97 @@
+{
+  "activationEvents": [
+    "onStartup",
+    "onCommand:skill-hub.open"
+  ],
+  "author": "xidea",
+  "contributes": {
+    "agentExtensions": [
+      "src/extension.js"
+    ],
+    "commands": [
+      {
+        "id": "skill-hub.open",
+        "keywords": [
+          "skill",
+          "技能",
+          "hub",
+          "管理",
+          "learn",
+          "侧边栏"
+        ],
+        "title": "Skill Hub: 打开技能工作台"
+      }
+    ],
+    "settings": [
+      {
+        "default": "project",
+        "enum": [
+          {
+            "label": "全局 (~/.agents/skills)",
+            "value": "global"
+          },
+          {
+            "label": "项目专属 (.agents/skills)",
+            "value": "project"
+          }
+        ],
+        "key": "defaultScope",
+        "title": "新建技能默认作用域",
+        "type": "select"
+      }
+    ],
+    "views": [
+      {
+        "entry": "renderer/index.html",
+        "icon": "book",
+        "id": "skill-hub",
+        "order": 12,
+        "title": {
+          "en": "Skill Hub",
+          "zh-CN": "技能管理"
+        }
+      }
+    ]
+  },
+  "description": "PI-Desktop 官方级侧边栏技能管理工作台：直观查看、分类检索、启用控制及项目/全局精准注入。",
+  "engines": {
+    "piDesktop": ">=0.14.0"
+  },
+  "i18n": {
+    "en": {
+      "name": "Skill Hub",
+      "description": "PI-Desktop skill management workspace: browse, search, toggle and inject skills directly from sidebar.",
+      "safetyNotes": "Only accesses skill directories in user and workspace scopes to manage skill definitions. No remote network calls or telemetry."
+    },
+    "zh-CN": {
+      "name": "技能管理",
+      "description": "PI-Desktop 官方级侧边栏技能管理工作台：直观查看、分类检索、启用控制及项目/全局精准注入。",
+      "safetyNotes": "仅读取和维护用户全局及当前工作区 .agents/skills 目录下的技能定义文件，无任何远程外联与遥测。"
+    }
+  },
+  "id": "io.github.xideadev.skill-hub",
+  "license": "MIT",
+  "main": "main.js",
+  "name": "技能管理",
+  "permissions": [
+    "ui.view",
+    "ui.panel",
+    "models.list",
+    "agent.extension",
+    "agent.complete",
+    "agent.prompt.inject",
+    "desktop.control"
+  ],
+  "safetyNotes": "仅读取和维护用户全局及当前工作区 .agents/skills 目录下的技能定义文件，无任何远程外联与遥测。",
+  "schemaVersion": 1,
+  "ui": {
+    "height": 760,
+    "panel": "renderer/index.html",
+    "title": {
+      "en": "Skill Hub",
+      "zh-CN": "技能管理"
+    },
+    "width": 440
+  },
+  "version": "0.1.0"
+}

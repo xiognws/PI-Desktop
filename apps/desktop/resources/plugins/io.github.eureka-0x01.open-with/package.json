@@ -1,0 +1,8 @@
+{
+  "name": "open-with",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PI-Desktop 插件：使用选中的应用打开当前项目目录。",
+  "license": "MIT",
+  "type": "commonjs"
+}

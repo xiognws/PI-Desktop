@@ -1,0 +1,1897 @@
+/*
+ * Panel styling.
+ *
+ * Follows juejin-usage: a quiet grey page, white 16px cards, pill-shaped
+ * segmented controls whose selected item is the accent blue, metric cards with
+ * a green mini-trend, a calendar heatmap with month and weekday headers, bar
+ * rankings and two donut cards. Light and dark are the same token set.
+ */
+
+:root {
+  --font-sans: "JetBrains Mono Variable", "JetBrains Mono", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+
+  --accent: #0a84ff;
+  --accent-soft: rgba(10, 132, 255, 0.12);
+  /* Filled accent surfaces (selected tab, primary button, active range pill,
+     selected day) keep a foreground of their own: the fill is pushed to a fixed
+     perceptual lightness, so the label clears 4.5:1 for any accent. The second
+     line is the fallback for engines without relative colour syntax. */
+  --on-accent: #ffffff;
+  --accent-fill: var(--accent);
+  --accent-fill: oklch(from var(--accent) min(l, 0.48) c h);
+  /* Accent used as text on --accent-soft (theme menu); the bare accent is only
+     3.15:1 there on white. */
+  --accent-ink: var(--accent);
+  --accent-ink: oklch(from var(--accent) min(l, 0.5) c h);
+  --amber: #f5a623;
+  --green: #2fbf71;
+  --violet: #8b6ee8;
+  --teal: #4fbd91;
+
+  /* Period-over-period: the pill and the mini-trend share one hue per direction.
+     The fallback hexes are the same colours for engines without oklch. */
+  --delta-up: #007840;
+  --delta-up: oklch(0.5 0.13 155);
+  --delta-down: #c13234;
+  --delta-down: oklch(0.54 0.18 25);
+  --delta-up-wash: color-mix(in oklab, var(--delta-up) 12%, transparent);
+  --delta-down-wash: color-mix(in oklab, var(--delta-down) 12%, transparent);
+
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f1f2f4;
+  --surface-3: #e9eaee;
+  --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --border: rgba(17, 24, 39, 0.06);
+  --border-strong: rgba(17, 24, 39, 0.2);
+  --control-border: rgba(17, 24, 39, 0.12);
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+
+  /* Trend-chart series walk five evenly spaced hues off the theme colour, so a
+     palette change repaints the charts. The rotation keeps the hue but pins the
+     perceptual lightness and clamps the chroma: rotating the hue at the source
+     lightness landed the yellow-green ends at 1.12:1 on the white card, and an
+     achromatic accent collapsed every line onto one grey. The plain line is the
+     fallback for engines without relative colour syntax. */
+  --series-l: 0.55;
+  --series-c: clamp(0.1, c, 0.18);
+  /* Chart marks that are literally the accent keep a usable lightness: a near-white
+     or near-black custom accent would otherwise draw slices invisible on its own
+     card. The plain line is the fallback for engines without relative colour. */
+  --accent-graph: var(--accent);
+  --accent-graph: oklch(from var(--accent) clamp(0.42, l, 0.6) max(c, 0.08) h);
+  --chart-input: #2f6feb;
+  --chart-input: var(--accent-graph);
+  --chart-output: #16a34a;
+  --chart-output: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 72));
+  --chart-cache-read: #8b5cf6;
+  --chart-cache-read: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 144));
+  --chart-cache-write: #f59e0b;
+  --chart-cache-write: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 216));
+  --chart-cost: #e5484d;
+  --chart-cost: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 288));
+
+  --source-desktop: var(--accent-graph);
+  /* Fallback for engines without relative colour syntax; the next line wins there. */
+  --source-cli: var(--amber);
+  --source-cli: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 40));
+  /* Donut slices: every slice is a hue step off the theme colour, so changing the
+     palette repaints all of them. The plain line is the fallback for engines
+     without relative colour syntax. */
+  --slice-0: var(--accent-graph);
+  --slice-1: var(--amber);
+  --slice-1: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 45));
+  --slice-2: var(--teal);
+  --slice-2: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 90));
+  --slice-3: var(--violet);
+  --slice-3: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 180));
+  --slice-4: #e45b55;
+  --slice-4: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 225));
+  --slice-5: #20a5a5;
+  --slice-5: oklch(from var(--accent) var(--series-l) var(--series-c) calc(h + 270));
+}
+
+[data-base="dark"] {
+  --accent: #4aa8ff;
+  --accent-soft: rgba(74, 168, 255, 0.16);
+  --on-accent: #0b1220;
+  --accent-fill: var(--accent);
+  --accent-fill: oklch(from var(--accent) max(l, 0.7) c h);
+  /* The dark accents are already light, so accent-as-text needs no darkening. */
+  --accent-ink: var(--accent);
+  --amber: #f7b955;
+  --green: #4fd48c;
+  --violet: #a58ef2;
+  --teal: #62cfa4;
+
+  /* Rise and fall read on their own, in both themes: a pill colour that also
+     survives as text on its own wash. */
+  --delta-up: #66d592;
+  --delta-up: oklch(0.79 0.14 155);
+  --delta-down: #ff958d;
+  --delta-down: oklch(0.78 0.13 25);
+
+  --bg: #0e0f11;
+  --surface: #17181b;
+  --surface-2: #202226;
+  --surface-3: #2a2d31;
+  --fg: #f5f5f7;
+  --muted: #9a9aa0;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.26);
+  --control-border: rgba(255, 255, 255, 0.08);
+  --shadow: none;
+
+  /* Lighter series, so the same hue rotation reads on the dark card. */
+  --series-l: 0.78;
+  /* Dark cards need the darker end of the accent lifted as well. */
+  --accent-graph: oklch(from var(--accent) clamp(0.55, l, 0.88) max(c, 0.08) h);
+  --accent-graph: oklch(from var(--accent) clamp(0.62, l, 0.88) max(c, 0.08) h);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  min-height: 100vh;
+  font: 13px/1.5 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-y: auto;
+}
+
+.app {
+  width: 100%;
+  padding: calc(var(--pi-plugin-titlebar-height, 46px) + 8px) clamp(14px, 2.2vw, 28px) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.1vw, 18px);
+  /* Never let the narrowest panel grow a horizontal scrollbar. */
+  overflow-x: clip;
+}
+
+/* ------------------------------------------------------------------ topbar */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  /* Sticky so range, source and appearance controls stay reachable while the
+     cards scroll underneath. The offset clears the host's own title bar. */
+  position: sticky;
+  top: var(--pi-plugin-titlebar-height, 46px);
+  z-index: 30;
+  background: var(--bg);
+  margin: -8px calc(-1 * clamp(14px, 2.2vw, 28px)) 0;
+  padding: 8px clamp(14px, 2.2vw, 28px) 4px;
+}
+
+.tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.tabs button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 15px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.tabs button[aria-selected="true"] {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+.tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tabs.mini {
+  padding: 2px;
+}
+
+.tabs.mini button {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--fg);
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pill:hover {
+  background: var(--surface-3);
+}
+
+.pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pill .caret {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.icon-btn {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--surface-3);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.source-filter {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 190px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.16);
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.menu label:hover {
+  background: var(--surface-2);
+}
+
+.menu input {
+  accent-color: var(--accent);
+}
+
+.menu .menu-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--border);
+}
+
+.menu .menu-action {
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 8px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.menu .menu-action:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+/* ------------------------------------------------------------------- cards */
+
+.card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 18px 20px 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.card-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card-head .hint {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card-head .head-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr));
+  align-items: stretch;
+
+/* A chart is drawn at the container's width, with a floor so the axis labels stay
+   legible; when the container is narrower than that floor the viewBox scales it
+   down instead of forcing a horizontal scrollbar. */
+.chart-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+  gap: clamp(12px, 1.1vw, 18px);
+}
+
+/* Cards in one row share a height; their content distributes instead of leaving a dead band. */
+.grid-2 > .card {
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* ----------------------------------------------------------------- metrics */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1.1vw, 18px);
+}
+
+/* Eight cards tile evenly only at 1, 2, 4 or 8 columns; any other count leaves
+   the last row short and the trailing slots empty. */
+@media (min-width: 1920px) {
+  .metrics {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.metric {
+  position: relative;
+  /* The 30px spark hangs into the padding; the caption must stay above it. */
+  padding-bottom: 30px;
+  container-type: inline-size;
+}
+
+/* Label and the period-over-period pill share the first line of the card. */
+.metric .metric-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.metric .delta-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric .delta-badge.is-up {
+  color: var(--delta-up);
+  background: var(--delta-up-wash);
+}
+
+.metric .delta-badge.is-down {
+  color: var(--delta-down);
+  background: var(--delta-down-wash);
+}
+
+.metric .label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.metric .info {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 11px;
+  text-align: center;
+  font-style: normal;
+  cursor: default;
+}
+
+.metric .value {
+  margin: 8px 0 0;
+  font-size: 29px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.metric .sub {
+  margin: 6px 0 0;
+  /* Clear the strip the absolutely positioned sparkline occupies. */
+  padding-right: 104px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric .spark {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  width: 92px;
+  height: 30px;
+  pointer-events: none;
+}
+
+/* Under 180px of card content the caption and the spark cannot both fit: keep the
+   caption and drop the mini-trend (only the 8-column tier gets this narrow). */
+@container (max-width: 180px) {
+  .metric .spark {
+    display: none;
+  }
+
+  .metric .sub {
+    padding-right: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- heatmap */
+
+.heat-card {
+  padding-bottom: 16px;
+}
+
+.heat-months {
+  position: relative;
+  height: 18px;
+  margin-left: 26px;
+}
+
+.heat-months span {
+  position: absolute;
+  top: 0;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.heat-body {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.heat-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: clamp(2px, 0.25vw, 3px);
+  width: 20px;
+  align-self: stretch;
+  font-size: 10px;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1;
+}
+
+.heat-weekdays span {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.heat-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: clamp(2px, 0.25vw, 3px);
+  width: 100%;
+  overflow: visible;
+}
+
+.heat-cell {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  max-height: 18px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--fg) 7%, transparent);
+}
+
+button.heat-cell {
+  appearance: none;
+  position: relative;
+  display: block;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+button.heat-cell:hover {
+  z-index: 3;
+  transform: scale(1.18);
+}
+
+button.heat-cell:focus-visible {
+  z-index: 3;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button.heat-cell.is-selected {
+  z-index: 2;
+  box-shadow: inset 0 0 0 2px var(--fg);
+  animation: heatPop 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes heatPop {
+  0% {
+    transform: scale(0.5);
+  }
+  60% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.heat-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.heat-legend .heat-cell {
+  width: 11px;
+  height: 11px;
+  aspect-ratio: auto;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.heat-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.heat-foot .heat-legend {
+  margin-top: 0;
+}
+
+.heat-detail {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-height: 18px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-detail .heat-date {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.heat-detail b {
+  margin-right: 4px;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.heat-detail .heat-hint {
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  /* The 10px weekday labels overlap and the 53 columns squeeze each cell under
+     6px. Drop the two label bands and let the grid scroll instead: every cell
+     keeps an 11px hit target and the month labels cannot drift out of step. */
+  .heat-weekdays,
+  .heat-months {
+    display: none;
+  }
+
+  .heat-body {
+    overflow-x: auto;
+    padding-bottom: 6px;
+    overscroll-behavior-x: contain;
+  }
+
+  .heat-grid {
+    gap: 2px;
+    /* max-content plus a floor per column: the grid becomes as wide as it needs
+       and the container scrolls, instead of shrinking the cells into dots. */
+    width: max-content;
+    grid-template-columns: repeat(var(--weeks, 53), 11px) !important;
+  }
+
+  .heat-cell {
+    max-height: none;
+  }
+}
+
+/* ----------------------------------------------------------------- charts */
+
+.chart {
+  position: relative;
+  width: 100%;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.chart .grid-line {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.chart .axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+
+.bars-axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+
+.hover-line {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.18);
+  min-width: 130px;
+}
+
+.tooltip .tip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tooltip .tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltip .tip-row span:first-child {
+  color: var(--muted);
+}
+
+.tooltip .tip-path {
+  margin: -2px 0 6px;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Heatmap hover card: the day, its level and the model split behind the square. */
+.tooltip--heat {
+  padding: 10px 12px;
+  min-width: 248px;
+  max-width: 330px;
+}
+
+.tip-heat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  font-weight: 600;
+}
+
+.tip-heat-level {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.tip-heat-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  color: var(--muted);
+}
+
+.tip-heat-total .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.tip-heat-total b {
+  margin-left: auto;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.tip-heat-sub {
+  margin: 10px 0 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tip-model-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tip-model {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 7px;
+  font-size: 11.5px;
+}
+
+.tip-model > img.rank-logo,
+.tip-model-logo {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.tip-model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tip-model-value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tip-model-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.tip-model-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+/* --------------------------------------------------------------- rankings */
+
+.rank-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rank-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 -6px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.rank-row:hover {
+  background: color-mix(in oklab, var(--fg) 4%, transparent);
+  transform: translateX(2px);
+}
+
+.rank-row.is-dimmed {
+  opacity: 0.45;
+}
+
+.rank-row.is-focused .rank-bar span {
+  filter: brightness(1.15);
+}
+
+.rank-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.rank-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rank-main {
+  min-width: 0;
+}
+
+.rank-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-sub {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-bar {
+  margin-top: 7px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.rank-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.rank-value {
+  text-align: right;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rank-value small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ donuts */
+
+.donut-body {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.donut-box {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.donut-center span {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.donut-center strong {
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.donut-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.slice-row {
+  display: grid;
+  grid-template-columns: 8px minmax(50px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Toggled off: the row stays readable but stops claiming a colour or a share. */
+.slice-row.is-off {
+  color: var(--muted);
+}
+
+.slice-row.is-off .dot {
+  opacity: 0.45;
+}
+
+.slice-row .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.slice-row .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slice-row .value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.slice-row .pct {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-align: right;
+  min-width: 44px;
+}
+
+/* ------------------------------------------------------------------ states */
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  font-size: 13px;
+}
+
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--fg);
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--surface-3);
+}
+
+.btn.primary {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.empty {
+  text-align: center;
+  padding: 44px 20px;
+  color: var(--muted);
+}
+
+.empty h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--fg);
+}
+
+.empty ul {
+  list-style: none;
+  margin: 16px auto 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  max-width: 640px;
+}
+
+.empty code {
+  font-family: var(--font-sans);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 1px 6px;
+  overflow-wrap: anywhere;
+}
+
+.rank-icon.is-logo {
+  background: transparent;
+}
+
+.rank-logo {
+  width: 28px;
+  height: 28px;
+  display: block;
+  object-fit: contain;
+}
+
+.progress {
+  height: 3px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 200ms ease;
+}
+
+@media (max-width: 620px) {
+  .app {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+}
+
+/* --------------------------------------------------------------- accents */
+
+.accent-filter {
+  position: relative;
+}
+
+.accent-menu {
+  min-width: 232px;
+  padding: 10px;
+}
+
+.accent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.accent-swatch {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.accent-swatch span {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: block;
+}
+
+.accent-swatch:hover {
+  transform: scale(1.08);
+}
+
+.accent-swatch[aria-pressed="true"] {
+  border-color: var(--fg);
+}
+
+/* The custom swatch hides an opacity:0 colour input on top of the button, so the
+   browser's own focus ring never shows through: mirror it on the swatch. */
+.accent-swatch:focus-visible,
+.accent-swatch:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.accent-swatch.accent-custom {
+  position: relative;
+  cursor: pointer;
+}
+
+.accent-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+[data-accent="violet"] {
+  --accent: #7c5cff;
+  --accent-soft: rgba(124, 92, 255, 0.14);
+}
+
+[data-accent="green"] {
+  --accent: #12a150;
+  --accent-soft: rgba(18, 161, 80, 0.14);
+}
+
+[data-accent="amber"] {
+  --accent: #d98324;
+  --accent-soft: rgba(217, 131, 36, 0.16);
+}
+
+[data-accent="rose"] {
+  --accent: #e5484d;
+  --accent-soft: rgba(229, 72, 77, 0.14);
+}
+
+[data-base="dark"][data-accent="violet"] {
+  --accent: #a58ef2;
+  --accent-soft: rgba(165, 142, 242, 0.18);
+}
+
+[data-base="dark"][data-accent="green"] {
+  --accent: #4fd48c;
+  --accent-soft: rgba(79, 212, 140, 0.18);
+}
+
+[data-base="dark"][data-accent="amber"] {
+  --accent: #f0b45a;
+  --accent-soft: rgba(240, 180, 90, 0.18);
+}
+
+[data-base="dark"][data-accent="rose"] {
+  --accent: #ff7b81;
+  --accent-soft: rgba(255, 123, 129, 0.18);
+}
+
+/* --------------------------------------------------------- summary block */
+
+.rank-summary {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.summary-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.summary-bar span {
+  display: block;
+  height: 100%;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.summary-row .summary-label {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.summary-row .summary-sub {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-row strong {
+  color: var(--fg);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------- motion */
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drawStroke {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes growUp {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes growRight {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes donutIn {
+  from {
+    opacity: 0;
+    transform: rotate(-10deg) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.card {
+  animation: cardIn 340ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.spark-fill {
+  animation: fadeIn 400ms ease-out;
+}
+
+.spark-line {
+  stroke-dasharray: 1;
+  animation: drawStroke 620ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.trend-fill,
+.trend-line {
+  animation: fadeIn 420ms ease-out;
+}
+
+.trend-card .card-head {
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.trend-range {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-grid {
+  stroke: var(--border);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.trend-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trend-legend-item .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background: transparent;
+}
+
+.hover-dots {
+  pointer-events: none;
+}
+
+.bar-bucket {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  transition: opacity 140ms ease;
+  animation: growUp 440ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.bars-average {
+  stroke: var(--muted);
+  stroke-dasharray: 5 4;
+  stroke-width: 1;
+  opacity: 0.6;
+}
+
+.bars-average-label {
+  fill: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.donut-slice {
+  pointer-events: none;
+  transition: stroke-width 140ms ease;
+}
+
+.donut-slice.is-active {
+  stroke-width: 24;
+}
+
+.donut-hit {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.donut-box svg {
+  animation: donutIn 460ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.rank-bar span {
+  transform-origin: left center;
+  animation: growRight 500ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.tabs button,
+.pill,
+.icon-btn,
+.btn {
+  transition: background 160ms ease, color 160ms ease, transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.tabs button:active,
+.pill:active,
+.icon-btn:active,
+.btn:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ----------------------------------------------------------- range picker */
+
+.range-filter,
+.theme-filter {
+  position: relative;
+}
+
+.range-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.range-custom {
+  padding: 7px 13px 7px 11px;
+  gap: 7px;
+}
+
+.range-custom svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--muted);
+}
+
+.range-custom[data-active="true"] {
+  background: var(--accent-fill);
+  border-color: transparent;
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+.range-custom[data-active="true"] svg,
+.range-custom[data-active="true"] .caret {
+  color: color-mix(in oklab, var(--on-accent) 82%, transparent);
+}
+
+.range-menu {
+  left: 0;
+  right: auto;
+  width: 566px;
+  max-width: calc(100vw - 44px);
+  padding: 14px;
+}
+
+.range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.range-presets button {
+  appearance: none;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.range-presets button:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.range-presets button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.range-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.range-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 10px 8px;
+  border: 1px solid var(--control-border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: text;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.range-field.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.range-field-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.range-field input {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.range-field input:focus {
+  outline: none;
+}
+
+.range-field input:disabled {
+  color: var(--muted);
+}
+
+.range-follow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.range-follow input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.range-cal {
+  padding: 6px 8px 8px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.cal-title {
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-nav {
+  appearance: none;
+  border: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cal-nav:hover {
+  background: var(--surface-3);
+  color: var(--fg);
+}
+
+.cal-nav:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cal-weekdays,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal-weekdays span {
+  text-align: center;
+  padding: 3px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cal-grid {
+  gap: 2px;
+}
+
+.cal-day {
+  appearance: none;
+  border: 0;
+  height: 29px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.cal-day:hover {
+  background: var(--surface-3);
+}
+
+.cal-day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.cal-day.is-out {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.cal-day.in-range {
+  border-radius: 0;
+  background: var(--accent-soft);
+}
+
+/* "Today" is information, not decoration: give it the theme colour at a weight
+   that survives both themes instead of the hairline divider grey. */
+.cal-day.is-today {
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--accent) 65%, var(--fg));
+}
+
+.cal-day.is-selected {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.range-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.range-foot .btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------ theme menu */
+
+.theme-menu {
+  min-width: 186px;
+  padding: 6px;
+}
+
+.theme-menu button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  padding: 8px 9px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme-menu button:hover {
+  background: var(--surface-2);
+}
+
+.theme-menu button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.theme-menu button[aria-checked="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.theme-menu svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.theme-menu .check {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0;
+}
+
+.theme-menu button[aria-checked="true"] .check {
+  opacity: 1;
+}
+
+@media (max-width: 620px) {
+  .range-menu {
+    width: calc(100vw - 40px);
+    padding: 12px;
+  }
+
+  .range-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

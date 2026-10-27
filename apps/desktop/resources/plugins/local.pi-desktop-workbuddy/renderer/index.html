@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data:; font-src 'self' file:; connect-src 'none'; form-action 'none'; base-uri 'none'"
+  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--
+    PI-Desktop owns a 46px drag band and the window-control capsule at the top
+    of every panel; this panel keeps its own sticky header below that band.
+  -->
+  <meta name="pi-plugin-chrome" content="v3" />
+  <title>pi-desktop-workbuddy</title>
+  <link rel="stylesheet" href="./panel.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-title">
+      <span class="dot" id="healthDot" aria-hidden="true"></span>
+      <strong id="barTitle">pi-desktop-workbuddy</strong>
+      <span class="muted" id="barSub"></span>
+    </div>
+    <div class="bar-actions">
+      <button type="button" id="rescanBtn" class="ghost"></button>
+      <button type="button" id="resetBtn" class="ghost"></button>
+      <button type="button" id="refreshBtn" class="ghost"></button>
+    </div>
+  </header>
+
+  <p class="sr-only" id="live" aria-live="polite"></p>
+
+  <main class="page">
+    <div id="banner" class="banner" hidden></div>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab active" data-tab="pool" role="tab" aria-selected="true"></button>
+      <button type="button" class="tab" data-tab="models" role="tab" aria-selected="false"></button>
+      <button type="button" class="tab" data-tab="check" role="tab" aria-selected="false"></button>
+    </nav>
+
+    <section id="poolView" class="view">
+      <nav class="regions" id="regionTabs" role="tablist"></nav>
+      <div class="strip" id="poolStrip"></div>
+      <div class="dist card">
+        <div class="card-head">
+          <span class="card-title" id="distTitle"></span>
+        </div>
+        <div class="seg" id="distControl" role="group"></div>
+        <p class="hint" id="distHint"></p>
+      </div>
+      <div id="accounts"></div>
+    </section>
+
+    <section id="modelsView" class="view" hidden>
+            <!--
+        Two columns, like PI-Desktop's own model sheet: the roster on the left,
+        the settings of the ticked models on the right. The panel keeps its
+        760px width, so the grid collapses to one column (roster above
+        settings) once the window is dragged narrower than 720px - see the
+        media query in panel.css.
+      -->
+      <div class="model-columns">
+        <section class="model-col" id="modelListView">
+          <div class="pane-head">
+            <input type="checkbox" id="modelSelectAll" class="row-check" />
+            <h3 class="pane-title" id="modelListTitle"></h3>
+            <button type="button" class="pane-action" id="modelFetchBtn"></button>
+          </div>
+          <div class="pane-search">
+            <input type="search" id="modelSearch" class="search" />
+          </div>
+          <div id="models"></div>
+        </section>
+
+        <section class="model-col" id="modelEditView">
+          <div class="pane-head">
+            <h3 class="pane-title" id="modelEditTitle"></h3>
+            <span class="count-chip" id="modelEditCount"></span>
+          </div>
+          <div class="pane-search">
+            <input type="search" id="chosenSearch" class="search" />
+          </div>
+          <div id="chosen"></div>
+        </section>
+      </div>
+
+      <div class="savebar" id="savebar" hidden>
+        <span id="saveNote"></span>
+        <span class="spacer"></span>
+        <button type="button" id="discardBtn" class="ghost"></button>
+        <button type="button" id="saveBtn" class="primary"></button>
+      </div>
+    </section>
+
+    <section id="checkView" class="view" hidden>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title" id="checkTitle"></span>
+          <button type="button" id="doctorBtn" class="ghost small"></button>
+          <button type="button" id="copyBtn" class="ghost small"></button>
+          <span class="copy-hint" id="copyHint"></span>
+        </div>
+        <div id="findings"></div>
+        <pre id="report" class="report"></pre>
+      </div>
+    </section>
+
+    <footer class="foot" id="foot"></footer>
+  </main>
+
+  <script src="./panel.js"></script>
+</body>
+</html>

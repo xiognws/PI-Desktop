@@ -1,0 +1,7 @@
+{
+  "name": "cc.fee.pi-terminal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A terminal in the right work panel: local shells and SSH sessions with a real pty, tabs, session persistence, and agent read/write over the terminal. Inspectable but never silently destructive.",
+  "license": "Apache-2.0"
+}

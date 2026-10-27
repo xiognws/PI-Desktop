@@ -1,0 +1,165 @@
+/**
+ * Node-free types describing the JSON document the PI-Desktop pi-desktop-workbuddy
+ * panel renders.
+ *
+ * Pool runtime state already lives in `src/status.ts` (`buildStatus` /
+ * `WorkBuddyStatus`); this module only carves the cross-domain (main.js → panel)
+ * JSON document into a shape that stays token-free and matches what the panel
+ * renders. These are the shapes the PI-Desktop panel renders, and they are the
+ * wire contract between `main.js` and the panel.
+ *
+ * @module pi-desktop-workbuddy/status-paths
+ */
+
+/** One pool account's row, token-free. */
+export interface PoolWebAccount {
+  id: string
+  label: string
+  nickname?: string
+  domain: string
+  /** ISO timestamp; absent when the credential carries no expiry. */
+  expiresAt?: string
+  /** Account-wide cooldown (every model blocked); only after a no-model penalize. */
+  cooling: boolean
+  /** ISO timestamp when the account-wide 429 cooldown lifts; only while cooling. */
+  cooldownUntil?: string
+  /**
+   * Per-model cooldowns currently active. The account is NOT `cooling` while a
+   * model is limited — its other models still serve — but each entry tells the
+   * card which model is out until when (e.g. `hy4-preview` cooling to 10:14,
+   * `hy3` normal).
+   */
+  modelCooldowns?: ReadonlyArray<{ modelId: string; until: string }>
+  rateLimitHits: number
+  /** ISO timestamp of the last successful use (best-effort pool bookkeeping). */
+  lastUsedAt?: string
+  /** Aggregated credit summary for the account, read-only. */
+  credits?: PoolWebCredits
+  creditsError?: string
+  /**
+   * Today's check-in state for this account, read-only. Present only when the
+   * per-account check-in probe succeeded and the program is active. The card
+   * renders one claim button per account, so a multi-account pool can collect
+   * every account's daily reward without switching accounts by hand.
+   */
+  checkin?: PoolWebCheckin
+  checkinError?: string
+}
+
+/** One credit package (as surfaced by the pool's upstream client), node-free. */
+export interface PoolWebCreditPackage {
+  packageName: string
+  remain?: number
+  size?: number
+  /** CapacityType 4 — refreshed each cycle and never expires. */
+  monthly?: boolean
+  /** Next cycle refresh point, ms. */
+  cycleRefreshMs?: number
+  /** One-off expiry, ms. */
+  expiresAtMs?: number
+}
+
+/** Aggregated credit answer the card renders under one account. */
+export interface PoolWebCredits {
+  total?: number
+  packages: readonly PoolWebCreditPackage[]
+  /** Credits expiring within 3 days. */
+  expiringSoon?: number
+  /** When the nearest package expires, ms. */
+  nearestExpiryMs?: number
+}
+
+/**
+ * Daily check-in state the card renders under one account's credits. Mirrors
+ * the upstream activity endpoint, minus anything the browser does not need.
+ */
+export interface PoolWebCheckin {
+  /** The activity is running; a claim button is offered only while true. */
+  active: boolean
+  /** Already collected today — the button renders as a done state. */
+  todayCheckedIn: boolean
+  /** Consecutive days checked in. */
+  streakDays: number
+  /** Credits a single day grants. */
+  dailyCredit: number
+  /** Credits collected today (0 before claiming). */
+  todayCredit: number
+  /** Today is a streak milestone day. */
+  isStreakDay: boolean
+  /** The day count the next milestone lands on. */
+  nextStreakDay: number
+  /** Bonus credits granted on a milestone day. */
+  streakBonusCredit: number
+}
+
+/** Result of one claim, so the card can confirm what was collected. */
+export interface PoolWebCheckinClaim {
+  credit: number
+  streakDays: number
+  isStreakDay: boolean
+}
+
+/** One model the pool exposes to DSH, with cost / free tags. */
+export interface PoolWebModel {
+  id: string
+  name: string
+  /** Relative credit cost, e.g. 0.79 for x0.79. */
+  multiplier?: number
+  /** Upstream tags: free / limited-free / night-discount. */
+  tags?: readonly string[]
+  /** Effective image support after the user's per-model toggle. */
+  supportsImages: boolean
+  /** Effective context window after the user's budget cap. */
+  contextWindow: number
+  /** The window the upstream advertises, before any cap. */
+  nativeContextWindow: number
+  /** Upstream output ceiling, so the card can show both limits. */
+  maxOutputTokens: number
+  /** Thinking levels the upstream declares, when it declares any. */
+  supportedEfforts?: readonly string[]
+  /** Whether this model is currently enabled in the picker. */
+  enabled: boolean
+}
+
+/** The user's saved model selection, echoed back so the card can diff a draft. */
+export interface PoolWebModelSelection {
+  /** Absent = every model is enabled. */
+  enabledModelIds?: readonly string[]
+  /** Absent = each model follows its upstream image capability. */
+  imageModelIds?: readonly string[]
+  /** Per-model context-window cap, keyed by model id. */
+  contextBudgets?: Readonly<Record<string, number | undefined>>
+}
+
+/** The JSON document the pool card renders. */
+export interface PoolWebStatus {
+  ok: boolean
+  accounts: readonly PoolWebAccount[]
+  /** The next account the pool would use (rotation cursor). */
+  activeAccountId?: string
+  cooling: number
+  models: readonly PoolWebModel[]
+  /** The saved selection the card diffs its draft against. */
+  selection: PoolWebModelSelection
+  /**
+   * How the pool spreads requests: `priority` drains one account before
+   * moving on, `round-robin` splits the spend evenly.
+   */
+  distribution: PoolDistribution
+  /** Which region this document describes. */
+  region: PoolRegion
+  /** Every region holding at least one account, in display order. */
+  regions: readonly PoolRegion[]
+  shim: { running: boolean; baseUrl?: string }
+}
+
+/**
+ * The two gateways, matching the provider ids the host registers. `cn` is the
+ * domestic gateway (`copilot.tencent.com` / `codebuddy.cn`); `global` is the
+ * international one (`workbuddy.ai`).
+ */
+export type PoolRegion = 'cn' | 'global'
+
+/** How the pool spreads requests across its accounts. */
+export type PoolDistribution = 'priority' | 'round-robin'
+

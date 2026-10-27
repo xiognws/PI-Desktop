@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- v3 paints the top strip through to this page: the host keeps its window
+         capsule and turns the empty band above the first card into drag
+         segments, so the panel owns that whole 46px. -->
+    <meta name="pi-plugin-chrome" content="v3" />
+    <title>Usage</title>
+    <script>
+      // Paint the remembered theme before the stylesheet is applied: waiting for
+      // the host bridge would flash a light panel on a dark setup.
+      (function () {
+        try {
+          var base = window.localStorage.getItem("usage.base");
+          if (base === "light" || base === "dark") {
+            document.documentElement.dataset.base = base;
+            document.documentElement.style.colorScheme = base;
+          }
+        } catch (error) {
+          // Storage unavailable: the panel follows the system appearance.
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app"></div>
+    <div id="tooltip" class="tooltip" hidden></div>
+    <script src="./lib/format.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

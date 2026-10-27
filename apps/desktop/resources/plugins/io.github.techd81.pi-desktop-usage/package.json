@@ -1,0 +1,36 @@
+{
+  "name": "pi-desktop-usage",
+  "version": "0.1.1",
+  "private": true,
+  "type": "commonjs",
+  "description": "Local token usage and cost statistics for PI-Desktop and the Pi CLI, in one PI-Desktop panel.",
+  "license": "MIT",
+  "author": "Techd81",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Techd81/pi-desktop-usage.git"
+  },
+  "homepage": "https://github.com/Techd81/pi-desktop-usage",
+  "keywords": [
+    "pi-desktop",
+    "pi-desktop-plugin",
+    "usage",
+    "token",
+    "cost",
+    "dashboard"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "pack": "node scripts/pack.mjs",
+    "probe": "node scripts/probe.mjs",
+    "icon": "node scripts/make-icon.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.9.2"
+  }
+}

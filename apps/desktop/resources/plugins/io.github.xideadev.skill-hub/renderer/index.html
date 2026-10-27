@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="pi-plugin-chrome" content="v3" />
+    <title>Skill Hub - 技能管理</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font: 13px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: calc(var(--pi-plugin-titlebar-height, 0px) + 12px) 14px 20px;
+        color: CanvasText;
+        background: Canvas;
+      }
+
+      /* 顶栏与标题 */
+      header {
+        margin-bottom: 12px;
+      }
+      .title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      h1 {
+        font-size: 15px;
+        font-weight: 650;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* 统一通用按钮 */
+      button {
+        font: inherit;
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 6px;
+        border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        background: color-mix(in srgb, CanvasText 4%, transparent);
+        color: CanvasText;
+        cursor: pointer;
+      }
+      button:hover {
+        background: color-mix(in srgb, CanvasText 8%, transparent);
+      }
+      button.primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+        font-weight: 600;
+      }
+      button.primary:hover {
+        background: #1d4ed8;
+      }
+      button.danger {
+        border-color: color-mix(in srgb, red 40%, transparent);
+        color: #ef4444;
+      }
+      button.danger:hover {
+        background: color-mix(in srgb, red 8%, transparent);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      /* 控件栏：搜索与过滤 */
+      .toolbar {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .search-box {
+        width: 100%;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        background: Canvas;
+        color: CanvasText;
+        font: inherit;
+        font-size: 12px;
+        outline: none;
+      }
+      .search-box:focus {
+        border-color: color-mix(in srgb, CanvasText 45%, transparent);
+      }
+
+      .filter-tabs {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+        padding-bottom: 6px;
+      }
+      .filter-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        padding: 3px 8px;
+        font-size: 11px;
+        color: GrayText;
+        white-space: nowrap;
+      }
+      .filter-btn:hover {
+        color: CanvasText;
+      }
+      .filter-btn.active {
+        background: color-mix(in srgb, CanvasText 8%, transparent);
+        border-color: color-mix(in srgb, CanvasText 15%, transparent);
+        color: CanvasText;
+        font-weight: 600;
+      }
+
+      /* 折叠编辑面板 */
+      .panel-section {
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
+        background: color-mix(in srgb, CanvasText 3%, transparent);
+      }
+      .panel-section h2 {
+        font-size: 13px;
+        font-weight: 650;
+        margin: 0 0 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 8px;
+      }
+      label {
+        font-size: 11px;
+        font-weight: 600;
+        color: GrayText;
+      }
+      input[type="text"], select, textarea {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 6px 8px;
+        font: inherit;
+        font-size: 12px;
+        color: CanvasText;
+        background: Canvas;
+        border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        border-radius: 6px;
+        outline: none;
+      }
+      input[type="text"]:focus, select:focus, textarea:focus {
+        border-color: color-mix(in srgb, CanvasText 50%, transparent);
+      }
+      textarea {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        resize: vertical;
+        min-height: 120px;
+      }
+
+      /* 技能列表 */
+      ul.skill-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      li.skill-item {
+        border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+        padding: 10px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      li.skill-item:first-child {
+        border-top: none;
+      }
+      li.skill-item.disabled {
+        opacity: 0.6;
+      }
+
+      .item-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .item-title-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      /* 点击标题弹出编辑，视觉反馈更轻盈 */
+      .skill-id {
+        font-weight: 600;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: CanvasText;
+        cursor: pointer;
+        transition: color 0.15s ease;
+      }
+      .skill-id:hover {
+        color: #2563eb;
+        text-decoration: underline;
+      }
+      .tag {
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        border: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
+        color: GrayText;
+      }
+      .tag.accent {
+        color: #2563eb;
+        border-color: color-mix(in srgb, #2563eb 30%, transparent);
+        background: color-mix(in srgb, #2563eb 8%, transparent);
+      }
+
+      .skill-desc {
+        color: GrayText;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .item-triggers {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 2px;
+      }
+      .item-toggle-label {
+        font-size: 11px;
+        color: GrayText;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+      }
+
+      .empty {
+        padding: 24px 0;
+        text-align: center;
+        color: GrayText;
+      }
+
+      /* 宿主原生质感 Toast 提示组件 */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(40px);
+        background: color-mix(in srgb, CanvasText 88%, Canvas);
+        color: Canvas;
+        padding: 7px 14px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 500;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+        z-index: 999;
+        white-space: nowrap;
+      }
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- 顶部总览 -->
+    <header>
+      <div class="title-row">
+        <h1>技能管理</h1>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" class="primary" onclick="openEditor('new')">新建</button>
+          <button type="button" id="btnOrganize" onclick="organizeSkills()" title="翻译并规范化技能简介">整理</button>
+          <button type="button" onclick="fetchSkills()">刷新</button>
+        </div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <input type="text" id="searchInput" class="search-box" oninput="renderSkills()" placeholder="搜索技能标识、触发词或描述…" />
+        <div class="filter-tabs">
+          <button type="button" class="filter-btn active" id="tab-all" onclick="setTab('all')">全部 (0)</button>
+          <button type="button" class="filter-btn" id="tab-global" onclick="setTab('global')">全局通用 (0)</button>
+          <button type="button" class="filter-btn" id="tab-project" onclick="setTab('project')">项目专属 (0)</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 编辑/新建技能区块 (点击标题或新建时就地展开) -->
+    <section class="panel-section" id="editorSection" style="display: none;">
+      <h2>
+        <span id="editorTitle">编辑技能</span>
+        <button type="button" style="padding: 2px 6px; font-size: 11px;" onclick="closeEditor()">收起</button>
+      </h2>
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="formId">技能标识 (ID / 目录名)</label>
+          <input type="text" id="formId" placeholder="例如 code-review" />
+        </div>
+        <div class="form-field">
+          <label for="formScope">生效作用域</label>
+          <select id="formScope">
+            <option value="project" selected>项目专属 (.agents/skills) [默认]</option>
+            <option value="global">全局通用 (~/.agents/skills)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label for="formDesc">描述 (Frontmatter description / 供大模型匹配)</label>
+        <input type="text" id="formDesc" placeholder="简要描述该技能的使用情境与核心专长" />
+      </div>
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="formTriggers">触发词 (逗号分隔)</label>
+          <input type="text" id="formTriggers" placeholder="review, audit, git" />
+        </div>
+        <div class="form-field">
+          <label for="formInjectionType">注入策略</label>
+          <select id="formInjectionType">
+            <option value="index">轻量索引 (按需调阅，节省上下文)</option>
+            <option value="direct">强制直注 (每轮拼入系统提示词)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label for="formContent">SKILL.md 正文规范</label>
+        <textarea id="formContent" rows="9" spellcheck="false"></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+        <button type="button" class="danger" id="btnDeleteSkill" onclick="deleteCurrentSkill()">删除此技能</button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onclick="closeEditor()">取消</button>
+          <button type="button" class="primary" onclick="saveCurrentSkill()">保存技能</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 技能主列表 -->
+    <ul class="skill-list" id="skillsList"></ul>
+
+    <script>
+      const bridge = window.pluginBridge || null;
+      let skillsData = [];
+      let currentTab = 'all';
+      let currentEditingId = null;
+
+      async function invoke(action, payload = {}) {
+        if (bridge && typeof bridge.invoke === 'function') {
+          return await bridge.invoke(action, payload);
+        }
+        return null;
+      }
+
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      async function fetchSkills() {
+        try {
+          const res = await invoke('skills.list');
+          if (res && Array.isArray(res.skills)) {
+            skillsData = res.skills;
+          }
+        } catch (err) {
+          console.error("fetchSkills error", err);
+        }
+        renderSkills();
+      }
+
+      function setTab(tab) {
+        currentTab = tab;
+        ['all', 'global', 'project'].forEach(t => {
+          const btn = document.getElementById(`tab-${t}`);
+          if (btn) {
+            if (t === tab) btn.classList.add('active');
+            else btn.classList.remove('active');
+          }
+        });
+        renderSkills();
+      }
+
+      function renderSkills() {
+        const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+        const listEl = document.getElementById('skillsList');
+        listEl.innerHTML = '';
+
+        const filtered = skillsData.filter(s => {
+          let matchTab = true;
+          if (currentTab === 'global') matchTab = s.scope === 'global';
+          else if (currentTab === 'project') matchTab = s.scope === 'project';
+
+          const matchQuery = !query || 
+                             s.name.toLowerCase().includes(query) || 
+                             s.desc.toLowerCase().includes(query) || 
+                             (s.triggers && s.triggers.some(t => t.toLowerCase().includes(query)));
+          return matchTab && matchQuery;
+        });
+
+        // 数量指标同步
+        const globalCount = skillsData.filter(s => s.scope === 'global').length;
+        const projectCount = skillsData.filter(s => s.scope === 'project').length;
+
+        document.getElementById('tab-all').textContent = `全部 (${skillsData.length})`;
+        document.getElementById('tab-global').textContent = `全局通用 (${globalCount})`;
+        document.getElementById('tab-project').textContent = `项目专属 (${projectCount})`;
+
+        if (filtered.length === 0) {
+          listEl.innerHTML = '<li class="empty">未找到匹配的技能规范</li>';
+          return;
+        }
+
+        for (const skill of filtered) {
+          const li = document.createElement('li');
+          li.className = `skill-item ${skill.enabled ? '' : 'disabled'}`;
+
+          const scopeTag = skill.scope === 'global'
+            ? '<span class="tag">全局</span>'
+            : '<span class="tag accent">项目专属</span>';
+            
+          const injectTag = skill.injectionType === 'direct'
+            ? '<span class="tag" style="color: #ea580c; border-color: #ea580c;">常驻直注</span>'
+            : '';
+
+          li.innerHTML = `
+            <div class="item-header">
+              <div class="item-title-group">
+                <span class="skill-id" onclick="openEditor('${skill.id}')" title="点击查看详情并编辑">${escapeHtml(skill.name)}</span>
+                ${scopeTag}
+                ${injectTag}
+              </div>
+              <label class="item-toggle-label">
+                <input type="checkbox" ${skill.enabled ? 'checked' : ''} onchange="toggleSkill('${skill.id}')" />
+                <span>${skill.enabled ? '已启用' : '已停用'}</span>
+              </label>
+            </div>
+            <div class="skill-desc">${escapeHtml(skill.desc)}</div>
+            ${(skill.triggers && skill.triggers.length) ? `
+              <div class="item-triggers">
+                ${skill.triggers.map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join(' ')}
+              </div>
+            ` : ''}
+          `;
+          listEl.appendChild(li);
+        }
+      }
+
+      async function toggleSkill(id) {
+        const s = skillsData.find(item => item.id === id);
+        if (s) {
+          s.enabled = !s.enabled;
+          await invoke('skills.toggle', { id, enabled: s.enabled });
+          renderSkills();
+        }
+      }
+
+      function openEditor(id) {
+        currentEditingId = id;
+        const section = document.getElementById('editorSection');
+        const isNew = id === 'new';
+
+        document.getElementById('btnDeleteSkill').style.display = isNew ? 'none' : 'inline-block';
+
+        if (isNew) {
+          document.getElementById('editorTitle').textContent = '新建技能';
+          document.getElementById('formId').value = '';
+          document.getElementById('formId').readOnly = false;
+          document.getElementById('formScope').value = 'project';
+          document.getElementById('formDesc').value = '';
+          document.getElementById('formTriggers').value = '';
+          document.getElementById('formInjectionType').value = 'index';
+          document.getElementById('formContent').value = 
+            '# New Skill\n\n## When to Use\n在此说明何时调用该技能。\n\n## Procedure\n1. 第一步执行命令；\n2. 第二步检查输出。\n\n## Verification\n验证指标与断言。';
+        } else {
+          const s = skillsData.find(item => item.id === id);
+          if (!s) return;
+          document.getElementById('editorTitle').textContent = `编辑技能: ${s.name}`;
+          document.getElementById('formId').value = s.id;
+          document.getElementById('formId').readOnly = true;
+          document.getElementById('formScope').value = s.scope;
+          document.getElementById('formDesc').value = s.desc;
+          document.getElementById('formTriggers').value = (s.triggers || []).join(', ');
+          document.getElementById('formInjectionType').value = s.injectionType || 'index';
+          document.getElementById('formContent').value = s.content || '';
+        }
+
+        section.style.display = 'block';
+      }
+
+      function closeEditor() {
+        document.getElementById('editorSection').style.display = 'none';
+      }
+
+      async function saveCurrentSkill() {
+        const id = document.getElementById('formId').value.trim();
+        if (!id) {
+          alert('请填写技能标识');
+          return;
+        }
+
+        const payload = {
+          id,
+          name: id,
+          scope: document.getElementById('formScope').value,
+          desc: document.getElementById('formDesc').value.trim(),
+          triggers: document.getElementById('formTriggers').value.split(',').map(t => t.trim()).filter(Boolean),
+          content: document.getElementById('formContent').value,
+          injectionType: document.getElementById('formInjectionType').value
+        };
+
+        await invoke('skills.save', { skill: payload, injectionType: payload.injectionType });
+        closeEditor();
+        showToast('技能已成功保存');
+        await fetchSkills();
+      }
+
+      async function deleteCurrentSkill() {
+        if (!currentEditingId || currentEditingId === 'new') return;
+        if (!confirm(`确定删除技能 ${currentEditingId} 吗？`)) return;
+        const s = skillsData.find(item => item.id === currentEditingId);
+        await invoke('skills.delete', { id: currentEditingId, scope: s?.scope || 'project' });
+        showToast(`已删除技能 ${currentEditingId}`);
+        closeEditor();
+        await fetchSkills();
+      }
+      let toastTimer = null;
+      function showToast(msg) {
+        let toast = document.getElementById('hubToast');
+        if (!toast) {
+          toast = document.createElement('div');
+          toast.id = 'hubToast';
+          toast.className = 'toast';
+          document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.classList.remove('show');
+        }, 2400);
+      }
+
+      async function organizeSkills() {
+        const btn = document.getElementById('btnOrganize');
+        const originText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '整理中…';
+        showToast('正在翻译与整理技能简介…');
+        try {
+          const res = await invoke('skills.organize');
+          if (res && res.ok) {
+            await fetchSkills();
+            const count = res.updatedCount || 0;
+            if (count > 0) {
+              showToast(`已整理并规范化 ${count} 个技能简介`);
+            } else {
+              showToast(`所有技能简介已是最新规范格式 (共 ${res.total || 0} 个)`);
+            }
+          } else {
+            showToast('整理未产生变更或通道异常');
+          }
+        } catch (e) {
+          console.error("organize failed", e);
+          showToast('整理失败，请查看控制台日志');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originText;
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        fetchSkills();
+      });
+    </script>
+  </body>
+</html>

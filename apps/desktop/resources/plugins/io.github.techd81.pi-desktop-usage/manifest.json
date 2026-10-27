@@ -1,0 +1,65 @@
+{
+  "activationEvents": [
+    "onStartup"
+  ],
+  "author": "Techd81",
+  "categories": [
+    "productivity",
+    "developer-tools"
+  ],
+  "changelog": "## 0.1.1\n\n- 指标卡：环比从灰色小字改成右上角涨跌胶囊，上升绿、下降红，上一周期没有流量时直接显示绝对差额；迷你趋势线按涨跌方向着色，并且不再和指标文字抢位置\n- 热力图：方块悬停弹出当日卡片（日期 / 等级 / 总用量 / 按模型的份额条），数据侧为每一天补上前 5 个模型与其余合计\n- 环形图图例：取消选中的项转为静音色、占比显示「—」，不再用半透明数字充当占比\n- 热力图配色：深浅档位改用活跃日的四分位划分——某一天突然有几亿 Token 时，其余日子仍能分出层次（原按最大值取比例，会把整年一起压到最浅一档）\n- 面板顶部：改用宿主 v3 穿透式 chrome——拖拽带由宿主按顶部空白区域铺设，顶栏只保留宿主窗口控制胶囊，标题区更干净",
+  "contributes": {
+    "views": [
+      {
+        "entry": "views/index.html",
+        "icon": "target",
+        "id": "usage",
+        "order": 55,
+        "title": {
+          "en": "Usage",
+          "zh-CN": "用量统计"
+        }
+      }
+    ]
+  },
+  "description": "Token usage and cost for PI-Desktop and the Pi CLI in one local panel, with the two sources kept apart.",
+  "engines": {
+    "piDesktop": ">=0.20.1"
+  },
+  "homepage": "https://github.com/Techd81/pi-desktop-usage",
+  "i18n": {
+    "en": {
+      "name": "Usage Statistics",
+      "description": "Token usage and cost for PI-Desktop and the Pi CLI in one local panel, with the two sources kept apart.",
+      "safetyNotes": "Reads the two local session directories with Node's own filesystem API (~/.pi-desktop/sessions and ~/.pi/agent/sessions) and keeps its cache inside its own plugin data directory. desktop.control is declared for three read-only catalogue operations only (providers/list, session/list, project/list) so provider names and project paths can be shown; no session, agent or project write operation is ever called, and every enrichment failure degrades to placeholders instead of affecting the counts. No network access, no telemetry, no clipboard, no shell."
+    },
+    "zh-CN": {
+      "name": "用量统计",
+      "description": "在同一个本地面板里查看 PI-Desktop 与 Pi CLI 的 token 用量与费用，两侧来源分开统计。",
+      "safetyNotes": "用 Node 自带的文件接口只读两个本地会话目录（~/.pi-desktop/sessions 与 ~/.pi/agent/sessions），缓存只写本插件自己的数据目录。声明 desktop.control 只为三个只读目录操作（providers/list、session/list、project/list），用于显示供应商名称与项目路径；绝不调用任何会话、Agent 或项目写入操作，富化失败只会退化成占位显示，不影响统计数字。无网络访问、无遥测、不读写剪贴板、不调用 shell。"
+    }
+  },
+  "id": "io.github.techd81.pi-desktop-usage",
+  "license": "MIT",
+  "main": "main.js",
+  "name": "Usage Statistics",
+  "permissions": [
+    "ui.view",
+    "ui.panel",
+    "keyboard.globalShortcut",
+    "desktop.control"
+  ],
+  "safetyNotes": "Reads two local session directories read-only and caches derived numbers in its own plugin data directory. desktop.control is used only for providers/list, session/list and project/list; nothing is written back to the host, nothing leaves the machine.",
+  "schemaVersion": 1,
+  "ui": {
+    "height": 860,
+    "panel": "views/index.html",
+    "resizable": true,
+    "title": {
+      "en": "Usage",
+      "zh-CN": "用量统计"
+    },
+    "width": 1180
+  },
+  "version": "0.1.1"
+}

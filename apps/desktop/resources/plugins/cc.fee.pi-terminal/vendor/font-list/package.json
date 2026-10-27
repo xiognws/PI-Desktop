@@ -1,0 +1,48 @@
+{
+  "name": "font-list",
+  "version": "2.1.0",
+  "description": "list system fonts",
+  "main": "index.js",
+  "module": "index.mjs",
+  "files": [
+    "index.js",
+    "index.mjs",
+    "index.d.ts",
+    "index.d.cts",
+    "index.d.mts",
+    "libs/",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./index.mjs"
+      },
+      "require": {
+        "types": "./index.d.cts",
+        "default": "./index.js"
+      }
+    }
+  },
+  "types": "index.d.ts",
+  "scripts": {
+    "build:darwin": "./scripts/build-darwin.sh",
+    "demo": "node demo.js",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm run build:darwin",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:darwin": "node --test test/darwin.test.mjs",
+    "p": "npm publish --access public"
+  },
+  "keywords": [
+    "font"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oldj/node-font-list"
+  },
+  "author": "oldj",
+  "license": "MIT"
+}

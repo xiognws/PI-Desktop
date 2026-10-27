@@ -1,0 +1,1045 @@
+/**
+ * OpenCode Zen anonymous free lane core for PI-Desktop.
+ *
+ * Core port of https://github.com/FishBottle7/opencode2dsh (MIT, © FishBottle7),
+ * which itself derives the disguise details from jasonxu114514/opencode2api.
+ * Ported pieces: adapter/ids.ts (correlation ids + headers), adapter/catalog.ts
+ * (S1/S2/S3 fallback chain) and adapter/messages.ts (free-lane body gate).
+ *
+ * Architecture (following eric8bit/pi-commandcode-desktop):
+ *
+ * PI-Desktop cannot register a provider at runtime — the host reads
+ * `contributes.providers` from the manifest BEFORE it spawns the plugin
+ * process, and the model picker only enumerates that host provider list.
+ * So this plugin declares its provider statically in the manifest (permission
+ * `provider.register`) and points it at a loopback HTTP endpoint (permission
+ * `background.service`) served by main.js. This module owns everything that
+ * goes on the wire to Zen: the CLI disguise header set, the canonical ses_
+ * session shape, the free-lane body gate, reasoning_effort normalization and
+ * the S1∩S2 free-model catalog used to rewrite the manifest's model list.
+ *
+ * Not ported on purpose: the IP pool / proxy rotation subsystem (quota
+ * evasion) and the legacy Go sidecar. The on-disk catalog cache IS ported:
+ * ModelCatalog seeds S1 (Zen ids) + S2 (models.dev prices) from
+ * `catalog-cache.json` in the host data dir (`pi.plugin.getDataPath()`,
+ * package dir as fallback) before the first network call, so an
+ * offline start keeps the real model list (and its metadata) instead of
+ * collapsing to the static bootstrap and rewriting the manifest down.
+ */
+
+'use strict';
+
+const fs = require('node:fs');
+const { createHash, randomBytes } = require('node:crypto');
+
+const ZEN_BASE_URL = 'https://opencode.ai/zen';
+/**
+ * Where the anonymous free lane is served since 2026-10-14: `/zen/*` answers
+ * 403 FreeTierError for keyless requests, and the client's free traffic goes to
+ * `/inference` instead (probed live 2026-10-15 — same body, `/inference` 200,
+ * `/zen` 403). The model catalog still comes from `/zen/v1/models`, which keeps
+ * answering 200.
+ */
+const ANONYMOUS_BASE_URL = 'https://opencode.ai/inference';
+const METADATA_URL = 'https://models.dev/api.json';
+const PROTOCOL_CATALOG_URL = 'https://models.opencode.ai/api.json';
+const PROTOCOL_DOCS_URL = 'https://raw.githubusercontent.com/anomalyco/opencode/dev/services/www/src/docs/content/console/models.mdx';
+const CATALOG_TIMEOUT_MS = 30_000;
+/** On-disk catalog cache: live data older than this is ignored on seed. */
+const CATALOG_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ANONYMOUS_KEY = 'public';
+
+// ---------------------------------------------------------------------------
+// Provider identity (mirrored into manifest.json contributes.providers)
+// ---------------------------------------------------------------------------
+
+const PROVIDER_ID = 'opencode-free';
+const PROVIDER_NAME = 'OpenCode免费模型';
+const PROVIDER_VENDOR_KEY = 'opencode';
+const PROVIDER_API_STYLE = 'chat_completions';
+
+/**
+ * S3: ids verified against the anonymous lane (live Zen catalog + models.dev).
+ * Sorted (byte order) so a static fallback declaration is
+ * identical to the manifest on disk — an offline start then rewrites nothing.
+ * `jev-*` is deliberately absent: it is free, but only answerable on the
+ * dedicated /systemone lane, which this plugin does not declare.
+ */
+const staticFreeModels = [
+  'big-pickle',
+  'beam-free',
+  'deepseek-v4.1-flash-free',
+  'glm-5.3-flash-free',
+  'longcat-2.5-preview-free',
+  'mimo-v2.6-flash-free',
+  'nemotron-3.5-lightning-free',
+  'nemotron-3.5-super-vl-free',
+  'space-bunny-free',
+];
+
+/**
+ * First-load bootstrap: the real free catalog as it stands (models.dev limits,
+ * input modalities and reasoning effort ladders, fetched 2026-09), so the
+ * manifest is valid before any network call — and so an offline start with an
+ * empty cache produces exactly the declaration already on disk (no rewrite,
+ * no development-plugin watcher reload).
+ *
+ * Two lanes, mirroring commandcode's one-wire-protocol-per-provider rule:
+ * chat models speak chat_completions; muse-spark-* answers ONLY on Zen's
+ * /v1/responses (OpenAI Responses wire), so it gets its own provider
+ * declaration pointing at the same loopback endpoint.
+ */
+const CHAT_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high'];
+const WIDE_THINKING_LEVELS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
+const SPACE_BUNNY_THINKING_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+const BOOTSTRAP_MODELS = [
+  { id: 'big-pickle', contextWindow: 200000, maxTokens: 32000, supportsImages: false, thinkingLevels: CHAT_THINKING_LEVELS },
+  { id: 'beam-free', contextWindow: 1048576, maxTokens: 131072, supportsImages: false, thinkingLevels: SPACE_BUNNY_THINKING_LEVELS },
+  { id: 'deepseek-v4.1-flash-free', contextWindow: 200000, maxTokens: 32000, supportsImages: true, thinkingLevels: ['low', 'high', 'max'] },
+  { id: 'glm-5.3-flash-free', contextWindow: 200000, maxTokens: 32000, supportsImages: false, thinkingLevels: ['low', 'high', 'max'] },
+  { id: 'longcat-2.5-preview-free', contextWindow: 1000000, maxTokens: 131072, supportsImages: true, thinkingLevels: CHAT_THINKING_LEVELS },
+  { id: 'mimo-v2.6-flash-free', contextWindow: 200000, maxTokens: 32000, supportsImages: true, thinkingLevels: CHAT_THINKING_LEVELS },
+  { id: 'nemotron-3.5-lightning-free', contextWindow: 262144, maxTokens: 262144, supportsImages: false, thinkingLevels: CHAT_THINKING_LEVELS },
+  { id: 'nemotron-3.5-super-vl-free', contextWindow: 1048576, maxTokens: 131072, supportsImages: true, thinkingLevels: WIDE_THINKING_LEVELS },
+  { id: 'space-bunny-free', contextWindow: 1048576, maxTokens: 524288, supportsImages: true, thinkingLevels: SPACE_BUNNY_THINKING_LEVELS },
+];
+
+const BOOTSTRAP_RESPONSES_MODELS = [];
+
+// ---------------------------------------------------------------------------
+// Correlation ids + disguise headers (port of adapter/ids.ts)
+// ---------------------------------------------------------------------------
+
+const CANONICAL_SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/;
+const BASE62_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+function base62Fixed(value, width) {
+  const base = 62n;
+  let n = value;
+  const out = new Array(width);
+  for (let i = width - 1; i >= 0; i -= 1) {
+    out[i] = BASE62_ALPHABET.charAt(Number(n % base));
+    n /= base;
+  }
+  return out.join('');
+}
+
+/** sha256("prefix\0value") truncated to 12 bytes — stable, non-reversible. */
+function stableID(prefix, value) {
+  const sum = createHash('sha256').update(prefix + '\x00' + value).digest();
+  return `${prefix}_${sum.subarray(0, 12).toString('hex')}`;
+}
+
+function randomID(prefix, size) {
+  return `${prefix}_${randomBytes(size).toString('hex')}`;
+}
+
+/** The conversation signal: JSON of the first user turn (stable per chat). */
+function conversationSeed(messages) {
+  for (const message of messages || []) {
+    if (!message || message.role !== 'user') continue;
+    const encoded = JSON.stringify(message.content ?? null);
+    if (encoded !== 'null' && encoded.length > 0) return encoded;
+  }
+  return '';
+}
+
+/**
+ * Zen's free tier only accepts OpenCode's canonical session shape
+ * ("ses_" + 12 hex + 14 base62) *and* the canonical encoding inside it: the
+ * twelve hex characters are the low 48 bits of ~(milliseconds << 12 | counter)
+ * with counter 1..63, so they always end in 0xFFF - counter and match
+ * ^[0-9a-f]{9}f[c-f][0-9a-f]$. A right-shaped id with a foreign encoding — a
+ * content hash, which is what this plugin used to mint — is refused with 403
+ * FreeTierError (probed live 2026-10-15). Since 2026-10-13 the low bits are also
+ * decoded as a sequence counter, so they must come from a real inverted clock.
+ * The timestamp is minted once per conversation and memoized, preserving both
+ * quota grouping and prompt-cache affinity across turns and retries.
+ */
+const CANONICAL_TIME_PART_PATTERN = /^[0-9a-f]{9}f[c-f][0-9a-f]$/;
+const SESSION_MEMO_LIMIT = 1024;
+const sessionMemo = new Map();
+
+function invertedTimestampHex(now = Date.now()) {
+  const stamped = BigInt(now) * 0x1000n + 1n;
+  return (~stamped & 0xffffffffffffn).toString(16).padStart(12, '0');
+}
+
+function canonicalSessionID(signal) {
+  if (CANONICAL_SESSION_PATTERN.test(signal)
+    && CANONICAL_TIME_PART_PATTERN.test(signal.slice(4, 16))) {
+    return signal;
+  }
+  const memoized = sessionMemo.get(signal);
+  if (memoized !== undefined) return memoized;
+  const sum = createHash('sha256').update('ses\x00' + signal).digest();
+  const randomPart = base62Fixed(BigInt('0x' + sum.subarray(6, 16).toString('hex')), 14);
+  const session = `ses_${invertedTimestampHex()}${randomPart}`;
+  if (sessionMemo.size >= SESSION_MEMO_LIMIT) {
+    const oldest = sessionMemo.keys().next();
+    if (!oldest.done) sessionMemo.delete(oldest.value);
+  }
+  sessionMemo.set(signal, session);
+  return session;
+}
+
+function deriveRequestIDs(messages) {
+  let signal = conversationSeed(messages);
+  if (signal === '' || signal === '{}') signal = randomID('fallback', 16);
+  return {
+    session: canonicalSessionID(signal),
+    request: randomID('req', 16),
+    project: stableID('prj', 'opencode2dsh:default-project'),
+  };
+}
+
+/** CLI-identical user agent (ids.ts opencodeUserAgent). */
+function opencodeUserAgent() {
+  return `opencode/1.18.31 (${process.platform} ${process.arch}; node${process.versions.node})`;
+}
+
+/**
+ * sha256("opencode-project\0<signal>")[:20] — the client's own bare 40-hex
+ * project id. A canonical "prj_*" value is refused with 403 FreeTierError
+ * (probed 2026-10-14); only the shape is checked, and hashing keeps one
+ * conversation pinned to one upstream project.
+ */
+function projectHeader(project) {
+  const sum = createHash('sha256').update(`opencode-project\x00${project || 'global'}`).digest();
+  return sum.subarray(0, 20).toString('hex');
+}
+
+/**
+ * The full disguise header set sent with every upstream request.
+ *
+ * Upstream fingerprints the client on every tier (probed 2026-10-14/15): both
+ * session spellings must be present (x-opencode-session and
+ * x-opencode-session-id), while this plugin's own x-opencode-request
+ * correlation header is refused — so it is not sent at all and tracing stays
+ * local to the plugin log.
+ */
+function disguiseHeaders(ids) {
+  return {
+    'user-agent': opencodeUserAgent(),
+    'x-opencode-client': 'cli',
+    'x-opencode-session': ids.session,
+    'x-opencode-session-id': ids.session,
+    'x-session-affinity': ids.session,
+    'X-Session-Id': ids.session,
+    'x-opencode-project': projectHeader(ids.project),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Free-lane body gate (port of adapter/messages.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * The anonymous lane's body gate, re-probed live on 2026-10-15 after upstream
+ * changed it: the body must stream and must carry the genuine OpenCode tool
+ * definitions for the names upstream recognises — the old bash/read stubs are
+ * refused now. `shell` is the name the client has used since 2026-07 (bash was
+ * renamed), and the five names below are the set the lane demands. Sending them
+ * alongside the host's own tools is fine; sending none is 403; a caller-side
+ * duplicate of a recognised name must be replaced rather than duplicated (two
+ * tools with one name is a 400).
+ *
+ * Definitions come from lib/opencode-tools.json, copied verbatim from the
+ * client's wire definitions: upstream compares description and parameter schema
+ * byte-for-byte, so they must never be paraphrased.
+ */
+const OFFICIAL_TOOLS = require('./opencode-tools.json');
+const FREE_LANE_GATE_TOOL_NAMES = ['shell', 'edit', 'glob', 'grep', 'read'];
+/**
+ * Tool names the client used before its 2026-07 rename. Upstream still
+ * recognises them and refuses any definition but the genuine one, which no
+ * longer exists to copy — a stand-in `bash` turns every request into 403
+ * whatever else it carries (probed 2026-10-15), so such a tool is dropped
+ * instead of forwarded. The host's own tools are capitalised (Bash), so
+ * nothing live is removed.
+ */
+const LEGACY_TOOL_NAMES = new Set(['bash']);
+
+/** The genuine definition for one recognised tool name. */
+function gateToolDefinition(name) {
+  const definition = OFFICIAL_TOOLS[name];
+  return {
+    description: definition?.description ?? `Agent tool ${name}`,
+    parameters: definition?.parameters ?? { type: 'object', properties: {} },
+  };
+}
+
+function freeLaneGateTool(name, dialect) {
+  const { description, parameters } = gateToolDefinition(name);
+  if (dialect === 'responses') {
+    return { type: 'function', name, description, parameters };
+  }
+  return { type: 'function', function: { name, description, parameters } };
+}
+
+function gateToolName(tool, dialect) {
+  if (!tool || typeof tool !== 'object') return undefined;
+  return dialect === 'responses' ? tool.name : (tool.function && tool.function.name) || undefined;
+}
+
+/** Tool names the host declared before the free-lane tools are injected. */
+function declaredToolNames(body, dialect = 'chat') {
+  const names = new Set();
+  for (const tool of Array.isArray(body?.tools) ? body.tools : []) {
+    const name = gateToolName(tool, dialect);
+    if (typeof name === 'string' && name) names.add(name);
+  }
+  if (dialect === 'chat' && Array.isArray(body?.functions)) {
+    for (const tool of body.functions) {
+      if (typeof tool?.name === 'string' && tool.name) names.add(tool.name);
+    }
+  }
+  return names;
+}
+
+/**
+ * Make a body acceptable to the anonymous lane: every recognised tool name
+ * carries the genuine definition (a caller's own spelling of one is replaced,
+ * since a stand-in is refused), the five required names are appended when they
+ * are missing, and a context that carried no tools at all also gets
+ * `tool_choice: "none"` so the injected tools are never called. A name the
+ * client retired (see LEGACY_TOOL_NAMES) is dropped rather than forwarded, and
+ * the host's own tools (Read, Bash, …) pass through untouched — upstream does
+ * not recognise those names. Client-provided tool choices are always preserved.
+ * The Responses lane only accepts `tool_choice: "auto"`, so that dialect never
+ * gets the field.
+ */
+function ensureFreeLaneShape(body, { dialect = 'chat' } = {}) {
+  const tools = (Array.isArray(body.tools) ? body.tools : [])
+    .filter((tool) => !LEGACY_TOOL_NAMES.has(gateToolName(tool, dialect)));
+  let replaced = false;
+  const next = tools.map((tool) => {
+    const name = gateToolName(tool, dialect);
+    if (!name || !Object.prototype.hasOwnProperty.call(OFFICIAL_TOOLS, name)) return tool;
+    replaced = true;
+    return freeLaneGateTool(name, dialect);
+  });
+  const names = new Set(next.map((tool) => gateToolName(tool, dialect)));
+  const missing = FREE_LANE_GATE_TOOL_NAMES.filter((name) => !names.has(name));
+  if (missing.length === 0 && !replaced) return body;
+  const shaped = { ...body, tools: [...next, ...missing.map((name) => freeLaneGateTool(name, dialect))] };
+  if (tools.length === 0 && dialect !== 'responses') shaped.tool_choice = 'none';
+  return shaped;
+}
+
+// ---------------------------------------------------------------------------
+// Reasoning effort (port of zen-adapter.ts reasoningEffortWire)
+// ---------------------------------------------------------------------------
+
+/** Effort ids the Zen gateway accepts on reasoning_effort (off -> "none"). */
+const REASONING_EFFORT_LADDER = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+const DEFAULT_EFFORT_LADDER = ['off', 'minimal', 'low', 'medium', 'high'];
+
+function reasoningEffortWire(id) {
+  if (id === undefined || id === null || id === '') return undefined;
+  if (id === 'none') return 'none';
+  if (id === 'off') return 'none';
+  return REASONING_EFFORT_LADDER.includes(id) ? id : undefined;
+}
+
+/**
+ * What the loopback proxy writes into the upstream body.
+ *
+ * The host owns the reasoning menu (it reads the thinkingLevels this plugin
+ * declares per model) and writes reasoning_effort only when the user picks a
+ * level. Zen validates the field against each model's ladder, so a missing
+ * value must stay missing: injecting "none" hard-400s models such as
+ * big-pickle. Explicit off/none still maps to "none"; unknown values are
+ * omitted rather than guessed.
+ */
+function upstreamEffort(hostValue) {
+  return reasoningEffortWire(hostValue);
+}
+
+/** UI effort ladder for a model from its models.dev capability. */
+function effortsFor(capability) {
+  if (!capability || !capability.reasoning) return [];
+  const declared = [];
+  for (const value of capability.effortValues || []) {
+    const level = value === 'none' ? 'off' : value;
+    if (REASONING_EFFORT_LADDER.includes(level) && !declared.includes(level)) declared.push(level);
+  }
+  if (declared.length === 0) return DEFAULT_EFFORT_LADDER.slice();
+  return declared.sort((a, b) => REASONING_EFFORT_LADDER.indexOf(a) - REASONING_EFFORT_LADDER.indexOf(b));
+}
+
+/**
+ * Prepare the host's OpenAI chat body for the anonymous lane: force streaming,
+ * normalize reasoning_effort, then apply the bash/read gate. Everything else
+ * the host sent (messages, tools, tool_choice, max_tokens, temperature…) is
+ * forwarded untouched — the host owns those semantics.
+ */
+function buildUpstreamBody(hostBody) {
+  const source = hostBody && typeof hostBody === 'object' ? hostBody : {};
+  const body = {
+    ...source,
+    stream: true,
+    stream_options: { ...(source.stream_options || {}), include_usage: true },
+  };
+  const effort = upstreamEffort(source.reasoning_effort);
+  if (effort !== undefined) body.reasoning_effort = effort;
+  return ensureFreeLaneShape(body);
+}
+
+// ---------------------------------------------------------------------------
+// Model catalog (port of adapter/catalog.ts, memory-only)
+// ---------------------------------------------------------------------------
+
+function isFreeModel(model) {
+  return String(model).toLowerCase().includes('free');
+}
+
+/** metadata-first free decision (catalog.ts decide, deprecation-first). */
+function decide(model, prices, ready) {
+  const nameFree = isFreeModel(model);
+  const fallback = (source) => (nameFree
+    ? { allowed: true, source: 'name_free', known: false }
+    : { allowed: false, source, known: false });
+  if (!ready || prices.size === 0) return fallback('metadata_pending');
+  const price = prices.get(model);
+  if (!price) return fallback('metadata_model_missing');
+  if (price.deprecated) return { allowed: false, source: 'metadata_deprecated', known: true };
+  if (price.input === 0 && price.output === 0) {
+    return { allowed: true, source: nameFree ? 'name_and_metadata_free' : 'metadata_free', known: true };
+  }
+  if (price.input === undefined || price.output === undefined) {
+    return { allowed: false, source: 'metadata_cost_unknown', known: false };
+  }
+  return { allowed: false, source: 'metadata_paid', known: true };
+}
+
+function metadataDeprecated(model) {
+  if (model.deprecated === true) return true;
+  const status = String(model.status ?? model.lifecycle ?? '').toLowerCase();
+  if (status === 'deprecated' || status === 'retired' || status === 'disabled') return true;
+  return model.deprecated_at != null || model.retirement_date != null;
+}
+
+function decodeEffortValues(raw) {
+  if (!Array.isArray(raw)) return { effortValues: [] };
+  const values = [];
+  for (const option of raw) {
+    if (!option || typeof option !== 'object') continue;
+    if (option.type !== 'effort' || !Array.isArray(option.values)) continue;
+    for (const value of option.values) {
+      if (typeof value === 'string' && value.length > 0 && !values.includes(value)) values.push(value);
+    }
+  }
+  return { effortValues: values };
+}
+
+function protocolFromNpm(npm) {
+  if (typeof npm !== 'string') return undefined;
+  if (npm.includes('anthropic')) return 'anthropic';
+  if (npm === '@ai-sdk/openai') return 'responses';
+  if (npm.includes('openai-compatible')) return 'chat';
+  return undefined;
+}
+
+/** Parse the endpoint table from OpenCode's Console model documentation. */
+function parseProtocolDocs(text) {
+  const protocols = {};
+  const pattern = /\|[^|\n]+\|\s*`?([^|`\s]+)`?\s*\|\s*`[^`]+\/v1\/(chat\/completions|responses|messages|systemone)`/g;
+  const mapping = {
+    'chat/completions': 'chat',
+    responses: 'responses',
+    messages: 'anthropic',
+    systemone: 'systemone',
+  };
+  for (const match of String(text ?? '').matchAll(pattern)) {
+    protocols[match[1]] = mapping[match[2]];
+  }
+  return protocols;
+}
+
+/** Read per-model npm packages from the OpenCode catalog. */
+function decodeProtocolCatalog(data) {
+  const protocols = new Map();
+  if (!data || typeof data !== 'object') return protocols;
+  const provider = data.opencode && typeof data.opencode === 'object' ? data.opencode : data;
+  const providerNpm = provider.npm;
+  const models = provider.models;
+  if (!models || typeof models !== 'object') return protocols;
+  for (const [key, raw] of Object.entries(models)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const id = typeof raw.id === 'string' && raw.id ? raw.id : key;
+    const protocol = protocolFromNpm(raw.npm ?? raw.provider?.npm ?? providerNpm);
+    if (protocol) protocols.set(id, protocol);
+  }
+  return protocols;
+}
+
+function modelProtocol(id, protocols) {
+  const value = String(id ?? '').toLowerCase();
+  const known = protocols instanceof Map ? protocols.get(id) : protocols?.[id];
+  if (known) return known;
+  if (value.startsWith('jev')) return 'systemone';
+  if (value.startsWith('muse-spark')) return 'responses';
+  return 'chat';
+}
+
+/** models.dev OpenCode section -> Map(modelId -> metadata). */
+function decodeModelsDev(data) {
+  const result = new Map();
+  if (!data || typeof data !== 'object') return result;
+  const providers = data;
+  const rank = (key) => {
+    const lower = key.toLowerCase();
+    if (lower === 'opencode' || lower === 'opencode-zen' || lower === 'opencode_zen') return 0;
+    if (lower.includes('opencode')) return 1;
+    return 2;
+  };
+  const keys = Object.keys(providers).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  for (const key of keys) {
+    if (rank(key) > 1) continue;
+    const provider = providers[key];
+    if (!provider || typeof provider !== 'object') continue;
+    if (rank(key) === 1) {
+      const identity = `${provider.id ?? ''} ${provider.name ?? ''}`.toLowerCase().trim();
+      if (!identity.includes('opencode')) continue;
+    }
+    const models = provider.models;
+    if (!models || typeof models !== 'object') continue;
+    for (const [modelKey, raw] of Object.entries(models)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const modelId = typeof raw.id === 'string' && raw.id.length > 0 ? raw.id : modelKey;
+      const cost = raw.cost ?? {};
+      const limit = raw.limit ?? {};
+      const num = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+      result.set(modelId, {
+        input: num(cost.input),
+        output: num(cost.output),
+        deprecated: metadataDeprecated(raw),
+        reasoning: raw.reasoning === true,
+        contextWindow: num(limit && limit.context) ?? 262144,
+        maxTokens: num(limit && limit.output) ?? 32768,
+        modalitiesInput: Array.isArray(raw.modalities && raw.modalities.input)
+          ? raw.modalities.input.map(String)
+          : [],
+        npm: raw.npm ?? raw.provider?.npm ?? provider.npm,
+        ...decodeEffortValues(raw.reasoning_options),
+      });
+    }
+    if (result.size > 0) return result;
+  }
+  return result;
+}
+
+async function withTimeout(promise, ms, label) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** S1: the live Zen catalog with the CLI disguise headers. */
+async function fetchZenModels(fetchImpl, userAgent) {
+  const response = await withTimeout(
+    fetchImpl(`${ZEN_BASE_URL}/v1/models`, {
+      headers: {
+        authorization: `Bearer ${ANONYMOUS_KEY}`,
+        'user-agent': userAgent,
+        'x-opencode-client': 'cli',
+        accept: 'application/json',
+      },
+    }),
+    CATALOG_TIMEOUT_MS,
+    'models catalog fetch',
+  );
+  if (!response.ok) throw new Error(`models endpoint returned HTTP ${response.status}`);
+  const payload = await response.json();
+  const models = [];
+  for (const item of payload && payload.data ? payload.data : []) {
+    if (item && typeof item.id === 'string' && item.id.length > 0) models.push(item.id);
+  }
+  if (models.length === 0) throw new Error('models endpoint returned an empty list');
+  return models;
+}
+
+class ModelCatalog {
+  constructor(fetchImpl, onChange, options = {}) {
+    this.#fetchImpl = fetchImpl;
+    this.#onChange = typeof onChange === 'function' ? onChange : null;
+    this.#cachePath = typeof options.cachePath === 'string' && options.cachePath.length > 0
+      ? options.cachePath
+      : null;
+  }
+
+  #fetchImpl = null;
+  #onChange = null;
+  #cachePath = null;
+  /** { updatedAt, fingerprint } of the last cache file we read or wrote. */
+  #cacheState = null;
+  #cacheSeeded = false;
+  /** Time of the last successful live fetch (either source), 0 = never. */
+  #liveAt = 0;
+  #changeKey = '';
+  #zen = new Set();
+  #updatedAt = 0;
+  #prices = new Map();
+  #pricesReady = false;
+  #protocols = new Map();
+  #lastError = '';
+  #timer = null;
+  #stopped = false;
+  #refreshing = false;
+
+  /**
+   * Seed S1 (Zen ids) and S2 (models.dev prices) from disk BEFORE the first
+   * network call. Without this an offline start falls back to the static
+   * bootstrap, re-declares a smaller provider and rewrites manifest.json —
+   * which the development-plugin watcher turns into a reload, i.e. model list
+   * shrinks (and the thinking menus go with it) plus a spurious reload.
+   * Runs once; a missing/corrupt/expired cache simply keeps the bootstrap.
+   */
+  #seedFromCache() {
+    if (this.#cacheSeeded) return;
+    this.#cacheSeeded = true;
+    if (!this.#cachePath) return;
+    let raw = null;
+    try {
+      raw = JSON.parse(fs.readFileSync(this.#cachePath, 'utf8'));
+    } catch {
+      return; // absent or unreadable cache: the static bootstrap is the fallback
+    }
+    if (!raw || raw.schema !== 'opencode-catalog') return;
+    if (!Number.isFinite(raw.updatedAt) || Date.now() - raw.updatedAt > CATALOG_CACHE_TTL_MS) return;
+    const ids = Array.isArray(raw.zen)
+      ? raw.zen.filter((id) => typeof id === 'string' && id.length > 0)
+      : [];
+    const prices = Array.isArray(raw.prices) ? new Map(raw.prices) : new Map();
+    const protocols = Array.isArray(raw.protocols) ? new Map(raw.protocols) : new Map();
+    if (ids.length === 0 && prices.size === 0 && protocols.size === 0) return;
+    if (ids.length > 0) {
+      this.#zen = new Set(ids);
+      this.#updatedAt = raw.updatedAt;
+    }
+    if (prices.size > 0) {
+      this.#prices = prices;
+      this.#pricesReady = true;
+    }
+    if (protocols.size > 0) this.#protocols = protocols;
+    this.#cacheState = { updatedAt: raw.updatedAt, fingerprint: this.#cacheFingerprint() };
+  }
+
+  #cachePayload() {
+    const sortPairs = (pairs) => [...pairs].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    return {
+      zen: [...this.#zen].sort(),
+      prices: sortPairs(this.#prices.entries()),
+      protocols: sortPairs(this.#protocols.entries()),
+    };
+  }
+
+  #cacheFingerprint() {
+    const payload = this.#cachePayload();
+    return JSON.stringify([payload.zen, payload.prices, payload.protocols]);
+  }
+
+  /**
+   * Persist the catalog only when the data really changed. Writing on every
+   * 5-minute refresh would make the dev-plugin watcher (manifest/package
+   * files) reload the plugin all day for no reason.
+   */
+  #saveCache() {
+    if (!this.#cachePath) return;
+    if (this.#zen.size === 0 && this.#prices.size === 0 && this.#protocols.size === 0) return;
+    const fingerprint = this.#cacheFingerprint();
+    if (this.#cacheState && this.#cacheState.fingerprint === fingerprint) return;
+    try {
+      const payload = { schema: 'opencode-catalog', updatedAt: Date.now(), ...this.#cachePayload() };
+      const temporary = `${this.#cachePath}.${process.pid}.tmp`;
+      fs.writeFileSync(temporary, JSON.stringify(payload), 'utf8');
+      fs.renameSync(temporary, this.#cachePath);
+      this.#cacheState = { updatedAt: payload.updatedAt, fingerprint };
+    } catch {
+      // An unwritable cache is not fatal: the live catalog still works.
+    }
+  }
+
+  async start() {
+    this.#stopped = false;
+    await this.refreshOnce();
+    let attempts = 0;
+    while (this.#zen.size === 0 && attempts < 4 && !this.#stopped) {
+      attempts += 1;
+      await new Promise((resolve) => setTimeout(resolve, 15_000));
+      if (this.#stopped) return;
+      await this.refreshOnce();
+    }
+    if (this.#stopped) return;
+    this.#timer = setInterval(() => {
+      void this.refreshOnce();
+    }, 300_000);
+    if (this.#timer.unref) this.#timer.unref();
+  }
+
+  stop() {
+    this.#stopped = true;
+    if (this.#timer) {
+      clearInterval(this.#timer);
+      this.#timer = null;
+    }
+  }
+
+  async refreshOnce() {
+    if (this.#refreshing) return;
+    this.#refreshing = true;
+    try {
+      // Disk first: an offline start must keep last known state, not collapse.
+      this.#seedFromCache();
+      await Promise.allSettled([
+        this.#refreshZen(),
+        this.#refreshMetadata(),
+        this.#refreshProtocols(),
+      ]);
+      this.#saveCache();
+      // Fire the change hook when the exposed list actually changed, so the
+      // owner can re-publish without polling. Fires once per real change;
+      // identical refreshes stay silent.
+      const key = this.list().join('|');
+      if (key !== this.#changeKey) {
+        const first = this.#changeKey === '';
+        this.#changeKey = key;
+        if (!first && this.#onChange) {
+          try { this.#onChange(); } catch { /* hook must never break refresh */ }
+        }
+      }
+    } finally {
+      this.#refreshing = false;
+    }
+  }
+
+  async #refreshZen() {
+    try {
+      const ids = await fetchZenModels(this.#fetchImpl, opencodeUserAgent());
+      this.#zen = new Set(ids);
+      this.#updatedAt = Date.now();
+      this.#liveAt = this.#updatedAt;
+      this.#lastError = '';
+    } catch (err) {
+      this.#lastError = err && err.message ? err.message : String(err);
+    }
+  }
+
+  async #refreshMetadata() {
+    try {
+      const response = await withTimeout(
+        this.#fetchImpl(METADATA_URL, { headers: { accept: 'application/json' } }),
+        CATALOG_TIMEOUT_MS,
+        'models.dev fetch',
+      );
+      if (!response.ok) throw new Error(`models.dev returned HTTP ${response.status}`);
+      const data = await response.json();
+      const prices = decodeModelsDev(data);
+      if (prices.size === 0) throw new Error('models.dev contains no OpenCode model metadata');
+      this.#prices = prices;
+      this.#pricesReady = true;
+      this.#liveAt = Date.now();
+    } catch (err) {
+      if (!this.#pricesReady) this.#lastError = err && err.message ? err.message : String(err);
+    }
+  }
+
+  async #refreshProtocols() {
+    const [catalog, docs] = await Promise.allSettled([
+      withTimeout(
+        this.#fetchImpl(PROTOCOL_CATALOG_URL, { headers: { accept: 'application/json' } }),
+        CATALOG_TIMEOUT_MS,
+        'OpenCode catalog fetch',
+      ).then((response) => {
+        if (!response.ok) throw new Error(`OpenCode catalog returned HTTP ${response.status}`);
+        return response.json();
+      }),
+      withTimeout(
+        this.#fetchImpl(PROTOCOL_DOCS_URL, { headers: { accept: 'text/plain' } }),
+        CATALOG_TIMEOUT_MS,
+        'OpenCode protocol docs fetch',
+      ).then((response) => {
+        if (!response.ok) throw new Error(`OpenCode protocol docs returned HTTP ${response.status}`);
+        return response.text();
+      }),
+    ]);
+    const protocols = new Map();
+    if (catalog.status === 'fulfilled') {
+      for (const [id, protocol] of decodeProtocolCatalog(catalog.value)) {
+        protocols.set(id, protocol);
+      }
+    }
+    if (docs.status === 'fulfilled') {
+      for (const [id, protocol] of Object.entries(parseProtocolDocs(docs.value))) {
+        protocols.set(id, protocol);
+      }
+    }
+    if (protocols.size > 0) this.#protocols = protocols;
+  }
+
+  decision(model) {
+    const metadata = decide(model, this.#prices, this.#pricesReady);
+    // S3 vouch: compile-time verified ids stay exposed when metadata is
+    // pending/missing, and even when stale metadata claims deprecation.
+    if (!metadata.allowed && (!metadata.known || metadata.source === 'metadata_deprecated')
+      && staticFreeModels.includes(model)) {
+      return { allowed: true, source: 'static_verified', known: false };
+    }
+    return metadata;
+  }
+
+  /** Exposed ids: S1 ∩ allowed, or the verified static list while S1 is pending. */
+  list() {
+    if (this.#zen.size === 0) return staticFreeModels.slice().sort();
+    const out = [];
+    for (const model of this.#zen) {
+      if (this.decision(model).allowed) out.push(model);
+    }
+    return out.sort();
+  }
+
+  reasoningCapability(model) {
+    const price = this.#prices.get(model);
+    if (!price) return undefined;
+    return { reasoning: price.reasoning === true, effortValues: price.effortValues ?? [] };
+  }
+
+  metadata(model) {
+    return this.#prices.get(model);
+  }
+
+  protocol(model) {
+    return modelProtocol(model, this.#protocols);
+  }
+
+  snapshot() {
+    const age = this.#updatedAt === 0 ? Infinity : Date.now() - this.#updatedAt;
+    const stale = this.#updatedAt !== 0 && age > 10 * 60 * 1000;
+    return {
+      status: this.#updatedAt === 0 ? 'pending' : stale ? 'stale' : 'ready',
+      // live = a real fetch succeeded this session; cache/static = seeded only
+      source: this.#liveAt !== 0 ? 'live' : this.#updatedAt !== 0 ? 'cache' : 'static',
+      total: this.#zen.size,
+      exposed: this.list().length,
+      lastError: this.#lastError,
+    };
+  }
+}
+
+function createCatalog(fetchImpl, onChange, options) {
+  return new ModelCatalog(fetchImpl, onChange, options);
+}
+
+// ---------------------------------------------------------------------------
+// Provider declaration (manifest contribute)
+// ---------------------------------------------------------------------------
+
+function laneProtocol(id, catalog) {
+  return catalog && typeof catalog.protocol === 'function'
+    ? catalog.protocol(id)
+    : modelProtocol(id);
+}
+
+/** A chat_completions provider must only advertise models on that wire. */
+function isChatLaneModel(id, catalog) {
+  return laneProtocol(id, catalog) === 'chat';
+}
+
+function isResponsesLaneModel(id, catalog) {
+  return laneProtocol(id, catalog) === 'responses';
+}
+
+function modelEntry({ id, contextWindow, maxTokens, supportsImages, thinkingLevels, defaultThinkingLevel }) {
+  const entry = {
+    id,
+    name: id,
+    contextWindow: Number.isFinite(contextWindow) ? contextWindow : 262144,
+    maxTokens: Number.isFinite(maxTokens) ? maxTokens : 32768,
+    supportsImages: supportsImages === true,
+  };
+  if (Array.isArray(thinkingLevels) && thinkingLevels.length > 0) {
+    entry.thinkingLevels = thinkingLevels;
+    entry.defaultThinkingLevel = thinkingLevels.includes('medium') ? 'medium' : thinkingLevels[0];
+  }
+  return entry;
+}
+
+/** First-load list: verified static chat models, with real limits. */
+function bootstrapModelEntries() {
+  return BOOTSTRAP_MODELS.filter((m) => isChatLaneModel(m.id)).map((m) => ({ ...m }));
+}
+
+/** First-load Responses-lane list. */
+function bootstrapResponsesEntries() {
+  return BOOTSTRAP_RESPONSES_MODELS
+    .filter((m) => isResponsesLaneModel(m.id))
+    .map((m) => ({ ...m }));
+}
+
+/**
+ * models.dev metadata -> declaration entry fields (image support, levels).
+ * When metadata is missing (offline start without a usable cache) the shipped
+ * bootstrap entry speaks instead, so the declaration never degrades to bare
+ * defaults (262144/32768, no images, no thinking menu) and manifest.json is
+ * left alone.
+ */
+function catalogEntry(id, catalog) {
+  const meta = catalog.metadata(id);
+  if (!meta) {
+    const fallback = [...BOOTSTRAP_MODELS, ...BOOTSTRAP_RESPONSES_MODELS].find((m) => m.id === id);
+    if (fallback) return { ...fallback };
+    return { id, contextWindow: undefined, maxTokens: undefined, supportsImages: false, thinkingLevels: [] };
+  }
+  const capability = catalog.reasoningCapability(id);
+  return {
+    id,
+    contextWindow: meta.contextWindow,
+    maxTokens: meta.maxTokens,
+    supportsImages: Array.isArray(meta.modalitiesInput)
+      ? meta.modalitiesInput.includes('image')
+      : false,
+    thinkingLevels: effortsFor(capability),
+  };
+}
+
+/** Live chat-lane list: limits, image support and levels from models.dev. */
+function catalogModelEntries(catalog) {
+  const out = [];
+  for (const id of catalog.list()) {
+    if (!isChatLaneModel(id, catalog)) continue;
+    out.push(modelEntry(catalogEntry(id, catalog)));
+  }
+  return out;
+}
+
+/** Live Responses-lane list, selected from the discovered protocol map. */
+function responsesModelEntries(catalog) {
+  const out = [];
+  for (const id of catalog.list()) {
+    if (!isResponsesLaneModel(id, catalog)) continue;
+    out.push(modelEntry(catalogEntry(id, catalog)));
+  }
+  return out;
+}
+
+const RESPONSES_PROVIDER_ID = 'opencode-free-responses';
+const RESPONSES_PROVIDER_NAME = 'OpenCode免费模型 · Responses';
+
+/**
+ * The whole `contributes.providers` value for a given loopback port.
+ * PI-Desktop binds exactly one wire protocol per provider, so the catalog
+ * splits across two declarations pointing at the SAME loopback endpoint
+ * (commandcode's pattern): chat_completions for Zen /v1/chat/completions,
+ * responses for muse-spark-* on Zen /v1/responses.
+ */
+function buildDeclaration(port, entries, responsesEntries) {
+  const out = [{
+    id: PROVIDER_ID,
+    name: PROVIDER_NAME,
+    vendorKey: PROVIDER_VENDOR_KEY,
+    baseUrl: `http://127.0.0.1:${port}/v1`,
+    apiStyle: PROVIDER_API_STYLE,
+    authKind: 'none',
+    models: entries.map(modelEntry),
+  }];
+  if (Array.isArray(responsesEntries) && responsesEntries.length > 0) {
+    out.push({
+      id: RESPONSES_PROVIDER_ID,
+      name: RESPONSES_PROVIDER_NAME,
+      vendorKey: PROVIDER_VENDOR_KEY,
+      baseUrl: `http://127.0.0.1:${port}/v1`,
+      apiStyle: 'responses',
+      authKind: 'none',
+      models: responsesEntries.map(modelEntry),
+    });
+  }
+  return out;
+}
+
+/**
+ * Correlation ids for either wire dialect: OpenAI chat (`messages`) and
+ * OpenAI Responses (`input`, string or item array). The session id must stay
+ * stable per conversation on both lanes.
+ */
+function deriveRequestIDsFromWire(body) {
+  if (body && Array.isArray(body.messages)) return deriveRequestIDs(body.messages);
+  const input = body && body.input;
+  if (typeof input === 'string') {
+    return deriveRequestIDs([{ role: 'user', content: input }]);
+  }
+  if (Array.isArray(input)) {
+    const messages = input.map((item) => {
+      if (typeof item === 'string') return { role: 'user', content: item };
+      if (item && typeof item === 'object') {
+        const role = item.role === 'assistant' ? 'assistant' : 'user';
+        const content = typeof item.content === 'string'
+          ? item.content
+          : Array.isArray(item.content)
+            ? item.content.map((part) => (part && typeof part.text === 'string' ? part.text : '')).join('')
+            : (typeof item.text === 'string' ? item.text : '');
+        return { role, content };
+      }
+      return null;
+    }).filter(Boolean);
+    return deriveRequestIDs(messages);
+  }
+  return deriveRequestIDs([]);
+}
+function extractErrorMessage(bodyText, status) {
+  let snippet = String(bodyText || '').slice(0, 300);
+  try {
+    const parsed = JSON.parse(bodyText);
+    snippet = (parsed && (parsed.message || (parsed.error && (parsed.error.message || parsed.error.code)))) || snippet;
+  } catch { /* keep raw snippet */ }
+  // The two 403 families need different reactions, so keep them apart: a
+  // region gate is about the egress country (the local proxy must be up), a
+  // free-lane gate is about the request body (see ensureFreeLaneShape).
+  if (status === 403 && /RegionError|not available in your country/i.test(snippet)) {
+    return `upstream 403 (region gate — 该通道要求非中国大陆出口，直连必被拒; 请确认本机代理已开启，插件会自动改走代理重试): ${snippet}`;
+  }
+  if (status === 403) return `upstream 403 (free-lane gate：上游门禁不认这个请求形状 — 检查 lib/zen.js 的会话 id 编码、伪装头与官方工具定义是否仍与当前客户端一致): ${snippet}`;
+  if (status === 429) return `upstream 429 rate limited (anonymous lane quota is per IP): ${snippet}`;
+  return `upstream ${status}: ${snippet}`;
+}
+
+module.exports = {
+  ZEN_BASE_URL,
+  ANONYMOUS_BASE_URL,
+  ANONYMOUS_KEY,
+  PROVIDER_ID,
+  PROVIDER_NAME,
+  RESPONSES_PROVIDER_ID,
+  RESPONSES_PROVIDER_NAME,
+  staticFreeModels,
+  bootstrapModelEntries,
+  bootstrapResponsesEntries,
+  catalogModelEntries,
+  responsesModelEntries,
+  buildDeclaration,
+  deriveRequestIDsFromWire,
+  buildUpstreamBody,
+  declaredToolNames,
+  decodeProtocolCatalog,
+  isChatLaneModel,
+  isResponsesLaneModel,
+  modelProtocol,
+  parseProtocolDocs,
+  REASONING_EFFORT_LADDER,
+  createCatalog,
+  deriveRequestIDs,
+  disguiseHeaders,
+  opencodeUserAgent,
+  effortsFor,
+  reasoningEffortWire,
+  upstreamEffort,
+  ensureFreeLaneShape,
+  extractErrorMessage,
+};

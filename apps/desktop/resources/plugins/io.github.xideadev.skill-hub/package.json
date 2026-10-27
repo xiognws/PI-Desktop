@@ -1,0 +1,16 @@
+{
+  "name": "io.github.xideadev.skill-hub",
+  "version": "0.1.0",
+  "description": "PI-Desktop 官方级侧边栏技能管理工作台",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"ok\""
+  },
+  "keywords": [
+    "pi-desktop",
+    "skills",
+    "prompt-injection"
+  ],
+  "author": "xidea",
+  "license": "MIT"
+}
