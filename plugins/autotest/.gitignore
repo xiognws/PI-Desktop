@@ -1,0 +1,10 @@
+# Plugin-local runtime artifacts (never packaged, never committed)
+platform/.venv/
+platform/workspace/
+platform/data/
+platform/ui/dist/
+platform/ui/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+runtime/
+*.log

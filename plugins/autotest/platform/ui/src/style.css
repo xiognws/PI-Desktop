@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* 极淡天空蓝 */
+:root {
+  --color-blue-50: #fbfdff;
+  --color-blue-100: #f6faff;
+  --color-blue-200: #eef6ff;
+  --color-blue-300: #dceeff;
+  --color-blue-400: #c0e0ff;
+  --color-blue-500: #9ccdfc;
+  --color-blue-600: #7ab8f5;
+  --color-blue-700: #619fdf;
+  --color-blue-800: #5184b8;
+  --color-blue-900: #44688f;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: #ffffff;
+}

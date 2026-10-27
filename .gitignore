@@ -54,6 +54,11 @@ coverage/
 .pi/
 .cc-connect/
 
+# Autotest plugin: local provisioning (deps live here, not in git)
+.venv/
+plugins/autotest/platform/.venv/
+runtime/e2e/.autotest-runs/
+
 .playwright-mcp/
 .claude/
 .workbuddy
@@ -61,3 +66,7 @@ electron.vite.config.*.mjs
 
 .playwright-cli
 worktrees
+# Python install artefacts
+*.egg-info/
+__pycache__/
+*.pyc

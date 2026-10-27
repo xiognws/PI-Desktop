@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BWaJ3C7D.js";import{RA as t,zA as n}from"./standaloneServices-12ifd5r_.js";var r,i,a,o,s,c=e((()=>{n(),r=t(`extensionGalleryService`),i=t(`extensionManagementService`),a=t(`IGlobalExtensionEnablementService`),o=t(`IExtensionTipsService`),s=t(`IAllowedExtensionsService`)}));export{a,o as i,r as n,c as o,i as r,s as t};
