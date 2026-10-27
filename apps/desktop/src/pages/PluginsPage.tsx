@@ -3,6 +3,7 @@ import { Button, TooltipButton, cx } from "../components/ui";
 import { IconCloudDown, IconDownload, IconMore, IconPlug } from "../components/icons";
 import { AnchoredMenu } from "../components/settings/AnchoredMenu";
 import { SearchField } from "../features/plugins/presentation";
+import { BuiltinCapabilitiesPanel } from "../features/plugins/BuiltinCapabilitiesPanel";
 import { InstalledPluginsPanel } from "../features/plugins/InstalledPluginsPanel";
 import { MarketplacePanel } from "../features/plugins/MarketplacePanel";
 import { PluginDetailSheet } from "../features/plugins/PluginDetailSheet";
@@ -176,6 +177,7 @@ export function PluginsPage() {
             </div>
           )}
         </div>
+        <BuiltinCapabilitiesPanel />
         {tab === "installed" ? (
           <InstalledPluginsPanel {...page} />
         ) : (
