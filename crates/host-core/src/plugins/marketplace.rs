@@ -42,6 +42,29 @@ pub(crate) fn market_source_env_override() -> Option<String> {
         .filter(|url| !url.is_empty())
 }
 
+/// Prefix placed in front of every resolved package URL.
+///
+/// A network that can read the catalog but not the artifact host the catalog
+/// names (a mirror behind an outbound proxy, a mirroring gateway) fetches the
+/// same checksummed packages by prefix instead of re-hosting the catalog. It
+/// outranks the declared base the same way the catalog override does: the
+/// environment is the only authority on how this machine reaches the world.
+///
+/// `file://` packages are never prefixed — a local package stays local even
+/// when a proxy is configured.
+pub(crate) fn artifact_base_env_override() -> Option<String> {
+    let raw = std::env::var("PI_DESKTOP_PLUGIN_ARTIFACT_BASE").ok()?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(if trimmed.ends_with('/') {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}/")
+    })
+}
+
 /// Application settings always use the official marketplace.
 ///
 /// The legacy fields remain in persisted settings for compatibility, but no
@@ -163,28 +186,57 @@ impl PluginManager {
         artifact_base_url: Option<&str>,
         package_url: &str,
     ) -> String {
-        if package_url.starts_with("http://")
-            || package_url.starts_with("https://")
-            || package_url.starts_with("file://")
-        {
+        Self::resolve_with_prefix(
+            catalog_url,
+            artifact_base_url,
+            package_url,
+            artifact_base_env_override().as_deref(),
+        )
+    }
+
+    /// `resolve_package_url` with the mirror prefix passed in, so the rules are
+    /// testable without mutating the process environment.
+    pub(crate) fn resolve_with_prefix(
+        catalog_url: &str,
+        artifact_base_url: Option<&str>,
+        package_url: &str,
+        prefix: Option<&str>,
+    ) -> String {
+        if package_url.starts_with("file://") {
             return package_url.to_string();
         }
-        let base = match artifact_base_url.map(str::trim).filter(|b| !b.is_empty()) {
-            // A declared base is a prefix, not a directory: a trailing slash is
-            // supplied here so `.../download` and `.../download/` agree.
-            Some(base) => {
-                if base.ends_with('/') {
-                    base.to_string()
-                } else {
-                    format!("{base}/")
+        let absolute = if package_url.starts_with("http://") || package_url.starts_with("https://")
+        {
+            package_url.to_string()
+        } else {
+            let base = match artifact_base_url.map(str::trim).filter(|b| !b.is_empty()) {
+                // A declared base is a prefix, not a directory: a trailing slash is
+                // supplied here so `.../download` and `.../download/` agree.
+                Some(base) => {
+                    if base.ends_with('/') {
+                        base.to_string()
+                    } else {
+                        format!("{base}/")
+                    }
                 }
-            }
-            None => match catalog_url.rfind('/') {
-                Some(idx) => catalog_url[..=idx].to_string(),
-                None => return package_url.to_string(),
-            },
+                None => match catalog_url.rfind('/') {
+                    Some(idx) => catalog_url[..=idx].to_string(),
+                    None => return package_url.to_string(),
+                },
+            };
+            format!("{base}{}", package_url.trim_start_matches('/'))
         };
-        format!("{base}{}", package_url.trim_start_matches('/'))
+        match prefix.map(str::trim).filter(|value| !value.is_empty()) {
+            Some(prefix) => {
+                let prefix = if prefix.ends_with('/') {
+                    prefix.to_string()
+                } else {
+                    format!("{prefix}/")
+                };
+                format!("{prefix}{absolute}")
+            }
+            None => absolute,
+        }
     }
 
     fn rewrite_catalog_urls(

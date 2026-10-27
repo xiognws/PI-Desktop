@@ -1747,6 +1747,50 @@ fn relative_package_urls_resolve_against_the_declared_artifact_base() {
     );
 }
 
+/// A mirror prefix is how a network that reads the catalog but cannot reach
+/// its artifact host still installs: the same checksummed package, fetched
+/// through a proxy, without re-hosting the catalog.
+#[test]
+fn artifact_base_override_prefixes_relative_and_absolute_package_urls() {
+    let catalog = "https://plugins.example/catalog.json";
+    let prefix = Some("https://proxy.example/");
+    assert_eq!(
+        PluginManager::resolve_with_prefix(catalog, None, "packages/x.piplug", prefix),
+        "https://proxy.example/https://plugins.example/packages/x.piplug"
+    );
+    assert_eq!(
+        PluginManager::resolve_with_prefix(
+            catalog,
+            Some("https://base.test/"),
+            "https://cdn.test/x.piplug",
+            prefix
+        ),
+        "https://proxy.example/https://cdn.test/x.piplug"
+    );
+    // A prefix without its trailing slash behaves identically.
+    assert_eq!(
+        PluginManager::resolve_with_prefix(
+            catalog,
+            None,
+            "packages/x.piplug",
+            Some("https://proxy.example")
+        ),
+        "https://proxy.example/https://plugins.example/packages/x.piplug"
+    );
+    // Unset (and blank) leaves the catalog's own answer untouched.
+    for unset in [None, Some(""), Some("   ")] {
+        assert_eq!(
+            PluginManager::resolve_with_prefix(catalog, None, "packages/x.piplug", unset),
+            "https://plugins.example/packages/x.piplug"
+        );
+    }
+    // A local package stays local even when a mirror is configured.
+    assert_eq!(
+        PluginManager::resolve_with_prefix(catalog, None, "file:///tmp/x.piplug", prefix),
+        "file:///tmp/x.piplug"
+    );
+}
+
 /// The official platform can return package URLs on approved GitHub and CNB
 /// hosts. The catalog's declared base keeps each package on its own host.
 #[test]
