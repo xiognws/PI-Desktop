@@ -210,6 +210,10 @@ impl Database {
             24 => {
                 super::model_discovery_migration::migrate(&conn, path)?;
             }
+            // v25 is the pre-memory schema. The memory migration is chained
+            // below with the other post-match steps, so this arm only has to
+            // stop the "newer than supported" fallback from firing.
+            25 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);

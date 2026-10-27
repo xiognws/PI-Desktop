@@ -399,3 +399,34 @@ fn content_hash_ignores_surrounding_whitespace() {
     assert_eq!(content_hash(" t ", " b "), content_hash("t", "b"));
     assert_ne!(content_hash("t", "b"), content_hash("t", "b2"));
 }
+
+/// Regression: `Database::open` must migrate a v25 database instead of falling
+/// into the "newer than supported" arm. Users upgrade in place, so a missing
+/// match arm here is an app that will not start on their existing data.
+#[test]
+fn opening_a_v25_database_migrates_instead_of_failing() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn
+            .execute_batch(
+                "DROP TABLE IF EXISTS memories_fts;
+                 DROP TABLE IF EXISTS memories;
+                 PRAGMA user_version = 25;",
+            )
+            .unwrap();
+    }
+
+    let db = Database::open(&path).unwrap();
+    let version: i64 = db
+        .conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 26, "v25 database must be migrated to v26");
+    let rows: i64 = db
+        .conn
+        .query_row("SELECT count(*) FROM memories", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(rows, 0, "migration must leave an empty memory store");
+}
