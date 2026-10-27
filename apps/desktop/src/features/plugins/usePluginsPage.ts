@@ -19,6 +19,7 @@ import {
   TEMPLATE_IDS,
   type TemplateId,
   groupOf,
+  groupRank,
   isClientVisibleMarketPlugin,
   matchesQuery,
   orderPermissions,
@@ -428,7 +429,12 @@ export function usePluginsPage() {
     return GROUP_ORDER.flatMap((id) => {
       const rows = buckets.get(id);
       if (!rows?.length) return [];
-      rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+      rows.sort(
+        (a, b) =>
+          groupRank(a) - groupRank(b) ||
+          a.name.localeCompare(b.name) ||
+          a.id.localeCompare(b.id),
+      );
       return [{ id, rows }];
     });
   }, [filteredInstalled]);

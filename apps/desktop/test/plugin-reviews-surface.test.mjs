@@ -26,13 +26,23 @@ const hook = read("../src/features/plugins/usePluginReviews.ts");
 const pageHook = read("../src/features/plugins/usePluginsPage.ts");
 const pluginsCss = read("../src/styles/plugins.css");
 
-test("installed plugins keep their state groups and their disclosure", () => {
+test("installed plugins group by origin and keep their own switch", () => {
   assert.match(installedPanel, /GROUP_LABEL_KEYS\[group\.id\]/);
   assert.match(installedPanel, /className="plugins-list"/);
   assert.match(installedPanel, /role="list"/);
   assert.match(installedPanel, /<PluginRowDetails/);
+  // The switch is the thing the user operates, so it stays on every row.
   assert.match(installedPanel, /<ScopeControl[\s\S]*?compact/);
-  assert.match(pageSrc, /GROUP_ORDER: GroupId\[\] = \["attention", "updates", "active", "disabled"\]/);
+  assert.match(
+    installedPanel,
+    /onSetEnabled=\{\(enabled\) =>[\s\S]*?api\.enablePlugin[\s\S]*?api\.disablePlugin/,
+  );
+  assert.match(pageSrc, /GROUP_ORDER: GroupId\[\] = \["builtin", "dev", "installed"\]/);
+  // Broken and pending-update states decorate the row instead of moving it
+  // into a bucket of their own.
+  assert.match(pageSrc, /export function groupOf\(plugin: PluginSummary\): GroupId \{/);
+  assert.match(pageSrc, /if \(plugin\.source === "dev"\) return "dev";/);
+  assert.match(installedPanel, /<Badge tone="error">\{t\("plugins\.badgeBroken"\)\}<\/Badge>/);
 });
 
 test("an installed card grows one call to action: update, then open panel", () => {

@@ -1,4 +1,4 @@
-import { Button, TooltipButton, cx } from "../../components/ui";
+import { Badge, Button, TooltipButton, cx } from "../../components/ui";
 import {
   IconCircleAlert,
   IconCloudDown,
@@ -14,7 +14,7 @@ import {
 import { ScopeControl } from "../../components/extensions/ScopeControl";
 import { AnchoredMenu } from "../../components/settings/AnchoredMenu";
 import type { ActivationScope } from "@pi-desktop/shared";
-import { GROUP_LABEL_KEYS, TEMPLATE_IDS, showsVerifiedBadge } from "./model";
+import { GROUP_LABEL_KEYS, TEMPLATE_IDS, isBroken, showsVerifiedBadge } from "./model";
 import { PluginRowDetails, RatingChip } from "./presentation";
 import type { PluginsPageModel } from "./usePluginsPage";
 import { api } from "../../lib/api";
@@ -95,7 +95,7 @@ export function InstalledPluginsPanel({
                     aria-label={t(GROUP_LABEL_KEYS[group.id])}
                   >
                     {group.rows.map((plugin) => {
-                      const broken = group.id === "attention";
+                      const broken = isBroken(plugin);
                       const menuOpen = rowMenu === plugin.id;
                       const update = plugin.updateAvailable;
                       /**
@@ -140,6 +140,12 @@ export function InstalledPluginsPanel({
                               {plugin.bundled ? (
                                 <span className="plugins-tag">{t("plugins.tagBundled")}</span>
                               ) : null}
+                              {broken ? (
+                                <Badge tone="error">{t("plugins.badgeBroken")}</Badge>
+                              ) : null}
+                              {plugin.enabled ? null : (
+                                <Badge tone="neutral">{t("plugins.badgeOff")}</Badge>
+                              )}
                             </div>
                           </div>
                           <div className="plugins-row-copy">

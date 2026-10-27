@@ -7,19 +7,23 @@ import type {
 export type TabId = "installed" | "market";
 
 /**
- * Always-visible sections of the installed index. Broken plugins come first and
- * pending updates second, so the two states that need a decision are never
- * buried under the plugins that are simply working.
+ * The installed index groups by where a plugin came from, which is the
+ * distinction a user can act on: a bundled plugin ships with the app, a dev
+ * plugin is one somebody is writing, and everything else was installed.
+ *
+ * Per-plugin state (broken, update pending, turned off) rides on the row as a
+ * badge and on the ordering instead of taking over the structure, so a plugin
+ * never disappears into a status bucket and the on/off switch — the thing the
+ * user actually operates — always sits in the same place.
  */
-export type GroupId = "attention" | "updates" | "active" | "disabled";
+export type GroupId = "builtin" | "dev" | "installed";
 
-export const GROUP_ORDER: GroupId[] = ["attention", "updates", "active", "disabled"];
+export const GROUP_ORDER: GroupId[] = ["builtin", "dev", "installed"];
 
 export const GROUP_LABEL_KEYS: Record<GroupId, string> = {
-  attention: "plugins.groupAttention",
-  updates: "plugins.groupUpdates",
-  active: "plugins.groupActive",
-  disabled: "plugins.groupDisabled",
+  builtin: "plugins.groupBuiltin",
+  dev: "plugins.groupDev",
+  installed: "plugins.groupInstalled",
 };
 
 /** Mirrors TEMPLATE_NAMES in @pi-desktop/plugin-devkit; main rejects anything else. */
@@ -237,7 +241,21 @@ export function isClientVisibleMarketPlugin(plugin: Pick<MarketPluginSummary, "i
 }
 
 export function groupOf(plugin: PluginSummary): GroupId {
-  if (plugin.status === "error" || plugin.status === "load_error") return "attention";
-  if (plugin.updateAvailable) return "updates";
-  return plugin.enabled ? "active" : "disabled";
+  if (plugin.source === "dev") return "dev";
+  if (plugin.source === "builtin" || plugin.bundled) return "builtin";
+  return "installed";
+}
+
+export function isBroken(plugin: PluginSummary): boolean {
+  return plugin.status === "error" || plugin.status === "load_error";
+}
+
+/**
+ * Order inside a group: something broken first, then a pending update, then
+ * whatever is simply working (enabled before disabled).
+ */
+export function groupRank(plugin: PluginSummary): number {
+  if (isBroken(plugin)) return 0;
+  if (plugin.updateAvailable) return 1;
+  return plugin.enabled ? 2 : 3;
 }
