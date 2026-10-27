@@ -19,6 +19,7 @@ import {
   IconArchive,
   IconBookOpen,
   IconBot,
+  IconBrain,
   IconChevronLeft,
   IconFileText,
   IconGlobe,
@@ -34,6 +35,7 @@ import {
 } from "../../components/icons";
 import { Badge, Button, cx, SegmentedControl, SettingsToggle } from "../../components/ui";
 import { ModelConfigPage } from "../../components/settings/ModelConfigPage";
+import { MemoryPane } from "../../components/settings/MemoryPane";
 import { KeyboardShortcutsSection } from "../../components/settings/KeyboardShortcutsSection";
 import { FontFamilyRow } from "../../components/settings/FontFamilyRow";
 import { ShowThinkingRow } from "../../components/settings/ShowThinkingRow";
@@ -240,6 +242,7 @@ export function SettingsPage() {
       skills: <IconBookOpen size={14} />,
       mcp: <IconServer size={14} />,
       subagents: <IconBot size={14} />,
+      memory: <IconBrain size={14} />,
       projects: <IconArchive size={14} />,
       sync: <IconCloudDown size={14} />,
       remoteHosts: <IconGlobe size={14} />,
@@ -630,6 +633,7 @@ export function SettingsPage() {
           {tab === "mcp" && <AgentMcpPage />}
 
           {tab === "subagents" && <AgentSubagentsPage />}
+          {tab === "memory" && <MemoryPane />}
 
           {tab === "instructions" && <AgentInstructionsSection />}
 

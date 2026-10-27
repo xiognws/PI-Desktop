@@ -15,6 +15,7 @@ export type SettingsTabId =
   | "mcp"
   | "subagents"
   | "projects"
+  | "memory"
   | "sync"
   | "remoteHosts"
   | "voice"
@@ -259,6 +260,27 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "extensions.subagents.presetFixerName",
       "extensions.subagents.presetUiDesignerName",
       "extensions.subagents.tools",
+    ],
+  },
+  {
+    id: "memory",
+    labelKey: "settings.nav.memory",
+    titleKey: "settings.memory",
+    group: "agent",
+    keywordKeys: [
+      "settings.memoryIntro",
+      "settings.memoryScopeGlobal",
+      "settings.memoryScopeProject",
+      "settings.memoryScopeSession",
+      "settings.memoryKindFact",
+      "settings.memoryKindPreference",
+      "settings.memoryKindDecision",
+      "settings.memoryKindPitfall",
+      "settings.memoryKindProcedure",
+      "settings.memoryPinned",
+      "settings.memoryTidy",
+      "settings.memoryEmpty",
+      "settings.memorySearchPlaceholder",
     ],
   },
   {

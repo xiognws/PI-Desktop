@@ -7,7 +7,7 @@ decisions, pitfalls and procedures the agent or the user chose to keep.
 Storage, dedupe, supersession and keyword recall are specified here;
 automatic extraction and decay are future stages (§9).
 
-Anchored by [ADR 0371](../adr/0371-memory-store.md).
+Anchored by [ADR 0371](../../adr/0371-memory-store.md).
 
 ## 2. Ownership
 

@@ -19,6 +19,7 @@ import { registerPluginIpc } from "./plugin-ipc";
 import { registerPluginUiIpc } from "./plugin-ui-ipc";
 import { registerJevIpc } from "./jev-ipc";
 import { registerProviderIpc } from "./provider-ipc";
+import { registerMemoryIpc } from "./memory-ipc";
 import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
@@ -395,6 +396,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     withGitBranch,
     stripWinLongPrefix,
   });
+
+  registerMemoryIpc({ registrar, getHost });
 
   registerAgentExtensionIpc({
     handle,
