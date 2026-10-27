@@ -181,6 +181,7 @@ impl Database {
         // One-time repair: strip the Windows extended-length path prefix
         // (`//?/X:/...` → `X:/...`) from project paths stored by older versions.
         self.fix_extended_length_project_paths()?;
+        self.daily_memory_tidy(now);
         Ok(())
     }
 
@@ -230,6 +231,34 @@ impl Database {
             }
         }
         Ok(())
+    }
+
+    /// Durable-memory retention (ADR 0371), at most once a day. Best effort:
+    /// housekeeping must never keep the host from starting.
+    fn daily_memory_tidy(&self, now: i64) {
+        const NAMESPACE: &str = "memoryTidy";
+        let last = self
+            .kv_get(NAMESPACE, "lastRunAt")
+            .ok()
+            .flatten()
+            .and_then(|value| value.as_i64())
+            .unwrap_or(0);
+        if now - last < 24 * 3600 * 1000 {
+            return;
+        }
+        match self.tidy_memories(&crate::memory::TidyPolicy::default()) {
+            Ok(outcome) => {
+                if outcome.total() > 0 {
+                    tracing::info!(
+                        expired = outcome.expired,
+                        overflow = outcome.overflow,
+                        "memory retention removed rows"
+                    );
+                }
+                let _ = self.kv_set(NAMESPACE, "lastRunAt", &serde_json::json!(now));
+            }
+            Err(error) => tracing::warn!(error = %error, "memory retention failed"),
+        }
     }
 }
 
@@ -979,6 +1008,27 @@ pub(crate) fn migrate_v21_to_v22(conn: &Connection, path: &Path) -> Result<()> {
     tx.commit().with_context(|| {
         format!(
             "commit schema v21 to v22 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
+/// Schema v26 adds the durable memory store (ADR 0371): the `memories` table,
+/// its keyword index and the indexes that back recall and listing.
+pub(crate) fn migrate_v25_to_v26_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    tx.execute_batch(MEMORIES_DDL)?;
+    tx.pragma_update(None, "user_version", 26i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v25_to_v26(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 25)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v25_to_v26_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v25 to v26 migration; backup {} remains",
             backup.display()
         )
     })?;

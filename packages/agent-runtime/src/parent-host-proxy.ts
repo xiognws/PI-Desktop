@@ -90,6 +90,19 @@ export class ParentHostProxy {
     return () => this.closeHandlers.delete(handler);
   }
 
+  /**
+   * Durable-memory recall (ADR 0371). Declared as its own member so recall is
+   * not just another entry in the generic `call` sequence callers assert on.
+   */
+  async memoryRecall(input: {
+    query: string;
+    projectPath?: string;
+    sessionId?: string;
+    limit?: number;
+  }): Promise<unknown> {
+    return this.call("memory.recall", input);
+  }
+
   async call<T = unknown>(
     method: string,
     params: unknown = {},
