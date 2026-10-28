@@ -519,10 +519,14 @@ a usage tab.
     levels, and the default thinking level. The row keeps the model ID,
     source, capabilities, and token limits visible at a glance in one shared
     compact form that keeps neighbouring windows apart (`1.05M · 128K`), and
-    expands in place for edits. The expanded body is a compact sheet, not a stacked
+    expands in place for edits. The display name is edited **on the row itself**,
+    beside the id it renames: an alias there is what the whole app shows, which
+    is how two providers serving the same model id stay apart
+    (`CX-deepseek-v4.1` / `TX-deepseek-v4.1`), and the field carries its
+    explanation as a title tooltip rather than a paragraph. The expanded body is
+    a compact sheet, not a stacked
     form dump: 2xs labels, dense numeric fields without native spinners, the
-    alias hint as a title tooltip rather than a paragraph, the default
-    thinking selector on the thinking label row, and attachments plus
+    default thinking selector on the thinking label row, and attachments plus
     subagent delegation on one wrapping row. The first row starts expanded so the form remains
     discoverable; additional rows stay collapsed to keep large model sets
     scannable. The bundled models.dev release snapshot pre-fills known rows; custom IDs

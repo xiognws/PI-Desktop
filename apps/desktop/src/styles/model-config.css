@@ -993,19 +993,37 @@
   white-space: nowrap;
 }
 
-/* The configured alias, shown beside the id it names. */
-.provider-chosen-row-alias {
+/* The configured name, edited in place beside the id it renames. Reads as the
+   chip it replaces until it is hovered or focused, so a long list of chosen
+   models does not turn into a column of input boxes. */
+.provider-chosen-row-name {
   flex: none;
-  max-width: 40%;
-  overflow: hidden;
+  width: 34%;
+  min-width: 96px;
+  max-width: 220px;
+}
+
+.provider-chosen-alias-input {
+  width: 100%;
   padding: 1px 6px;
+  border-color: transparent;
   border-radius: var(--radius-full);
   background: var(--ds-tile-deep);
   color: var(--ds-text-secondary);
   font-size: var(--text-3xs);
   line-height: var(--leading-normal);
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.provider-chosen-alias-input::placeholder {
+  color: var(--ds-text-faint);
+}
+
+.provider-chosen-alias-input:hover,
+.provider-chosen-alias-input:focus {
+  border-color: var(--ds-border-strong);
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
 }
 
 .provider-chosen-row-limits {
