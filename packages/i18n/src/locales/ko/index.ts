@@ -1,6 +1,24 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  statusBar: {
+    project: "프로젝트",
+    context: "컨텍스트",
+    used: "사용",
+    left: "남음",
+    cacheShort: "캐시",
+    speed: "속도",
+    used: "사용",
+    left: "남음",
+    cache: "캐시",
+    scheduled: "예약",
+    sessionAge: "세션",
+    customize: "상태 표시줄 사용자 지정",
+    hideBar: "상태 표시줄 숨기기",
+    showBar: "상태 표시줄 표시",
+    running: "실행 중",
+    pending: "승인 대기",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "새 격리 세션",

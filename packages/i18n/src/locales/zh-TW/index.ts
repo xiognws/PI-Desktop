@@ -1,6 +1,24 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
+  statusBar: {
+    project: "專案",
+    context: "上下文",
+    used: "已用",
+    left: "剩餘",
+    cacheShort: "快取",
+    speed: "生成速率",
+    used: "已用",
+    left: "剩餘",
+    cache: "快取",
+    scheduled: "排程",
+    sessionAge: "本對話",
+    customize: "自訂狀態列",
+    hideBar: "隱藏狀態列",
+    showBar: "顯示狀態列",
+    running: "執行中",
+    pending: "等待核准",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "新增隔離工作階段",

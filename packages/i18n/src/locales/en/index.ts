@@ -1,4 +1,22 @@
 export const en = {
+  statusBar: {
+    project: "Project",
+    context: "Context",
+    used: "used",
+    left: "left",
+    cacheShort: "cache",
+    speed: "Rate",
+    used: "used",
+    left: "left",
+    cache: "Cache",
+    scheduled: "Scheduled",
+    sessionAge: "Session",
+    customize: "Customize status bar",
+    hideBar: "Hide status bar",
+    showBar: "Show status bar",
+    running: "Running",
+    pending: "Waiting for approval",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "New isolated session",

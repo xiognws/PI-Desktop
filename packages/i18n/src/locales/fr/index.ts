@@ -1,6 +1,24 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const fr = {
+  statusBar: {
+    project: "Projet",
+    context: "Contexte",
+    used: "utilisé",
+    left: "libre",
+    cacheShort: "cache",
+    speed: "Débit",
+    used: "utilisé",
+    left: "libre",
+    cache: "Cache",
+    scheduled: "Planifié",
+    sessionAge: "Session",
+    customize: "Personnaliser la barre d'état",
+    hideBar: "Masquer la barre d'état",
+    showBar: "Afficher la barre d'état",
+    running: "En cours",
+    pending: "En attente d'approbation",
+  },
   "worktree": {
     "menu": { "group": "Git" },
     "newIsolatedSession": "Nouvelle session isolée",

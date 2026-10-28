@@ -9,7 +9,8 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "dev": "pnpm --filter @pi-desktop/desktop dev",
+    "dev": "node scripts/dev-isolated.mjs",
+    "dev:shared": "pnpm --filter @pi-desktop/desktop dev",
     "preview": "pnpm --filter @pi-desktop/desktop run preview",
     "pack": "pnpm --filter @pi-desktop/desktop run pack",
     "dist": "pnpm --filter @pi-desktop/desktop run dist",

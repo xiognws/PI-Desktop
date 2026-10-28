@@ -1155,6 +1155,23 @@ export async function createWindow({
     if (boundsWatchdog) clearInterval(boundsWatchdog);
   });
 
+  // A launch must always end with a visible window.
+  //
+  // The window is created hidden and shown on `ready-to-show`, but a restored
+  // session or a half-torn-down previous process can leave it shown-and-hidden
+  // again, and then a double-click looks like nothing happened. Unless the
+  // caller asked for a background start (`--hidden`, used by login autostart),
+  // re-assert visibility at every checkpoint the renderer passes.
+  const revealOnLaunch = () => {
+    if (!isLiveWindow() || process.argv.includes("--hidden")) return;
+    if (window.isMinimized()) window.restore();
+    if (!window.isVisible()) window.show();
+  };
+  window.webContents.on("did-finish-load", revealOnLaunch);
+  for (const delayMs of [1200, 3000, 6000]) {
+    setTimeout(revealOnLaunch, delayMs);
+  }
+
   window.once("ready-to-show", () => {
     if (!isLiveWindow()) return;
     // Capture runs need the deterministic Codex footprint; normal launches

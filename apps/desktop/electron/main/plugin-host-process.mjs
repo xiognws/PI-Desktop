@@ -18,9 +18,10 @@
  *   parent -> child  { t: "event", event, ... }           push, no reply (bus.message, host events)
  *   child  -> parent { t: "log", level, message }         diagnostics, fire and forget
  */
-import { createRequire } from "node:module";
+import Module from "node:module";
 import { pathToFileURL } from "node:url";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 const parentPort = process.parentPort;
@@ -500,18 +501,66 @@ function handleHostEvent(message) {
   }
 }
 
-async function loadPluginModule(entry) {
-  const require = createRequire(import.meta.url);
+/**
+ * Load a plugin's `main` as CommonJS even when the file is treated as ESM.
+ *
+ * A bundled plugin is a folder with `main.js`, no `package.json` of its own, and
+ * CommonJS source. Node decides the module type by the *nearest* `package.json`,
+ * which can be the app's own (`"type": "module"`): `require()` then refuses with
+ * ERR_REQUIRE_ESM and the ESM loader dies on `module is not defined`. Compiling
+ * the source as CJS gives the plugin exactly the resolution rules it would get
+ * from a `.cjs` file, without shipping a package.json into every plugin folder.
+ */
+function compileAsCommonJs(entry) {
+  const mod = new Module(entry);
+  mod.filename = entry;
+  mod.paths = Module._nodeModulePaths(dirname(entry));
+  mod._compile(readFileSync(entry, "utf8"), entry);
+  return mod.exports;
+}
+
+/**
+ * The plugin's syntax decides how it is loaded, not the nearest `package.json`.
+ *
+ * Bundled plugins are plain CommonJS sources with no `package.json` of their own,
+ * so Node falls back to the app's `"type": "module"` and either refuses to
+ * `require()` them or evaluates them as ESM and dies on `module.exports`. Which
+ * ancestor happens to declare a module type is not the plugin author's business,
+ * so the entry file is inspected: `.mjs` is ESM, `.cjs` is CommonJS, and a `.js`
+ * entry is ESM only when it actually uses `import`/`export` syntax.
+ */
+function isEsmSource(entry, source) {
+  if (entry.endsWith(".mjs")) return true;
+  if (entry.endsWith(".cjs")) return false;
+  return /^\s*(import|export)\s/m.test(source) || /\bimport\.meta\b/.test(source);
+}
+
+/**
+ * A CommonJS plugin needs a `package.json` of its own, not just a CJS entry.
+ *
+ * The host only decides how to load the entry file; everything the plugin then
+ * `require()`s is resolved by Node's own rules, which walk up to the nearest
+ * `package.json` — the app's own `"type": "module"` when the plugin ships none.
+ * Its submodules were then evaluated as ESM (`require is not defined`). Writing
+ * the one field the folder is missing keeps the whole plugin tree CommonJS, the
+ * way it was authored; a plugin that ships its own package.json is left alone.
+ */
+function ensureCommonJsPackage(entry, pluginPath) {
+  const pkgPath = join(pluginPath, "package.json");
+  if (existsSync(pkgPath)) return;
+  if (isEsmSource(entry, readFileSync(entry, "utf8"))) return;
   try {
-    delete require.cache[require.resolve(entry)];
-    return require(entry);
-  } catch (error) {
-    if (error?.code === "ERR_REQUIRE_ESM" || error?.code === "ERR_REQUIRE_ASYNC_MODULE") {
-      const mod = await import(pathToFileURL(entry).href);
-      return mod?.default && typeof mod.default === "object" ? mod.default : mod;
-    }
-    throw error;
+    writeFileSync(pkgPath, `${JSON.stringify({ private: true, type: "commonjs" }, null, 2)}\n`);
+  } catch {
+    // Read-only install: the entry still loads below, submodules may not.
   }
+}
+
+async function loadPluginModule(entry) {
+  const source = readFileSync(entry, "utf8");
+  if (!isEsmSource(entry, source)) return compileAsCommonJs(entry);
+  const mod = await import(`${pathToFileURL(entry).href}?t=${Date.now()}`);
+  return mod?.default && typeof mod.default === "object" ? mod.default : mod;
 }
 
 async function handleInit(message) {
@@ -521,6 +570,7 @@ async function handleInit(message) {
   const entry = join(pluginPath, String(message.main ?? manifest.main ?? ""));
 
   globalThis.pi = buildApi();
+  ensureCommonJsPackage(entry, pluginPath);
   pluginModule = await loadPluginModule(entry);
   const oauthProviders = Array.isArray(manifest?.contributes?.providers)
     ? manifest.contributes.providers.filter((provider) => provider?.authKind === "oauth")

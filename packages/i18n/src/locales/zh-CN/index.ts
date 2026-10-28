@@ -1,6 +1,24 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhCN = {
+  statusBar: {
+    project: "项目",
+    context: "上下文",
+    used: "已用",
+    left: "剩余",
+    cacheShort: "缓存",
+    speed: "生成速率",
+    used: "已用",
+    left: "剩余",
+    cache: "缓存",
+    scheduled: "计划",
+    sessionAge: "本会话",
+    customize: "自定义状态栏",
+    hideBar: "隐藏状态栏",
+    showBar: "显示状态栏",
+    running: "运行中",
+    pending: "等待批准",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "新建隔离会话",

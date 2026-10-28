@@ -1,6 +1,24 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const tr = {
+  statusBar: {
+    project: "Proje",
+    context: "Bağlam",
+    used: "kullanılan",
+    left: "kalan",
+    cacheShort: "önbellek",
+    speed: "Hız",
+    used: "kullanılan",
+    left: "kalan",
+    cache: "Önbellek",
+    scheduled: "Zamanlı",
+    sessionAge: "Oturum",
+    customize: "Durum çubuğunu özelleştir",
+    hideBar: "Durum çubuğunu gizle",
+    showBar: "Durum çubuğunu göster",
+    running: "Çalışıyor",
+    pending: "Onay bekliyor",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "Yeni yalıtılmış oturum",

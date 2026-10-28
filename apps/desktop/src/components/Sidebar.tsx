@@ -30,6 +30,20 @@ import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
 import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import {
+  StatusBarCache,
+  StatusBarElapsed,
+  StatusBarMetrics,
+  StatusBarScheduled,
+  StatusBarSessionAge,
+  StatusBarSpeed,
+} from "./StatusBarUsage";
+import { StatusBarMenu, type StatusBarMenuEntry } from "./StatusBarMenu";
+import {
+  setStatusBarHidden,
+  useStatusBarPrefs,
+} from "../lib/status-bar-prefs";
+import { pendingPermissionsCount, runningSessionsCount } from "../lib/status-bar";
+import {
   getGlobalPinnedSessions,
   normalizeProjectPath,
   sessionArchived,
@@ -275,6 +289,20 @@ export function Sidebar({
   const runningSessions = useAppStore((s) => s.runningSessions);
   const sessionOutcomes = useAppStore((s) => s.sessionOutcomes);
   const pendingPermissions = useAppStore((s) => s.pendingPermissions);
+  const runningCount = runningSessionsCount(runningSessions);
+  const pendingCount = pendingPermissionsCount(pendingPermissions);
+  const statusBarPrefs = useStatusBarPrefs();
+  const [statusBarMenuAt, setStatusBarMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const statusBarEntries: StatusBarMenuEntry[] = [
+    { id: "project", label: t("statusBar.project") },
+    { id: "context", label: t("statusBar.context") },
+    { id: "speed", label: t("statusBar.speed") },
+    { id: "cache", label: t("statusBar.cache") },
+    { id: "sessionAge", label: t("statusBar.sessionAge") },
+    { id: "scheduled", label: t("statusBar.scheduled") },
+    { id: "timer", label: t("statusBar.running") },
+    { id: "pending", label: t("statusBar.pending") },
+  ];
   const setPage = useAppStore((s) => s.setPage);
   const navBack = useAppStore((s) => s.navBack);
   const canNavBack = useAppStore((s) => s.canNavBack);
@@ -2749,7 +2777,13 @@ export function Sidebar({
             })} />
         </div>
 
-        <div className="sidebar-footer no-drag">
+        <div
+          className={cx("sidebar-footer no-drag", statusBarPrefs.barHidden && "is-bar-hidden")}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setStatusBarMenuAt({ x: event.clientX, y: window.innerHeight - event.clientY });
+          }}
+        >
           <div className="footer-actions">
             <TooltipButton
               type="button"
@@ -2789,6 +2823,35 @@ export function Sidebar({
             <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
           </div>
 
+          <div className="statusbar-info">
+            {!statusBarPrefs.hidden.includes("project") && workspace?.name ? (
+              <span className="statusbar-metric" title={workspace.path}>
+                <span className="statusbar-label">{t("statusBar.project")}</span>
+                <span className="statusbar-value">{workspace.name}</span>
+              </span>
+            ) : null}
+            {statusBarPrefs.hidden.includes("context") ? null : <StatusBarMetrics />}
+            {statusBarPrefs.hidden.includes("speed") ? null : <StatusBarSpeed />}
+            {statusBarPrefs.hidden.includes("cache") ? null : <StatusBarCache />}
+            {statusBarPrefs.hidden.includes("sessionAge") ? null : <StatusBarSessionAge />}
+            {statusBarPrefs.hidden.includes("scheduled") ? null : <StatusBarScheduled />}
+            {runningCount > 1 ? (
+              <span className="statusbar-metric">
+                <span className="statusbar-value">
+                  {t("statusBar.running")} {runningCount}
+                </span>
+              </span>
+            ) : null}
+            {statusBarPrefs.hidden.includes("timer") ? null : <StatusBarElapsed />}
+            {!statusBarPrefs.hidden.includes("pending") && pendingCount > 0 ? (
+              <span className="statusbar-metric statusbar-metric-warn">
+                <span className="statusbar-value">
+                  {t("statusBar.pending")} {pendingCount}
+                </span>
+              </span>
+            ) : null}
+          </div>
+
           <TooltipButton
             type="button"
             className={`footer-build ${updateReady ? "has-update" : ""}`}
@@ -2811,9 +2874,28 @@ export function Sidebar({
             <span className="footer-build-version">{buildLabel}</span>
             {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
           </TooltipButton>
+          {statusBarPrefs.barHidden ? (
+            <button
+              type="button"
+              className="statusbar-restore no-drag"
+              onClick={() => setStatusBarHidden(false)}
+              title={t("statusBar.showBar")}
+              aria-label={t("statusBar.showBar")}
+            >
+              <IconClock size={12} aria-hidden />
+            </button>
+          ) : null}
         </div>
       </div>
       {renderFloatingMenu()}
+      {statusBarMenuAt ? (
+        <StatusBarMenu
+          at={statusBarMenuAt}
+          entries={statusBarEntries}
+          prefs={statusBarPrefs}
+          onClose={() => setStatusBarMenuAt(null)}
+        />
+      ) : null}
       {sessionHoverCard ? (
         <SessionHoverCard
           key={sessionHoverCard.session.id}

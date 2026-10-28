@@ -107,23 +107,31 @@
   color: var(--ds-text-primary);
 }
 
+/*
+ * The bar is not a sidebar footer: it spans the whole window so the session
+ * frame sits *above* it, and the numbers it carries (project, branch, context,
+ * running work) belong to the window, not to the sidebar column. Fixed to the
+ * shell's bottom edge; `.app-chat-shell` reserves the height below.
+ */
 .sidebar-footer {
-  /* Positioning context for the notification popover. */
-  position: relative;
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 45;
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  margin-top: auto;
-  /* No side padding: .sidebar-body's 8px already sets the content grid, so the
-     chip's own padding lands its text on the 16px nav inset and the trailing
-     icon's hover fill ends flush with the nav rows above. */
-  padding: 7px 0 2px;
-  background: transparent;
+  gap: 10px;
+  min-height: 30px;
+  height: 30px;
+  margin-top: 0;
+  padding: 0 12px;
+  background: var(--ds-bg-sidebar);
+  border-top: 1px solid var(--ds-border-subtle);
+  backdrop-filter: blur(12px);
 }
 
 :root[data-theme="light"] .sidebar-footer {
-  background: transparent;
+  background: var(--ds-bg-sidebar);
 }
 
 /* Build chip: quiet by default, accented only when an update is actionable. */
@@ -171,6 +179,220 @@
   display: flex;
   align-items: center;
   gap: 0;
+}
+
+/* Info cluster: quiet labels, one line, truncating the widest value first. */
+.statusbar-info {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ds-text-secondary);
+}
+
+.statusbar-metric {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  white-space: nowrap;
+}
+
+.statusbar-label {
+  color: var(--ds-text-secondary);
+}
+
+.statusbar-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  text-overflow: ellipsis;
+}
+
+/* The context item is a button: the bar's own typography, the composer's panel. */
+.statusbar-clickable .context-inspector {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+}
+
+.statusbar-clickable .context-inspector-trigger.has-custom-trigger {
+  display: inline-flex;
+  height: 100%;
+  align-items: center;
+  gap: 5px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+}
+
+.statusbar-clickable .context-inspector-trigger.has-custom-trigger:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* Hidden bar: the reserved strip stays, everything in it goes. */
+.sidebar-footer.is-bar-hidden {
+  justify-content: flex-end;
+  background: transparent;
+  border-top-color: transparent;
+  pointer-events: none;
+}
+
+.sidebar-footer.is-bar-hidden > * {
+  display: none;
+}
+
+.sidebar-footer.is-bar-hidden > .statusbar-restore {
+  display: inline-flex;
+  pointer-events: auto;
+}
+
+.statusbar-restore {
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+}
+
+.statusbar-restore:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* Right-click menu: a small panel anchored above the bar. */
+.statusbar-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: 8px;
+  background: var(--ds-bg-secondary);
+  box-shadow: var(--ds-shadow-menu, 0 12px 32px rgba(0, 0, 0, 0.35));
+  font-size: 11px;
+  color: var(--ds-text-primary);
+}
+
+.statusbar-menu-title {
+  padding: 4px 8px;
+  color: var(--ds-text-secondary);
+}
+
+.statusbar-menu-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.statusbar-menu-row:hover {
+  background: var(--ds-bg-hover);
+}
+
+.statusbar-menu-row.is-action {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.statusbar-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--ds-border-subtle);
+}
+
+.statusbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.statusbar-button:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* A real bar: block glyphs at 9px read as a grey smear, and they drift off the
+   text centre line. */
+.statusbar-bar {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--ds-border-default);
+}
+
+.statusbar-bar-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: 2px;
+  background: var(--ds-text-secondary);
+}
+
+.statusbar-metric-warn .statusbar-bar-fill {
+  background: var(--ds-warning, #d9a13b);
+}
+
+.statusbar-aside {
+  color: var(--ds-text-secondary);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.statusbar-metric-warn .statusbar-value {
+  color: var(--ds-warning, #d9a13b);
+}
+
+.statusbar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ds-text-secondary);
+  align-self: center;
+}
+
+.statusbar-dot-live {
+  background: var(--ds-accent, #4c8dff);
+  animation: statusbar-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes statusbar-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 /* Shares the notification trigger's 32px hit target so the row reads as one bar. */

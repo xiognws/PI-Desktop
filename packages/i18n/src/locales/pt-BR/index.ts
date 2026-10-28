@@ -1,6 +1,24 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
+  statusBar: {
+    project: "Projeto",
+    context: "Contexto",
+    used: "usado",
+    left: "livre",
+    cacheShort: "cache",
+    speed: "Velocidade",
+    used: "usado",
+    left: "livre",
+    cache: "Cache",
+    scheduled: "Agendado",
+    sessionAge: "Sessão",
+    customize: "Personalizar barra de status",
+    hideBar: "Ocultar barra de status",
+    showBar: "Mostrar barra de status",
+    running: "Em execução",
+    pending: "Aguardando aprovação",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "Nova sessão isolada",
