@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Search,
@@ -43,8 +43,78 @@ let envTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   loadEnvStatus()
+  loadRuntime()
   envTimer = setInterval(loadEnvStatus, 30000)
+  runtimeTimer = setInterval(loadRuntime, 5000)
 })
+
+// 状态栏运行态（学桌面端：模型 / 用量 / 正在跑什么 / 下一次计划）
+type Runtime = {
+  version?: string
+  running?: number
+  waiting?: number
+  currentStage?: string
+  latestPipeline?: { id: string; status: string; modelKey?: string; stage: string } | null
+  tokens?: { in: number; out: number; calls: number }
+  latestTokens?: { in: number; out: number; calls: number }
+  schedules?: number
+  nextRun?: string | null
+}
+const runtime = ref<Runtime>({})
+const stageLabels: Record<string, string> = {
+  analyze: '需求分析',
+  design: '用例设计',
+  author: '脚本工程',
+  gate: '静态闸门',
+  execute: '脚本执行',
+  judge: '结果判定',
+  repair: '脚本修复',
+  report: '结果收集',
+}
+const runtimeModel = computed(() => {
+  const key = runtime.value.latestPipeline?.modelKey || ''
+  if (!key) return '未使用模型'
+  const parts = key.split('/')
+  return parts[parts.length - 1] || key
+})
+const runtimeTokens = computed(() => {
+  const own = runtime.value.latestTokens
+  if (!own || !own.calls) return '0 tok'
+  const total = own.in + own.out
+  const text = total >= 1000 ? `${(total / 1000).toFixed(1)}k` : String(total)
+  return `${text} tok · ${own.calls} 次`
+})
+const runtimeState = computed(() => {
+  const latest = runtime.value.latestPipeline
+  if (!latest) return '还没有流水线'
+  if (runtime.value.running) {
+    const stage = stageLabels[latest.stage] || latest.stage
+    return `运行中 · ${stage}`
+  }
+  if (runtime.value.waiting) {
+    const stage = stageLabels[latest.stage] || latest.stage
+    return `待确认 · ${stage}`
+  }
+  return latest.status === 'done' ? '最近一条已完成' : `最近一条 ${latest.status}`
+})
+const nextRunText = computed(() => {
+  const next = runtime.value.nextRun
+  if (!next) return '无计划'
+  return next.slice(5, 16)
+})
+
+let runtimeTimer: ReturnType<typeof setInterval> | null = null
+
+async function loadRuntime() {
+  try {
+    const pid = route.params.projectId
+    if (!pid) return
+    const res = await fetch(`/api/runtime?projectId=${pid}`)
+    if (res.ok) runtime.value = await res.json()
+  } catch {
+    // 状态栏是旁路信息，取不到就保持上一次
+  }
+}
 
 async function loadEnvStatus() {
   try {
@@ -61,6 +131,7 @@ async function loadEnvStatus() {
 
 onUnmounted(() => {
   if (envTimer) clearInterval(envTimer)
+  if (runtimeTimer) clearInterval(runtimeTimer)
 })
 
 
@@ -153,7 +224,21 @@ function backToHome() {
         <span class="w-1.5 h-1.5 rounded-full" :class="item.ok ? 'bg-green-500' : 'bg-red-500'"></span>
         {{ item.label }}
       </span>
-      <span class="ml-auto text-gray-400">AutoTest · v0.2.0</span>
+      <span class="text-gray-300">|</span>
+      <span class="flex items-center gap-1" :title="runtime.latestPipeline?.modelKey || ''">
+        <span class="text-gray-400">模型</span>{{ runtimeModel }}
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="text-gray-400">用量</span>{{ runtimeTokens }}
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full" :class="runtime.running ? 'bg-blue-500 animate-pulse' : 'bg-gray-300'"></span>
+        {{ runtimeState }}
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="text-gray-400">下次计划</span>{{ nextRunText }}
+      </span>
+      <span class="ml-auto text-gray-400">AutoTest · v{{ runtime.version || '0.2.0' }}</span>
     </div>
   </div>
 </template>

@@ -6,5 +6,5 @@ platform/ui/dist/
 platform/ui/node_modules/
 **/__pycache__/
 **/.pytest_cache/
-runtime/
+/runtime/
 *.log

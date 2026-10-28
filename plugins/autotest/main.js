@@ -125,9 +125,59 @@ async function api(path, options) {
 async function healthy() {
   try {
     const body = await api("/api/health");
-    return body?.status === "ok";
+    return body?.status === "ok" ? body : null;
   } catch {
-    return false;
+    return null;
+  }
+}
+
+/**
+ * 后端代码指纹：只哈希"改了就要求重启后端"的那几个文件。
+ * 端口上跑的是旧代码时，接手它等于改了提示词却在跑老逻辑。
+ */
+function codeStamp() {
+  const crypto = require("node:crypto");
+  const fs = require("node:fs");
+  const hash = crypto.createHash("sha1");
+  const files = [
+    join(platformDir(), "src/autotest/api/server.py"),
+    join(platformDir(), "src/autotest/pipelines/service.py"),
+    join(platformDir(), "src/autotest/pipelines/schedules.py"),
+    join(platformDir(), "src/autotest/runtime/watchdog.py"),
+  ];
+  for (const file of files) {
+    try {
+      const st = fs.statSync(file);
+      hash.update(`${file}:${st.size}:${st.mtimeMs}`);
+    } catch {
+      hash.update(`${file}:missing`);
+    }
+  }
+  hash.update(join(pluginDir(), "pipeline", "config.mjs"));
+  return hash.digest("hex").slice(0, 12);
+}
+
+/** 结束占用端口的进程（只在确认它是本插件自己的旧后端之后调用）。 */
+async function killPortOwner(port) {
+  const { execFileSync } = require("node:child_process");
+  try {
+    if (process.platform === "win32") {
+      const out = execFileSync(
+        "powershell",
+        ["-NoProfile", "-Command", `(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue).OwningProcess`],
+        { encoding: "utf8" },
+      ).trim();
+      const pid = Number(out.split(/\s+/).find((part) => /^\d+$/.test(part)));
+      if (pid > 0) process.kill(pid);
+    } else {
+      const out = execFileSync("sh", ["-c", `lsof -ti tcp:${port} -sTCP:LISTEN`], { encoding: "utf8" }).trim();
+      for (const line of out.split(/\s+/)) {
+        const pid = Number(line);
+        if (pid > 0) process.kill(pid);
+      }
+    }
+  } catch (error) {
+    state.log(`[autotest] could not free port ${port}: ${error?.message ?? error}`);
   }
 }
 
@@ -170,6 +220,26 @@ async function startBackend() {
     return;
   }
 
+  state.stopping = false;
+  const stamp = codeStamp();
+  const already = await healthy();
+  if (already && already.codeStamp === stamp) {
+    state.log(`[autotest] reusing the backend already listening on ${state.port} (code ${stamp})`);
+    return;
+  }
+  if (already) {
+    // 旧代码的孤儿后端：先收掉，否则新提示词/新规则根本不会生效
+    state.log(
+      `[autotest] replacing stale backend on ${state.port} ` +
+        `(code ${already.codeStamp || "unknown"} -> ${stamp})`,
+    );
+    await killPortOwner(state.port);
+    for (let i = 0; i < 20; i += 1) {
+      if (!(await healthy())) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
   state.log(`[autotest] starting backend: ${exe} (port ${state.port}, platform ${platformDir()})`);
   const e2eHome = resolveE2eHome();
   const child = spawn(
@@ -185,6 +255,9 @@ async function startBackend() {
         PYTHONPATH: [join(platformDir(), "src"), process.env.PYTHONPATH].filter(Boolean).join(";"),
         // keep project data outside the plugin package
         AUTOTEST_WORKSPACE: state.dataRoot,
+        // 宿主退出时后端要跟着退，否则残留进程占住端口
+        AUTOTEST_PARENT_PID: String(process.pid),
+        AUTOTEST_CODE_STAMP: stamp,
         // the host may sanitise env, so resolve the e2e runtime here and hand it over
         ...(e2eHome ? { AUTOTEST_E2E_HOME: e2eHome } : {}),
         ...(existsSync(join(pluginDir(), "runner", "run.mjs"))
@@ -206,6 +279,15 @@ async function startBackend() {
   child.on("exit", (code, signal) => {
     state.log(`[backend] exited code=${code} signal=${signal}`);
     if (state.child === child) state.child = null;
+    // 后端崩了没人接手，面板就会一直"离线"直到用户重开插件：自己重起，带退避。
+    if (state.stopping || state.restartTimer) return;
+    state.restartAttempts = (state.restartAttempts ?? 0) + 1;
+    const delay = Math.min(30000, 1500 * 2 ** Math.min(4, state.restartAttempts - 1));
+    state.log(`[autotest] backend exited; restarting in ${delay}ms (attempt ${state.restartAttempts})`);
+    state.restartTimer = setTimeout(() => {
+      state.restartTimer = null;
+      void startBackend().catch((error) => state.log(`[autotest] restart failed: ${error}`));
+    }, delay);
   });
   child.on("error", (error) => {
     state.lastError = String(error?.message ?? error);
@@ -213,11 +295,17 @@ async function startBackend() {
   });
 
   const ready = await waitHealthy(HEALTH_TIMEOUT_MS);
+  if (ready) state.restartAttempts = 0;
   state.lastError = ready ? "" : "backend did not answer /api/health in time";
   state.log(ready ? `[autotest] backend ready on ${state.port}` : `[autotest] ${state.lastError}`);
 }
 
 async function stopBackend() {
+  state.stopping = true;
+  if (state.restartTimer) {
+    clearTimeout(state.restartTimer);
+    state.restartTimer = null;
+  }
   const child = state.child;
   if (!child) return;
   state.child = null;
@@ -504,7 +592,7 @@ const TOOLS = [
   {
     name: "platform_status",
     run: async () => ({
-      ok: await healthy(),
+      ok: Boolean(await healthy()),
       port: state.port,
       platformDir: platformDir(),
       dataRoot: state.dataRoot,
@@ -714,6 +802,10 @@ async function onLoad(ctx) {
     stop: stopBackend,
   });
   startPipelineSupervisor();
+  // 宿主的服务管理器不一定替我们把 backend 起起来（权限待审、服务状态 stopped 时它
+  // 只登记不执行）。后端是面板的全部依赖，所以这里自己拉起一次；startBackend 自身
+  // 幂等（同 codeStamp 已在跑就复用）。
+  void startBackend().catch((error) => state.log(`[autotest] backend start failed: ${error}`));
 }
 
 async function onUnload() {

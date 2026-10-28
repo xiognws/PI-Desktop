@@ -32,6 +32,11 @@ from autotest.pipelines.service import PipelineRuleError
 from autotest.storage.migrations import ensure_project_schema
 from autotest.storage.sqlite import init_db, get_conn
 
+# 宿主关掉后自己退出：否则残留后端会占住端口，下一次启动像是"插件坏了"
+from autotest.runtime.watchdog import start_parent_watchdog
+
+start_parent_watchdog()
+
 app = FastAPI(title="AutoTestDemo", version="0.2.0")
 
 # 版本指纹：/api/health 返回；前端据此感知后端版本变更（防"新后端+旧前端"错位）
@@ -253,6 +258,15 @@ def init_project_db(project_id: str):
 async def startup():
     init_db()
     WORKSPACE.mkdir(parents=True, exist_ok=True)
+    stray = 0
+    # 上个进程被强杀时没人写结束状态：启动时把"还在跑"的流水线收尾，
+    # 否则面板/状态栏会一直等一个不存在的执行。
+    for project_dir in WORKSPACE.iterdir():
+        if not project_dir.is_dir():
+            continue
+        stray += pipeline_service.mark_interrupted_runs(project_dir / "data.db")
+    if stray:
+        print(f"[autotest] closed {stray} pipeline(s) left running by the previous process", flush=True)
 
 
 # ====== 项目管理 ======
@@ -1116,7 +1130,14 @@ async def list_all_pipelines(status: str = ""):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": APP_VERSION}
+    # codeStamp 让插件判断端口上那份后端是不是**这次**的代码：
+    # 旧代码的孤儿进程不能冒充新后端，否则改了半天提示词，跑的还是老逻辑。
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "codeStamp": os.environ.get("AUTOTEST_CODE_STAMP", ""),
+        "pid": os.getpid(),
+    }
 
 
 @app.post("/api/backend/restart")
@@ -1218,6 +1239,66 @@ def _probe_env(project_id: str) -> dict:
         except Exception:
             pass
     return result
+
+
+@app.get("/api/runtime")
+async def runtime_status(projectId: str = ""):
+    """状态栏用的运行态摘要：模型、token、运行中的流水线、下一条计划。
+
+    都从已落库的行算出来，不额外维护计数（状态栏不能比数据库更"乐观"）。
+    """
+    payload: dict[str, object] = {"version": APP_VERSION, "projectId": projectId}
+    if not projectId:
+        return payload
+    db_path = get_project_db(projectId)
+    if not db_path.exists():
+        return payload
+
+    pipelines = pipeline_service.list_pipelines(db_path, projectId)
+    # running 和 waiting 不是一回事：waiting 是等人确认，不该在状态栏写成"运行中"
+    running = [row for row in pipelines if row["status"] == "running"]
+    waiting = [row for row in pipelines if row["status"] == "waiting"]
+    latest = pipelines[0] if pipelines else None
+    payload["running"] = len(running)
+    payload["waiting"] = len(waiting)
+    active = running or waiting
+    payload["currentStage"] = active[0]["current_stage"] if active else ""
+    payload["latestPipeline"] = {
+        "id": latest["id"],
+        "status": latest["status"],
+        "modelKey": latest["model_key"],
+        "stage": latest["current_stage"],
+    } if latest else None
+
+    conn = sqlite3.connect(db_path)
+    try:
+        tokens = conn.execute(
+            "SELECT COALESCE(SUM(tokens_in),0), COALESCE(SUM(tokens_out),0), COUNT(*) FROM agent_calls"
+        ).fetchone()
+        if latest:
+            own = conn.execute(
+                "SELECT COALESCE(SUM(tokens_in),0), COALESCE(SUM(tokens_out),0), COUNT(*) "
+                "FROM agent_calls WHERE pipeline_id = ?",
+                (latest["id"],),
+            ).fetchone()
+        else:
+            own = (0, 0, 0)
+    except sqlite3.Error:
+        tokens, own = (0, 0, 0), (0, 0, 0)
+    finally:
+        conn.close()
+    payload["tokens"] = {"in": int(tokens[0]), "out": int(tokens[1]), "calls": int(tokens[2])}
+    payload["latestTokens"] = {"in": int(own[0]), "out": int(own[1]), "calls": int(own[2])}
+
+    try:
+        schedules = [row for row in schedule_service.list_schedules(db_path, projectId) if row["enabled"]]
+        upcoming = sorted(row["next_run_at"] for row in schedules if row.get("next_run_at"))
+        payload["schedules"] = len(schedules)
+        payload["nextRun"] = upcoming[0] if upcoming else None
+    except Exception:  # 计划表缺失不该让状态栏整条掉线
+        payload["schedules"] = 0
+        payload["nextRun"] = None
+    return payload
 
 
 @app.get("/api/projects/{project_id}/env-status")

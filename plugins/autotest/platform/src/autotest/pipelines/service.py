@@ -96,6 +96,40 @@ def hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:32]
 
 
+def mark_interrupted_runs(db_path: Path) -> int:
+    """收尾上一个进程留下的 running 行。
+
+    后端被强杀时没有任何人写结束状态，于是流水线会永远"在跑"：面板时间线、
+    状态栏、定时监督器全都在等一个不存在的执行。启动时把这类行判成失败，
+    并保留出错阶段，比让它们假装还活着诚实。
+    """
+    if not db_path.exists():
+        return 0
+    conn = sqlite3.connect(db_path)
+    try:
+        pending = conn.execute(
+            "SELECT COUNT(*) FROM pipelines WHERE status = 'running'"
+        ).fetchone()[0]
+        if not pending:
+            return 0
+        conn.execute(
+            "UPDATE pipelines SET status = 'failed', finished_at = CURRENT_TIMESTAMP "
+            "WHERE status = 'running'"
+        )
+        conn.execute(
+            "UPDATE pipeline_stages SET status = 'failed', "
+            "error = COALESCE(error, 'backend restarted while this stage was running'), "
+            "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP) "
+            "WHERE status = 'running'"
+        )
+        conn.commit()
+        return int(pending)
+    except sqlite3.Error:
+        return 0
+    finally:
+        conn.close()
+
+
 def ensure_pipeline_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(PIPELINE_SCHEMA)
     # 老库补列：target_url 是后加的（e2e 用例必须知道被测应用地址）
