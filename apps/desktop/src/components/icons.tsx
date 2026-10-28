@@ -13,6 +13,7 @@ import {
   Bell,
   BookOpen,
   Bot,
+  Brain,
   Camera,
   Check,
   CheckCheck,
@@ -150,6 +151,7 @@ export const IconPlus = icon(Plus);
 export const IconPower = icon(Power);
 export const IconPlay = icon(Play);
 export const IconBookOpen = icon(BookOpen);
+export const IconBrain = icon(Brain);
 /** Paste-from-clipboard actions (MCP config import). */
 export const IconClipboard = icon(ClipboardPaste);
 export const IconArchive = icon(Archive);

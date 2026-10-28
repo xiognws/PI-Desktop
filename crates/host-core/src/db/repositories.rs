@@ -271,6 +271,12 @@ impl Database {
         }
         if migrated_version == 25 {
             super::tool_image_storage_migration::migrate(&conn, path)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        }
+        // The memory store is the step after the v26 image envelope, so a v25
+        // database walks both migrations in the same launch.
+        if migrated_version == 26 {
+            migrate_v26_to_v27(&conn, path)?;
         }
         let db = Self { conn, data_dir };
         db.boot_maintenance()?;

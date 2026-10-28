@@ -1,5 +1,7 @@
 mod config_sync_rpc;
 mod gen_ui;
+mod memory_rpc;
+mod memory_tool;
 mod plugin_reviews_rpc;
 mod remote_tools;
 mod scheduled_rpc;
@@ -1919,6 +1921,10 @@ async fn handle_request(
         return config_sync_rpc::handle(state, method, params, tx)
             .await
             .map_err(config_sync_rpc_err);
+    }
+
+    if method.starts_with("memory.") {
+        return memory_rpc::handle(state, method, params).await;
     }
 
     match method {
@@ -4599,6 +4605,10 @@ async fn handle_request(
                     // The checklist body owns its own trusted-transport checks,
                     // the atomic write, and the after-commit notification.
                     todos::execute_write(&state, &tx, &p, call_started).await?
+                } else if p.tool_name == "Remember" {
+                    // Durable memory write (ADR 0371). Scope comes from the
+                    // session, never from `args`.
+                    memory_tool::execute(&state, &p).await?
                 } else if tools::is_desktop_dispatched(&p.tool_name) {
                     // Plugin and MCP dispatch has its own bounded default, sized
                     // to outlast Electron's budgets; command-shell timeout

@@ -1,4 +1,4 @@
-# 04. Data Storage (Schema v26)
+# 04. Data Storage (Schema v27)
 
 
 ### Lossless tool-image storage (#1868)

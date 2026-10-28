@@ -51,6 +51,7 @@ import type {
   McpCatalogEntry,
   SkillCatalogEntry,
   ModelInfo,
+  ModelBenchmarkLoad,
   McpServerInput,
   McpServerRecord,
   McpServerStatus,
@@ -680,6 +681,62 @@ function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
   };
 }
 
+export type MemoryScope = "global" | "project" | "session";
+export type MemoryKind = "fact" | "preference" | "decision" | "pitfall" | "procedure";
+export type MemorySource = "agent" | "user" | "import";
+
+/** One durable memory (ADR 0371); mirrors the host's `MemoryRecord`. */
+export type MemoryRecord = {
+  id: string;
+  scope: MemoryScope;
+  projectPath?: string | null;
+  sessionId?: string | null;
+  kind: MemoryKind;
+  title: string;
+  body: string;
+  tags: string[];
+  source: MemorySource;
+  confidence: number;
+  pinned: boolean;
+  useCount: number;
+  createdAt: number;
+  updatedAt: number;
+  lastUsedAt?: number | null;
+  validFrom: number;
+  validUntil?: number | null;
+  supersededBy?: string | null;
+};
+
+export type MemoryStats = {
+  total: number;
+  live: number;
+  pinned: number;
+  byScope: Record<string, number>;
+  byKind: Record<string, number>;
+};
+
+export type MemoryListFilter = {
+  scope?: MemoryScope;
+  kind?: MemoryKind;
+  pinned?: boolean;
+  projectPath?: string;
+  sessionId?: string;
+  includeSuperseded?: boolean;
+  limit?: number;
+  offset?: number;
+};
+
+export type MemoryUpdateInput = {
+  id: string;
+  title?: string;
+  body?: string;
+  tags?: string[];
+  confidence?: number;
+  pinned?: boolean;
+};
+
+export type MemoryTidyResult = { removed: number; expired: number; overflow: number };
+
 export const api = {
   getVersion: () => invoke<AppVersionInfo>(IPC.invoke.appGetVersion),
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
@@ -944,6 +1001,15 @@ export const api = {
       evidence?: string;
     }>(IPC.invoke.providersListModels, input),
   /**
+   * Benchmark overlay for the model picker, keyed by normalized model id.
+   *
+   * Cached for a day and refreshed in the background when stale: an offline or
+   * failed refresh returns the last good table (`stale: true`) or an empty one
+   * (`source: "none"`), so a picker never has to handle an error here.
+   */
+  modelBenchmarks: (input?: { forceRefresh?: boolean }) =>
+    invoke<ModelBenchmarkLoad>(IPC.invoke.modelsBenchmarks, input),
+  /**
    * Look one hand-typed model id up in the local models.dev snapshot.
    *
    * The discovered list only describes ids a service already serves, so this is
@@ -1044,6 +1110,20 @@ export const api = {
     invoke<{ memory: ProjectMemory }>(IPC.invoke.projectMemorySave, {
       projectPath,
       entries,
+    }),
+  listMemories: (filter?: MemoryListFilter) =>
+    invoke<{ memories: MemoryRecord[]; total: number }>(IPC.invoke.memoryList, filter),
+  memoryStats: () => invoke<{ stats: MemoryStats }>(IPC.invoke.memoryStats),
+  updateMemory: (input: MemoryUpdateInput) =>
+    invoke<{ memory: MemoryRecord }>(IPC.invoke.memoryUpdate, input),
+  forgetMemory: (input: { id: string } | { sessionId: string }) =>
+    invoke<{ removed: number }>(IPC.invoke.memoryForget, input),
+  tidyMemories: (input?: { maxAgeDays?: number; minConfidence?: number; maxLive?: number; expire?: boolean }) =>
+    invoke<MemoryTidyResult>(IPC.invoke.memoryTidy, input),
+  supersedeMemory: (id: string, replacementId: string) =>
+    invoke<{ superseded: string; replacementId: string }>(IPC.invoke.memorySupersede, {
+      id,
+      replacementId,
     }),
   cloneProject: (url: string) =>
     invoke<{ workspace: ProjectWorkspace | null; canceled?: boolean }>(

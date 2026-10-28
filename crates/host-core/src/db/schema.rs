@@ -26,6 +26,73 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_session_todo_active
 /// Same DDL as the fresh schema, exposed for the v20 -> v21 migration.
 pub(crate) const SESSION_TODO_DDL: &str = session_todo_ddl!();
 
+/// `memories` table, its keyword index, and the supporting indexes in one
+/// place, so the fresh schema and the v26 -> v27 migration cannot drift
+/// (ADR 0371). Retrieval is keyword-first: the FTS5 table stores a *copy* of
+/// the text rather than external content, because the write path normalises
+/// CJK text to one token per ideograph (see `memory::normalise_search_text`).
+macro_rules! memories_ddl {
+    () => {
+        r#"
+CREATE TABLE IF NOT EXISTS memories (
+  id            TEXT PRIMARY KEY,
+  scope         TEXT NOT NULL CHECK (scope IN ('global', 'project', 'session')),
+  project_path  TEXT,
+  session_id    TEXT,
+  kind          TEXT NOT NULL CHECK (kind IN (
+                  'fact', 'preference', 'decision', 'pitfall', 'procedure'
+                )),
+  title         TEXT NOT NULL CHECK (
+                  length(title) > 0 AND length(title) <= 200
+                  AND instr(title, char(0)) = 0
+                ),
+  body          TEXT NOT NULL CHECK (
+                  length(body) > 0 AND length(body) <= 8000
+                  AND instr(body, char(0)) = 0
+                ),
+  tags          TEXT NOT NULL DEFAULT '[]',
+  source        TEXT NOT NULL CHECK (source IN ('agent', 'user', 'import')),
+  confidence    REAL NOT NULL DEFAULT 0.7 CHECK (confidence >= 0.0 AND confidence <= 1.0),
+  pinned        INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)),
+  content_hash  TEXT NOT NULL CHECK (length(content_hash) = 64),
+  use_count     INTEGER NOT NULL DEFAULT 0 CHECK (use_count >= 0),
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL,
+  last_used_at  INTEGER,
+  -- Bi-temporal columns: when the fact is true in the world (valid_*) is kept
+  -- apart from when the agent learned it (created_at/updated_at).
+  valid_from    INTEGER NOT NULL,
+  valid_until   INTEGER,
+  superseded_by TEXT,
+  CHECK ((scope = 'project') = (project_path IS NOT NULL)),
+  CHECK ((scope = 'session') = (session_id IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_dedupe
+  ON memories(content_hash, scope, ifnull(project_path, ''), ifnull(session_id, ''));
+CREATE INDEX IF NOT EXISTS idx_memories_scope_created
+  ON memories(scope, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_project_used
+  ON memories(project_path, last_used_at DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_session_created
+  ON memories(session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_pinned
+  ON memories(use_count DESC) WHERE pinned = 1;
+CREATE INDEX IF NOT EXISTS idx_memories_live
+  ON memories(scope, created_at DESC) WHERE superseded_by IS NULL;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+  title,
+  body,
+  tags,
+  tokenize = 'unicode61 remove_diacritics 2'
+);
+"#
+    };
+}
+
+/// Same DDL as the fresh schema, exposed for the v26 -> v27 migration.
+pub(crate) const MEMORIES_DDL: &str = memories_ddl!();
+
 pub(crate) const SCHEMA_LATEST: &str = concat!(
     r#"
 CREATE TABLE kv (
@@ -114,6 +181,7 @@ CREATE INDEX idx_sessions_deleted ON sessions(deleted_at) WHERE deleted_at IS NO
 
 "#,
     session_todo_ddl!(),
+    memories_ddl!(),
     r#"
 
 CREATE TABLE session_import_origins (

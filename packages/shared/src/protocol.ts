@@ -212,6 +212,12 @@ export const IPC = {
     projectPickFolders: "pi-desktop/project/pickFolders",
     projectMemoryGet: "pi-desktop/project/memory/get",
     projectMemorySave: "pi-desktop/project/memory/save",
+    memoryList: "pi-desktop/memory/list",
+    memoryStats: "pi-desktop/memory/stats",
+    memoryUpdate: "pi-desktop/memory/update",
+    memoryForget: "pi-desktop/memory/forget",
+    memoryTidy: "pi-desktop/memory/tidy",
+    memorySupersede: "pi-desktop/memory/supersede",
     projectGroupList: "pi-desktop/project-group/list",
     projectGroupCreateRemote: "pi-desktop/project-group/createRemote",
     projectGroupCreate: "pi-desktop/project-group/create",
@@ -289,6 +295,13 @@ export const IPC = {
      */
     jevTest: "pi-desktop/jev/test",
     providersListModels: "pi-desktop/providers/listModels",
+    /**
+     * Benchmark overlay for the model picker: coding index, its percentile, and
+     * the row's rank in a coding-sorted catalog, keyed by normalized model id.
+     * Cached for a day in the app's user data directory; never part of the
+     * provider catalog and never persisted in the database.
+     */
+    modelsBenchmarks: "pi-desktop/models/benchmarks",
     /**
      * Look one model id up in the local models.dev snapshot.
      *

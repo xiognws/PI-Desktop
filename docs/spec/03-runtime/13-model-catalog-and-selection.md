@@ -642,6 +642,38 @@ same model to the check mark, the toggle and the duplicate guard.
       neighbouring 1M-line windows apart (`1M` / `1.05M` / `1.1M`), and never
       renders a `K` mantissa at or above 1000
 
+## 15. Benchmark scores in the picker
+
+The picker may show one optional badge per model, from the coding-sorted
+`modelgrep` catalog:
+
+- the published **coding** index (rounded) when the catalog measured it, else
+- the **intelligence** index (rounded), so a model the user actually runs is not
+  left unlabelled when only the composite was measured.
+
+A model with neither index gets no badge. The two indexes come from the same
+Artificial Analysis block, so the badge never mixes provenance.
+
+- **Decorating only.** The score is an overlay, never part of the provider
+  catalog: nothing is written to SQLite, the binding shape is unchanged, and a
+  model without a published score simply has no badge.
+- **Main-process fetch.** The request goes through the same strict public-HTTPS
+  client as the other third-party catalogs (no private or loopback address,
+  per-hop redirect re-validation, the relaxed fake-IP policy only when the user
+  already opted in). Concurrent picker opens share one in-flight request.
+- **One-day cache.** The parsed table is cached at
+  `<userData>/cache/model-benchmarks.json` with its fetch time; `24h` is the TTL.
+- **Failure is not an error surface.** An expired cache is served as `stale`
+  when the refresh fails, an empty or unrecognized payload never overwrites a
+  good cache, and no cache plus no network yields an empty table. The picker
+  renders identically in all three cases.
+- **Opt-out.** `PI_DESKTOP_MODEL_SCORES=off` keeps the app offline for this data.
+- **Id lookup** normalizes an optional `provider/` prefix on either side, so a
+  binding id and a catalog id meet.
+- **Acceptance.** Opening the picker offline, or with the overlay disabled,
+  changes nothing except the missing badges; a failed refresh logs no user-facing
+  error.
+
 ## Image model binding
 
 The default conversation model has a separate **Image generation model** row below

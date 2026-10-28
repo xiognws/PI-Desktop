@@ -17,11 +17,14 @@ import {
   bindingForCustomModelInfo,
   bindingFromModelInfo,
   formatTokenCount,
+  lookupModelBenchmark,
   modelMatchesFilter,
+  pickModelBenchmarkBadge,
   nativeWebSearchSupportedOn,
   publishedThinkingLevels,
   resolveBindingDefaultThinkingLevel,
   sortThinkingLevels,
+  type ModelBenchmarkTable,
   type ModelBinding,
   type ModelInfo,
   type SessionThinkingLevel,
@@ -34,7 +37,7 @@ import {
   matchPresetIndex,
 } from "../../lib/model-limit-presets";
 import { api } from "../../lib/api";
-import { Button, Field, HelpIcon, Input, Tooltip, TooltipButton, cx } from "../ui";
+import { Badge, Button, Field, HelpIcon, Input, Tooltip, TooltipButton, cx } from "../ui";
 import { IconClose, IconGripVertical, IconHelp, IconPlus, IconRefresh, IconSearch } from "../icons";
 import { ReasoningEffortSelect } from "./ReasoningEffortSelect";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
@@ -254,6 +257,21 @@ export function ModelSelectionPanes({
 }: ModelSelectionPanesProps) {
   const { t } = useTranslation();
   const { rows, models, publishedLevelsById, setModels } = selection;
+  // Published benchmark numbers decorate the list; they are optional, cached for
+  // a day in the main process, and their absence must never block the picker.
+  const [benchmarks, setBenchmarks] = useState<ModelBenchmarkTable>({});
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .modelBenchmarks()
+      .then((load) => {
+        if (!cancelled) setBenchmarks(load.table);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [modelQuery, setModelQuery] = useState("");
   const [chosenQuery, setChosenQuery] = useState("");
   const [customModelId, setCustomModelId] = useState("");
@@ -489,6 +507,17 @@ export function ModelSelectionPanes({
                   <span className="provider-models-row-name">{row.displayName}</span>
                 ) : null}
               </span>
+              {(() => {
+                const badge = pickModelBenchmarkBadge(lookupModelBenchmark(benchmarks, row.id));
+                if (!badge) return null;
+                return (
+                  <Badge tone="neutral">
+                    {badge.kind === "coding"
+                      ? t("settings.modelCodingScore", { score: badge.value })
+                      : t("settings.modelIntelligenceScore", { score: badge.value })}
+                  </Badge>
+                );
+              })()}
               <span className="provider-models-row-limits">
                 {formatTokenCount(publishedModelLimit(row.info, "contextWindow"))} ·{" "}
                 {formatTokenCount(publishedModelLimit(row.info, "maxTokens"))}
