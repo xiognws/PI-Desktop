@@ -9,13 +9,6 @@ export function runningSessionsCount(map: Record<string, boolean> | undefined): 
   return total;
 }
 
-/** `[██████░░░░]` — ten cells, same idea as the terminal bars this app mirrors. */
-export function contextBarText(percent: number | undefined, width = 10): string {
-  const bounded = Math.max(0, Math.min(100, percent ?? 0));
-  const filled = Math.round((bounded / 100) * width);
-  return `${"█".repeat(filled)}${"░".repeat(width - filled)}`;
-}
-
 /** `842` / `42.1k` / `1.2M` — token counts stay short enough for a 30px bar. */
 export function compactTokens(count: number): string {
   if (!Number.isFinite(count) || count <= 0) return "0";

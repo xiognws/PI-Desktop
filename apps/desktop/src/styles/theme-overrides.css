@@ -186,17 +186,20 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  height: 100%;
   overflow: hidden;
   font-size: 11px;
+  line-height: 1;
   color: var(--ds-text-secondary);
 }
 
 .statusbar-metric {
   display: inline-flex;
   min-width: 0;
-  align-items: baseline;
+  align-items: center;
   gap: 5px;
+  height: 100%;
   white-space: nowrap;
 }
 
@@ -221,8 +224,110 @@
 .statusbar-clickable .context-inspector-trigger.has-custom-trigger {
   display: inline-flex;
   height: 100%;
-  align-items: baseline;
+  align-items: center;
   gap: 5px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+}
+
+.statusbar-clickable .context-inspector-trigger.has-custom-trigger:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* Hidden bar: the reserved strip stays, everything in it goes. */
+.sidebar-footer.is-bar-hidden {
+  justify-content: flex-end;
+  background: transparent;
+  border-top-color: transparent;
+  pointer-events: none;
+}
+
+.sidebar-footer.is-bar-hidden > * {
+  display: none;
+}
+
+.sidebar-footer.is-bar-hidden > .statusbar-restore {
+  display: inline-flex;
+  pointer-events: auto;
+}
+
+.statusbar-restore {
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+}
+
+.statusbar-restore:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+/* Right-click menu: a small panel anchored above the bar. */
+.statusbar-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: 8px;
+  background: var(--ds-bg-secondary);
+  box-shadow: var(--ds-shadow-menu, 0 12px 32px rgba(0, 0, 0, 0.35));
+  font-size: 11px;
+  color: var(--ds-text-primary);
+}
+
+.statusbar-menu-title {
+  padding: 4px 8px;
+  color: var(--ds-text-secondary);
+}
+
+.statusbar-menu-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.statusbar-menu-row:hover {
+  background: var(--ds-bg-hover);
+}
+
+.statusbar-menu-row.is-action {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.statusbar-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--ds-border-subtle);
+}
+
+.statusbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
   padding: 0 4px;
   border: 0;
   border-radius: 4px;
@@ -233,15 +338,33 @@
   cursor: pointer;
 }
 
-.statusbar-clickable .context-inspector-trigger.has-custom-trigger:hover {
+.statusbar-button:hover {
   background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
+/* A real bar: block glyphs at 9px read as a grey smear, and they drift off the
+   text centre line. */
 .statusbar-bar {
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 9px;
-  letter-spacing: -0.5px;
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--ds-border-default);
+}
+
+.statusbar-bar-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: 2px;
+  background: var(--ds-text-secondary);
+}
+
+.statusbar-metric-warn .statusbar-bar-fill {
+  background: var(--ds-warning, #d9a13b);
 }
 
 .statusbar-aside {

@@ -290,6 +290,14 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // is refreshed on demand from Settings (see models-dev-catalog / the
     // 13-model-catalog-and-selection spec).
     void modelsDevCatalog.ensureLoaded();
+    // The window comes first, the backend second.
+    //
+    // Host-core boot and plugin activation are the slow half of startup (they
+    // load a database, spawn child processes and restore plugins), and none of
+    // it is needed to paint a shell: the renderer already shows its boot state
+    // and asks for data once IPC answers. Awaiting the backend here put that
+    // whole cost in front of the first frame.
+    await ensureWindow();
     let bootError: unknown = null;
     try {
       await bootBackends();
@@ -347,7 +355,6 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       applyPluginLauncherShortcut();
       applyToggleWindowShortcut();
     }
-    await ensureWindow();
     if (process.env.PI_DESKTOP_MCP_CONTROL === "1") {
       try {
         state.mcpControl = new McpControlServer({

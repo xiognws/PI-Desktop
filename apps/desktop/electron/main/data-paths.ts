@@ -88,6 +88,29 @@ export function desktopDataDir(
   });
 }
 
+/**
+ * Where a shipped installation keeps *everything* it writes.
+ *
+ * The system drive is small, shared with the OS, and the first thing a user
+ * notices filling up: caches, the database, plugin data and the Playwright
+ * browsers all used to land there. A release therefore claims one folder of its
+ * own on a non-system fixed drive (`D:\PI-Desktop`, then `E:`, ...) and keeps
+ * the database, Electron's user data and the browser cache inside it. The
+ * folder name is the app's, so two installations never share a root.
+ *
+ * `override` (`PI_DESKTOP_DATA_ROOT`) wins, and when no other drive exists the
+ * caller keeps the old home-directory layout rather than failing to start.
+ */
+export function resolveReleaseDataRoot(input: {
+  override?: string;
+  candidates: readonly string[];
+}): string | null {
+  const explicit = input.override?.trim();
+  if (explicit) return resolve(explicit);
+  const first = input.candidates.find((candidate) => candidate.trim().length > 0);
+  return first ? resolve(first) : null;
+}
+
 /** The Electron `app` surface this helper needs; kept structural so tests need no Electron. */
 export type UserDataApp = {
   commandLine: { hasSwitch(name: string): boolean };

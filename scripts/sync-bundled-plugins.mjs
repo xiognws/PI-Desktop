@@ -21,6 +21,7 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile, stat } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -78,6 +79,26 @@ function trackedPluginIds() {
   }
 }
 const TRACKED = trackedPluginIds();
+
+/**
+ * Plugin ids this build must never bundle.
+ *
+ * Declared in `scripts/bundled-plugins-excluded.json` so a deliberate removal
+ * survives the next sync: without it, the catalog would expand the package
+ * again and the host would show the plugin once more.
+ */
+function excludedPluginIds() {
+  try {
+    const text = readFileSync(join(REPO, "scripts", "bundled-plugins-excluded.json"), "utf8");
+    const ids = JSON.parse(text).excluded;
+    return new Set(
+      (Array.isArray(ids) ? ids : []).filter((id) => typeof id === "string" && id.trim()),
+    );
+  } catch (error) {
+    throw new Error(`bundled-plugins-excluded.json: ${error.message}`);
+  }
+}
+const EXCLUDED = excludedPluginIds();
 
 function compareVersions(left, right) {
   const parse = (value) => {
@@ -170,6 +191,7 @@ const BASE = flag("base", declaredBase ? `${PROXY_PREFIX}${declaredBase}` : "");
 
 const wanted = [];
 for (const plugin of catalog.plugins) {
+  if (EXCLUDED.has(plugin.id)) continue;
   if (ONLY.length && !ONLY.includes(plugin.id)) continue;
   const candidates = plugin.versions.filter(
     (version) => version.yanked !== true && version.shasum && version.url,
@@ -180,11 +202,21 @@ for (const plugin of catalog.plugins) {
 }
 
 console.log(`target: ${TARGET}`);
-console.log(`plugins: ${wanted.length}${ONLY.length ? ` (filtered: ${ONLY.join(", ")})` : ""}`);
+console.log(
+  `plugins: ${wanted.length}${ONLY.length ? ` (filtered: ${ONLY.join(", ")})` : ""}` +
+    `${EXCLUDED.size ? ` (excluded: ${[...EXCLUDED].join(", ")})` : ""}`,
+);
 console.log(`packages: ${(wanted.reduce((sum, item) => sum + (item.sizeBytes || 0), 0) / 1048576).toFixed(1)} MiB`);
 if (DRY_RUN) {
   for (const item of wanted) console.log(`  ${item.id}@${item.version} ${((item.sizeBytes || 0) / 1024).toFixed(0)} KiB`);
   process.exit(0);
+}
+
+// An excluded id can still sit on disk from an earlier sync. The host
+// reconciles this directory rather than the catalog, so drop the leftover copy
+// instead of letting it stay visible.
+for (const id of EXCLUDED) {
+  await rm(join(TARGET, id), { recursive: true, force: true });
 }
 
 await mkdir(STAGING, { recursive: true });

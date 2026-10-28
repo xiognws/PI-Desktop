@@ -1,0 +1,11 @@
+{
+  "//": "Plugins the marketplace sync must never bundle into apps/desktop/resources/plugins. Ids listed here are skipped by scripts/sync-bundled-plugins.mjs and any already-expanded copy is removed.",
+  "excluded": [
+    "cn.star.jianying-assistant",
+    "icedly.moyu-games",
+    "local.mi-note",
+    "cn.star.grok-enhance",
+    "hawchou.mumu-player",
+    "io.github.caopengfei.opencode-quota"
+  ]
+}
