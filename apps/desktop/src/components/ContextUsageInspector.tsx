@@ -42,6 +42,7 @@ export function ContextUsageInspector({
   responseDurationMs,
   responseOutputTokens,
   responseOutputEstimated = false,
+  trigger,
 }: {
   usage: MessageUsage;
   turnUsage: MessageUsage;
@@ -50,6 +51,10 @@ export function ContextUsageInspector({
   responseDurationMs?: number;
   responseOutputTokens?: number;
   responseOutputEstimated?: boolean;
+  /** Replaces the ring with the caller's own label. The popover, placement and
+   *  accessibility wiring stay exactly the same — a second surface (the window
+   *  status bar) can show the same numbers without a second detail panel. */
+  trigger?: ReactNode;
 }) {
   const { t } = useTranslation();
   const panelId = useId();
@@ -463,7 +468,7 @@ export function ContextUsageInspector({
       <TooltipButton
         ref={triggerRef}
         type="button"
-        className="context-inspector-trigger"
+        className={cx("context-inspector-trigger", trigger && "has-custom-trigger")}
         tooltip={t("chat.usageContextAria", ariaArguments)}
         ariaLabel={t("chat.usageContextAria", ariaArguments)}
         aria-haspopup="dialog"
@@ -471,6 +476,8 @@ export function ContextUsageInspector({
         aria-controls={open ? panelId : undefined}
         onClick={toggleInspector}
       >
+        {trigger ?? (
+        <>
         <svg
           className="context-inspector-ring"
           viewBox="0 0 24 24"
@@ -496,6 +503,8 @@ export function ContextUsageInspector({
         <span className="context-inspector-ring-value">
           {display.percent}%
         </span>
+        </>
+        )}
       </TooltipButton>
       {popover && typeof document !== "undefined"
         ? portalToBody(popover)

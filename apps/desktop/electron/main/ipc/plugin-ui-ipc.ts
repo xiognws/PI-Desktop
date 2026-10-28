@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { IPC, type PluginScenicThemesDestinationMeta, type PluginViewMeta } from "@pi-desktop/shared";
-import { normalizeThemeAssetPath, pluginThemeId, resolvePluginLocalizedString, themeAssetUrl } from "@pi-desktop/plugin-sdk";
+import { normalizeThemeAssetPath, parseNetDomains, pluginThemeId, resolvePluginLocalizedString, themeAssetUrl } from "@pi-desktop/plugin-sdk";
 import type { BrowserHost } from "../browser-host";
 import { BROWSER_PLUGIN_ID, BROWSER_VIEW_ID } from "../browser-host";
 import type { PluginRuntime } from "../plugin-runtime";
@@ -138,6 +138,10 @@ export function registerPluginUiIpc({
     }
     const htmlPath = resolveInsidePluginRoot(loaded.path, manifest.ui.panel);
     if (!htmlPath) throw new Error("plugin panel must stay inside the plugin");
+    // 面板是一整张网页：不把 manifest 的 egress 白名单带过去，页面里每个请求都会被
+    // net-policy 拦掉——插件自带的本地后端明明活着，面板却一直显示"离线"。
+    // `pi.ui.openPanel` 那条路径本来就带这些字段，从界面按钮打开不该是另一套策略。
+    const parsedDomains = parseNetDomains(manifest.net?.domains);
     await pluginPanels.open({
       pluginId: id,
       title: resolvePluginLocalizedString(manifest.ui.title, getUpdaterLocale(), manifest.name),
@@ -149,6 +153,9 @@ export function registerPluginUiIpc({
       width: manifest.ui.width ?? 480,
       height: manifest.ui.height ?? 360,
       htmlPath,
+      netDomains: parsedDomains.ok ? (parsedDomains.domains ?? []) : [],
+      netAnyHost: loaded.permissions.has("net.anyHost"),
+      allowMicrophone: loaded.permissions.has("ui.microphone"),
     });
     return { ok: true };
   });

@@ -1,4 +1,12 @@
 export const en = {
+  statusBar: {
+    project: "Project",
+    context: "Context",
+    running: "Running",
+    pending: "Waiting for approval",
+    speed: "Speed",
+    cache: "Cache",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "New isolated session",

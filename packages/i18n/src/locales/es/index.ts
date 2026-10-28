@@ -1,6 +1,14 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const es = {
+  statusBar: {
+    project: "Proyecto",
+    context: "Contexto",
+    running: "En ejecución",
+    pending: "Esperando aprobación",
+    speed: "Velocidad",
+    cache: "Caché",
+  },
   "worktree": {
     "menu": { "group": "Git" },
     "newIsolatedSession": "Nueva sesión aislada",

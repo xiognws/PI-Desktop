@@ -1,6 +1,14 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
+  statusBar: {
+    project: "專案",
+    context: "上下文",
+    running: "執行中",
+    pending: "等待核准",
+    speed: "速率",
+    cache: "快取",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "新增隔離工作階段",

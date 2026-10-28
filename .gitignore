@@ -61,3 +61,13 @@ electron.vite.config.*.mjs
 
 .playwright-cli
 worktrees
+
+# Bundled third-party plugins synced from the plugin marketplace by
+# scripts/sync-bundled-plugins.mjs. They ship inside the installer via
+# extraResources but are not versioned here: 100+ MiB of assets with their own
+# release cadence, regenerable from the catalog. The two first-party plugins
+# stay tracked.
+/apps/desktop/resources/plugins/*
+!/apps/desktop/resources/plugins/pi.browser/
+!/apps/desktop/resources/plugins/pi.file-manager/
+/.plugin-packages/

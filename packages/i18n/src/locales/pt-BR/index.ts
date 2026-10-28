@@ -1,6 +1,14 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
+  statusBar: {
+    project: "Projeto",
+    context: "Contexto",
+    running: "Em execução",
+    pending: "Aguardando aprovação",
+    speed: "Velocidade",
+    cache: "Cache",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "Nova sessão isolada",

@@ -1,6 +1,14 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  statusBar: {
+    project: "프로젝트",
+    context: "컨텍스트",
+    running: "실행 중",
+    pending: "승인 대기",
+    speed: "속도",
+    cache: "캐시",
+  },
   worktree: {
     menu: { group: "Git" },
     newIsolatedSession: "새 격리 세션",

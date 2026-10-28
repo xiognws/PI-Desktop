@@ -30,6 +30,13 @@ import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
 import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import {
+  StatusBarCache,
+  StatusBarContext,
+  StatusBarElapsed,
+  StatusBarSpeed,
+} from "./StatusBarUsage";
+import { pendingPermissionsCount, runningSessionsCount } from "../lib/status-bar";
+import {
   getGlobalPinnedSessions,
   normalizeProjectPath,
   sessionArchived,
@@ -275,6 +282,8 @@ export function Sidebar({
   const runningSessions = useAppStore((s) => s.runningSessions);
   const sessionOutcomes = useAppStore((s) => s.sessionOutcomes);
   const pendingPermissions = useAppStore((s) => s.pendingPermissions);
+  const runningCount = runningSessionsCount(runningSessions);
+  const pendingCount = pendingPermissionsCount(pendingPermissions);
   const setPage = useAppStore((s) => s.setPage);
   const navBack = useAppStore((s) => s.navBack);
   const canNavBack = useAppStore((s) => s.canNavBack);
@@ -2787,6 +2796,33 @@ export function Sidebar({
               <IconClock size={14} aria-hidden />
             </TooltipButton>
             <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
+          </div>
+
+          <div className="statusbar-info">
+            {workspace?.name ? (
+              <span className="statusbar-metric" title={workspace.path}>
+                <span className="statusbar-label">{t("statusBar.project")}</span>
+                <span className="statusbar-value">{workspace.name}</span>
+              </span>
+            ) : null}
+            <StatusBarContext />
+            <StatusBarSpeed />
+            <StatusBarCache />
+            {runningCount > 1 ? (
+              <span className="statusbar-metric">
+                <span className="statusbar-value">
+                  {t("statusBar.running")} {runningCount}
+                </span>
+              </span>
+            ) : null}
+            <StatusBarElapsed />
+            {pendingCount > 0 ? (
+              <span className="statusbar-metric statusbar-metric-warn">
+                <span className="statusbar-value">
+                  {t("statusBar.pending")} {pendingCount}
+                </span>
+              </span>
+            ) : null}
           </div>
 
           <TooltipButton
