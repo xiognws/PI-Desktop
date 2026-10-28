@@ -1734,6 +1734,8 @@ sklm: {
     providerUnavailable: "所选服务已不可用。",
     modelsFetchInvalidResponse: "服务未返回可用的模型列表。",
     modelsEmptyHint: "填写地址即可获取模型列表。",
+    modelCodingScore: "编码 {{score}}",
+    modelIntelligenceScore: "智能 {{score}}",
     refreshModelCatalog: "更新模型目录",
     refreshingModelCatalog: "正在更新目录…",
     modelCatalogUpdated: "模型目录已更新",

@@ -1732,6 +1732,8 @@ sklm: {
     "modelsFromCatalogNote": "Ce service n'a publié aucune liste de modèles, donc models.dev est affiché à la place.",
     "modelsFallbackNote": "Seul le modèle configuré est disponible pour ce service.",
     "modelsLoading": "Chargement des modèles…",
+    "modelCodingScore": "Code {{score}}",
+    "modelIntelligenceScore": "Intelligence {{score}}",
     "refreshModelCatalog": "Actualiser le catalogue de modèles",
     "refreshingModelCatalog": "Actualisation du catalogue…",
     "modelCatalogUpdated": "Catalogue de modèles mis à jour",

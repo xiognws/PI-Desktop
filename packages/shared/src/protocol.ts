@@ -278,6 +278,13 @@ export const IPC = {
     jevTest: "pi-desktop/jev/test",
     providersListModels: "pi-desktop/providers/listModels",
     /**
+     * Benchmark overlay for the model picker: coding index, its percentile, and
+     * the row's rank in a coding-sorted catalog, keyed by normalized model id.
+     * Cached for a day in the app's user data directory; never part of the
+     * provider catalog and never persisted in the database.
+     */
+    modelsBenchmarks: "pi-desktop/models/benchmarks",
+    /**
      * Look one model id up in the local models.dev snapshot.
      *
      * `providersListModels` cannot answer this: it describes a saved or

@@ -11,6 +11,10 @@ import { orderSystemRows, SystemTranscriptJournal } from "./system-transcript-jo
 import { planWorkspaceRequiredResult } from "./plan-workspace-error.js";
 import { accountModelStream } from "./request-usage.js";
 import { modeToolDenial, retainModeToolDeclaration, withModeExecutionGuard } from "./mode-tool-access.js";
+import {
+  shellGateBlockReason,
+  shellGateVerdict,
+} from "./shell-command-gate.js";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
 import { requestExtensionUi } from "./extensions/ui-request.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
@@ -1276,7 +1280,7 @@ const TOOL_PARAM_ALIASES: Record<string, Record<string, string>> = {
   Grep: { query: "pattern" },
 };
 const TOOL_OUTPUT_UPDATE_THROTTLE_MS = 100;
-const READ_ONLY_CORE_TOOLS = new Set(["Read", "Glob", "Grep"]);
+const READ_ONLY_CORE_TOOLS = new Set(["Read", "Glob", "Grep", "AstSearch"]);
 /**
  * How long a stop request waits for a tool that host-core can actually
  * interrupt (`Bash`, `GenerateImages`) to hand back the output it collected
@@ -1350,6 +1354,7 @@ function commandShellToolDescription(
     `The session scratch directory variable is ${shellScratchVariable(shell)}.`,
     `An optional timeout from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS} seconds may be supplied; without it, the command defaults to a 60-second timeout.`,
     `Set runInBackground: true for long-lived processes the user needs after the turn ends (dev servers, watchers, builds). A background call returns a backgroundTaskId immediately, survives turn aborts and timeouts, and its output is visible in the composer's running-tasks bar; do not set it for commands whose output the current turn depends on.`,
+    "A shell command gate refuses commands that wipe a filesystem or disk, delete recursively outside the workspace, escalate privileges, force-push or rewrite git history, or publish a package. Those calls return a block reason instead of running; choose a scoped, reversible alternative.",
     ...(formattedScratch ? [`The session scratch directory is ${formattedScratch}.`] : []),
   ].join(" ");
 }
@@ -1400,6 +1405,21 @@ function requireAliasedParams(toolName: string, params: unknown): void {
       { errorCode: "INVALID_ARGUMENT" },
     );
   }
+}
+
+/**
+ * Block reason when the shell command gate refuses this call, or undefined.
+ *
+ * Decided here rather than inside the wrapper chain so the block reaches the
+ * model through pi's own before-tool-call channel: the command never runs, and
+ * the transcript shows the rule that stopped it instead of a host failure.
+ */
+function shellCommandBlock(context: BeforeToolCallContext): string | undefined {
+  if (context.toolCall.name !== "Bash") return undefined;
+  const params = normalizeToolParams("Bash", context.args);
+  if (!isRecord(params) || typeof params.command !== "string") return undefined;
+  const verdict = shellGateVerdict(params.command);
+  return verdict.action === "deny" ? shellGateBlockReason(verdict, params.command) : undefined;
 }
 
 /**
@@ -2688,6 +2708,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       if (!this.isToolAllowedInMode(context.toolCall.name)) {
         return { block: true, reason: modeToolDenial(context.toolCall.name, this.mode) };
       }
+      const shellBlock = shellCommandBlock(context);
+      if (shellBlock) return { block: true, reason: shellBlock };
       const blocked = await this.extensionToolCall(context);
       if (blocked?.block) return blocked;
       await this.preparePathToolCall(context);
@@ -3330,6 +3352,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           return `Create or overwrite a file. Deliverables go into the workspace; temporary/intermediate files go into the scratch directory.${scratchPathHint}${externalPathHint}`;
         case "Edit":
           return `Replace, insert, or delete lines in an existing file. Names positions and supplies new content only — never old_string. Required: path, tag (4 hex from the latest Read/Grep/Write/Edit), ops. Ops: PUT N.=M: replace inclusive lines N–M; PUT <N: insert before N; PUT >N: insert after N; PUT >$: append; CUT N.=M delete; REM delete the file; MV DEST rename after other ops. Body rows are + plus the final line text. Every PUT with body rows must include the trailing colon, for example PUT 48.=48:; PUT 48.=48 followed by + rows is invalid. A colonless PUT is only for a register paste such as PUT <1 @name. No -old or context rows. Ranges name only the lines being changed. Re-ground on the tag returned by every successful write. After one failed Edit, classify the error: Read the live file for a stale tag or unseen lines (or retry unchanged on a complete EDIT_LINES_UNSEEN reveal), but correct syntax or range errors directly; do not guess. Do not edit the same path concurrently.${scratchPathHint}${externalPathHint}`;
+        case "AstSearch":
+          return (
+            "Search the session's code by its syntax tree instead of its text: one ast-grep pattern matches calls, declarations, and member access across TypeScript, Tsx, JavaScript, Html, and Css files. Use it when a Grep regex would also match comments, strings, or unrelated names. Returns `path:line:column` rows and stops at a bounded number of files and matches, reporting what it left out."
+          );
         case "Bash":
           return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
         case "TodoWrite":
@@ -3435,6 +3461,21 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             description:
               "Legacy text replacement: new text to replace old_string with.",
           }),
+        ),
+      },
+      AstSearch: {
+        pattern: Type.String({
+          description:
+            "ast-grep structural pattern, for example `name($ARG)` or `class $C { $M($$$) }`. Matches syntax, not text.",
+        }),
+        path: Type.Optional(
+          Type.String({
+            description:
+              "File or directory inside the session project or scratch directory. Defaults to the project root.",
+          }),
+        ),
+        limit: Type.Optional(
+          Type.Number({ description: "Maximum reported matches from 1 to 100; defaults to 20." }),
         ),
       },
       Bash: {
@@ -3983,11 +4024,12 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "Write",
             "Glob",
             "Grep",
+            "AstSearch",
             "BrowserPreview",
             "PluginCheck",
             "TodoWrite",
           ]
-        : ["Read", "Glob", "Grep", "BrowserPreview", "Bash", "Write", "Edit"];
+        : ["Read", "Glob", "Grep", "AstSearch", "BrowserPreview", "Bash", "Write", "Edit"];
     if (this.mode === "agent") {
       tools.push("PluginScaffold", "PluginPack", "GenerateImages", ...Object.keys(scheduledToolParameters));
     }
@@ -4176,6 +4218,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       "Read",
       "Glob",
       "Grep",
+      "AstSearch",
       "BrowserPreview",
       "Bash",
       ASK_TOOL_NAME,
@@ -5056,6 +5099,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             }),
             tools: scopedTools,
             beforeToolCall: async (context) => {
+              const shellBlock = shellCommandBlock(context);
+              if (shellBlock) return { block: true, reason: shellBlock };
               await this.preparePathToolCall(context, applyInstructions, builtinToolNames);
               return undefined;
             },

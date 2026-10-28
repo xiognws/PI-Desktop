@@ -15,6 +15,7 @@ import { registerMcpIpc } from "./mcp-ipc";
 import type { McpOAuthManager } from "../mcp-oauth";
 import { searchMcpMarket } from "../mcp-registry-catalog";
 import { registerNotificationIpc } from "./notification-ipc";
+import { registerModelBenchmarksIpc } from "./model-benchmarks-ipc";
 import { registerPluginIpc } from "./plugin-ipc";
 import { registerPluginUiIpc } from "./plugin-ui-ipc";
 import { registerJevIpc } from "./jev-ipc";
@@ -267,6 +268,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     updater,
   });
   registerStorageIpc({ registrar, getMainWindow, restart: dependencies.restartForStorage });
+  registerModelBenchmarksIpc(registrar);
   registerNotificationIpc({
     registrar,
     getHost,

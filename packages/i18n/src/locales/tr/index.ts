@@ -1753,6 +1753,8 @@ sklm: {
     providerUnavailable: "Seçilen sağlayıcı artık kullanılamıyor.",
     modelsFetchInvalidResponse: "Servis kullanılabilir bir model listesi döndürmedi.",
     modelsEmptyHint: "Modelleri yüklemek için bir temel URL girin.",
+    modelCodingScore: "Kodlama {{score}}",
+    modelIntelligenceScore: "Zeka {{score}}",
     noModelMatches: "Eşleşen model yok.",
     customModel: "Özel",
     addCustomModel: "Özel model ekle",

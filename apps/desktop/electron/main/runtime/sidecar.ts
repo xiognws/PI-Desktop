@@ -13,6 +13,7 @@ import {
 } from "../builtin-skills";
 import { createImageGenerationTool } from "../services/image-generation-service";
 import { registerPluginDevTools } from "../plugin-dev-tools";
+import { createAstSearchTool } from "../ast-search-tool";
 import { resolveLocalFile } from "../browser-view";
 import { catalogModelConfigFor } from "../models-dev-catalog";
 import { AgentSidecar } from "../agent-sidecar";
@@ -570,6 +571,13 @@ export function createSidecarRuntime({
     // Fake-IP tolerance belongs to the network policy, not to the proxy switch.
     allowFakeIp: () => relaxedNetworkPolicyEnabled(),
   }));
+  // Structural search over the session's own files. Runs here because the
+  // parser is a native addon; the shared module owns the grammar and rendering
+  // rules so the tool cannot drift from its spec.
+  s.setLocalTool(
+    "AstSearch",
+    createAstSearchTool({ getRoots: (sessionId) => browserHost.getFileRoots(sessionId) }),
+  );
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
     const raw = String((args as { path?: unknown })?.path ?? "").trim();
     if (!raw) {

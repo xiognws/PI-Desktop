@@ -51,6 +51,7 @@ import type {
   McpCatalogEntry,
   SkillCatalogEntry,
   ModelInfo,
+  ModelBenchmarkLoad,
   McpServerInput,
   McpServerRecord,
   McpServerStatus,
@@ -941,6 +942,15 @@ export const api = {
       apiStyleHint?: string;
       evidence?: string;
     }>(IPC.invoke.providersListModels, input),
+  /**
+   * Benchmark overlay for the model picker, keyed by normalized model id.
+   *
+   * Cached for a day and refreshed in the background when stale: an offline or
+   * failed refresh returns the last good table (`stale: true`) or an empty one
+   * (`source: "none"`), so a picker never has to handle an error here.
+   */
+  modelBenchmarks: (input?: { forceRefresh?: boolean }) =>
+    invoke<ModelBenchmarkLoad>(IPC.invoke.modelsBenchmarks, input),
   /**
    * Look one hand-typed model id up in the local models.dev snapshot.
    *

@@ -1763,6 +1763,8 @@ sklm: {
     providerUnavailable: "The selected provider is no longer available.",
     modelsFetchInvalidResponse: "The service did not return a model list.",
     modelsEmptyHint: "Enter a base URL to load models.",
+    modelCodingScore: "Coding {{score}}",
+    modelIntelligenceScore: "Intelligence {{score}}",
     noModelMatches: "No matching models.",
     customModel: "Custom",
     addCustomModel: "Add custom model",

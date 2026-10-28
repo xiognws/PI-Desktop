@@ -31,9 +31,10 @@
     "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
+    "@ast-grep/napi": "0.51.0",
     "@picovoice/pvrecorder-node": "1.2.9",
-    "transcribe-cpp": "0.2.2",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "transcribe-cpp": "0.2.2"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "1.3.0",
@@ -288,6 +289,8 @@
       ]
     },
     "asarUnpack": [
+      "node_modules/@ast-grep/napi/**/*.node",
+      "node_modules/@ast-grep/napi-*/**/*.node",
       "node_modules/transcribe-cpp/**/*.node",
       "node_modules/transcribe-cpp/**/bin/**",
       "node_modules/@picovoice/pvrecorder-node/**/*.node",

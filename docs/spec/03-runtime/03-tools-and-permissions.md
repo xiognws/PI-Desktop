@@ -65,6 +65,7 @@ Let the agent get things done, but stay under control by default.
 | `new_context` | low | Start a new context window at the next turn boundary; takes no parameters and changes no environment state |
 | `Glob` | low | List files by pattern |
 | `Grep` | low | Content search; uses system `rg` when installed, else in-process; mints a per-file `tag` |
+| `AstSearch` | low | Structural (AST) search across TypeScript, Tsx, JavaScript, Html and Css files inside the session roots ([2.2](#22-structural-search-astsearch)) |
 | `BrowserPreview` | low | Open a workspace-relative preview in the bundled Browser plugin (fails if `pi.browser` is disabled) |
 | `EnterPlanMode` | low | Move the same Agent from Agent to Plan after host validation |
 | `SubmitPlan` | low | Preserve exact Markdown bytes in a new `.pi/plan/*.md` artifact and request approval |
@@ -91,6 +92,7 @@ ADR 0230). The runtime still registers optional capabilities without sending
 their full schemas up front:
 
 - `BrowserPreview`
+- `AstSearch` (structural search)
 - `PluginCheck`, `PluginScaffold`, and `PluginPack`
 - plugin-declared agent tools
 - `JevClassify` when the user enables Jev and saves a TypeSafe API key
@@ -134,6 +136,35 @@ never bypasses execution permissions. Missing selection fields retain normal
 on-demand discovery. Main rejects a selected MCP command without task text or
 an attachment before opening or persisting a turn. See
 `docs/adr/composer-mcp-invocations.md`.
+
+### 2.2 Structural search (`AstSearch`)
+
+`AstSearch` finds code by syntax rather than by text, so a pattern matches a call
+or a declaration without also matching a comment or a string literal.
+
+- **Where it runs.** Electron main, beside the other filesystem-facing local
+  tools, because the parser (`@ast-grep/napi`) is a native addon. The shared
+  package owns the grammar table, the limit rules, and the rendering; main owns
+  the walk and the parse.
+- **What it may read.** Only files under the session's own project and scratch
+  roots. A path that resolves outside them, or that contains a `..` segment, is
+  refused before any file is opened. Build output and dependency directories
+  (`node_modules`, `dist`, `out`, `target`, …) are skipped.
+- **Grammars.** TypeScript, Tsx, JavaScript, Html, Css. Files in other languages
+  are not parsed; the addon ships no grammar for them, and mis-parsing would be
+  worse than not searching.
+- **Pattern validation.** The pattern is code: it must parse in TypeScript, Tsx,
+  JavaScript, or Css without an error node. Html is excluded from validation
+  because it accepts almost any text. An invalid pattern is a tool error that
+  names the accepted grammars — never a silent "no matches".
+- **Bounds.** At most 3000 files opened, 100 reported matches (default 20), and
+  12k characters of rendered output; each row keeps one line. A bounded result
+  states how many matches or files it left out, so the model narrows the query
+  instead of assuming completeness.
+- **Mode and batching.** Read-only: available in Agent, Plan, and Goal, and
+  executed sequentially like every tool outside the read/search batch set. It
+  sits in the on-demand catalog with the other ancillary tools, so the model
+  activates it once with `ToolSearch` before its first call.
 
 ## 3. Common Tool Constraints
 
@@ -522,6 +553,22 @@ Host execution baseline:
 - A command that exits non-zero returns `ok: false`, `isError: true`, and
   `errorCode: TOOL_FAILED` while preserving its `exitCode`, stdout, and stderr
   in `content` so the agent can diagnose the command without blindly retrying.
+- **Shell command gate runs before execution.** The runtime classifies
+  `Bash.command` against a fixed rule table (ported from `@xynogen/pix-gate`,
+  MIT) in three tiers: `critical` (recursive delete of `/`, `$HOME`, a system
+  directory or a Windows drive root, filesystem format/wipe, `dd` or a redirect
+  onto a raw device, fork bomb, machine power commands, shadow-copy deletion),
+  `dangerous` (any recursive delete, privilege escalation, world-writable ACLs,
+  `curl … | sh`, destructive git, package publish, destructive docker / infra /
+  scheduler operations, destructive SQL, Defender / firewall / service /
+  registry changes, encoded PowerShell, LOLBin downloads) and `risky` (force
+  checkout, stash drop, `.env` writes). `critical` and `dangerous` are refused
+  with a reason naming the matched rule; `risky` runs. A refused call returns a
+  tool error before `tools.execute`, so no process starts and no state changes,
+  and the rule applies to session and delegated `Bash` calls alike.
+  `PI_DESKTOP_SHELL_GATE=critical` narrows refusals to the critical tier;
+  `PI_DESKTOP_SHELL_GATE=off` disables the gate. Catastrophic commands stay
+  refused as a floor in every mode.
 - `runInBackground: true` detaches the command from the turn: the call returns
   `backgroundTaskId` as soon as the shell starts, no timeout applies, and the
   process survives `tools.abort` and `agent.abort`. The host owns the process

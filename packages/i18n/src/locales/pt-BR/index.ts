@@ -1715,6 +1715,8 @@ export const ptBR = {
     providerUnavailable: "O provedor selecionado não está mais disponível.",
     modelsFetchInvalidResponse: "O serviço não retornou uma lista de modelos.",
     modelsEmptyHint: "Insira uma URL base para carregar modelos.",
+    modelCodingScore: "Código {{score}}",
+    modelIntelligenceScore: "Inteligência {{score}}",
     noModelMatches: "Nenhum modelo correspondente.",
     customModel: "Personalizado",
     addCustomModel: "Adicionar modelo personalizado",

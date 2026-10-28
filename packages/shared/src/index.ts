@@ -11,6 +11,8 @@ export * from "./composer-trigger.js";
 export * from "./inline-attachments.js";
 export * from "./session-link.js";
 export * from "./fuzzy.js";
+export * from "./model-benchmarks.js";
+export * from "./ast-search.js";
 export * from "./mcp-import.js";
 export * from "./mcp-catalog.js";
 export * from "./mcp-catalog-builtin.js";
