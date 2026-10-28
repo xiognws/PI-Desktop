@@ -8,8 +8,6 @@ export const zhTW = {
     left: "剩餘",
     cacheShort: "快取",
     speed: "生成速率",
-    used: "已用",
-    left: "剩餘",
     cache: "快取",
     scheduled: "排程",
     sessionAge: "本對話",

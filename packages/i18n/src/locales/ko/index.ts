@@ -8,8 +8,6 @@ export const ko = {
     left: "남음",
     cacheShort: "캐시",
     speed: "속도",
-    used: "사용",
-    left: "남음",
     cache: "캐시",
     scheduled: "예약",
     sessionAge: "세션",

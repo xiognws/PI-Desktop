@@ -8,8 +8,6 @@ export const es = {
     left: "libre",
     cacheShort: "caché",
     speed: "Velocidad",
-    used: "usado",
-    left: "libre",
     cache: "Caché",
     scheduled: "Programado",
     sessionAge: "Sesión",

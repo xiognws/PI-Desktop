@@ -8,8 +8,6 @@ export const de = {
     left: "frei",
     cacheShort: "Cache",
     speed: "Tempo",
-    used: "belegt",
-    left: "frei",
     cache: "Cache",
     scheduled: "Geplant",
     sessionAge: "Sitzung",

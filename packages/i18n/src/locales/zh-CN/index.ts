@@ -8,8 +8,6 @@ export const zhCN = {
     left: "剩余",
     cacheShort: "缓存",
     speed: "生成速率",
-    used: "已用",
-    left: "剩余",
     cache: "缓存",
     scheduled: "计划",
     sessionAge: "本会话",

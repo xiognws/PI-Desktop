@@ -8,8 +8,6 @@ export const ptBR = {
     left: "livre",
     cacheShort: "cache",
     speed: "Velocidade",
-    used: "usado",
-    left: "livre",
     cache: "Cache",
     scheduled: "Agendado",
     sessionAge: "Sessão",

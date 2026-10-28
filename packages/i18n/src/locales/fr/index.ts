@@ -8,8 +8,6 @@ export const fr = {
     left: "libre",
     cacheShort: "cache",
     speed: "Débit",
-    used: "utilisé",
-    left: "libre",
     cache: "Cache",
     scheduled: "Planifié",
     sessionAge: "Session",

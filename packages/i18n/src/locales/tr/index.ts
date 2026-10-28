@@ -8,8 +8,6 @@ export const tr = {
     left: "kalan",
     cacheShort: "önbellek",
     speed: "Hız",
-    used: "kullanılan",
-    left: "kalan",
     cache: "Önbellek",
     scheduled: "Zamanlı",
     sessionAge: "Oturum",

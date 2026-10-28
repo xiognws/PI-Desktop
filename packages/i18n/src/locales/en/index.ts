@@ -6,8 +6,6 @@ export const en = {
     left: "left",
     cacheShort: "cache",
     speed: "Rate",
-    used: "used",
-    left: "left",
     cache: "Cache",
     scheduled: "Scheduled",
     sessionAge: "Session",
