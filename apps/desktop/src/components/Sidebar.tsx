@@ -29,12 +29,7 @@ import { formatSessionLastReplyDate } from "../lib/sidebar-session-date";
 import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
 import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
-import {
-  StatusBarCache,
-  StatusBarContext,
-  StatusBarElapsed,
-  StatusBarSpeed,
-} from "./StatusBarUsage";
+import { StatusBarContext, StatusBarElapsed } from "./StatusBarUsage";
 import { pendingPermissionsCount, runningSessionsCount } from "../lib/status-bar";
 import {
   getGlobalPinnedSessions,
@@ -2806,8 +2801,6 @@ export function Sidebar({
               </span>
             ) : null}
             <StatusBarContext />
-            <StatusBarSpeed />
-            <StatusBarCache />
             {runningCount > 1 ? (
               <span className="statusbar-metric">
                 <span className="statusbar-value">

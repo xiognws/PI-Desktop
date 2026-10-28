@@ -2,17 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/app-store";
 import { latestTurnContextInspector } from "../lib/latest-turn-context";
-import {
-  calculateContextUsage,
-  contextUsageView,
-  resolveContextUsageDisplay,
-} from "../lib/context-usage";
 import { contextBarText, compactTokens, formatElapsed } from "../lib/status-bar";
+import { ContextUsageInspector } from "./ContextUsageInspector";
 
 /**
  * The status bar's live numbers belong to the active session and change with
- * every streamed token. Each one is its own leaf so a running turn repaints a
- * few spans instead of the whole sidebar.
+ * every streamed token, so each one is its own leaf: a running turn repaints a
+ * couple of spans instead of the whole sidebar.
  */
 function useTurnInspector() {
   const messages = useAppStore((s) => s.messages);
@@ -27,66 +23,41 @@ function useTurnInspector() {
   );
 }
 
-/** `[██████░░░░] 61% 42.1k` — shape first, then the two numbers that explain it. */
+/**
+ * `[██████░░░░] 61% 42.1k` and, on click, the same detail panel the composer
+ * opens: context used/left, cache hit rate, throughput, per-tool tokens. One
+ * component owns both, so the bar can never disagree with the composer.
+ */
 export function StatusBarContext() {
   const { t } = useTranslation();
   const inspector = useTurnInspector();
-  const displayMode = useAppStore((s) => s.settings?.contextUsageDisplay);
-  const view = useMemo(() => {
-    if (!inspector) return null;
-    const usage = calculateContextUsage(inspector.usage, inspector.contextWindow);
-    return contextUsageView(usage, resolveContextUsageDisplay(displayMode));
-  }, [inspector, displayMode]);
-
-  if (!view) return null;
-  return (
-    <span className="statusbar-metric" title={`${view.tokens} / ${inspector?.contextWindow ?? "?"}`}>
-      <span className="statusbar-label">{t("statusBar.context")}</span>
-      <span className="statusbar-bar">{contextBarText(view.percent)}</span>
-      <span className="statusbar-value">{view.percent}%</span>
-      <span className="statusbar-aside">{compactTokens(view.tokens)}</span>
-    </span>
-  );
-}
-
-/** `38 t/s` — throughput of the newest completed response, not a running average. */
-export function StatusBarSpeed() {
-  const { t } = useTranslation();
-  const inspector = useTurnInspector();
-  const perSecond = useMemo(() => {
-    const tokens = inspector?.responseOutputTokens ?? 0;
-    const ms = inspector?.responseDurationMs ?? 0;
-    if (tokens <= 0 || ms <= 0) return 0;
-    return Math.round((tokens / ms) * 1000);
-  }, [inspector]);
-
-  if (!perSecond) return null;
-  return (
-    <span className="statusbar-metric">
-      <span className="statusbar-label">{t("statusBar.speed")}</span>
-      <span className="statusbar-value">{perSecond} t/s</span>
-    </span>
-  );
-}
-
-/** `72%` cache reads — shown only when the provider actually reported cache tokens. */
-export function StatusBarCache() {
-  const { t } = useTranslation();
-  const inspector = useTurnInspector();
   const percent = useMemo(() => {
+    if (!inspector) return 0;
+    const window_ = inspector.contextWindow || 0;
+    const used = inspector.usage.inputTokens + inspector.usage.outputTokens;
+    if (window_ <= 0) return 0;
+    return Math.min(100, Math.round((used / window_) * 100));
+  }, [inspector]);
+  const tokens = useMemo(() => {
     const usage = inspector?.usage;
-    if (!usage) return null;
-    const cached = usage.cacheReadTokens ?? 0;
-    const prompt = usage.inputTokens + cached + (usage.cacheWriteTokens ?? 0);
-    if (cached <= 0 || prompt <= 0) return null;
-    return Math.round((cached / prompt) * 100);
+    if (!usage) return 0;
+    return usage.inputTokens + usage.outputTokens;
   }, [inspector]);
 
-  if (percent === null) return null;
+  if (!inspector) return null;
   return (
-    <span className="statusbar-metric">
-      <span className="statusbar-label">{t("statusBar.cache")}</span>
-      <span className="statusbar-value">{percent}%</span>
+    <span className="statusbar-metric statusbar-clickable">
+      <ContextUsageInspector
+        {...inspector}
+        trigger={
+          <>
+            <span className="statusbar-label">{t("statusBar.context")}</span>
+            <span className="statusbar-bar">{contextBarText(percent)}</span>
+            <span className="statusbar-value">{percent}%</span>
+            <span className="statusbar-aside">{compactTokens(tokens)}</span>
+          </>
+        }
+      />
     </span>
   );
 }

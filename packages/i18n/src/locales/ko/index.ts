@@ -6,8 +6,6 @@ export const ko = {
     context: "컨텍스트",
     running: "실행 중",
     pending: "승인 대기",
-    speed: "속도",
-    cache: "캐시",
   },
   worktree: {
     menu: { group: "Git" },

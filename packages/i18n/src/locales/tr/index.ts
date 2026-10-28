@@ -6,8 +6,6 @@ export const tr = {
     context: "Bağlam",
     running: "Çalışıyor",
     pending: "Onay bekliyor",
-    speed: "Hız",
-    cache: "Önbellek",
   },
   worktree: {
     menu: { group: "Git" },

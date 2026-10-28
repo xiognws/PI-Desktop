@@ -4,8 +4,6 @@ export const en = {
     context: "Context",
     running: "Running",
     pending: "Waiting for approval",
-    speed: "Speed",
-    cache: "Cache",
   },
   worktree: {
     menu: { group: "Git" },

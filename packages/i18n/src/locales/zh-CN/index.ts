@@ -6,8 +6,6 @@ export const zhCN = {
     context: "上下文",
     running: "运行中",
     pending: "等待批准",
-    speed: "速率",
-    cache: "缓存",
   },
   worktree: {
     menu: { group: "Git" },

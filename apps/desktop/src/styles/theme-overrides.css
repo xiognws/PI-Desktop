@@ -211,6 +211,33 @@
   text-overflow: ellipsis;
 }
 
+/* The context item is a button: the bar's own typography, the composer's panel. */
+.statusbar-clickable .context-inspector {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+}
+
+.statusbar-clickable .context-inspector-trigger.has-custom-trigger {
+  display: inline-flex;
+  height: 100%;
+  align-items: baseline;
+  gap: 5px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.statusbar-clickable .context-inspector-trigger.has-custom-trigger:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
 .statusbar-bar {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 9px;

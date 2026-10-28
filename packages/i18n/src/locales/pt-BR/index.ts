@@ -6,8 +6,6 @@ export const ptBR = {
     context: "Contexto",
     running: "Em execução",
     pending: "Aguardando aprovação",
-    speed: "Velocidade",
-    cache: "Cache",
   },
   worktree: {
     menu: { group: "Git" },

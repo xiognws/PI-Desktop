@@ -6,8 +6,6 @@ export const fr = {
     context: "Contexte",
     running: "En cours",
     pending: "En attente d'approbation",
-    speed: "Débit",
-    cache: "Cache",
   },
   "worktree": {
     "menu": { "group": "Git" },

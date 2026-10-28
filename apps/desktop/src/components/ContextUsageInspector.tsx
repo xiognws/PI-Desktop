@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -15,7 +16,7 @@ import {
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { formatToolDuration } from "../lib/tool-display";
-import { TooltipButton } from "./ui";
+import { TooltipButton, cx } from "./ui";
 import {
   aggregateToolTokenUsage,
   calculateCacheRate,
@@ -468,7 +469,7 @@ export function ContextUsageInspector({
       <TooltipButton
         ref={triggerRef}
         type="button"
-        className={cx("context-inspector-trigger", trigger && "has-custom-trigger")}
+        className={cx("context-inspector-trigger", Boolean(trigger) && "has-custom-trigger")}
         tooltip={t("chat.usageContextAria", ariaArguments)}
         ariaLabel={t("chat.usageContextAria", ariaArguments)}
         aria-haspopup="dialog"
