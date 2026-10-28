@@ -238,10 +238,11 @@ test("the advanced body is a compact sheet without helper paragraphs", () => {
   // inside a half-pane. Labels stay 2xs, the alias hint is the help mark beside
   // the label, and the default selector sits on the thinking label row.
   assert.match(pickerSource, /className="provider-chosen-field"/);
-  assert.match(
-    pickerSource,
-    /<HelpIcon label=\{t\("settings\.modelAliasHint"\)\} \/>/,
-  );
+  // The name field lives on the row itself (the id is the primary label and a
+  // rename control hidden behind Advanced is one nobody finds), so its
+  // explanation is the field's own tooltip rather than a help mark in the body.
+  assert.match(pickerSource, /className="provider-chosen-row-name"/);
+  assert.match(pickerSource, /title=\{t\("settings\.modelAliasHint"\)\}/);
   assert.doesNotMatch(pickerSource, /hint=\{t\("settings\.modelAliasHint"\)\}/);
   assert.match(pickerSource, /aria-controls=\{advancedId\}/);
   // Every row starts folded so chosen models stay scannable (D625).

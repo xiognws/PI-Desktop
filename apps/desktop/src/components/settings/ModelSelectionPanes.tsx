@@ -660,9 +660,33 @@ export function ModelSelectionPanes({
                     <span className="provider-chosen-row-id font-mono selectable">
                       {binding.id}
                     </span>
-                    {binding.alias?.trim() ? (
-                      <span className="provider-chosen-row-alias">{binding.alias.trim()}</span>
-                    ) : null}
+                    {/* The name the rest of the app shows, edited in place: an
+                        alias keeps two providers that serve the same model id
+                        apart ("CX-deepseek-v4.1" / "TX-deepseek-v4.1"). It sits
+                        on every row instead of inside the Advanced body, because
+                        the id is the primary label and a hidden rename field is
+                        one the user never finds. */}
+                    <label
+                      className="provider-chosen-row-name"
+                      title={t("settings.modelAliasHint")}
+                    >
+                      <Input
+                        className="provider-chosen-alias-input"
+                        value={binding.alias ?? ""}
+                        placeholder={t("settings.modelAliasPlaceholder")}
+                        aria-label={t("settings.modelAlias")}
+                        spellCheck={false}
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        onChange={(event) =>
+                          updateBinding(binding.id, {
+                            // Host-core caps the alias at 60 Unicode scalars, so
+                            // clamp by code point rather than UTF-16 unit.
+                            alias: [...event.target.value].slice(0, 60).join(""),
+                          })
+                        }
+                      />
+                    </label>
                     <span className="provider-chosen-row-limits">
                       {formatTokenCount(displayedContextWindow)} ·{" "}
                       {formatTokenCount(displayedMaxTokens)}
@@ -701,26 +725,6 @@ export function ModelSelectionPanes({
                     id={advancedId}
                     hidden={!expanded}
                   >
-                    <label className="provider-chosen-field">
-                      <span className="provider-chosen-field-label">
-                        {t("settings.modelAlias")}
-                        <HelpIcon label={t("settings.modelAliasHint")} />
-                      </span>
-                      <Input
-                        value={binding.alias ?? ""}
-                        placeholder={t("settings.modelAliasPlaceholder")}
-                        spellCheck={false}
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        onChange={(event) =>
-                          updateBinding(binding.id, {
-                            // Host-core caps the alias at 60 Unicode scalars, so
-                            // clamp by code point rather than UTF-16 unit.
-                            alias: [...event.target.value].slice(0, 60).join(""),
-                          })
-                        }
-                      />
-                    </label>
                     <div className="provider-chosen-limits">
                       <label className="provider-chosen-field">
                         {/* A catalog window keeps following models.dev until the

@@ -285,13 +285,13 @@ test("model ids are copyable and a configured model can carry an alias", () => {
   assert.match(pickerSource, /event\.target instanceof HTMLInputElement/);
   assert.match(pickerSource, /event\.preventDefault\(\)/);
   assert.doesNotMatch(pickerSource, /window\.getSelection\(\)\?\.toString\(\)/);
-  // The alias is edited in the Advanced body and shown beside the id.
+  // The display name is edited in place on the row, beside the id it renames.
   assert.match(pickerSource, /settings\.modelAlias/);
   assert.match(pickerSource, /updateBinding\(binding\.id, \{/);
   // The 60-character cap counts Unicode scalars, matching host-core.
   assert.match(pickerSource, /\[\.\.\.event\.target\.value\]\.slice\(0, 60\)/);
-  assert.match(pickerSource, /provider-chosen-row-alias/);
-  assert.match(styles, /\.provider-chosen-row-alias\s*\{/);
+  assert.match(pickerSource, /provider-chosen-alias-input/);
+  assert.match(styles, /\.provider-chosen-alias-input\s*\{/);
 });
 
 test("the chosen pane narrows a long configured list with its own search", () => {
