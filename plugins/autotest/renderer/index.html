@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+    (function () {
+      var http = location.protocol.indexOf("http") === 0;
+      // Served by the backend: root-absolute base so client-side routes keep
+      // loading /assets/*. Opened from the plugin directory: relative base.
+      var base = document.createElement("base");
+      base.href = http ? "/" : new URL(".", location.href).href;
+      document.head.appendChild(base);
+      var q = new URLSearchParams(location.search).get("api");
+      window.__AUTOTEST_API__ = q || (http ? "" : "http://127.0.0.1:4000");
+    })();
+  </script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Autotest</title>
+    <script type="module" crossorigin src="./assets/index-Cx3D87lu.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-BWaJ3C7D.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-DABdVmxc.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

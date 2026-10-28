@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "autotest/run-event.v1.json",
+  "title": "RunEvent v1",
+  "description": "One line of an NDJSON run stream. Shared by every executor channel (ui, ecu, api).",
+  "type": "object",
+  "required": ["schemaVersion", "type", "runId", "seq", "ts"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "seq": { "type": "integer", "minimum": 0 },
+    "ts": { "type": "string", "format": "date-time" },
+    "runId": { "type": "string" },
+    "type": {
+      "enum": [
+        "run.start",
+        "case.start",
+        "step.start",
+        "step.end",
+        "artifact",
+        "case.end",
+        "run.end"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "run.start" } } },
+      "then": {
+        "required": ["projectId", "channel", "startedAt"],
+        "properties": {
+          "projectId": { "type": "string" },
+          "caseIds": { "type": "array", "items": { "type": "string" } },
+          "channel": { "enum": ["ui", "ecu", "api"] },
+          "startedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "case.start" } } },
+      "then": {
+        "required": ["caseId", "attempt", "startedAt"],
+        "properties": {
+          "caseId": { "type": "string" },
+          "attempt": { "type": "integer", "minimum": 1 },
+          "startedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "step.start" } } },
+      "then": {
+        "required": ["caseId", "stepId", "index", "kind", "label"],
+        "properties": {
+          "caseId": { "type": "string" },
+          "stepId": { "type": "string" },
+          "index": { "type": "integer", "minimum": 0 },
+          "kind": { "enum": ["act", "assert", "driver"] },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "step.end" } } },
+      "then": {
+        "required": ["caseId", "stepId", "status", "durationMs", "replayHit"],
+        "properties": {
+          "caseId": { "type": "string" },
+          "stepId": { "type": "string" },
+          "status": { "enum": ["pass", "fail", "skip"] },
+          "durationMs": { "type": "number", "minimum": 0 },
+          "replayHit": { "type": "boolean" },
+          "detail": { "type": "object" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "artifact" } } },
+      "then": {
+        "required": ["caseId", "kind", "path"],
+        "properties": {
+          "caseId": { "type": "string" },
+          "kind": { "enum": ["screenshot", "video", "trace", "report", "log"] },
+          "path": { "type": "string" },
+          "bytes": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "case.end" } } },
+      "then": {
+        "required": ["caseId", "status", "durationMs"],
+        "properties": {
+          "caseId": { "type": "string" },
+          "status": { "enum": ["pass", "fail", "skip", "error"] },
+          "durationMs": { "type": "number", "minimum": 0 },
+          "failure": { "type": ["string", "null"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "run.end" } } },
+      "then": {
+        "required": ["status", "counts", "durationMs"],
+        "properties": {
+          "status": { "enum": ["pass", "fail", "error", "cancelled"] },
+          "counts": {
+            "type": "object",
+            "required": ["pass", "fail", "skip"],
+            "properties": {
+              "pass": { "type": "integer", "minimum": 0 },
+              "fail": { "type": "integer", "minimum": 0 },
+              "skip": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "durationMs": { "type": "number", "minimum": 0 },
+          "replayHits": { "type": "integer", "minimum": 0 },
+          "modelCalls": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  ]
+}

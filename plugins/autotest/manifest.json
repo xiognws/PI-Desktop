@@ -1,0 +1,419 @@
+{
+  "schemaVersion": 1,
+  "id": "com.autotest.platform",
+  "name": "Autotest",
+  "version": "0.2.0",
+  "description": "Automotive ECU / cockpit HMI test platform: projects, cases, runs, reports (the Desktop agent reasons; the plugin executes).",
+  "main": "main.js",
+  "ui": {
+    "panel": "renderer/index.html",
+    "width": 1180,
+    "height": 820,
+    "title": {
+      "en": "Autotest",
+      "zh-CN": "自动化测试"
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "id": "autotest.open",
+        "title": "Autotest: Open Platform",
+        "keywords": [
+          "autotest",
+          "test",
+          "platform"
+        ]
+      },
+      {
+        "id": "autotest.restart-backend",
+        "title": "Autotest: Restart Backend",
+        "keywords": [
+          "autotest",
+          "backend",
+          "restart"
+        ]
+      }
+    ],
+    "agentTools": [
+      {
+        "name": "platform_status",
+        "description": "Report whether the Autotest backend is reachable and which version it runs.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "list_projects",
+        "description": "List Autotest projects with id, name, type and last activity.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        }
+      },
+      {
+        "name": "list_cases",
+        "description": "List test cases of one project.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        }
+      },
+      {
+        "name": "list_executions",
+        "description": "List recent executions of one project with status and counts.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        }
+      },
+      {
+        "name": "list_scripts",
+        "description": "List scripts of one project (id, name, language, status).",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        }
+      },
+      {
+        "name": "create_script",
+        "description": "Create a script/case file in a project. language is 'python' or 'e2e'.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string",
+              "enum": [
+                "python",
+                "e2e"
+              ]
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId",
+            "name",
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "run_case",
+        "description": "Start a case run in the background and return immediately; poll get_execution for the result.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "scriptId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId",
+            "scriptId"
+          ]
+        }
+      },
+      {
+        "name": "get_execution",
+        "description": "Read one execution with its run events (steps, durations, artifacts, failure).",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "executionId": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "projectId",
+            "executionId"
+          ]
+        }
+      },
+      {
+        "name": "cancel_run",
+        "description": "Ask a running execution to stop; it ends as cancelled within a few seconds.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "executionId": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "projectId",
+            "executionId"
+          ]
+        }
+      },
+      {
+        "name": "run_pipeline",
+        "description": "Run the requirement→cases→scripts pipeline. checkpointPolicy: auto | analyze | analyze_author.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "requirementFilename": {
+              "type": "string"
+            },
+            "checkpointPolicy": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "analyze",
+                "analyze_author"
+              ]
+            },
+            "targetUrl": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        }
+      },
+      {
+        "name": "pipeline_status",
+        "description": "Read one pipeline (stages, outputs, agent-call ledger) or list all of a project.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "pipelineId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        }
+      },
+      {
+        "name": "pipeline_action",
+        "description": "Approve a waiting pipeline, retry its current stage, or cancel it.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "pipelineId": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "approve",
+                "retry",
+                "cancel"
+              ]
+            }
+          },
+          "required": [
+            "projectId",
+            "pipelineId",
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "pipeline_report",
+        "description": "Read the markdown report of a finished pipeline (evidence, artifacts, repair log).",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "pipelineId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId",
+            "pipelineId"
+          ]
+        }
+      },
+      {
+        "name": "list_schedules",
+        "description": "List scheduled pipeline runs of a project (kind, next run, last pipeline).",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId"
+          ]
+        }
+      },
+      {
+        "name": "fire_schedule",
+        "description": "Start a scheduled pipeline right now (advances its next run).",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "scheduleId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId",
+            "scheduleId"
+          ]
+        }
+      }
+    ],
+    "views": [
+      {
+        "id": "runs",
+        "title": {
+          "en": "Autotest Runs",
+          "zh-CN": "测试执行"
+        },
+        "entry": "renderer/runs.html",
+        "order": 40
+      }
+    ],
+    "skills": [
+      "skills/autotest.md"
+    ],
+    "settings": [
+      {
+        "key": "pythonPath",
+        "title": "Python interpreter",
+        "description": "Venv interpreter that runs the backend. Empty uses <plugin>/platform/.venv.",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "key": "dataRoot",
+        "title": "Project data folder",
+        "description": "Where projects and their databases live. Empty keeps them under the plugin data folder.",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "key": "backendPort",
+        "title": "Backend port",
+        "type": "number",
+        "default": 4000
+      },
+      {
+        "key": "autoStart",
+        "title": "Start the backend with the app",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "key": "e2eHome",
+        "title": "e2e runtime folder",
+        "description": "Folder holding node_modules/e2e (Playwright engine). Empty uses the bundled runtime/e2e.",
+        "type": "string",
+        "default": ""
+      }
+    ],
+    "services": [
+      {
+        "id": "backend",
+        "label": "Autotest backend",
+        "autoRestart": true
+      }
+    ]
+  },
+  "permissions": [
+    "ui.panel",
+    "ui.view",
+    "background.service",
+    "agent.tool.register",
+    "agent.prompt.inject",
+    "net.fetch",
+    "agent.complete",
+    "models.list",
+    "session.read",
+    "notify"
+  ],
+  "net": {
+    "domains": [
+      "127.0.0.1"
+    ]
+  },
+  "engines": {
+    "piDesktop": ">=0.21.0"
+  },
+  "activationEvents": [
+    "onStartup",
+    "onCommand:autotest.open",
+    "onCommand:autotest.restart-backend"
+  ]
+}

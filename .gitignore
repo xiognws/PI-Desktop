@@ -54,6 +54,11 @@ coverage/
 .pi/
 .cc-connect/
 
+# Autotest plugin: local provisioning (deps live here, not in git)
+.venv/
+plugins/autotest/platform/.venv/
+runtime/e2e/.autotest-runs/
+
 .playwright-mcp/
 .claude/
 .workbuddy
@@ -71,3 +76,8 @@ worktrees
 !/apps/desktop/resources/plugins/pi.browser/
 !/apps/desktop/resources/plugins/pi.file-manager/
 /.plugin-packages/
+
+# Python install artefacts
+*.egg-info/
+__pycache__/
+*.pyc

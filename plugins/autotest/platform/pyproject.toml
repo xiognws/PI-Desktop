@@ -1,0 +1,31 @@
+[project]
+name = "autotest"
+version = "0.2.0"
+description = "Automotive ECU / cockpit HMI test platform (executes; the Desktop agent reasons)"
+requires-python = ">=3.11"
+dependencies = [
+    # 平台只负责存储与执行；模型推理、用例设计交给桌面端 Agent
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.0",
+    "pytest>=8.0",
+    "httpx>=0.27",
+    "sse-starlette>=2.1",
+    "websockets>=12.0",
+    # 需求文档上传走 multipart/form-data
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller>=6.0",
+    "pytest-cov",
+    "ruff",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

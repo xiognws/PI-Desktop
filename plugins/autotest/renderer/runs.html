@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Autotest Runs</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #181818;
+        --surface: #212121;
+        --surface-hover: color-mix(in oklab, #ffffff 6%, transparent);
+        --fg: #ffffff;
+        --muted: color-mix(in oklab, #ffffff 52%, transparent);
+        --border: color-mix(in oklab, #ffffff 10%, transparent);
+        --ok: #3ecf8e;
+        --error: #f1616f;
+      }
+      :root[data-base="light"] {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f9f9f9;
+        --surface-hover: color-mix(in oklab, #1a1c1f 5%, transparent);
+        --fg: #1a1c1f;
+        --muted: #5d5d5d;
+        --border: color-mix(in oklab, #1a1c1f 10%, transparent);
+        --ok: #12855a;
+        --error: #c02b39;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 12px 16px 16px;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      header { display: flex; gap: 10px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+      h1 { margin: 0; font-size: 14px; font-weight: 560; }
+      select, button {
+        font: inherit;
+        color: var(--fg);
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 5px 9px;
+      }
+      button { cursor: pointer; }
+      button:hover { background: var(--surface-hover); }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--border); }
+      th { color: var(--muted); font-weight: 500; font-size: 12px; }
+      tbody tr:hover { background: var(--surface-hover); }
+      .muted { color: var(--muted); }
+      .status-pass { color: var(--ok); }
+      .status-fail { color: var(--error); }
+      .note { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--muted); }
+      tbody tr { cursor: pointer; }
+      tbody tr.selected { background: var(--surface-hover); }
+      .events { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
+      .events h2 { margin: 0 0 8px; font-size: 13px; font-weight: 560; }
+      .ev { display: flex; gap: 10px; padding: 3px 0; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .ev-type { min-width: 84px; color: var(--muted); }
+      .ev-ok { color: var(--ok); }
+      .ev-bad { color: var(--error); }
+      .ev-body { flex: 1; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 id="title">Autotest Runs</h1>
+      <select id="project"></select>
+      <button id="refresh">Refresh</button>
+    </header>
+    <main id="content"></main>
+    <script>
+      // 同源（后端 serve 本页）用相对路径；插件面板（file/app 源）回落本机后端
+      const apiParam = new URLSearchParams(location.search).get("api");
+      const BASE = apiParam || (location.protocol.indexOf("http") === 0 ? "" : "http://127.0.0.1:4000");
+      const zh = (navigator.language || "en").toLowerCase().startsWith("zh");
+      const COPY = {
+        title: zh ? "测试执行" : "Autotest Runs",
+        refresh: zh ? "刷新" : "Refresh",
+        empty: zh ? "该还没有执行记录。" : "No executions for this project yet.",
+        offline: zh ? "后端未就绪（127.0.0.1:4000）。" : "Backend offline (127.0.0.1:4000).",
+        project: zh ? "项目" : "Project",
+        started: zh ? "开始时间" : "Started",
+        status: zh ? "状态" : "Status",
+        cases: zh ? "用例" : "Cases",
+        duration: zh ? "耗时" : "Duration",
+      };
+
+      const applyAppearance = (appearance) => {
+        const base = appearance?.base;
+        document.documentElement.dataset.base =
+          base === "light" || base === "dark"
+            ? base
+            : window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      };
+      applyAppearance(null);
+      window.pluginBridge?.on("appearance:changed", applyAppearance);
+
+      const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+      async function getJson(path) {
+        const response = await fetch(`${BASE}${path}`, { headers: { accept: "application/json" } });
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        return response.json();
+      }
+
+      const projectSelect = document.getElementById("project");
+      const content = document.getElementById("content");
+
+      async function loadProjects() {
+        const raw = await getJson("/api/projects");
+        const rows = Array.isArray(raw) ? raw : (raw.projects ?? []);
+        projectSelect.innerHTML = rows
+          .map((row) => `<option value="${esc(row.id)}">${esc(row.name ?? row.id)}</option>`)
+          .join("");
+        return rows;
+      }
+
+      async function loadExecutions() {
+        const projectId = projectSelect.value;
+        if (!projectId) {
+          content.innerHTML = "";
+          return;
+        }
+        const raw = await getJson(`/api/projects/${encodeURIComponent(projectId)}/executions`);
+        const rows = Array.isArray(raw) ? raw : (raw.executions ?? []);
+        if (rows.length === 0) {
+          content.innerHTML = `<div class="note">${esc(COPY.empty)}</div>`;
+          return;
+        }
+        content.innerHTML = `
+          <table>
+            <thead><tr>
+              <th>${esc(COPY.started)}</th><th>${esc(COPY.status)}</th>
+              <th>${esc(COPY.cases)}</th><th>${esc(COPY.duration)}</th>
+            </tr></thead>
+            <tbody>
+              ${rows.map((row) => {
+                const status = String(row.status ?? "");
+                const cls = /pass|success|通过/i.test(status) ? "status-pass" : /fail|error|失败/i.test(status) ? "status-fail" : "muted";
+                return `<tr data-exec="${esc(row.id ?? "")}">
+                  <td class="muted">${esc(row.started_at ?? row.created_at ?? "")}</td>
+                  <td class="${cls}">${esc(status)}</td>
+                  <td class="muted">${esc(row.case_count ?? row.cases ?? "")}</td>
+                  <td class="muted">${esc(row.duration_ms ?? row.duration ?? "")}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+          <div id="events"></div>`;
+      }
+
+      async function refresh() {
+        document.title = COPY.title;
+        document.getElementById("title").textContent = COPY.title;
+        document.getElementById("refresh").textContent = COPY.refresh;
+        try {
+          await loadProjects();
+          await loadExecutions();
+        } catch (error) {
+          content.innerHTML = `<div class="note">${esc(COPY.offline)} <code>${esc(String(error.message || error))}</code></div>`;
+        }
+      }
+
+      projectSelect.addEventListener("change", () => { loadExecutions().catch(() => {}); });
+      document.getElementById("refresh").addEventListener("click", refresh);
+
+      // 点一行 → 读该次执行的 RunEvent 流（/executions/{id}/events）
+      content.addEventListener("click", async (event) => {
+        const row = event.target.closest("tr[data-exec]");
+        if (!row) return;
+        const executionId = row.dataset.exec;
+        if (!executionId) return;
+        for (const other of content.querySelectorAll("tr.selected")) other.classList.remove("selected");
+        row.classList.add("selected");
+        const pane = document.getElementById("events");
+        if (!pane) return;
+        pane.innerHTML = `<h2>execution ${esc(executionId)}</h2><div class="ev"><span class="ev-type">…</span><span class="ev-body">loading</span></div>`;
+        try {
+          const data = await getJson(`/api/projects/${encodeURIComponent(projectSelect.value)}/executions/${encodeURIComponent(executionId)}/events`);
+          const list = data.events ?? [];
+          pane.innerHTML = `<h2>execution ${esc(executionId)} · ${list.length} events</h2>` + list.map((ev) => {
+            const status = ev.status ? ` ${ev.status}` : "";
+            const cls = ev.status === "fail" || ev.status === "error" ? "ev-bad" : ev.status === "pass" ? "ev-ok" : "";
+            const body = ev.type === "artifact"
+              ? esc(ev.path)
+              : esc([ev.label ?? ev.stepId ?? ev.caseId ?? "", ev.durationMs != null ? `${ev.durationMs}ms` : "", ev.failure ?? ""].filter(Boolean).join(" · "));
+            return `<div class="ev"><span class="ev-type">${esc(ev.type)}</span><span class="ev-body ${cls}">${body}${esc(status)}</span></div>`;
+          }).join("");
+        } catch (error) {
+          pane.innerHTML = `<div class="ev ev-bad">${esc(String(error.message || error))}</div>`;
+        }
+      });
+
+      refresh();
+    </script>
+  </body>
+</html>

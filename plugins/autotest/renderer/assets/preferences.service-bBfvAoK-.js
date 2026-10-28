@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BWaJ3C7D.js";import{RA as t,zA as n}from"./standaloneServices-12ifd5r_.js";var r,i=e((()=>{n(),r=t(`preferencesService`)}));export{i as n,r as t};
