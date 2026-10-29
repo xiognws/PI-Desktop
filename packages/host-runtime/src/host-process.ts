@@ -12,6 +12,14 @@ import {
 const HOST_DISPOSE_GRACE_MS = 3_000;
 const HOST_FORCE_KILL_GRACE_MS = 1_000;
 const HOST_OVERLOAD_RETRY_DELAYS_MS = [50, 100, 200, 400] as const;
+const HANDSHAKE_METHOD = "app.handshake";
+/**
+ * How long a request waits for this generation's handshake before it is sent
+ * anyway. A host that never answers must fail with its own error rather than
+ * park the caller forever, and a cold start on a slow disk spends seconds
+ * before the binary answers.
+ */
+const HANDSHAKE_WAIT_MS = 30_000;
 
 export type HostNotificationHandler = (method: string, params: unknown) => void;
 export type ProcessExitHandler = (info: {
@@ -87,6 +95,17 @@ export class HostProcess {
   private disposePromise?: Promise<void>;
   private stdoutReader?: ReturnType<typeof readNdjsonLines>;
   private lastStderr = "";
+  /**
+   * Requests wait for this generation's handshake. A caller that runs during
+   * boot — the native window corner preference, a renderer restoring before
+   * the host answered — is exactly the traffic the handshake legitimises, so it
+   * queues for it instead of racing it. Before this gate it reached host-core
+   * first, was refused with `handshake required`, and surfaced as a toast on
+   * every start.
+   */
+  private handshakeGate: Promise<void> | null = null;
+  private releaseHandshakeGate: (() => void) | null = null;
+  private handshakeSettled = false;
   private readonly diagnoseFailure?: HostProcessOptions["diagnoseFailure"];
   readonly binaryPath: string;
   readonly generation = randomUUID();
@@ -94,6 +113,11 @@ export class HostProcess {
   constructor(options: HostProcessOptions) {
     this.exitPromise = new Promise<void>((resolve) => {
       this.resolveExit = resolve;
+    });
+    // The gate exists from the moment the child does, so nothing issued between
+    // the spawn and the handshake answer can slip past it.
+    this.handshakeGate = new Promise<void>((resolve) => {
+      this.releaseHandshakeGate = resolve;
     });
     this.binaryPath = options.binaryPath;
     this.diagnoseFailure = options.diagnoseFailure;
@@ -153,6 +177,9 @@ export class HostProcess {
       p.reject(error);
     }
     this.pending.clear();
+    // Wake anyone still waiting on a handshake that will now never arrive, so
+    // they fail with this transport error instead of waiting out their bound.
+    this.settleHandshakeGate();
     this.handlers.clear();
     this.stdoutReader?.close();
     this.stdoutReader = undefined;
@@ -267,11 +294,43 @@ export class HostProcess {
     return () => this.handlers.delete(handler);
   }
 
+  private settleHandshakeGate() {
+    if (!this.handshakeGate || this.handshakeSettled) return;
+    this.handshakeSettled = true;
+    const release = this.releaseHandshakeGate;
+    this.releaseHandshakeGate = null;
+    release?.();
+  }
+
+  /**
+   * Wait for the handshake this generation needs, bounded by
+   * `HANDSHAKE_WAIT_MS`. A transport that never answered must fail with its own
+   * error, so the wait is a delay and never a deadlock.
+   */
+  private async waitForHandshake(): Promise<void> {
+    if (this.handshakeSettled || !this.handshakeGate) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        this.handshakeGate,
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, HANDSHAKE_WAIT_MS);
+          timer.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   async call<T = unknown>(
     method: string,
     params: unknown = {},
     timeoutOverrideMs?: number,
   ): Promise<T> {
+    // The handshake is what makes any other method legal, so a boot-time caller
+    // waits for it instead of being refused.
+    if (method !== HANDSHAKE_METHOD) await this.waitForHandshake();
     for (const delayMs of [0, ...HOST_OVERLOAD_RETRY_DELAYS_MS]) {
       if (delayMs > 0) {
         await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
@@ -359,7 +418,13 @@ export class HostProcess {
   }
 
   async handshake(): Promise<void> {
-    await this.call("app.handshake", { protocolVersion: PROTOCOL_VERSION });
+    try {
+      await this.call(HANDSHAKE_METHOD, { protocolVersion: PROTOCOL_VERSION });
+    } finally {
+      // Release queued callers either way: on failure they must see the real
+      // transport error, not wait out their own bound.
+      this.settleHandshakeGate();
+    }
   }
 
   async dispose(): Promise<void> {
