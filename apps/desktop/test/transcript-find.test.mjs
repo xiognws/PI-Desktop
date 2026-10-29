@@ -47,6 +47,9 @@ test("the bar is mounted by the transcript, over the rows it searches", () => {
   assert.match(bar, /event\.key === "Escape"[\s\S]{0,120}onClose\(\);/);
   assert.match(bar, /event\.key === "Enter"[\s\S]{0,120}onStep\(event\.shiftKey \? -1 : 1\)/);
   assert.match(styles, /\.transcript-find \{[\s\S]*?position: absolute;/);
+  // The steps are labelled: an arrow alone reads as decoration beside a count.
+  assert.match(bar, /className="transcript-find-step"[\s\S]{0,220}<span>\{t\("chat\.findPrevious"\)\}<\/span>/);
+  assert.match(bar, /className="transcript-find-step"[\s\S]{0,220}<span>\{t\("chat\.findNext"\)\}<\/span>/);
 });
 
 test("matches come from the rendered text and reuse the search helpers", () => {

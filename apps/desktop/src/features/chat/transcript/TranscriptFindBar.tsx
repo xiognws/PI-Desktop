@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { findPosition } from "@pi-desktop/shared";
 
 import { IconArrowDown, IconArrowUp, IconX } from "../../../components/icons";
-import { Input, TooltipButton } from "../../../components/ui";
+import { Button, Input, TooltipButton } from "../../../components/ui";
 
 /**
  * Find inside the open conversation.
@@ -71,26 +71,32 @@ export function TranscriptFindBar({
             ? t("chat.findNoMatches")
             : ""}
       </span>
-      <TooltipButton
+      {/* Labelled, not icon-only: the two steps are the reason the bar exists, and
+          an arrow alone reads as decoration next to a count. */}
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         className="transcript-find-step"
-        tooltip={t("chat.findPrevious")}
-        ariaLabel={t("chat.findPrevious")}
+        aria-label={t("chat.findPrevious")}
         disabled={total === 0}
         onClick={() => onStep(-1)}
       >
-        <IconArrowUp size={14} aria-hidden />
-      </TooltipButton>
-      <TooltipButton
+        <IconArrowUp size={13} aria-hidden />
+        <span>{t("chat.findPrevious")}</span>
+      </Button>
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         className="transcript-find-step"
-        tooltip={t("chat.findNext")}
-        ariaLabel={t("chat.findNext")}
+        aria-label={t("chat.findNext")}
         disabled={total === 0}
         onClick={() => onStep(1)}
       >
-        <IconArrowDown size={14} aria-hidden />
-      </TooltipButton>
+        <IconArrowDown size={13} aria-hidden />
+        <span>{t("chat.findNext")}</span>
+      </Button>
       <TooltipButton
         type="button"
         className="transcript-find-close"

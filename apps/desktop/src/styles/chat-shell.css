@@ -994,6 +994,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  max-width: calc(100% - 32px);
   padding: 5px 6px 5px 8px;
   border: 1px solid var(--ds-border);
   border-radius: var(--radius-full);
@@ -1022,7 +1023,15 @@
   white-space: nowrap;
 }
 
-.transcript-find-step,
+.transcript-find-step {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--ds-text-muted);
+  white-space: nowrap;
+}
+
 .transcript-find-close {
   color: var(--ds-text-muted);
 }
