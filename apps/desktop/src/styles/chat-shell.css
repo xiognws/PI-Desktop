@@ -988,7 +988,10 @@
    reflow the text being searched. */
 .transcript-find {
   position: absolute;
-  top: 8px;
+  /* Clears the absolutely positioned conversation top bar: the transcript
+     reserves --ds-toolbar-height for it, and the bar starts at the wrap's top
+     edge rather than inside that reserve. */
+  top: calc(var(--ds-toolbar-height) + 8px);
   right: 16px;
   z-index: 30;
   display: flex;
