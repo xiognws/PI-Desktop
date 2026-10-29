@@ -981,3 +981,57 @@
     padding-bottom: 18px;
   }
 }
+
+/* Find bar ---------------------------------------------------------------- */
+
+/* Floats over the transcript instead of pushing it: opening find must not
+   reflow the text being searched. */
+.transcript-find {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 8px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-full);
+  background: var(--ds-panel, var(--ds-tile));
+  box-shadow: var(--shadow-md, 0 6px 20px rgb(0 0 0 / 0.18));
+}
+
+.transcript-find-input {
+  width: 180px;
+  border-color: transparent;
+  background: transparent;
+  font-size: var(--text-sm);
+}
+
+.transcript-find-input:focus {
+  border-color: var(--ds-border-strong);
+}
+
+.transcript-find-count {
+  flex: none;
+  min-width: 48px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.transcript-find-step,
+.transcript-find-close {
+  color: var(--ds-text-muted);
+}
+
+.transcript-find-step:hover:not(:disabled),
+.transcript-find-close:hover {
+  color: var(--ds-text-primary);
+}
+
+.transcript-find-step:disabled {
+  opacity: 0.4;
+}

@@ -3662,6 +3662,17 @@
   background-color: color-mix(in srgb, var(--ds-accent) 35%, transparent);
 }
 
+/* Find in the open conversation: every match, then the one being read. */
+::highlight(transcript-find) {
+  color: var(--ds-text-primary);
+  background-color: color-mix(in srgb, var(--ds-accent) 28%, transparent);
+}
+
+::highlight(transcript-find-active) {
+  color: var(--ds-accent-contrast, #fff);
+  background-color: var(--ds-accent);
+}
+
 .transcript-search-source-match {
   background-color: color-mix(in srgb, var(--ds-accent) 25%, transparent);
   outline: 2px solid color-mix(in srgb, var(--ds-accent) 65%, transparent);

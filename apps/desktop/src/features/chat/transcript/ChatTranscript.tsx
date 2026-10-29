@@ -33,6 +33,8 @@ import { useTranscriptContinuation } from "../../../hooks/use-transcript-continu
 import type { TranscriptSearchTarget } from "../../../lib/transcript-reading";
 import type { RestoreTranscriptReading } from "../../../hooks/use-transcript-reading-position";
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
+import { TranscriptFindBar } from "./TranscriptFindBar";
+import { useTranscriptFind } from "./use-transcript-find";
 import { DisclosureAnchorContext } from "../../../lib/disclosure-anchor-context";
 import { api } from "../../../lib/api";
 import { mergeLiveSessionMessages } from "../../../lib/session-transcript";
@@ -199,6 +201,10 @@ function TranscriptBody({
     readingWindow,
     onRestoreReading,
   });
+
+  // Find runs over the rendered rows, so it needs the same content element the
+  // transcript already measures for the minimap and search focus.
+  const find = useTranscriptFind(contentRef);
 
   const continuationCursor = useAppStore((state) =>
     sessionId ? state.transcriptViews[sessionId]?.messageEnd : undefined,
@@ -425,6 +431,16 @@ function TranscriptBody({
       ref={wrapRef}
       data-transcript-settling={veilCovering ? "true" : undefined}
     >
+      {find.open ? (
+        <TranscriptFindBar
+          query={find.query}
+          index={find.index}
+          total={find.total}
+          onQueryChange={find.setQuery}
+          onStep={find.step}
+          onClose={find.close}
+        />
+      ) : null}
       {/* The minimap measures row positions against a rendered scroller. A
         * hidden pane has none, so measuring there would cache junk offsets and
         * reuse them on reveal. It is out of flow and re-measures on mount, so

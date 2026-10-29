@@ -574,6 +574,13 @@ export const ptBR = {
     toolBlockContent: "Conteúdo do arquivo",
     toolBlockWritten: "Conteúdo gravado",
     toolBlockCommand: "Comando",
+    findInConversation: "Buscar na conversa",
+    findPlaceholder: "Buscar na conversa",
+    findPosition: "{{current}} de {{total}}",
+    findNoMatches: "Nenhuma correspondência",
+    findPrevious: "Correspondência anterior",
+    findNext: "Próxima correspondência",
+    findClose: "Fechar busca",
     toolActions: "Ações da ferramenta",
     copyToolOutput: "Copiar saída",
     copyToolCommand: "Copiar comando",
@@ -1093,6 +1100,7 @@ export const ptBR = {
       window: "Janela"
     },
     shortcutAction: {
+      findInTranscript: "Buscar na conversa",
       navigateBack: "Voltar",
       navigateForward: "Avançar",
       newTask: "Nova tarefa",

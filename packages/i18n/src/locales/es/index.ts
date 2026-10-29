@@ -575,6 +575,13 @@ export const es = {
     "toolBlockContent": "Archivo contenido",
     "toolBlockWritten": "Contenido escrito",
     "toolBlockCommand": "Comando",
+    "findInConversation": "Buscar en la conversación",
+    "findPlaceholder": "Buscar en la conversación",
+    "findPosition": "{{current}} de {{total}}",
+    "findNoMatches": "Sin coincidencias",
+    "findPrevious": "Coincidencia anterior",
+    "findNext": "Coincidencia siguiente",
+    "findClose": "Cerrar búsqueda",
     "toolActions": "Acciones de la herramienta",
     "copyToolOutput": "Copiar salida",
     "copyToolCommand": "Copiar comando",
@@ -1267,6 +1274,7 @@ sklm: {
       "window": "Ventana"
     },
     "shortcutAction": {
+      "findInTranscript": "Buscar en la conversación",
       "navigateBack": "Retroceder",
       "navigateForward": "Avanzar",
       "newTask": "Nueva tarea",

@@ -24,6 +24,7 @@ import {
   saveSidebarWidth,
 } from "../../lib/sidebar-preferences";
 import { sidebarWidthBudget } from "../../lib/sidebar-resize";
+import { requestTranscriptFind } from "../../lib/transcript-find-request";
 import { commitWorkPanelPresentation } from "../../lib/work-panel-presentation";
 import {
   MAIN_PANE_MIN_WIDTH,
@@ -897,6 +898,9 @@ export function useAppShellRuntime() {
           case "openProject":
           case "openSettings":
             void runMenuCommand(id);
+            break;
+          case "findInTranscript":
+            requestTranscriptFind();
             break;
           case "openSearch":
             setSearchOpen(true);
