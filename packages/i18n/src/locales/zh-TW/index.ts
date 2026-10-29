@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
+  artifacts: {
+    title: "產物檔案",
+    count: "{{count}} / {{total}} 個檔案",
+    searchPlaceholder: "搜尋檔案、路徑或工作階段",
+    refresh: "重新整理",
+    loading: "正在讀取產物檔案…",
+    loadFailed: "讀取產物檔案失敗：{{message}}",
+    empty: "還沒有檔案",
+    emptyHint: "工作階段寫入或修改過的檔案會出現在這裡。",
+    noMatches: "沒有符合的檔案。",
+    untitledSession: "未命名工作階段",
+    copyPath: "複製路徑",
+    openFile: "開啟 {{name}}",
+    copied: "已複製",
+    op: {
+      write: "寫入",
+      edit: "修改",
+      other: "變更",
+    },
+  },
   statusBar: {
     project: "專案",
     context: "上下文",
@@ -229,6 +249,7 @@ export const zhTW = {
   },
   nav: {
     pinnedSessions: "釘選",
+    pages: "頁面",
     home: "首頁",
     newTask: "新建任務",
     newProject: "新建專案",
@@ -556,6 +577,17 @@ export const zhTW = {
     toolBlockContent: "檔案內容",
     toolBlockWritten: "寫入內容",
     toolBlockCommand: "命令",
+    findInConversation: "會話內尋找",
+    findPlaceholder: "在會話中尋找",
+    findPosition: "{{current}} / {{total}}",
+    findNoMatches: "沒有符合",
+    findPrevious: "上一個",
+    findNext: "下一個",
+    findClose: "關閉尋找",
+    toolActions: "工具操作",
+    copyToolOutput: "複製輸出",
+    copyToolCommand: "複製命令",
+    openToolFile: "開啟檔案",
     toolBlockStdout: "輸出",
     toolBlockStderr: "錯誤輸出",
     toolBlockDiff: "改動",
@@ -1235,6 +1267,7 @@ sklm: {
       window: "視窗",
     },
     shortcutAction: {
+      findInTranscript: "會話內尋找",
       navigateBack: "後退",
       navigateForward: "前進",
       newTask: "新建任務",

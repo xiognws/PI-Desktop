@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const es = {
+  "artifacts": {
+    "title": "Artefactos",
+    "count": "{{count}} de {{total}} archivos",
+    "searchPlaceholder": "Buscar archivos, rutas o sesiones",
+    "refresh": "Actualizar",
+    "loading": "Cargando artefactos…",
+    "loadFailed": "No se pudieron cargar los artefactos: {{message}}",
+    "empty": "Aún no hay archivos",
+    "emptyHint": "Aquí aparecen los archivos que una sesión escribe o edita.",
+    "noMatches": "Ningún archivo coincide con la búsqueda.",
+    "untitledSession": "Sesión sin título",
+    "copyPath": "Copiar ruta",
+    "openFile": "Abrir {{name}}",
+    "copied": "Copiado",
+    "op": {
+      "write": "Escribir",
+      "edit": "Editar",
+      "other": "Cambio",
+    },
+  },
   statusBar: {
     project: "Proyecto",
     context: "Contexto",
@@ -227,6 +247,7 @@ export const es = {
   },
   "nav": {
     "pinnedSessions": "Fijadas",
+    "pages": "Páginas",
     "home": "Inicio",
     "newTask": "Nueva tarea",
     "newProject": "Nuevo proyecto",
@@ -554,6 +575,17 @@ export const es = {
     "toolBlockContent": "Archivo contenido",
     "toolBlockWritten": "Contenido escrito",
     "toolBlockCommand": "Comando",
+    "findInConversation": "Buscar en la conversación",
+    "findPlaceholder": "Buscar en la conversación",
+    "findPosition": "{{current}} de {{total}}",
+    "findNoMatches": "Sin coincidencias",
+    "findPrevious": "Anterior",
+    "findNext": "Siguiente",
+    "findClose": "Cerrar búsqueda",
+    "toolActions": "Acciones de la herramienta",
+    "copyToolOutput": "Copiar salida",
+    "copyToolCommand": "Copiar comando",
+    "openToolFile": "Abrir archivo",
     "toolBlockStdout": "Salida",
     "toolBlockStderr": "Errores",
     "toolBlockDiff": "Cambios",
@@ -1242,6 +1274,7 @@ sklm: {
       "window": "Ventana"
     },
     "shortcutAction": {
+      "findInTranscript": "Buscar en la conversación",
       "navigateBack": "Retroceder",
       "navigateForward": "Avanzar",
       "newTask": "Nueva tarea",

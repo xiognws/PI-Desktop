@@ -24,6 +24,7 @@ import {
   saveSidebarWidth,
 } from "../../lib/sidebar-preferences";
 import { sidebarWidthBudget } from "../../lib/sidebar-resize";
+import { requestTranscriptFind } from "../../lib/transcript-find-request";
 import { commitWorkPanelPresentation } from "../../lib/work-panel-presentation";
 import {
   MAIN_PANE_MIN_WIDTH,
@@ -339,7 +340,7 @@ export function useAppShellRuntime() {
 
   useEffect(() => {
     const pageHidesWorkPanel =
-      page === "settings" || page === "plugins" || page === "scheduled";
+      page === "settings" || page === "plugins" || page === "scheduled" || page === "artifacts";
     const shouldPresent =
       ready && !pageHidesWorkPanel && workPanelOpen;
     const request = ++workPanelReservationRequest.current;
@@ -898,6 +899,9 @@ export function useAppShellRuntime() {
           case "openSettings":
             void runMenuCommand(id);
             break;
+          case "findInTranscript":
+            requestTranscriptFind();
+            break;
           case "openSearch":
             setSearchOpen(true);
             break;
@@ -912,7 +916,7 @@ export function useAppShellRuntime() {
             break;
           case "openWorkPanel": {
             const p = useAppStore.getState().page;
-            if (p !== "settings" && p !== "plugins" && p !== "scheduled") {
+            if (p !== "settings" && p !== "plugins" && p !== "scheduled" && p !== "artifacts") {
               useAppStore.getState().toggleWorkPanel();
             }
             break;

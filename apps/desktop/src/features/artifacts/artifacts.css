@@ -1,0 +1,218 @@
+/*
+  Artifacts page — files a session wrote or edited.
+
+  A read-only workbench: one scroll surface, session headings, dense rows. Every
+  colour, size and radius comes from the token scales so the page follows the
+  active theme and the font-scale setting.
+*/
+
+.artifacts-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 18px 20px 0;
+}
+
+.artifacts-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.artifacts-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ds-text-primary);
+}
+
+.artifacts-title h2 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+.artifacts-count {
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.artifacts-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.artifacts-search {
+  width: 220px;
+}
+
+.artifacts-refresh,
+.artifacts-copy {
+  color: var(--ds-text-muted);
+}
+
+.artifacts-refresh:hover,
+.artifacts-copy:hover {
+  color: var(--ds-text-primary);
+}
+
+.artifacts-placeholder {
+  margin: 0;
+  padding: 28px 0;
+  color: var(--ds-text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.artifacts-placeholder.is-error {
+  color: var(--ds-danger, #d9534f);
+}
+
+.artifacts-hint {
+  margin: 6px 0 0;
+  font-size: var(--text-2xs);
+}
+
+.artifacts-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
+.artifacts-group + .artifacts-group {
+  margin-top: 18px;
+}
+
+.artifacts-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--ds-text-muted);
+}
+
+.artifacts-group-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifacts-group-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+.artifacts-group-count {
+  flex: none;
+  color: var(--ds-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.artifacts-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--radius-lg);
+  background: var(--ds-tile);
+  overflow: hidden;
+}
+
+.artifacts-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, auto) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+}
+
+.artifacts-row + .artifacts-row {
+  border-top: 1px solid var(--ds-border-faint, var(--ds-border));
+}
+
+.artifacts-row:hover {
+  background: var(--ds-bg-hover);
+}
+
+.artifacts-op {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.artifacts-op.is-edit {
+  color: var(--ds-accent, var(--ds-text-muted));
+}
+
+/* The name is the opener: it reads as text until hovered, so the page stays a
+   list rather than a wall of buttons. */
+.artifacts-name {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.artifacts-name:hover {
+  color: var(--ds-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.artifacts-name:focus-visible {
+  outline: 2px solid var(--ds-border-strong);
+  outline-offset: 2px;
+}
+
+.artifacts-dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  direction: rtl;
+  text-align: left;
+}
+
+.artifacts-when {
+  flex: none;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -4,6 +4,8 @@ export * from "./errors.js";
 export * from "./rpc-error.js";
 export * from "./certificate-errors.js";
 export * from "./types.js";
+export * from "./artifacts.js";
+export * from "./transcript-find.js";
 export * from "./transcript-truncation.js";
 export * from "./keyboard-shortcuts.js";
 export * from "./changelog.js";

@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const tr = {
+  artifacts: {
+    title: "Çıktılar",
+    count: "{{count}} / {{total}} dosya",
+    searchPlaceholder: "Dosya, yol veya oturum ara",
+    refresh: "Yenile",
+    loading: "Çıktılar yükleniyor…",
+    loadFailed: "Çıktılar yüklenemedi: {{message}}",
+    empty: "Henüz dosya yok",
+    emptyHint: "Bir oturumun yazdığı veya düzenlediği dosyalar burada görünür.",
+    noMatches: "Bu aramayla eşleşen dosya yok.",
+    untitledSession: "Başlıksız oturum",
+    copyPath: "Yolu kopyala",
+    openFile: "{{name}} aç",
+    copied: "Kopyalandı",
+    op: {
+      write: "Yaz",
+      edit: "Düzenle",
+      other: "Değişiklik",
+    },
+  },
   statusBar: {
     project: "Proje",
     context: "Bağlam",
@@ -236,6 +256,7 @@ export const tr = {
   },
   nav: {
     "pinnedSessions": "Sabitlenmiş",
+    "pages": "Sayfalar",
     home: "Ana sayfa",
     newTask: "Yeni görev",
     newProject: "Yeni proje",
@@ -563,6 +584,17 @@ export const tr = {
     toolBlockContent: "Dosya içeriği",
     toolBlockWritten: "Yazılan içerik",
     toolBlockCommand: "Komut",
+    findInConversation: "Konuşmada ara",
+    findPlaceholder: "Konuşmada ara",
+    findPosition: "{{current}} / {{total}}",
+    findNoMatches: "Eşleşme yok",
+    findPrevious: "Önceki",
+    findNext: "Sonraki",
+    findClose: "Aramayı kapat",
+    toolActions: "Araç işlemleri",
+    copyToolOutput: "Çıktıyı kopyala",
+    copyToolCommand: "Komutu kopyala",
+    openToolFile: "Dosyayı aç",
     toolBlockStdout: "Çıktı",
     toolBlockStderr: "Hatalar",
     toolBlockDiff: "Değişiklikler",
@@ -1244,6 +1276,7 @@ sklm: {
       window: "Pencere",
     },
     shortcutAction: {
+      findInTranscript: "Konuşmada ara",
       navigateBack: "Geri git",
       navigateForward: "İleri git",
       newTask: "Yeni görev",

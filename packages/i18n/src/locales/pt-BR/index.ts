@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
+  artifacts: {
+    title: "Artefatos",
+    count: "{{count}} de {{total}} arquivos",
+    searchPlaceholder: "Buscar arquivos, caminhos ou sessões",
+    refresh: "Atualizar",
+    loading: "Carregando artefatos…",
+    loadFailed: "Não foi possível carregar os artefatos: {{message}}",
+    empty: "Nenhum arquivo ainda",
+    emptyHint: "Arquivos que uma sessão escreve ou edita aparecem aqui.",
+    noMatches: "Nenhum arquivo corresponde a esta busca.",
+    untitledSession: "Sessão sem título",
+    copyPath: "Copiar caminho",
+    openFile: "Abrir {{name}}",
+    copied: "Copiado",
+    op: {
+      write: "Escrever",
+      edit: "Editar",
+      other: "Alteração",
+    },
+  },
   statusBar: {
     project: "Projeto",
     context: "Contexto",
@@ -226,6 +246,7 @@ export const ptBR = {
   },
   nav: {
     pinnedSessions: "Fixadas",
+    pages: "Páginas",
     home: "Início",
     newTask: "Nova tarefa",
     newProject: "Novo projeto",
@@ -553,6 +574,17 @@ export const ptBR = {
     toolBlockContent: "Conteúdo do arquivo",
     toolBlockWritten: "Conteúdo gravado",
     toolBlockCommand: "Comando",
+    findInConversation: "Buscar na conversa",
+    findPlaceholder: "Buscar na conversa",
+    findPosition: "{{current}} de {{total}}",
+    findNoMatches: "Nenhuma correspondência",
+    findPrevious: "Anterior",
+    findNext: "Próximo",
+    findClose: "Fechar busca",
+    toolActions: "Ações da ferramenta",
+    copyToolOutput: "Copiar saída",
+    copyToolCommand: "Copiar comando",
+    openToolFile: "Abrir arquivo",
     toolBlockStdout: "Saída",
     toolBlockStderr: "Saída de erro",
     toolBlockDiff: "Alterações",
@@ -1068,6 +1100,7 @@ export const ptBR = {
       window: "Janela"
     },
     shortcutAction: {
+      findInTranscript: "Buscar na conversa",
       navigateBack: "Voltar",
       navigateForward: "Avançar",
       newTask: "Nova tarefa",

@@ -20,6 +20,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconCopy,
+  IconFolderOpen,
   IconPencil,
   IconReview,
   IconTextSelect,
@@ -304,4 +305,76 @@ function upIcon() {
 
 function downIcon() {
   return <IconArrowDown size={14} />;
+}
+
+function openFileIcon() {
+  return <IconFolderOpen size={14} />;
+}
+
+/**
+ * A tool call: read what it produced, or take the pieces of it.
+ *
+ * The row already shows the command and the outcome; the menu carries the parts
+ * a user copies out of a call — its output, the command itself, the path it
+ * touched — and never offers an action the row cannot satisfy, so a call with no
+ * output has no Copy item rather than a disabled one.
+ */
+export function toolRowMenuItems({
+  t,
+  output,
+  command,
+  filePath,
+  selectTarget,
+  actions,
+  onOpenFile,
+}: {
+  t: TFunction;
+  output: string;
+  command: string;
+  filePath: string | null;
+  selectTarget: HTMLElement | null;
+  actions: MenuItemActions;
+  onOpenFile: (() => void) | null;
+}): ContextMenuItem[] {
+  const items: ContextMenuItem[] = [];
+  if (output.trim()) {
+    items.push({
+      id: "copy-output",
+      label: t("chat.copyToolOutput"),
+      icon: copyIcon(),
+      onSelect: (selection) => actions.copyText(output, selection),
+    });
+  }
+  if (command.trim()) {
+    items.push({
+      id: "copy-command",
+      label: t("chat.copyToolCommand"),
+      icon: copyIcon(),
+      onSelect: () => actions.copyText(command),
+    });
+  }
+  if (filePath) {
+    items.push({
+      id: "copy-path",
+      label: t("chat.copyFullPath"),
+      icon: copyIcon(),
+      onSelect: () => actions.copyText(filePath),
+    });
+    if (onOpenFile) {
+      items.push({
+        id: "open-file",
+        label: t("chat.openToolFile"),
+        icon: openFileIcon(),
+        onSelect: () => onOpenFile(),
+      });
+    }
+  }
+  items.push({
+    id: "select-tool-text",
+    label: t("chat.selectMessageText"),
+    icon: selectIcon(),
+    separatorBefore: items.length > 0,
+    onSelect: () => actions.selectText(selectTarget),
+  });
+  return items;
 }

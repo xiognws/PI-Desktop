@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  artifacts: {
+    title: "산출물",
+    count: "{{count}} / {{total}}개 파일",
+    searchPlaceholder: "파일, 경로 또는 세션 검색",
+    refresh: "새로 고침",
+    loading: "산출물을 불러오는 중…",
+    loadFailed: "산출물을 불러오지 못했습니다: {{message}}",
+    empty: "아직 파일이 없습니다",
+    emptyHint: "세션이 쓰거나 수정한 파일이 여기에 표시됩니다.",
+    noMatches: "이 검색과 일치하는 파일이 없습니다.",
+    untitledSession: "제목 없는 세션",
+    copyPath: "경로 복사",
+    openFile: "{{name}} 열기",
+    copied: "복사됨",
+    op: {
+      write: "쓰기",
+      edit: "수정",
+      other: "변경",
+    },
+  },
   statusBar: {
     project: "프로젝트",
     context: "컨텍스트",
@@ -236,6 +256,7 @@ export const ko = {
   },
   nav: {
     "pinnedSessions": "고정됨",
+    "pages": "페이지",
     home: "홈",
     newTask: "새 작업",
     newProject: "새 프로젝트",
@@ -563,6 +584,17 @@ export const ko = {
     toolBlockContent: "파일 내용",
     toolBlockWritten: "작성된 내용",
     toolBlockCommand: "명령",
+    findInConversation: "대화에서 찾기",
+    findPlaceholder: "대화에서 찾기",
+    findPosition: "{{current}} / {{total}}",
+    findNoMatches: "일치 항목 없음",
+    findPrevious: "이전",
+    findNext: "다음",
+    findClose: "찾기 닫기",
+    toolActions: "도구 작업",
+    copyToolOutput: "출력 복사",
+    copyToolCommand: "명령 복사",
+    openToolFile: "파일 열기",
     toolBlockStdout: "출력",
     toolBlockStderr: "오류",
     toolBlockDiff: "변경 사항",
@@ -1250,6 +1282,7 @@ sklm: {
       window: "창",
     },
     shortcutAction: {
+      findInTranscript: "대화에서 찾기",
       navigateBack: "뒤로 이동",
       navigateForward: "앞으로 이동",
       newTask: "새 작업",

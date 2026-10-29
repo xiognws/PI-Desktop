@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const de = {
+  "artifacts": {
+    "title": "Artefakte",
+    "count": "{{count}} von {{total}} Dateien",
+    "searchPlaceholder": "Dateien, Pfade oder Sitzungen suchen",
+    "refresh": "Aktualisieren",
+    "loading": "Artefakte werden geladen …",
+    "loadFailed": "Artefakte konnten nicht geladen werden: {{message}}",
+    "empty": "Noch keine Dateien",
+    "emptyHint": "Dateien, die eine Sitzung schreibt oder ändert, erscheinen hier.",
+    "noMatches": "Keine Datei passt zu dieser Suche.",
+    "untitledSession": "Unbenannte Sitzung",
+    "copyPath": "Pfad kopieren",
+    "openFile": "{{name}} öffnen",
+    "copied": "Kopiert",
+    "op": {
+      "write": "Schreiben",
+      "edit": "Ändern",
+      "other": "Änderung",
+    },
+  },
   statusBar: {
     project: "Projekt",
     context: "Kontext",
@@ -227,6 +247,7 @@ export const de = {
   },
   "nav": {
     "pinnedSessions": "Angeheftet",
+    "pages": "Seiten",
     "home": "Startseite",
     "newTask": "Neue Aufgabe",
     "newProject": "Neues Projekt",
@@ -554,6 +575,17 @@ export const de = {
     "toolBlockContent": "Dateiinhalt",
     "toolBlockWritten": "Geschriebener Inhalt",
     "toolBlockCommand": "Befehl",
+    "findInConversation": "In Unterhaltung suchen",
+    "findPlaceholder": "In Unterhaltung suchen",
+    "findPosition": "{{current}} von {{total}}",
+    "findNoMatches": "Keine Treffer",
+    "findPrevious": "Zurück",
+    "findNext": "Weiter",
+    "findClose": "Suche schließen",
+    "toolActions": "Werkzeugaktionen",
+    "copyToolOutput": "Ausgabe kopieren",
+    "copyToolCommand": "Befehl kopieren",
+    "openToolFile": "Datei öffnen",
     "toolBlockStdout": "Ausgabe",
     "toolBlockStderr": "Fehler",
     "toolBlockDiff": "Änderungen",
@@ -1242,6 +1274,7 @@ sklm: {
       "window": "Fenster"
     },
     "shortcutAction": {
+      "findInTranscript": "In Unterhaltung suchen",
       "navigateBack": "Zurück",
       "navigateForward": "Vorwärts",
       "newTask": "Neue Aufgabe",

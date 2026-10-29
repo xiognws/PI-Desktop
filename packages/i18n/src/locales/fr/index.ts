@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const fr = {
+  "artifacts": {
+    "title": "Artefacts",
+    "count": "{{count}} sur {{total}} fichiers",
+    "searchPlaceholder": "Rechercher des fichiers, chemins ou sessions",
+    "refresh": "Actualiser",
+    "loading": "Chargement des artefacts…",
+    "loadFailed": "Impossible de charger les artefacts : {{message}}",
+    "empty": "Aucun fichier pour l’instant",
+    "emptyHint": "Les fichiers qu’une session écrit ou modifie apparaissent ici.",
+    "noMatches": "Aucun fichier ne correspond à cette recherche.",
+    "untitledSession": "Session sans titre",
+    "copyPath": "Copier le chemin",
+    "openFile": "Ouvrir {{name}}",
+    "copied": "Copié",
+    "op": {
+      "write": "Écrire",
+      "edit": "Modifier",
+      "other": "Modification",
+    },
+  },
   statusBar: {
     project: "Projet",
     context: "Contexte",
@@ -227,6 +247,7 @@ export const fr = {
   },
   "nav": {
     "pinnedSessions": "Épinglées",
+    "pages": "Pages",
     "home": "Accueil",
     "newTask": "Nouvelle tâche",
     "newProject": "Nouveau projet",
@@ -554,6 +575,17 @@ export const fr = {
     "toolBlockContent": "Contenu du fichier",
     "toolBlockWritten": "Contenu écrit",
     "toolBlockCommand": "Commande",
+    "findInConversation": "Rechercher dans la conversation",
+    "findPlaceholder": "Rechercher dans la conversation",
+    "findPosition": "{{current}} sur {{total}}",
+    "findNoMatches": "Aucun résultat",
+    "findPrevious": "Précédent",
+    "findNext": "Suivant",
+    "findClose": "Fermer la recherche",
+    "toolActions": "Actions de l’outil",
+    "copyToolOutput": "Copier la sortie",
+    "copyToolCommand": "Copier la commande",
+    "openToolFile": "Ouvrir le fichier",
     "toolBlockStdout": "Sortie",
     "toolBlockStderr": "Erreurs",
     "toolBlockDiff": "Modifications",
@@ -1242,6 +1274,7 @@ sklm: {
       "window": "Fenêtre"
     },
     "shortcutAction": {
+      "findInTranscript": "Rechercher dans la conversation",
       "navigateBack": "Revenir en arrière",
       "navigateForward": "Avancer",
       "newTask": "Nouvelle tâche",

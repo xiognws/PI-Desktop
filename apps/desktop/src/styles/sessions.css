@@ -664,6 +664,59 @@
   margin-top: 18px;
 }
 
+/* Page destinations sit above the session list, the way the shell's own
+   destinations do: a place to go reads as a row, not as a footer chip. */
+.sidebar-nav-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 0 2px;
+}
+
+.sidebar-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-nav-row:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.sidebar-nav-row.is-active {
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-primary);
+}
+
+.sidebar-nav-row:focus-visible {
+  outline: 2px solid var(--ds-border-strong);
+  outline-offset: -2px;
+}
+
+.sidebar-nav-row-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A label here is prose, not a section header: CJK keeps its own tracking. */
+:lang(zh-CN) .sidebar-nav-row-label,
+:lang(zh-TW) .sidebar-nav-row-label {
+  letter-spacing: var(--tracking-normal);
+}
+
 .sidebar-list-toolbar {
   position: relative;
   display: flex;

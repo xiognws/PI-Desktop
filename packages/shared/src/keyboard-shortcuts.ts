@@ -6,6 +6,7 @@ export const KEYBOARD_SHORTCUT_IDS = [
   "openSettings",
   "openSearch",
   "openCommandPalette",
+  "findInTranscript",
   "openPluginLauncher",
   "toggleSidebar",
   "openWorkPanel",
@@ -46,6 +47,13 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     id: "openCommandPalette",
     group: "navigation",
     defaultBinding: "Mod+Shift+P",
+  },
+  // Find inside the open conversation rather than across sessions: Mod+K stays
+  // the global search, so the two never fight over the same keystroke.
+  {
+    id: "findInTranscript",
+    group: "navigation",
+    defaultBinding: "Mod+F",
   },
   {
     id: "openPluginLauncher",

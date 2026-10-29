@@ -1,6 +1,26 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhCN = {
+  artifacts: {
+    title: "产物文件",
+    count: "{{count}} / {{total}} 个文件",
+    searchPlaceholder: "搜索文件、路径或会话",
+    refresh: "刷新",
+    loading: "正在读取产物文件…",
+    loadFailed: "读取产物文件失败：{{message}}",
+    empty: "还没有文件",
+    emptyHint: "会话写入或修改过的文件会出现在这里。",
+    noMatches: "没有匹配的文件。",
+    untitledSession: "未命名会话",
+    copyPath: "复制路径",
+    openFile: "打开 {{name}}",
+    copied: "已复制",
+    op: {
+      write: "写入",
+      edit: "修改",
+      other: "变更",
+    },
+  },
   statusBar: {
     project: "项目",
     context: "上下文",
@@ -229,6 +249,7 @@ export const zhCN = {
   },
   nav: {
     pinnedSessions: "置顶",
+    pages: "页面",
     home: "首页",
     newTask: "新建任务",
     newProject: "新建项目",
@@ -556,6 +577,17 @@ export const zhCN = {
     toolBlockContent: "文件内容",
     toolBlockWritten: "写入内容",
     toolBlockCommand: "命令",
+    findInConversation: "会话内查找",
+    findPlaceholder: "在会话中查找",
+    findPosition: "{{current}} / {{total}}",
+    findNoMatches: "没有匹配",
+    findPrevious: "上一个",
+    findNext: "下一个",
+    findClose: "关闭查找",
+    toolActions: "工具操作",
+    copyToolOutput: "复制输出",
+    copyToolCommand: "复制命令",
+    openToolFile: "打开文件",
     toolBlockStdout: "输出",
     toolBlockStderr: "错误输出",
     toolBlockDiff: "改动",
@@ -1235,6 +1267,7 @@ sklm: {
       window: "窗口",
     },
     shortcutAction: {
+      findInTranscript: "会话内查找",
       navigateBack: "后退",
       navigateForward: "前进",
       newTask: "新建任务",
