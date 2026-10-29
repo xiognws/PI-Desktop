@@ -35,9 +35,17 @@ test("the artifacts page is reachable from the shell, the sidebar and global sea
   // A full page hides the work panel and must not be treated as a chat surface.
   assert.match(runtimeSource, /page === "settings" \|\| page === "plugins" \|\| page === "scheduled" \|\| page === "artifacts"/);
   assert.match(runtimeSource, /p !== "settings" && p !== "plugins" && p !== "scheduled" && p !== "artifacts"/);
-  // Sidebar entry, alongside the other page actions.
+  // The sidebar entry is a destination row above the session list, not a footer
+  // chip: a place to go reads as a row where a conversation list starts.
+  assert.match(sidebarSource, /<nav className="sidebar-nav-rows" aria-label=\{t\("nav\.pages"\)\}>/);
+  assert.match(sidebarSource, /className=\{`sidebar-nav-row\$\{page === "artifacts" \? " is-active" : ""\}`\}/);
   assert.match(sidebarSource, /data-nav="artifacts"/);
   assert.match(sidebarSource, /setPage\("artifacts"\)/);
+  const navAt = sidebarSource.indexOf('className="sidebar-nav-rows"');
+  const listAt = sidebarSource.indexOf('className="sidebar-standalone-sessions"');
+  assert.ok(navAt > 0 && listAt > 0 && navAt < listAt, "the entry must precede the session list");
+  // The footer keeps its three actions.
+  assert.doesNotMatch(sidebarSource, /footer-action \$\{page === "artifacts"/);
   // Global search lists it next to the other navigable pages.
   assert.match(searchSource, /\{ page: "artifacts", labelKey: "artifacts\.title", icon: IconFileText \}/);
 });

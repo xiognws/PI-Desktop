@@ -2615,6 +2615,24 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-body no-drag">
+        {/* Destinations sit above the session list: they are places to go, not
+            conversations, so the list keeps the whole body below them. */}
+        <nav className="sidebar-nav-rows" aria-label={t("nav.pages")}>
+          <button
+            type="button"
+            className={`sidebar-nav-row${page === "artifacts" ? " is-active" : ""}`}
+            data-nav="artifacts"
+            aria-current={page === "artifacts" ? "page" : undefined}
+            onClick={() =>
+              page === "artifacts"
+                ? (canNavBack() ? navBack() : setPage("chat"))
+                : setPage("artifacts")
+            }
+          >
+            <IconFileText size={14} aria-hidden />
+            <span className="sidebar-nav-row-label">{t("artifacts.title")}</span>
+          </button>
+        </nav>
 
         {pinnedSessions.length > 0 ? (
           <section
@@ -2809,19 +2827,6 @@ export function Sidebar({
               aria-pressed={page === "plugins"}
             >
               <IconPlug size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "artifacts" ? "active" : ""}`}
-              data-nav="artifacts"
-              tooltip={t("artifacts.title")}
-              ariaLabel={t("artifacts.title")}
-              onClick={() => page === "artifacts"
-                ? (canNavBack() ? navBack() : setPage("chat"))
-                : setPage("artifacts")}
-              aria-pressed={page === "artifacts"}
-            >
-              <IconFileText size={14} aria-hidden />
             </TooltipButton>
             <TooltipButton
               type="button"

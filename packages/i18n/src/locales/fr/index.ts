@@ -247,6 +247,7 @@ export const fr = {
   },
   "nav": {
     "pinnedSessions": "Épinglées",
+    "pages": "Pages",
     "home": "Accueil",
     "newTask": "Nouvelle tâche",
     "newProject": "Nouveau projet",

@@ -249,6 +249,7 @@ export const zhCN = {
   },
   nav: {
     pinnedSessions: "置顶",
+    pages: "页面",
     home: "首页",
     newTask: "新建任务",
     newProject: "新建项目",

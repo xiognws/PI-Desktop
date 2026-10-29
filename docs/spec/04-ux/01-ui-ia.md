@@ -389,8 +389,9 @@ A query box narrows the list in memory over path, directory, operation and
 session title: the page is one bounded host read, so searching never
 round-trips. A session that no longer exists keeps its artifacts under an
 untitled heading instead of hiding them — the files are still on disk. The
-sidebar entry and global search open this route, and the route takes the page
-the way Extensions and Settings do.
+route opens from a destination row above the session list — places to go read as
+rows where the conversation list begins, not as footer chips — and from global
+search, and it takes the page the way Extensions and Settings do.
 
 ### 3.5 Extensions
 
