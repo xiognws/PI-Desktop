@@ -189,11 +189,46 @@ review snapshots, plugin code/data, models, configuration, or logs. Partial clea
 failure remains observable, retains active roots, and can be retried.
 
 
-A packaged installation keeps this tree in `~/.pi-desktop`. A development build
-keeps the same tree in `~/.pi-desktop-dev`, because a shipped app and a
-`pnpm dev` host are two installations that have to run at the same time (D599,
-ADR 0094). `PI_DESKTOP_DATA_DIR` replaces either root outright and is resolved
-to an absolute path before it reaches host-core as a child-process variable.
+An installed build claims one folder on the data drive — the first fixed drive
+other than the system drive, as `<drive>:\PI-Desktop` — and keeps everything it
+produces there (ADR 0372):
+
+```text
+<drive>:\PI-Desktop\
+ ├── data/          # this tree (database, transcripts, plugins, logs, …)
+ ├── userdata/      # packaged Electron profile: lock, localStorage, caches
+ ├── userdata-dev/  # the same profile for a `pnpm dev` host
+ ├── ms-playwright/ # e2e browser binaries
+ ├── agents/        # global capabilities: user skills and subagents
+ └── pi/            # agent home state written by extensions (`~/.pi`)
+```
+
+The two profiles stay separate because a shipped app and a `pnpm dev` host are
+two installations that have to run at the same time (D599, ADR 0094).
+`PI_DESKTOP_DATA_DIR` replaces the `data/` root outright and is resolved to an
+absolute path before it reaches host-core as a child-process variable;
+`PI_DESKTOP_DATA_ROOT` replaces the folder; `PI_DESKTOP_AGENTS_DIR` pins the
+capability root. `data/` is the tree below, so no path in the rest of this
+document changes.
+
+Three home-level directories are links onto that folder, because bundled
+plugins resolve their own state from the OS home directory instead of a host
+API and cannot be reached by an environment variable: `~/.agents` →
+`<root>/agents`, `~/.pi` → `<root>/pi`, and `~/.pi-desktop` → `data/`. On first
+launch existing content is copied into the root — the root wins per file, so a
+stale file left behind by a plugin cannot overwrite the live one — and the
+original directory is removed only after the copy succeeds, then replaced by a
+directory junction (Windows) or directory symlink. A path that is already a
+link, a non-directory at that path, or a failed copy leaves the original
+directory untouched and is logged; the app then keeps that directory in the home
+layout instead of treating the location as a startup precondition. A link whose
+target is gone — the data drive is not mounted this launch — is removed (the link
+only, never its target) so that directory is recreated in the home layout and
+writes do not fail against a missing drive.
+
+Without a non-system fixed drive the previous layout is used unchanged: a
+packaged installation keeps this tree in `~/.pi-desktop`, a development build in
+`~/.pi-desktop-dev`.
 
 ```text
 ~/.pi-desktop/

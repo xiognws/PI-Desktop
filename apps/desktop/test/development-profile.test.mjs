@@ -139,13 +139,19 @@ test("main resolves one data directory and publishes it to everything below", ()
   assert.match(indexSource, /process\.env\.PI_DESKTOP_DATA_DIR = dataDir;/);
   assert.doesNotMatch(indexSource, /join\(homedir\(\), "\.pi-desktop"\)/);
 
-  // Publishing happens after the lock verdict, which reads the same variable:
-  // moving the write above `singleInstanceRequired` would make every launch
-  // look like it had been given an explicit data directory and skip the lock.
-  const lockVerdict = installationSource.indexOf(
-    "const singleInstanceRequired = !process.env.PI_DESKTOP_DATA_DIR;",
+  // Publishing happens after the lock verdict, which reads what the launch was
+  // given: `applyReleaseDataRoot` publishes PI_DESKTOP_DATA_DIR for the services
+  // below, so reading the variable after that point would make every launch look
+  // like it had been given an explicit directory and skip the lock.
+  const explicitVerdict = installationSource.indexOf(
+    "const dataDirWasExplicit = Boolean(process.env.PI_DESKTOP_DATA_DIR?.trim());",
   );
-  assert.ok(lockVerdict > 0);
+  const claimRoot = installationSource.indexOf("applyReleaseDataRoot(isDevelopmentBuild)");
+  const lockVerdict = installationSource.indexOf(
+    "const singleInstanceRequired = !dataDirWasExplicit;",
+  );
+  assert.ok(explicitVerdict > 0 && explicitVerdict < claimRoot, "the verdict is taken before the root is claimed");
+  assert.ok(lockVerdict > claimRoot, "the lock is decided after the root is claimed");
   assert.doesNotMatch(installationSource, /process\.env\.PI_DESKTOP_DATA_DIR = dataDir;/);
   assert.match(entrySource, /from ["']\.\/installation["']/);
   assert.match(entrySource, /\.then\([\s\S]*?import\(["']\.\/index["']\)/);
