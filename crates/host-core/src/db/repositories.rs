@@ -219,6 +219,13 @@ impl Database {
                 archive_legacy_db(path, legacy)?;
                 return Self::open(path);
             }
+            // v26 is the lossless tool-image envelope, a version stamp with no
+            // table changes. A database can also already sit at 26 because the
+            // memory branch stamped it there before the two lines merged, which
+            // is equivalent: MEMORIES_DDL is IF NOT EXISTS, so the v26 -> v27
+            // step below is safe for either flavour. Without this arm in-place
+            // upgrades of v26 data are refused as "newer than supported".
+            26 => {}
             SCHEMA_VERSION => {}
             other => {
                 return Err(anyhow!(

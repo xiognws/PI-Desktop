@@ -430,3 +430,42 @@ fn opening_a_v25_database_migrates_instead_of_failing() {
         .unwrap();
     assert_eq!(rows, 0, "migration must leave an empty memory store");
 }
+
+/// Regression: a database already stamped at v26 must migrate to v27. v26 is a
+/// pure version stamp, so the same number can come from the merged line or from
+/// a build that created the memory store before the merge; both must open, and
+/// the second one must not fail on tables that already exist.
+#[test]
+fn opening_a_v26_database_migrates_instead_of_failing() {
+    for memories_already_present in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            if !memories_already_present {
+                db.conn
+                    .execute_batch(
+                        "DROP TABLE IF EXISTS memories_fts;
+                         DROP TABLE IF EXISTS memories;",
+                    )
+                    .unwrap();
+            }
+            db.conn.execute_batch("PRAGMA user_version = 26;").unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let version: i64 = db
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(
+            version, 27,
+            "v26 database (memories present: {memories_already_present}) must be migrated to v27"
+        );
+        let rows: i64 = db
+            .conn
+            .query_row("SELECT count(*) FROM memories", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(rows, 0, "migration must leave an empty memory store");
+    }
+}
