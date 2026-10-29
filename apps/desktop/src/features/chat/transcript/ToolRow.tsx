@@ -13,12 +13,15 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
 import { useOpenPreviewTarget } from "../../../hooks/use-preview-target";
 import { useChatFileMenu } from "../../../hooks/use-chat-file-menu";
-import { ContextMenu } from "../../../components/ContextMenu";
+import { ContextMenu, useContextMenu } from "../../../components/ContextMenu";
+import { toolRowMenuItems } from "./menu-items";
+import { useChatTextActions } from "./TranscriptMenu";
 import { useFollowScroll } from "../../../hooks/use-follow-scroll";
 import { getToolPreviewTarget } from "../../../lib/chat-links";
 import { disclosureKey } from "./disclosure";
@@ -184,6 +187,10 @@ function HostToolRow({
   const root = useAppStore((s) => localToolsAllowed ? s.workspace?.path : undefined);
   const openTarget = useOpenPreviewTarget();
   const { fileMenu, openFileMenu, closeFileMenu } = useChatFileMenu();
+  // The transcript's own vocabulary, so a tool row's menu offers the same kind
+  // of actions as a message row instead of inventing a second set.
+  const rowMenu = useContextMenu();
+  const textActions = useChatTextActions();
   const openSubagentTab = useAppStore((s) => s.openSubagentTab);
   const activeWorkPanelTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const status = message.toolStatus;
@@ -226,6 +233,35 @@ function HostToolRow({
   const command = runHead
     ? getToolSummaryValue(message.toolName, message.toolArgs)
     : "";
+  /* Right-click asks the same questions the row's chips answer one at a time:
+     what did it print, what did it run, which file did it touch. An empty
+     answer is left out instead of shown disabled. */
+  const openRowMenu = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      const raw = toolResultPayload(message);
+      const output =
+        typeof raw === "string"
+          ? raw
+          : raw === undefined || raw === null
+            ? ""
+            : stringifyPayload(raw);
+      const filePath = previewTarget?.kind === "file" ? previewTarget.path : null;
+      rowMenu.openContextMenu(event, {
+        label: t("chat.toolActions"),
+        items: toolRowMenuItems({
+          t,
+          output,
+          command,
+          filePath,
+          selectTarget: event.currentTarget,
+          actions: textActions,
+          onOpenFile:
+            previewTarget?.kind === "file" ? () => openTarget(previewTarget) : null,
+        }),
+      });
+    },
+    [command, message, openTarget, previewTarget, rowMenu, t, textActions],
+  );
   // A delegation is always expandable: its brief, report and the delegate's
   // own rows all live in the body.
   const hasDetails = hasToolDetails(message) || Boolean(delegate);
@@ -389,6 +425,7 @@ function HostToolRow({
 
   return (
     <div
+      onContextMenu={variant === "topology" ? undefined : openRowMenu}
       className={`tool-row ${variant === "topology" ? "subagent-topology-node" : ""} ${
         renderedOpen ? "open" : ""
       } status-${run === "failed" ? "error" : status || "success"}${outcome ? ` outcome-${outcome.replaceAll("_", "-")}` : ""}${creating ? " outcome-creating" : ""}`}
@@ -600,8 +637,21 @@ function HostToolRow({
         />
       ) : null}
       <ContextMenu state={fileMenu} onClose={closeFileMenu} />
+      <ContextMenu state={rowMenu.contextMenu} onClose={rowMenu.closeContextMenu} />
     </div>
   );
+}
+
+/**
+ * A non-string payload is still copyable: the menu hands back what the host
+ * returned, formatted rather than described.
+ */
+function stringifyPayload(payload: unknown): string {
+  try {
+    return JSON.stringify(payload, null, 2) ?? "";
+  } catch {
+    return String(payload);
+  }
 }
 
 /**

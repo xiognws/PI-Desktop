@@ -716,6 +716,21 @@ may be retained while exactly one workspace supplies the visible shell context.
   writes naming an unknown action are rejected by both the renderer and
   Electron Main.
 
+### 1.12 Tool row context menu
+
+- A right-click anywhere on a tool row opens the transcript's vertical menu over
+  that call. It is the row's own surface: topology nodes and delegated rows keep
+  the parent call's menu, and the summary keeps the file menu it already
+  answered with, so a right-click on a file reference still offers its open
+  destinations instead of a second, competing menu.
+- The vocabulary is what a call can hand back: copy the output it produced, copy
+  the command it ran, copy the path it touched, open that path in the file view,
+  and select the row's text. An item the call cannot satisfy is left out rather
+  than rendered disabled — a call with no output has no copy-output entry, and a
+  call with no file target has neither path nor open entry.
+- Copy follows the transcript's rule everywhere else in the menu system: an
+  active text selection inside the row wins over the row's whole text.
+
 ## 2. Streaming message behavior
 
 ### 2.1 Token rendering
