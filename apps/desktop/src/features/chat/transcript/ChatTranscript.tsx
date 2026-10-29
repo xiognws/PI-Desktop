@@ -204,7 +204,7 @@ function TranscriptBody({
 
   // Find runs over the rendered rows, so it needs the same content element the
   // transcript already measures for the minimap and search focus.
-  const find = useTranscriptFind(contentRef);
+  const find = useTranscriptFind(contentRef, scrollRef, releaseFollow);
 
   const continuationCursor = useAppStore((state) =>
     sessionId ? state.transcriptViews[sessionId]?.messageEnd : undefined,

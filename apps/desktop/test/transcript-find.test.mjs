@@ -41,7 +41,7 @@ test("the shell forwards the keystroke instead of searching itself", () => {
 });
 
 test("the bar is mounted by the transcript, over the rows it searches", () => {
-  assert.match(transcript, /const find = useTranscriptFind\(contentRef\);/);
+  assert.match(transcript, /const find = useTranscriptFind\(contentRef, scrollRef, releaseFollow\);/);
   assert.match(transcript, /\{find\.open \? \(\s*<TranscriptFindBar/);
   // Enter steps, Shift+Enter steps back, Escape closes — the browser's own pair.
   assert.match(bar, /event\.key === "Escape"[\s\S]{0,120}onClose\(\);/);
@@ -61,6 +61,15 @@ test("matches come from the rendered text and reuse the search helpers", () => {
   assert.match(hook, /CSS\.highlights\.set\(ACTIVE_HIGHLIGHT, new Highlight\(range\)\)/);
   assert.match(highlights, /::highlight\(transcript-find\)/);
   assert.match(highlights, /::highlight\(transcript-find-active\)/);
+  // Stepping scrolls the transcript itself: the target row is paint-contained
+  // until it is marked, and pinned-follow would pull the view back.
+  assert.match(hook, /export function useTranscriptFind\(\s*content: RefObject<HTMLElement \| null>,\s*scroller: RefObject<HTMLElement \| null>,\s*releaseFollow\?: \(\) => void,/);
+  assert.match(hook, /row\.classList\.add\(TARGET_CLASS\)/);
+  assert.match(hook, /box\.scrollTop \+= measure\.top - viewport\.top/);
+  assert.doesNotMatch(hook, /\.scrollIntoView\(/);
+  assert.match(highlights, /\.message-row\.transcript-find-target \{\s*content-visibility: visible;/);
+  // The transcript hands the hook its scroller and the follow release.
+  assert.match(transcript, /useTranscriptFind\(contentRef, scrollRef, releaseFollow\)/);
   // Stepping and wrapping are pure arithmetic, covered by the shared tests.
   assert.match(helper, /export function stepFindIndex\(/);
   assert.match(helper, /export function findPosition\(/);
