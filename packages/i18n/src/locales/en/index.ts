@@ -1,4 +1,23 @@
 export const en = {
+  artifacts: {
+    title: "Artifacts",
+    count: "{{count}} of {{total}} files",
+    searchPlaceholder: "Search files, paths or sessions",
+    refresh: "Refresh",
+    loading: "Loading artifacts…",
+    loadFailed: "Could not load artifacts: {{message}}",
+    empty: "No files yet",
+    emptyHint: "Files a session writes or edits show up here.",
+    noMatches: "No file matches this search.",
+    untitledSession: "Untitled session",
+    copyPath: "Copy path",
+    copied: "Copied",
+    op: {
+      write: "Write",
+      edit: "Edit",
+      other: "Change",
+    },
+  },
   statusBar: {
     project: "Project",
     context: "Context",

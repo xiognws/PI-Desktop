@@ -1,6 +1,25 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
+  artifacts: {
+    title: "산출물",
+    count: "{{count}} / {{total}}개 파일",
+    searchPlaceholder: "파일, 경로 또는 세션 검색",
+    refresh: "새로 고침",
+    loading: "산출물을 불러오는 중…",
+    loadFailed: "산출물을 불러오지 못했습니다: {{message}}",
+    empty: "아직 파일이 없습니다",
+    emptyHint: "세션이 쓰거나 수정한 파일이 여기에 표시됩니다.",
+    noMatches: "이 검색과 일치하는 파일이 없습니다.",
+    untitledSession: "제목 없는 세션",
+    copyPath: "경로 복사",
+    copied: "복사됨",
+    op: {
+      write: "쓰기",
+      edit: "수정",
+      other: "변경",
+    },
+  },
   statusBar: {
     project: "프로젝트",
     context: "컨텍스트",

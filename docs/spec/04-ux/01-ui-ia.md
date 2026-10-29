@@ -373,7 +373,22 @@ Agent tools can change a Manual task to Hourly by supplying only its id and
 fields and paused state. Daily and Weekly still require a valid saved or supplied
 schedule. Renaming an Hourly task does not restart its interval.
 
-### 3.4 Extensions
+### 3.4 Artifacts
+
+Every file a session wrote or edited, read from the host's own artifact table
+(03-runtime/04-data-storage §4.9). One read-only list, grouped by session —
+newest session first, newest file first inside it — because that is how the work
+is remembered: the file the refactor wrote. A row keeps the operation
+(write/edit), the file name, its directory and when that session last touched
+it; name and directory stay selectable, and a row action copies the whole path.
+A query box narrows the list in memory over path, directory, operation and
+session title: the page is one bounded host read, so searching never
+round-trips. A session that no longer exists keeps its artifacts under an
+untitled heading instead of hiding them — the files are still on disk. The
+sidebar entry and global search open this route, and the route takes the page
+the way Extensions and Settings do.
+
+### 3.5 Extensions
 
 The Extensions destination is a focused plugin surface with a compact header and
 only two tabs: **Installed** and **Marketplace**. Installed groups plugin cards
@@ -388,8 +403,7 @@ set apart by tone and spacing, and hairlines are reserved for floating layers
 (menus, sheet, dialogs). MCP, Skills, and Subagents are not tabs or sections of
 Extensions.
 
-### 3.5 Settings (full-page takeover)
-### 3.5 Settings (full-page takeover)
+### 3.6 Settings (full-page takeover)
 Settings replaces the whole shell (D063): back-to-app + search + a grouped
 settings rail with concise, parallel destination labels. The Agent group
 contains independent Skills, MCP, and Subagents destinations alongside

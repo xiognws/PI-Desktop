@@ -123,6 +123,7 @@ import {
   IconArchive,
   IconArchiveRestore,
   IconArrowUpDown,
+  IconFileText,
   IconPlug,
   IconBranch,
   IconCheck,
@@ -2808,6 +2809,19 @@ export function Sidebar({
               aria-pressed={page === "plugins"}
             >
               <IconPlug size={14} aria-hidden />
+            </TooltipButton>
+            <TooltipButton
+              type="button"
+              className={`footer-action ${page === "artifacts" ? "active" : ""}`}
+              data-nav="artifacts"
+              tooltip={t("artifacts.title")}
+              ariaLabel={t("artifacts.title")}
+              onClick={() => page === "artifacts"
+                ? (canNavBack() ? navBack() : setPage("chat"))
+                : setPage("artifacts")}
+              aria-pressed={page === "artifacts"}
+            >
+              <IconFileText size={14} aria-hidden />
             </TooltipButton>
             <TooltipButton
               type="button"

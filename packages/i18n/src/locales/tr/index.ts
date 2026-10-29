@@ -1,6 +1,25 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const tr = {
+  artifacts: {
+    title: "Çıktılar",
+    count: "{{count}} / {{total}} dosya",
+    searchPlaceholder: "Dosya, yol veya oturum ara",
+    refresh: "Yenile",
+    loading: "Çıktılar yükleniyor…",
+    loadFailed: "Çıktılar yüklenemedi: {{message}}",
+    empty: "Henüz dosya yok",
+    emptyHint: "Bir oturumun yazdığı veya düzenlediği dosyalar burada görünür.",
+    noMatches: "Bu aramayla eşleşen dosya yok.",
+    untitledSession: "Başlıksız oturum",
+    copyPath: "Yolu kopyala",
+    copied: "Kopyalandı",
+    op: {
+      write: "Yaz",
+      edit: "Düzenle",
+      other: "Değişiklik",
+    },
+  },
   statusBar: {
     project: "Proje",
     context: "Bağlam",

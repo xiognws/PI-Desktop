@@ -46,6 +46,11 @@ const PluginsPage = lazy(() =>
     default: module.PluginsPage,
   })),
 );
+const ArtifactsPage = lazy(() =>
+  import("../../pages/ArtifactsPage").then((module) => ({
+    default: module.ArtifactsPage,
+  })),
+);
 const loadChatSurface = () => import("../../components/ChatSurface");
 const ChatSurface = lazy(() =>
   loadChatSurface().then((module) => ({
@@ -288,6 +293,10 @@ export function AppShell() {
                   ) : page === "plugins" ? (
                     <div className="route-surface route-page">
                       <PluginsPage />
+                    </div>
+                  ) : page === "artifacts" ? (
+                    <div className="route-surface route-page">
+                      <ArtifactsPage />
                     </div>
                   ) : (
                     <ChatSurface visible={page === "chat"} />

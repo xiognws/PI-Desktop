@@ -1,6 +1,25 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
+  artifacts: {
+    title: "產物檔案",
+    count: "{{count}} / {{total}} 個檔案",
+    searchPlaceholder: "搜尋檔案、路徑或工作階段",
+    refresh: "重新整理",
+    loading: "正在讀取產物檔案…",
+    loadFailed: "讀取產物檔案失敗：{{message}}",
+    empty: "還沒有檔案",
+    emptyHint: "工作階段寫入或修改過的檔案會出現在這裡。",
+    noMatches: "沒有符合的檔案。",
+    untitledSession: "未命名工作階段",
+    copyPath: "複製路徑",
+    copied: "已複製",
+    op: {
+      write: "寫入",
+      edit: "修改",
+      other: "變更",
+    },
+  },
   statusBar: {
     project: "專案",
     context: "上下文",

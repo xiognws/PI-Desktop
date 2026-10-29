@@ -1,6 +1,25 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
+  artifacts: {
+    title: "Artefatos",
+    count: "{{count}} de {{total}} arquivos",
+    searchPlaceholder: "Buscar arquivos, caminhos ou sessões",
+    refresh: "Atualizar",
+    loading: "Carregando artefatos…",
+    loadFailed: "Não foi possível carregar os artefatos: {{message}}",
+    empty: "Nenhum arquivo ainda",
+    emptyHint: "Arquivos que uma sessão escreve ou edita aparecem aqui.",
+    noMatches: "Nenhum arquivo corresponde a esta busca.",
+    untitledSession: "Sessão sem título",
+    copyPath: "Copiar caminho",
+    copied: "Copiado",
+    op: {
+      write: "Escrever",
+      edit: "Editar",
+      other: "Alteração",
+    },
+  },
   statusBar: {
     project: "Projeto",
     context: "Contexto",

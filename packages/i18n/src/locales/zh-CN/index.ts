@@ -1,6 +1,25 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhCN = {
+  artifacts: {
+    title: "产物文件",
+    count: "{{count}} / {{total}} 个文件",
+    searchPlaceholder: "搜索文件、路径或会话",
+    refresh: "刷新",
+    loading: "正在读取产物文件…",
+    loadFailed: "读取产物文件失败：{{message}}",
+    empty: "还没有文件",
+    emptyHint: "会话写入或修改过的文件会出现在这里。",
+    noMatches: "没有匹配的文件。",
+    untitledSession: "未命名会话",
+    copyPath: "复制路径",
+    copied: "已复制",
+    op: {
+      write: "写入",
+      edit: "修改",
+      other: "变更",
+    },
+  },
   statusBar: {
     project: "项目",
     context: "上下文",

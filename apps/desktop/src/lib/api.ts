@@ -34,6 +34,8 @@ import type {
   JevKeyCheckResult,
   CommandShellCatalog,
   AppVersionInfo,
+  ArtifactListFilter,
+  ArtifactRow,
   BrowserAction,
   BrowserState,
   CommandItem,
@@ -1125,6 +1127,8 @@ export const api = {
       id,
       replacementId,
     }),
+  listArtifacts: (filter?: ArtifactListFilter) =>
+    invoke<{ artifacts: ArtifactRow[] }>(IPC.invoke.artifactsList, filter ?? {}),
   cloneProject: (url: string) =>
     invoke<{ workspace: ProjectWorkspace | null; canceled?: boolean }>(
       IPC.invoke.projectClone,

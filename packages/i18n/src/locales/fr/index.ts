@@ -1,6 +1,25 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const fr = {
+  "artifacts": {
+    "title": "Artefacts",
+    "count": "{{count}} sur {{total}} fichiers",
+    "searchPlaceholder": "Rechercher des fichiers, chemins ou sessions",
+    "refresh": "Actualiser",
+    "loading": "Chargement des artefacts…",
+    "loadFailed": "Impossible de charger les artefacts : {{message}}",
+    "empty": "Aucun fichier pour l’instant",
+    "emptyHint": "Les fichiers qu’une session écrit ou modifie apparaissent ici.",
+    "noMatches": "Aucun fichier ne correspond à cette recherche.",
+    "untitledSession": "Session sans titre",
+    "copyPath": "Copier le chemin",
+    "copied": "Copié",
+    "op": {
+      "write": "Écrire",
+      "edit": "Modifier",
+      "other": "Modification",
+    },
+  },
   statusBar: {
     project: "Projet",
     context: "Contexte",

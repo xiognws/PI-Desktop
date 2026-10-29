@@ -1,6 +1,25 @@
 import { en, type EnglishCatalog } from "../en/index.js";
 
 export const de = {
+  "artifacts": {
+    "title": "Artefakte",
+    "count": "{{count}} von {{total}} Dateien",
+    "searchPlaceholder": "Dateien, Pfade oder Sitzungen suchen",
+    "refresh": "Aktualisieren",
+    "loading": "Artefakte werden geladen …",
+    "loadFailed": "Artefakte konnten nicht geladen werden: {{message}}",
+    "empty": "Noch keine Dateien",
+    "emptyHint": "Dateien, die eine Sitzung schreibt oder ändert, erscheinen hier.",
+    "noMatches": "Keine Datei passt zu dieser Suche.",
+    "untitledSession": "Unbenannte Sitzung",
+    "copyPath": "Pfad kopieren",
+    "copied": "Kopiert",
+    "op": {
+      "write": "Schreiben",
+      "edit": "Ändern",
+      "other": "Änderung",
+    },
+  },
   statusBar: {
     project: "Projekt",
     context: "Kontext",
