@@ -430,3 +430,96 @@ fn opening_a_v25_database_migrates_instead_of_failing() {
         .unwrap();
     assert_eq!(rows, 0, "migration must leave an empty memory store");
 }
+
+#[test]
+fn a_retired_memory_leaves_recall_and_comes_back_on_restore() {
+    let (db, _dir) = db();
+    let stored = db
+        .remember(project_memory(
+            "Deploy flag",
+            "The release build needs --locked",
+            "/work/alpha",
+        ))
+        .unwrap();
+    let id = stored.memory.id.clone();
+    assert_eq!(recall_into(&db, "release build", "/work/alpha", "s1").len(), 1);
+
+    assert!(db.retire_memory(&id, "decay").unwrap());
+    assert!(
+        recall_into(&db, "release build", "/work/alpha", "s1").is_empty(),
+        "a retired memory must not be recalled"
+    );
+    assert!(
+        db.list_memories(&ListFilter::default()).unwrap().0.iter().any(|row| row.id == id),
+        "retiring is not deleting: the row stays auditable"
+    );
+
+    assert!(db.restore_memory(&id).unwrap());
+    assert_eq!(
+        recall_into(&db, "release build", "/work/alpha", "s1").len(),
+        1,
+        "restoring believes it again"
+    );
+}
+
+#[test]
+fn a_pinned_memory_is_never_retired_by_decay() {
+    let (db, _dir) = db();
+    let stored = db
+        .remember(
+            project_memory("Pinned fact", "The staging host is staging.example", "/work/alpha")
+                .pinned(true),
+        )
+        .unwrap();
+    let failure = db
+        .retire_memory(&stored.memory.id, "decay")
+        .unwrap_err()
+        .to_string();
+    assert!(failure.contains("MEMORY_PINNED"), "{failure}");
+    assert_eq!(recall_into(&db, "staging host", "/work/alpha", "s1").len(), 1);
+}
+
+#[test]
+fn learning_a_retired_memory_again_creates_a_fresh_live_row() {
+    let (db, _dir) = db();
+    let first = db
+        .remember(project_memory("Port note", "Dev server listens on 5173", "/work/alpha"))
+        .unwrap();
+    db.retire_memory(&first.memory.id, "decay").unwrap();
+
+    let second = db
+        .remember(project_memory("Port note", "Dev server listens on 5173", "/work/alpha"))
+        .unwrap();
+    assert!(second.deduped, "the dedupe index keeps one row per content hash");
+    assert_eq!(second.memory.id, first.memory.id);
+    assert!(
+        second.memory.valid_until.is_none(),
+        "re-learning a retired memory believes it again"
+    );
+    assert_eq!(recall_into(&db, "dev server", "/work/alpha", "s1").len(), 1);
+}
+
+#[test]
+fn the_automatic_sweep_retires_instead_of_deleting() {
+    let (db, _dir) = db();
+    let stored = db
+        .remember(project_memory("Old fact", "A stale build flag", "/work/alpha"))
+        .unwrap();
+    // Age it past every window the default policy uses.
+    let ancient = now_ms() - 400 * 86_400_000;
+    db.conn
+        .execute(
+            "UPDATE memories SET created_at = ?1, updated_at = ?1, last_used_at = NULL, confidence = 0.9
+              WHERE id = ?2",
+            params![ancient, stored.memory.id],
+        )
+        .unwrap();
+
+    let (retired, _pruned) = db
+        .retire_decayed(&crate::memory::decay::DecayPolicy::default())
+        .unwrap();
+    assert_eq!(retired, 1);
+    let row = db.get_memory(&stored.memory.id).expect("the row survives the sweep");
+    assert!(row.valid_until.is_some(), "the sweep stops recalling it");
+    assert!(recall_into(&db, "stale build flag", "/work/alpha", "s1").is_empty());
+}

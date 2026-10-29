@@ -184,9 +184,32 @@ lossless tool-image envelope, and a v25 database walks both steps in one launch.
 
 | Stage | Content |
 |---|---|
-| 2b | confidence decay; periodic tidy-up; automatic extraction after a completed turn |
+| 2b | confidence decay and periodic tidy-up (**decay shipped, see §9.2**); automatic extraction after a completed turn (still open) |
 | 3 | optional embeddings (`embedding` column + `sqlite-vec`) fused with BM25 via reciprocal rank |
 | — | markdown export/import so memories are readable by other agents |
+
+### 9.2 Stage 2b: decay retires, it never deletes (implemented)
+
+- **The decision is a pure function** (`crates/host-core/src/memory/decay.rs`):
+  stored rows, a policy and `now` in, proposals out. Confidence halves every
+  `half_life_days` (default 120) without a recall; retirement is proposed only
+  for a live, unpinned memory that is unused past `idle_days` (default 120), has
+  faded below `min_confidence` (default 0.2), and was used fewer than
+  `keep_use_count` (default 2) times.
+- **Retirement sets `valid_until`**, the same "believed until" column
+  supersession writes. No schema change: recall excludes a passed `valid_until`,
+  while `memory.list` still shows the row so the panel can audit and restore it.
+- **`memory.decay` is read-only**; `memory.retire` stops recall and
+  `memory.restore` believes the memory again. A pinned memory is refused with
+  `MEMORY_PINNED` rather than silently skipped.
+- **Re-learning revives**: the dedupe unique index keeps one row per content
+  hash, so a refresh clears `valid_until` instead of inserting a twin.
+- **The unattended daily sweep retires**; it no longer deletes. Retirement is
+  bounded at 200 rows, oldest first, so the store cannot grow without limit.
+  `memory.tidy` remains the only path that removes rows outright, and it is
+  always explicit.
+- **Automatic extraction after a completed turn is still open.** It needs a model
+  and a review step, the same discipline the skill curator follows.
 
 ### 9.1 Stage 2a: recall injection and the `Remember` tool (implemented)
 

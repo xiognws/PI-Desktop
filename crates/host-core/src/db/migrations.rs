@@ -246,14 +246,13 @@ impl Database {
         if now - last < 24 * 3600 * 1000 {
             return;
         }
-        match self.tidy_memories(&crate::memory::TidyPolicy::default()) {
-            Ok(outcome) => {
-                if outcome.total() > 0 {
-                    tracing::info!(
-                        expired = outcome.expired,
-                        overflow = outcome.overflow,
-                        "memory retention removed rows"
-                    );
+        // Retirement, not deletion: an unattended job must not destroy a memory
+        // the user paid for, so it stops recalling instead (ADR 0375). The manual
+        // `memory.tidy` call stays the only path that removes rows outright.
+        match self.retire_decayed(&crate::memory::decay::DecayPolicy::default()) {
+            Ok((retired, pruned)) => {
+                if retired > 0 || pruned > 0 {
+                    tracing::info!(retired, pruned, "memory retention retired rows");
                 }
                 let _ = self.kv_set(NAMESPACE, "lastRunAt", &serde_json::json!(now));
             }

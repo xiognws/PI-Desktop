@@ -397,3 +397,4 @@ Each ADR includes:
 | 0372 | [One data root per installation, linked from the home directory](0372-home-data-root-and-links.md) | Accepted |
 | 0373 | [One flat skill library — skills have no project level](0373-flat-skill-library.md) | Accepted |
 | 0374 | [Skill curation proposes, archives, never deletes](0374-skill-curation.md) | Accepted |
+| 0375 | [Memory decay retires instead of deleting](0375-memory-decay.md) | Accepted |

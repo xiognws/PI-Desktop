@@ -92,6 +92,24 @@ function forgetParams(input: unknown): Raw {
   return params;
 }
 
+/** Thresholds for one decay sweep; the host fills every omitted field. */
+function decayParams(input: unknown): Record<string, unknown> {
+  const source = (input ?? {}) as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (typeof source.halfLifeDays === "number") out.halfLifeDays = source.halfLifeDays;
+  if (typeof source.idleDays === "number") out.idleDays = source.idleDays;
+  if (typeof source.minConfidence === "number") out.minConfidence = source.minConfidence;
+  return out;
+}
+
+/** `{ id }` plus an optional free-text reason the archive log keeps. */
+function idParams(input: unknown, reasonField: "reason" | undefined): Record<string, unknown> {
+  const source = typeof input === "string" ? { id: input } : ((input ?? {}) as Record<string, unknown>);
+  const out: Record<string, unknown> = { id: source.id };
+  if (reasonField && typeof source[reasonField] === "string") out[reasonField] = source[reasonField];
+  return out;
+}
+
 function tidyParams(input: unknown): Raw {
   if (!isRecord(input)) return {};
   const params: Raw = {};
@@ -144,5 +162,14 @@ export function registerMemoryIpc({
   );
   registrar.handle(IPC.invoke.memorySupersede, async (input?: unknown) =>
     forward("memory.supersede", supersedeParams(input)),
+  );
+  registrar.handle(IPC.invoke.memoryDecay, async (input?: unknown) =>
+    forward("memory.decay", decayParams(input)),
+  );
+  registrar.handle(IPC.invoke.memoryRetire, async (input?: unknown) =>
+    forward("memory.retire", idParams(input, "reason")),
+  );
+  registrar.handle(IPC.invoke.memoryRestore, async (input?: unknown) =>
+    forward("memory.restore", idParams(input, undefined)),
   );
 }

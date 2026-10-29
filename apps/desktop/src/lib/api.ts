@@ -710,6 +710,35 @@ export type MemoryRecord = {
   supersededBy?: string | null;
 };
 
+/** Stage-2b decay: a proposal, never an action (ADR 0375). */
+export type MemoryDecayFinding =
+  | { kind: "idle"; idleDays: number }
+  | { kind: "faded"; confidence: number; decayed: number }
+  | { kind: "wellUsed"; useCount: number }
+  | { kind: "pinned" }
+  | { kind: "superseded" };
+
+export type MemoryDecaySuggestion = "keep" | "retire";
+
+export type MemoryDecayProposal = {
+  id: string;
+  title: string;
+  scope: MemoryScope;
+  confidence: number;
+  decayedConfidence: number;
+  useCount: number;
+  idleDays: number;
+  suggestion: MemoryDecaySuggestion;
+  findings: MemoryDecayFinding[];
+};
+
+export type MemoryDecayPolicy = {
+  halfLifeDays: number;
+  minConfidence: number;
+  idleDays: number;
+  keepUseCount: number;
+};
+
 export type MemoryStats = {
   total: number;
   live: number;
@@ -1121,6 +1150,19 @@ export const api = {
     invoke<{ memory: MemoryRecord }>(IPC.invoke.memoryUpdate, input),
   forgetMemory: (input: { id: string } | { sessionId: string }) =>
     invoke<{ removed: number }>(IPC.invoke.memoryForget, input),
+  /**
+   * Which memories decay would stop recalling. Read-only: `retireMemory` is the
+   * only thing that moves one out of recall, and `restoreMemory` puts it back.
+   */
+  decayMemories: (input?: Partial<MemoryDecayPolicy>) =>
+    invoke<{ proposals: MemoryDecayProposal[]; policy: MemoryDecayPolicy }>(
+      IPC.invoke.memoryDecay,
+      input ?? {},
+    ),
+  retireMemory: (id: string, reason?: string) =>
+    invoke<{ retired: boolean }>(IPC.invoke.memoryRetire, { id, reason }),
+  restoreMemory: (id: string) =>
+    invoke<{ restored: boolean }>(IPC.invoke.memoryRestore, { id }),
   tidyMemories: (input?: { maxAgeDays?: number; minConfidence?: number; maxLive?: number; expire?: boolean }) =>
     invoke<MemoryTidyResult>(IPC.invoke.memoryTidy, input),
   supersedeMemory: (id: string, replacementId: string) =>

@@ -29,6 +29,9 @@ pub(super) async fn handle(
         "memory.pinned" => pinned(state, params).await,
         "memory.forget" => forget(state, params).await,
         "memory.tidy" => tidy(state, params).await,
+        "memory.decay" => decay(state, params).await,
+        "memory.retire" => retire(state, params).await,
+        "memory.restore" => restore(state, params).await,
         "memory.stats" => stats(state, params).await,
         other => Err(rpc_err(
             1003,
@@ -322,6 +325,62 @@ async fn tidy(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonR
     Ok(
         json!({ "removed": outcome.total(), "expired": outcome.expired, "overflow": outcome.overflow }),
     )
+}
+
+/// Which memories decay would stop recalling, and why. Read-only.
+async fn decay(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
+    let mut policy = crate::memory::decay::DecayPolicy::default();
+    if let Some(days) = optional_usize(&params, "halfLifeDays")? {
+        policy.half_life_days = days as f64;
+    }
+    if let Some(days) = optional_usize(&params, "idleDays")? {
+        policy.idle_days = days as u64;
+    }
+    if let Some(value) = params.get("minConfidence") {
+        if !value.is_null() {
+            policy.min_confidence = value
+                .as_f64()
+                .ok_or_else(|| invalid("minConfidence must be a number"))?;
+        }
+    }
+    let st = state.lock().await;
+    let proposals = st.db.decay_plan(&policy).map_err(internal)?;
+    Ok(json!({ "proposals": proposals, "policy": policy }))
+}
+
+/// Stop recalling one memory. Reversible through `memory.restore`.
+async fn retire(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
+    let id = params
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid("id is required"))?;
+    let reason = params
+        .get("reason")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("manual");
+    let st = state.lock().await;
+    let retired = st
+        .db
+        .retire_memory(id, reason)
+        .map_err(|error| rpc_err(1002, error.to_string(), "MEMORY_INVALID"))?;
+    Ok(json!({ "retired": retired }))
+}
+
+/// Believe a retired memory again.
+async fn restore(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
+    let id = params
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid("id is required"))?;
+    let st = state.lock().await;
+    let restored = st.db.restore_memory(id).map_err(internal)?;
+    Ok(json!({ "restored": restored }))
 }
 
 async fn stats(state: Arc<Mutex<AppState>>, _params: Value) -> Result<Value, JsonRpcError> {

@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   api,
+  type MemoryDecayProposal,
   type MemoryKind,
   type MemoryRecord,
   type MemoryScope,
@@ -77,6 +78,9 @@ export function MemoryPane() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tidying, setTidying] = useState(false);
+  // Stage-2b decay (ADR 0375): the host proposes, the user retires, restore undoes it.
+  const [decay, setDecay] = useState<MemoryDecayProposal[] | null>(null);
+  const [decayBusy, setDecayBusy] = useState(false);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -86,6 +90,50 @@ export function MemoryPane() {
       return haystack.includes(needle);
     });
   }, [records, query]);
+
+  const checkDecay = async () => {
+    setDecayBusy(true);
+    setNotice(null);
+    try {
+      const result = await api.decayMemories();
+      setDecay(
+        (result.proposals ?? []).filter((proposal) => proposal.suggestion === "retire"),
+      );
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setDecayBusy(false);
+    }
+  };
+
+  const retire = async (proposal: MemoryDecayProposal) => {
+    setBusyId(proposal.id);
+    setNotice(null);
+    try {
+      await api.retireMemory(proposal.id, "decay");
+      setDecay((prev) => (prev ?? []).filter((item) => item.id !== proposal.id));
+      await load();
+      setNotice(t("settings.memoryDecayDone", { title: proposal.title }));
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const restore = async (record: MemoryRecord) => {
+    setBusyId(record.id);
+    setNotice(null);
+    try {
+      await api.restoreMemory(record.id);
+      await load();
+      setNotice(t("settings.memoryDecayRestored", { title: record.title }));
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const togglePin = async (record: MemoryRecord) => {
     setBusyId(record.id);
@@ -143,9 +191,14 @@ export function MemoryPane() {
       title={t("settings.memory")}
       description={t("settings.memoryIntro")}
       action={
-        <Button variant="secondary" size="sm" onClick={() => void tidy()} disabled={tidying}>
-          {tidying ? t("settings.memoryTidying") : t("settings.memoryTidy")}
-        </Button>
+        <>
+          <Button variant="secondary" size="sm" onClick={() => void checkDecay()} disabled={decayBusy}>
+            {decayBusy ? t("settings.memoryDecayChecking") : t("settings.memoryDecayCheck")}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => void tidy()} disabled={tidying}>
+            {tidying ? t("settings.memoryTidying") : t("settings.memoryTidy")}
+          </Button>
+        </>
       }
     >
       <div className="flex flex-col gap-3">
@@ -185,6 +238,39 @@ export function MemoryPane() {
           </p>
         ) : null}
 
+        {decay !== null ? (
+          decay.length === 0 ? (
+            <p className="text-xs text-muted">{t("settings.memoryDecayEmpty")}</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {decay.map((proposal) => (
+                <li
+                  key={proposal.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-[var(--border)] px-3 py-1.5"
+                >
+                  <span className="min-w-0 flex-1 truncate text-xs">{proposal.title}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-[11px] text-muted">
+                      {t("settings.memoryDecayReason", {
+                        days: proposal.idleDays,
+                        value: proposal.decayedConfidence.toFixed(2),
+                      })}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId === proposal.id}
+                      onClick={() => void retire(proposal)}
+                    >
+                      {t("settings.memoryDecayRetire")}
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : null}
+
         <ul className="flex flex-col gap-2">
           {visible.map((record) => (
             <li
@@ -203,6 +289,9 @@ export function MemoryPane() {
                     {record.pinned ? <Badge>{t("settings.memoryPinned")}</Badge> : null}
                     {record.supersededBy ? (
                       <Badge>{t("settings.memorySuperseded")}</Badge>
+                    ) : null}
+                    {record.validUntil ? (
+                      <Badge>{t("settings.memoryDecayRetired")}</Badge>
                     ) : null}
                   </div>
                   <p className="mt-1 whitespace-pre-wrap text-xs text-muted">{record.body}</p>
@@ -224,6 +313,16 @@ export function MemoryPane() {
                   >
                     {record.pinned ? t("settings.memoryUnpin") : t("settings.memoryPin")}
                   </Button>
+                  {record.validUntil ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId === record.id}
+                      onClick={() => void restore(record)}
+                    >
+                      {t("settings.memoryDecayRestore")}
+                    </Button>
+                  ) : null}
                   <Button
                     variant="ghost"
                     size="sm"

@@ -20,6 +20,10 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
+
+pub mod decay;
+
+use decay::{DecayInput, DecayPolicy, DecayProposal};
 use sha2::{Digest, Sha256};
 
 use crate::db::{now_ms, Database};
@@ -419,7 +423,10 @@ impl Database {
                 0
             };
             self.conn.execute(
-                "UPDATE memories SET confidence = ?1, pinned = ?2, updated_at = ?3 WHERE id = ?4",
+                // Re-learning a retired memory revives it: it is believed
+                // again, so the retired marker goes with the refresh.
+                "UPDATE memories SET confidence = ?1, pinned = ?2, updated_at = ?3, valid_until = NULL
+                  WHERE id = ?4",
                 params![confidence, pinned, now, id],
             )?;
             self.sync_fts_for(&id)?;
@@ -484,6 +491,9 @@ impl Database {
                      JOIN memories m ON m.rowid = memories_fts.rowid
                     WHERE memories_fts MATCH ?1
                       AND m.superseded_by IS NULL
+                      -- A retired memory is no longer believed: stage-2b decay
+                      -- sets valid_until, and recall honours it (ADR 0375).
+                      AND (m.valid_until IS NULL OR m.valid_until > ?6)
                       AND (?2 IS NULL OR m.scope = ?2)
                       AND (
                             m.scope = 'global'
@@ -493,13 +503,15 @@ impl Database {
                     ORDER BY m.pinned DESC, score ASC, m.use_count DESC, m.created_at DESC
                     LIMIT ?5";
         let mut stmt = self.conn.prepare(sql)?;
+        let now = now_ms();
         let rows = stmt.query_map(
             params![
                 match_expr,
                 scope,
                 query.project_path.as_deref(),
                 query.session_id.as_deref(),
-                limit
+                limit,
+                now
             ],
             |row| Ok((row_to_memory(row)?, row.get::<_, f64>(18)?)),
         )?;
@@ -646,6 +658,126 @@ impl Database {
 
     /// Delete one memory (hard delete, index included). Returns whether a row
     /// existed.
+    /// Retire everything decay currently proposes. Returns how many memories
+    /// were retired and how many older retired rows were pruned to keep the
+    /// store bounded.
+    ///
+    /// This is what the unattended daily job runs: an automatic sweep must never
+    /// delete a memory the user paid for, so it moves them out of recall instead
+    /// (ADR 0375). Reversibility is bounded on purpose — beyond
+    /// `MAX_RETIRED_ROWS` the oldest retired rows are dropped, so the store does
+    /// not grow forever.
+    pub fn retire_decayed(&self, policy: &DecayPolicy) -> Result<(usize, usize)> {
+        let proposals = self.decay_plan(policy)?;
+        let mut retired = 0;
+        for proposal in proposals {
+            if proposal.suggestion != decay::DecaySuggestion::Retire {
+                continue;
+            }
+            if self
+                .retire_memory(&proposal.id, "decay")
+                .unwrap_or(false)
+            {
+                retired += 1;
+            }
+        }
+        let pruned = self.prune_retired()?;
+        Ok((retired, pruned))
+    }
+
+    /// Drop the oldest retired memories beyond the retention bound.
+    fn prune_retired(&self) -> Result<usize> {
+        const MAX_RETIRED_ROWS: i64 = 200;
+        let retired: i64 = self.conn.query_row(
+            "SELECT count(*) FROM memories WHERE valid_until IS NOT NULL AND superseded_by IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let overflow = retired - MAX_RETIRED_ROWS;
+        if overflow <= 0 {
+            return Ok(0);
+        }
+        let removed = self.conn.execute(
+            "DELETE FROM memories WHERE id IN (
+                 SELECT id FROM memories
+                  WHERE valid_until IS NOT NULL AND superseded_by IS NULL
+                  ORDER BY valid_until ASC, id ASC
+                  LIMIT ?1
+             )",
+            params![overflow],
+        )?;
+        Ok(removed)
+    }
+
+    /// Which memories decay would stop recalling, and why. Read-only: the
+    /// caller accepts an id before anything is retired.
+    pub fn decay_plan(&self, policy: &DecayPolicy) -> Result<Vec<DecayProposal>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, title, scope, confidence, pinned, use_count, created_at, updated_at,
+                    last_used_at, valid_until, superseded_by
+               FROM memories",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(DecayInput {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                scope: row.get(2)?,
+                confidence: row.get(3)?,
+                pinned: row.get::<_, i64>(4)? != 0,
+                use_count: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+                last_used_at: row.get(8)?,
+                valid_until: row.get(9)?,
+                superseded_by: row.get(10)?,
+            })
+        })?;
+        let mut inputs = Vec::new();
+        for row in rows {
+            inputs.push(row?);
+        }
+        Ok(decay::plan(&inputs, policy, now_ms()))
+    }
+
+    /// Stop recalling a memory without losing it: `valid_until` is the same
+    /// "believed until" column supersession uses, so this needs no schema
+    /// change and `restore_memory` is simply clearing it.
+    pub fn retire_memory(&self, id: &str, reason: &str) -> Result<bool> {
+        let now = now_ms();
+        let pinned: Option<i64> = self
+            .conn
+            .query_row("SELECT pinned FROM memories WHERE id = ?1", [id], |row| row.get(0))
+            .optional()?;
+        let Some(pinned) = pinned else {
+            return Ok(false);
+        };
+        if pinned != 0 {
+            anyhow::bail!("MEMORY_PINNED: a pinned memory is never retired by decay");
+        }
+        let changed = self.conn.execute(
+            "UPDATE memories SET valid_until = ?1, updated_at = ?1
+              WHERE id = ?2
+                AND pinned = 0
+                AND superseded_by IS NULL
+                AND (valid_until IS NULL OR valid_until > ?1)",
+            params![now, id],
+        )?;
+        if changed > 0 {
+            tracing::info!(target: "pi_desktop_host_core::memory", reason, "memory retired");
+        }
+        Ok(changed > 0)
+    }
+
+    /// Believe a retired memory again.
+    pub fn restore_memory(&self, id: &str) -> Result<bool> {
+        let changed = self.conn.execute(
+            "UPDATE memories SET valid_until = NULL, updated_at = ?1
+              WHERE id = ?2 AND superseded_by IS NULL",
+            params![now_ms(), id],
+        )?;
+        Ok(changed > 0)
+    }
+
     pub fn forget_memory(&self, id: &str) -> Result<bool> {
         let rowid: Option<i64> = self
             .conn
