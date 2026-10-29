@@ -103,6 +103,15 @@ export function useAppShellRuntime() {
   }, [ready, activeSessionId, workPanelOpen]);
 
   const [searchOpen, setSearchOpen] = useState(false);
+  /**
+   * The palette and the search box share one surface but are not the same task:
+   * Mod+Shift+P asks for an action, Mod+K asks for a conversation or setting.
+   */
+  const [searchMode, setSearchMode] = useState<"search" | "commands">("search");
+  const openSearchSurface = useCallback((mode: "search" | "commands") => {
+    setSearchMode(mode);
+    setSearchOpen(true);
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => loadSidebarWidth());
   const { sidebarEntering, sidebarExiting, handleSidebarAnimationEnd } = useSidebarTransition(
@@ -427,10 +436,10 @@ export function useAppShellRuntime() {
             store.setSettingsTab("general");
             break;
           case "openSearch":
-            setSearchOpen(true);
+            openSearchSurface("search");
             break;
           case "openCommandPalette":
-            setSearchOpen(true);
+            openSearchSurface("commands");
             break;
           case "toggleSidebar":
             toggleSidebar();
@@ -903,10 +912,10 @@ export function useAppShellRuntime() {
             requestTranscriptFind();
             break;
           case "openSearch":
-            setSearchOpen(true);
+            openSearchSurface("search");
             break;
           case "openCommandPalette":
-            setSearchOpen(true);
+            openSearchSurface("commands");
             break;
           case "openPluginLauncher":
             void api.togglePluginLauncher();
@@ -1083,6 +1092,7 @@ export function useAppShellRuntime() {
     activeSessionId,
     workPanelOpen,
     searchOpen,
+    searchMode,
     setSearchOpen,
     sidebarCollapsed,
     setSidebarCollapsed,

@@ -2210,6 +2210,8 @@ export const ptBR = {
   },
   search: {
     placeholder: "Pesquisar títulos e mensagens…",
+    palettePlaceholder: "Digite um comando…",
+    paletteEmpty: "Nenhum comando corresponde",
     metadataMatch: "Título / projeto",
     messageMatches: "{{count}} mensagens correspondentes",
     user: "Você",

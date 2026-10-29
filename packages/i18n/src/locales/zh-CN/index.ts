@@ -2239,6 +2239,8 @@ sklm: {
   },
   search: {
     placeholder: "搜索标题和消息…",
+    palettePlaceholder: "输入命令…",
+    paletteEmpty: "没有匹配的命令",
     metadataMatch: "标题 / 项目",
     messageMatches: "{{count}} 条消息命中",
     user: "用户",

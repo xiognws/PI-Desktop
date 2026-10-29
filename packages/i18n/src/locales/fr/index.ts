@@ -2244,6 +2244,8 @@ sklm: {
   },
   "search": {
     placeholder: "Rechercher titres et messages…",
+    palettePlaceholder: "Saisissez une commande…",
+    paletteEmpty: "Aucune commande correspondante",
     metadataMatch: "Titre / projet",
     messageMatches: "{{count}} messages correspondants",
     user: "Vous",

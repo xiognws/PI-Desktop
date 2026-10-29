@@ -2260,6 +2260,8 @@ sklm: {
   },
   search: {
     placeholder: "제목 및 메시지 검색…",
+    palettePlaceholder: "명령 입력…",
+    paletteEmpty: "일치하는 명령 없음",
     metadataMatch: "제목 / 프로젝트",
     messageMatches: "메시지 {{count}}개 일치",
     user: "사용자",

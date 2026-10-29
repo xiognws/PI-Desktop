@@ -2239,6 +2239,8 @@ sklm: {
   },
   search: {
     placeholder: "搜尋標題和訊息…",
+    palettePlaceholder: "輸入指令…",
+    paletteEmpty: "沒有符合的指令",
     metadataMatch: "標題 / 專案",
     messageMatches: "{{count}} 則訊息符合",
     user: "使用者",

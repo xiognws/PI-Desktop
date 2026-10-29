@@ -72,7 +72,21 @@ function highlightMatch(text: string, query: string) {
   return <SearchHighlight text={text} query={query} />;
 }
 
-export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SearchDialog({
+  open,
+  onClose,
+  mode = "search",
+}: {
+  open: boolean;
+  onClose: () => void;
+  /**
+   * `commands` is the palette (Mod+Shift+P): only app and plugin commands, no
+   * conversations, pages, or settings, and no full-text search behind it — the
+   * reader asked for an action, not for a document.
+   */
+  mode?: "search" | "commands";
+}) {
+  const commandsOnly = mode === "commands";
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
   const sessionMeta = useAppStore((s) => s.sessionMeta);
@@ -92,7 +106,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
 
   const query = useSessionSearchState((state) => state.query);
   const setQuery = useSessionSearchState((state) => state.setQuery);
-  const search = useSessionSearch(open, query);
+  const search = useSessionSearch(open && !commandsOnly, query);
   const selectionRequest = useRef(0);
   useEffect(() => {
     selectionRequest.current += 1;
@@ -147,6 +161,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
   }, [openProjects, workspace]);
 
   const rows = useMemo<SearchRow[]>(() => {
+    if (commandsOnly) return [];
     const q = query.trim().toLowerCase();
     const candidates: Omit<SearchRow, "optionIndex">[] = [];
     // Recents come from the store, so the same ownership rule applies here:
@@ -181,7 +196,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
       index += 1 + (row.hit?.matches.length ?? 0);
       return { ...row, optionIndex };
     });
-  }, [sessions, sessionMeta, projectNames, query, search.hits, t]);
+  }, [commandsOnly, sessions, sessionMeta, projectNames, query, search.hits, t]);
 
   const groups = useMemo(() => {
     const now = new Date();
@@ -206,18 +221,21 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
   // Pages and settings rows join the listbox after the session results;
   // flat option order is: new-task, sessions, pages, settings.
   const pageHits = useMemo<PageEntry[]>(() => {
+    if (commandsOnly) return [];
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return PAGE_ENTRIES.filter((entry) => t(entry.labelKey).toLowerCase().includes(q));
-  }, [query, t]);
+  }, [commandsOnly, query, t]);
 
   const settingsHits = useMemo<SettingsSearchHit[]>(
     () =>
-      searchSettings(query, t, {
-        developerMode,
-        includeDevelopmentOnly: import.meta.env.DEV,
-      }),
-    [query, t, developerMode],
+      commandsOnly
+        ? []
+        : searchSettings(query, t, {
+            developerMode,
+            includeDevelopmentOnly: import.meta.env.DEV,
+          }),
+    [commandsOnly, query, t, developerMode],
   );
 
   const sessionOptionCount = rows.reduce(
@@ -346,8 +364,10 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             aria-expanded="true"
             aria-controls="global-search-results"
             aria-activedescendant={`global-search-option-${active}`}
-            aria-label={t("nav.search")}
-            placeholder={t("search.placeholder")}
+            aria-label={commandsOnly ? t("settings.shortcutAction.openCommandPalette") : t("nav.search")}
+            placeholder={
+              commandsOnly ? t("search.palettePlaceholder") : t("search.placeholder")
+            }
             value={query}
             maxLength={500}
             autoFocus
@@ -526,7 +546,9 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
           query.trim() &&
           !search.loading &&
           !search.error ? (
-            <div className="search-empty">{t("search.empty")}</div>
+            <div className="search-empty">
+              {commandsOnly ? t("search.paletteEmpty") : t("search.empty")}
+            </div>
           ) : null}
         </div>
       </div>

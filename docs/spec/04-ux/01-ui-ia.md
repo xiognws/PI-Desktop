@@ -458,7 +458,8 @@ shared capability contract:
 
 | Overlay | Trigger | Notes |
 |---|---|---|
-| Command palette | Cmd/Ctrl+K (also Cmd/Ctrl+Shift+P per D014) | builtin + plugin commands |
+| Command palette | Cmd/Ctrl+Shift+P | builtin + plugin commands only — no conversations, pages, settings, or full-text search |
+| Global search | Cmd/Ctrl+K | conversations, messages, pages, settings, commands |
 | Model menu | Composer-right model × reasoning chip | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
 | Notification inbox | sidebar footer bell | All/Unread views, task failure rows only (successful completions are hidden, D295), mark-all-read and clear actions (D130/D117) |
@@ -497,7 +498,8 @@ shared capability contract:
 
 | Keys | Action |
 |---|---|
-| Cmd/Ctrl+K, Cmd/Ctrl+Shift+P | command palette |
+| Cmd/Ctrl+Shift+P | command palette |
+| Cmd/Ctrl+K | global search |
 | Cmd/Ctrl+B | toggle sidebar |
 | Cmd/Ctrl+[ | previous destination |
 | Cmd/Ctrl+] | next destination |

@@ -70,6 +70,7 @@ export function AppShell() {
     activeSessionId,
     workPanelOpen,
     searchOpen,
+    searchMode,
     setSearchOpen,
     sidebarCollapsed,
     sidebarEntering,
@@ -360,7 +361,11 @@ export function AppShell() {
             <SettingsPage />
           </Suspense>
         ) : null}
-        <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+        <SearchDialog
+          open={searchOpen}
+          mode={searchMode}
+          onClose={() => setSearchOpen(false)}
+        />
         <ToastHost anchorElement={page === "settings" ? null : toastAnchor} />
         <LiveVoiceStatusHost />
         <PluginRendererHost />

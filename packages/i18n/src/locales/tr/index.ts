@@ -2254,6 +2254,8 @@ sklm: {
   },
   search: {
     placeholder: "Başlık ve mesaj ara…",
+    palettePlaceholder: "Komut yazın…",
+    paletteEmpty: "Eşleşen komut yok",
     metadataMatch: "Başlık / proje",
     messageMatches: "{{count}} mesaj eşleşmesi",
     user: "Siz",
