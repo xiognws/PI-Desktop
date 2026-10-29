@@ -13,6 +13,7 @@ export const tr = {
     noMatches: "Bu aramayla eşleşen dosya yok.",
     untitledSession: "Başlıksız oturum",
     copyPath: "Yolu kopyala",
+    openFile: "{{name}} aç",
     copied: "Kopyalandı",
     op: {
       write: "Yaz",

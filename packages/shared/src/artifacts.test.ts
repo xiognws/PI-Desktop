@@ -88,6 +88,17 @@ describe("groupArtifactsBySession", () => {
     expect(groups[1]?.rows.map((r) => artifactFileName(r.path))).toEqual(["new.ts", "old.ts"]);
   });
 
+  it("names the project once per session group", () => {
+    const groups = groupArtifactsBySession([
+      row({ projectName: "PI-Desktop", projectPath: "D:\\Code\\PI-Desktop" }),
+      row({ path: "/a/two.ts", projectName: "PI-Desktop", projectPath: "D:\\Code\\PI-Desktop" }),
+      row({ sessionId: "s2", sessionTitle: "Other", projectName: null, projectPath: null }),
+    ]);
+    expect(groups[0]?.projectName).toBe("PI-Desktop");
+    expect(groups[0]?.projectPath).toBe("D:\\Code\\PI-Desktop");
+    expect(groups[1]?.projectName).toBeNull();
+  });
+
   it("keeps artifacts of a deleted session under a null title", () => {
     const groups = groupArtifactsBySession([row({ sessionTitle: null })]);
     expect(groups).toHaveLength(1);

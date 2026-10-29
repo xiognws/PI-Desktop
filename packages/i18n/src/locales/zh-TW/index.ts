@@ -13,6 +13,7 @@ export const zhTW = {
     noMatches: "沒有符合的檔案。",
     untitledSession: "未命名工作階段",
     copyPath: "複製路徑",
+    openFile: "開啟 {{name}}",
     copied: "已複製",
     op: {
       write: "寫入",

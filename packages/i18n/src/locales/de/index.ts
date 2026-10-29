@@ -13,6 +13,7 @@ export const de = {
     "noMatches": "Keine Datei passt zu dieser Suche.",
     "untitledSession": "Unbenannte Sitzung",
     "copyPath": "Pfad kopieren",
+    "openFile": "{{name}} öffnen",
     "copied": "Kopiert",
     "op": {
       "write": "Schreiben",

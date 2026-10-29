@@ -11,6 +11,7 @@ export const en = {
     noMatches: "No file matches this search.",
     untitledSession: "Untitled session",
     copyPath: "Copy path",
+    openFile: "Open {{name}}",
     copied: "Copied",
     op: {
       write: "Write",

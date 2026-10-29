@@ -13,6 +13,7 @@ export const fr = {
     "noMatches": "Aucun fichier ne correspond à cette recherche.",
     "untitledSession": "Session sans titre",
     "copyPath": "Copier le chemin",
+    "openFile": "Ouvrir {{name}}",
     "copied": "Copié",
     "op": {
       "write": "Écrire",

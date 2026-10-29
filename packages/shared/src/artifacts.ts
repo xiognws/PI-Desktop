@@ -10,6 +10,9 @@ export type ArtifactRow = {
   sessionId: string;
   /** Null when the session row is gone but its artifacts remain. */
   sessionTitle?: string | null;
+  /** Project the session belongs to; null when the session has none. */
+  projectName?: string | null;
+  projectPath?: string | null;
   /** Absolute path as the tool received it. */
   path: string;
   /** `write` or `edit` today; treated as opaque elsewhere. */
@@ -66,6 +69,9 @@ export type ArtifactGroup = {
   sessionId: string;
   /** Null when the session was deleted; the UI labels it separately. */
   sessionTitle: string | null;
+  /** Project behind the session, named once per group rather than per row. */
+  projectName: string | null;
+  projectPath: string | null;
   rows: ArtifactRow[];
 };
 
@@ -78,12 +84,22 @@ export function groupArtifactsBySession(rows: ArtifactRow[]): ArtifactGroup[] {
   for (const row of rows) {
     const existing = groups.get(row.sessionId);
     const title = row.sessionTitle?.trim() ? row.sessionTitle : null;
+    const project = row.projectName?.trim() ? row.projectName : null;
+    const projectPath = row.projectPath?.trim() ? row.projectPath : null;
     if (existing) {
       existing.rows.push(row);
       existing.sessionTitle = existing.sessionTitle ?? title;
+      existing.projectName = existing.projectName ?? project;
+      existing.projectPath = existing.projectPath ?? projectPath;
       continue;
     }
-    groups.set(row.sessionId, { sessionId: row.sessionId, sessionTitle: title, rows: [row] });
+    groups.set(row.sessionId, {
+      sessionId: row.sessionId,
+      sessionTitle: title,
+      projectName: project,
+      projectPath,
+      rows: [row],
+    });
   }
   const ordered = [...groups.values()];
   for (const group of ordered) {

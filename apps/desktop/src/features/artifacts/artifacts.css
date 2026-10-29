@@ -109,6 +109,19 @@
   white-space: nowrap;
 }
 
+.artifacts-group-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
 .artifacts-group-count {
   flex: none;
   color: var(--ds-text-faint);
@@ -156,13 +169,33 @@
   color: var(--ds-accent, var(--ds-text-muted));
 }
 
+/* The name is the opener: it reads as text until hovered, so the page stays a
+   list rather than a wall of buttons. */
 .artifacts-name {
   min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--ds-text-primary);
   font-size: var(--text-sm);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.artifacts-name:hover {
+  color: var(--ds-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.artifacts-name:focus-visible {
+  outline: 2px solid var(--ds-border-strong);
+  outline-offset: 2px;
 }
 
 .artifacts-dir {

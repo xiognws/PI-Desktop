@@ -13,6 +13,7 @@ export const zhCN = {
     noMatches: "没有匹配的文件。",
     untitledSession: "未命名会话",
     copyPath: "复制路径",
+    openFile: "打开 {{name}}",
     copied: "已复制",
     op: {
       write: "写入",

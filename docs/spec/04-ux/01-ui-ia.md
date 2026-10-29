@@ -378,9 +378,13 @@ schedule. Renaming an Hourly task does not restart its interval.
 Every file a session wrote or edited, read from the host's own artifact table
 (03-runtime/04-data-storage §4.9). One read-only list, grouped by session —
 newest session first, newest file first inside it — because that is how the work
-is remembered: the file the refactor wrote. A row keeps the operation
-(write/edit), the file name, its directory and when that session last touched
-it; name and directory stay selectable, and a row action copies the whole path.
+is remembered: the file the refactor wrote. Each group also names the project
+its session belongs to — the host joins it, so the page never guesses from a
+path — and the file name is the opener: a click resolves through the same
+file-reference path the transcript uses, so a project file lands in the bundled
+file view instead of a second viewer. A row keeps the operation (write/edit),
+the file name, its directory and when that session last touched it; the
+directory stays selectable, and a row action copies the whole path.
 A query box narrows the list in memory over path, directory, operation and
 session title: the page is one bounded host read, so searching never
 round-trips. A session that no longer exists keeps its artifacts under an

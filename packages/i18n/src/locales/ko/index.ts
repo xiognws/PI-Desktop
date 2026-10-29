@@ -13,6 +13,7 @@ export const ko = {
     noMatches: "이 검색과 일치하는 파일이 없습니다.",
     untitledSession: "제목 없는 세션",
     copyPath: "경로 복사",
+    openFile: "{{name}} 열기",
     copied: "복사됨",
     op: {
       write: "쓰기",

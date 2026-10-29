@@ -13,6 +13,7 @@ export const ptBR = {
     noMatches: "Nenhum arquivo corresponde a esta busca.",
     untitledSession: "Sessão sem título",
     copyPath: "Copiar caminho",
+    openFile: "Abrir {{name}}",
     copied: "Copiado",
     op: {
       write: "Escrever",

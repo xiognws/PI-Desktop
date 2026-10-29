@@ -24,6 +24,7 @@ const searchSource = await read("../src/components/SearchDialog.tsx");
 const apiSource = await read("../src/lib/api.ts");
 const ipcSource = await read("../electron/main/ipc/artifacts-ipc.ts");
 const registerSource = await read("../electron/main/ipc/register.ts");
+const hostSource = await read("../../../crates/host-core/src/artifacts.rs");
 
 test("the artifacts page is reachable from the shell, the sidebar and global search", () => {
   // Shell: lazy route, so the page is not in the first chunk.
@@ -67,7 +68,21 @@ test("the page renders host rows and never mutates them", () => {
   assert.match(pageSource, /t\("artifacts\.title"\)/);
   assert.match(pageSource, /<Input[\s\S]{0,200}className="artifacts-search"/);
   assert.match(pageSource, /<TooltipButton/);
-  assert.doesNotMatch(pageSource, /<button/);
+  // The file name is the opener, through the transcript's own resolver rather
+  // than a second way of turning a path into a view.
+  assert.match(pageSource, /useOpenChatFileRef\(\)/);
+  assert.match(pageSource, /onClick=\{onOpen\}/);
+  assert.match(pageSource, /className="artifacts-name font-mono"/);
+  assert.match(pageSource, /t\("artifacts\.openFile", \{ name: artifactFileName\(row\.path\) \}\)/);
+});
+
+test("each session group names its project", () => {
+  assert.match(pageSource, /group\.projectName \? \(/);
+  assert.match(pageSource, /className="artifacts-group-project" title=\{group\.projectPath \?\? undefined\}/);
+  assert.match(styles, /\.artifacts-group-project\s*\{/);
+  // The host joins the project, so the renderer never guesses from a path.
+  assert.match(hostSource, /LEFT JOIN projects p ON p\.id = s\.project_id/);
+  assert.match(hostSource, /project_name: row\.get\(2\)\?/);
 });
 
 test("the artifact list is themed through tokens and stays scannable", () => {

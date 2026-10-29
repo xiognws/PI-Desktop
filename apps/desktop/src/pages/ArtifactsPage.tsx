@@ -8,9 +8,10 @@ import {
   type ArtifactRow,
 } from "@pi-desktop/shared";
 
-import { IconClipboard, IconFileText, IconRefresh } from "../components/icons";
+import { IconClipboard, IconFileText, IconFolder, IconRefresh } from "../components/icons";
 import { Input, TooltipButton } from "../components/ui";
 import { useArtifacts } from "../features/artifacts/use-artifacts";
+import { useOpenChatFileRef } from "../hooks/use-preview-target";
 import "../features/artifacts/artifacts.css";
 
 /**
@@ -26,6 +27,9 @@ export function ArtifactsPage() {
   const [query, setQuery] = useState("");
   const workspace = useArtifacts(query);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
+  // The same opener the transcript uses for a file reference: a click lands in
+  // the bundled file view on a project file instead of inventing a second path.
+  const openFileRef = useOpenChatFileRef();
 
   const formatter = useMemo(
     () => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }),
@@ -88,6 +92,12 @@ export function ArtifactsPage() {
                 <span className="artifacts-group-title">
                   {group.sessionTitle ?? t("artifacts.untitledSession")}
                 </span>
+                {group.projectName ? (
+                  <span className="artifacts-group-project" title={group.projectPath ?? undefined}>
+                    <IconFolder size={11} aria-hidden />
+                    {group.projectName}
+                  </span>
+                ) : null}
                 <span className="artifacts-group-count">{group.rows.length}</span>
               </h3>
               <ul className="artifacts-list">
@@ -98,6 +108,7 @@ export function ArtifactsPage() {
                     when={formatter.format(new Date(row.updatedAt))}
                     copied={copiedPath === row.path}
                     onCopy={() => copy(row.path)}
+                    onOpen={() => openFileRef(row.path)}
                   />
                 ))}
               </ul>
@@ -114,20 +125,28 @@ function ArtifactRowItem({
   when,
   copied,
   onCopy,
+  onOpen,
 }: {
   row: ArtifactRow;
   when: string;
   copied: boolean;
   onCopy: () => void;
+  onOpen: () => void;
 }) {
   const { t } = useTranslation();
   const directory = artifactDirectory(row.path);
   return (
     <li className="artifacts-row">
       <span className={`artifacts-op is-${row.op}`}>{t(artifactOpKey(row.op))}</span>
-      <span className="artifacts-name selectable font-mono" title={row.path}>
+      <button
+        type="button"
+        className="artifacts-name font-mono"
+        title={row.path}
+        aria-label={t("artifacts.openFile", { name: artifactFileName(row.path) })}
+        onClick={onOpen}
+      >
         {artifactFileName(row.path)}
-      </span>
+      </button>
       <span className="artifacts-dir selectable" title={directory}>
         {directory}
       </span>
