@@ -560,9 +560,9 @@ Rules the control encodes:
 - Built-in skill activation controls the skill catalog and on-demand document
   loading only. It does not disable or unregister any agent tool associated
   with the skill; tool activation remains independent.
-- The Skills page has independent global and selected-project columns rooted at
-  `~/.agents/skills` and `<project>/.agents/skills`.
-- Each column has a native single-file Import action and a folder Import action
+- The Skills page is a single global list rooted at `~/.agents/skills`; skills
+  have no project level (ADR 0373).
+- The list has a native single-file Import action and a folder Import action
   that can select multiple `<name>/SKILL.md` folders at once. The host imports
   selected folders independently, preserves sibling resources, and reports
   partial failures without undoing successful imports. The folder picker

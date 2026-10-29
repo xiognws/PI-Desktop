@@ -1849,6 +1849,19 @@ fn parse_scope(params: &Value) -> Result<crate::activation::ActivationScope, Jso
     serde_json::from_value(raw).map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
 }
 
+/// Read a skill catalog query. Skills are global-only, so a `project` level is
+/// rejected here rather than silently scanning a directory the flat library no
+/// longer uses.
+fn parse_skill_query(params: &Value) -> Result<(CapabilityLevel, Option<String>), JsonRpcError> {
+    let query = parse_capability_query(params)?;
+    if query.0 == CapabilityLevel::Project {
+        return Err(capability_err(
+            "SKILL_PROJECT_LEVEL_REMOVED: skills are global-only",
+        ));
+    }
+    Ok(query)
+}
+
 fn parse_capability_query(
     params: &Value,
 ) -> Result<(CapabilityLevel, Option<String>), JsonRpcError> {
@@ -5264,7 +5277,7 @@ async fn handle_request(
         }
 
         "skills.list" => {
-            let (level, project_path) = parse_capability_query(&params)?;
+            let (level, project_path) = parse_skill_query(&params)?;
             let mut st = state.lock().await;
             let skills = st
                 .user_skills
@@ -5360,7 +5373,7 @@ async fn handle_request(
                 .get("enabled")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
-            let (level, project_path) = parse_capability_query(&params)?;
+            let (level, project_path) = parse_skill_query(&params)?;
             let mut st = state.lock().await;
             let skill = st
                 .user_skills

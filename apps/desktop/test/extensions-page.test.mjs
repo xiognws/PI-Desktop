@@ -151,13 +151,15 @@ test("Settings exposes three independent Agent capability destinations", () => {
   assert.match(settingsPageSrc, /tab === "subagents" && <AgentSubagentsPage \/>/);
   assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /AgentCapabilityPage/);
   assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /agent-capability-list/);
-  for (const name of ["AgentSkillsPage.tsx", "AgentMcpPage.tsx"]) {
-    const source = settingsComponents.get(name);
-    assert.match(source, /useAgentProjects\(\)/, name);
-    assert.match(source, /AgentProjectPicker/, name);
-    assert.match(source, /level: "global"/);
-    assert.match(source, /level: "project"/);
-  }
+  // MCP keeps a project level; skills are one flat library and never show a
+  // project picker or read a project level.
+  const mcpPage = settingsComponents.get("AgentMcpPage.tsx");
+  assert.match(mcpPage, /useAgentProjects\(\)/);
+  assert.match(mcpPage, /AgentProjectPicker/);
+  assert.match(mcpPage, /level: "global"/);
+  assert.match(mcpPage, /level: "project"/);
+  const skillsPage = settingsComponents.get("AgentSkillsPage.tsx");
+  assert.doesNotMatch(skillsPage, /useAgentProjects|AgentProjectPicker|level: "project"/);
   assert.doesNotMatch(settingsComponents.get("AgentSubagentsPage.tsx"), /AgentProjectPicker|projectPath/);
 });
 
@@ -201,10 +203,17 @@ test("MCP management reuses the modal and validates its locked id and transport 
   assert.match(sheet, /slice\(0, MCP_TEST_TOOL_NAME_LIMIT\)/);
 });
 
-test("project records shadow global records before disabled records are filtered", () => {
+test("project records shadow global records for MCP; skills have one flat level", () => {
   assert.match(hostCapabilitySources, /existing\.id != record\.id/);
   assert.match(hostCapabilitySources, /if record\.enabled \{/);
   assert.match(hostCapabilitySources, /record\.name\.eq_ignore_ascii_case/);
+  // The only remaining merge is MCP's: a skill catalog is one directory, so it
+  // has nothing to shadow and nothing to merge.
+  const skillRegistry = readFileSync(
+    join(here, "../../../crates/host-core/src/user_skills.rs"),
+    "utf8",
+  );
+  assert.doesNotMatch(skillRegistry, /fn merge_active_records/);
 });
 
 test("subagents are global-only and use the agents root", () => {

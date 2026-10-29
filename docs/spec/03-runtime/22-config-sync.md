@@ -55,10 +55,13 @@ Project and project-group lists are device-local. Their names, pinning, root
 lists, and ordering are not captured or applied by sync or backup, and there is
 no projects category. Legacy `projects` entities in existing vault revisions
 are ignored during sync and restore; this does not delete local projects or
-remote revision history. Project-scoped MCP, skills, instructions, memory, and
+remote revision history. Project-scoped MCP, instructions, memory, and
 automation bindings remain supported through local folder mappings. Receiving
 devices register their own projects and groups when those features require a
-local workspace.
+local workspace. Skills are captured from, and applied to, the one global
+library only (ADR 0373): the capture reads that directory once, and a bundle
+from an older build that still names a project applies its document globally
+because the flat catalog has no other level to read.
 
 Project and workspace bindings are represented by opaque logical identifiers.
 Host-core assigns a persistent logical identity to each registered standalone

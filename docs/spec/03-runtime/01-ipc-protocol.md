@@ -1622,8 +1622,10 @@ bridge's `plugin_` namespace (D015).
 
 ## 12b. User skill API (D194)
 
-User skills are Markdown documents scanned from `~/.agents/skills` and
-`<project>/.agents/skills`. Both direct Markdown files and the conventional
+User skills are Markdown documents scanned from one directory, the global
+library `~/.agents/skills` (repointed to `<data root>/agents/skills` by an
+installed build; ADR 0373). Skills have no project level. Both direct Markdown
+files and the conventional
 `<skill>/SKILL.md` shape are accepted. Enablement is stored in
 `<data>/agent-capabilities/skills.json`, never in the document. Catalog ids
 are ASCII slugs: the frontmatter `name` when it slugifies, otherwise the

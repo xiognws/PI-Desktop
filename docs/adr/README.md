@@ -394,3 +394,4 @@ Each ADR includes:
 
 | model-reasoning-effort-override | [Model reasoning effort override](model-reasoning-effort-override.md) | Proposed |
 | 0372 | [One data root per installation, linked from the home directory](0372-home-data-root-and-links.md) | Accepted |
+| 0373 | [One flat skill library — skills have no project level](0373-flat-skill-library.md) | Accepted |

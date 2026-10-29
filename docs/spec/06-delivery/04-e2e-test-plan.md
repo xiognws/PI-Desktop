@@ -9517,27 +9517,27 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      search narrows both groups and its counts, that clearing the search
      restores every row, and that a search with no matches reports it and
      suggests widening the filter.
-  4. Toggle a global skill off while project A is selected. Confirm the switch
+  4. Toggle a skill off. Confirm the switch
      flips immediately without the list reverting to skeletons, the row is
      dimmed, a toast names the skill, every other row stays interactive while
-     the request is in flight, and the global document remains unchanged. Switch
-     to project B and confirm the global skill remains enabled there. Force a
+     the request is in flight, and the document on disk remains unchanged.
+     Select a different project and confirm the skill is still disabled there:
+     enablement has one scope. Force a
      host rejection and confirm the switch returns to its previous position.
-  5. Create a skill from the page. With the filter on Global confirm the primary
-     action names the global destination and the new document lands in
-     `~/.agents/skills`; with the filter on Project confirm it names the project
-     and lands in project A. With Project selected and no project chosen,
-     confirm the attempt reports it instead of failing silently. Edit the new
-     skill, save, and confirm the body round-trips.
-  6. From a project skill's overflow menu choose Reveal and confirm the project
-     file is revealed, not a global file of the same id. Choose Remove and
+  5. Create a skill from the page. Confirm the primary action names the one
+     global library and the new document lands in
+     `~/.agents/skills`, with no project level offered anywhere on the page.
+     Edit the new skill, save, and confirm the body round-trips.
+  6. From a skill's overflow menu choose Reveal and confirm the document in the
+     global library is revealed. Confirm there is no Move item, since a skill
+     has one level. Choose Remove and
      confirm the first press only arms and relabels the item, the second press
      deletes, and dismissing the menu disarms it.
-  7. Put a same-name project skill in A and disable it. Confirm the effective
-     runtime catalog does not fall back to the global skill; the project record
-     shadows first and filtering happens second.
+  7. Put a skill document in `<project>/.agents/skills` and confirm it is not
+     listed and does not shadow anything; a `skills.list` call with
+     `level: "project"` is refused with `SKILL_PROJECT_LEVEL_REMOVED`.
   8. Use the Import action to choose exactly one Markdown file. Confirm it is
-     physically copied to the level the filter points at, appears immediately,
+     physically copied into the global library, appears immediately,
      and a second file cannot be selected in the same picker invocation.
   9. Open MCP. Add a project server and a global server, edit the project server,
      and test an existing connection from the row's overflow menu. Confirm the
@@ -9597,8 +9597,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   - Create, edit, and delete are available for all three capabilities without
     leaving Settings. New capabilities land at the level the filter points at,
     destructive actions require two presses of the same relabelled menu item,
-    and revealing a project-level skill opens that project's file rather than a
-    global file sharing its id. The Subagents editor Model field is a grouped
+    and revealing a skill opens its file in the one global library (skills have
+    no project level, and a project-level skill request is refused). The
+    Subagents editor Model field is a grouped
     select of configured runnable models plus inherit-session, not a free-typed
     id; saving writes `vendorKey-or-name/modelId` (using a unique provider name
     or id when aliases collide), and an unconfigured existing pin remains

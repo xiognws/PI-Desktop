@@ -671,7 +671,10 @@ system while preserving their different data ownership:
   filter as a segmented control with live counts (All / Global / Project), one
   search field with a clear affordance, the selected-project picker, and the
   page's primary actions right-aligned. Subagents omits the filter and the
-  picker because it is global-only, keeping only search and its actions.
+  picker because it is global-only, keeping only search and its actions. Skills
+  also omits the picker and offers only All / Global: a skill library is one
+  flat directory (`~/.agents/skills`), so there is no project level to filter
+  to, no project to resolve against, and no move between levels (ADR 0373).
   The panel still uses two in-panel groups: **Built-in** (the five shipped
   definitions `explorer`, `code-reviewer`, `test-runner`, `fixer`, and
   `ui-designer`) and **Global** (`~/.agents/subagents`, user-owned). An enabled
@@ -691,7 +694,8 @@ system while preserving their different data ownership:
   filter points at — Global under All or Global, Project under Project — and
   the primary action's tooltip names that destination so the choice is never
   implicit. Choosing Project without a selected project reports that instead
-  of failing silently.
+  of failing silently. Skills skip this: every skill is created in the one
+  global library, and the tooltip says so.
 - Inside the panel, each level is a group header row — level name, resolved
   `.agents` path in mono, localized count — followed by its rows. Lists flow
   at natural page height like every other Settings surface; the page scrolls
@@ -709,8 +713,9 @@ system while preserving their different data ownership:
   list is read for. Without hover the quiet actions are always shown. The
   overflow menu holds the level-aware destructive, move, and out-of-app
   actions — Reveal and Remove for skills and subagents, Test connection and
-  Remove for MCP, and Move to Global / Move into <project> on MCP and Skill
-  rows — and Remove arms on first press, relabels to ask for confirmation,
+  Remove for MCP, and Move to Global / Move into <project> on MCP rows only
+  (a skill row has one level, so it offers no move; ADR 0373) — and Remove arms
+  on first press, relabels to ask for confirmation,
   and disarms on its own if the menu is dismissed or left alone. The move
   direction follows the row's own level: a global row offers Move into the
   project named by the page toolbar's project picker, and a project row offers
@@ -1037,16 +1042,18 @@ system while preserving their different data ownership:
 21. Skills, MCP, and Subagents each render one toolbar above one panel; the
     level filter changes which groups appear without hiding the toolbar or the
     primary actions, and the counts on the segments agree with the rows the
-    panel renders under the active search
+    panel renders under the active search; Skills offers only All and Global
+    because a skill has no project level
 22. Each capability page can create, edit, and delete a capability without
     leaving Settings; new capabilities land at the level the filter points at,
     the primary action names that destination, and choosing a project level
-    with no selected project reports it instead of failing silently
+    with no selected project reports it instead of failing silently; a skill is
+    always created in the one global library
 23. Removing a capability requires two presses of the same menu item, the
     second press labelled as the confirmation, and the arming lapses on its own
     if the menu is dismissed
-24. Revealing a project-level skill opens that project's file, not a global
-    file of the same id
+24. Revealing a skill opens its file in the global library, and a project-level
+    skill request is refused rather than resolved to a project directory
 25. Toggling one capability leaves every other row interactive, does not
     replace the list with skeletons, and restores the previous switch position
     if the host rejects the change

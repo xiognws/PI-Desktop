@@ -211,11 +211,18 @@ export function CapabilityToolbar({
   searchPlaceholder,
   projectPicker,
   actions,
+  levels = ["all", "global", "project"],
 }: {
   /** Omit to hide the filter entirely, as the global-only subagents page does. */
   filter?: CapabilityFilter;
   onFilterChange?: (filter: CapabilityFilter) => void;
   counts?: { all: number; global: number; project: number };
+  /**
+   * Which level segments to offer. Defaults to all three; a page whose
+   * capabilities have no project level passes `["all", "global"]` so the
+   * toolbar never offers a filter that cannot match anything.
+   */
+  levels?: readonly CapabilityFilter[];
   search: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder: string;
@@ -223,22 +230,22 @@ export function CapabilityToolbar({
   actions?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const segments: readonly { id: CapabilityFilter; label: string; count: number }[] =
-    counts
-      ? [
-          { id: "all", label: t("settings.capabilityFilterAll"), count: counts.all },
-          {
-            id: "global",
-            label: t("settings.capabilityFilterGlobal"),
-            count: counts.global,
-          },
-          {
-            id: "project",
-            label: t("settings.capabilityFilterProject"),
-            count: counts.project,
-          },
-        ]
-      : [];
+  const allSegments: readonly { id: CapabilityFilter; label: string; count: number }[] = counts
+    ? [
+        { id: "all", label: t("settings.capabilityFilterAll"), count: counts.all },
+        {
+          id: "global",
+          label: t("settings.capabilityFilterGlobal"),
+          count: counts.global,
+        },
+        {
+          id: "project",
+          label: t("settings.capabilityFilterProject"),
+          count: counts.project,
+        },
+      ]
+    : [];
+  const segments = allSegments.filter((segment) => levels.includes(segment.id));
   return (
     <div className="agent-capability-toolbar">
       {filter && onFilterChange && segments.length > 0 ? (

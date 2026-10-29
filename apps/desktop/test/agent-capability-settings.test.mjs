@@ -47,20 +47,27 @@ test("bundled skill activation validates the catalog and writes host-owned state
   assert.match(skillImport, /sendToRenderer\(IPC\.event\.pluginChanged, \{ reason: "skill" \}\)/);
 });
 
-test("skills and MCP filter one list by level instead of stacking two sections", () => {
-  for (const source of [skills, mcp]) {
-    assert.match(source, /useAgentProjects\(\)/);
-    assert.match(source, /AgentProjectPicker/);
-    assert.match(source, /level: "global"/);
-    assert.match(source, /level: "project"/);
-    // One toolbar, one panel, group headers inside it — not a section per level.
-    assert.match(source, /<CapabilityToolbar/);
-    assert.match(source, /<CapabilityPanel/);
-    assert.match(source, /CapabilityGroupHeader/);
-    assert.match(source, /useState<CapabilityFilter>\("all"\)/);
-    assert.match(source, /const showGlobal = filter !== "project"/);
-    assert.match(source, /const showProject = filter !== "global"/);
-  }
+test("skills are one global list; MCP still filters its list by level", () => {
+  // MCP keeps a project level, so it keeps its picker and its level filter.
+  assert.match(mcp, /useAgentProjects\(\)/);
+  assert.match(mcp, /AgentProjectPicker/);
+  assert.match(mcp, /level: "global"/);
+  assert.match(mcp, /level: "project"/);
+  // One toolbar, one panel, group headers inside it — not a section per level.
+  assert.match(mcp, /<CapabilityToolbar/);
+  assert.match(mcp, /<CapabilityPanel/);
+  assert.match(mcp, /CapabilityGroupHeader/);
+  assert.match(mcp, /useState<CapabilityFilter>\("all"\)/);
+
+  // Skills are a single flat library: no project picker, no project level to
+  // read or write, and only the two filter segments that can match anything.
+  assert.doesNotMatch(skills, /useAgentProjects|AgentProjectPicker/);
+  assert.doesNotMatch(skills, /level: "project"|projectSkills|projectPath/);
+  assert.match(skills, /levels=\{\["all", "global"\]\}/);
+  assert.match(skills, /<CapabilityToolbar/);
+  assert.match(skills, /<CapabilityPanel/);
+  assert.match(skills, /CapabilityGroupHeader/);
+  assert.match(skills, /useState<CapabilityFilter>\("all"\)/);
   assert.doesNotMatch(layout, /AgentCapabilitySection|AgentCapabilityColumn/);
   assert.match(layout, /agent-capability-list/);
   assert.match(layout, /<SegmentedControl[\s\S]*?value=\{filter\}/);
@@ -88,15 +95,14 @@ test("one search field covers the page and every row carries its level", () => {
 
 test("skills keep file imports in group headers and expose the external scan in-page", () => {
   const toolbar = skills.slice(skills.indexOf("<CapabilityToolbar"), skills.indexOf("<CapabilityPanel"));
-  assert.match(toolbar, /actions=\{[\s\S]*?CapabilityButton variant="primary"/);
+  assert.match(toolbar, /actions=\{[\s\S]*?CapabilityButton[\s\S]*?variant="primary"/);
   assert.match(toolbar, /settings\.newSkill/);
   assert.match(toolbar, /ImportToggleButton/);
   assert.match(toolbar, /settings\.importSkillFromTools/);
   assert.doesNotMatch(toolbar, /extensions\.skills\.add/);
-  assert.match(skills, /action=\{importButton\("global"\)\}/);
-  assert.match(skills, /action=\{selectedProjectPath \? importButton\("project"\) : undefined\}/);
+  assert.match(skills, /action=\{importButton\}/);
   assert.match(skills, /<AgentSkillImportPanel/);
-  assert.match(skills, /level=\{targetLevel\}/);
+  assert.doesNotMatch(skills, /importButton\("project"\)|level=\{\}|level="project"/);
   assert.match(mcp, /<AgentMcpImportPanel/);
   assert.match(mcp, /settings\.importMcpFromTools/);
   assert.match(layout, /action\?: ReactNode/);
@@ -296,14 +302,14 @@ test("row actions stay quiet until the row is engaged, but not on touch", () => 
   assert.match(styles, /@media \(hover: none\)[\s\S]*?opacity:\s*1/);
 });
 
-test("revealing a skill carries the level so project skills resolve", () => {
+test("revealing a skill carries its level so the row resolves", () => {
   const api = read("../src/lib/api.ts");
   assert.match(api, /revealUserSkill:\s*\(id: string, query\?: Partial<AgentCapabilityQuery>\)/);
   assert.match(api, /IPC\.invoke\.skillReveal, \{ id, \.\.\.query \}/);
   const handler = skillImport.slice(skillImport.indexOf("IPC.invoke.skillReveal"));
   assert.match(handler, /typeof payload === "string" \? \{ id: payload \} : payload/);
   assert.match(handler, /host\.call<\{ skill: UserSkillRecord \| null \}>\("skills\.read", request\)/);
-  assert.match(skills, /api\.revealUserSkill\(skill\.id, levelQuery\(level\)\)/);
+  assert.match(skills, /api\.revealUserSkill\(skill\.id, SKILL_LEVEL_QUERY\)/);
 });
 
 test("skill file import stays single-select while folder import selects many", () => {
@@ -326,7 +332,7 @@ test("MCP management reuses the validated modal and blocks same-level duplicates
   assert.match(mcp, /api\.testMcpServer/);
 });
 
-test("capability state stays outside capability files and active merge shadows disabled project rows", () => {
+test("capability state stays outside capability files and skills have no merge step", () => {
   const capabilities = read("../../../crates/host-core/src/agent_capabilities.rs");
   const mcpRegistry = read("../../../crates/host-core/src/mcp_servers.rs");
   const skillRegistry = read("../../../crates/host-core/src/user_skills.rs");
@@ -339,10 +345,14 @@ test("capability state stays outside capability files and active merge shadows d
   // capability_dir resolves it under.
   assert.match(capabilities, /pub const AGENTS_DIR: &str = "\.agents";/);
   assert.match(skillRegistry, /capability_dir\([^;]*"skills"/);
+  // MCP still merges a project level over the global one.
   assert.match(mcpRegistry, /existing\.id != record\.id/);
   assert.match(mcpRegistry, /if record\.enabled \{/);
-  assert.match(skillRegistry, /existing\.id != record\.id/);
-  assert.match(skillRegistry, /if record\.enabled \{/);
+  // Skills are a single flat library: one scan, no project merge, and the
+  // per-project enabled override still reaches the global state.
+  assert.doesNotMatch(skillRegistry, /fn merge_active_records/);
+  assert.match(skillRegistry, /self\.scan_level\(CapabilityLevel::Global, None, selected\.as_deref\(\)\)/);
+  assert.match(skillRegistry, /SKILL_PROJECT_LEVEL_REMOVED/);
 });
 
 test("all capability paths are agents roots, not legacy capability directories", () => {
@@ -392,7 +402,7 @@ test("Settings lists shipped builtin subagents with a switch of their own", () =
   assert.match(api, /setBuiltinSubagentEnabled: \(id: string, enabled: boolean\) =>/);
 });
 
-test("a capability can be moved between the global and a project level", () => {
+test("MCP can be moved between the global and a project level; skills cannot", () => {
   const api = read("../src/lib/api.ts");
   const protocol = read("../../../packages/shared/src/protocol.ts");
   const sharedTypes = read("../../../packages/shared/src/types/capabilities.ts");
@@ -411,7 +421,6 @@ test("a capability can be moved between the global and a project level", () => {
   assert.match(protocol, /mcpTransfer: "pi-desktop\/mcp\/transfer"/);
   assert.match(protocol, /skillTransfer: "pi-desktop\/skill\/transfer"/);
   assert.match(api, /transferMcpServer: \(move: AgentCapabilityMove\) =>/);
-  assert.match(api, /transferUserSkill: \(move: AgentCapabilityMove\) =>/);
   assert.match(mcpIpc, /host\.call<\{ server: McpServerRecord \}>\("mcp\.transfer", payload\)/);
   assert.match(
     skillImport,
@@ -430,36 +439,33 @@ test("a capability can be moved between the global and a project level", () => {
   );
   assert.match(capabilities, /pub fn move_capability_file\(/);
   assert.match(mcpRegistry, /pub fn transfer\(/);
-  assert.match(skillRegistry, /pub fn transfer\(/);
   // A destination that already owns the id or name keeps both by renaming.
   assert.match(capabilities, /pub fn suffixed_capability_id\(/);
   assert.match(capabilities, /pub fn suffixed_display_name\(/);
-  // A directory-shaped skill carries its sibling resources, so the directory is
-  // the unit, not the one markdown file.
-  assert.match(skillRegistry, /fn directory_skill_root\(/);
-  assert.match(skillRegistry, /copy_directory_tree\(dir, &target_unit, true\)/);
+  // Skills keep the transfer entry point only to refuse the retired level: the
+  // flat library has nowhere to move a document to.
+  assert.match(skillRegistry, /pub fn transfer\(/);
+  assert.match(
+    skillRegistry,
+    /from\.level == CapabilityLevel::Project \|\| to\.level == CapabilityLevel::Project/,
+  );
   // Renaming must not reformat the document it edits.
   assert.match(skillRegistry, /fn rewrite_document_name\(/);
-  assert.doesNotMatch(
-    skillRegistry.slice(
-      skillRegistry.indexOf("pub fn transfer("),
-      skillRegistry.indexOf("pub fn new(data_dir"),
-    ),
-    /render_document/,
-  );
 });
 
-test("the move action offers a level only when there is a destination", () => {
-  for (const source of [skills, mcp]) {
-    assert.match(source, /settings\.capabilityMoveToGlobal/);
-    assert.match(source, /settings\.capabilityMoveToProject/);
-    assert.match(source, /settings\.capabilityMovedRenamed/);
-    assert.match(source, /IconArrowUpDown/);
-    // The project picker owns the destination, so a global row has nowhere to
-    // go until a project is selected; a project row always has Global.
-    assert.match(source, /moveTarget\[level === "global" \? "project" : "global"\]/);
-    assert.match(source, /showToast\(t\("settings\.selectProjectFirst"\)/);
-  }
+test("the move action is offered by MCP only, never by the flat skill library", () => {
+  assert.match(mcp, /settings\.capabilityMoveToGlobal/);
+  assert.match(mcp, /settings\.capabilityMoveToProject/);
+  assert.match(mcp, /settings\.capabilityMovedRenamed/);
+  assert.match(mcp, /IconArrowUpDown/);
+  // The project picker owns the destination, so a global row has nowhere to
+  // go until a project is selected; a project row always has Global.
+  assert.match(mcp, /moveTarget\[level === "global" \? "project" : "global"\]/);
+  assert.match(mcp, /showToast\(t\("settings\.selectProjectFirst"\)/);
+
+  // Skills live in one directory, so there is no destination to offer.
+  assert.doesNotMatch(skills, /capabilityMoveToGlobal|capabilityMoveToProject|IconArrowUpDown/);
+  assert.doesNotMatch(skills, /transferUserSkill|moveTarget/);
 });
 
 test("MCP OAuth subscribe is owned by a ref cleaned up on unmount", () => {

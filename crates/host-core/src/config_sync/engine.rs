@@ -1217,11 +1217,12 @@ mod tests {
                 enabled: Some(true),
                 ..McpServerInput::default()
             })?;
+            // Skills have one level (ADR 0373): the portable skill is a global
+            // document, while the MCP server above stays project-scoped.
             let portable_skill = state.user_skills.create(UserSkillInput {
                 id: Some("portable-skill".into()),
                 name: Some("Portable Skill".into()),
-                level: Some("project".into()),
-                project_path: Some(project_a.to_string_lossy().into_owned()),
+                level: Some("global".into()),
                 body: Some("Use the portable project workflow.".into()),
                 enabled: Some(true),
                 shape: Some("dir".into()),
@@ -1231,8 +1232,8 @@ mod tests {
             // survive capture, upload, read-back, and apply.
             state.user_skills.write_package_files(
                 &portable_skill.id,
-                CapabilityLevel::Project,
-                Some(&project_a.to_string_lossy()),
+                CapabilityLevel::Global,
+                None,
                 &[("data/fonts.csv".into(), portable_skill_resource())],
             )?;
             provider.id
@@ -1377,7 +1378,11 @@ mod tests {
             .collect::<std::collections::BTreeSet<_>>();
         assert!(domains.contains(DOMAIN_PROVIDERS), "domains: {domains:?}");
         assert!(domains.contains(DOMAIN_MCP), "domains: {domains:?}");
-        assert!(domains.contains(DOMAIN_SKILLS), "domains: {domains:?}");
+        // The skill is a global document (ADR 0373), so it needs no project
+        // mapping: it is applied in the plain approval round and its import is
+        // asserted below, while the project-scoped MCP server still asks for a
+        // mapping first.
+        assert!(!domains.contains(DOMAIN_SKILLS), "domains: {domains:?}");
         assert!(!domains.contains("projects"), "domains: {domains:?}");
         let mapping_key = received
             .get("pendingApprovals")
@@ -1425,22 +1430,17 @@ mod tests {
                 .list(CapabilityLevel::Project, Some(&project_b.to_string_lossy()),)?
                 .iter()
                 .any(|record| record.id == "portable-server"));
-            assert!(state
-                .user_skills
-                .list(CapabilityLevel::Project, Some(&project_b.to_string_lossy()),)?
-                .iter()
-                .any(|record| record.id == "portable-skill"));
             let received_skill = state
                 .user_skills
-                .list(CapabilityLevel::Project, Some(&project_b.to_string_lossy()))?
+                .list(CapabilityLevel::Global, None)?
                 .into_iter()
                 .find(|record| record.id == "portable-skill")
                 .expect("portable skill imported");
             assert_eq!(
                 state.user_skills.package_files(
                     &received_skill.id,
-                    CapabilityLevel::Project,
-                    Some(&project_b.to_string_lossy()),
+                    CapabilityLevel::Global,
+                    None,
                 )?,
                 vec![("data/fonts.csv".into(), portable_skill_resource())],
                 "packaged resource did not survive the sync round trip"

@@ -153,15 +153,11 @@ fn capture_skills(
 ) -> Result<(Vec<PortableEntity>, ResourceMap)> {
     let mut result = Vec::new();
     let mut resources = BTreeMap::new();
-    let projects = st.db.list_projects()?;
-    let mut targets: Vec<(CapabilityLevel, Option<String>)> = vec![(CapabilityLevel::Global, None)];
-    targets.extend(
-        projects
-            .into_iter()
-            .map(|project| (CapabilityLevel::Project, Some(project.path))),
-    );
-    for (level, project_path) in targets {
-        for record in st.user_skills.list(level, project_path.as_deref())? {
+    // Skills are one flat global library (ADR 0373): there is no project level
+    // to walk, so the catalog is read once.
+    for record in st.user_skills.list(CapabilityLevel::Global, None)? {
+        let level = CapabilityLevel::Global;
+        {
             let bytes = st
                 .user_skills
                 .read(&record.id, Some(level), record.project_path.as_deref())?

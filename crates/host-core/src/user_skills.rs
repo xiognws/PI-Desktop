@@ -248,33 +248,13 @@ fn level_and_project(input: &UserSkillInput) -> Result<(CapabilityLevel, Option<
         .as_deref()
         .map(normalize_project_path)
         .filter(|value| !value.is_empty());
-    if level == CapabilityLevel::Project && project_path.is_none() {
-        bail!("CAPABILITY_INVALID: projectPath is required for project skills");
-    }
-    if level == CapabilityLevel::Global && project_path.is_some() {
-        // A project path on a global request is meaningful only for its local
-        // enabled override; the file still belongs to the global directory.
-        return Ok((level, project_path));
+    if level == CapabilityLevel::Project {
+        // Skills are a single flat library: the project level was retired.
+        // A caller that still asks for it gets a readable error rather than a
+        // stale capability directory being written below a project root.
+        bail!("SKILL_PROJECT_LEVEL_REMOVED: skills are global-only; use level \"global\"");
     }
     Ok((level, project_path))
-}
-
-fn merge_active_records(
-    global: Vec<UserSkillRecord>,
-    project: Vec<UserSkillRecord>,
-) -> Vec<UserSkillRecord> {
-    let mut result = global;
-    for record in project {
-        result.retain(|existing| {
-            existing.id != record.id && !existing.name.eq_ignore_ascii_case(&record.name)
-        });
-        if record.enabled {
-            result.push(record);
-        }
-    }
-    result.retain(|record| record.enabled);
-    result.sort_by_key(|record| record.name.to_lowercase());
-    result
 }
 
 /// The text after the opening `---` line, when `text` really starts frontmatter.
@@ -630,10 +610,12 @@ fn ensure_no_symlink_path(root: &Path, target: &Path) -> Result<()> {
 }
 
 impl UserSkillRegistry {
-    /// Move one skill between the global directory and a project's.
+    /// Move one skill within the global skill library.
     ///
-    /// The document moves instead of being copied: a copy would leave the old
-    /// level holding a skill the user just said belongs somewhere else. When the
+    /// Skills are a single flat library, so the only transfer this supports is
+    /// a rename within the global root (a level switch is gone). The document
+    /// moves instead of being copied: a copy would leave the old location
+    /// holding a skill the user just said belongs somewhere else. When the
     /// destination already owns the same id or display name the arriving skill
     /// is renamed, so both survive under names that tell them apart. The
     /// arriving document's id is read back from a scan by path, because a
@@ -646,6 +628,9 @@ impl UserSkillRegistry {
         from: &CapabilityTarget,
         to: &CapabilityTarget,
     ) -> Result<UserSkillRecord> {
+        if from.level == CapabilityLevel::Project || to.level == CapabilityLevel::Project {
+            bail!("SKILL_PROJECT_LEVEL_REMOVED: skills are global-only; a project level target is not supported");
+        }
         let Some(source) = self.find(id, Some(from.level), from.project_path.as_deref())? else {
             bail!("SKILL_INVALID: unknown skill \"{id}\"");
         };
@@ -882,42 +867,29 @@ impl UserSkillRegistry {
         self.scan_level(level, project_path, selected.as_deref())
     }
 
-    /// Return the effective user skill catalog. A project document shadows a
-    /// global document with the same normalized name.
+    /// Return the effective user skill catalog.
+    ///
+    /// Skills are a single flat library living under one root (`global`). The
+    /// `project` level is retired for skills: a project path is still accepted
+    /// and only influences the per-project enabled override, exactly like the
+    /// global branch of [`CapabilityState::enabled`], but no skills are ever
+    /// read from a project's `.agents/skills` directory.
     pub fn active_for(&mut self, project_path: Option<&str>) -> Result<Vec<UserSkillRecord>> {
         let selected = project_path.map(normalize_project_path);
-        let global = self.scan_level(CapabilityLevel::Global, None, selected.as_deref())?;
-        let project = selected
-            .as_deref()
-            .map(|path| self.scan_level(CapabilityLevel::Project, Some(path), Some(path)))
-            .transpose()?
-            .unwrap_or_default();
-        Ok(merge_active_records(global, project))
+        self.scan_level(CapabilityLevel::Global, None, selected.as_deref())
     }
 
     fn find(
         &mut self,
         id: &str,
-        level: Option<CapabilityLevel>,
-        project_path: Option<&str>,
+        _level: Option<CapabilityLevel>,
+        _project_path: Option<&str>,
     ) -> Result<Option<UserSkillRecord>> {
-        if let Some(level) = level {
-            return Ok(self
-                .list(level, project_path)?
-                .into_iter()
-                .find(|record| record.id == id));
-        }
-        if let Some(project) = project_path {
-            if let Some(record) = self
-                .list(CapabilityLevel::Project, Some(project))?
-                .into_iter()
-                .find(|record| record.id == id)
-            {
-                return Ok(Some(record));
-            }
-        }
+        // Skills live in a single flat library under the global root; a caller
+        // passing `project` (or a project path) still finds the same global
+        // document, so lookups never diverge by level.
         Ok(self
-            .list(CapabilityLevel::Global, project_path)?
+            .list(CapabilityLevel::Global, None)?
             .into_iter()
             .find(|record| record.id == id))
     }

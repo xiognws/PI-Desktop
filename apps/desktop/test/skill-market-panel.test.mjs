@@ -31,7 +31,9 @@ test("install sheet previews the assembled document and blocks oversized bodies"
 
 test("installed state comes from matching skill ids", () => {
   assert.match(panel, /installedIds\.includes\(entry\.id\)/);
-  assert.match(page, /installedIds=\{\[\.\.\.globalSkills, \.\.\.projectSkills\]/);
+  // Skills are one flat library, so the installed ids come from that single list.
+  assert.match(page, /installedIds=\{globalSkills\.map\(\(skill\) => skill\.id\)\}/);
+  assert.doesNotMatch(page, /projectSkills/);
 });
 
 test("source badges use the catalog sourceId, including default GitHub sources", () => {

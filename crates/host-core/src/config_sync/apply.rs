@@ -234,10 +234,11 @@ fn apply_entity(
     if entity.domain == domains::DOMAIN_SKILLS {
         let mut input: crate::user_skills::UserSkillInput =
             serde_json::from_value(entity.payload.clone())?;
-        if let Some(path) = mapped_project_path(config, &entity.payload)? {
-            input.project_path = Some(path);
-            input.level = Some("project".into());
-        }
+        // Skills have one level (ADR 0373). A bundle captured by an older build
+        // can still name a project; the document lands in the global library,
+        // which is the only directory the flat catalog reads.
+        input.level = Some("global".into());
+        input.project_path = None;
         if !entity.deleted {
             input.body = Some(required_resource(bundle, entity)?);
         }

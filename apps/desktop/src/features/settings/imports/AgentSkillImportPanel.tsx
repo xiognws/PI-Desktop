@@ -29,11 +29,13 @@ const SKILL_SOURCE_KEY: Record<ExternalSkillSourceKind, string> = {
 };
 
 export function AgentSkillImportPanel({
-  level,
-  projectPath,
   onImported,
+  projectPath,
 }: {
-  level: "global" | "project";
+  /**
+   * Skills have no project level (ADR 0373), so the panel always imports into
+   * the one global library. `projectPath` only widens the external scan.
+   */
   projectPath?: string;
   onImported: () => Promise<unknown>;
 }) {
@@ -80,8 +82,7 @@ export function AgentSkillImportPanel({
     setImporting(true);
     try {
       const res = await api.runExternalSkillsImport({
-        level,
-        ...(level === "project" && projectPath ? { projectPath } : {}),
+        level: "global",
         mode,
         items,
       });

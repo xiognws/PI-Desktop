@@ -12,7 +12,6 @@ import { useHostCollection } from "../../hooks/use-host-collection";
 import { useRowBusy } from "../../hooks/use-row-busy";
 import {
   AgentCapabilityPage,
-  AgentProjectPicker,
   CapabilityButton,
   CapabilityEmpty,
   CapabilityGroupHeader,
@@ -22,8 +21,6 @@ import {
   CapabilityToggle,
   CapabilityToolbar,
   matchesCapabilitySearch,
-  projectDisplayName,
-  useAgentProjects,
   useArmedDelete,
   type CapabilityFilter,
   type CapabilityMenuItem,
@@ -35,7 +32,6 @@ import {
   type SkillDraft,
 } from "./SkillEditorSheet";
 import {
-  IconArrowUpDown,
   IconBookOpen,
   IconDownload,
   IconFileText,
@@ -51,9 +47,9 @@ import { ImportToggleButton } from "../../features/settings/import-workbench";
 import { TooltipButton } from "../ui";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
 
-function projectSkillsPath(projectPath: string | null): string {
-  return projectPath ? `${projectPath}/.agents/skills` : "<project-root>/.agents/skills";
-}
+/** Skills are a single flat library, so every row lives at this level. */
+const SKILL_LEVEL: AgentCapabilityLevel = "global";
+const SKILL_LEVEL_QUERY = { level: SKILL_LEVEL } as const;
 
 type SkillEditorState = {
   draft: SkillDraft;
@@ -64,34 +60,25 @@ type SkillEditorState = {
 type SkillCollection = {
   builtins: BuiltinSkillRecord[];
   global: UserSkillRecord[];
-  project: UserSkillRecord[];
 };
 
-const EMPTY_SKILL_COLLECTION: SkillCollection = { builtins: [], global: [], project: [] };
+const EMPTY_SKILL_COLLECTION: SkillCollection = { builtins: [], global: [] };
 
 export function AgentSkillsPage() {
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
-  const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const fetchSkills = useCallback(async (): Promise<SkillCollection> => {
-    const [builtins, global, project] = await Promise.all([
+    const [builtins, global] = await Promise.all([
       api.listBuiltinSkills(),
-      api.listUserSkills({
-        level: "global",
-        ...(selectedProjectPath ? { projectPath: selectedProjectPath } : {}),
-      }),
-      selectedProjectPath
-        ? api.listUserSkills({ level: "project", projectPath: selectedProjectPath })
-        : Promise.resolve({ skills: [] as UserSkillRecord[] }),
+      api.listUserSkills({ level: SKILL_LEVEL }),
     ]);
     return {
       builtins: builtins.builtins ?? [],
       global: global.skills ?? [],
-      project: project.skills ?? [],
     };
-  }, [selectedProjectPath]);
+  }, []);
   const {
-    data: { builtins: builtinSkills, global: globalSkills, project: projectSkills },
+    data: { builtins: builtinSkills, global: globalSkills },
     setData: setSkills,
     loading,
     refreshing,
@@ -119,33 +106,24 @@ export function AgentSkillsPage() {
     }));
   };
 
-  const patchRow = (
-    level: AgentCapabilityLevel,
-    id: string,
-    patch: Partial<UserSkillRecord>,
-  ) => {
+  const patchRow = (id: string, patch: Partial<UserSkillRecord>) => {
     setSkills((current) => ({
       ...current,
-      [level]: current[level].map((row) => (row.id === id ? { ...row, ...patch } : row)),
+      global: current.global.map((row) => (row.id === id ? { ...row, ...patch } : row)),
     }));
   };
-
-  const levelQuery = (level: AgentCapabilityLevel) => ({
-    level,
-    ...(selectedProjectPath ? { projectPath: selectedProjectPath } : {}),
-  });
 
   /**
    * The switch flips locally first and only reverts if the host refuses, so one
    * row's request never blanks the list or freezes the others.
    */
-  const toggle = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
-    const key = rowKey(level, skill.id);
+  const toggle = async (skill: UserSkillRecord) => {
+    const key = rowKey(SKILL_LEVEL, skill.id);
     if (!rowBusy.begin(key)) return;
     const next = !skill.enabled;
-    patchRow(level, skill.id, { enabled: next });
+    patchRow(skill.id, { enabled: next });
     try {
-      await api.setUserSkillEnabled(skill.id, next, levelQuery(level));
+      await api.setUserSkillEnabled(skill.id, next, SKILL_LEVEL_QUERY);
       showToast(
         t(next ? "settings.capabilityEnabled" : "settings.capabilityDisabled", {
           name: skill.name || skill.id,
@@ -153,7 +131,7 @@ export function AgentSkillsPage() {
         { variant: "success" },
       );
     } catch (error) {
-      patchRow(level, skill.id, { enabled: skill.enabled });
+      patchRow(skill.id, { enabled: skill.enabled });
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
       rowBusy.end(key);
@@ -181,36 +159,23 @@ export function AgentSkillsPage() {
     }
   };
 
-  /** Where a new or imported skill lands: the filtered level, global when both. */
-  const targetLevel: AgentCapabilityLevel = filter === "project" ? "project" : "global";
-
   const openCreate = () => {
-    if (targetLevel === "project" && !selectedProjectPath) {
-      showToast(t("settings.selectProjectFirst"), { variant: "error" });
-      return;
-    }
     setEditor({
-      draft: {
-        ...emptySkillDraft(),
-        scope:
-          targetLevel === "global"
-            ? GLOBAL_SCOPE
-            : { mode: "projects", projects: [selectedProjectPath!] },
-      },
+      draft: { ...emptySkillDraft(), scope: GLOBAL_SCOPE },
       editing: null,
-      level: targetLevel,
+      level: SKILL_LEVEL,
     });
   };
 
-  const openEdit = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
-    const key = rowKey(level, skill.id);
+  const openEdit = async (skill: UserSkillRecord) => {
+    const key = rowKey(SKILL_LEVEL, skill.id);
     if (!rowBusy.begin(key)) return;
     try {
-      const result = await api.readUserSkill(skill.id, levelQuery(level));
+      const result = await api.readUserSkill(skill.id, SKILL_LEVEL_QUERY);
       setEditor({
         draft: draftFromSkill(result.skill ?? skill, result.body ?? ""),
         editing: result.skill ?? skill,
-        level,
+        level: SKILL_LEVEL,
       });
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
@@ -221,16 +186,14 @@ export function AgentSkillsPage() {
 
   const save = async () => {
     if (!editor) return;
-    const { draft, editing, level } = editor;
-    const projectPath = level === "project" ? selectedProjectPath ?? undefined : undefined;
+    const { draft, editing } = editor;
     const payload = {
       name: draft.name.trim(),
       description: draft.description.trim(),
       body: draft.body,
       enabled: draft.enabled,
       scope: draft.scope,
-      level,
-      ...(projectPath ? { projectPath } : {}),
+      level: SKILL_LEVEL,
     };
     setSaving(true);
     try {
@@ -249,19 +212,19 @@ export function AgentSkillsPage() {
     }
   };
 
-  const reveal = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
+  const reveal = async (skill: UserSkillRecord) => {
     try {
-      await api.revealUserSkill(skill.id, levelQuery(level));
+      await api.revealUserSkill(skill.id, SKILL_LEVEL_QUERY);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     }
   };
 
-  const remove = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
-    const key = rowKey(level, skill.id);
+  const remove = async (skill: UserSkillRecord) => {
+    const key = rowKey(SKILL_LEVEL, skill.id);
     if (!rowBusy.begin(key)) return;
     try {
-      await api.removeUserSkill(skill.id, levelQuery(level));
+      await api.removeUserSkill(skill.id, SKILL_LEVEL_QUERY);
       await load();
       showToast(t("settings.capabilityDeleted", { name: skill.name || skill.id }), {
         variant: "success",
@@ -274,24 +237,11 @@ export function AgentSkillsPage() {
     }
   };
 
-  const importSkill = async (
-    level: AgentCapabilityLevel = targetLevel,
-    sourceKind: "file" | "dir" = "file",
-  ) => {
-    if (level === "project" && !selectedProjectPath) {
-      showToast(t("settings.selectProjectFirst"), { variant: "error" });
-      return;
-    }
+  const importSkill = async (sourceKind: "file" | "dir" = "file") => {
     const importKey = sourceKind === "dir" ? "import-dir" : "import";
     if (!rowBusy.begin(importKey)) return;
     try {
-      const result = await api.importUserSkill({
-        level,
-        sourceKind,
-        ...(level === "project" && selectedProjectPath
-          ? { projectPath: selectedProjectPath }
-          : {}),
-      });
+      const result = await api.importUserSkill({ level: SKILL_LEVEL, sourceKind });
       if (!result.canceled) {
         await load();
         if (result.skill) {
@@ -328,77 +278,17 @@ export function AgentSkillsPage() {
     return {
       builtins: builtinSkills.filter(matchBuiltin),
       global: globalSkills.filter(match),
-      project: projectSkills.filter(match),
     };
-  }, [builtinSkills, globalSkills, projectSkills, search]);
+  }, [builtinSkills, globalSkills, search]);
 
   const counts = {
-    all: visible.builtins.length + visible.global.length + visible.project.length,
+    all: visible.builtins.length + visible.global.length,
     global: visible.builtins.length + visible.global.length,
-    project: visible.project.length,
+    project: 0,
   };
 
-  const projectName = useMemo(
-    () =>
-      options.find((project) => project.path === selectedProjectPath)?.name ??
-      (selectedProjectPath ? projectDisplayName(selectedProjectPath) : undefined),
-    [options, selectedProjectPath],
-  );
-
-  /** Where a move sends a row, named the way the toast should say it. */
-  const moveTarget: Partial<Record<AgentCapabilityLevel, string>> = {
-    global: t("settings.globalLevel"),
-    project: selectedProjectPath
-      ? `${t("settings.projectLevel")} · ${projectName ?? projectDisplayName(selectedProjectPath)}`
-      : undefined,
-  };
-
-  /**
-   * Move one row to the other level. The project picker owns the destination,
-   * so the same action reads "Move into <project>" on a global row and "Move to
-   * Global" on a project one.
-   *
-   * The host moves the document rather than copying it, and a destination that
-   * already holds the id or display name renames the arriving skill, so the
-   * toast reports the new name instead of pretending the id survived.
-   */
-  const move = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
-    const to: AgentCapabilityLevel = level === "global" ? "project" : "global";
-    const target = moveTarget[to];
-    if (!target) {
-      showToast(t("settings.selectProjectFirst"), { variant: "error" });
-      return;
-    }
-    const key = rowKey(level, skill.id);
-    if (!rowBusy.begin(key)) return;
-    try {
-      const result = await api.transferUserSkill({
-        id: skill.id,
-        from: levelQuery(level),
-        to: levelQuery(to),
-      });
-      await load();
-      const name = skill.name || skill.id;
-      const arrived = result.skill;
-      showToast(
-        arrived && arrived.id !== skill.id
-          ? t("settings.capabilityMovedRenamed", {
-              name,
-              target,
-              newName: arrived.name || arrived.id,
-            })
-          : t("settings.capabilityMoved", { name, target }),
-        { variant: "success" },
-      );
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
-    } finally {
-      rowBusy.end(key);
-    }
-  };
-
-  const renderRow = (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
-    const key = rowKey(level, skill.id);
+  const renderRow = (skill: UserSkillRecord) => {
+    const key = rowKey(SKILL_LEVEL, skill.id);
     const name = skill.name || skill.id;
     const busy = rowBusy.isBusy(key);
     const isArmed = armed === key;
@@ -409,32 +299,9 @@ export function AgentSkillsPage() {
         icon: <IconFolderOpen size={14} />,
         onSelect: () => {
           setMenuFor(null);
-          void reveal(skill, level);
+          void reveal(skill);
         },
       },
-      /**
-       * A move needs a destination, so a global row offers it only while the
-       * picker names a project; a project row always has Global to go back to.
-       */
-      ...(moveTarget[level === "global" ? "project" : "global"]
-        ? [
-            {
-              key: "move",
-              label:
-                level === "global"
-                  ? t("settings.capabilityMoveToProject", {
-                      project:
-                        projectName ?? projectDisplayName(selectedProjectPath ?? ""),
-                    })
-                  : t("settings.capabilityMoveToGlobal"),
-              icon: <IconArrowUpDown size={14} />,
-              onSelect: () => {
-                setMenuFor(null);
-                void move(skill, level);
-              },
-            } satisfies CapabilityMenuItem,
-          ]
-        : []),
       {
         key: "remove",
         label: isArmed ? t("settings.capabilityRemoveConfirm") : t("extensions.skills.remove"),
@@ -443,7 +310,7 @@ export function AgentSkillsPage() {
         onSelect: () => {
           if (isArmed) {
             setMenuFor(null);
-            void remove(skill, level);
+            void remove(skill);
           } else {
             setArmed(key);
           }
@@ -460,9 +327,7 @@ export function AgentSkillsPage() {
         badges={
           <>
             <span className="agent-capability-badge is-level">
-              {level === "global"
-                ? t("settings.capabilityFilterGlobal")
-                : t("settings.capabilityFilterProject")}
+              {t("settings.capabilityFilterGlobal")}
             </span>
             {skill.source === "imported" ? (
               <span className="agent-capability-badge">{t("settings.imported")}</span>
@@ -478,7 +343,7 @@ export function AgentSkillsPage() {
               ariaLabel={t("extensions.skills.rowActions", { name })}
               tooltip={t("extensions.skills.edit")}
               disabled={busy}
-              onClick={() => void openEdit(skill, level)}
+              onClick={() => void openEdit(skill)}
             >
               <IconPencil size={15} />
             </TooltipButton>
@@ -496,7 +361,7 @@ export function AgentSkillsPage() {
               checked={skill.enabled}
               busy={busy}
               label={t("settings.toggleCapability", { name })}
-              onChange={() => void toggle(skill, level)}
+              onChange={() => void toggle(skill)}
             />
           </>
         }
@@ -532,34 +397,20 @@ export function AgentSkillsPage() {
     );
   };
 
-  const showGlobal = filter !== "project";
-  const showProject = filter !== "global";
-  const newSkillTitle =
-    targetLevel === "project"
-      ? t("settings.capabilityCreateInProject")
-      : t("settings.capabilityCreateInGlobal");
-  const importButton = (level: AgentCapabilityLevel) => (
+  const importButton = (
     <>
       <CapabilityButton
         busy={rowBusy.isBusy("import")}
-        title={
-          level === "project"
-            ? t("settings.capabilityImportToProject")
-            : t("settings.capabilityImportToGlobal")
-        }
-        onClick={() => void importSkill(level, "file")}
+        title={t("settings.capabilityImportToGlobal")}
+        onClick={() => void importSkill("file")}
       >
         <IconDownload size={14} />
         {t("settings.importSkillFile")}
       </CapabilityButton>
       <CapabilityButton
         busy={rowBusy.isBusy("import-dir")}
-        title={
-          level === "project"
-            ? t("settings.capabilityImportToProject")
-            : t("settings.capabilityImportToGlobal")
-        }
-        onClick={() => void importSkill(level, "dir")}
+        title={t("settings.capabilityImportToGlobal")}
+        onClick={() => void importSkill("dir")}
       >
         <IconDownload size={14} />
         {t("settings.importSkillDir")}
@@ -579,7 +430,7 @@ export function AgentSkillsPage() {
   if (view === "market") {
     return (
       <SkillMarketPanel
-        installedIds={[...globalSkills, ...projectSkills].map((skill) => skill.id)}
+        installedIds={globalSkills.map((skill) => skill.id)}
         onBack={() => {
           setView("skills");
           void load();
@@ -599,27 +450,23 @@ export function AgentSkillsPage() {
           filter={filter}
           onFilterChange={setFilter}
           counts={counts}
+          levels={["all", "global"]}
           search={search}
           onSearchChange={setSearch}
           searchPlaceholder={t("extensions.skills.searchPlaceholder")}
-          projectPicker={
-            <AgentProjectPicker
-              value={selectedProjectPath}
-              options={options}
-              label={t("settings.selectProject")}
-              onChange={setSelectedProjectPath}
-            />
-          }
           actions={
             <>
               <ImportToggleButton
                 open={importOpen}
                 controls="agent-skills-import-panel"
                 label={t("settings.importSkillFromTools")}
-                disabled={targetLevel === "project" && !selectedProjectPath}
                 onClick={() => setImportOpen((current) => !current)}
               />
-              <CapabilityButton variant="primary" title={newSkillTitle} onClick={openCreate}>
+              <CapabilityButton
+                variant="primary"
+                title={t("settings.capabilityCreateInGlobal")}
+                onClick={openCreate}
+              >
                 <IconPlus size={14} />
                 {t("settings.newSkill")}
               </CapabilityButton>
@@ -641,9 +488,7 @@ export function AgentSkillsPage() {
         </div>
         <div className="import-inline-workbench">
           <AgentSkillImportPanel
-            key={`${targetLevel}:${targetLevel === "project" ? selectedProjectPath ?? "" : ""}`}
-            level={targetLevel}
-            projectPath={targetLevel === "project" ? selectedProjectPath ?? undefined : undefined}
+            key="global"
             onImported={load}
           />
         </div>
@@ -661,55 +506,31 @@ export function AgentSkillsPage() {
           />
         ) : (
           <>
-            {showGlobal ? (
-              <>
-                <CapabilityGroupHeader
-                  label={t("settings.builtinSkills")}
-                  count={visible.builtins.length}
-                />
-                {visible.builtins.map(renderBuiltinRow)}
-                <CapabilityGroupHeader
-                  label={t("settings.globalLevel")}
-                  path={GLOBAL_SKILLS_PATH}
-                  count={visible.global.length}
-                  action={importButton("global")}
-                />
-                {visible.global.length === 0 ? (
-                  <CapabilityEmpty
-                    message={t("settings.skillsEmpty")}
-                    icon={<IconBookOpen size={18} />}
-                    action={
-                      <CapabilityButton variant="primary" onClick={openCreate}>
-                        <IconPlus size={14} />
-                        {t("extensions.skills.add")}
-                      </CapabilityButton>
-                    }
-                  />
-                ) : (
-                  visible.global.map((skill) => renderRow(skill, "global"))
-                )}
-              </>
-            ) : null}
-            {showProject ? (
-              <>
-                <CapabilityGroupHeader
-                  label={t("settings.projectLevel")}
-                  path={projectSkillsPath(selectedProjectPath)}
-                  count={visible.project.length}
-                  action={selectedProjectPath ? importButton("project") : undefined}
-                />
-                {!selectedProjectPath ? (
-                  <CapabilityEmpty message={t("settings.selectProjectFirst")} />
-                ) : visible.project.length === 0 ? (
-                  <CapabilityEmpty
-                    message={t("settings.skillsEmpty")}
-                    icon={<IconBookOpen size={18} />}
-                  />
-                ) : (
-                  visible.project.map((skill) => renderRow(skill, "project"))
-                )}
-              </>
-            ) : null}
+            <CapabilityGroupHeader
+              label={t("settings.builtinSkills")}
+              count={visible.builtins.length}
+            />
+            {visible.builtins.map(renderBuiltinRow)}
+            <CapabilityGroupHeader
+              label={t("settings.globalLevel")}
+              path={GLOBAL_SKILLS_PATH}
+              count={visible.global.length}
+              action={importButton}
+            />
+            {visible.global.length === 0 ? (
+              <CapabilityEmpty
+                message={t("settings.skillsEmpty")}
+                icon={<IconBookOpen size={18} />}
+                action={
+                  <CapabilityButton variant="primary" onClick={openCreate}>
+                    <IconPlus size={14} />
+                    {t("extensions.skills.add")}
+                  </CapabilityButton>
+                }
+              />
+            ) : (
+              visible.global.map(renderRow)
+            )}
           </>
         )}
       </CapabilityPanel>
@@ -721,14 +542,13 @@ export function AgentSkillsPage() {
           editing={editor.editing}
           saving={saving}
           level={editor.level}
-          projectName={projectName}
           onClose={() => {
             if (!saving) setEditor(null);
           }}
           onSave={() => void save()}
           onReveal={
             editor.editing
-              ? () => void reveal(editor.editing!, editor.level)
+              ? () => void reveal(editor.editing!)
               : undefined
           }
         />

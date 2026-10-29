@@ -313,52 +313,37 @@ async fn resource_updates_and_packaged_skill_deletion_reach_the_other_device() -
     let project_b = directory_b.path().join("project");
     fs::create_dir_all(&project_a)?;
     fs::create_dir_all(&project_b)?;
-    let project_a = project_a.canonicalize()?.to_string_lossy().into_owned();
-    let project_b = project_b.canonicalize()?.to_string_lossy().into_owned();
-    // Project registration is device-local; scoped capability capture requires
-    // the receiving device to have registered its own mapped project.
-    device_b.lock().await.db.ensure_project(&project_b, false)?;
+    // Skills have one level (ADR 0373), so the replica under test is a global
+    // package: resource updates and deletion still have to reach the other
+    // device, and no project mapping is involved.
     {
         let mut state = device_a.lock().await;
-        state.db.ensure_project(&project_a, false)?;
         state
             .user_skills
             .create(crate::user_skills::UserSkillInput {
                 id: Some("changing-skill".into()),
                 name: Some("Changing skill".into()),
-                level: Some("project".into()),
-                project_path: Some(project_a.clone()),
+                level: Some("global".into()),
                 body: Some("Fixture instructions".into()),
                 shape: Some("dir".into()),
                 ..Default::default()
             })?;
         state.user_skills.write_package_files(
             "changing-skill",
-            CapabilityLevel::Project,
-            Some(&project_a),
+            CapabilityLevel::Global,
+            None,
             &[("data.txt".into(), b"first".to_vec())],
         )?;
     }
     let (tx, _rx) = mpsc::unbounded_channel();
     sync_now(device_a.clone(), tx.clone()).await?;
-    let received = sync_now(device_b.clone(), tx.clone()).await?;
-    let mapping = received["pendingApprovals"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find_map(|item| item["mappingKey"].as_str())
-        .unwrap();
-    map_project(
-        device_b.clone(),
-        json!({"logicalId":mapping,"paths":[project_b]}),
-    )
-    .await?;
+    sync_now(device_b.clone(), tx.clone()).await?;
     approve_all(&device_b, &tx).await?;
     {
         let mut state = device_a.lock().await;
         let skill = state
             .user_skills
-            .list(CapabilityLevel::Project, Some(&project_a))?
+            .list(CapabilityLevel::Global, None)?
             .remove(0);
         fs::write(
             Path::new(&skill.path).parent().unwrap().join("data.txt"),
@@ -371,19 +356,17 @@ async fn resource_updates_and_packaged_skill_deletion_reach_the_other_device() -
     {
         let mut state = device_b.lock().await;
         assert_eq!(
-            state.user_skills.package_files(
-                "changing-skill",
-                CapabilityLevel::Project,
-                Some(&project_b)
-            )?,
+            state
+                .user_skills
+                .package_files("changing-skill", CapabilityLevel::Global, None)?,
             vec![("data.txt".into(), b"updated".to_vec())]
         );
     }
-    device_a.lock().await.user_skills.remove(
-        "changing-skill",
-        Some(CapabilityLevel::Project),
-        Some(&project_a),
-    )?;
+    device_a
+        .lock()
+        .await
+        .user_skills
+        .remove("changing-skill", Some(CapabilityLevel::Global), None)?;
     sync_now(device_a.clone(), tx.clone()).await?;
     sync_now(device_b.clone(), tx.clone()).await?;
     approve_all(&device_b, &tx).await?;
@@ -391,7 +374,7 @@ async fn resource_updates_and_packaged_skill_deletion_reach_the_other_device() -
         .lock()
         .await
         .user_skills
-        .list(CapabilityLevel::Project, Some(&project_b))?
+        .list(CapabilityLevel::Global, None)?
         .is_empty());
     sync_now(device_b.clone(), tx).await?;
     Ok(())

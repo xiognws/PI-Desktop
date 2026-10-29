@@ -14,32 +14,23 @@ fn input(name: &str, level: &str, project_path: Option<&str>) -> UserSkillInput 
 }
 
 #[test]
-fn imports_one_file_into_the_selected_agents_directory() {
+fn imports_one_file_into_the_global_skills_directory() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source = app.path().join("incoming.md");
     let raw = "---\nname: Review\ndescription: Check code\n---\n\nDo it.\n";
     fs::write(&source, raw).unwrap();
-    let mut registry = UserSkillRegistry::new(app.path());
-    let record = registry
-        .import(
-            source.to_str().unwrap(),
-            input("Ignored", "project", Some(app.path().to_str().unwrap())),
-        )
-        .unwrap();
-    let target = app.path().join(".agents/skills/review.md");
-    assert_eq!(record.level.as_deref(), Some("project"));
-    let normalized_project =
-        crate::agent_capabilities::normalize_project_path(app.path().to_str().unwrap());
-    let expected = crate::agent_capabilities::capability_dir(
-        CapabilityLevel::Project,
-        Some(&normalized_project),
-        "skills",
-    )
-    .unwrap()
-    .join("review.md");
-    assert_eq!(record.path, expected.to_string_lossy());
-    assert_eq!(fs::read_to_string(target).unwrap(), raw);
-    assert!(source.is_file());
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let record = registry
+            .import(source.to_str().unwrap(), input("Ignored", "global", None))
+            .unwrap();
+        let expected_doc = home.path().join("skills").join("review.md");
+        assert_eq!(record.level.as_deref(), Some("global"));
+        assert_eq!(record.path, expected_doc.to_string_lossy());
+        assert_eq!(fs::read_to_string(&expected_doc).unwrap(), raw);
+        assert!(source.is_file());
+    });
 }
 
 #[test]
@@ -66,49 +57,11 @@ fn project_skills_shadow_global_skills_by_name() {
 }
 
 #[test]
-fn disabled_project_skill_shadows_global_skill() {
-    let global = UserSkillRecord {
-        id: "review".into(),
-        name: "Review".into(),
-        level: Some("global".into()),
-        project_path: None,
-        description: Some("Global".into()),
-        enabled: true,
-        scope: ActivationScope::default(),
-        source: "imported".into(),
-        path: "/global/review.md".into(),
-        size_bytes: 1,
-        created_at: String::new(),
-        updated_at: String::new(),
-    };
-    let mut project = global.clone();
-    project.level = Some("project".into());
-    project.project_path = Some("/repo".into());
-    project.enabled = false;
-
-    let active = merge_active_records(vec![global.clone()], vec![project]);
-    assert!(active.is_empty());
-
-    let mut project = global.clone();
-    project.level = Some("project".into());
-    project.project_path = Some("/repo".into());
-    project.path = "/repo/.agents/skills/review.md".into();
-    let active = merge_active_records(vec![global], vec![project.clone()]);
-    assert_eq!(active, vec![project]);
-}
-
-#[test]
 fn capability_state_is_not_written_into_skill_documents() {
     let app = tempdir().unwrap();
     let mut state = CapabilityState::new(app.path(), SKILL_KIND);
     state
-        .set_enabled(
-            SKILL_KIND,
-            CapabilityLevel::Project,
-            "review",
-            Some("/repo"),
-            false,
-        )
+        .set_enabled(SKILL_KIND, CapabilityLevel::Global, "review", None, false)
         .unwrap();
     assert!(!app
         .path()
@@ -175,6 +128,7 @@ fn builtin_activation_rejects_invalid_ids() {
 
 #[test]
 fn import_uses_parent_directory_when_name_is_not_ascii() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source_dir = app.path().join("incoming/code-review");
     fs::create_dir_all(&source_dir).unwrap();
@@ -184,49 +138,46 @@ fn import_uses_parent_directory_when_name_is_not_ascii() {
         "---\nname: 代码审查\ndescription: >\n  Review diffs before merge.\n---\n\nCheck the patch.\n",
     )
     .unwrap();
-    let mut registry = UserSkillRegistry::new(app.path());
-    let record = registry
-        .import(
-            source.to_str().unwrap(),
-            input("Ignored", "project", Some(app.path().to_str().unwrap())),
-        )
-        .unwrap();
-    assert_eq!(record.id, "code-review");
-    assert_eq!(record.name, "代码审查");
-    assert_eq!(
-        record.description.as_deref(),
-        Some("Review diffs before merge.")
-    );
-    let listed = registry
-        .list(CapabilityLevel::Project, Some(app.path().to_str().unwrap()))
-        .unwrap();
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].id, "code-review");
-    assert_eq!(listed[0].name, "代码审查");
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let record = registry
+            .import(source.to_str().unwrap(), input("Ignored", "global", None))
+            .unwrap();
+        assert_eq!(record.id, "code-review");
+        assert_eq!(record.name, "代码审查");
+        assert_eq!(
+            record.description.as_deref(),
+            Some("Review diffs before merge.")
+        );
+        let listed = registry.list(CapabilityLevel::Global, None).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, "code-review");
+        assert_eq!(listed[0].name, "代码审查");
+    });
 }
 
 #[test]
 fn directory_skills_do_not_collide_on_the_skill_file_stem() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
-    let project = app.path().to_str().unwrap();
-    fs::create_dir_all(app.path().join(".agents/skills/pdf")).unwrap();
-    fs::create_dir_all(app.path().join(".agents/skills/docx")).unwrap();
+    fs::create_dir_all(home.path().join("skills/pdf")).unwrap();
+    fs::create_dir_all(home.path().join("skills/docx")).unwrap();
     fs::write(
-        app.path().join(".agents/skills/pdf/SKILL.md"),
+        home.path().join("skills/pdf/SKILL.md"),
         "# PDF\n\nExtract text.\n",
     )
     .unwrap();
     fs::write(
-        app.path().join(".agents/skills/docx/SKILL.md"),
+        home.path().join("skills/docx/SKILL.md"),
         "# DOCX\n\nEdit documents.\n",
     )
     .unwrap();
-    let mut registry = UserSkillRegistry::new(app.path());
-    let listed = registry
-        .list(CapabilityLevel::Project, Some(project))
-        .unwrap();
-    let ids: Vec<_> = listed.iter().map(|record| record.id.as_str()).collect();
-    assert_eq!(ids, vec!["docx", "pdf"]);
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let listed = registry.list(CapabilityLevel::Global, None).unwrap();
+        let ids: Vec<_> = listed.iter().map(|record| record.id.as_str()).collect();
+        assert_eq!(ids, vec!["docx", "pdf"]);
+    });
 }
 
 /// A global skill document plus the project directory it can move into.
@@ -255,20 +206,13 @@ fn record(id: &str, name: &str) -> UserSkillRecord {
     }
 }
 
-/// A level may never list two records with the same id or the same name:
-/// either collision makes one of them disappear from the catalog.
-fn assert_unique_records(records: &[UserSkillRecord]) {
-    let ids: HashSet<&str> = records.iter().map(|record| record.id.as_str()).collect();
-    let names: HashSet<String> = records
-        .iter()
-        .map(|record| record.name.to_lowercase())
-        .collect();
-    assert_eq!(ids.len(), records.len(), "duplicate ids: {records:?}");
-    assert_eq!(names.len(), records.len(), "duplicate names: {records:?}");
+/// Compare two paths despite platform separator differences.
+fn canonical(value: &str) -> String {
+    value.replace('\\', "/")
 }
 
 #[test]
-fn a_global_skill_moves_into_a_project() {
+fn a_transfer_toward_a_project_target_is_rejected() {
     let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let project = tempdir().unwrap();
@@ -281,36 +225,27 @@ fn a_global_skill_moves_into_a_project() {
         )
         .unwrap();
         let mut registry = UserSkillRegistry::new(app.path());
-
-        let moved = registry
+        let err = registry
             .transfer(
                 "review",
                 &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
                 &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
             )
-            .unwrap();
-
-        assert_eq!(moved.id, "review");
-        assert_eq!(moved.level.as_deref(), Some("project"));
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        // The global document stays put; no project directory appears.
+        assert!(home.path().join("skills/review.md").is_file());
+        assert!(!project.path().join(".agents").exists());
         assert_eq!(
-            moved.project_path.as_deref(),
-            Some(crate::agent_capabilities::normalize_project_path(&project_path).as_str())
+            registry.list(CapabilityLevel::Global, None).unwrap().len(),
+            1
         );
-        assert!(!home.path().join("skills/review.md").exists());
-        let target = project.path().join(".agents/skills/review.md");
-        assert_eq!(
-            fs::read_to_string(&target).unwrap(),
-            "---\nname: Review\ndescription: Check code\n---\n\nDo it.\n"
-        );
-        assert!(registry
-            .list(CapabilityLevel::Global, None)
-            .unwrap()
-            .is_empty());
     });
 }
 
 #[test]
-fn a_name_collision_rewrites_only_the_documents_name_line() {
+fn a_transfer_renaming_into_a_project_target_is_rejected() {
     let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let project = tempdir().unwrap();
@@ -318,8 +253,6 @@ fn a_name_collision_rewrites_only_the_documents_name_line() {
     test_support::with_global_agents(home.path(), || {
         skill_home(home.path());
         fs::create_dir_all(project.path().join(".agents/skills")).unwrap();
-        // Extra frontmatter and deliberate body formatting: a renaming move
-        // must not reformat the document the user only asked to relocate.
         let original = "---\nname: Review\nlicense: MIT\n---\n\n## Step 1\n\n   indented\n";
         fs::write(home.path().join("skills/review.md"), original).unwrap();
         fs::write(
@@ -329,32 +262,26 @@ fn a_name_collision_rewrites_only_the_documents_name_line() {
         .unwrap();
         let mut registry = UserSkillRegistry::new(app.path());
 
-        let moved = registry
+        let err = registry
             .transfer(
                 "review",
                 &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
                 &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
             )
-            .unwrap();
-
-        assert_eq!(moved.id, "review-2");
-        assert_eq!(moved.name, "Review (2)");
-        let document =
-            fs::read_to_string(project.path().join(".agents/skills/review-2.md")).unwrap();
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        // The global document is untouched; the project copy remains too.
         assert_eq!(
-            document,
-            "---\nname: Review (2)\nlicense: MIT\n---\n\n## Step 1\n\n   indented\n"
+            fs::read_to_string(home.path().join("skills/review.md")).unwrap(),
+            original
         );
-        // The skill that was already there is untouched.
-        assert_eq!(
-            fs::read_to_string(project.path().join(".agents/skills/review.md")).unwrap(),
-            "---\nname: Review\n---\n\nProject copy\n"
-        );
+        assert!(project.path().join(".agents/skills/review.md").is_file());
     });
 }
 
 #[test]
-fn a_directory_skill_moves_with_its_resources() {
+fn a_directory_skill_transfer_into_a_project_is_rejected() {
     let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let project = tempdir().unwrap();
@@ -367,31 +294,23 @@ fn a_directory_skill_moves_with_its_resources() {
         fs::write(source.join("templates/page.html"), "<p>page</p>").unwrap();
         let mut registry = UserSkillRegistry::new(app.path());
 
-        let moved = registry
+        let err = registry
             .transfer(
                 "pdf",
                 &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
                 &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
             )
-            .unwrap();
-
-        assert_eq!(moved.id, "pdf");
-        assert!(!source.exists());
-        let target = project.path().join(".agents/skills/pdf");
-        assert_eq!(
-            fs::read_to_string(target.join("SKILL.md")).unwrap(),
-            "# PDF\n\nExtract text.\n"
-        );
-        // The resource beside the document is part of the skill.
-        assert_eq!(
-            fs::read_to_string(target.join("templates/page.html")).unwrap(),
-            "<p>page</p>"
-        );
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        // Document and resource remain in the global library.
+        assert!(source.join("SKILL.md").is_file());
+        assert!(source.join("templates/page.html").is_file());
     });
 }
 
 #[test]
-fn a_renamed_directory_skill_keeps_its_resources() {
+fn a_renamed_directory_skill_transfer_into_a_project_is_rejected() {
     let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let project = tempdir().unwrap();
@@ -410,66 +329,24 @@ fn a_renamed_directory_skill_keeps_its_resources() {
         fs::write(source.join("notes.txt"), "keep me").unwrap();
         let mut registry = UserSkillRegistry::new(app.path());
 
-        let moved = registry
+        let err = registry
             .transfer(
                 "pdf",
                 &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
                 &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
             )
-            .unwrap();
-
-        assert_eq!(moved.id, "pdf-2");
-        assert!(!source.exists());
-        let target = project.path().join(".agents/skills/pdf-2");
-        assert_eq!(
-            fs::read_to_string(target.join("notes.txt")).unwrap(),
-            "keep me"
-        );
-        assert_eq!(
-            fs::read_to_string(project.path().join(".agents/skills/pdf/SKILL.md")).unwrap(),
-            "# PDF\n\nProject copy.\n"
-        );
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        // Global document, resource, and the separate project copy all survive.
+        assert!(source.join("SKILL.md").is_file());
+        assert!(source.join("notes.txt").is_file());
+        assert!(project.path().join(".agents/skills/pdf/SKILL.md").is_file());
     });
 }
 
 #[test]
-fn a_disabled_project_skill_becomes_the_global_default() {
-    let home = tempdir().unwrap();
-    let app = tempdir().unwrap();
-    let project = tempdir().unwrap();
-    let project_path = project_dir(project.path());
-    test_support::with_global_agents(home.path(), || {
-        skill_home(home.path());
-        let mut registry = UserSkillRegistry::new(app.path());
-        let mut request = input("Review", "project", Some(&project_path));
-        request.enabled = Some(false);
-        registry.create(request).unwrap();
-
-        let moved = registry
-            .transfer(
-                "review",
-                &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
-                &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
-            )
-            .unwrap();
-
-        assert_eq!(moved.level.as_deref(), Some("global"));
-        assert!(!moved.enabled);
-        assert!(home.path().join("skills/review.md").is_file());
-        assert!(!project.path().join(".agents/skills/review.md").exists());
-        // Off everywhere, because the document is off and its state is now
-        // the global default rather than one project's leftover override.
-        assert!(!registry.state.enabled(
-            SKILL_KIND,
-            CapabilityLevel::Global,
-            "review",
-            Some("/elsewhere")
-        ));
-    });
-}
-
-#[test]
-fn a_skill_without_frontmatter_gains_a_name_when_it_has_to_rename() {
+fn a_transfer_out_of_a_project_source_is_rejected() {
     let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let project = tempdir().unwrap();
@@ -477,9 +354,6 @@ fn a_skill_without_frontmatter_gains_a_name_when_it_has_to_rename() {
     test_support::with_global_agents(home.path(), || {
         skill_home(home.path());
         fs::create_dir_all(project.path().join(".agents/skills")).unwrap();
-        // No frontmatter: the display name falls back to the file stem, so a
-        // move that must rename has to open a block to carry the new name.
-        fs::write(home.path().join("skills/review.md"), "# Review\n\nDo it.\n").unwrap();
         fs::write(
             project.path().join(".agents/skills/review.md"),
             "---\nname: Review\n---\n\nProject copy\n",
@@ -487,21 +361,46 @@ fn a_skill_without_frontmatter_gains_a_name_when_it_has_to_rename() {
         .unwrap();
         let mut registry = UserSkillRegistry::new(app.path());
 
-        let moved = registry
+        let err = registry
+            .transfer(
+                "review",
+                &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
+                &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        // The project document stays put; nothing appears in the global library.
+        assert!(project.path().join(".agents/skills/review.md").is_file());
+        assert!(registry
+            .list(CapabilityLevel::Global, None)
+            .unwrap()
+            .is_empty());
+    });
+}
+
+#[test]
+fn a_frontmatterless_transfer_into_a_project_is_rejected() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    let project = tempdir().unwrap();
+    let project_path = project_dir(project.path());
+    test_support::with_global_agents(home.path(), || {
+        skill_home(home.path());
+        let source_doc = home.path().join("skills/review.md");
+        fs::write(&source_doc, "# Review\n\nDo it.\n").unwrap();
+        let mut registry = UserSkillRegistry::new(app.path());
+
+        let err = registry
             .transfer(
                 "review",
                 &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
                 &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
             )
-            .unwrap();
-        // With no stored name the display name is the file stem, so that is
-        // what the suffix is applied to.
-        assert_eq!(moved.id, "review-2");
-        assert_eq!(moved.name, "review (2)");
-        assert_eq!(
-            fs::read_to_string(project.path().join(".agents/skills/review-2.md")).unwrap(),
-            "---\nname: review (2)\n---\n\n# Review\n\nDo it.\n"
-        );
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        assert!(source_doc.is_file());
     });
 }
 
@@ -550,80 +449,35 @@ fn placement_reports_exhaustion_instead_of_reusing_a_taken_name() {
 }
 
 #[test]
-fn a_chinese_named_skill_moves_without_hiding_the_other_levels_copy() {
+fn a_cjk_named_skill_transfer_into_a_project_is_rejected() {
     let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let project = tempdir().unwrap();
     let project_path = project_dir(project.path());
     test_support::with_global_agents(home.path(), || {
         skill_home(home.path());
-        fs::create_dir_all(project.path().join(".agents/skills")).unwrap();
-        // Both names slug to nothing, so each document's id comes from its
-        // file stem — while the renamed candidate `代码审查 (2)` slugs to
-        // `2`, which is nothing like the stem the old move would have used.
         fs::write(
             home.path().join("skills/code-review.md"),
             "---\nname: 代码审查\n---\n\nGlobal copy.\n",
         )
         .unwrap();
-        fs::write(
-            project.path().join(".agents/skills/code-review.md"),
-            "---\nname: 代码审查\n---\n\nProject copy.\n",
-        )
-        .unwrap();
         let mut registry = UserSkillRegistry::new(app.path());
 
-        let moved = registry
+        let err = registry
             .transfer(
                 "code-review",
                 &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
                 &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
             )
-            .unwrap();
-
-        assert_eq!(moved.id, "2");
-        assert_eq!(moved.name, "代码审查 (2)");
-        assert!(!home.path().join("skills/code-review.md").exists());
-        assert_eq!(
-            fs::read_to_string(project.path().join(".agents/skills/2.md")).unwrap(),
-            "---\nname: 代码审查 (2)\n---\n\nGlobal copy.\n"
-        );
-        // The project's own copy is untouched and both documents are listed
-        // under distinct ids and names.
-        assert_eq!(
-            fs::read_to_string(project.path().join(".agents/skills/code-review.md")).unwrap(),
-            "---\nname: 代码审查\n---\n\nProject copy.\n"
-        );
-        let listed = registry
-            .list(CapabilityLevel::Project, Some(&project_path))
-            .unwrap();
-        assert_eq!(listed.len(), 2);
-        assert_unique_records(&listed);
-        assert!(listed.iter().any(|record| record.name == "代码审查"));
-        assert!(listed.iter().any(|record| record.name == "代码审查 (2)"));
-
-        // The same document moves back to the global level under its new
-        // name, keeping the id the scan gave it.
-        let back = registry
-            .transfer(
-                "2",
-                &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
-                &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
-            )
-            .unwrap();
-        assert_eq!(back.id, "2");
-        assert_eq!(back.name, "代码审查 (2)");
-        assert!(home.path().join("skills/2.md").is_file());
-        assert_unique_records(
-            &registry
-                .list(CapabilityLevel::Project, Some(&project_path))
-                .unwrap(),
-        );
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        assert!(home.path().join("skills/code-review.md").is_file());
     });
 }
 
 #[test]
-fn a_names_slug_is_not_used_when_that_id_belongs_to_another_document() {
+fn a_slug_collision_transfer_into_a_project_is_rejected() {
     let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let project = tempdir().unwrap();
@@ -636,13 +490,6 @@ fn a_names_slug_is_not_used_when_that_id_belongs_to_another_document() {
             "---\nname: 代码审查\n---\n\nGlobal copy.\n",
         )
         .unwrap();
-        fs::write(
-            project.path().join(".agents/skills/code-review.md"),
-            "---\nname: 代码审查\n---\n\nProject copy.\n",
-        )
-        .unwrap();
-        // This document's id is exactly the slug the renamed candidate
-        // `代码审查 (2)` would produce, so that candidate cannot be used.
         fs::write(
             project.path().join(".agents/skills/2.md"),
             "---\nname: 2\n---\n\nTakes the id 2.\n",
@@ -650,26 +497,16 @@ fn a_names_slug_is_not_used_when_that_id_belongs_to_another_document() {
         .unwrap();
         let mut registry = UserSkillRegistry::new(app.path());
 
-        let moved = registry
+        let err = registry
             .transfer(
                 "code-review",
                 &CapabilityTarget::new(CapabilityLevel::Global, None).unwrap(),
                 &CapabilityTarget::new(CapabilityLevel::Project, Some(&project_path)).unwrap(),
             )
-            .unwrap();
-
-        assert_eq!(moved.name, "代码审查 (3)");
-        assert_eq!(moved.id, "3");
-        assert!(project.path().join(".agents/skills/3.md").is_file());
-        assert_eq!(
-            fs::read_to_string(project.path().join(".agents/skills/2.md")).unwrap(),
-            "---\nname: 2\n---\n\nTakes the id 2.\n"
-        );
-        let listed = registry
-            .list(CapabilityLevel::Project, Some(&project_path))
-            .unwrap();
-        assert_eq!(listed.len(), 3);
-        assert_unique_records(&listed);
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_PROJECT_LEVEL_REMOVED"), "err = {err}");
+        assert!(home.path().join("skills/code-review.md").is_file());
     });
 }
 #[test]
@@ -730,6 +567,7 @@ fn rewriting_a_name_keeps_the_frontmatter_shaped_document_intact() {
 
 #[test]
 fn imports_a_directory_with_skill_md_in_copy_mode() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source_dir = app.path().join("incoming/example-skill");
     fs::create_dir_all(&source_dir).unwrap();
@@ -740,40 +578,35 @@ fn imports_a_directory_with_skill_md_in_copy_mode() {
     .unwrap();
     fs::write(source_dir.join("resource.txt"), "extra\n").unwrap();
 
-    let mut registry = UserSkillRegistry::new(app.path());
-    let record = registry
-        .import(
-            source_dir.to_str().unwrap(),
-            input("Ignored", "project", Some(app.path().to_str().unwrap())),
-        )
-        .unwrap();
-    let normalized_project =
-        crate::agent_capabilities::normalize_project_path(app.path().to_str().unwrap());
-    let expected_root = crate::agent_capabilities::capability_dir(
-        CapabilityLevel::Project,
-        Some(&normalized_project),
-        "skills",
-    )
-    .unwrap()
-    .join("example");
-    assert!(expected_root.is_dir(), "target dir exists");
-    assert!(expected_root.join("SKILL.md").is_file(), "SKILL.md placed");
-    assert!(
-        expected_root.join("resource.txt").is_file(),
-        "resources copied"
-    );
-    assert_eq!(record.name, "Example");
-    // The record path points at the SKILL.md the scanner selects.
-    assert_eq!(
-        record.path,
-        expected_root.join("SKILL.md").to_string_lossy()
-    );
-    // Source is untouched under copy mode.
-    assert!(source_dir.join("SKILL.md").is_file());
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let record = registry
+            .import(
+                source_dir.to_str().unwrap(),
+                input("Ignored", "global", None),
+            )
+            .unwrap();
+        let expected_root = home.path().join("skills").join("example");
+        assert!(expected_root.is_dir(), "target dir exists");
+        assert!(expected_root.join("SKILL.md").is_file(), "SKILL.md placed");
+        assert!(
+            expected_root.join("resource.txt").is_file(),
+            "resources copied"
+        );
+        assert_eq!(record.name, "Example");
+        // The record path points at the SKILL.md the scanner selects.
+        assert_eq!(
+            canonical(&record.path),
+            canonical(&expected_root.join("SKILL.md").to_string_lossy())
+        );
+        // Source is untouched under copy mode.
+        assert!(source_dir.join("SKILL.md").is_file());
+    });
 }
 
 #[test]
 fn imports_a_directory_with_skill_md_in_link_mode() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source_dir = app.path().join("incoming/linked-skill");
     fs::create_dir_all(&source_dir).unwrap();
@@ -783,39 +616,34 @@ fn imports_a_directory_with_skill_md_in_link_mode() {
     )
     .unwrap();
 
-    let mut registry = UserSkillRegistry::new(app.path());
-    let mut payload = input("Ignored", "project", Some(app.path().to_str().unwrap()));
-    payload.mode = Some("link".into());
-    let record = match registry.import(source_dir.to_str().unwrap(), payload) {
-        Ok(record) => record,
-        Err(err) if cfg!(windows) && format!("{err:#}").contains("1314") => {
-            // Unprivileged Windows environments without Developer Mode enabled
-            // cannot create filesystem symlinks (os error 1314).
-            return;
-        }
-        Err(err) => panic!("import failed unexpectedly: {err:#}"),
-    };
-    let normalized_project =
-        crate::agent_capabilities::normalize_project_path(app.path().to_str().unwrap());
-    let expected_root = crate::agent_capabilities::capability_dir(
-        CapabilityLevel::Project,
-        Some(&normalized_project),
-        "skills",
-    )
-    .unwrap()
-    .join("linked");
-    let metadata = fs::symlink_metadata(&expected_root).unwrap();
-    assert!(
-        metadata.file_type().is_symlink(),
-        "link mode leaves a symlink at the destination"
-    );
-    // The symlink resolves and the scanned SKILL.md path reads back through it.
-    assert!(expected_root.join("SKILL.md").is_file());
-    assert_eq!(record.name, "Linked");
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut payload = input("Ignored", "global", None);
+        payload.mode = Some("link".into());
+        let record = match registry.import(source_dir.to_str().unwrap(), payload) {
+            Ok(record) => record,
+            Err(err) if cfg!(windows) && format!("{err:#}").contains("1314") => {
+                // Unprivileged Windows environments without Developer Mode enabled
+                // cannot create filesystem symlinks (os error 1314).
+                return;
+            }
+            Err(err) => panic!("import failed unexpectedly: {err:#}"),
+        };
+        let expected_root = home.path().join("skills/linked");
+        let metadata = fs::symlink_metadata(&expected_root).unwrap();
+        assert!(
+            metadata.file_type().is_symlink(),
+            "link mode leaves a symlink at the destination"
+        );
+        // The symlink resolves and the scanned SKILL.md path reads back through it.
+        assert!(expected_root.join("SKILL.md").is_file());
+        assert_eq!(record.name, "Linked");
+    });
 }
 
 #[test]
 fn imports_a_file_in_link_mode() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source = app.path().join("incoming/notes.md");
     fs::create_dir_all(source.parent().unwrap()).unwrap();
@@ -825,135 +653,136 @@ fn imports_a_file_in_link_mode() {
     )
     .unwrap();
 
-    let mut registry = UserSkillRegistry::new(app.path());
-    let mut payload = input("Ignored", "project", Some(app.path().to_str().unwrap()));
-    payload.mode = Some("link".into());
-    let record = match registry.import(source.to_str().unwrap(), payload) {
-        Ok(record) => record,
-        Err(err) if cfg!(windows) && format!("{err:#}").contains("1314") => {
-            // Unprivileged Windows environments without Developer Mode enabled
-            // cannot create filesystem symlinks (os error 1314).
-            return;
-        }
-        Err(err) => panic!("import failed unexpectedly: {err:#}"),
-    };
-    let normalized_project =
-        crate::agent_capabilities::normalize_project_path(app.path().to_str().unwrap());
-    let expected = crate::agent_capabilities::capability_dir(
-        CapabilityLevel::Project,
-        Some(&normalized_project),
-        "skills",
-    )
-    .unwrap()
-    .join("notes.md");
-    let metadata = fs::symlink_metadata(&expected).unwrap();
-    assert!(metadata.file_type().is_symlink());
-    assert_eq!(record.name, "Notes");
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut payload = input("Ignored", "global", None);
+        payload.mode = Some("link".into());
+        let record = match registry.import(source.to_str().unwrap(), payload) {
+            Ok(record) => record,
+            Err(err) if cfg!(windows) && format!("{err:#}").contains("1314") => {
+                // Unprivileged Windows environments without Developer Mode enabled
+                // cannot create filesystem symlinks (os error 1314).
+                return;
+            }
+            Err(err) => panic!("import failed unexpectedly: {err:#}"),
+        };
+        let expected = home.path().join("skills/notes.md");
+        let metadata = fs::symlink_metadata(&expected).unwrap();
+        assert!(metadata.file_type().is_symlink());
+        assert_eq!(record.name, "Notes");
+    });
 }
 
 #[test]
 fn directory_import_without_skill_md_is_rejected() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source_dir = app.path().join("incoming/no-skill");
     fs::create_dir_all(&source_dir).unwrap();
     fs::write(source_dir.join("readme.md"), "just docs\n").unwrap();
 
-    let mut registry = UserSkillRegistry::new(app.path());
-    let err = registry
-        .import(
-            source_dir.to_str().unwrap(),
-            input("Ignored", "project", Some(app.path().to_str().unwrap())),
-        )
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("SKILL_INVALID"), "err = {err}");
-    assert!(err.contains("SKILL.md"), "err = {err}");
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let err = registry
+            .import(
+                source_dir.to_str().unwrap(),
+                input("Ignored", "global", None),
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("SKILL_INVALID"), "err = {err}");
+        assert!(err.contains("SKILL.md"), "err = {err}");
+    });
 }
 
 #[test]
 fn unknown_import_mode_is_rejected() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source = app.path().join("incoming.md");
     fs::write(&source, "---\nname: Any\n---\n\nBody.\n").unwrap();
-    let mut registry = UserSkillRegistry::new(app.path());
-    let mut payload = input("Ignored", "project", Some(app.path().to_str().unwrap()));
-    payload.mode = Some("teleport".into());
-    let err = registry
-        .import(source.to_str().unwrap(), payload)
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("unknown import mode"), "err = {err}");
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut payload = input("Ignored", "global", None);
+        payload.mode = Some("teleport".into());
+        let err = registry
+            .import(source.to_str().unwrap(), payload)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("unknown import mode"), "err = {err}");
+    });
 }
 
 #[test]
 fn shape_dir_requires_a_directory_source() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
     let source = app.path().join("incoming.md");
     fs::write(&source, "---\nname: X\n---\n\nBody.\n").unwrap();
-    let mut registry = UserSkillRegistry::new(app.path());
-    let mut payload = input("Ignored", "project", Some(app.path().to_str().unwrap()));
-    payload.shape = Some("dir".into());
-    let err = registry
-        .import(source.to_str().unwrap(), payload)
-        .unwrap_err()
-        .to_string();
-    assert!(
-        err.contains("SKILL_INVALID") && err.contains("directory"),
-        "err = {err}"
-    );
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut payload = input("Ignored", "global", None);
+        payload.shape = Some("dir".into());
+        let err = registry
+            .import(source.to_str().unwrap(), payload)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("SKILL_INVALID") && err.contains("directory"),
+            "err = {err}"
+        );
+    });
 }
 
 #[test]
 fn directory_skill_package_resources_round_trip_without_execution() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
-    let project = app.path().join("project");
-    fs::create_dir_all(&project).unwrap();
-    let mut registry = UserSkillRegistry::new(app.path());
-    let mut payload = input("Packaged", "project", Some(project.to_str().unwrap()));
-    payload.id = Some("packaged".into());
-    payload.shape = Some("dir".into());
-    let record = registry.create(payload).unwrap();
-    registry
-        .write_package_files(
-            &record.id,
-            CapabilityLevel::Project,
-            Some(project.to_str().unwrap()),
-            &[("scripts/check.txt".into(), b"safe bytes".to_vec())],
-        )
-        .unwrap();
-    let files = registry
-        .package_files(
-            &record.id,
-            CapabilityLevel::Project,
-            Some(project.to_str().unwrap()),
-        )
-        .unwrap();
-    assert_eq!(
-        files,
-        vec![("scripts/check.txt".into(), b"safe bytes".to_vec())]
-    );
-    assert!(record.path.ends_with("SKILL.md"));
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut payload = input("Packaged", "global", None);
+        payload.id = Some("packaged".into());
+        payload.shape = Some("dir".into());
+        let record = registry.create(payload).unwrap();
+        registry
+            .write_package_files(
+                &record.id,
+                CapabilityLevel::Global,
+                None,
+                &[("scripts/check.txt".into(), b"safe bytes".to_vec())],
+            )
+            .unwrap();
+        let files = registry
+            .package_files(&record.id, CapabilityLevel::Global, None)
+            .unwrap();
+        assert_eq!(
+            files,
+            vec![("scripts/check.txt".into(), b"safe bytes".to_vec())]
+        );
+        assert!(record.path.ends_with("SKILL.md"));
+    });
 }
 
 #[test]
 fn directory_skill_package_rejects_traversal() {
+    let home = tempdir().unwrap();
     let app = tempdir().unwrap();
-    let project = app.path().join("project");
-    fs::create_dir_all(&project).unwrap();
-    let mut registry = UserSkillRegistry::new(app.path());
-    let mut payload = input("Packaged", "project", Some(project.to_str().unwrap()));
-    payload.id = Some("packaged".into());
-    payload.shape = Some("dir".into());
-    let record = registry.create(payload).unwrap();
-    let error = registry
-        .write_package_files(
-            &record.id,
-            CapabilityLevel::Project,
-            Some(project.to_str().unwrap()),
-            &[("../outside.txt".into(), b"unsafe".to_vec())],
-        )
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("SKILL_INVALID"));
-    assert!(!app.path().join("outside.txt").exists());
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut payload = input("Packaged", "global", None);
+        payload.id = Some("packaged".into());
+        payload.shape = Some("dir".into());
+        let record = registry.create(payload).unwrap();
+        let error = registry
+            .write_package_files(
+                &record.id,
+                CapabilityLevel::Global,
+                None,
+                &[("../outside.txt".into(), b"unsafe".to_vec())],
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("SKILL_INVALID"));
+        assert!(!app.path().join("outside.txt").exists());
+    });
 }

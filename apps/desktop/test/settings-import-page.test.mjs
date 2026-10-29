@@ -37,9 +37,17 @@ test("model, skills, and MCP imports are available from their own settings pages
 
   assert.match(skillsPage, /ImportToggleButton/);
   assert.match(skillsPage, /<AgentSkillImportPanel/);
-  assert.match(skillsPage, /level=\{targetLevel\}/);
+  // The skills panel imports into the one global library, so it takes no
+  // level at all; scoped to the panel, since the editor sheet still does.
+  const skillImportBlock = skillsPage.slice(
+    skillsPage.indexOf("<AgentSkillImportPanel"),
+    skillsPage.indexOf("/>", skillsPage.indexOf("<AgentSkillImportPanel")),
+  );
+  assert.doesNotMatch(skillImportBlock, /level=/);
+  assert.doesNotMatch(skillsPage, /targetLevel|selectedProjectPath/);
+  assert.match(skillImport, /level: "global",/);
   assert.match(skillImport, /api\.scanExternalSkills\(/);
-  assert.match(skillImport, /level,\s*\.\.\./);
+  assert.doesNotMatch(skillImport, /level: "project"/);
   assert.match(skillImport, /description=\{t\("settings\.importAgentSkillsDesc"\)\}/);
 
   assert.match(mcpPage, /ImportToggleButton/);
@@ -62,14 +70,16 @@ test("model, skills, and MCP imports are available from their own settings pages
   }
 });
 
-test("capability imports follow the selected project and reset when scope changes", () => {
-  for (const source of [skillsPage, mcpPage]) {
-    assert.match(source, /key=\{`\$\{targetLevel\}:/);
-    assert.match(source, /projectPath=\{targetLevel === "project" \? selectedProjectPath/);
-    assert.match(source, /disabled=\{targetLevel === "project" && !selectedProjectPath\}/);
-  }
-  assert.match(skillImport, /level === "project" && projectPath/);
+test("capability imports follow the selected project; skills import to the flat library", () => {
+  // MCP keeps a project level, so its import panel follows the picker.
+  assert.match(mcpPage, /key=\{`\$\{targetLevel\}:/);
+  assert.match(mcpPage, /projectPath=\{targetLevel === "project" \? selectedProjectPath/);
+  assert.match(mcpPage, /disabled=\{targetLevel === "project" && !selectedProjectPath\}/);
   assert.match(mcpImport, /level === "project" && projectPath/);
+  // Skills have one level, so their import panel is pinned to it.
+  assert.match(skillsPage, /key="global"/);
+  assert.doesNotMatch(skillsPage, /targetLevel|selectedProjectPath/);
+  assert.match(skillImport, /level: "global",/);
 });
 
 test("shared inline workbench retains accessible selection and importer controls", () => {
