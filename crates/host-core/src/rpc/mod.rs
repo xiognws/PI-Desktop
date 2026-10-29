@@ -5400,6 +5400,51 @@ async fn handle_request(
             Ok(json!({ "skill": skill }))
         }
 
+        // Curation: a proposal, an accepted archive, and the way back. Nothing
+        // here deletes a document.
+        "skills.curate" => {
+            let policy = match params.get("policy") {
+                Some(value) if !value.is_null() => {
+                    serde_json::from_value::<crate::user_skills::curator::CuratorPolicy>(
+                        value.clone(),
+                    )
+                    .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?
+                }
+                _ => crate::user_skills::curator::CuratorPolicy::default(),
+            };
+            let mut st = state.lock().await;
+            let candidates = st.user_skills.curate(&policy).map_err(skill_err)?;
+            Ok(json!({ "candidates": candidates, "policy": policy }))
+        }
+        "skills.archive" => {
+            let id = require_id(&params)?;
+            let reason = params
+                .get("reason")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("manual");
+            let mut st = state.lock().await;
+            let entry = st.user_skills.archive(&id, reason).map_err(skill_err)?;
+            Ok(json!({ "entry": entry }))
+        }
+        "skills.archived" => {
+            let st = state.lock().await;
+            let entries = st.user_skills.archived().map_err(skill_err)?;
+            Ok(json!({ "entries": entries }))
+        }
+        "skills.restore" => {
+            let entry_id = params
+                .get("entryId")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "entryId is required", "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let skill = st.user_skills.restore(entry_id).map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
+
         "agents.list" => {
             let mut st = state.lock().await;
             Ok(json!({ "subagents": st.user_subagents.list().map_err(subagent_err)? }))

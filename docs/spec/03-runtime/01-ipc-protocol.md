@@ -1634,6 +1634,14 @@ skill directory name for `SKILL.md` (not a staging folder such as
 listed. Folded YAML `description: >` / `|` blocks flatten into the catalog
 one-liner.
 
+- `skills.curate({ policy? })` → `{ candidates: SkillCuratorCandidate[], policy }`. Read-only:
+  the host scores the catalog against the activity ledger and answers with a proposal.
+- `skills.archive({ id, reason? })` → `{ entry: ArchivedSkill }`. Moves the document (and a
+  directory-shaped skill's sibling resources) into `<data>/skills-archive/`, forgets its
+  enablement state, and appends to `<data>/agent-capabilities/skill-archive.json`.
+- `skills.archived()` → `{ entries: ArchivedSkill[] }`, newest first, restored entries included.
+- `skills.restore({ entryId })` → `{ skill: UserSkillRecord }`. Puts the tree back; an occupied
+  original path is `SKILL_ARCHIVE_CONFLICT`, never an overwrite.
 - `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
 - `skills.active({ projectPath? })` → the effective runtime list
 - `skills.create(skill)`

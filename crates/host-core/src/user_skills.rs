@@ -31,6 +31,10 @@ const SKILL_KIND: &str = "skills";
 /// documents and must not erase a built-in preference.
 const BUILTIN_SKILL_KIND: &str = "skill-builtins";
 
+pub mod curator;
+
+use curator::{CuratorCandidate, CuratorPolicy, CuratorSkill};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UserSkillRecord {
@@ -114,6 +118,26 @@ impl ImportShape {
 pub struct UserSkillRegistry {
     state: CapabilityState,
     builtins: CapabilityState,
+    /// Kept so an archived skill has somewhere to go: the archive is a sibling
+    /// of the state files, not of the skill directory, so nothing a scan walks
+    /// can see an archived document.
+    data_dir: PathBuf,
+}
+
+/// One skill the user or the curator moved out of the library. The archive is a
+/// move, so restoring an entry puts the exact tree back.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchivedSkill {
+    pub entry_id: String,
+    pub skill_id: String,
+    pub name: String,
+    pub reason: String,
+    pub archived_at: String,
+    pub original_path: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restored_at: Option<String>,
 }
 
 /// Place a single skill file at `target`, either as a copy or a symlink.
@@ -748,6 +772,7 @@ impl UserSkillRegistry {
         Self {
             state: CapabilityState::new(data_dir, SKILL_KIND),
             builtins: CapabilityState::new(data_dir, BUILTIN_SKILL_KIND),
+            data_dir: data_dir.to_path_buf(),
         }
     }
 
@@ -1280,6 +1305,173 @@ impl UserSkillRegistry {
             .unwrap_or(CapabilityLevel::Global);
         let _ = self.find(id, Some(level), record.project_path.as_deref())?;
         Ok(true)
+    }
+
+    /// Which skills the curator would archive, and why. Read-only: nothing moves
+    /// until the caller accepts an id and calls [`Self::archive`].
+    pub fn curate(&mut self, policy: &CuratorPolicy) -> Result<Vec<CuratorCandidate>> {
+        let records = self.list(CapabilityLevel::Global, None)?;
+        let usage = self.read_usage_ledger();
+        let skills = records
+            .iter()
+            .map(|record| CuratorSkill {
+                id: record.id.clone(),
+                name: record.name.clone(),
+                description: record.description.clone().unwrap_or_default(),
+                body_chars: fs::read_to_string(&record.path)
+                    .map(|body| body.chars().count())
+                    .unwrap_or(0),
+                updated_at: record.updated_at.clone(),
+                enabled: record.enabled,
+            })
+            .collect::<Vec<_>>();
+        Ok(curator::plan(&skills, &usage, policy, chrono::Utc::now()))
+    }
+
+    /// The learning plugin keeps an activity ledger beside the library. Reading
+    /// it is best effort: a library that predates the plugin still curates, on
+    /// the documents' own timestamps.
+    fn read_usage_ledger(&self) -> std::collections::BTreeMap<String, curator::SkillUsage> {
+        let Ok(directory) = capability_dir(CapabilityLevel::Global, None, SKILL_KIND) else {
+            return std::collections::BTreeMap::new();
+        };
+        let path = directory.join(".skill-learning").join("usage.json");
+        let Ok(raw) = fs::read_to_string(path) else {
+            return std::collections::BTreeMap::new();
+        };
+        serde_json::from_str::<std::collections::BTreeMap<String, curator::SkillUsage>>(&raw)
+            .unwrap_or_default()
+    }
+
+    fn archive_root(&self) -> PathBuf {
+        self.data_dir.join("skills-archive")
+    }
+
+    fn archive_index_path(&self) -> PathBuf {
+        self.data_dir
+            .join("agent-capabilities")
+            .join("skill-archive.json")
+    }
+
+    fn read_archive_index(&self) -> Vec<ArchivedSkill> {
+        let Ok(raw) = fs::read_to_string(self.archive_index_path()) else {
+            return Vec::new();
+        };
+        serde_json::from_str(&raw).unwrap_or_default()
+    }
+
+    fn write_archive_index(&self, entries: &[ArchivedSkill]) -> Result<()> {
+        let path = self.archive_index_path();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, serde_json::to_string_pretty(entries)?)
+            .with_context(|| format!("SKILL_ARCHIVE_WRITE: {}", path.display()))?;
+        Ok(())
+    }
+
+    /// Archived skills, newest first, including the ones already restored so the
+    /// history stays auditable.
+    pub fn archived(&self) -> Result<Vec<ArchivedSkill>> {
+        let mut entries = self.read_archive_index();
+        entries.sort_by(|left, right| right.archived_at.cmp(&left.archived_at));
+        Ok(entries)
+    }
+
+    /// Move one skill out of the library. The archive is a move, not a copy: the
+    /// document is gone from the catalog afterwards and `restore` puts the exact
+    /// tree back. Nothing here deletes user content.
+    pub fn archive(&mut self, id: &str, reason: &str) -> Result<ArchivedSkill> {
+        let Some(record) = self.find(id, Some(CapabilityLevel::Global), None)? else {
+            bail!("SKILL_NOT_FOUND: no skill with id {id}");
+        };
+        let document = PathBuf::from(&record.path);
+        // A directory-shaped skill is one unit: its sibling resources travel
+        // with the document, or a restore would bring back a broken skill.
+        let unit = if document.file_name().and_then(|name| name.to_str()) == Some("SKILL.md") {
+            document
+                .parent()
+                .map(Path::to_path_buf)
+                .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: skill document has no directory"))?
+        } else {
+            document.clone()
+        };
+        let unix_name = unit
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: skill unit has no name"))?
+            .to_string();
+
+        let archived_at = chrono::Utc::now();
+        let entry_id = format!(
+            "{}-{}",
+            archived_at.format("%Y%m%d-%H%M%S"),
+            path_stem_for_id(Path::new(id))
+        );
+        let staged_root = self.archive_root().join(&entry_id);
+        fs::create_dir_all(&staged_root)
+            .with_context(|| format!("SKILL_ARCHIVE_WRITE: {}", staged_root.display()))?;
+        let staged = staged_root.join(&unix_name);
+        if unit.is_dir() {
+            copy_directory_tree(&unit, &staged, false)?;
+            fs::remove_dir_all(&unit)?;
+        } else {
+            fs::copy(&unit, &staged)?;
+            fs::remove_file(&unit)?;
+        }
+
+        // The enabled bit belonged to the catalog row; the archived document has
+        // no row until it comes back.
+        self.state
+            .forget(SKILL_KIND, CapabilityLevel::Global, id, None)?;
+
+        let entry = ArchivedSkill {
+            entry_id,
+            skill_id: record.id.clone(),
+            name: record.name.clone(),
+            reason: reason.to_string(),
+            archived_at: archived_at.to_rfc3339(),
+            original_path: unit.to_string_lossy().into_owned(),
+            path: staged.to_string_lossy().into_owned(),
+            restored_at: None,
+        };
+        let mut entries = self.read_archive_index();
+        entries.push(entry.clone());
+        self.write_archive_index(&entries)?;
+        Ok(entry)
+    }
+
+    /// Put an archived skill back where it came from. A path that is occupied
+    /// again is a conflict, not an overwrite.
+    pub fn restore(&mut self, entry_id: &str) -> Result<UserSkillRecord> {
+        let mut entries = self.read_archive_index();
+        let index = entries
+            .iter()
+            .position(|entry| entry.entry_id == entry_id)
+            .ok_or_else(|| anyhow::anyhow!("SKILL_ARCHIVE_NOT_FOUND: {entry_id}"))?;
+        let entry = entries[index].clone();
+        if entry.restored_at.is_some() {
+            bail!("SKILL_ARCHIVE_ALREADY_RESTORED: {entry_id}");
+        }
+        let original = PathBuf::from(&entry.original_path);
+        if original.exists() {
+            bail!("SKILL_ARCHIVE_CONFLICT: {} already exists", original.display());
+        }
+        if let Some(parent) = original.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let staged = PathBuf::from(&entry.path);
+        if staged.is_dir() {
+            copy_directory_tree(&staged, &original, false)?;
+        } else {
+            fs::copy(&staged, &original)?;
+        }
+        fs::remove_dir_all(self.archive_root().join(&entry.entry_id)).ok();
+
+        entries[index].restored_at = Some(chrono::Utc::now().to_rfc3339());
+        self.write_archive_index(&entries)?;
+        self.find(&entry.skill_id, Some(CapabilityLevel::Global), None)?
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: restored skill was not found"))
     }
 
     pub fn set_enabled(

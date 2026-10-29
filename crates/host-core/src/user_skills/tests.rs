@@ -786,3 +786,156 @@ fn directory_skill_package_rejects_traversal() {
         assert!(!app.path().join("outside.txt").exists());
     });
 }
+
+fn directory_skill(registry: &mut UserSkillRegistry, name: &str) -> UserSkillRecord {
+    let record = registry
+        .create(UserSkillInput {
+            name: Some(name.into()),
+            level: Some("global".into()),
+            description: Some("Check the relevant files before changing them".into()),
+            body: Some("Read the diff, then make the smallest change.".into()),
+            shape: Some("dir".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    registry
+        .write_package_files(
+            &record.id,
+            CapabilityLevel::Global,
+            None,
+            &[("data/notes.txt".into(), b"keep me".to_vec())],
+        )
+        .unwrap();
+    record
+}
+
+#[test]
+fn archiving_moves_the_whole_directory_skill_and_restore_puts_it_back() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let record = directory_skill(&mut registry, "Review");
+        let unit = Path::new(&record.path).parent().unwrap().to_path_buf();
+        assert!(unit.is_dir());
+
+        let entry = registry.archive(&record.id, "duplicate of review-v2").unwrap();
+        assert_eq!(entry.skill_id, record.id);
+        assert_eq!(entry.reason, "duplicate of review-v2");
+        assert!(!unit.exists(), "the catalog must stop seeing an archived skill");
+        assert!(registry.list(CapabilityLevel::Global, None).unwrap().is_empty());
+        let staged = PathBuf::from(&entry.path);
+        assert!(staged.join("SKILL.md").is_file());
+        assert_eq!(
+            fs::read(staged.join("data").join("notes.txt")).unwrap(),
+            b"keep me".to_vec()
+        );
+
+        let restored = registry.restore(&entry.entry_id).unwrap();
+        assert_eq!(restored.id, record.id);
+        assert!(unit.join("SKILL.md").is_file());
+        assert_eq!(
+            fs::read(unit.join("data").join("notes.txt")).unwrap(),
+            b"keep me".to_vec(),
+            "a directory skill must come back whole"
+        );
+        let archived = registry.archived().unwrap();
+        assert_eq!(archived.len(), 1);
+        assert!(archived[0].restored_at.is_some(), "the history stays auditable");
+    });
+}
+
+#[test]
+fn archiving_forgets_the_enabled_state_and_restore_starts_from_the_default() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let record = directory_skill(&mut registry, "Review");
+        registry
+            .set_enabled(&record.id, false, Some(CapabilityLevel::Global), None)
+            .unwrap();
+        let entry = registry.archive(&record.id, "idle").unwrap();
+        let state = fs::read_to_string(app.path().join("agent-capabilities").join("skills.json"))
+            .unwrap_or_default();
+        assert!(
+            !state.contains(&record.id),
+            "an archived skill keeps no catalog state: {state}"
+        );
+        let restored = registry.restore(&entry.entry_id).unwrap();
+        assert!(restored.enabled, "a restored skill is back on by default");
+    });
+}
+
+#[test]
+fn restore_refuses_a_path_that_is_occupied_again() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let record = directory_skill(&mut registry, "Review");
+        let unit = Path::new(&record.path).parent().unwrap().to_path_buf();
+        let entry = registry.archive(&record.id, "idle").unwrap();
+        // A later skill took the same directory name; restoring must not overwrite it.
+        fs::create_dir_all(&unit).unwrap();
+        fs::write(unit.join("SKILL.md"), "someone else's skill").unwrap();
+        let failure = registry.restore(&entry.entry_id).unwrap_err().to_string();
+        assert!(failure.contains("SKILL_ARCHIVE_CONFLICT"), "{failure}");
+        assert_eq!(
+            fs::read_to_string(unit.join("SKILL.md")).unwrap(),
+            "someone else's skill"
+        );
+    });
+}
+
+#[test]
+fn curate_reads_the_activity_ledger_and_spares_the_used_skill() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let used = directory_skill(&mut registry, "Shared Review");
+        let idle = directory_skill(&mut registry, "Legacy Review");
+        let ledger = home.path().join("skills").join(".skill-learning");
+        fs::create_dir_all(&ledger).unwrap();
+        fs::write(
+            ledger.join("usage.json"),
+            serde_json::json!({
+                used.id.clone(): {
+                    "use_count": 7,
+                    "patch_count": 1,
+                    "pinned": false,
+                    "last_activity_at": "2026-10-28T00:00:00.000Z"
+                },
+                idle.id.clone(): {
+                    "use_count": 0,
+                    "patch_count": 0,
+                    "pinned": false,
+                    "last_activity_at": "2025-01-01T00:00:00.000Z"
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let plan = registry.curate(&CuratorPolicy::default()).unwrap();
+        let by_id = |id: &str| plan.iter().find(|candidate| candidate.id == id).cloned();
+        let used_row = by_id(&used.id).expect("used skill planned");
+        assert_eq!(used_row.use_count, 7);
+        assert!(
+            !used_row
+                .findings
+                .iter()
+                .any(|finding| matches!(finding, crate::user_skills::curator::CuratorFinding::Stale { .. })),
+            "a used skill is never stale: {used_row:?}"
+        );
+        let idle_row = by_id(&idle.id).expect("idle skill planned");
+        assert!(
+            idle_row
+                .findings
+                .iter()
+                .any(|finding| matches!(finding, crate::user_skills::curator::CuratorFinding::Stale { .. })),
+            "an idle skill is stale: {idle_row:?}"
+        );
+    });
+}

@@ -222,3 +222,45 @@ export type UserSubagentInput = {
   enabled?: boolean;
   scope?: ActivationScope;
 };
+
+/**
+ * One signal the curator found on a skill. `kind` discriminates the payload so a
+ * row can explain itself without the renderer re-deriving the reason.
+ */
+export type SkillCuratorFinding =
+  | { kind: "duplicate"; keeper: string; similarity: number }
+  | { kind: "stale"; idleDays: number; useCount: number }
+  | { kind: "thin"; bodyChars: number }
+  | { kind: "pinned" };
+
+export type SkillCuratorSuggestion = "keep" | "archive";
+
+/** What the curator thinks of one skill. A suggestion, never an action. */
+export type SkillCuratorCandidate = {
+  id: string;
+  name: string;
+  suggestion: SkillCuratorSuggestion;
+  findings: SkillCuratorFinding[];
+  useCount: number;
+  idleDays: number | null;
+  enabled: boolean;
+};
+
+/** Thresholds for one sweep; omit to take the host defaults. */
+export type SkillCuratorPolicy = {
+  duplicateSimilarity: number;
+  staleAfterDays: number;
+  thinBodyChars: number;
+};
+
+/** A skill that was moved out of the library, and whether it came back. */
+export type ArchivedSkill = {
+  entryId: string;
+  skillId: string;
+  name: string;
+  reason: string;
+  archivedAt: string;
+  originalPath: string;
+  path: string;
+  restoredAt?: string;
+};

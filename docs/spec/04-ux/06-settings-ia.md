@@ -689,6 +689,12 @@ system while preserving their different data ownership:
   so the switch is still the way back on, and the next catalog load stops
   offering it to `Task`. Reveal and delete remain absent because a builtin is
   not a file.
+- The Skills toolbar carries a **Curate** action beside New and Market. It opens one inline
+  section above the list, refreshed every time it opens, that lists only the rows the host marked
+  `archive`, each with its findings in words (duplicate of `<keeper>`, idle for `<days>`, thin
+  content, kept on purpose) and a single Archive button. Below them sits the archive itself,
+  newest first: every entry can be restored, and an entry that was already restored stays listed
+  as history (ADR 0374). Nothing in this section deletes a document.
 - The level filter narrows which groups the panel renders; it never hides the
   toolbar or moves the actions. New capabilities are created at the level the
   filter points at — Global under All or Global, Project under Project — and
@@ -1052,6 +1058,9 @@ system while preserving their different data ownership:
 23. Removing a capability requires two presses of the same menu item, the
     second press labelled as the confirmation, and the arming lapses on its own
     if the menu is dismissed
+23a. Curating a skill library proposes only duplicates and idle rows, archives
+    by moving the document into the host archive, and restores it from there;
+    a pinned or thin row is reported but never archived, and no step deletes
 24. Revealing a skill opens its file in the global library, and a project-level
     skill request is refused rather than resolved to a project directory
 25. Toggling one capability leaves every other row interactive, does not

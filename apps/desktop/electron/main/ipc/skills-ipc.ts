@@ -1,6 +1,6 @@
 import { app, dialog, shell } from "electron";
 import { importSkillFolders, readLastSkillImportDirectory, writeLastSkillImportDirectory } from "../skill-folder-import";
-import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type UserSkillRecord, type UserSubagentRecord } from "@pi-desktop/shared";
+import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type SkillCuratorPolicy, type UserSkillRecord, type UserSubagentRecord } from "@pi-desktop/shared";
 import { loadSubagentDefinitions, type UserSubagentDocument } from "@pi-desktop/agent-runtime";
 import { builtinSkillCatalog } from "../builtin-skills";
 import type { HostProcess } from "../host-process";
@@ -321,6 +321,36 @@ export function registerSkillsIpc({
    * with the id because `skills.read` falls back to the global directory when
    * they are absent, which never resolves a project-only document.
    */
+  handle(
+    IPC.invoke.skillCurate,
+    async (payload?: { policy?: Partial<SkillCuratorPolicy> }) => {
+      if (!host) throw new Error("host unavailable");
+      return host.call("skills.curate", payload ?? {});
+    },
+  );
+
+  handle(
+    IPC.invoke.skillArchive,
+    async (payload: { id: string; reason?: string }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("skills.archive", payload);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return res;
+    },
+  );
+
+  handle(IPC.invoke.skillArchived, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("skills.archived", {});
+  });
+
+  handle(IPC.invoke.skillRestore, async (payload: { entryId: string }) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("skills.restore", payload);
+    sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+    return res;
+  });
+
   handle(
     IPC.invoke.skillReveal,
     async (payload: string | ({ id: string } & Partial<AgentCapabilityQuery>)) => {

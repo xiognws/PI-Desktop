@@ -156,6 +156,9 @@ import type {
   TrustedExtensionUiPromptResponse,
   SessionTodoSnapshot,
   StorageInfo,
+  ArchivedSkill,
+  SkillCuratorCandidate,
+  SkillCuratorPolicy,
 } from "@pi-desktop/shared";
 import {
   defaultCommandShellForPlatform,
@@ -1498,6 +1501,22 @@ export const api = {
    */
   transferUserSkill: (move: AgentCapabilityMove) =>
     invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillTransfer, move),
+  /**
+   * Ask the curator what it would archive. Read-only: the answer is a proposal,
+   * and `archiveUserSkill` is the only thing that moves a document.
+   */
+  curateUserSkills: (policy?: Partial<SkillCuratorPolicy>) =>
+    invoke<{ candidates: SkillCuratorCandidate[]; policy: SkillCuratorPolicy }>(
+      IPC.invoke.skillCurate,
+      { policy },
+    ),
+  /** Move one skill into the archive. Reversible through `restoreUserSkill`. */
+  archiveUserSkill: (id: string, reason?: string) =>
+    invoke<{ entry: ArchivedSkill }>(IPC.invoke.skillArchive, { id, reason }),
+  listArchivedUserSkills: () =>
+    invoke<{ entries: ArchivedSkill[] }>(IPC.invoke.skillArchived),
+  restoreUserSkill: (entryId: string) =>
+    invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillRestore, { entryId }),
   /**
    * Level and project must travel with the id: a project skill has no global
    * counterpart to fall back to, so resolving by id alone would miss it.

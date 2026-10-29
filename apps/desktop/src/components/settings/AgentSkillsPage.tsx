@@ -3,7 +3,10 @@ import { useTranslation } from "react-i18next";
 import {
   GLOBAL_SCOPE,
   type AgentCapabilityLevel,
+  type ArchivedSkill,
   type BuiltinSkillRecord,
+  type SkillCuratorCandidate,
+  type SkillCuratorFinding,
   type UserSkillRecord,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
@@ -32,12 +35,15 @@ import {
   type SkillDraft,
 } from "./SkillEditorSheet";
 import {
+  IconArchive,
+  IconArchiveRestore,
   IconBookOpen,
   IconDownload,
   IconFileText,
   IconFolderOpen,
   IconPencil,
   IconPlus,
+  IconSparkles,
   IconTrash,
 } from "../icons";
 import { SkillMarketPanel } from "./SkillMarketPanel";
@@ -63,6 +69,18 @@ type SkillCollection = {
 };
 
 const EMPTY_SKILL_COLLECTION: SkillCollection = { builtins: [], global: [] };
+
+/**
+ * What the curation panel shows. The plan is a proposal, so it is fetched when
+ * the panel opens and never cached across visits: age and usage move.
+ */
+type CuratorState = {
+  loading: boolean;
+  candidates: SkillCuratorCandidate[];
+  archived: ArchivedSkill[];
+};
+
+const EMPTY_CURATOR: CuratorState = { loading: false, candidates: [], archived: [] };
 
 export function AgentSkillsPage() {
   const { t } = useTranslation();
@@ -93,6 +111,8 @@ export function AgentSkillsPage() {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [editor, setEditor] = useState<SkillEditorState | null>(null);
   const [view, setView] = useState<"skills" | "market">("skills");
+  const [curatorOpen, setCuratorOpen] = useState(false);
+  const [curator, setCurator] = useState<CuratorState>(EMPTY_CURATOR);
   const [saving, setSaving] = useState(false);
   const { armed, setArmed } = useArmedDelete();
 
@@ -397,6 +417,89 @@ export function AgentSkillsPage() {
     );
   };
 
+  /** One row of the plan, in the words the panel shows. */
+  const describeFinding = (finding: SkillCuratorFinding) => {
+    switch (finding.kind) {
+      case "duplicate":
+        return t("settings.skillCuratorReasonDuplicate", { keeper: finding.keeper });
+      case "stale":
+        return t("settings.skillCuratorReasonStale", { days: finding.idleDays });
+      case "thin":
+        return t("settings.skillCuratorReasonThin", { chars: finding.bodyChars });
+      default:
+        return t("settings.skillCuratorReasonPinned");
+    }
+  };
+
+  /**
+   * The archive record keeps a machine-readable reason, so an audit can tell an
+   * accepted duplicate from a manual archive without re-running the plan.
+   */
+  const archiveReason = (candidate: SkillCuratorCandidate) =>
+    candidate.findings
+      .map((finding) =>
+        finding.kind === "duplicate"
+          ? `duplicate:${finding.keeper}`
+          : finding.kind === "stale"
+            ? `stale:${finding.idleDays}d`
+            : finding.kind,
+      )
+      .join(",") || "manual";
+
+  const loadCuration = useCallback(async () => {
+    setCurator((current) => ({ ...current, loading: true }));
+    try {
+      const [plan, archived] = await Promise.all([
+        api.curateUserSkills(),
+        api.listArchivedUserSkills(),
+      ]);
+      setCurator({
+        loading: false,
+        candidates: plan.candidates ?? [],
+        archived: archived.entries ?? [],
+      });
+    } catch (error) {
+      setCurator(EMPTY_CURATOR);
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    }
+  }, [showToast]);
+
+  const archiveSkill = async (candidate: SkillCuratorCandidate) => {
+    const key = `curator:${candidate.id}`;
+    if (!rowBusy.begin(key)) return;
+    try {
+      await api.archiveUserSkill(candidate.id, archiveReason(candidate));
+      await Promise.all([load(), loadCuration()]);
+      showToast(t("settings.skillCuratorArchiveDone", { name: candidate.name }), {
+        variant: "success",
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      rowBusy.end(key);
+    }
+  };
+
+  const restoreSkill = async (entry: ArchivedSkill) => {
+    const key = `restore:${entry.entryId}`;
+    if (!rowBusy.begin(key)) return;
+    try {
+      await api.restoreUserSkill(entry.entryId);
+      await Promise.all([load(), loadCuration()]);
+      showToast(t("settings.skillCuratorRestoreDone", { name: entry.name }), {
+        variant: "success",
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      rowBusy.end(key);
+    }
+  };
+
+  const archivable = curator.candidates.filter(
+    (candidate) => candidate.suggestion === "archive",
+  );
+
   const importButton = (
     <>
       <CapabilityButton
@@ -470,6 +573,17 @@ export function AgentSkillsPage() {
                 <IconPlus size={14} />
                 {t("settings.newSkill")}
               </CapabilityButton>
+              <CapabilityButton
+                busy={curator.loading}
+                onClick={() => {
+                  const next = !curatorOpen;
+                  setCuratorOpen(next);
+                  if (next) void loadCuration();
+                }}
+              >
+                <IconSparkles size={14} />
+                {t("settings.skillCuratorOpen")}
+              </CapabilityButton>
               {marketButton}
             </>
           }
@@ -492,6 +606,78 @@ export function AgentSkillsPage() {
             onImported={load}
           />
         </div>
+      </section>
+
+      <section
+        id="agent-skills-curator-panel"
+        className="settings-card-block import-inline-section"
+        hidden={!curatorOpen}
+      >
+        <div className="settings-card-heading-line">
+          <h3 className="settings-card-heading">{t("settings.skillCuratorTitle")}</h3>
+        </div>
+        <p className="settings-inline-hint">{t("settings.skillCuratorHint")}</p>
+        {curator.loading ? (
+          <div className="sidebar-session-empty">{t("settings.skillCuratorScanning")}</div>
+        ) : archivable.length === 0 && curator.archived.length === 0 ? (
+          <CapabilityEmpty
+            message={t("settings.skillCuratorEmpty")}
+            icon={<IconSparkles size={18} />}
+          />
+        ) : (
+          <>
+            {archivable.map((candidate) => (
+              <CapabilityRow
+                key={`curator:${candidate.id}`}
+                glyph={<IconSparkles size={16} />}
+                name={candidate.name}
+                description={candidate.findings.map(describeFinding).join(" \u00b7 ")}
+                actions={
+                  <CapabilityButton
+                    busy={rowBusy.isBusy(`curator:${candidate.id}`)}
+                    onClick={() => void archiveSkill(candidate)}
+                  >
+                    <IconArchive size={14} />
+                    {t("settings.skillCuratorArchive")}
+                  </CapabilityButton>
+                }
+              />
+            ))}
+            {curator.archived.length > 0 ? (
+              <>
+                <CapabilityGroupHeader
+                  label={t("settings.skillCuratorArchived", {
+                    count: curator.archived.length,
+                  })}
+                  count={curator.archived.length}
+                />
+                {curator.archived.map((entry) => (
+                  <CapabilityRow
+                    key={entry.entryId}
+                    glyph={<IconArchiveRestore size={16} />}
+                    name={entry.name}
+                    description={
+                      entry.restoredAt
+                        ? t("settings.skillCuratorRestoreDone", { name: entry.name })
+                        : entry.reason
+                    }
+                    actions={
+                      entry.restoredAt ? undefined : (
+                        <CapabilityButton
+                          busy={rowBusy.isBusy(`restore:${entry.entryId}`)}
+                          onClick={() => void restoreSkill(entry)}
+                        >
+                          <IconArchiveRestore size={14} />
+                          {t("settings.skillCuratorRestore")}
+                        </CapabilityButton>
+                      )
+                    }
+                  />
+                ))}
+              </>
+            ) : null}
+          </>
+        )}
       </section>
 
       <CapabilityPanel

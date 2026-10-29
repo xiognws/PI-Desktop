@@ -396,3 +396,4 @@ Each ADR includes:
 | 0371 | [Durable agent memory lives in host-core SQLite, keyword-first](0371-memory-store.md) | Accepted for implementation |
 | 0372 | [One data root per installation, linked from the home directory](0372-home-data-root-and-links.md) | Accepted |
 | 0373 | [One flat skill library — skills have no project level](0373-flat-skill-library.md) | Accepted |
+| 0374 | [Skill curation proposes, archives, never deletes](0374-skill-curation.md) | Accepted |
