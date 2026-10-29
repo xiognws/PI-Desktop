@@ -269,10 +269,12 @@ test("the rejected catalog-browser styles are gone from the cascade", () => {
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test("model ids are copyable and a configured model can carry an alias", () => {
+test("model ids stay copyable and a configured model can carry an alias", () => {
   // The shell is non-selectable, so the id/name text opts back in.
   assert.match(pickerSource, /provider-models-row-copy selectable/);
-  assert.match(pickerSource, /provider-chosen-row-id font-mono selectable/);
+  // The row shows the configured name only: the service's model list already
+  // carries the id, so renaming does not leave a second copy behind.
+  assert.doesNotMatch(pickerSource, /provider-chosen-row-id is-origin/);
   // A drag-selection inside the row is a copy gesture, not a checkbox toggle.
   // The guard is row-scoped, so a stale selection elsewhere on the page cannot
   // cancel a plain click or the Space key's synthetic click.
@@ -285,9 +287,13 @@ test("model ids are copyable and a configured model can carry an alias", () => {
   assert.match(pickerSource, /event\.target instanceof HTMLInputElement/);
   assert.match(pickerSource, /event\.preventDefault\(\)/);
   assert.doesNotMatch(pickerSource, /window\.getSelection\(\)\?\.toString\(\)/);
-  // The display name is edited in place on the row, beside the id it renames.
+  // The name to edit is the name shown: the field is seeded with the alias when
+  // set and with the model id otherwise, so renaming never means copying the id.
   assert.match(pickerSource, /settings\.modelAlias/);
+  assert.match(pickerSource, /aliasDrafts\[binding\.id\] \?\? \(binding\.alias\?\.trim\(\) \|\| binding\.id\)/);
   assert.match(pickerSource, /updateBinding\(binding\.id, \{/);
+  // Keeping or restoring the id clears the alias instead of storing a no-op.
+  assert.match(pickerSource, /trimmed === binding\.id \? undefined : next/);
   // The 60-character cap counts Unicode scalars, matching host-core.
   assert.match(pickerSource, /\[\.\.\.event\.target\.value\]\.slice\(0, 60\)/);
   assert.match(pickerSource, /provider-chosen-alias-input/);

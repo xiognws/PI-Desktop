@@ -519,11 +519,15 @@ a usage tab.
     levels, and the default thinking level. The row keeps the model ID,
     source, capabilities, and token limits visible at a glance in one shared
     compact form that keeps neighbouring windows apart (`1.05M · 128K`), and
-    expands in place for edits. The display name is edited **on the row itself**,
-    beside the id it renames: an alias there is what the whole app shows, which
-    is how two providers serving the same model id stay apart
-    (`CX-deepseek-v4.1` / `TX-deepseek-v4.1`), and the field carries its
-    explanation as a title tooltip rather than a paragraph. The expanded body is
+    expands in place for edits. The display name **is the row's name field**: it
+    opens showing the model id, so renaming is a prefix typed in place instead of
+    the id copied into a second box, and it is what the whole app shows, which is
+    how two providers serving the same model id stay apart
+    (`CX-deepseek-v4.1` / `TX-deepseek-v4.1`). The row shows only that name —
+    the id stays visible in the service's model list, so a renamed row does not
+    repeat it — and keeping or restoring the id removes the alias. The field
+    carries its explanation as a title tooltip rather than a paragraph. The
+    expanded body is
     a compact sheet, not a stacked
     form dump: 2xs labels, dense numeric fields without native spinners, the
     default thinking selector on the thinking label row, and attachments plus

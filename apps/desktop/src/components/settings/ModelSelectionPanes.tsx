@@ -278,6 +278,10 @@ export function ModelSelectionPanes({
   const [customModelError, setCustomModelError] = useState("");
   // Keep selections scannable; advanced settings stay folded until requested.
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
+  // Renaming happens in the field that already shows the model, so while it has
+  // focus the text is a draft: an empty box or the original id means "no alias"
+  // and the row falls back to the id once the draft is dropped.
+  const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
 
   // The returned list is short and already local, so filtering is client-side:
   // no host search and no debounced IPC round trip.
@@ -686,32 +690,44 @@ export function ModelSelectionPanes({
                     >
                       <IconGripVertical size={14} aria-hidden />
                     </button>
-                    <span className="provider-chosen-row-id font-mono selectable">
-                      {binding.id}
-                    </span>
-                    {/* The name the rest of the app shows, edited in place: an
-                        alias keeps two providers that serve the same model id
-                        apart ("CX-deepseek-v4.1" / "TX-deepseek-v4.1"). It sits
-                        on every row instead of inside the Advanced body, because
-                        the id is the primary label and a hidden rename field is
-                        one the user never finds. */}
+                    {/* The name is the field: it opens showing the model id, so a
+                        rename is a prefix typed in place instead of the id copied
+                        into a second box. An alias keeps two providers that serve
+                        the same model id apart ("CX-deepseek-v4.1" /
+                        "TX-deepseek-v4.1"). The id itself stays visible in the
+                        service's model list, so the row does not repeat it. */}
                     <label
                       className="provider-chosen-row-name"
                       title={t("settings.modelAliasHint")}
                     >
                       <Input
-                        className="provider-chosen-alias-input"
-                        value={binding.alias ?? ""}
-                        placeholder={t("settings.modelAliasPlaceholder")}
+                        className="provider-chosen-alias-input font-mono"
+                        value={aliasDrafts[binding.id] ?? (binding.alias?.trim() || binding.id)}
                         aria-label={t("settings.modelAlias")}
                         spellCheck={false}
                         autoCorrect="off"
                         autoCapitalize="off"
-                        onChange={(event) =>
+                        onFocus={() =>
+                          setAliasDrafts((current) => ({
+                            ...current,
+                            [binding.id]: binding.alias?.trim() || binding.id,
+                          }))
+                        }
+                        onChange={(event) => {
+                          // Host-core caps the alias at 60 Unicode scalars, so
+                          // clamp by code point rather than UTF-16 unit.
+                          const next = [...event.target.value].slice(0, 60).join("");
+                          setAliasDrafts((current) => ({ ...current, [binding.id]: next }));
+                          const trimmed = next.trim();
                           updateBinding(binding.id, {
-                            // Host-core caps the alias at 60 Unicode scalars, so
-                            // clamp by code point rather than UTF-16 unit.
-                            alias: [...event.target.value].slice(0, 60).join(""),
+                            alias: trimmed === "" || trimmed === binding.id ? undefined : next,
+                          });
+                        }}
+                        onBlur={() =>
+                          setAliasDrafts((current) => {
+                            const next = { ...current };
+                            delete next[binding.id];
+                            return next;
                           })
                         }
                       />
