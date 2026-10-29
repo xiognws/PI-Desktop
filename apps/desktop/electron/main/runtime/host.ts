@@ -9,6 +9,7 @@ import type { RuntimeState } from "./context";
 import type { FinishTurn } from "./plans";
 import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
 import { createRemoteWorkspaceToolRelay, type RemoteWorkspaceToolRequest } from "../remote/remote-workspace-tools";
+import { reapplyWindowCorners } from "../window-native-corners.ts";
 
 export type HostRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -399,6 +400,9 @@ export function createHostRuntime({
     logger.app("runtime", "info", "host-core handshake ok", {
       data: { generation: h.generation },
     });
+    // Window chrome was created before this host existed; apply what it asked
+    // for now that a method call will actually be accepted.
+    reapplyWindowCorners();
     void importLegacyScheduled();
     // Drain before the renderer can session.get. Assistant/tool rows live in
     // this outbox until host-core appends them; a cold start that raced the

@@ -1,4 +1,5 @@
 import type { BrowserWindow, Screen } from "electron";
+import { callAfterHandshake, isHandshakeRace } from "./host-handshake-retry.ts";
 import type { HostProcess } from "./host-process";
 import type { Logger } from "./logger";
 import { isWindowFullScreen } from "./window-fullscreen.ts";
@@ -9,6 +10,15 @@ import {
 } from "./window-shape.ts";
 
 const controllers = new WeakMap<BrowserWindow, NativeCornerController>();
+
+/**
+ * A controller whose current radius can be read back, so the hint can be
+ * re-applied after the host becomes ready.
+ */
+export type PendingCornerController = NativeCornerController & { readonly radius: number };
+
+/** Controllers waiting for a host that is ready to take the DWM hint. */
+const awaitingControllers = new Set<PendingCornerController>();
 
 export type NativeCornerController = {
   setRadius: (radius: number) => Promise<number>;
@@ -69,27 +79,47 @@ export async function installWindows11CornerController(
     const rounded = radius > 0 && !window.isMaximized() && !isWindowFullScreen(window);
     const operation = pending.catch(() => undefined).then(async () => {
       if (disposed || window.isDestroyed() || requestGeneration !== generation) return;
-      const host = getHost();
-      if (!host) throw new Error("host-core is unavailable for native window corners");
-      await host.call("window.setNativeCornerPreference", {
-        nativeHandle,
-        ownerPid: process.pid,
-        preference: rounded ? "round" : "square",
-      }, 5_000);
+      // The window is created before the host exists, let alone finishes its
+      // handshake, so this hint can arrive when there is no host yet or while the
+      // host still refuses every method. Both are retried here instead of being
+      // reported as a corner failure on every cold start. The budget covers a
+      // measured cold start where the host only handshakes ~7s after the window
+      // (proxy relay and sidecar setup run in between).
+      await callAfterHandshake(
+        async () => {
+          const host = getHost();
+          if (!host) throw new Error("host-core is unavailable for native window corners");
+          await host.call("window.setNativeCornerPreference", {
+            nativeHandle,
+            ownerPid: process.pid,
+            preference: rounded ? "round" : "square",
+          }, 5_000);
+        },
+        { attempts: 5, delayMs: 300 },
+      );
     });
     pending = operation;
     return operation;
   };
 
   const reportFailure = (error: unknown) => {
-    logger.app("lifecycle", "warn", "native window corner preference failed", {
-      data: String(error),
-    });
+    // A host that is not up yet is the normal cold-start state, not a defect:
+    // the hint is re-applied from `reapplyWindowCorners` once the handshake
+    // lands. Only a failure after that is worth a warning.
+    logger.app(
+      "lifecycle",
+      isHandshakeRace(error) ? "debug" : "warn",
+      "native window corner preference failed",
+      { data: String(error) },
+    );
   };
   const reapply = () => {
     void enqueue().catch(reportFailure);
   };
-  const controller: NativeCornerController = {
+  const controller: PendingCornerController = {
+    get radius() {
+      return radius;
+    },
     async setRadius(nextRadius) {
       radius = normalizeWindowCornerRadius(nextRadius);
       try {
@@ -129,6 +159,7 @@ export async function installWindows11CornerController(
 
   const dispose = () => {
     disposed = true;
+    awaitingControllers.delete(controller);
     window.removeListener("maximize", reapply);
     window.removeListener("unmaximize", reapply);
     window.removeListener("enter-full-screen", reapply);
@@ -143,13 +174,27 @@ export async function installWindows11CornerController(
   };
   window.once("closed", dispose);
 
-  try {
-    await controller.setRadius(radius);
-  } catch {
-    // Keep startup available when the backend cannot apply the optional DWM
-    // hint. The failure is logged; Windows may still apply its default policy.
-  }
+  // Not awaited: window creation runs before the host exists, so waiting here
+  // would hold the first paint for the length of the retry budget. The hint is
+  // applied again when the handshake lands; Windows keeps its default policy
+  // until then.
+  awaitingControllers.add(controller);
+  void controller.setRadius(radius).catch(() => undefined);
   return controller;
+}
+
+/**
+ * Apply every installed controller's current radius again.
+ *
+ * Called once the host handshake lands: window creation runs before the host
+ * exists, so the first attempt can only fail, and the DWM hint would otherwise
+ * stay unapplied for the life of the process.
+ */
+export function reapplyWindowCorners(): void {
+  for (const controller of awaitingControllers) {
+    const radius = controller.radius;
+    void controller.setRadius(radius).catch(() => undefined);
+  }
 }
 
 /** Apply a theme's requested radius through DWM or the legacy Windows path. */
