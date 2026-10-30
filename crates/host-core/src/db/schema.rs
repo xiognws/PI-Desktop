@@ -93,6 +93,44 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
 /// Same DDL as the fresh schema, exposed for the v26 -> v27 migration.
 pub(crate) const MEMORIES_DDL: &str = memories_ddl!();
 
+/// Proposals the extraction pass writes and the memory panel reviews. A
+/// proposal is not a memory: it becomes one only when a person accepts it, so a
+/// model can suggest without ever writing to the store on its own (ADR 0376).
+macro_rules! memory_proposals_ddl {
+    () => {
+        r#"
+CREATE TABLE IF NOT EXISTS memory_proposals (
+  id            TEXT PRIMARY KEY,
+  scope         TEXT NOT NULL CHECK (scope IN ('global', 'project', 'session')),
+  project_path  TEXT,
+  session_id    TEXT,
+  kind          TEXT NOT NULL,
+  title         TEXT NOT NULL,
+  body          TEXT NOT NULL,
+  tags          TEXT NOT NULL DEFAULT '[]',
+  confidence    REAL NOT NULL DEFAULT 0.6,
+  content_hash  TEXT NOT NULL,
+  origin        TEXT NOT NULL DEFAULT 'turn',
+  created_at    INTEGER NOT NULL,
+  decided_at    INTEGER,
+  decision      TEXT CHECK (decision IS NULL OR decision IN ('accepted', 'rejected')),
+  CHECK ((scope = 'project') = (project_path IS NOT NULL)),
+  CHECK ((scope = 'session') = (session_id IS NOT NULL))
+);
+-- One open proposal per content hash and scope: a model that proposes the same
+-- fact twice in a row must not queue two reviews.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_proposals_open
+  ON memory_proposals(content_hash, scope, ifnull(project_path, ''), ifnull(session_id, ''))
+  WHERE decision IS NULL;
+CREATE INDEX IF NOT EXISTS idx_memory_proposals_pending
+  ON memory_proposals(created_at DESC) WHERE decision IS NULL;
+"#
+    };
+}
+
+/// Same DDL as the fresh schema, exposed for the v27 -> v28 migration.
+pub(crate) const MEMORY_PROPOSALS_DDL: &str = memory_proposals_ddl!();
+
 pub(crate) const SCHEMA_LATEST: &str = concat!(
     r#"
 CREATE TABLE kv (
@@ -182,6 +220,7 @@ CREATE INDEX idx_sessions_deleted ON sessions(deleted_at) WHERE deleted_at IS NO
 "#,
     session_todo_ddl!(),
     memories_ddl!(),
+    memory_proposals_ddl!(),
     r#"
 
 CREATE TABLE session_import_origins (

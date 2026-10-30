@@ -172,4 +172,16 @@ export function registerMemoryIpc({
   registrar.handle(IPC.invoke.memoryRestore, async (input?: unknown) =>
     forward("memory.restore", idParams(input, undefined)),
   );
+  registrar.handle(IPC.invoke.memoryPropose, async (input?: unknown) =>
+    forward("memory.propose", input && typeof input === "object" ? input : {}),
+  );
+  registrar.handle(IPC.invoke.memoryProposals, async (input?: unknown) =>
+    forward("memory.proposals", input && typeof input === "object" ? input : {}),
+  );
+  registrar.handle(IPC.invoke.memoryAcceptProposal, async (input?: unknown) =>
+    forward("memory.acceptProposal", idParams(input, undefined)),
+  );
+  registrar.handle(IPC.invoke.memoryRejectProposal, async (input?: unknown) =>
+    forward("memory.rejectProposal", idParams(input, undefined)),
+  );
 }

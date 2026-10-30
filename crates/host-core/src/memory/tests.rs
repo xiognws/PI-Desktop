@@ -1,5 +1,5 @@
 use super::*;
-use crate::db::Database;
+use crate::db::{Database, SCHEMA_VERSION};
 
 fn db() -> (Database, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
@@ -423,7 +423,11 @@ fn opening_a_v25_database_migrates_instead_of_failing() {
         .conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 27, "v25 database must be migrated to v27");
+    assert_eq!(
+        version,
+        SCHEMA_VERSION,
+        "a v25 database must be migrated to the current schema"
+    );
     let rows: i64 = db
         .conn
         .query_row("SELECT count(*) FROM memories", [], |row| row.get(0))
@@ -522,4 +526,84 @@ fn the_automatic_sweep_retires_instead_of_deleting() {
     let row = db.get_memory(&stored.memory.id).expect("the row survives the sweep");
     assert!(row.valid_until.is_some(), "the sweep stops recalling it");
     assert!(recall_into(&db, "stale build flag", "/work/alpha", "s1").is_empty());
+}
+
+fn proposal(title: &str, body: &str) -> NewMemoryProposal {
+    NewMemoryProposal {
+        scope: MemoryScope::Project,
+        project_path: Some("/work/alpha".to_string()),
+        session_id: None,
+        kind: MemoryKind::Fact,
+        title: title.to_string(),
+        body: body.to_string(),
+        tags: Vec::new(),
+        confidence: Some(0.6),
+        origin: "turn".to_string(),
+    }
+}
+
+#[test]
+fn a_proposal_queues_without_becoming_a_memory() {
+    let (db, _dir) = db();
+    let queued = db
+        .propose_memory(proposal("Build flag", "Release builds need --locked"))
+        .unwrap()
+        .expect("queued");
+    assert!(queued.decision.is_none());
+    assert!(db.list_memories(&ListFilter::default()).unwrap().0.is_empty());
+    assert_eq!(db.list_memory_proposals(false, 10).unwrap().len(), 1);
+}
+
+#[test]
+fn a_proposal_the_store_already_believes_is_not_queued() {
+    let (db, _dir) = db();
+    db.remember(project_memory("Build flag", "Release builds need --locked", "/work/alpha"))
+        .unwrap();
+    assert!(db
+        .propose_memory(proposal("Build flag", "Release builds need --locked"))
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn the_same_open_proposal_is_never_queued_twice() {
+    let (db, _dir) = db();
+    assert!(db
+        .propose_memory(proposal("Port note", "Dev server listens on 5173"))
+        .unwrap()
+        .is_some());
+    assert!(db
+        .propose_memory(proposal("Port note", "Dev server listens on 5173"))
+        .unwrap()
+        .is_none());
+    assert_eq!(db.list_memory_proposals(false, 10).unwrap().len(), 1);
+}
+
+#[test]
+fn accepting_a_proposal_writes_the_memory_and_closes_the_proposal() {
+    let (db, _dir) = db();
+    let queued = db
+        .propose_memory(proposal("Build flag", "Release builds need --locked"))
+        .unwrap()
+        .unwrap();
+    let memory = db.accept_memory_proposal(&queued.id).unwrap().expect("memory");
+    assert_eq!(memory.title, "Build flag");
+    assert_eq!(memory.scope, MemoryScope::Project);
+    assert_eq!(recall_into(&db, "release builds", "/work/alpha", "s1").len(), 1);
+    assert!(db.list_memory_proposals(false, 10).unwrap().is_empty());
+    assert!(db.accept_memory_proposal(&queued.id).is_err(), "review happens once");
+}
+
+#[test]
+fn rejecting_a_proposal_never_writes_a_memory() {
+    let (db, _dir) = db();
+    let queued = db
+        .propose_memory(proposal("Noise", "A guess the model made"))
+        .unwrap()
+        .unwrap();
+    assert!(db.reject_memory_proposal(&queued.id).unwrap());
+    assert!(db.list_memories(&ListFilter::default()).unwrap().0.is_empty());
+    assert!(!db.reject_memory_proposal(&queued.id).unwrap(), "already decided");
+    let decided = db.list_memory_proposals(true, 10).unwrap();
+    assert_eq!(decided[0].decision.as_deref(), Some("rejected"));
 }

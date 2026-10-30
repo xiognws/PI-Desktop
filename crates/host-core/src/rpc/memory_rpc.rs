@@ -29,6 +29,10 @@ pub(super) async fn handle(
         "memory.pinned" => pinned(state, params).await,
         "memory.forget" => forget(state, params).await,
         "memory.tidy" => tidy(state, params).await,
+        "memory.propose" => propose(state, params).await,
+        "memory.proposals" => proposals(state, params).await,
+        "memory.acceptProposal" => accept_proposal(state, params).await,
+        "memory.rejectProposal" => reject_proposal(state, params).await,
         "memory.decay" => decay(state, params).await,
         "memory.retire" => retire(state, params).await,
         "memory.restore" => restore(state, params).await,
@@ -325,6 +329,81 @@ async fn tidy(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonR
     Ok(
         json!({ "removed": outcome.total(), "expired": outcome.expired, "overflow": outcome.overflow }),
     )
+}
+
+/// Queue a candidate memory for review. Never writes a memory: the extraction
+/// pass proposes, a person accepts (ADR 0376).
+async fn propose(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
+    let kind_value = required_str(&params, "kind")?;
+    let kind = MemoryKind::parse(kind_value)
+        .map_err(|_| invalid(format!("unknown kind: {kind_value}")))?;
+    let project_path = optional_str(&params, "projectPath")?;
+    let session_id = optional_str(&params, "sessionId")?;
+    // Scope is server-side: a model that returns one cannot widen its own reach.
+    let scope = match scope_param(&params)? {
+        Some(scope) => scope,
+        None if project_path.is_some() => MemoryScope::Project,
+        None if session_id.is_some() => MemoryScope::Session,
+        None => MemoryScope::Global,
+    };
+    let tags = match params.get("tags") {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::Array(items)) => items
+            .iter()
+            .filter_map(|item| item.as_str())
+            .map(str::trim)
+            .filter(|tag| !tag.is_empty())
+            .map(str::to_string)
+            .collect(),
+        Some(_) => return Err(invalid("tags must be an array of strings")),
+    };
+    let confidence = params.get("confidence").and_then(Value::as_f64);
+    let origin = optional_str(&params, "origin")?.unwrap_or_else(|| "turn".to_string());
+    let input = crate::memory::NewMemoryProposal {
+        scope,
+        project_path: project_path.filter(|_| scope == MemoryScope::Project),
+        session_id: session_id.filter(|_| scope == MemoryScope::Session),
+        kind,
+        title: required_str(&params, "title")?.to_string(),
+        body: required_str(&params, "body")?.to_string(),
+        tags,
+        confidence,
+        origin,
+    };
+    let st = state.lock().await;
+    let proposal = st
+        .db
+        .propose_memory(input)
+        .map_err(|error| rpc_err(1002, error.to_string(), "MEMORY_INVALID"))?;
+    Ok(json!({ "proposal": proposal, "queued": proposal.is_some() }))
+}
+
+async fn proposals(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
+    let include_decided = optional_bool(&params, "includeDecided")?.unwrap_or(false);
+    let limit = optional_usize(&params, "limit")?.unwrap_or(50);
+    let st = state.lock().await;
+    let proposals = st
+        .db
+        .list_memory_proposals(include_decided, limit)
+        .map_err(internal)?;
+    Ok(json!({ "proposals": proposals }))
+}
+
+async fn accept_proposal(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
+    let id = required_str(&params, "id")?;
+    let st = state.lock().await;
+    let memory = st
+        .db
+        .accept_memory_proposal(id)
+        .map_err(|error| rpc_err(1002, error.to_string(), "MEMORY_INVALID"))?;
+    Ok(json!({ "memory": memory }))
+}
+
+async fn reject_proposal(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
+    let id = required_str(&params, "id")?;
+    let st = state.lock().await;
+    let rejected = st.db.reject_memory_proposal(id).map_err(internal)?;
+    Ok(json!({ "rejected": rejected }))
 }
 
 /// Which memories decay would stop recalling, and why. Read-only.

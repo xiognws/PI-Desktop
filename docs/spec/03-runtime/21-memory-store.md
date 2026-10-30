@@ -188,6 +188,26 @@ lossless tool-image envelope, and a v25 database walks both steps in one launch.
 | 3 | optional embeddings (`embedding` column + `sqlite-vec`) fused with BM25 via reciprocal rank |
 | — | markdown export/import so memories are readable by other agents |
 
+### 9.3 Stage 2b: extraction proposes, a person accepts (review queue implemented)
+
+- **A proposal is not a memory.** `memory_proposals` (schema v28) holds scope,
+  kind, title, body, tags, confidence, origin and a nullable `decision`. Nothing
+  in the store recalls a proposal, and nothing writes one into `memories`.
+- **`memory.propose`** takes `{ kind, title, body, tags?, confidence?, origin?,
+  projectPath?, sessionId? }` and is the only writer of the queue. Scope is
+  derived on the host from which ids arrived, so a model-supplied scope is
+  ignored. The call answers `{ proposal, queued }`, where `queued: false` means
+  the store already believes this content or already has it open.
+- **`memory.proposals`** → `{ proposals }`, open rows first and newest first;
+  `includeDecided` also returns the accepted and rejected history.
+- **`memory.acceptProposal`** runs the ordinary `remember` path and marks the
+  proposal `accepted`; **`memory.rejectProposal`** marks it `rejected` and writes
+  nothing. Review happens once: a decided proposal is refused.
+- **The pass itself is opt-in and off the turn's critical path.** It runs after a
+  turn completes, never fails or slows the turn, and its failure is swallowed.
+  Which process owns that model call is an open architecture decision (ADR 0376);
+  the store, the RPC surface and the review panel are complete without it.
+
 ### 9.2 Stage 2b: decay retires, it never deletes (implemented)
 
 - **The decision is a pure function** (`crates/host-core/src/memory/decay.rs`):

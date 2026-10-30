@@ -376,12 +376,82 @@ pub fn fts_match_query(query: &str) -> String {
 }
 
 /// Dedupe key: identical title+body writes the same hash regardless of scope.
+fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MemoryProposal> {
+    let scope: String = row.get(1)?;
+    let kind: String = row.get(4)?;
+    let tags: String = row.get(7)?;
+    Ok(MemoryProposal {
+        id: row.get(0)?,
+        scope: MemoryScope::parse(&scope).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Text, error.into())
+        })?,
+        project_path: row.get(2)?,
+        session_id: row.get(3)?,
+        kind: MemoryKind::parse(&kind).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, error.into())
+        })?,
+        title: row.get(5)?,
+        body: row.get(6)?,
+        tags: serde_json::from_str(&tags).unwrap_or_default(),
+        confidence: row.get(8)?,
+        origin: row.get(9)?,
+        created_at: row.get(10)?,
+        decided_at: row.get(11)?,
+        decision: row.get(12)?,
+    })
+}
+
 pub fn content_hash(title: &str, body: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(title.trim().as_bytes());
     hasher.update(b"\n");
     hasher.update(body.trim().as_bytes());
     hex::encode(hasher.finalize())
+}
+
+/// A candidate memory an extraction pass proposed. It is not a memory: it has no
+/// belief of its own until a person accepts it (ADR 0376).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryProposal {
+    pub id: String,
+    pub scope: MemoryScope,
+    pub project_path: Option<String>,
+    pub session_id: Option<String>,
+    pub kind: MemoryKind,
+    pub title: String,
+    pub body: String,
+    pub tags: Vec<String>,
+    pub confidence: f64,
+    pub origin: String,
+    pub created_at: i64,
+    pub decided_at: Option<i64>,
+    pub decision: Option<String>,
+}
+
+/// What an extraction pass sends. Scope and ids come from the session, never
+/// from the model, exactly like the `Remember` tool.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewMemoryProposal {
+    pub scope: MemoryScope,
+    #[serde(default)]
+    pub project_path: Option<String>,
+    #[serde(default)]
+    pub session_id: Option<String>,
+    pub kind: MemoryKind,
+    pub title: String,
+    pub body: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    #[serde(default = "default_proposal_origin")]
+    pub origin: String,
+}
+
+fn default_proposal_origin() -> String {
+    "turn".to_string()
 }
 
 impl Database {
@@ -707,6 +777,150 @@ impl Database {
             params![overflow],
         )?;
         Ok(removed)
+    }
+
+
+    /// Queue a candidate memory for review. Returns `None` when the store already
+    /// believes it or already has this proposal open, so a repeated pass over the
+    /// same turn cannot queue the same review twice.
+    pub fn propose_memory(&self, input: NewMemoryProposal) -> Result<Option<MemoryProposal>> {
+        let title = input.title.trim();
+        let body = input.body.trim();
+        if title.is_empty() || body.is_empty() {
+            anyhow::bail!("MEMORY_INVALID: a proposal needs a title and a body");
+        }
+        let hash = content_hash(title, body);
+        let project_path = input.project_path.as_deref().map(str::trim);
+        let session_id = input.session_id.as_deref().map(str::trim);
+        let live: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT id FROM memories
+                  WHERE content_hash = ?1 AND scope = ?2
+                    AND ifnull(project_path, '') = ifnull(?3, '')
+                    AND ifnull(session_id, '') = ifnull(?4, '')
+                  LIMIT 1",
+                params![
+                    hash,
+                    input.scope.as_str(),
+                    project_path.unwrap_or(""),
+                    session_id.unwrap_or("")
+                ],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if live.is_some() {
+            return Ok(None);
+        }
+        let open: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT id FROM memory_proposals
+                  WHERE content_hash = ?1 AND scope = ?2
+                    AND ifnull(project_path, '') = ifnull(?3, '')
+                    AND ifnull(session_id, '') = ifnull(?4, '')
+                    AND decision IS NULL
+                  LIMIT 1",
+                params![
+                    hash,
+                    input.scope.as_str(),
+                    project_path.unwrap_or(""),
+                    session_id.unwrap_or("")
+                ],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if open.is_some() {
+            return Ok(None);
+        }
+
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = now_ms();
+        self.conn.execute(
+            "INSERT INTO memory_proposals (
+                id, scope, project_path, session_id, kind, title, body, tags,
+                confidence, content_hash, origin, created_at, decided_at, decision
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, NULL, NULL)",
+            params![
+                id,
+                input.scope.as_str(),
+                project_path,
+                session_id,
+                input.kind.as_str(),
+                title,
+                body,
+                serde_json::to_string(&input.tags)?,
+                input.confidence.unwrap_or(0.6).clamp(0.0, 1.0),
+                hash,
+                input.origin.as_str(),
+                now
+            ],
+        )?;
+        self.get_memory_proposal(&id)
+    }
+
+    pub fn get_memory_proposal(&self, id: &str) -> Result<Option<MemoryProposal>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id, scope, project_path, session_id, kind, title, body, tags,
+                        confidence, origin, created_at, decided_at, decision
+                   FROM memory_proposals WHERE id = ?1",
+                [id],
+                proposal_from_row,
+            )
+            .optional()?)
+    }
+
+    /// Open proposals first (newest first), then the decisions already made so
+    /// the panel can show what was accepted or ignored.
+    pub fn list_memory_proposals(&self, include_decided: bool, limit: usize) -> Result<Vec<MemoryProposal>> {
+        let limit = limit.clamp(1, 500) as i64;
+        let mut stmt = self.conn.prepare(
+            "SELECT id, scope, project_path, session_id, kind, title, body, tags,
+                    confidence, origin, created_at, decided_at, decision
+               FROM memory_proposals
+              WHERE (?1 = 1 OR decision IS NULL)
+              ORDER BY (decision IS NULL) DESC, created_at DESC, id
+              LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![if include_decided { 1 } else { 0 }, limit], proposal_from_row)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    /// Accepting a proposal is the only way one becomes a memory.
+    pub fn accept_memory_proposal(&self, id: &str) -> Result<Option<MemoryRecord>> {
+        let Some(proposal) = self.get_memory_proposal(id)? else {
+            return Ok(None);
+        };
+        if proposal.decision.is_some() {
+            anyhow::bail!("MEMORY_PROPOSAL_DECIDED: this proposal was already reviewed");
+        }
+        let mut input = NewMemory::new(proposal.scope, proposal.kind, &proposal.title, &proposal.body);
+        input.project_path = proposal.project_path.clone();
+        input.session_id = proposal.session_id.clone();
+        input.tags = proposal.tags.clone();
+        input.confidence = proposal.confidence;
+        input.source = MemorySource::Agent;
+        let outcome = self.remember(input)?;
+        self.conn.execute(
+            "UPDATE memory_proposals SET decision = 'accepted', decided_at = ?1 WHERE id = ?2",
+            params![now_ms(), id],
+        )?;
+        Ok(Some(outcome.memory))
+    }
+
+    pub fn reject_memory_proposal(&self, id: &str) -> Result<bool> {
+        let changed = self.conn.execute(
+            "UPDATE memory_proposals SET decision = 'rejected', decided_at = ?1
+              WHERE id = ?2 AND decision IS NULL",
+            params![now_ms(), id],
+        )?;
+        Ok(changed > 0)
     }
 
     /// Which memories decay would stop recalling, and why. Read-only: the

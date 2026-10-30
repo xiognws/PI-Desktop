@@ -398,3 +398,4 @@ Each ADR includes:
 | 0373 | [One flat skill library — skills have no project level](0373-flat-skill-library.md) | Accepted |
 | 0374 | [Skill curation proposes, archives, never deletes](0374-skill-curation.md) | Accepted |
 | 0375 | [Memory decay retires instead of deleting](0375-memory-decay.md) | Accepted |
+| 0376 | [An extraction pass proposes memories; only a person writes them](0376-memory-extraction-proposals.md) | Accepted for implementation |

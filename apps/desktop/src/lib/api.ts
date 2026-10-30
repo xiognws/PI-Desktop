@@ -732,6 +732,35 @@ export type MemoryDecayProposal = {
   findings: MemoryDecayFinding[];
 };
 
+/** A candidate memory queued by an extraction pass, awaiting review. */
+export type MemoryProposal = {
+  id: string;
+  scope: MemoryScope;
+  projectPath?: string | null;
+  sessionId?: string | null;
+  kind: MemoryKind;
+  title: string;
+  body: string;
+  tags: string[];
+  confidence: number;
+  origin: string;
+  createdAt: number;
+  decidedAt?: number | null;
+  decision?: "accepted" | "rejected" | null;
+};
+
+export type NewMemoryProposalInput = {
+  scope?: MemoryScope;
+  projectPath?: string | null;
+  sessionId?: string | null;
+  kind: MemoryKind;
+  title: string;
+  body: string;
+  tags?: string[];
+  confidence?: number;
+  origin?: string;
+};
+
 export type MemoryDecayPolicy = {
   halfLifeDays: number;
   minConfidence: number;
@@ -1163,6 +1192,21 @@ export const api = {
     invoke<{ retired: boolean }>(IPC.invoke.memoryRetire, { id, reason }),
   restoreMemory: (id: string) =>
     invoke<{ restored: boolean }>(IPC.invoke.memoryRestore, { id }),
+  /**
+   * Candidate memories an extraction pass queued. A proposal is not a memory:
+   * `acceptMemoryProposal` is the only call that writes one.
+   */
+  listMemoryProposals: (input?: { includeDecided?: boolean; limit?: number }) =>
+    invoke<{ proposals: MemoryProposal[] }>(IPC.invoke.memoryProposals, input ?? {}),
+  proposeMemory: (input: NewMemoryProposalInput) =>
+    invoke<{ proposal: MemoryProposal | null; queued: boolean }>(
+      IPC.invoke.memoryPropose,
+      input,
+    ),
+  acceptMemoryProposal: (id: string) =>
+    invoke<{ memory: MemoryRecord | null }>(IPC.invoke.memoryAcceptProposal, { id }),
+  rejectMemoryProposal: (id: string) =>
+    invoke<{ rejected: boolean }>(IPC.invoke.memoryRejectProposal, { id }),
   tidyMemories: (input?: { maxAgeDays?: number; minConfidence?: number; maxLive?: number; expire?: boolean }) =>
     invoke<MemoryTidyResult>(IPC.invoke.memoryTidy, input),
   supersedeMemory: (id: string, replacementId: string) =>

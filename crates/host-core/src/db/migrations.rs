@@ -1023,6 +1023,28 @@ pub(crate) fn migrate_v26_to_v27_tx(tx: &rusqlite::Transaction<'_>) -> Result<()
     Ok(())
 }
 
+/// Schema v28 adds `memory_proposals`: the queue an extraction pass writes and
+/// the memory panel reviews. A proposal becomes a memory only when a person
+/// accepts it (ADR 0376), so the table is deliberately separate from `memories`.
+pub(crate) fn migrate_v27_to_v28_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    tx.execute_batch(crate::db::schema::MEMORY_PROPOSALS_DDL)?;
+    tx.pragma_update(None, "user_version", 28i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v27_to_v28(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 27)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v27_to_v28_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v27 to v28 memory proposal migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
 pub(crate) fn migrate_v26_to_v27(conn: &Connection, path: &Path) -> Result<()> {
     let backup = create_migration_backup(conn, path, 26)?;
     let tx = conn.unchecked_transaction()?;
