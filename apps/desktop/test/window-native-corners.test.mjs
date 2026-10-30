@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   applyWindowCornerRadius,
   installWindows11CornerController,
+  reapplyWindowCorners,
   usesWindows11NativeCorners,
 } from "../electron/main/window-native-corners.ts";
 
@@ -65,6 +66,9 @@ test("DWM preference follows theme radius, window state, and display updates", a
     logger,
   );
 
+  // Installation does not wait for the host: the first apply is queued, so the
+  // caller settles the queue before asserting.
+  await controller.flush();
   assert.deepEqual(host.calls[0], {
     method: "window.setNativeCornerPreference",
     params: {
@@ -110,6 +114,33 @@ test("DWM preference follows theme radius, window state, and display updates", a
   assert.equal(fixture.window.listenerCount("maximize"), 0);
   assert.equal(screen.listenerCount("display-metrics-changed"), 0);
   assert.equal(await applyWindowCornerRadius(fixture.window, 8), null);
+});
+
+test("a host that arrives late still receives the installed preference", async () => {
+  const fixture = makeWindow();
+  const screen = makeScreen();
+  let host = null;
+  // The window is created before host-core exists, so install has to return even
+  // though there is nothing to call yet.
+  const controller = await installWindows11CornerController(
+    fixture.window,
+    12,
+    () => host,
+    screen,
+    logger,
+  );
+  await controller.flush().catch(() => undefined);
+
+  const late = makeHost();
+  host = late;
+  reapplyWindowCorners();
+  await controller.flush();
+  assert.equal(late.calls.at(-1).method, "window.setNativeCornerPreference");
+  assert.equal(late.calls.at(-1).params.preference, "round");
+
+  fixture.close();
+  reapplyWindowCorners();
+  assert.equal(late.calls.length, 1);
 });
 
 test("overlapping theme requests leave DWM with the newest preference", async () => {
