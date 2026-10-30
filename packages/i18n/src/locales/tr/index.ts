@@ -590,6 +590,7 @@ export const tr = {
     findNoMatches: "Eşleşme yok",
     findPrevious: "Önceki",
     findNext: "Sonraki",
+    findMatchCase: "Büyük/küçük harf duyarlı",
     findClose: "Aramayı kapat",
     toolActions: "Araç işlemleri",
     copyToolOutput: "Çıktıyı kopyala",

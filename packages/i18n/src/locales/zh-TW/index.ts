@@ -583,6 +583,7 @@ export const zhTW = {
     findNoMatches: "沒有符合",
     findPrevious: "上一個",
     findNext: "下一個",
+    findMatchCase: "區分大小寫",
     findClose: "關閉尋找",
     toolActions: "工具操作",
     copyToolOutput: "複製輸出",

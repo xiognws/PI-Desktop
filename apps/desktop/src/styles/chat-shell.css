@@ -1039,6 +1039,17 @@
   color: var(--ds-text-muted);
 }
 
+.transcript-find-case {
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  color: var(--ds-text-secondary, inherit);
+}
+
+.transcript-find-case[aria-pressed="true"] {
+  background: var(--ds-accent-soft, rgba(127, 127, 127, 0.18));
+  color: var(--ds-text-primary, inherit);
+}
+
 .transcript-find-step:hover:not(:disabled),
 .transcript-find-close:hover {
   color: var(--ds-text-primary);

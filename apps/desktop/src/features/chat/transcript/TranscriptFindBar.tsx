@@ -16,16 +16,20 @@ import { Button, Input, TooltipButton } from "../../../components/ui";
  */
 export function TranscriptFindBar({
   query,
+  matchCase,
   index,
   total,
   onQueryChange,
+  onMatchCaseChange,
   onStep,
   onClose,
 }: {
   query: string;
+  matchCase: boolean;
   index: number;
   total: number;
   onQueryChange: (value: string) => void;
+  onMatchCaseChange: (value: boolean) => void;
   onStep: (delta: number) => void;
   onClose: () => void;
 }) {
@@ -71,6 +75,20 @@ export function TranscriptFindBar({
             ? t("chat.findNoMatches")
             : ""}
       </span>
+      {/* Searching an identifier is the common case that the default scan
+          gets wrong: `onClick` is not `onclick`. */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="transcript-find-case"
+        aria-pressed={matchCase}
+        aria-label={t("chat.findMatchCase")}
+        title={t("chat.findMatchCase")}
+        onClick={() => onMatchCaseChange(!matchCase)}
+      >
+        <span aria-hidden>Aa</span>
+      </Button>
       {/* Labelled, not icon-only: the two steps are the reason the bar exists, and
           an arrow alone reads as decoration next to a count. */}
       <Button

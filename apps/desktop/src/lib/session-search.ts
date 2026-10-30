@@ -5,9 +5,36 @@ export function foldSearchText(text: string): string {
   return text.toLowerCase();
 }
 
-export function searchMatchRanges(text: string, query: string): [number, number][] {
-  const needle = foldSearchText(query.trim());
-  if (!needle) return [];
+export type SearchMatchOptions = {
+  /**
+   * Compare the text as written. Off is the host's own behaviour (Unicode
+   * lowercase literal search), and the find bar turns it on for the reader who
+   * is looking for an identifier rather than prose.
+   */
+  matchCase?: boolean;
+};
+
+export function searchMatchRanges(
+  text: string,
+  query: string,
+  options: SearchMatchOptions = {},
+): [number, number][] {
+  const raw = query.trim();
+  if (!raw) return [];
+  if (options.matchCase) {
+    // Same scan as below without folding: offsets stay 1:1 with the text, so
+    // the mapping tables are not needed.
+    const ranges: [number, number][] = [];
+    let from = 0;
+    while (from < text.length) {
+      const index = text.indexOf(raw, from);
+      if (index < 0) break;
+      ranges.push([index, index + raw.length]);
+      from = index + raw.length;
+    }
+    return ranges;
+  }
+  const needle = foldSearchText(raw);
   const folded = foldSearchText(text);
   // Lowercase can expand one character (İ -> i + combining dot). Map only
   // when needed, so ordinary ASCII/CJK highlighting has no allocation per char.

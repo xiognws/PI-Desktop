@@ -54,7 +54,7 @@ test("the bar is mounted by the transcript, over the rows it searches", () => {
 
 test("matches come from the rendered text and reuse the search helpers", () => {
   assert.match(hook, /import \{ transcriptSearchRanges \} from "\.\.\/\.\.\/\.\.\/lib\/transcript-search-highlight";/);
-  assert.match(hook, /const found = transcriptSearchRanges\(root, query\);/);
+  assert.match(hook, /const found = transcriptSearchRanges\(root, query, \{ matchCase \}\);/);
   assert.match(hook, /stepFindIndex\(current, ranges\.current\.length, delta\)/);
   // Two highlight groups: the set, and the one being read.
   assert.match(hook, /CSS\.highlights\.set\(ALL_HIGHLIGHT, new Highlight\(\.\.\.ranges\.current\)\)/);
@@ -70,6 +70,19 @@ test("matches come from the rendered text and reuse the search helpers", () => {
   assert.match(highlights, /\.message-row\.transcript-find-target \{\s*content-visibility: visible;/);
   // The transcript hands the hook its scroller and the follow release.
   assert.match(transcript, /useTranscriptFind\(contentRef, scrollRef, releaseFollow\)/);
+  // Case sensitivity: the default scan folds (host parity), and the bar can turn
+  // that off for identifier searches.
+  assert.match(hook, /const \[matchCase, setMatchCase\] = useState\(false\);/);
+  assert.match(hook, /transcriptSearchRanges\(root, query, \{ matchCase \}\)/);
+  assert.match(hook, /matchCase,\s*index,\s*total,\s*setQuery,\s*setMatchCase/);
+  assert.match(bar, /aria-pressed=\{matchCase\}/);
+  assert.match(bar, /onMatchCaseChange\(!matchCase\)/);
+  assert.match(bar, /t\("chat\.findMatchCase"\)/);
+  assert.match(transcript, /matchCase=\{find\.matchCase\}/);
+  assert.match(transcript, /onMatchCaseChange=\{find\.setMatchCase\}/);
+  assert.match(styles, /\.transcript-find-case\[aria-pressed="true"\] \{/);
+  assert.match(en, /findMatchCase: "Match case"/);
+  assert.match(zh, /findMatchCase: "区分大小写"/);
   // Stepping and wrapping are pure arithmetic, covered by the shared tests.
   assert.match(helper, /export function stepFindIndex\(/);
   assert.match(helper, /export function findPosition\(/);

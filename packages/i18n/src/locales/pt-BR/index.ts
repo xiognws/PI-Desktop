@@ -580,6 +580,7 @@ export const ptBR = {
     findNoMatches: "Nenhuma correspondência",
     findPrevious: "Anterior",
     findNext: "Próximo",
+    findMatchCase: "Diferenciar maiúsculas",
     findClose: "Fechar busca",
     toolActions: "Ações da ferramenta",
     copyToolOutput: "Copiar saída",

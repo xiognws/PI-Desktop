@@ -581,6 +581,7 @@ export const es = {
     "findNoMatches": "Sin coincidencias",
     "findPrevious": "Anterior",
     "findNext": "Siguiente",
+    "findMatchCase": "Distinguir mayúsculas",
     "findClose": "Cerrar búsqueda",
     "toolActions": "Acciones de la herramienta",
     "copyToolOutput": "Copiar salida",

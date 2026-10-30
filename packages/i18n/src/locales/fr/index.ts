@@ -581,6 +581,7 @@ export const fr = {
     "findNoMatches": "Aucun résultat",
     "findPrevious": "Précédent",
     "findNext": "Suivant",
+    "findMatchCase": "Respecter la casse",
     "findClose": "Fermer la recherche",
     "toolActions": "Actions de l’outil",
     "copyToolOutput": "Copier la sortie",

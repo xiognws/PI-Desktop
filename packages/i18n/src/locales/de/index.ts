@@ -581,6 +581,7 @@ export const de = {
     "findNoMatches": "Keine Treffer",
     "findPrevious": "Zurück",
     "findNext": "Weiter",
+    "findMatchCase": "Groß-/Kleinschreibung beachten",
     "findClose": "Suche schließen",
     "toolActions": "Werkzeugaktionen",
     "copyToolOutput": "Ausgabe kopieren",

@@ -19,9 +19,12 @@ const TARGET_CLASS = "transcript-find-target";
 export type TranscriptFindState = {
   open: boolean;
   query: string;
+  /** Compare as written instead of the default case-insensitive scan. */
+  matchCase: boolean;
   index: number;
   total: number;
   setQuery: (value: string) => void;
+  setMatchCase: (value: boolean) => void;
   step: (delta: number) => void;
   close: () => void;
 };
@@ -45,6 +48,7 @@ export function useTranscriptFind(
   const request = useTranscriptFindRequest();
   const [open, setOpen] = useState(false);
   const [query, setQueryState] = useState("");
+  const [matchCase, setMatchCase] = useState(false);
   const [index, setIndex] = useState(-1);
   const [total, setTotal] = useState(0);
   const ranges = useRef<Range[]>([]);
@@ -124,13 +128,13 @@ export function useTranscriptFind(
       clearHighlights();
       return;
     }
-    const found = transcriptSearchRanges(root, query);
+    const found = transcriptSearchRanges(root, query, { matchCase });
     ranges.current = found;
     setTotal(found.length);
     setIndex(found.length ? 0 : -1);
     paint(0);
     if (found.length) reveal(0);
-  }, [clearHighlights, content, open, paint, query, reveal]);
+  }, [clearHighlights, content, matchCase, open, paint, query, reveal]);
 
   // Stepping paints and reveals from an effect rather than inside the state
   // updater: an updater runs before the browser has laid the new row out.
@@ -157,5 +161,5 @@ export function useTranscriptFind(
     clearHighlights();
   }, [clearHighlights]);
 
-  return { open, query, index, total, setQuery, step, close };
+  return { open, query, matchCase, index, total, setQuery, setMatchCase, step, close };
 }

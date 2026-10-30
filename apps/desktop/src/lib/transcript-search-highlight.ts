@@ -1,4 +1,4 @@
-import { searchMatchRanges } from "./session-search";
+import { searchMatchRanges, type SearchMatchOptions } from "./session-search";
 
 const NON_CONTENT = "button:not(.chat-text-link):not(.chat-file-chip):not(.chat-code-link), textarea, [aria-hidden='true']";
 
@@ -18,9 +18,13 @@ function textNodes(root: HTMLElement) {
 }
 
 /** Match across Markdown's inline elements without rewriting React-owned DOM. */
-export function transcriptSearchRanges(root: HTMLElement, query: string): Range[] {
+export function transcriptSearchRanges(
+  root: HTMLElement,
+  query: string,
+  options: SearchMatchOptions = {},
+): Range[] {
   const { nodes, text } = textNodes(root);
-  return searchMatchRanges(text, query).flatMap(([start, end]) => {
+  return searchMatchRanges(text, query, options).flatMap(([start, end]) => {
     const first = nodes.find((part) => part.end > start);
     const last = nodes.find((part) => part.end >= end && part.start < end);
     if (!first || !last) return [];

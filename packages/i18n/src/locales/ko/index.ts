@@ -590,6 +590,7 @@ export const ko = {
     findNoMatches: "일치 항목 없음",
     findPrevious: "이전",
     findNext: "다음",
+    findMatchCase: "대/소문자 구분",
     findClose: "찾기 닫기",
     toolActions: "도구 작업",
     copyToolOutput: "출력 복사",

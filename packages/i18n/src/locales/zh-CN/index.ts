@@ -583,6 +583,7 @@ export const zhCN = {
     findNoMatches: "没有匹配",
     findPrevious: "上一个",
     findNext: "下一个",
+    findMatchCase: "区分大小写",
     findClose: "关闭查找",
     toolActions: "工具操作",
     copyToolOutput: "复制输出",

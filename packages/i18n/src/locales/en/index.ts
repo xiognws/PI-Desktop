@@ -593,6 +593,7 @@ export const en = {
     findNoMatches: "No matches",
     findPrevious: "Prev",
     findNext: "Next",
+    findMatchCase: "Match case",
     findClose: "Close find",
     toolActions: "Tool actions",
     copyToolOutput: "Copy output",

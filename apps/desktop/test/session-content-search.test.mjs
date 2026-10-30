@@ -52,6 +52,21 @@ test("literal highlighting agrees with host Unicode folding and preserves UTF-16
     assert.deepEqual(searchMatchRanges(text, query), expected);
 });
 
+test("match case compares the text as written", () => {
+  const text = "onClick onclick ONCLICK İstanbul";
+  assert.deepEqual(searchMatchRanges(text, "onclick"), [
+    [0, 7],
+    [8, 15],
+    [16, 23],
+  ]);
+  assert.deepEqual(searchMatchRanges(text, "onclick", { matchCase: true }), [[8, 15]]);
+  assert.deepEqual(searchMatchRanges(text, "ONCLICK", { matchCase: true }), [[16, 23]]);
+  // No folding means no offset table: indexing survives an expanded lowercase.
+  assert.deepEqual(searchMatchRanges("İstanbul", "İst", { matchCase: true }), [[0, 3]]);
+  assert.deepEqual(searchMatchRanges(text, "  ONCLICK  ", { matchCase: true }), [[16, 23]]);
+  assert.deepEqual(searchMatchRanges(text, "", { matchCase: true }), []);
+});
+
 test("older queries and closed palettes cannot publish asynchronous results", async () => {
   const old = deferred();
   const current = deferred();

@@ -434,9 +434,11 @@ function TranscriptBody({
       {find.open ? (
         <TranscriptFindBar
           query={find.query}
+          matchCase={find.matchCase}
           index={find.index}
           total={find.total}
           onQueryChange={find.setQuery}
+          onMatchCaseChange={find.setMatchCase}
           onStep={find.step}
           onClose={find.close}
         />
