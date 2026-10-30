@@ -1395,6 +1395,8 @@ sklm: {
     capabilityFilterAll: "全部",
     capabilityFilterGlobal: "全域性",
     capabilityFilterProject: "專案",
+    memoryExtractLabel: "回合結束後建議記憶",
+    memoryExtractHint: "只在用過工具的回合多跑一次模型呼叫；建議需你審閱後才入庫。",
     memoryProposalTitle: "待審閱的記憶（{{count}}）",
     memoryProposalAccept: "接受",
     memoryProposalReject: "忽略",

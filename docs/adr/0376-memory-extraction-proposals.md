@@ -1,6 +1,6 @@
 # ADR 0376: An extraction pass proposes memories; only a person writes them
 
-- Status: Accepted for implementation
+- Status: Accepted
 - Date: 2026-10-29
 - Related: ADR 0371, ADR 0375, spec `03-runtime/21-memory-store.md` §9.3
 
@@ -53,10 +53,19 @@ Three properties make this harder than it looks.
 - Review is cheap: the queue is one row per suggestion, with the body visible.
 - `memory_proposals` is bounded by the same discipline as the archive: decided
   rows are history, and only open rows are unique.
-- The model call is the remaining piece. It needs a place that owns credentials
-  and one-shot completions — the two candidates are the agent runtime's
-  post-turn hook (correct boundary, more plumbing) and the Electron main
-  one-shot completion the plugin bridge already uses (faster, but it crosses the
-  plugin capability boundary). That choice is deliberately not made here: it is
-  an architecture decision that deserves its own review, and the host half is
-  useful without it.
+- **The model call lives in Electron main**, as a first-party service
+  (`memory-extraction-service.ts`) built from the same dependencies the plugin
+  bridge receives — `resolveAgentRuntimeLaunch`, `vendorOAuth` and the runtime's
+  exported `completeOneShot`. It deliberately does **not** go through the plugin
+  capability system: this is the app reviewing its own turn, not a plugin asking
+  for a completion, and credentials never leave the main process either way.
+- **It is opt-in and gated twice.** `memoryExtractAfterTurn` is off unless the
+  user turns it on (the switch sits in the memory panel, next to what it
+  produces), and the pass only runs on a turn that **used a tool** — a chat turn
+  rarely yields something durable, so the gate keeps most turns free.
+- It runs **after** the turn is fully finished, one pass per session at a time,
+  with a 30 s bound, and every failure is a log line: extraction can never fail,
+  slow, or alter a turn. The decision itself stays pure in
+  `@pi-desktop/agent-runtime/memory-extraction.ts`, where the parser drops
+  unknown kinds, blank fields, over-long bodies and duplicates, and never accepts
+  more than five candidates.

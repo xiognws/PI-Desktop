@@ -1403,6 +1403,8 @@ sklm: {
     "capabilityFilterAll": "Todos",
     "capabilityFilterGlobal": "Global",
     "capabilityFilterProject": "Proyecto",
+    "memoryExtractLabel": "Sugerir recuerdos tras un turno",
+    "memoryExtractHint": "Una llamada extra al modelo tras un turno con herramientas; las sugerencias esperan revisión.",
     "memoryProposalTitle": "Recuerdos sugeridos ({{count}})",
     "memoryProposalAccept": "Aceptar",
     "memoryProposalReject": "Ignorar",

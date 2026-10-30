@@ -184,7 +184,7 @@ lossless tool-image envelope, and a v25 database walks both steps in one launch.
 
 | Stage | Content |
 |---|---|
-| 2b | confidence decay and periodic tidy-up (**decay shipped, see §9.2**); automatic extraction after a completed turn (still open) |
+| 2b | confidence decay and periodic tidy-up (**shipped, §9.2**); automatic extraction after a completed turn (**shipped as a review queue, §9.3**) |
 | 3 | optional embeddings (`embedding` column + `sqlite-vec`) fused with BM25 via reciprocal rank |
 | — | markdown export/import so memories are readable by other agents |
 
@@ -203,10 +203,13 @@ lossless tool-image envelope, and a v25 database walks both steps in one launch.
 - **`memory.acceptProposal`** runs the ordinary `remember` path and marks the
   proposal `accepted`; **`memory.rejectProposal`** marks it `rejected` and writes
   nothing. Review happens once: a decided proposal is refused.
-- **The pass itself is opt-in and off the turn's critical path.** It runs after a
-  turn completes, never fails or slows the turn, and its failure is swallowed.
-  Which process owns that model call is an open architecture decision (ADR 0376);
-  the store, the RPC surface and the review panel are complete without it.
+- **The pass itself is opt-in and off the turn's critical path.** It runs in
+  Electron main through the runtime's one-shot completion, only when
+  `memoryExtractAfterTurn` is on **and** the turn used a tool, after the turn is
+  finished, one pass per session at a time, with a 30 s bound. Every failure is a
+  log line: extraction never fails, slows, or alters a turn. Parsing is pure
+  (`@pi-desktop/agent-runtime/memory-extraction.ts`) and drops unknown kinds,
+  blank fields, over-long bodies and duplicates, capped at five candidates.
 
 ### 9.2 Stage 2b: decay retires, it never deletes (implemented)
 

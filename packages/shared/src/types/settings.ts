@@ -59,6 +59,12 @@ export type AppSettings = {
    * Absent and false use the bounded ten-retry policy.
    */
   infiniteProviderRetry?: boolean;
+  /**
+   * Run one memory-extraction pass after a turn that used a tool, and queue what
+   * it suggests for review. Off when absent: a completion per turn is a cost the
+   * user chooses (ADR 0376).
+   */
+  memoryExtractAfterTurn?: boolean;
   /** Allow Agent mode to call TypeSafe Jev for explicit structured classifications. */
   jevEnabled?: boolean;
   /** Prevent idle system sleep while this desktop app runs; off when absent. */

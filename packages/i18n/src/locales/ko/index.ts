@@ -1411,6 +1411,8 @@ sklm: {
     capabilityFilterAll: "모두",
     capabilityFilterGlobal: "전역",
     capabilityFilterProject: "프로젝트",
+    memoryExtractLabel: "턴이 끝난 뒤 기억 제안",
+    memoryExtractHint: "도구를 사용한 턴에만 모델을 한 번 더 호출하며, 제안은 검토 후 저장됩니다.",
     memoryProposalTitle: "검토할 기억 ({{count}})",
     memoryProposalAccept: "수락",
     memoryProposalReject: "무시",

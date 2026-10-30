@@ -1395,6 +1395,8 @@ sklm: {
     capabilityFilterAll: "全部",
     capabilityFilterGlobal: "全局",
     capabilityFilterProject: "项目",
+    memoryExtractLabel: "回合结束后建议记忆",
+    memoryExtractHint: "只在用过工具的回合多跑一次模型调用；建议需你审阅后才入库。",
     memoryProposalTitle: "待审阅的记忆（{{count}}）",
     memoryProposalAccept: "接受",
     memoryProposalReject: "忽略",

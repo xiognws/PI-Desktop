@@ -1405,6 +1405,8 @@ sklm: {
     capabilityFilterAll: "Tümü",
     capabilityFilterGlobal: "Genel",
     capabilityFilterProject: "Proje",
+    memoryExtractLabel: "Tur sonunda anı öner",
+    memoryExtractHint: "Araç kullanılan turlardan sonra bir ek model çağrısı; öneriler incelemeyi bekler.",
     memoryProposalTitle: "Önerilen anılar ({{count}})",
     memoryProposalAccept: "Kabul et",
     memoryProposalReject: "Yoksay",

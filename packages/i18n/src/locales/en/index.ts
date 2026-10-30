@@ -1255,6 +1255,8 @@ sklm: {
     capabilityFilterAll: "All",
     capabilityFilterGlobal: "Global",
     capabilityFilterProject: "Project",
+    memoryExtractLabel: "Suggest memories after a turn",
+    memoryExtractHint: "One extra model call after a turn that used a tool; suggestions wait for review.",
     memoryProposalTitle: "Suggested memories ({{count}})",
     memoryProposalAccept: "Accept",
     memoryProposalReject: "Ignore",

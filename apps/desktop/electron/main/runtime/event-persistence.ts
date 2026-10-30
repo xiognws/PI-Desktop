@@ -8,6 +8,14 @@ import type { PersistenceOutbox } from "../persistence-outbox";
 import type { SessionCoordination } from "./session-coordination";
 
 export type EventPersistenceDependencies = {
+  /**
+   * Passive observer of finished turns. Optional so a test harness that only
+   * cares about persistence can leave extraction out (ADR 0376).
+   */
+  scheduleMemoryExtraction?: (request: {
+    sessionId: string;
+    usedTools: boolean;
+  }) => void;
   runtimeState: RuntimeState;
   steeringReplies: Set<string>;
   /** Host-verified completion notice turns awaiting their first settled reply. */
@@ -61,6 +69,7 @@ export function createEventPersistence({
   transcriptRewrite,
   finishApprovedExecution,
   emitAgentEvent,
+  scheduleMemoryExtraction,
 }: EventPersistenceDependencies): {
   subagentTagged: (message: UiMessage, envelope: AgentEventEnvelope) => UiMessage;
   persistAgentEvent: (envelope: AgentEventEnvelope) => UiMessage | undefined;
@@ -71,6 +80,9 @@ export function createEventPersistence({
   flush: () => Promise<void>;
 } {
   const inflightSnapshots = new Map<string, UiMessage>();
+  // Whether the turn in flight ran a tool. Extraction only reviews those turns:
+  // a chat-only turn rarely produces something worth remembering (ADR 0376).
+  const turnUsedTools = new Set<string>();
   const pendingWrites = new Set<Promise<void>>();
   function trackWrite(write: Promise<void>): void {
     pendingWrites.add(write);
@@ -184,6 +196,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     return;
   }
   if (event.type === "tool_start") {
+    turnUsedTools.add(envelope.sessionId);
     activeToolCalls.set(activeToolCallKey(envelope.sessionId, event.toolCallId), {
       toolName: event.toolName,
       args: event.args,
@@ -217,6 +230,12 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     // finalizer below would still settle a turn this event does not own.
     if (isStaleTerminalEvent(envelope)) return;
     completionNoticeTurns.delete(envelope.turnId ?? turnId ?? "");
+    // Fire and forget: the turn is finished, and a failure here must never be
+    // visible as a turn failure.
+    scheduleMemoryExtraction?.({
+      sessionId: envelope.sessionId,
+      usedTools: turnUsedTools.delete(envelope.sessionId),
+    });
     const turnFinalization = finishTurn(
       envelope.sessionId,
       event.error.code === "TURN_ABORTED" ? "aborted" : "error",

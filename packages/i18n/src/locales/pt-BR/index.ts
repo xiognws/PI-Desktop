@@ -1223,6 +1223,8 @@ export const ptBR = {
     capabilityFilterAll: "Todos",
     capabilityFilterGlobal: "Global",
     capabilityFilterProject: "Projeto",
+    memoryExtractLabel: "Sugerir memórias após um turno",
+    memoryExtractHint: "Uma chamada extra ao modelo após um turno com ferramentas; as sugestões aguardam revisão.",
     memoryProposalTitle: "Memórias sugeridas ({{count}})",
     memoryProposalAccept: "Aceitar",
     memoryProposalReject: "Ignorar",

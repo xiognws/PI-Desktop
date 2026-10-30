@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { AppSettings } from "@pi-desktop/shared";
 import {
   api,
   type MemoryDecayProposal,
@@ -19,7 +20,7 @@ import {
   type MemoryStats,
 } from "../../lib/api";
 import { SettingsCard } from "../../features/settings/primitives";
-import { Badge, Button, cx, Input, SegmentedControl } from "../ui";
+import { Badge, Button, cx, Input, SegmentedControl, SettingsToggle } from "../ui";
 
 const PAGE_SIZE = 200;
 
@@ -87,6 +88,9 @@ export function MemoryPane() {
   // Stage-2b decay (ADR 0375): the host proposes, the user retires, restore undoes it.
   const [decay, setDecay] = useState<MemoryDecayProposal[] | null>(null);
   const [decayBusy, setDecayBusy] = useState(false);
+  // Extraction is opt-in, so the switch has to be reachable from the surface that
+  // shows what it produces (ADR 0376).
+  const [settings, setSettings] = useState<AppSettings | null>(null);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -96,6 +100,26 @@ export function MemoryPane() {
       return haystack.includes(needle);
     });
   }, [records, query]);
+
+  useEffect(() => {
+    void api
+      .getSettings()
+      .then(setSettings)
+      .catch(() => setSettings(null));
+  }, []);
+
+  const toggleExtraction = async (next: boolean) => {
+    const current = settings;
+    if (!current) return;
+    const updated = { ...current, memoryExtractAfterTurn: next };
+    setSettings(updated);
+    try {
+      await api.setSettings(updated);
+    } catch (cause) {
+      setSettings(current);
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
 
   const acceptProposal = async (proposal: MemoryProposal) => {
     setBusyId(proposal.id);
@@ -269,6 +293,20 @@ export function MemoryPane() {
           <p className="text-xs text-muted">
             {query.trim() ? t("settings.memoryEmptyFiltered") : t("settings.memoryEmpty")}
           </p>
+        ) : null}
+
+        {settings ? (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--border)] px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium">{t("settings.memoryExtractLabel")}</p>
+              <p className="mt-0.5 text-[11px] text-muted">{t("settings.memoryExtractHint")}</p>
+            </div>
+            <SettingsToggle
+              checked={settings.memoryExtractAfterTurn === true}
+              label={t("settings.memoryExtractLabel")}
+              onChange={() => void toggleExtraction(settings.memoryExtractAfterTurn !== true)}
+            />
+          </div>
         ) : null}
 
         {proposals.length > 0 ? (

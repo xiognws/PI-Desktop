@@ -1,3 +1,4 @@
+import type { AppSettings } from "@pi-desktop/shared";
 import {
   app,
   BrowserWindow,
@@ -62,6 +63,7 @@ import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
 import { createSidecarRuntime } from "./runtime/sidecar";
 import { createEventPersistence } from "./runtime/event-persistence";
+import { createMemoryExtractionService } from "./memory-extraction-service";
 import { createPlanRuntime } from "./runtime/plans";
 import { createRuntimeLifecycle } from "./runtime/lifecycle";
 import {
@@ -730,6 +732,32 @@ const {
   dispatchExecutionForProposal,
 } = planRuntime;
 
+// Memory extraction reads finished turns only: it never gates a turn, and the
+// setting decides whether it runs at all (ADR 0376).
+const memoryExtraction = createMemoryExtractionService({
+  settings: async () => {
+    const host = getHost();
+    if (!host) throw new Error("host unavailable");
+    return host.call<AppSettings>("settings.get");
+  },
+  session: async (sessionId) => {
+    const host = getHost();
+    if (!host) return undefined;
+    const response = await host.call<{ session?: Record<string, unknown> }>("session.get", {
+      id: sessionId,
+    });
+    return response?.session as never;
+  },
+  resolveLaunch: (sessionId, session, settings, options) =>
+    resolveAgentRuntimeLaunch(sessionId, session, settings, options as never),
+  vendorOAuth,
+  host: () => getHost(),
+  logger: {
+    app: (category, level, event, data) =>
+      logger.app(category as never, level as never, event, data as never),
+  },
+});
+
 const eventPersistence = createEventPersistence({
   runtimeState,
   steeringReplies,
@@ -751,6 +779,7 @@ const eventPersistence = createEventPersistence({
   transcriptRewrite: sessionCoordination,
   finishApprovedExecution,
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
+  scheduleMemoryExtraction: (request) => memoryExtraction.schedule(request),
 });
 const { persistAgentEvent } = eventPersistence;
 
