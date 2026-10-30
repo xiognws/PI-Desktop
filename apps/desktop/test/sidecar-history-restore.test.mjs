@@ -22,7 +22,11 @@ test("history restore failures cannot accept a clean prompt for stable or legacy
   let restoreFailure = "host";
   lines.on("line", (line) => {
     const value = JSON.parse(line);
-    if (value.method === "host.proxy") {
+    if (value.method === "host.proxy" && value.params.method === "memory.recall") {
+      // Best-effort recall runs before the restore; an empty store is a valid
+      // answer and keeps this test about the history path.
+      send({ id: value.id, result: { memories: [] } });
+    } else if (value.method === "host.proxy") {
       assert.equal(value.params.method, "session.get");
       if (restoreFailure === "host") send({ id: value.id, error: { code: -32000, message: "corrupted persisted history", data: { errorCode: "HISTORY_CORRUPT" } } });
       else if (restoreFailure === "empty") send({ id: value.id, result: { session: { messages: [] } } });

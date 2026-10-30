@@ -88,6 +88,19 @@ test("refresh hides unlisted chat choices and preserves editable configured bind
   }
   const render = () => renderToStaticMarkup(createElement(I18nextProvider, { i18n }, createElement(Picker)));
   const ids = (html, className) => [...html.matchAll(new RegExp(`<span class="${className}[^"]*">([^<]*)</span>`, "g"))].map((match) => match[1]);
+  // A chosen row's name is now the rename field itself, so the row id arrives as
+  // the input's value instead of a span.
+  const chosenNames = (html) => [...html.matchAll(/<input\b[^>]*>/g)]
+    .map((match) => match[0])
+    .filter((tag) => tag.includes("provider-chosen-alias-input"))
+    .map((tag) => tag.match(/value="([^"]*)"/)?.[1] ?? "");
+  /** Limits cell of the chosen row whose rename field currently holds `name`. */
+  const chosenLimitsFor = (html, name, limitClass) => {
+    const row = [...html.matchAll(/<li\b[\s\S]*?<\/li>/g)]
+      .map((match) => match[0])
+      .find((item) => item.includes(`value="${name}"`) && item.includes("provider-chosen-alias-input"));
+    return row?.match(new RegExp(`class="${limitClass}">([^<]*)`))?.[1];
+  };
   const limitsFor = (html, idClass, limitClass, modelId) => {
     const row = [...html.matchAll(/<li\b[\s\S]*?<\/li>/g)]
       .map((match) => match[0])
@@ -128,8 +141,9 @@ test("refresh hides unlisted chat choices and preserves editable configured bind
   const html = await refresh();
   assert.deepEqual(ids(html, "provider-models-row-id"), served);
   assert.deepEqual(persisted, row.models);
-  assert.deepEqual(ids(html, "provider-chosen-row-id"), [
-    "gpt-6-sol", "claude-sonnet-4-5", "gpt-6-astra", "new-model",
+  // The row shows the reader's own name where one was given, the id otherwise.
+  assert.deepEqual(chosenNames(html), [
+    "gpt-6-sol", "Saved alias", "gpt-6-astra", "new-model",
   ]);
   assert.deepEqual(
     composerModelsForProvider(row, discovery.models).map((model) => model.modelId),
@@ -144,7 +158,7 @@ test("refresh hides unlisted chat choices and preserves editable configured bind
     "an undiscovered model does not present generic runtime defaults as catalog limits",
   );
   assert.equal(
-    limitsFor(html, "provider-chosen-row-id", "provider-chosen-row-limits", "new-model"),
+    chosenLimitsFor(html, "new-model", "provider-chosen-row-limits"),
     "— · —",
     "an unknown configured model is labeled unknown until its limits are published or overridden",
   );

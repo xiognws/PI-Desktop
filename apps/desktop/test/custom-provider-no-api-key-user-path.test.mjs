@@ -362,6 +362,8 @@ app.whenReady().then(async () => {
       newKeyedProviderPreserved: true,
     });
   } finally {
-    await rm(temp, { recursive: true, force: true });
+    // Chromium releases its dictionary slightly after the window is gone, and
+    // Windows surfaces that as EBUSY rather than a late close.
+    await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });

@@ -339,5 +339,9 @@ app.whenReady().then(async () => {
     assert.equal(code, 0, output.slice(-6000));
     assert.match(output, /S3_SETTINGS_PROBE \{"passed":true\}/);
     assert.match(output, /CHECKBOX_PROBE \{"passed":true\}/);
-  } finally { await rm(temp, { recursive: true, force: true }); }
+  } finally {
+    // Chromium keeps its spellcheck dictionary open for a moment after the window
+    // closes; Windows reports that as EBUSY, so the removal retries.
+    await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
 });

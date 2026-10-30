@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { posix, win32 } from "node:path";
+import { join, posix, resolve as resolvePath, win32 } from "node:path";
 import test from "node:test";
 import { isWithinRoot } from "../../../packages/agent-runtime/src/project-instructions.ts";
 import { resolveWithinRoot } from "../../../packages/host-runtime/src/workspace-files.ts";
@@ -50,7 +50,9 @@ test("windows directories that are not roots stay contained", () => {
 });
 
 test("a posix filesystem root contains a relative path", () => {
-  assert.equal(resolveWithinRoot("/", REL), `/${REL}`);
+  // Without an explicit path module the helper follows the host, and a Windows
+  // host resolves "/" to the root of the current drive.
+  assert.equal(resolveWithinRoot("/", REL), join(resolvePath("/"), REL));
   assert.equal(resolveWithinRoot("/", REL, posix), `/${REL}`);
   assert.equal(resolveWithinRoot("/srv/app", "../app-evil/x", posix), null);
 });

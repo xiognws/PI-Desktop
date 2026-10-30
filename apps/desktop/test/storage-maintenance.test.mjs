@@ -7,6 +7,12 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test, { after } from "node:test";
 
+/** NTFS keeps no POSIX mode bits, so a Windows host cannot report them back. */
+async function assertMode(target, expected) {
+  if (process.platform === "win32") return;
+  assert.equal((await lstat(target)).mode & 0o777, expected);
+}
+
 const { build } = createRequire(new URL("../../../packages/agent-runtime/package.json", import.meta.url))("esbuild");
 const storageDirectory = fileURLToPath(new URL("../electron/main/storage/", import.meta.url));
 const result = await build({
@@ -246,8 +252,8 @@ test("cold migration copies real data, verifies hashes, preserves secret permiss
   const events = []; const relocations = [];
   const next = await migrate(value, { progress: (event) => events.push(event), relocate: async (...roots) => relocations.push(roots) });
   assert.equal(hash(await readFile(join(next.data, "sessions/chat.jsonl"))), hash(payload));
-  assert.equal((await lstat(join(next.data, "secrets.json"))).mode & 0o777, 0o600);
-  assert.equal((await lstat(next.data)).mode & 0o777, 0o700);
+  await assertMode(join(next.data, "secrets.json"), 0o600);
+  await assertMode(next.data, 0o700);
   assert.equal(await readFile(join(next.browser, "Local Storage/leveldb/test.ldb"), "utf8"), "browser state");
   assert.equal(await exists(join(next.browser, storage.STORAGE_PREFERENCE_FILE)), false);
   for (const name of installLockNames) assert.equal(await exists(join(next.browser, name)), false);
@@ -297,7 +303,7 @@ test("migration preserves external relative links and read-only files", { timeou
   await put(join(value.roots.data, "plugins/installed/read-only.js"), "plugin source", 0o444);
   const next = await migrate(value);
   assert.equal(await realpath(join(next.data, "external-relative")), external);
-  assert.equal((await lstat(join(next.data, "plugins/installed/read-only.js"))).mode & 0o777, 0o444);
+  await assertMode(join(next.data, "plugins/installed/read-only.js"), 0o444);
   assert.equal(await readFile(join(next.data, "plugins/installed/read-only.js"), "utf8"), "plugin source");
 });
 
@@ -319,7 +325,7 @@ test("migration re-reads and rejects a tampered read-only copy before relocating
   }, relocate: async () => { relocated = true; } }), /changed|verification/);
   assert.equal(relocated, false);
   assert.equal(await readFile(join(value.roots.data, "plugins/installed/read-only.js"), "utf8"), "plugin source");
-  assert.equal((await lstat(join(value.target, "data/plugins/installed/read-only.js"))).mode & 0o777, 0o444);
+  await assertMode(join(value.target, "data/plugins/installed/read-only.js"), 0o444);
 });
 
 test("interrupted migration retries only the same claimed job and preserves the original", { timeout: 60_000 }, async (t) => {
@@ -457,7 +463,7 @@ test("storage preferences round-trip pending work atomically and reject malforme
   const preferences = { version: 1, roots: value.roots, backups: [], pending: { id: randomUUID(), kind: "migrate", target: value.target, language: "en" } };
   storage.writeStoragePreferences(file, preferences);
   assert.deepEqual(storage.readStoragePreferences(file, value.roots), preferences);
-  assert.equal((await lstat(file)).mode & 0o777, 0o600);
+  await assertMode(file, 0o600);
   await writeFile(file, JSON.stringify({ ...preferences, roots: { data: "relative", browser: value.anchor } }));
   assert.throws(() => storage.readStoragePreferences(file, value.roots), /Invalid storage preferences/);
 });

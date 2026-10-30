@@ -21,7 +21,8 @@ test("Settings hides the mounted chat shell and keeps its portal layers out of v
   assert.match(appShell, /className="app-chat-shell"[\s\S]*?<ChatSurface visible=\{page === "chat"\} \/>/);
   assert.match(appShell, /\{page === "settings" \? \([\s\S]*?<SettingsPage \/>/);
   assert.match(appShell, /<ChatSurface visible=\{page === "chat"\} \/>/);
-  assert.match(appShell, /<SearchDialog open=\{searchOpen\}/);
+  // The overlay is mounted in every page state; it now also carries its mode.
+  assert.match(appShell, /<SearchDialog[\s\S]{0,60}open=\{searchOpen\}/);
   assert.match(styles, /\.app-chat-shell\s*\{\s*display:\s*contents;/);
   assert.match(styles, /\.app-chat-shell\[hidden\]\s*\{\s*display:\s*none;/);
   assert.match(portalVisibility, /<PortalVisibilityContext\.Consumer>[\s\S]*visible \? node : null/);

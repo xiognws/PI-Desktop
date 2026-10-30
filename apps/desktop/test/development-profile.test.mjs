@@ -142,10 +142,14 @@ test("main resolves one data directory and publishes it to everything below", ()
   // Publishing happens after the lock verdict, which reads the same variable:
   // moving the write above `singleInstanceRequired` would make every launch
   // look like it had been given an explicit data directory and skip the lock.
-  const lockVerdict = installationSource.indexOf(
-    "const singleInstanceRequired = !process.env.PI_DESKTOP_DATA_DIR;",
+  const explicitFlag = installationSource.indexOf("const dataDirWasExplicit =");
+  const publishesRoot = installationSource.indexOf("applyReleaseDataRoot(");
+  assert.ok(explicitFlag > 0, "installation must read the explicit data-dir flag");
+  assert.ok(
+    explicitFlag < publishesRoot,
+    "the flag has to be read before the build publishes its own root",
   );
-  assert.ok(lockVerdict > 0);
+  assert.match(installationSource, /const singleInstanceRequired = !dataDirWasExplicit;/);
   assert.doesNotMatch(installationSource, /process\.env\.PI_DESKTOP_DATA_DIR = dataDir;/);
   assert.match(entrySource, /from ["']\.\/installation["']/);
   assert.match(entrySource, /\.then\([\s\S]*?import\(["']\.\/index["']\)/);

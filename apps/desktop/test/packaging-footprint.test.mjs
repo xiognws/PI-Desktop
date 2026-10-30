@@ -29,6 +29,9 @@ const pluginPanelPreloadSource = await readFile(
 
 test("packaging keeps native voice modules as runtime dependencies", () => {
   assert.deepEqual(Object.keys(packageJson.dependencies).sort(), [
+    // Native AST search: the desktop runs `ast_search` in main with the prebuilt
+    // grammar bindings, so the payload ships like the voice modules do.
+    "@ast-grep/napi",
     "@picovoice/pvrecorder-node",
     "electron-updater",
     "transcribe-cpp",
@@ -272,6 +275,8 @@ test("macOS DMG remains a two-icon install and artifacts omit first-launch guida
 test("packaging keeps voice native payloads unpacked and excludes removed PTY payloads", () => {
   assert.deepEqual(packageJson.build.asar, { smartUnpack: false });
   assert.deepEqual(packageJson.build.asarUnpack, [
+    "node_modules/@ast-grep/napi/**/*.node",
+    "node_modules/@ast-grep/napi-*/**/*.node",
     "node_modules/transcribe-cpp/**/*.node",
     "node_modules/transcribe-cpp/**/bin/**",
     "node_modules/@picovoice/pvrecorder-node/**/*.node",

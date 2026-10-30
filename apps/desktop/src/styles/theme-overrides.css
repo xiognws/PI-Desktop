@@ -127,7 +127,10 @@
   padding: 0 12px;
   background: var(--ds-bg-sidebar);
   border-top: 1px solid var(--ds-border-subtle);
-  backdrop-filter: blur(12px);
+  /* Paired with a saturation like every other frosted surface: blur alone
+     flattens the colours behind the bar. */
+  backdrop-filter: saturate(1.4) blur(12px);
+  -webkit-backdrop-filter: saturate(1.4) blur(12px);
 }
 
 :root[data-theme="light"] .sidebar-footer {

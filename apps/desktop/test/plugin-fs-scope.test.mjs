@@ -694,14 +694,16 @@ test("the project's other folders are not an escape hatch", async (t) => {
     "PERMISSION_DENIED",
     /never readable by plugins/,
   );
-  // A folder this project did not register is not a group folder.
+  // A folder this project did not register is not a group folder, so its path
+  // resolves outside the plugin root: that is an escape, not a typo, and the
+  // runtime says so instead of claiming the file is missing.
   await refused(
     t,
     runtime.invokePanelBridge("fs.folders.guards", "fs.openDefault", {
       path: join(stranger, "notes.txt"),
     }),
-    "NOT_FOUND",
-    /path not found/,
+    "INVALID_ARGUMENT",
+    /escapes the plugin's root/,
   );
   assert.ok(
     audits.some((entry) => entry.api === "fs.read" && entry.ok === false),
