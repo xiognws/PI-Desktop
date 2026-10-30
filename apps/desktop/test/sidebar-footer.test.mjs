@@ -77,13 +77,20 @@ test("footer exposes settings, plugins, scheduled tasks and notifications in one
   assert.match(footerAttributes('data-nav="scheduled"'), /aria-pressed=\{page === "scheduled"\}/);
 });
 
-test("footer sits on the sidebar content grid without a hairline", () => {
-  const block = globalStyles.match(/\.sidebar-footer\s*\{[^}]+\}/)?.[0] ?? "";
-  // Zero side padding keeps the chip text and trailing icon aligned with the
-  // nav rows that .sidebar-body already insets by 8px. D297: the footer is set
-  // apart from the nav by `margin-top: auto` and its own padding, not a rule.
-  assert.match(block, /padding:\s*7px 0 2px/);
-  assert.doesNotMatch(block, /border-top/);
+test("footer is the window-wide status bar, and the shell reserves its height", () => {
+  // The bar is not a sidebar footer any more: it spans the window so the session
+  // frame sits above it, which is why it is fixed to the bottom edge and why a
+  // hairline is what separates it from the content rather than a sidebar rule.
+  const block = globalStyles.match(/\.sidebar-footer\s*\{[^}]+/)?.[0] ?? "";
+  assert.match(block, /position:\s*fixed/);
+  assert.match(block, /inset-inline:\s*0/);
+  assert.match(block, /bottom:\s*0/);
+  assert.match(block, /height:\s*30px/);
+  assert.match(block, /padding:\s*0 12px/);
+  assert.match(block, /border-top:\s*1px solid var\(--ds-border-subtle\)/);
+  // A fixed bar hides the last rows unless the shell pays for it.
+  const shell = globalStyles.match(/\.app-shell\s*\{[^}]+/)?.[0] ?? "";
+  assert.match(shell, /padding-bottom:\s*30px/);
   assert.match(globalStyles, /\.footer-build\s*\{[^}]*padding:\s*5px 8px/s);
 });
 

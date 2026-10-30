@@ -206,7 +206,7 @@ export function MemoryPane() {
                     ) : null}
                   </div>
                   <p className="mt-1 whitespace-pre-wrap text-xs text-muted">{record.body}</p>
-                  <p className="mt-1 text-[11px] text-muted">
+                  <p className="mt-1 text-2xs text-muted">
                     {t("settings.memoryMeta", {
                       used: record.useCount,
                       date: new Date(record.lastUsedAt ?? record.createdAt).toLocaleDateString(
