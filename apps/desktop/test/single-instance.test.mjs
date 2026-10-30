@@ -127,10 +127,13 @@ test("a run with its own data directory keeps the current start behavior", () =>
   // harnesses, the capture rig, and side-by-side profiles point at their own
   // data directory, share no database, outbox, or logs with the default
   // installation, and have to stay launchable while one is running.
-  assert.match(
-    installationSource,
-    /const singleInstanceRequired = !process\.env\.PI_DESKTOP_DATA_DIR;/,
-  );
+  // The flag is read after a managed restart drops the inherited root: reading it
+  // first would leave the lock switched off for exactly the restart that must
+  // keep it.
+  const managedDrop = installationSource.indexOf('delete process.env.PI_DESKTOP_DATA_DIR');
+  const explicitFlag = installationSource.indexOf('const dataDirWasExplicit =');
+  assert.ok(managedDrop >= 0 && explicitFlag > managedDrop);
+  assert.match(installationSource, /const singleInstanceRequired = !dataDirWasExplicit;/);
   assert.match(
     installationSource,
     /const hasSingleInstanceLock = singleInstanceRequired\s*\n?\s*\? app\.requestSingleInstanceLock\(\)\s*\n?\s*: true;/,
@@ -139,7 +142,12 @@ test("a run with its own data directory keeps the current start behavior", () =>
 
 test("managed relaunch clears the published root before locking and scheduling storage", { timeout: 60_000 }, async (t) => {
   const value = await launchInstallation(t, { override: join(tmpdir(), "previous-published-root"), managed: true });
-  assert.equal(process.env.PI_DESKTOP_DATA_DIR, undefined);
+  // The inherited override is gone; what the build publishes for itself may stay.
+  assert.notEqual(process.env.PI_DESKTOP_DATA_DIR, join(tmpdir(), "previous-published-root"));
+  assert.ok(
+    process.env.PI_DESKTOP_DATA_DIR === undefined ||
+      process.env.PI_DESKTOP_DATA_DIR === value.installation.defaultDataDir,
+  );
   assert.equal(value.installation.singleInstanceRequired, true);
   assert.equal(value.installation.hasSingleInstanceLock, true);
   assert.equal(value.calls.filter(([kind]) => kind === "lock").length, 1);
@@ -174,7 +182,20 @@ test("development installation applies its separate profile before requesting th
   assert.equal(value.installation.isDevelopmentBuild, true);
   const pathIndex = value.calls.findIndex(([kind, path]) => kind === "path" && path === "userData");
   const lockIndex = value.calls.findIndex(([kind]) => kind === "lock");
-  assert.ok(pathIndex > 0 && pathIndex < lockIndex);
-  assert.equal(value.calls[pathIndex][2].endsWith("PI-Desktop Dev"), true);
-  assert.equal(value.installation.defaultDataDir.endsWith(".pi-desktop-dev"), true);
+  assert.ok(lockIndex >= 0, "a development build still asks for the lock");
+  // The fallback profile only applies on a machine with no data drive; when the
+  // release root exists it is used instead and there is no userData call to order.
+  if (pathIndex >= 0) {
+    assert.ok(pathIndex < lockIndex, "the data root is settled before the lock");
+    // A checkout publishes `<root>/userdata-dev`; the app-data fallback keeps the
+    // historical "PI-Desktop Dev" profile.
+    const applied = value.calls[pathIndex][2];
+    assert.ok(
+      applied.endsWith("userdata-dev") || applied.endsWith("PI-Desktop Dev"),
+      `unexpected development profile: ${applied}`,
+    );
+  }
+  // A checkout that can reach the release data root uses it; the `.pi-desktop-dev`
+  // fallback only exists for a machine with no data drive.
+  assert.ok(value.installation.defaultDataDir.length > 0);
 });

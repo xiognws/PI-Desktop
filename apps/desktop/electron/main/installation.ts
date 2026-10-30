@@ -10,8 +10,12 @@ ignoreBrokenStdio();
 installMainProcessErrorHandlers();
 export const isDevelopmentBuild = process.env.PI_DESKTOP_DEV === "1" || !app.isPackaged;
 app.setName(APP_NAME);
-// Only an explicit override opts out of the single-instance lock; the data root
-// this build claims for itself must not look like one.
+// A managed restart inherits the root published for children, not an explicit
+// profile override. Dropped before anything reads the override below.
+if (process.argv.includes("--pi-managed-storage")) delete process.env.PI_DESKTOP_DATA_DIR;
+// Only an explicit override opts out of the single-instance lock, and it has to
+// be read before the data root below is published into the environment — that
+// root belongs to the build, not to the caller.
 const dataDirWasExplicit = Boolean(process.env.PI_DESKTOP_DATA_DIR?.trim());
 // A shipped build keeps everything it writes on a non-system drive; a checkout
 // keeps its own development profile. Must run before any writer resolves a path.
@@ -21,8 +25,6 @@ const dataRoot = applyReleaseDataRoot(isDevelopmentBuild);
 if (!dataRoot) applyDevelopmentUserData(app, isDevelopmentBuild);
 if (process.platform === "win32") app.setAppUserModelId(APP_ID);
 
-// A managed restart inherits the root published for children, not an explicit profile override.
-if (process.argv.includes("--pi-managed-storage")) delete process.env.PI_DESKTOP_DATA_DIR;
 export const singleInstanceRequired = !dataDirWasExplicit;
 export const hasSingleInstanceLock = singleInstanceRequired ? app.requestSingleInstanceLock() : true;
 export const defaultDataDir = desktopDataDir(isDevelopmentBuild);

@@ -15,6 +15,21 @@ const { IPC } = await import("@pi-desktop/shared");
 
 const SESSION = "session-1";
 
+/**
+ * The relay unrefs its answer timer so a closing window cannot hold the process
+ * open. A test has no other handle to keep its event loop alive, so waiting on an
+ * offer nobody answers would end the loop and cancel the test. One referenced
+ * timer stands in for the window that would normally still be there.
+ */
+async function withLoopAlive(promise) {
+  const keepAlive = setTimeout(() => undefined, 10_000);
+  try {
+    return await promise;
+  } finally {
+    clearTimeout(keepAlive);
+  }
+}
+
 function makeRelay({ activeSession = SESSION, answerTimeoutMs = 50 } = {}) {
   const sent = [];
   const relay = createComposerSuggestionRelay({
@@ -25,7 +40,13 @@ function makeRelay({ activeSession = SESSION, answerTimeoutMs = 50 } = {}) {
     getActiveSession: () => (activeSession ? { sessionId: activeSession } : null),
     answerTimeoutMs,
   });
-  return { relay, sent };
+  return {
+    relay: {
+      ...relay,
+      offer: (input) => withLoopAlive(relay.offer(input)),
+    },
+    sent,
+  };
 }
 
 function offer(overrides = {}) {

@@ -111,15 +111,19 @@ test("optional dependencies and overrides cannot escape the registry before npm 
     assert.match(String(result.error), /non-registry spec/);
     assert.equal(npmRan, false);
   }
-  let deepOverrides = {};
-  let cursor = deepOverrides;
-  for (let index = 0; index < 2000; index += 1) {
-    cursor[`package-${index}`] = {};
-    cursor = cursor[`package-${index}`];
-  }
-  cursor.evil = "git+ssh://git@evil.example/evil.git";
+  // Written as text: `JSON.stringify` walks the 2000 levels recursively and
+  // overflows the stack itself, which says nothing about the installer under
+  // test — the point is that the installer's walk is iterative.
+  const depth = 2000;
+  const nestedOverrides =
+    Array.from({ length: depth }, (_, index) => `{"package-${index}":`).join("") +
+    '{"evil":"git+ssh://git@evil.example/evil.git"}' +
+    "}".repeat(depth);
   const deepRoot = mkdtempSync(join(tmpdir(), "ext-deps-deep-overrides-"));
-  writeFileSync(join(deepRoot, "package.json"), JSON.stringify({ dependencies: { ok: "^1" }, overrides: deepOverrides }));
+  writeFileSync(
+    join(deepRoot, "package.json"),
+    `{"dependencies":{"ok":"^1"},"overrides":${nestedOverrides}}`,
+  );
   const deepResult = await installExtensionDependencies(deepRoot, { runner: async () => ({ code: 0, stderr: "" }) });
   assert.equal(deepResult.state, "failed");
   assert.match(String(deepResult.error), /non-registry spec/);
