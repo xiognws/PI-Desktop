@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { darwinOnly } from "./helpers/platform-guard.mjs";
 
 const verifyScript = new URL(
   "../../../scripts/verify-macos-release.sh",
@@ -97,7 +98,7 @@ function runNotarize(release, bin, log, extraEnv = {}) {
   });
 }
 
-test("the DMG is submitted to Apple before it is stapled", async (t) => {
+test("the DMG is submitted to Apple before it is stapled", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-dmg-notary-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -119,7 +120,7 @@ test("the DMG is submitted to Apple before it is stapled", async (t) => {
   assert.match(result.stdout, /status.*Accepted/);
 });
 
-test("stapling retries only after Apple accepts the DMG", async (t) => {
+test("stapling retries only after Apple accepts the DMG", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-dmg-retry-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -140,7 +141,7 @@ test("stapling retries only after Apple accepts the DMG", async (t) => {
   );
 });
 
-test("a rejected DMG is never stapled and the Apple log is fetched", async (t) => {
+test("a rejected DMG is never stapled and the Apple log is fetched", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-dmg-rejected-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -159,7 +160,7 @@ test("a rejected DMG is never stapled and the Apple log is fetched", async (t) =
   assert.match(calls, new RegExp(`notarytool log ${SUBMISSION_ID}`));
 });
 
-test("a failed submission fails the run and dumps the Apple log", async (t) => {
+test("a failed submission fails the run and dumps the Apple log", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-dmg-submitfail-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -178,7 +179,7 @@ test("a failed submission fails the run and dumps the Apple log", async (t) => {
   assert.doesNotMatch(calls, /stapler staple/);
 });
 
-test("the notarization step fails closed without team-scoped credentials", async (t) => {
+test("the notarization step fails closed without team-scoped credentials", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-dmg-nocreds-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -214,7 +215,7 @@ test("the notarization step fails closed without team-scoped credentials", async
   );
 });
 
-test("macOS release verification requires a notarized Developer ID app and DMG", async (t) => {
+test("macOS release verification requires a notarized Developer ID app and DMG", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-release-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -261,7 +262,7 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
   );
 });
 
-test("macOS release verification rejects a Developer ID app without notarization", async (t) => {
+test("macOS release verification rejects a Developer ID app without notarization", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-unnotarized-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -291,7 +292,7 @@ test("macOS release verification rejects a Developer ID app without notarization
   assert.match(result.stderr, /did not recognize .* as notarized/);
 });
 
-test("macOS release verification accepts the prefixed identity form", async (t) => {
+test("macOS release verification accepts the prefixed identity form", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-prefixed-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -324,7 +325,7 @@ test("macOS release verification accepts the prefixed identity form", async (t) 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
-test("macOS release verification rejects a different signing identity", async (t) => {
+test("macOS release verification rejects a different signing identity", darwinOnly, async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-wrong-id-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 

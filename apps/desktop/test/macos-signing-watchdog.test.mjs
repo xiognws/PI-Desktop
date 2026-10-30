@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { darwinOnly } from "./helpers/platform-guard.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const watchdogPath = join(repoRoot, "scripts", "macos-signing-watchdog.mjs");
@@ -151,7 +152,7 @@ test("a silent signing stage produces a stall dump without failing the run", asy
   assert.ok(elapsedMs < 20_000, `watchdog took ${elapsedMs}ms`);
 });
 
-test("a hard timeout kills the process group, dumps diagnostics and exits 124", async () => {
+test("a hard timeout kills the process group, dumps diagnostics and exits 124", darwinOnly, async () => {
   const { status, stdout, elapsedMs } = await runWatchdog([
     "--label",
     "timeout",
@@ -340,7 +341,7 @@ test(
   },
 );
 
-test("the app stapler shim retries only stapler staple and preserves arguments", async (t) => {
+test("the app stapler shim retries only stapler staple and preserves arguments", darwinOnly, async (t) => {
   const root = await makeTempDir(t);
   const fakeBin = join(root, "fakebin");
   const callLog = join(root, "xcrun-calls.log");

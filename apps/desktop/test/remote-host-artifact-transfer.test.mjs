@@ -5,6 +5,7 @@ import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { register } from "node:module";
+import { posixOnly } from "./helpers/platform-guard.mjs";
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const { uploadSshArtifact } = await import("../electron/main/remote/ssh-artifact-transfer.ts");
 const { createSshBootstrap } = await import("../electron/main/remote/ssh-bootstrap.ts");
@@ -24,7 +25,7 @@ function transferFixture(overrides = {}) {
   };
   return { transport, commands, uploads };
 }
-test("verified bytes stream over SSH, temporary local bytes are removed, cleanup is idempotent", async () => {
+test("verified bytes stream over SSH, temporary local bytes are removed, cleanup is idempotent", posixOnly, async () => {
   const f = transferFixture();
   const artifact = await uploadSshArtifact(f.transport, { url, expectedSha256: digest,
     fetchArtifact: async () => new Response(bytes) });
@@ -112,7 +113,7 @@ test("cancellation while checksum waits cannot resume installation", async () =>
   controller.abort(); gate.resolve(digest);
   await assert.rejects(pending, { name: "AbortError" }); assert.equal(installs, 0);
 });
-test("system SSH file transport preserves binary stdin", async () => {
+test("system SSH file transport preserves binary stdin", posixOnly, async () => {
   const dir = await mkdtemp(join(tmpdir(), "ssh-file-stream-"));
   const binary = join(dir, "ssh"), source = join(dir, "source"), dest = join(dir, "dest");
   await writeFile(binary, '#!/bin/sh\nfor arg do command="$arg"; done\nexec sh -c "$command"\n', { mode: 0o755 });

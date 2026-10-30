@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { darwinOnly } from "./helpers/platform-guard.mjs";
 
 // Both scripts are plain bash / node CLI tools with no dependencies, so these
 // tests drive them through a fake PATH and a temporary bundle fixture instead of
@@ -336,7 +337,7 @@ test("diagnostics never echo signing secrets", async (t) => {
   }
 });
 
-test("inventory counts the signing payload of a release directory", async (t) => {
+test("inventory counts the signing payload of a release directory", darwinOnly, async (t) => {
   const root = await tempRoot(t, "pi-desktop-bundle-inventory-");
   const release = join(root, "release");
   const app = await writeBundleFixture(release);

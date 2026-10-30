@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
+import { posixOnly } from "./helpers/platform-guard.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
@@ -75,7 +76,7 @@ server.listen(0, '127.0.0.1', () => console.log('PI_HOST_READY ' + JSON.stringif
   return { home, base, work, credentials, run };
 }
 
-test("stopped installed Host starts at a fresh port, then running reuse preserves PID and credentials", async t => {
+test("stopped installed Host starts at a fresh port, then running reuse preserves PID and credentials", posixOnly, async t => {
   const f = await fixture(t);
   await writeFile(join(f.work, "pi-host.pid"), "99999999\n");
   await writeFile(join(f.work, "pi-host.log"), line(ready) + "PI_HOST_PAIRING_TOKEN historic-secret\n");
@@ -94,14 +95,14 @@ test("stopped installed Host starts at a fresh port, then running reuse preserve
   assert.ok((await readFile(join(f.work, "pi-host.log"), "utf8")).includes("historic-secret"));
 });
 
-test("legacy installed bundle can use system Node without installing", async t => {
+test("legacy installed bundle can use system Node without installing", posixOnly, async t => {
   const f = await fixture(t, { legacy: true });
   const result = await f.run();
   assert.equal(result.code, 0, result.stderr);
   parseRemoteHostReady(result.stdout, { version: VERSION });
 });
 
-test("unrelated live PID is neither killed nor mistaken for an installed Host", async t => {
+test("unrelated live PID is neither killed nor mistaken for an installed Host", posixOnly, async t => {
   const f = await fixture(t);
   await writeFile(join(f.work, "pi-host.pid"), String(process.pid));
   await writeFile(join(f.work, "pi-host.log"), line(ready));

@@ -8,6 +8,7 @@ import { register } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { posixOnly } from "./helpers/platform-guard.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
@@ -245,7 +246,7 @@ test("a hostile version stays one literal value when the assignments run", async
   }
 });
 
-test("the generated script installs, starts, and prints the ready/pairing lines", async () => {
+test("the generated script installs, starts, and prints the ready/pairing lines", posixOnly, async () => {
   const { dir, cleanup } = await tempDir("pi-host-script-run-");
   try {
     const sandbox = await prepareSandbox(dir);
@@ -272,7 +273,7 @@ test("the generated script installs, starts, and prints the ready/pairing lines"
   }
 });
 
-test("a checksum mismatch fails the script before anything is installed", async () => {
+test("a checksum mismatch fails the script before anything is installed", posixOnly, async () => {
   const { dir, cleanup } = await tempDir("pi-host-script-digest-");
   try {
     const sandbox = await prepareSandbox(dir);
@@ -391,7 +392,7 @@ async function seedVerifiedInstall(root, sandbox) {
   return { base, current };
 }
 
-test("a fully verified release is reused without a download", async () => {
+test("a fully verified release is reused without a download", posixOnly, async () => {
   const { dir, cleanup } = await tempDir("pi-host-reuse-");
   try {
     const sandbox = await prepareSandbox(dir);
@@ -409,7 +410,7 @@ test("a fully verified release is reused without a download", async () => {
 });
 
 for (const kind of ["damaged", "different-release", "changed-manifest"]) {
-  test(`refuses ${kind} reuse and preserves installed contents on download failure`, async () => {
+  test(`refuses ${kind} reuse and preserves installed contents on download failure`, posixOnly, async () => {
     const { dir, cleanup } = await tempDir("pi-host-reuse-refused-");
     try {
       const sandbox = await prepareSandbox(dir);
