@@ -54,8 +54,9 @@ export default defineConfig({
       "process.env.WS_NO_BUFFER_UTIL": "\"1\"",
       "process.env.WS_NO_UTF_8_VALIDATE": "\"1\"",
       // The main bundle is ESM (`type: module`), where Node does not provide
-      // the CommonJS `__dirname` global used by Electron's relative asset paths.
-      "__dirname": "import.meta.dirname",
+      // the CommonJS `__dirname` global. Nothing in the bundled main sources
+      // references it, so no substitution is needed here; defining it would
+      // also be applied to this config file itself and break `resolve(__dirname)`.
     },
     build: {
       rollupOptions: {
@@ -72,6 +73,14 @@ export default defineConfig({
           "jiti/static",
           "@picovoice/pvrecorder-node",
           "transcribe-cpp",
+          // Native module: its dist is CJS and resolves the platform .node
+          // binary through its own runtime `require`. Bundling it into the
+          // ESM main output leaves those `require` calls in module scope,
+          // where `require` is undefined, so the whole startup chain fails
+          // with "require is not defined in ES module scope". Electron loads
+          // it from node_modules at runtime instead (already asarUnpacked).
+          "@ast-grep/napi",
+          "@ast-grep/napi-win32-x64-msvc",
         ],
         input: {
           index: resolve(__dirname, "electron/main/entry.ts"),

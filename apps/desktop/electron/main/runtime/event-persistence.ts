@@ -261,6 +261,13 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     // regenerate branch archive below on its behalf.
     if (isStaleTerminalEvent(envelope)) return;
     completionNoticeTurns.delete(envelope.turnId ?? turnId ?? "");
+    // Memory extraction reads finished turns only, and a normally completed
+    // turn is the common case: schedule here as well as on the error branch,
+    // otherwise extraction never fires in practice.
+    scheduleMemoryExtraction?.({
+      sessionId: envelope.sessionId,
+      usedTools: turnUsedTools.delete(envelope.sessionId),
+    });
     const turnFinalization = finishTurn(envelope.sessionId, "completed", undefined, {
       turnId: envelope.turnId ?? "",
     });

@@ -20,6 +20,7 @@ import {
   type MemoryStats,
 } from "../../lib/api";
 import { SettingsCard } from "../../features/settings/primitives";
+import { MemoryProposalsQueue } from "./MemoryProposalsQueue";
 import { Badge, Button, cx, Input, SegmentedControl, SettingsToggle } from "../ui";
 
 const PAGE_SIZE = 200;
@@ -91,6 +92,8 @@ export function MemoryPane() {
   // Extraction is opt-in, so the switch has to be reachable from the surface that
   // shows what it produces (ADR 0376).
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  // Bumped whenever a proposal is decided, so the queue refetches without a remount.
+  const [queueToken, setQueueToken] = useState(0);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -118,33 +121,6 @@ export function MemoryPane() {
     } catch (cause) {
       setSettings(current);
       setNotice(cause instanceof Error ? cause.message : String(cause));
-    }
-  };
-
-  const acceptProposal = async (proposal: MemoryProposal) => {
-    setBusyId(proposal.id);
-    setNotice(null);
-    try {
-      await api.acceptMemoryProposal(proposal.id);
-      await load();
-      setNotice(t("settings.memoryProposalAccepted", { title: proposal.title }));
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const rejectProposal = async (proposal: MemoryProposal) => {
-    setBusyId(proposal.id);
-    setNotice(null);
-    try {
-      await api.rejectMemoryProposal(proposal.id);
-      await load();
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusyId(null);
     }
   };
 
@@ -309,51 +285,13 @@ export function MemoryPane() {
           </div>
         ) : null}
 
-        {proposals.length > 0 ? (
-          <div className="flex flex-col gap-1">
-            <p className="text-xs font-medium">
-              {t("settings.memoryProposalTitle", { count: proposals.length })}
-            </p>
-            <ul className="flex flex-col gap-1">
-              {proposals.map((proposal) => (
-                <li
-                  key={proposal.id}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-xs font-medium">{proposal.title}</span>
-                        <Badge>{t(KIND_LABEL_KEY[proposal.kind])}</Badge>
-                        <Badge>{t(SCOPE_LABEL_KEY[proposal.scope])}</Badge>
-                      </div>
-                      <p className="mt-1 whitespace-pre-wrap text-[11px] text-muted">
-                        {proposal.body}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        size="sm"
-                        disabled={busyId === proposal.id}
-                        onClick={() => void acceptProposal(proposal)}
-                      >
-                        {t("settings.memoryProposalAccept")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busyId === proposal.id}
-                        onClick={() => void rejectProposal(proposal)}
-                      >
-                        {t("settings.memoryProposalReject")}
-                      </Button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <MemoryProposalsQueue
+          refreshToken={queueToken}
+          onDecided={() => {
+            setQueueToken((token) => token + 1);
+            void load();
+          }}
+        />
 
         {decay !== null ? (
           decay.length === 0 ? (

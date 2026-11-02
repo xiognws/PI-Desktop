@@ -8,8 +8,9 @@
  *
  * Three rules shape it:
  *
- * - It is **opt-in**: `memoryExtractAfterTurn` is off unless the user turns it on,
- *   because a completion per turn is a cost the user should choose.
+ * - It **runs on every tool-using turn**: this build forces extraction on from
+ *   the bottom and ignores `memoryExtractAfterTurn`, which the UI still
+ *   stores. A completion per turn is the accepted cost.
  * - It only runs on a turn that **used a tool**. A chat turn rarely produces a
  *   durable fact, so the cheap signal keeps most turns free.
  * - It **never fails a turn**: the turn has already finished when this runs, and
@@ -87,7 +88,10 @@ export function createMemoryExtractionService(deps: MemoryExtractionDependencies
     if (!host) return 0;
 
     const settings = await deps.settings();
-    if (!settings.memoryExtractAfterTurn) return 0;
+    // Forced on: extraction runs after every tool-using turn regardless of
+    // `memoryExtractAfterTurn`. The stored setting is no longer a gate; the UI
+    // toggle is kept so an existing profile does not lose the field. This
+    // override of ADR 0376 is deliberate.
     const providerId = settings.defaultProviderId;
     const modelId = settings.defaultModelId;
     if (!providerId || !modelId) return 0;
