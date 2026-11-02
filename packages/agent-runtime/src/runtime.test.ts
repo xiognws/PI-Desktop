@@ -3968,6 +3968,11 @@ describe("DesktopAgentRuntime plan transitions", () => {
     expect(internal.role).toBe("user");
     expect(internal.content).toContain(execution.artifact.relativePath);
     expect(internal.content).toContain(execution.plan);
+    // An approved plan is prose. Unless the run opens a checklist the dock stays
+    // empty for its whole duration, so the instruction must ask for one.
+    expect(internal.content).toContain("call TodoWrite with the steps you intend to take");
+    expect(internal.content).toContain("exactly one in_progress and the rest pending");
+    expect(internal.content).toContain("Leave no todo pending or in_progress");
     expect(
       onEvent.mock.calls.some(
         ([envelope]) => (envelope as any).event?.message?.role === "user",
@@ -4459,6 +4464,10 @@ describe("DesktopAgentRuntime plan transitions", () => {
     expect(internal.content).toContain(execution.artifact.relativePath);
     expect(internal.content).toContain("verify every acceptance criterion");
     expect(internal.content).not.toContain("Execute the approved implementation plan");
+    // A goal run is the longest autonomous path there is; without a checklist the
+    // dock shows nothing until the final report.
+    expect(internal.content).toContain("call TodoWrite with the steps you intend to take");
+    expect(internal.content).toContain("Leave no todo pending or in_progress");
 
     await runtime.dispose();
   });
