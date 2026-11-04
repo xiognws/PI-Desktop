@@ -52,11 +52,19 @@ import { recoverRendererAfterGone } from "../renderer-recovery";
 function windowsIconPath(): string | undefined {
   if (process.platform !== "win32") return undefined;
 
+  // A PNG first, on purpose. Electron flattens an `.ico` to its single largest
+  // bitmap before handing Windows a window icon, so the taskbar button — which
+  // asks for 24 or 32 logical pixels — has nothing it can use and falls back to
+  // the window class default, i.e. Electron's own atom logo on a branded exe.
+  // Handing it a PNG lets Electron produce the size Windows asked for. The .ico
+  // stays as the fallback for a package that predates this change.
   const resourceRoot = app.isPackaged
     ? process.resourcesPath
     : join(app.getAppPath(), "build");
-  const iconPath = join(resourceRoot, app.isPackaged ? "app-icon.ico" : "icon.ico");
-  return existsSync(iconPath) ? iconPath : undefined;
+  const candidates = app.isPackaged
+    ? [join(resourceRoot, "app-icon.png"), join(resourceRoot, "app-icon.ico")]
+    : [join(resourceRoot, "icon.png"), join(resourceRoot, "icon.ico")];
+  return candidates.find((candidate) => existsSync(candidate));
 }
 
 export type WindowLifecycleState = {
