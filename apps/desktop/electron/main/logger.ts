@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { localTimestamp } from "./log-timestamp.ts";
 
 // NDJSON file logging per docs/spec/03-runtime/09-logging-and-observability.md.
 // Each channel is split into focused category files instead of one crowded
@@ -322,7 +323,7 @@ export class Logger {
     const { event: _event, data, ...attributes } = safeFields;
     const safeData = data === undefined ? undefined : boundData(data);
     const record: LogRecord = {
-      ts: new Date().toISOString(),
+      ts: localTimestamp(),
       level,
       channel,
       category,

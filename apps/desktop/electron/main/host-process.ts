@@ -13,6 +13,7 @@ import {
 import { DbSchemaTooNewError, parseSchemaTooNew } from "./host-boot-diagnostics";
 import { redactValue } from "./logger";
 import { getModuleDirectory } from "./module-path";
+import { localTimestamp } from "./log-timestamp.ts";
 
 export type {
   HostNotificationHandler,
@@ -95,7 +96,7 @@ export function diagnoseHostFailure({
 function fallbackStderrLogger(text: string): void {
   console.error(
     `[host/runtime] ${JSON.stringify({
-      ts: new Date().toISOString(),
+      ts: localTimestamp(),
       level: "info",
       channel: "host",
       category: "runtime",

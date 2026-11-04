@@ -6,6 +6,7 @@ import {
 } from "@pi-desktop/host-runtime";
 import { redactValue } from "./logger";
 import { getModuleDirectory } from "./module-path";
+import { localTimestamp } from "./log-timestamp.ts";
 
 export type {
   LocalToolHandler,
@@ -40,7 +41,7 @@ function resolveSidecarEntry(): string {
 function fallbackStderrLogger(text: string): void {
   console.error(
     `[agent/runtime] ${JSON.stringify({
-      ts: new Date().toISOString(),
+      ts: localTimestamp(),
       level: "info",
       channel: "agent",
       category: "runtime",

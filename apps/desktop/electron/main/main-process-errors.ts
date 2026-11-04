@@ -5,6 +5,7 @@
  */
 
 import { redactValue } from "./logger.ts";
+import { localTimestamp } from "./log-timestamp.ts";
 
 /** Matches `isBrokenPipeError` in logger.ts without importing that module. */
 function isBrokenPipeError(error: unknown): boolean {
@@ -78,7 +79,7 @@ export function classifyMainProcessError(
 function defaultEmit(record: MainProcessErrorRecord): void {
   try {
     const payload = {
-      ts: new Date().toISOString(),
+      ts: localTimestamp(),
       level: "error",
       channel: "app",
       category: "runtime",
