@@ -1,6 +1,12 @@
 export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
-export const APP_ID = "net.aiuo.pi-desktop";
+// The taskbar's app identity. Windows caches the name and icon it resolved for
+// an AppUserModelID, and a machine that ever ran this project from source has
+// "Electron" cached for the upstream id (dev runs use the same constant through
+// `node_modules/electron`), which no amount of clearing the icon cache fixes.
+// The fork advertises its own id so the shell resolves a fresh identity from the
+// executable instead of a stale one.
+export const APP_ID = "net.xiognws.pi-desktop";
 export const APP_NAME = "PI-Desktop";
 export const APP_VERSION = "0.21.0";
 

@@ -81,7 +81,7 @@
     "zustand": "^5.0.15"
   },
   "build": {
-    "appId": "net.aiuo.pi-desktop",
+    "appId": "net.xiognws.pi-desktop",
     "productName": "PI-Desktop",
     "directories": {
       "output": "release"
