@@ -18,6 +18,7 @@ pub use history_mutations::{
 mod model_system;
 mod usage;
 pub use usage::record_usage;
+pub use usage::session_totals;
 
 pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
 

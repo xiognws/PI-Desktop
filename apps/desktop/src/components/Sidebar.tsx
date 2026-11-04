@@ -36,6 +36,7 @@ import {
   StatusBarScheduled,
   StatusBarSessionAge,
   StatusBarSpeed,
+  StatusBarTokens,
 } from "./StatusBarUsage";
 import { StatusBarMenu, type StatusBarMenuEntry } from "./StatusBarMenu";
 import {
@@ -298,6 +299,7 @@ export function Sidebar({
   const statusBarEntries: StatusBarMenuEntry[] = [
     { id: "project", label: t("statusBar.project") },
     { id: "context", label: t("statusBar.context") },
+    { id: "tokens", label: t("statusBar.tokens") },
     { id: "speed", label: t("statusBar.speed") },
     { id: "cache", label: t("statusBar.cache") },
     { id: "sessionAge", label: t("statusBar.sessionAge") },
@@ -2865,6 +2867,7 @@ export function Sidebar({
               </span>
             ) : null}
             {statusBarPrefs.hidden.includes("context") ? null : <StatusBarMetrics />}
+            {statusBarPrefs.hidden.includes("tokens") ? null : <StatusBarTokens />}
             {statusBarPrefs.hidden.includes("speed") ? null : <StatusBarSpeed />}
             {statusBarPrefs.hidden.includes("cache") ? null : <StatusBarCache />}
             {statusBarPrefs.hidden.includes("sessionAge") ? null : <StatusBarSessionAge />}

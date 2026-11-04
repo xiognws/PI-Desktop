@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { SessionUsageTotals } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
+import { api } from "../lib/api";
 import { latestTurnContextInspector } from "../lib/latest-turn-context";
 import {
   calculateContextUsage,
   contextUsageView,
   resolveContextUsageDisplay,
 } from "../lib/context-usage";
-import { compactTokens, formatElapsed } from "../lib/status-bar";
+import { compactTokens, formatElapsed, sessionTokensUsed } from "../lib/status-bar";
 import { IPC } from "@pi-desktop/shared/protocol";
 import { ContextUsageInspector } from "./ContextUsageInspector";
 
@@ -197,6 +199,65 @@ export function StatusBarSpeed() {
           </>
         }
       />
+    </span>
+  );
+}
+
+/**
+ * `本会话 1.2M` — everything this session has spent, from its first turn.
+ *
+ * The number comes from the host's turn ledger, never from the transcript: the
+ * rendered window is bounded, so a session's earliest turns are gone from it
+ * while the total must not shrink. It refreshes on session switch and when a
+ * turn ends; a slow timer stands in for the turns that stream for minutes.
+ */
+export function StatusBarTokens() {
+  const { t } = useTranslation();
+  const sessionId = useAppStore((s) => s.activeSessionId);
+  const running = useAppStore((s) =>
+    s.activeSessionId ? s.runningSessions[s.activeSessionId] : false,
+  );
+  const [totals, setTotals] = useState<SessionUsageTotals | null>(null);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setTotals(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const result = await api.sessionUsageTotals(sessionId);
+        if (!cancelled) setTotals(result?.totals ?? null);
+      } catch {
+        // The status bar is a side channel: a failed poll keeps the last total.
+      }
+    };
+    void load();
+    const timer = setInterval(load, running ? 5000 : 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [sessionId, running]);
+
+  if (!sessionId || !totals) return null;
+  // A cache read is its own bucket, not part of the prompt's input count, so
+  // the four add up to what the provider actually processed.
+  const used = sessionTokensUsed(totals);
+  if (used <= 0) return null;
+  const breakdown = [
+    `${t("statusBar.tokenInput")} ${compactTokens(totals.inputTokens)}`,
+    `${t("statusBar.tokenOutput")} ${compactTokens(totals.outputTokens)}`,
+    `${t("statusBar.tokenCacheRead")} ${compactTokens(totals.cacheReadTokens)}`,
+    `${t("statusBar.tokenCacheWrite")} ${compactTokens(totals.cacheWriteTokens)}`,
+    `${t("statusBar.tokenReasoning")} ${compactTokens(totals.reasoningTokens)}`,
+    `${t("statusBar.tokenTurns")} ${totals.turns}`,
+  ].join(" · ");
+  return (
+    <span className="statusbar-metric" title={breakdown}>
+      <span className="statusbar-label">{t("statusBar.tokens")}</span>
+      <span className="statusbar-value">{compactTokens(used)}</span>
     </span>
   );
 }

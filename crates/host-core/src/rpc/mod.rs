@@ -2697,6 +2697,20 @@ async fn handle_request(
             }))
         }
 
+        // Session token totals come from the turn ledger, not from the rows the
+        // renderer happens to hold: its transcript window is bounded, and the
+        // status bar counts the session from its first turn.
+        "session.usageTotals" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let totals = sessions::session_totals(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "totals": totals }))
+        }
+
         "session.list" => {
             let st = state.lock().await;
             let sessions = sessions::list_sessions(&st.db)

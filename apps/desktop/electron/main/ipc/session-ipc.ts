@@ -578,6 +578,18 @@ export function registerSessionIpc({
       });
     },
   );
+  /*
+   * Session token totals come from the host's turn ledger, never from the rows
+   * the renderer holds: the transcript window is bounded, and the status bar
+   * counts the session from its first turn.
+   */
+  handle(IPC.invoke.sessionUsageTotals, async (input: { sessionId?: string }) => {
+    if (!host) throw new Error("host unavailable");
+    const sessionId = String(input?.sessionId || "");
+    if (!sessionId) throw new Error("sessionUsageTotals expects a sessionId");
+    return host.call("session.usageTotals", { sessionId });
+  });
+
   handle(
     IPC.invoke.sessionListRevisions,
     async (input: { sessionId: string; rootUserId: string }) => {

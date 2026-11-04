@@ -343,6 +343,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D680 | Cloud sync and Remote Hosts leave Settings | **Remove the `sync` and `remoteHosts` destinations from the Settings index: their rail rows, pages, search-keyword indexes, the packaged/development visibility rules they carried, their renderer components and feature modules, their styles, and the tests that pinned them are gone. The host-side configuration-sync service, the remote-host/SSH service, the IPC/RPC contracts, the `configSync.*` / `remoteHosts.*` locale strings, and the Create project dialog's remote source stay. See `04-ux/06-settings-ia.md`, `00-baseline.md`, and `06-delivery/04-e2e-test-plan.md`.** | Both surfaces are unused in this deployment; unreachable pages, Experimental badges, and dead styles only widened the settings directory and kept a maintenance surface alive. |
 | D681 | Bundled tool packages get their own page | **Add a Tools destination below Artifacts in the app-shell rail: the build's `resources/tools/<id>/tool.json` packages, rendered as one card each with name, version, description, declared tools and risk levels, and one enable switch. host-core scans the directory (`crates/host-core/src/tool_packages.rs`) and persists the enabled set in `<data>/tools/state.json`; `toolPackages.list` / `toolPackages.setEnabled` are the only surface, and a package that cannot be read keeps its row with the reason. See `04-ux/01-ui-ia.md` §3.4.1 and `03-runtime/04-data-storage.md` §2.** | Tool packages ship inside the image and need a visible, switchable roster without a plugin install/update/permission model; a separate declarative manifest keeps the marketplace surface out of it. |
 | D682 | The newest prompt stays readable while its answer scrolls | **A single-line strip at the transcript's top edge repeats the newest prompt the user sent once that row's bottom edge has passed the scrollport's top edge, and disappears as soon as any part of the row is visible again. It collapses whitespace, cuts on a word boundary, names the attachment count for an attachment-only prompt, never pins an agent-to-agent delivery, and yields the top edge to an open Find bar. Clicking it scrolls the row back into view. See `04-ux/09-interaction-patterns.md` §2.6.** | The reference client pins its human bubble to the top of the thread; a long answer otherwise pushes the question out of sight and the user has to scroll back to remember what they asked. |
+| D683 | Each session totals its tokens in the status bar | **The status bar gains a session token total, summed over every turn the session has run. The number comes from the host's turn ledger through a new `session.usageTotals` RPC rather than from the rendered transcript, whose window is bounded; the bar polls it on session switch, while a turn streams, and when one ends. The breakdown (input / output / cache read / cache write / reasoning / turns) lives in the item's tooltip, and the item can be hidden from the status bar menu like every other one. See `03-runtime/04-data-storage.md` (usage ledger).** | "How much has this conversation cost me" is a whole-session question; every existing token reading on the bar described one request or one context window. |
 
 
 ## M0. Model catalog decisions
@@ -8205,3 +8206,29 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   pins, the delivery exclusion, preview collapsing and truncation, the geometry
   boundary, selector escaping, the rendered strip (including the attachment-only
   case), the transcript wiring, and the two new keys in all nine catalogs.
+
+## 2026-11-04 — Each session totals its tokens in the status bar (D683)
+
+- The status bar's token readings described one request: `上下文` is the newest
+  turn's context occupancy, `缓存` its cache share. Nothing answered "how much has
+  this conversation used", which is the whole-session question.
+- The number comes from the host. `crates/host-core/src/sessions/usage.rs` gained
+  `session_totals`, exposed as `session.usageTotals`; it sums the turn ledger's
+  token columns and the cache/reasoning counters in the merged usage document.
+  Summing the renderer's own messages was rejected: the transcript window is
+  bounded, so a long session would report a total that shrinks as it scrolls.
+- `StatusBarTokens` renders the total as `Token 1.2M`, with the breakdown
+  (input / output / cache read / cache write / reasoning / turns) in the tooltip.
+  It refreshes on session switch, every five seconds while a turn streams, and
+  every thirty seconds otherwise; a failed poll keeps the last number, because the
+  bar is a side channel.
+- The four buckets are disjoint — a cache read is not part of the prompt's input
+  count — so the displayed total is their sum, and reasoning is excluded because
+  it is already inside the output count. `sessionTokensUsed` in
+  `apps/desktop/src/lib/status-bar.ts` owns that rule.
+- The item is registered in the status bar's customize menu (`tokens`), so it can
+  be hidden like every other reading.
+- Covered by `crates/host-core/src/sessions/usage.rs` (two turns summed, another
+  session's turns excluded, a turn with no usage document still counted, unknown
+  session empty) and `apps/desktop/test/session-usage-totals.test.mjs` (bucket
+  arithmetic, compaction, the host-ledger wiring, the menu entry, nine catalogs).

@@ -19,6 +19,24 @@ import type { SessionWorktreeSummary } from "./worktree.js";
  */
 export type SessionSource = "desktop" | "pi-native" | "remote";
 
+/**
+ * What one session has spent, summed over every turn it has run.
+ *
+ * The host's turn ledger is the source: a session's first turns are long gone
+ * from the renderer's bounded transcript window, so summing loaded messages
+ * would undercount. `cacheReadTokens` / `cacheWriteTokens` are separate buckets
+ * from `inputTokens` (a cache read is not part of the prompt's input count), and
+ * `reasoningTokens` is already inside `outputTokens`.
+ */
+export type SessionUsageTotals = {
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+};
+
 export type SessionCapabilities = {
   canPrompt: boolean;
   canStop: boolean;

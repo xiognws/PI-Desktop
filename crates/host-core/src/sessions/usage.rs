@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
+use serde::Serialize;
 use serde_json::{json, Map, Value};
 
 use crate::db::Database;
@@ -204,6 +205,58 @@ pub fn record_usage(db: &Database, session_id: &str, turn_id: &str, usage: &Valu
     Ok(true)
 }
 
+/// What one session has spent, summed over every turn it has run.
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTotals {
+    pub turns: i64,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub cache_write_tokens: i64,
+    /// Already part of `outputTokens`; reported for the breakdown only.
+    pub reasoning_tokens: i64,
+}
+
+/// Token totals for one session, from its first turn.
+///
+/// The caller cannot derive this from a transcript: the renderer's window is
+/// bounded and older turns drop out of it, while the status bar is supposed to
+/// count the whole session. Turns the user deleted are gone with their rows,
+/// which is exactly what the ledger itself says.
+pub fn session_totals(db: &Database, session_id: &str) -> Result<SessionTotals> {
+    let mut statement = db
+        .conn()
+        .prepare("SELECT input_tokens, output_tokens, usage_json FROM turns WHERE session_id = ?1")?;
+    let mut totals = SessionTotals::default();
+    let mut rows = statement.query(params![session_id])?;
+    while let Some(row) = rows.next()? {
+        totals.turns = totals.turns.saturating_add(1);
+        totals.input_tokens = totals
+            .input_tokens
+            .saturating_add(row.get::<_, Option<i64>>(0)?.unwrap_or(0).max(0));
+        totals.output_tokens = totals
+            .output_tokens
+            .saturating_add(row.get::<_, Option<i64>>(1)?.unwrap_or(0).max(0));
+        // Cache and reasoning live in the merged usage document only; the token
+        // columns carry the prompt/completion pair the ledger bills on.
+        let usage: Option<String> = row.get(2)?;
+        let Some(parsed) = usage
+            .as_deref()
+            .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        else {
+            continue;
+        };
+        let token = |key: &str| parsed.get(key).and_then(Value::as_i64).unwrap_or(0).max(0);
+        totals.cache_read_tokens = totals.cache_read_tokens.saturating_add(token("cacheReadTokens"));
+        totals.cache_write_tokens = totals
+            .cache_write_tokens
+            .saturating_add(token("cacheWriteTokens"));
+        totals.reasoning_tokens = totals.reasoning_tokens.saturating_add(token("reasoningTokens"));
+    }
+    Ok(totals)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,6 +334,63 @@ mod tests {
         assert_eq!(stored["totalTokens"], 30);
         assert_eq!(stored["cost"]["total"], 0.3);
         assert_eq!(stored["operations"].as_array().unwrap().len(), 2);
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn session_totals_sum_every_turn_from_the_first() {
+        let dir = std::env::temp_dir().join(format!("pi-usage-totals-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::open(&dir.join("test.sqlite")).unwrap();
+        let session = super::super::create_session(&db, None, None, None, None, None).unwrap();
+        let other = super::super::create_session(&db, None, None, None, None, None).unwrap();
+
+        // A session that has not run a turn yet is empty, not an error: the
+        // status bar polls by session id from the moment the session opens.
+        let fresh = session_totals(&db, &session.id).unwrap();
+        assert_eq!(fresh.turns, 0);
+        assert_eq!(fresh.input_tokens, 0);
+        assert_eq!(session_totals(&db, "missing-session").unwrap().turns, 0);
+
+        for (index, (input, output, cached, reasoning)) in
+            [(10_i64, 2_i64, 40_i64, 1_i64), (30, 5, 60, 4)].into_iter().enumerate()
+        {
+            let turn = super::super::begin_turn(&db, &session.id, None, None).unwrap();
+            let usage = json!({
+                "operationId": format!("op-{index}"),
+                "usageOrigin": "pi",
+                "inputTokens": input,
+                "outputTokens": output,
+                "totalTokens": input + output,
+                "cacheReadTokens": cached,
+                "cacheWriteTokens": 7,
+                "reasoningTokens": reasoning,
+                "costStatus": "unknown",
+            });
+            assert!(record_usage(&db, &session.id, &turn, &usage).unwrap());
+            super::super::end_turn(&db, &turn, "completed", None, Some(&usage), false).unwrap();
+        }
+
+        // Another session's turns must never leak into this total.
+        let foreign = super::super::begin_turn(&db, &other.id, None, None).unwrap();
+        assert!(record_usage(&db, &other.id, &foreign, &operation("other", false)).unwrap());
+
+        let totals = session_totals(&db, &session.id).unwrap();
+        assert_eq!(totals.turns, 2);
+        assert_eq!(totals.input_tokens, 40);
+        assert_eq!(totals.output_tokens, 7);
+        assert_eq!(totals.cache_read_tokens, 100);
+        assert_eq!(totals.cache_write_tokens, 14);
+        assert_eq!(totals.reasoning_tokens, 5);
+
+        // The turn whose usage document never arrived still counts its columns.
+        let bare = super::super::begin_turn(&db, &session.id, None, None).unwrap();
+        super::super::end_turn(&db, &bare, "aborted", None, None, false).unwrap();
+        let totals = session_totals(&db, &session.id).unwrap();
+        assert_eq!(totals.turns, 3);
+        assert_eq!(totals.input_tokens, 40);
+
         drop(db);
         std::fs::remove_dir_all(dir).unwrap();
     }

@@ -155,6 +155,7 @@ export const IPC = {
     sessionSearch: "pi-desktop/session/search",
     sessionSearchContext: "pi-desktop/session/searchContext",
     sessionGet: "pi-desktop/session/get",
+    sessionUsageTotals: "pi-desktop/session/usageTotals",
     sessionCollaboration: "pi-desktop/session/collaboration",
     /** Validate and select a durable session from a reviewed host operation. */
     sessionOpen: "pi-desktop/session/open",

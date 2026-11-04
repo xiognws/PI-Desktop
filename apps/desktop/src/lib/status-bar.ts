@@ -17,6 +17,28 @@ export function compactTokens(count: number): string {
   return `${(count / 1_000_000).toFixed(1)}M`;
 }
 
+/**
+ * Tokens the provider actually processed for one session.
+ *
+ * The four buckets are disjoint — a cache read is not counted inside the
+ * prompt's input tokens — so adding them is what the provider billed for, and
+ * reasoning stays out because it is already part of the output count.
+ */
+export function sessionTokensUsed(totals: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+}): number {
+  const bucket = (value: number) => (Number.isFinite(value) && value > 0 ? value : 0);
+  return (
+    bucket(totals.inputTokens) +
+    bucket(totals.outputTokens) +
+    bucket(totals.cacheReadTokens) +
+    bucket(totals.cacheWriteTokens)
+  );
+}
+
 /** `0:42`, `12:05`, `1:02:33`. */
 export function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

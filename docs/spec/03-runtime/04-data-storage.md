@@ -2083,3 +2083,13 @@ An unknown price is distinct from a known zero price; partial known costs remain
 on the individual operations. Late usage targets its captured turn and does not
 revive it or debit the currently active turn. Immediate nested parent and owning
 Task remain separate optional transcript/event fields.
+
+`session.usageTotals` reads that ledger back for one session: it sums
+`turns.input_tokens` / `turns.output_tokens` and the cache/reasoning counters in
+the merged `usage_json` for every turn the session has run, oldest first, and
+returns `{ turns, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens,
+reasoningTokens }`. Zero turns is an empty total, not an error, so the status bar
+can poll a freshly created session. It exists because a client cannot derive the
+number from a transcript it renders: that window is bounded, and the total is
+defined as the whole session. Turns the user deleted are deleted with their rows,
+which is what the ledger itself reports.
