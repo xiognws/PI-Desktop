@@ -6,6 +6,13 @@
 /* Codex settings: full-window page (no app sidebar) */
 .app-shell.settings-mode {
   background: var(--ds-bg-primary);
+  /*
+    Settings replaces the whole shell, so the chat sidebar — and with it the
+    window status bar fixed to the bottom edge — is not painted. Keeping the
+    shell's status-bar reserve would leave an empty band under the page and lift
+    the rail's back-to-app footer off the window edge.
+  */
+  padding-bottom: 0;
 }
 
 :root[data-plugin-theme^="plugin:io.github.akshayxkill.nexus-scenic-themes:"] .app-shell.settings-mode,

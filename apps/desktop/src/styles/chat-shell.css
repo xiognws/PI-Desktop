@@ -206,12 +206,16 @@
 .transcript-pinned-prompt {
   position: absolute;
   top: 6px;
-  left: 50%;
+  /* Centred with auto margins rather than a translate: a transformed ancestor
+     becomes the containing block for absolutely positioned descendants, and the
+     transcript must not hand its overlay tree one (see
+     settings-dialog-overlay.test.mjs). */
+  inset-inline: 0;
   z-index: 6;
   display: flex;
   justify-content: center;
   max-width: min(680px, calc(100% - 28px));
-  transform: translateX(-50%);
+  margin-inline: auto;
   pointer-events: none;
 }
 
