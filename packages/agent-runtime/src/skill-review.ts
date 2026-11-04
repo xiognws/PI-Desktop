@@ -46,6 +46,9 @@ Depth:
 - Frame tools as PI: read, write, edit, bash, grep, glob.
 - Prefer patching an existing skill over creating a near-duplicate.`;
 
+/** Per-op content budget for one review answer. See the size rules below. */
+export const REVIEW_OP_CONTENT_LIMIT = 4_000;
+
 /** System prompt for one review pass. Output must be JSON only. */
 export const SKILL_REVIEW_SYSTEM = `You review one finished PI-Desktop agent turn and decide whether the learned skill library should change.
 
@@ -60,6 +63,11 @@ ops items:
 - {"action":"write_file","name":"existing-skill-name","file_path":"references/topic.md","content":"<markdown>"}
 - {"action":"patch","name":"existing-skill-name","old_string":"exact unique substring of that skill's body","new_string":"replacement"}
 - {"action":"create","name":"class-level-name","content":"<full SKILL.md including frontmatter>"}
+
+Answer size — a cut-off answer is worth nothing:
+- Emit one compact object on one line. No indentation, no pretty-printing, no newlines inside strings: the reply budget is derived from the model's context window and a formatted answer runs out of it mid-string, which cannot be parsed and records nothing.
+- Keep each op's content under ${REVIEW_OP_CONTENT_LIMIT} characters. Distil to decision rules, exact commands and traps, and split longer material across ops rather than writing one long document.
+- The reason field is one short sentence. Never restate the transcript in it.
 
 Choose the cheapest op that records what you learned:
 - write_file adds a new references/<topic>.md beside the skill. Prefer this for anything that is a self-contained lesson: a pitfall, a recipe, a failure mode, a table. It does not touch the existing document, so it is always safe.
@@ -182,6 +190,53 @@ export function shrinkReviewUser(user: string, maxChars = 40_000): string {
   const head = text.slice(0, Math.floor(cap * 0.35));
   const tail = text.slice(-Math.floor(cap * 0.6));
   return `${head}\n\n[...truncated for retry...]\n\n${tail}`;
+}
+
+/**
+ * Did the output limit cut this answer off, rather than the model answering in
+ * prose?
+ *
+ * The two failures need opposite repairs — one has to get smaller, the other has
+ * to become a JSON object at all — and the reply itself rarely says which
+ * happened. Unbalanced braces after an opening one is the honest signal: a
+ * truncated object cannot close them, and a prose answer has no braces to balance.
+ */
+export function looksTruncatedReview(text: string): boolean {
+  let depth = 0;
+  let sawOpen = false;
+  for (const character of String(text || "")) {
+    if (character === "{") {
+      depth += 1;
+      sawOpen = true;
+    } else if (character === "}") {
+      depth -= 1;
+    }
+  }
+  return sawOpen && depth !== 0;
+}
+
+/**
+ * The retry prompt after a completion the parser could not read.
+ *
+ * Both branches end with the same hard size cap: the first answer ran out of the
+ * reply budget (that is what truncation means), so the second must fit in less of
+ * it, or the retry spends another paid completion to fail the same way.
+ */
+export function buildSkillReviewRetry(user: string, previous: string): string {
+  const truncated = looksTruncatedReview(previous);
+  const diagnosis = truncated
+    ? "你的上一条回复被输出上限截断（JSON 没有闭合），没有内容被读到。"
+    : `你的上一条回复不是 JSON：\n${shrinkReviewUser(String(previous || ""), 2_000)}`;
+  return [
+    user,
+    "",
+    "---",
+    diagnosis,
+    "现在只输出一个 JSON 对象，不要解释、不要 markdown 围栏，并压到最小：",
+    "- 单行紧凑 JSON，不要缩进、不要换行。",
+    `- 最多 1 个 op；op 的 content 不超过 ${Math.floor(REVIEW_OP_CONTENT_LIMIT / 2)} 字符，只留判定规则、精确命令和陷阱。`,
+    '- 没有值得沉淀的内容就输出 {"decision":"skip","reason":"...","ops":[]}。',
+  ].join("\n");
 }
 
 /** Pull the first JSON object out of a completion, tolerating code fences. */

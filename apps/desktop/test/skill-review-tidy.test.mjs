@@ -18,9 +18,11 @@ const WRITE_DECISION = {
 
 const SKIP_DECISION = { decision: "skip", reason: "one-off", ops: [] };
 
-function harness({ decision = WRITE_DECISION, tidy, tidyThrows = false } = {}) {
+function harness({ decision = WRITE_DECISION, tidy, tidyThrows = false, completions } = {}) {
   const calls = [];
   const logs = [];
+  const prompts = [];
+  let completionIndex = 0;
   const host = {
     call: async (method, params) => {
       calls.push({ method, params });
@@ -61,13 +63,17 @@ function harness({ decision = WRITE_DECISION, tidy, tidyThrows = false } = {}) {
       },
     }),
     vendorOAuth: { resolveAuth: async () => "" },
-    complete: async () => ({ text: JSON.stringify(decision) }),
+    complete: async (_provider, context) => {
+      prompts.push(context.messages.map((message) => String(message.content)).join("\n"));
+      const next = completions?.[completionIndex++];
+      return { text: next ?? JSON.stringify(decision) };
+    },
     now: () => 1_000_000,
   });
 
   const run = () =>
     review.run({ sessionId: "session-1", usedTools: true, toolCallCount: 5, mode: "agent" });
-  return { run, calls, logs };
+  return { run, schedule: (request) => review.schedule(request), calls, logs, prompts };
 }
 
 test("a review that wrote consolidates the library", async () => {
@@ -81,7 +87,41 @@ test("a review that wrote consolidates the library", async () => {
 
   const tidy = logs.find((entry) => entry.event === "skill library tidied");
   assert.ok(tidy, "the tidy is observable, not silent");
-  assert.deepEqual(tidy.data.data, { removed: 1, bytesFreed: 42 });
+  assert.deepEqual(tidy.data.data, {
+    removed: 1,
+    bytesFreed: 42,
+    scanned: 0,
+    references: 0,
+    reported: { unlinked: 0, oversized: 0 },
+  });
+});
+
+test("a tidy that removed nothing still says it ran", async () => {
+  // The pass used to log only when it deleted something, so "ran, found nothing
+  // provably redundant" was indistinguishable from "never ran".
+  const { run, logs } = harness({
+    tidy: {
+      report: {
+        skills_scanned: 3,
+        references_scanned: 9,
+        references_removed: [],
+        bytes_freed: 0,
+        unlinked: ["a/references/orphan.md"],
+        oversized: [{ id: "b", chars: 9000 }],
+      },
+    },
+  });
+  await run();
+
+  const tidy = logs.find((entry) => entry.event === "skill library tidied");
+  assert.ok(tidy, "running and finding nothing is still an event");
+  assert.deepEqual(tidy.data.data, {
+    removed: 0,
+    bytesFreed: 0,
+    scanned: 3,
+    references: 9,
+    reported: { unlinked: 1, oversized: 1 },
+  });
 });
 
 test("a tidy that fails never undoes a review that succeeded", async () => {
@@ -114,4 +154,53 @@ test("the pass asks for the conservative default policy", async () => {
   const request = calls.find((call) => call.method === "skills.tidy");
   assert.ok(request, "the pass is asked for the conservative default, not a dry run");
   assert.deepEqual(request.params, {});
+});
+
+test("a schedule that never reaches the model says why", () => {
+  // Both of these gates used to return without a log line, so a turn skipped for
+  // having no tools looked exactly like a turn where nothing ran at all.
+  const idle = harness();
+  idle.schedule({ sessionId: "session-1", usedTools: false, toolCallCount: 0 });
+  const noTools = idle.logs.at(-1);
+  assert.equal(noTools.event, "skill review skipped");
+  assert.equal(noTools.data.data.reason, "no-tools");
+
+  const busy = harness();
+  // `schedule` claims the session synchronously, so the second call lands while
+  // the first pass is still in flight.
+  const request = { sessionId: "session-1", usedTools: true, toolCallCount: 9 };
+  busy.schedule(request);
+  busy.schedule(request);
+  const running = busy.logs.find((entry) => entry.data?.data?.reason === "already-running");
+  assert.ok(running, "a pass already in flight for this session is logged");
+});
+
+test("a truncated answer is retried with a size cap, not a prose scolding", async () => {
+  const truncated =
+    '{"decision":"update","reason":"the turn taught a flag","ops":[{"action":"write_file","name":"npm-script","file_path":"references/a.md","content":"# A\\n';
+  const { run, logs, prompts } = harness({
+    completions: [truncated, JSON.stringify(WRITE_DECISION)],
+  });
+  const applied = await run();
+
+  const retry = logs.find((entry) => entry.event === "skill review retrying");
+  assert.ok(retry);
+  assert.equal(retry.data.data.reason, "truncated", "truncation is named as such");
+  assert.equal(retry.data.data.chars, truncated.length, "and its size is recorded");
+
+  const retryPrompt = prompts.at(-1);
+  assert.match(retryPrompt, /被输出上限截断/);
+  assert.match(retryPrompt, /最多 1 个 op/, "the repair is a smaller answer");
+  assert.equal(applied, 1, "the retry still lands the write");
+});
+
+test("a prose answer still gets the prose repair", async () => {
+  const { run, logs, prompts } = harness({
+    completions: ["Reading the current file to repair the insertion.", JSON.stringify(SKIP_DECISION)],
+  });
+  await run();
+
+  const retry = logs.find((entry) => entry.event === "skill review retrying");
+  assert.equal(retry.data.data.reason, "no-json");
+  assert.match(prompts.at(-1), /不是 JSON/);
 });

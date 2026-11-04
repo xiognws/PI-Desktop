@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  REVIEW_OP_CONTENT_LIMIT,
+  SKILL_REVIEW_SYSTEM,
+  buildSkillReviewRetry,
   buildSkillReviewUser,
   completionText,
   interpretProseSkip,
+  looksTruncatedReview,
   normalizeSkillReview,
   parseSkillReview,
   readSkillReview,
@@ -247,5 +251,54 @@ describe("readSkillReview", () => {
   it("survives a trailing comma the model left behind", () => {
     const decision = readSkillReview('{"decision":"skip","reason":"x","ops":[],}');
     expect(decision?.decision).toBe("skip");
+  });
+});
+
+describe("looksTruncatedReview", () => {
+  it("sees an object the output limit cut in half", () => {
+    const cut = '{"decision":"update","reason":"x","ops":[{"action":"write_file","content":"# A';
+    expect(looksTruncatedReview(cut)).toBe(true);
+  });
+
+  it("does not fire on a closed object, however malformed", () => {
+    expect(looksTruncatedReview('{"decision":"skip","reason":"x","ops":[]}')).toBe(false);
+    expect(looksTruncatedReview('{"decision":"skip",,,}')).toBe(false);
+  });
+
+  it("does not fire on prose, which has no braces to balance", () => {
+    expect(looksTruncatedReview("Reading the current file to repair the insertion.")).toBe(false);
+    expect(looksTruncatedReview("")).toBe(false);
+  });
+});
+
+describe("buildSkillReviewRetry", () => {
+  const user = "Workspace: /tmp\nTranscript (truncated):\n## user\nadd a script";
+
+  it("shrinks the answer when the first one was cut off", () => {
+    const prompt = buildSkillReviewRetry(user, '{"decision":"update","ops":[{"content":"# long');
+    expect(prompt).toContain("被输出上限截断");
+    expect(prompt).toContain("最多 1 个 op");
+    expect(prompt).toContain(String(Math.floor(REVIEW_OP_CONTENT_LIMIT / 2)));
+    expect(prompt).toContain(user);
+  });
+
+  it("feeds a prose answer back instead of capping its size", () => {
+    const prompt = buildSkillReviewRetry(user, "Reading the current file to repair the insertion.");
+    expect(prompt).toContain("不是 JSON");
+    expect(prompt).toContain("Reading the current file to repair the insertion.");
+    // The cap is there either way: the second completion must fit in less budget.
+    expect(prompt).toContain("最多 1 个 op");
+  });
+
+  it("always states the skip shape, so a retry can still decline", () => {
+    expect(buildSkillReviewRetry(user, "x")).toContain('{"decision":"skip"');
+  });
+});
+
+describe("SKILL_REVIEW_SYSTEM size rules", () => {
+  it("forbids the formatting and the length that cause truncation", () => {
+    expect(SKILL_REVIEW_SYSTEM).toContain("No indentation, no pretty-printing");
+    expect(SKILL_REVIEW_SYSTEM).toContain(`${REVIEW_OP_CONTENT_LIMIT} characters`);
+    expect(SKILL_REVIEW_SYSTEM).toMatch(/split longer material across ops/i);
   });
 });

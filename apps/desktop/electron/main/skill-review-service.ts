@@ -28,10 +28,11 @@
  */
 import {
   SKILL_REVIEW_SYSTEM,
+  buildSkillReviewRetry,
   buildSkillReviewUser,
   completionText,
+  looksTruncatedReview,
   readSkillReview,
-  shrinkReviewUser,
   splitSkillDocument,
   type SkillCatalogEntry,
   type SkillReviewDecision,
@@ -127,8 +128,14 @@ export type SkillReviewRequest = {
  * description of the same contract that nobody keeps in step.
  */
 type SkillTidyReport = {
+  skills_scanned?: number;
+  references_scanned?: number;
   references_removed?: string[];
   bytes_freed?: number;
+  /** References the document never mentions. Reported, never removed. */
+  unlinked?: string[];
+  /** Documents past the umbrella length. Reported, never trimmed. */
+  oversized?: unknown[];
 };
 
 function messageText(message: SessionMessage): string {
@@ -342,15 +349,20 @@ export function createSkillReviewService(deps: SkillReviewDependencies) {
     let text = await completeOnce(user);
     let decision = readSkillReview(text);
     if (!decision) {
-      // One retry with the model's own words fed back. A prose answer is the
-      // single most common failure here, and a second, blunter instruction
-      // usually lands; giving up on the first miss throws away a paid call.
+      // One retry, repaired for the failure that actually happened: a truncated
+      // answer has to get *smaller*, a prose answer has to become a JSON object
+      // at all. The char count and the truncation flag are logged because
+      // "no-json" alone cannot tell the two apart, and each one's fix is the
+      // other one's poison.
       deps.logger.app("skill-review", "info", "skill review retrying", {
         sessionId: request.sessionId,
-        data: { reason: "no-json", sample: text.slice(0, 200) },
+        data: {
+          reason: looksTruncatedReview(text) ? "truncated" : "no-json",
+          chars: text.length,
+          sample: text.slice(0, 200),
+        },
       });
-      const retryUser = `${user}\n\n---\n你的上一条回复不是 JSON：\n${shrinkReviewUser(text, 2000)}\n\n现在只输出一个 JSON 对象，不要解释、不要 markdown 围栏。没有值得沉淀的内容就输出 {"decision":"skip","reason":"...","ops":[]}。`;
-      text = await completeOnce(retryUser);
+      text = await completeOnce(buildSkillReviewRetry(user, text));
       decision = readSkillReview(text);
     }
 
@@ -361,7 +373,12 @@ export function createSkillReviewService(deps: SkillReviewDependencies) {
     if (!decision) {
       deps.logger.app("skill-review", "warn", "skill review failed", {
         sessionId: request.sessionId,
-        data: { reason: "no-json-after-retry", sample: text.slice(0, 300) },
+        data: {
+          reason: "no-json-after-retry",
+          chars: text.length,
+          truncated: looksTruncatedReview(text),
+          sample: text.slice(0, 300),
+        },
       });
       return 0;
     }
@@ -406,13 +423,25 @@ export function createSkillReviewService(deps: SkillReviewDependencies) {
     if (appliedOps.length > 0) {
       try {
         const tidied = await host.call<{ report?: SkillTidyReport }>("skills.tidy", {});
-        const removed = tidied?.report?.references_removed?.length ?? 0;
-        if (removed > 0) {
-          deps.logger.app("skill-review", "info", "skill library tidied", {
-            sessionId: request.sessionId,
-            data: { removed, bytesFreed: tidied?.report?.bytes_freed ?? 0 },
-          });
-        }
+        // Logged on every pass, not only when it deleted something. "It ran and
+        // found nothing provably redundant" is the answer to "did this ever
+        // run?", and `unlinked`/`oversized` are the only record of what the
+        // conservative policy deliberately left alone — without them that policy
+        // is invisible and the pass looks like it did nothing at all.
+        const report = tidied?.report ?? {};
+        deps.logger.app("skill-review", "info", "skill library tidied", {
+          sessionId: request.sessionId,
+          data: {
+            removed: report.references_removed?.length ?? 0,
+            bytesFreed: report.bytes_freed ?? 0,
+            scanned: report.skills_scanned ?? 0,
+            references: report.references_scanned ?? 0,
+            reported: {
+              unlinked: report.unlinked?.length ?? 0,
+              oversized: report.oversized?.length ?? 0,
+            },
+          },
+        });
       } catch (error) {
         // A tidy that fails must not undo a review that succeeded.
         deps.logger.app("skill-review", "warn", "skill tidy failed", {
@@ -430,8 +459,24 @@ export function createSkillReviewService(deps: SkillReviewDependencies) {
   return {
     /** Fire and forget: the turn is already persisted when this runs. */
     schedule(request: SkillReviewRequest): void {
-      if (!request.usedTools) return;
-      if (running.has(request.sessionId)) return;
+      // Both early exits log. A pass that was never attempted and a pass that
+      // decided to skip look identical from the outside, so "why did nothing
+      // happen" has to be answerable from the log rather than from the absence
+      // of one.
+      const skipped = (reason: string): void => {
+        deps.logger.app("skill-review", "info", "skill review skipped", {
+          sessionId: request.sessionId,
+          data: { reason, toolCallCount: request.toolCallCount ?? 0 },
+        });
+      };
+      if (!request.usedTools) {
+        skipped("no-tools");
+        return;
+      }
+      if (running.has(request.sessionId)) {
+        skipped("already-running");
+        return;
+      }
       running.add(request.sessionId);
       void run(request)
         .catch((error: unknown) => {
