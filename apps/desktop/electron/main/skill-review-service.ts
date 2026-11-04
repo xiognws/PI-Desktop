@@ -68,6 +68,13 @@ type SessionLike = {
   id?: string;
   projectPath?: string | null;
   /**
+   * The session's operating profile: `plan`, `goal` or `agent` (the host's
+   * `normalize_mode` persists exactly those three). Only `agent` executes — Plan
+   * and Goal negotiate a contract first and share a denial-only tool set — so
+   * this is what decides whether a turn has work worth learning from.
+   */
+  mode?: string;
+  /**
    * The provider/model this session runs on. The review completion must use the
    * session's own pair: a session can point at a different provider than the
    * global default, and using the default spends the completion against a
@@ -291,6 +298,12 @@ export function createSkillReviewService(deps: SkillReviewDependencies) {
     }
 
     const session = await deps.session(request.sessionId);
+    // The mode lives on the session, not on the turn: the scheduler hands over
+    // the turn's facts (`usedTools`, `toolCallCount`) and nothing else, so a gate
+    // reading only `request.mode` never fired and Plan/Goal turns were reviewed
+    // too. `request.mode` is still honoured first for a caller that has it.
+    const mode = request.mode ?? session?.mode;
+    if (mode && mode !== "agent") return skip("mode", { mode });
     const messages = transcriptOf(session);
     if (messages.length === 0) return skip("empty-transcript");
 

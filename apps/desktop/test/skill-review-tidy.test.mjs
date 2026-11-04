@@ -18,7 +18,7 @@ const WRITE_DECISION = {
 
 const SKIP_DECISION = { decision: "skip", reason: "one-off", ops: [] };
 
-function harness({ decision = WRITE_DECISION, tidy, tidyThrows = false, completions } = {}) {
+function harness({ decision = WRITE_DECISION, tidy, tidyThrows = false, completions, sessionMode } = {}) {
   const calls = [];
   const logs = [];
   const prompts = [];
@@ -50,6 +50,7 @@ function harness({ decision = WRITE_DECISION, tidy, tidyThrows = false, completi
       projectPath: "/tmp/workspace",
       providerId: "p",
       modelId: "m",
+      ...(sessionMode ? { mode: sessionMode } : {}),
       messages: [
         { role: "user", content: "add a npm script for the build" },
         { role: "assistant", content: "added it" },
@@ -71,8 +72,10 @@ function harness({ decision = WRITE_DECISION, tidy, tidyThrows = false, completi
     now: () => 1_000_000,
   });
 
-  const run = () =>
-    review.run({ sessionId: "session-1", usedTools: true, toolCallCount: 5, mode: "agent" });
+  // No `mode`: the real scheduler sends only the turn's facts, which is exactly
+  // why the mode gate needs the session.
+  const run = (overrides = {}) =>
+    review.run({ sessionId: "session-1", usedTools: true, toolCallCount: 5, ...overrides });
   return { run, schedule: (request) => review.schedule(request), calls, logs, prompts };
 }
 
@@ -203,4 +206,27 @@ test("a prose answer still gets the prose repair", async () => {
   const retry = logs.find((entry) => entry.event === "skill review retrying");
   assert.equal(retry.data.data.reason, "no-json");
   assert.match(prompts.at(-1), /不是 JSON/);
+});
+
+test("a Plan or Goal session is not reviewed", async () => {
+  // The gate reads the session's mode. It used to read only the request, which
+  // never carried one, so Plan/Goal turns were reviewed although only Agent
+  // executes — Plan and Goal negotiate a contract and share a denial-only tool
+  // set, so there is no work in them to learn from.
+  const plan = harness({ sessionMode: "plan" });
+  assert.equal(await plan.run(), 0);
+  const skipped = plan.logs.find((entry) => entry.data?.data?.reason === "mode");
+  assert.ok(skipped, "the gate reports itself instead of vanishing");
+  assert.equal(skipped.data.data.mode, "plan");
+  assert.ok(
+    !plan.calls.some((call) => call.method === "skills.create"),
+    "and nothing was written off a Plan turn",
+  );
+
+  const agent = harness({ sessionMode: "agent" });
+  assert.equal(await agent.run(), 1, "an Agent session is still reviewed");
+
+  // An explicit mode on the request still wins over the session's.
+  const overridden = harness({ sessionMode: "plan" });
+  assert.equal(await overridden.run({ mode: "agent" }), 1);
 });
