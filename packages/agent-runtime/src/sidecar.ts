@@ -16,7 +16,7 @@ import {
   type PluginToolDef,
   type RuntimePrompt,
   type RuntimePromptAttachment,
-  type RuntimeProviderConfig,
+  type RuntimeProviderConfig,  type SkillReviewPolicy,
 } from "./runtime.js";
 import type { PluginSkillDef } from "./plugin-skills-prompt.js";
 import type { SessionMessageOrigin, TrustedExtensionSpec } from "@pi-desktop/shared";
@@ -113,6 +113,8 @@ type RuntimeParams = {
   infiniteProviderRetry?: boolean;
   /** Session `/fast` switch AND the model's opt-in, resolved by main (ADR 0334). */
   fastMode?: boolean;
+  /** Background skill review policy, resolved by Electron main (see runtime.ts). */
+  skillReview?: SkillReviewPolicy;
   /** Opt-in TypeSafe classifier credential resolved by Electron main. */
   jevApiKey?: string;
   provider: RuntimeProviderConfig;
@@ -319,6 +321,9 @@ async function runtimeFor(
     thinkingLevel,
     infiniteProviderRetry: params.infiniteProviderRetry === true,
     fastMode: params.fastMode === true,
+    // The review runs where the agent loop and its tools are; the policy travels
+    // with the launch.
+    skillReview: params.skillReview,
     jevApiKey: params.jevApiKey,
     history,
     compaction,

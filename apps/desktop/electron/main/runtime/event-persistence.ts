@@ -13,15 +13,6 @@ export type EventPersistenceDependencies = {
    * entry-list memory through the `memory` tool, the way Hermes does, so a second
    * model call per turn only bought a parallel store nobody read.
    */
-  /**
-   * Passive observer that decides whether a finished turn taught something
-   * reusable. Optional for the same reason as extraction (ADR 0377).
-   */
-  scheduleSkillReview?: (request: {
-    sessionId: string;
-    usedTools: boolean;
-    toolCallCount: number;
-  }) => void;
   runtimeState: RuntimeState;
   steeringReplies: Set<string>;
   /** Host-verified completion notice turns awaiting their first settled reply. */
@@ -75,7 +66,6 @@ export function createEventPersistence({
   transcriptRewrite,
   finishApprovedExecution,
   emitAgentEvent,
-  scheduleSkillReview,
 }: EventPersistenceDependencies): {
   subagentTagged: (message: UiMessage, envelope: AgentEventEnvelope) => UiMessage;
   persistAgentEvent: (envelope: AgentEventEnvelope) => UiMessage | undefined;
@@ -150,6 +140,23 @@ function storableMessage(message: UiMessage): UiMessage {
 
 
 function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined {
+  // The background skill review reports itself. The pass is a forked run whose
+  // writes are ordinary `skill_manage` calls, so those writes already reached the
+  // library; this event is the *summary* a person can see, and nothing about it
+  // belongs in the transcript. The log names stay the ones the review has always
+  // used, so existing diagnostics keep working.
+  if (envelope.event.type === "skill_review") {
+    const event = envelope.event;
+    const level = event.outcome === "failed" ? "warn" : "info";
+    logger.app("skill-review", level, `skill review ${event.outcome}`, {
+      sessionId: envelope.sessionId,
+      data: {
+        ...(event.reason ? { reason: event.reason } : {}),
+        ...(event.actions?.length ? { applied: event.actions.length, ops: event.actions } : {}),
+      },
+    });
+    return undefined;
+  }
   const event = envelope.event;
   if (transcriptRewrite.deferTranscriptEvent(envelope)) return;
   const activeTurnId = activeTurns.get(envelope.sessionId);
@@ -267,10 +274,8 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     }
     // Fire and forget: the turn is finished, and a failure here must never be
     // visible as a turn failure.
-    const usedTools = turnUsedTools.delete(envelope.sessionId);
-    const toolCallCount = turnToolCalls.get(envelope.sessionId) ?? 0;
+    turnUsedTools.delete(envelope.sessionId);
     turnToolCalls.delete(envelope.sessionId);
-    scheduleSkillReview?.({ sessionId: envelope.sessionId, usedTools, toolCallCount });
     const turnFinalization = finishTurn(
       envelope.sessionId,
       event.error.code === "TURN_ABORTED" ? "aborted" : "error",
@@ -296,12 +301,8 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     // regenerate branch archive below on its behalf.
     if (isStaleTerminalEvent(envelope)) return;
     completionNoticeTurns.delete(envelope.turnId ?? turnId ?? "");
-    // A normally completed turn is the common case: schedule here as well as on
-    // the error branch, otherwise skill review never fires in practice.
-    const usedTools = turnUsedTools.delete(envelope.sessionId);
-    const toolCallCount = turnToolCalls.get(envelope.sessionId) ?? 0;
+    turnUsedTools.delete(envelope.sessionId);
     turnToolCalls.delete(envelope.sessionId);
-    scheduleSkillReview?.({ sessionId: envelope.sessionId, usedTools, toolCallCount });
     const turnFinalization = finishTurn(envelope.sessionId, "completed", undefined, {
       turnId: envelope.turnId ?? "",
     });

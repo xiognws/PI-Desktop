@@ -37,6 +37,17 @@ import { imageGenerationDescription, imageGenerationParameters } from "./image-g
 import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
 import { createMemoryTool } from "./memory-agent-tool.js";
 import { createSkillManageTool } from "./skill-manage-tool.js";
+import {
+  REVIEW_DEFAULT_MIN_INTERVAL_SEC,
+  REVIEW_DEFAULT_MIN_TOOL_CALLS,
+  SKILL_REVIEW_DEFINITION,
+  SKILL_REVIEW_PROMPT,
+  SKILL_REVIEW_TOOL_NOTE,
+  ReviewActionCollector,
+  canReview,
+  describeReviewAction,
+  reviewToolsFrom,
+} from "./skill-review-run.js";
 import { createJevClassifierTool } from "./jev-classifier-tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
@@ -1023,6 +1034,19 @@ export type PluginToolDef = {
   planSafeActions?: readonly string[];
 };
 
+/**
+ * When a finished turn is reviewed for skill-worthy material.
+ *
+ * Electron main owns the *settings* (they are the user's); the runtime owns the
+ * *mechanism*, because this is where the agent loop and its tools are. Absent
+ * means on with the defaults below.
+ */
+export type SkillReviewPolicy = {
+  enabled?: boolean;
+  afterToolCalls?: number;
+  minIntervalSec?: number;
+};
+
 export type AgentRuntimeOptions = {
   host: RuntimeHost;
   sessionId: string;
@@ -1038,6 +1062,8 @@ export type AgentRuntimeOptions = {
    * session `/fast` switch and the model binding's opt-in (ADR 0334).
    */
   fastMode?: boolean;
+  /** Background skill review policy for this session (see SkillReviewPolicy). */
+  skillReview?: SkillReviewPolicy;
   /** TypeSafe Jev credential, resolved by Electron main only when enabled. */
   jevApiKey?: string;
   systemPrompt?: string;
@@ -1848,6 +1874,13 @@ export class DesktopAgentRuntime {
   private mode: Mode;
   private provider: RuntimeProviderConfig;
   private thinkingLevel: SessionThinkingLevel;
+  private readonly skillReviewPolicy: SkillReviewPolicy;
+  /** Tool calls seen in the turn now running; the review's size gate reads it. */
+  private turnToolCalls = 0;
+  private lastSkillReviewAt = 0;
+  private skillReviewRunning = false;
+  /** Aborts an in-flight review when a new turn arrives (foreground priority). */
+  private skillReviewAbort?: AbortController;
   private host: RuntimeHost;
   private onEvent: (envelope: AgentEventEnvelope) => void;
   private onDiagnostic: (diagnostic: AgentRuntimeDiagnostic) => void;
@@ -2096,6 +2129,7 @@ export class DesktopAgentRuntime {
     this.mode = opts.mode;
     this.planningState = proposalKindForMode(this.mode) ? "planning" : "inactive";
     this.provider = opts.provider;
+    this.skillReviewPolicy = opts.skillReview ?? {};
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.infiniteProviderRetry = opts.infiniteProviderRetry === true;
     this.fastMode = opts.fastMode === true;
@@ -2465,6 +2499,84 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
    * unambiguous CLAIMS leaves the turn unreported: a missed log line is cheaper
    * than the noise this diagnostic exists to avoid.
    */
+  /**
+   * Review the finished turn for skill-worthy material.
+   *
+   * Ported from Hermes' `agent/background_review.py`: the review is a *forked agent*
+   * with a restricted tool set, not a completion carrying a JSON plan. It reads the
+   * library with `Skill` and writes with `skill_manage`, so a review's write is
+   * validated exactly where every other write is, and there is no answer that can be
+   * cut in half by the output limit — the failure mode the JSON protocol kept
+   * producing.
+   *
+   * Everything here is best-effort: the turn is already over, and a review that
+   * fails must never surface as a turn failure.
+   */
+  private async runSkillReviewIfDue(): Promise<void> {
+    const policy = this.skillReviewPolicy;
+    const skipped = (reason: string): void => {
+      this.emit({ type: "skill_review", outcome: "skipped", reason });
+    };
+    if (policy.enabled === false) return skipped("disabled");
+    // Plan and Goal negotiate a contract first and share a denial-only tool set;
+    // there is no work in them to learn from (the host's `is_contract_mode`).
+    if (this.mode !== "agent") return skipped("mode");
+    if (this.skillReviewRunning) return skipped("already-running");
+    const minToolCalls = policy.afterToolCalls ?? REVIEW_DEFAULT_MIN_TOOL_CALLS;
+    if (this.turnToolCalls < minToolCalls) return skipped("too-few-tools");
+    const minIntervalSec = policy.minIntervalSec ?? REVIEW_DEFAULT_MIN_INTERVAL_SEC;
+    if (Date.now() - this.lastSkillReviewAt < minIntervalSec * 1000) return skipped("cooldown");
+
+    const tools = reviewToolsFrom(this.declaredTools());
+    // A fork without `skill_manage` and `Skill` would pay a full completion and
+    // could not land a single change.
+    if (!canReview(tools)) return skipped("no-skill-tools");
+
+    const controller = new AbortController();
+    this.skillReviewAbort = controller;
+    this.skillReviewRunning = true;
+    const collector = new ReviewActionCollector();
+    try {
+      const run = new SubagentRun({
+        definition: SKILL_REVIEW_DEFINITION,
+        sessionId: this.sessionId,
+        parentToolCallId: "skill-review",
+        task: SKILL_REVIEW_PROMPT,
+        systemPrompt: SKILL_REVIEW_TOOL_NOTE,
+        tools,
+        provider: this.provider,
+        thinkingLevel: "off",
+        initialMessages: [...this.agent.state.messages],
+        onEvent: (envelope) => collector.record(envelope.event),
+        signal: controller.signal,
+      });
+      const result = await run.run();
+      const summary = collector.actions().map(describeReviewAction);
+      if (summary.length > 0) {
+        this.emit({ type: "skill_review", outcome: "applied", actions: summary });
+      } else {
+        this.emit({
+          type: "skill_review",
+          outcome: "skipped",
+          reason: result.status === "completed" ? "nothing-to-save" : result.status,
+        });
+      }
+    } catch (error) {
+      this.emit({
+        type: "skill_review",
+        outcome: "failed",
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      this.skillReviewRunning = false;
+      this.skillReviewAbort = undefined;
+      // The cooldown starts whether or not the fork wrote anything: the completion
+      // was spent, and a skip must not invite a retry loop.
+      this.lastSkillReviewAt = Date.now();
+      this.turnToolCalls = 0;
+    }
+  }
+
   private async classifyTurnReply(reply: string, outcome: TurnOutcome): Promise<void> {
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), TURN_VERDICT_JUDGE_TIMEOUT_MS);
@@ -8993,6 +9105,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         });
         break;
       case "tool_execution_end":
+        this.turnToolCalls += 1;
         // The agent issues the follow-up provider request as soon as the tool
         // results are in, so this is the anchor for the next providerWaitMs.
         {
@@ -9078,6 +9191,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         this.retainPendingSteering();
         this.autonomousExecution = false;
         this.clearAgentActivity();
+        // After the turn, never during it: the fork replays the transcript this
+        // turn just produced.
+        void this.runSkillReviewIfDue().catch((error: unknown) => {
+          this.logEventHandlerFailure(event, error);
+        });
         this.reportMutationTermination();
         this.emit({
           type: "agent_end",
@@ -9353,6 +9471,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.assertNotRunning();
+    // Foreground priority: a queued turn supersedes a review still running, the way
+    // Hermes cancels its review fork when a live turn arrives. Self-improvement work
+    // must never delay a user-facing turn.
+    this.skillReviewAbort?.abort();
+    this.turnToolCalls = 0;
     const turnId = durableTurnId?.trim() || randomUUID();
     return this.trackTurnOperation(turnId, async () => {
       try { return await this.promptTurn(input, userMessageId, turnId); }

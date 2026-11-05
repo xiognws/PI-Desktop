@@ -28,6 +28,7 @@ import {
   optionalProviderHeaders,
   resolveSubagentProviders,
   skillCatalogBudget,
+  skillReviewPolicyFrom,
   visionFromModelConfig,
   type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
@@ -783,6 +784,10 @@ export function createSessionLaunchRuntime({
         // The session `/fast` switch only reaches a model the user allowed it
         // for in model settings (ADR 0334).
         fastMode: session.fastMode === true && storedModel?.fastModeAllowed === true,
+        // The background review runs inside the runtime — that is where the agent
+        // loop and its tools are — so its policy travels with the launch. The
+        // settings stay Main's: they are the user's.
+        skillReview: skillReviewPolicyFrom(settings as unknown as Record<string, unknown>),
         ...(jevApiKey ? { jevApiKey } : {}),
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),

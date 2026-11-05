@@ -317,6 +317,18 @@ export type AgentEvent =
       error?: { code: string; message: string };
     }
   | { type: "error"; error: AppError }
+  | {
+      /**
+       * A background skill review finished. The review is a forked run whose writes
+       * are ordinary `skill_manage` calls, so the transcript never shows them:
+       * this event carries the summary a person would otherwise never see.
+       * `applied` lists what changed; `skipped`/`failed` carry the reason.
+       */
+      type: "skill_review";
+      outcome: "applied" | "skipped" | "failed";
+      reason?: string;
+      actions?: string[];
+    }
   | { type: "status"; status: AgentStatus };
 
 export type AgentEventEnvelope = {

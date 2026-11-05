@@ -771,6 +771,10 @@ export function racpKindForAgentEvent(
       return { kind: "item.completed", durable: true, itemType: "compaction" };
     case "planning_state":
       return { kind: "session.changed", durable: true };
+    case "skill_review":
+      // A review is not a turn item: nothing about it belongs in the transcript,
+      // so it rides the non-durable activity rail rather than creating an item.
+      return { kind: "turn.activity", durable: false };
     case "tool_permission_request":
       return { kind: "approval.requested", durable: true };
     case "asktool_request":
@@ -797,6 +801,7 @@ export const LOCAL_AGENT_EVENT_TYPES: readonly AgentEvent["type"][] = [
   "tool_update",
   "tool_end",
   "planning_state",
+  "skill_review",
   "tool_permission_request",
   "asktool_request",
   "compaction_start",

@@ -22,7 +22,7 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
 
 import type { RuntimeHost } from "./host-client.js";
-import { SKILL_AUTHORING_GUIDE } from "./skill-review.js";
+import { SKILL_AUTHORING_GUIDE } from "./skill-authoring.js";
 
 /** Host surface this tool needs: read, create, patch, and resource writes. */
 export type SkillManageHost = Pick<RuntimeHost, "call">;

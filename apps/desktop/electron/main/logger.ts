@@ -28,6 +28,9 @@ export type LogCategory =
   | "updater"
   | "diagnostics"
   | "runtime"
+  // The background skill review keeps its own file: it is a whole subsystem
+  // (prompt, gates, writes) and folding it into "session" buries it.
+  | "skill-review"
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
