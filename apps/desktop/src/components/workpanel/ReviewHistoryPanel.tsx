@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReviewChangesPage, ReviewContextLines, ReviewTurnsPage } from "@pi-desktop/shared";
+import type { ReviewChangesPage, ReviewContextLines, ReviewTurnsPage } from "@pi-workspace/shared";
 import { api } from "../../lib/api";
 import { groupReviewFiles, readReviewPages } from "../../lib/review-history";
 import { useReviewFocusRequest } from "../../lib/review-focus-request";

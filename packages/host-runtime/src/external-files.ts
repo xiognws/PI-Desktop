@@ -1,6 +1,6 @@
 import { realpath, stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
-import type { FsReadResult } from "@pi-desktop/shared";
+import type { FsReadResult } from "@pi-workspace/shared";
 import { isAttachmentBlobRef, previewFile, resolveRealOpenablePath } from "./workspace-files.js";
 
 /**

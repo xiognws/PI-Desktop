@@ -760,6 +760,7 @@ export const ptBR = {
       delegate: "uso de subagentes",
       use: "chamada de ferramentas",
       todo: "atualização de tarefas",
+      skill: "Usar uma habilidade",
     },
     activityJoin: {
       two: "{{a}} e {{b}}",

@@ -15,7 +15,7 @@
  *    reports that case inconsistently, which is exactly why the renderer has
  *    its own bounds, and only a real launch exercises them.
  *
- * Prereqs: `pnpm --filter @pi-desktop/desktop build`, a host-core binary
+ * Prereqs: `pnpm --filter @pi-workspace/desktop build`, a host-core binary
  * (target/debug, target/release, or PI_DESKTOP_HOST_BIN), and `ffmpeg` on PATH
  * to generate the playable fixture.
  */
@@ -33,7 +33,7 @@ const root = repositoryRoot();
 const { appDir, electronBinary } = resolveElectronBinary(root);
 
 if (!existsSync(join(appDir, "out/main/index.js"))) {
-  console.error("desktop app not built. Run: pnpm --filter @pi-desktop/desktop build");
+  console.error("desktop app not built. Run: pnpm --filter @pi-workspace/desktop build");
   process.exit(1);
 }
 

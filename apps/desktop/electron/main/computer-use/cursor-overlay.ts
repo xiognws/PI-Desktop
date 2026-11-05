@@ -1,6 +1,6 @@
 import { app, BrowserWindow, screen } from "electron";
 import { join } from "node:path";
-import { IPC, type ComputerCursorEvent, type ComputerRect } from "@pi-desktop/shared";
+import { IPC, type ComputerCursorEvent, type ComputerRect } from "@pi-workspace/shared";
 import { getModuleDirectory } from "../module-path";
 import { suppressLinuxFramelessSystemMenu } from "../frameless-system-menu";
 

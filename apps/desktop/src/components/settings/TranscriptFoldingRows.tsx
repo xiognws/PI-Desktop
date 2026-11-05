@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { AppSettings } from "@pi-desktop/shared";
+import type { AppSettings } from "@pi-workspace/shared";
 import { resolveShowThinking } from "../../lib/thinking-visibility";
 import { resolveTranscriptDisplayMode } from "../../lib/transcript-display-mode";
 import {

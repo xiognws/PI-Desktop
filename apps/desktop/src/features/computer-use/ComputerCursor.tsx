@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ComputerCursorEvent, ComputerRect } from "@pi-desktop/shared";
+import type { ComputerCursorEvent, ComputerRect } from "@pi-workspace/shared";
 import { computerUseApi } from "./computer-use-api";
 import "../../styles/computer-cursor.css";
 

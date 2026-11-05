@@ -791,7 +791,9 @@ function announceSkillReview(envelope: AgentEventEnvelope): void {
     event.actions.join(" · "),
   );
   sendToRenderer(IPC.event.toast, { message: notice });
+}
 
+/**
  * The agent's drawn cursor and the indicator feed (ADR 0342 §10).
  *
  * The overlay is created lazily by its own module on the first draw command,

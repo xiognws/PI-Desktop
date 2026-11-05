@@ -760,7 +760,8 @@ export const es = {
       "fork": "bifurcación de tareas",
       "delegate": "uso de subagentes",
       "use": "llamada a herramientas",
-      "todo": "actualización de pendientes"
+      "todo": "actualización de pendientes",
+      "skill": "Usar una habilidad"
     },
     "activityJoin": {
       "two": "{{a}} y {{b}}",

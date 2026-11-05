@@ -15,7 +15,7 @@
 import {
   STARTUP_ANIMATION_REVEAL_MS,
   type StartupAnimationDescriptor,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /**
  * - `video`: the animation is playing over black.

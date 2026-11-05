@@ -19679,7 +19679,7 @@ their separate platform acceptance.
   reports no match, because input longer than 256 characters is never matched
   against a trigger. Step 9 still shows the pinned application in the `Pinned`
   row.
-- **Automation**: `pnpm --filter @pi-desktop/desktop test` runs the offline
+- **Automation**: `pnpm --filter @pi-workspace/desktop test` runs the offline
   coverage for these rules: `launcher-search.test.mjs` (ranking order, section
   caps, overflow total, trigger whole-input matching, the 256-character limit
   and the all-plugins view), `launcher-store.test.mjs` (pins and the eight-pin

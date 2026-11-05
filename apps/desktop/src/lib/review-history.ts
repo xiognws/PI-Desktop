@@ -1,4 +1,4 @@
-import type { DiffHunk, DiffLine, ReviewChangesPage, ReviewHistoryChange } from "@pi-desktop/shared";
+import type { DiffHunk, DiffLine, ReviewChangesPage, ReviewHistoryChange } from "@pi-workspace/shared";
 import { reviewChangeFromMessage, type ReviewChangeEntry } from "./workspace-review.ts";
 
 export type NumberedReviewLine = DiffLine & { oldLine: number | null; newLine: number | null };

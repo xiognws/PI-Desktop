@@ -41,7 +41,7 @@ async function loadService(t) {
     bundle: true,
     platform: "node",
     format: "esm",
-    alias: { electron: stub, "@pi-desktop/agent-runtime": runtimeStub },
+    alias: { electron: stub, "@pi-workspace/agent-runtime": runtimeStub },
   });
   return import(pathToFileURL(outfile).href);
 }

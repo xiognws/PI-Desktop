@@ -1,7 +1,7 @@
 import { shell } from "electron";
 import { mkdir } from "node:fs/promises";
-import { IPC } from "@pi-desktop/shared";
-import type { StartupAnimationStatus } from "@pi-desktop/shared";
+import { IPC } from "@pi-workspace/shared";
+import type { StartupAnimationStatus } from "@pi-workspace/shared";
 import {
   resolveStartupAnimation,
   startupAnimationDirectory,

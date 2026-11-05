@@ -20,7 +20,7 @@ import {
   type ComputerRunOutcome,
   type ComputerRunResult,
   type ComputerStepRecord,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 import { parseLoopAnswer, validateAnswerAction, type LoopAnswer } from "./answer.js";
 import {

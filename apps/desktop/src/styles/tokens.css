@@ -215,7 +215,7 @@
      reveal is the end of a cinematic, not a control answering a click, so it
      is sized in that register instead of the in-flow feedback register. It is
      used only by .startup-animation and must stay matched to
-     STARTUP_ANIMATION_REVEAL_MS in @pi-desktop/shared. */
+     STARTUP_ANIMATION_REVEAL_MS in @pi-workspace/shared. */
   --motion-startup-reveal: 1000ms;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);

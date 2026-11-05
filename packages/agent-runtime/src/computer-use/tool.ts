@@ -1,4 +1,4 @@
-import { COMPUTER_MAX_STEPS_LIMIT } from "@pi-desktop/shared";
+import { COMPUTER_MAX_STEPS_LIMIT } from "@pi-workspace/shared";
 import { Type } from "typebox";
 
 /**

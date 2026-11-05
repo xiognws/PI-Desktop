@@ -1,4 +1,4 @@
-import type { ReviewContextLines } from "@pi-desktop/shared";
+import type { ReviewContextLines } from "@pi-workspace/shared";
 import { useTranslation } from "react-i18next";
 import { ContextMenu, useContextMenu } from "../ContextMenu";
 import { Select, TooltipButton } from "../ui";

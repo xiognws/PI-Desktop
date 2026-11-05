@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReviewContextLines } from "@pi-desktop/shared";
+import type { ReviewContextLines } from "@pi-workspace/shared";
 import { reviewFilePathLabel, type ReviewFileGroup } from "../../lib/review-history";
 import { ReviewChangeDetails } from "../ReviewChangeCard";
 import { Button, TooltipButton, cx } from "../ui";

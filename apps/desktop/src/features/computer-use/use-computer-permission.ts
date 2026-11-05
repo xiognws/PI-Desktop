@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { needsAccessibilityRequest, type ComputerCapabilities } from "@pi-desktop/shared";
+import { needsAccessibilityRequest, type ComputerCapabilities } from "@pi-workspace/shared";
 import { computerUseApi } from "./computer-use-api";
 
 /** Settings owns permission requests; focus/visibility only rechecks OS state. */

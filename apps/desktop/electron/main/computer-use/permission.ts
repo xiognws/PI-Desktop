@@ -1,5 +1,5 @@
 import { shell, systemPreferences } from "electron";
-import { needsAccessibilityRequest, type ComputerCapabilities } from "@pi-desktop/shared";
+import { needsAccessibilityRequest, type ComputerCapabilities } from "@pi-workspace/shared";
 
 /** Fixed OS pane only; neither renderer nor model can supply an external URL. */
 export const ACCESSIBILITY_SETTINGS_URL =

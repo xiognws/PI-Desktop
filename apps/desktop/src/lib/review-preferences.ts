@@ -1,4 +1,4 @@
-import type { ReviewContextLines } from "@pi-desktop/shared";
+import type { ReviewContextLines } from "@pi-workspace/shared";
 
 /** Profile-wide display preference, never session data or snapshot evidence. */
 export const REVIEW_CONTEXT_STORAGE_KEY = "pi.desktop.reviewContextLines";

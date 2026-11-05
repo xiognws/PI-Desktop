@@ -766,6 +766,7 @@ export const zhTW = {
       delegate: "調度子代理",
       use: "呼叫工具",
       todo: "更新待辦",
+      skill: "使用技能",
     },
     activityJoin: {
       two: "{{a}}並{{b}}",

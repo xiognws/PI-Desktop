@@ -760,7 +760,8 @@ export const de = {
       "fork": "Aufgaben abzweigen",
       "delegate": "Subagenten nutzen",
       "use": "Tools aufrufen",
-      "todo": "To-dos aktualisieren"
+      "todo": "To-dos aktualisieren",
+      "skill": "Fertigkeit nutzen"
     },
     "activityJoin": {
       "two": "{{a}} und {{b}}",

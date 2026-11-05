@@ -37,6 +37,7 @@ export const ACTIVITY_BUCKET_ORDER: readonly ActivityBucketId[] = [
   "delegate",
   "use",
   "todo",
+  "skill",
 ];
 
 /** Distinct actions a label names before it summarizes the rest. */
@@ -53,6 +54,7 @@ const BUCKET_LABEL_KEYS: Record<ActivityBucketId, string> = {
   fetch: "chat.activityBucket.fetch",
   fork: "chat.activityBucket.fork",
   delegate: "chat.activityBucket.delegate",
+  skill: "chat.activityBucket.skill",
   use: "chat.activityBucket.use",
   todo: "chat.activityBucket.todo",
 };

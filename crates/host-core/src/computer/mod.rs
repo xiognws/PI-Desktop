@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 pub use backend::{DesktopError, Dispatched, TargetRef};
 
 /// Hard ceiling on the tree one `inspect` returns. Mirrors
-/// `COMPUTER_MAX_NODES` in `@pi-desktop/shared`.
+/// `COMPUTER_MAX_NODES` in `@pi-workspace/shared`.
 pub const MAX_NODES: usize = 400;
 /// Hard ceiling on one accessible label, so a hostile window cannot pad a
 /// model context through its own titles.

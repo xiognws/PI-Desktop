@@ -1,4 +1,4 @@
-import type { ReviewTurn } from "@pi-desktop/shared";
+import type { ReviewTurn } from "@pi-workspace/shared";
 import { useTranslation } from "react-i18next";
 
 /** Only Host-recorded totals are displayed; missing/unsafe values stay unknown. */

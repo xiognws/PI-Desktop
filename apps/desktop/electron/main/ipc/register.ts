@@ -56,7 +56,7 @@ export type RegisterIpcDependencies = {
   getMainWindow: () => BrowserWindow | null;
   getHost: () => HostProcess | null;
   /** Push the live computer-use grant to the renderer's indicator. */
-  publishComputerGrant: (grant: import("@pi-desktop/shared").ComputerGrantView | null) => void;
+  publishComputerGrant: (grant: import("@pi-workspace/shared").ComputerGrantView | null) => void;
   traySessions: ReturnType<typeof createTraySessions>;
   taskbarUnreadBadge: ReturnType<typeof createTaskbarUnreadBadge>;
   getSidecar: () => AgentSidecar | null;

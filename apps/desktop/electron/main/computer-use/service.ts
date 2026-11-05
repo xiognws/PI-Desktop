@@ -1,5 +1,5 @@
-import { completeOneShot, type RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
-import { runComputerLoop, type DecisionRequest, type Observation } from "@pi-desktop/computer-use";
+import { completeOneShot, type RuntimeProviderConfig } from "@pi-workspace/agent-runtime";
+import { runComputerLoop, type DecisionRequest, type Observation } from "@pi-workspace/computer-use";
 import {
   validateComputerToolArgs,
   type AppSettings,
@@ -10,7 +10,7 @@ import {
   type ComputerRunResult,
   type ComputerStepRecord,
   type ComputerTarget,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { Context } from "@earendil-works/pi-ai";
 import type { LocalToolHandler, LocalToolResult } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";

@@ -28,7 +28,7 @@ import {
   type LauncherMatchReason,
   type LauncherPluginEntry,
   type LauncherTriggerMeta,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   launcherMonogram,
   launcherPinyinTokens,

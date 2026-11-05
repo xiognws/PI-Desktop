@@ -770,6 +770,7 @@ export const tr = {
       delegate: "alt ajan kullanımı",
       use: "araç çağırma",
       todo: "görev güncelleme",
+      skill: "Beceri kullan",
     },
     activityJoin: {
       two: "{{a}} ve {{b}}",

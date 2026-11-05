@@ -760,7 +760,8 @@ export const fr = {
       "fork": "déploiement de tâches",
       "delegate": "appel de sous-agents",
       "use": "appel d'outils",
-      "todo": "mise à jour des tâches"
+      "todo": "mise à jour des tâches",
+      "skill": "Utiliser une compétence"
     },
     "activityJoin": {
       "two": "{{a}} et {{b}}",

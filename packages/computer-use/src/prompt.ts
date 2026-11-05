@@ -20,7 +20,7 @@ import {
   type ComputerNode,
   type ComputerStepRecord,
   type ComputerTarget,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export type Observation = {
   grant: ComputerGrantView;

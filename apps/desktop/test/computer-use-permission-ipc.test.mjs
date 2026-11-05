@@ -32,12 +32,12 @@ export const systemPreferences = {
   await build({
     stdin: { contents: `
 export { registerComputerIpc } from "./apps/desktop/electron/main/ipc/computer-ipc";
-export { IPC } from "@pi-desktop/shared";
+export { IPC } from "@pi-workspace/shared";
 `, resolveDir: root },
     outfile, bundle: true, platform: "node", format: "esm",
     // Pair the macOS Host reply with the same capture platform on every runner.
     define: { "process.platform": JSON.stringify("darwin") },
-    alias: { electron: stub, "@pi-desktop/shared": join(root, "packages/shared/src") },
+    alias: { electron: stub, "@pi-workspace/shared": join(root, "packages/shared/src") },
   });
   const { registerComputerIpc, IPC } = await import(pathToFileURL(outfile).href);
   const fixture = { urls: [], openError: false, appTrusted: false, prompts: [] };

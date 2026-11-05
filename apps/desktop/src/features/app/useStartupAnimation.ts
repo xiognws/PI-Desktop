@@ -3,7 +3,7 @@ import {
   STARTUP_ANIMATION_FIRST_FRAME_TIMEOUT_MS,
   STARTUP_ANIMATION_HOLD_HINT_MS,
   STARTUP_ANIMATION_MAX_DURATION_MS,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   INITIAL_STARTUP_ANIMATION_STATE,
   REVEAL_MS,

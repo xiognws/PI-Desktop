@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AppSettings, StartupAnimationStatus } from "@pi-desktop/shared";
+import type { AppSettings, StartupAnimationStatus } from "@pi-workspace/shared";
 import { api } from "../../lib/api";
 import { SettingsRow } from "../../features/settings/primitives";
 import { SettingsToggle } from "../ui";

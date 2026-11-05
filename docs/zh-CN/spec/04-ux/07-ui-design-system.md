@@ -647,7 +647,7 @@ D419。主题专属取值应写在 `styles/tokens.css` 的标记块里，两套�
 
 上面的梯度是按「控件回应一次点击」这种界面内反馈来定尺的。渐显是用户自备影片的收尾，
 因此按另一种语境定尺。它只被 `.startup-animation` 使用，且必须与
-`@pi-desktop/shared` 中的 `STARTUP_ANIMATION_REVEAL_MS` 保持一致。新界面不引用它。
+`@pi-workspace/shared` 中的 `STARTUP_ANIMATION_REVEAL_MS` 保持一致。新界面不引用它。
 
 ### 8. 2 宽松
 

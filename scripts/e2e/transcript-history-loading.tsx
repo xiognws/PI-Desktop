@@ -3,8 +3,8 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import i18n from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { en } from "@pi-desktop/i18n";
-import type { UiMessage } from "@pi-desktop/shared";
+import { en } from "@pi-workspace/i18n";
+import type { UiMessage } from "@pi-workspace/shared";
 import { ChatTranscript } from "../../apps/desktop/src/features/chat/transcript/ChatTranscript";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 

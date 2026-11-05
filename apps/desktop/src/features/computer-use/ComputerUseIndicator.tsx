@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconMonitor } from "../../components/icons";
 import { Badge, Button } from "../../components/ui";
-import type { ComputerGrantView } from "@pi-desktop/shared";
+import type { ComputerGrantView } from "@pi-workspace/shared";
 import { useAppStore } from "../../stores/app-store";
 import { computerUseApi } from "./computer-use-api";
 import "../../styles/computer-use.css";

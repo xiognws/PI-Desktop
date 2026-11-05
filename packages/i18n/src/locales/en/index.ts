@@ -773,6 +773,7 @@ export const en = {
       delegate: "use subagents",
       use: "call tools",
       todo: "update todos",
+      skill: "Use a skill",
     },
     activityJoin: {
       two: "{{a}} and {{b}}",

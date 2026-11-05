@@ -14,7 +14,7 @@ import {
   type ComputerActionKind,
   type ComputerInspection,
   type ComputerNode,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export const COMPUTER_ACTION_KINDS: readonly ComputerActionKind[] = [
   "click",

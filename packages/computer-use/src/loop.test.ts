@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ComputerAction, ComputerCursorEvent, ComputerGrantView, ComputerNode } from "@pi-desktop/shared";
+import type { ComputerAction, ComputerCursorEvent, ComputerGrantView, ComputerNode } from "@pi-workspace/shared";
 
 import { runComputerLoop, type ComputerLoopDeps } from "./loop.js";
 import type { Observation } from "./prompt.js";

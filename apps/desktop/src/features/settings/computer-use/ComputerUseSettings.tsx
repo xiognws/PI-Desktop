@@ -7,7 +7,7 @@ import {
   type ComputerUseSettings as ComputerUseSettingsValue,
   type ProviderPublic,
   needsAccessibilityRequest,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { Badge, Button, SettingsToggle } from "../../../components/ui";
 import { SettingsMenuSelect } from "../../../components/settings/SettingsMenuSelect";
 import { SettingsCard, SettingsRow } from "../primitives";

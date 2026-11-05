@@ -734,7 +734,7 @@ The scale above is sized for in-flow UI feedback — a control answering a
 click. The reveal is the end of a cinematic the user supplied, so it is sized
 in that register instead. It is used by `.startup-animation` and nothing else,
 and it must stay matched to `STARTUP_ANIMATION_REVEAL_MS` in
-`@pi-desktop/shared`. New surfaces do not reference it.
+`@pi-workspace/shared`. New surfaces do not reference it.
 
 ### 8.2 Easing
 

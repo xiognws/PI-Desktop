@@ -1,8 +1,3 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { isThemeColorScheme, type PluginSummary } from "@pi-workspace/shared";
-import { api } from "../lib/api";
-import { searchLaunchablePlugins } from "../lib/plugin-launcher-search";
 import {
   useCallback,
   useEffect,
@@ -15,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import {
   isThemeColorScheme,
   type LauncherCatalog,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { api } from "../lib/api";
 import { resolveLauncherContentHeight } from "../lib/launcher-height";
 import {

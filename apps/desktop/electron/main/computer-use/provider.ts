@@ -1,5 +1,5 @@
-import type { RuntimeProviderConfig } from "@pi-desktop/agent-runtime";
-import type { ComputerModelBinding, ProviderPublic } from "@pi-desktop/shared";
+import type { RuntimeProviderConfig } from "@pi-workspace/agent-runtime";
+import type { ComputerModelBinding, ProviderPublic } from "@pi-workspace/shared";
 import type { HostProcess } from "../host-process";
 
 /**

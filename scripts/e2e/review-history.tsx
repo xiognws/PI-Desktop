@@ -3,14 +3,14 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { catalogs, flattenCatalog } from "@pi-desktop/i18n";
+import { catalogs, flattenCatalog } from "@pi-workspace/i18n";
 import { api } from "../../apps/desktop/src/lib/api";
 import { ReviewHistoryFile } from "../../apps/desktop/src/components/workpanel/ReviewHistoryFile";
 import { groupReviewFiles } from "../../apps/desktop/src/lib/review-history";
 import { ReviewTab } from "../../apps/desktop/src/components/workpanel/ReviewTab";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 import { requestReviewFocus } from "../../apps/desktop/src/lib/review-focus-request";
-import type { SessionSummary, UiMessage } from "@pi-desktop/shared";
+import type { SessionSummary, UiMessage } from "@pi-workspace/shared";
 
 declare global {
   interface Window {

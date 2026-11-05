@@ -7,7 +7,7 @@ import {
   startupAnimationExtensionOf,
   type StartupAnimationCandidate,
   type StartupAnimationDescriptor,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /**
  * Discover the user's boot animation in `<dataDir>/startup/` (D679 / ADR 0338).

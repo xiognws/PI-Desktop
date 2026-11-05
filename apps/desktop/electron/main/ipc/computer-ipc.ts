@@ -7,7 +7,7 @@
  * never hold that authority — and every call is pinned to the trusted main
  * window, so a plugin view or the cursor overlay cannot reach even these.
  */
-import { IPC, type ComputerCapabilities, type ComputerGrantView } from "@pi-desktop/shared";
+import { IPC, type ComputerCapabilities, type ComputerGrantView } from "@pi-workspace/shared";
 import { capturePermissionState } from "../computer-use/capture";
 import { applicationAccessibility, openAccessibilitySettings } from "../computer-use/permission";
 import type { HostProcess } from "../host-process";

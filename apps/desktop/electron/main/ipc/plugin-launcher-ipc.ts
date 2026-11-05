@@ -23,7 +23,7 @@ import {
   type LauncherPluginEntry,
   type LauncherTriggerMeta,
   type PluginSummary,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { HostProcess } from "../host-process";
 import type { LocalAppCatalog } from "../local-apps";
 import { clampLauncherContentHeight } from "../plugin-launcher-state.ts";

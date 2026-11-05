@@ -1,4 +1,4 @@
-import type { ReviewContextLines, ReviewContextResult, ReviewTurnsPage, ReviewChangesPage } from "@pi-desktop/shared";
+import type { ReviewContextLines, ReviewContextResult, ReviewTurnsPage, ReviewChangesPage } from "@pi-workspace/shared";
 type ClipboardDirectoryPaste = {
   items: Array<{ kind: "directory"; path: string; name: string } | { kind: "file"; name: string }>;
   token: string | null;
@@ -1792,7 +1792,7 @@ export const api = {
   workspaceReviewOpenFile: (input: { sessionId: string; snapshotId: string; action: "external" | "folder" }) =>
     invoke(IPC.invoke.workspaceReviewOpenFile, input),
   workspaceReviewRollbackFile: (input: { sessionId: string; snapshotId: string }) =>
-    invoke<import("@pi-desktop/shared").ReviewFileRollbackResult>(IPC.invoke.workspaceReviewRollbackFile, input),
+    invoke<import("@pi-workspace/shared").ReviewFileRollbackResult>(IPC.invoke.workspaceReviewRollbackFile, input),
   workspaceReviewRollback: (input: {
     sessionId: string;
     snapshotId: string;

@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { STARTUP_ANIMATION_URL } from "@pi-desktop/shared";
+import { STARTUP_ANIMATION_URL } from "@pi-workspace/shared";
 import type { StartupAnimationEndReason } from "../lib/startup-animation";
 import { cx } from "./ui";
 

@@ -770,6 +770,7 @@ export const ko = {
       delegate: "하위 에이전트 호출",
       use: "도구 호출",
       todo: "할 일 업데이트",
+      skill: "스킬 사용",
     },
     activityJoin: {
       two: "{{a}} 및 {{b}}",

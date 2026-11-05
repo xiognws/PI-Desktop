@@ -1,4 +1,4 @@
-import type { AppSettings } from "@pi-desktop/shared";
+import type { AppSettings } from "@pi-workspace/shared";
 
 /*
  * Which levels of a settled turn fold themselves (issue #2094).

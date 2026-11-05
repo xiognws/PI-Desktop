@@ -4,7 +4,7 @@ import {
   type AssistantMessage,
   type Models,
 } from "@earendil-works/pi-ai";
-import type { AgentEventEnvelope, SubagentDefinition } from "@pi-desktop/shared";
+import type { AgentEventEnvelope, SubagentDefinition } from "@pi-workspace/shared";
 import { DesktopAgentRuntime, type RuntimeProviderConfig } from "./runtime.js";
 
 // Keep both parent and delegate pi loops real; replace only provider transport.

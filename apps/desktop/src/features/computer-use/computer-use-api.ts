@@ -3,7 +3,7 @@ import {
   type ComputerCapabilities,
   type ComputerCursorEvent,
   type ComputerGrantView,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /**
  * The renderer's computer-use surface (ADR 0342, ADR 0344).

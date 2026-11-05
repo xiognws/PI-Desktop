@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReviewContextLines } from "@pi-desktop/shared";
+import type { ReviewContextLines } from "@pi-workspace/shared";
 import { api } from "../../lib/api";
 import type { ReviewFileGroup } from "../../lib/review-history";
 import { withReviewChangeState } from "../../lib/workspace-review";

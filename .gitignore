@@ -91,6 +91,8 @@ worktrees
 # `pi.prompt-enhancement` folder has no such file; the tracked copy stays
 # exactly the released file set.
 /apps/desktop/resources/plugins/pi.prompt-enhancement/package.json
+# The plugin host also writes one into any example plugin folder it loads.
+/examples/plugins/*/package.json
 /.plugin-packages/
 
 # Python install artefacts

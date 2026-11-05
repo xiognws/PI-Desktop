@@ -7,7 +7,7 @@ import {
   STARTUP_ANIMATION_MAX_BYTES,
   STARTUP_ANIMATION_MIME_TYPES,
   STARTUP_ANIMATION_SCHEME,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { ResolvedStartupAnimation } from "./startup-animation";
 
 /**

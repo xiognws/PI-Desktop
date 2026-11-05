@@ -17,7 +17,7 @@ try {
     outfile: join(temp, "renderer.js"), bundle: true, platform: "browser", format: "esm", jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"', "import.meta.env": JSON.stringify({ DEV: false, MODE: "production" }) },
     loader: { ".css": "empty" }, alias: {
-      "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
+      "@pi-workspace/i18n": join(root, "packages/i18n/src/index.ts"),
       react: join(root, "apps/desktop/node_modules/react"), "react-dom": join(root, "apps/desktop/node_modules/react-dom") },
     nodePaths: [join(root, "apps/desktop/node_modules")], plugins: [{ name: "assets", setup(b) {
       b.onResolve({ filter: /\?url$/ }, ({ path, resolveDir }) => ({ path: join(resolveDir, path.slice(0, -4)), namespace: "asset" }));

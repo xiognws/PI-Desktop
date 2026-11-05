@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ComputerInspection, ComputerNode } from "@pi-desktop/shared";
+import type { ComputerInspection, ComputerNode } from "@pi-workspace/shared";
 
 import { extractJsonObject, parseLoopAnswer, validateAnswerAction } from "./answer.js";
 

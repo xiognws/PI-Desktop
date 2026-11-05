@@ -1,5 +1,5 @@
 import { desktopCapturer, systemPreferences } from "electron";
-import type { ComputerPermissionState, ComputerRect } from "@pi-desktop/shared";
+import type { ComputerPermissionState, ComputerRect } from "@pi-workspace/shared";
 
 /**
  * Scope-cropped capture for computer use (ADR 0342 §11).

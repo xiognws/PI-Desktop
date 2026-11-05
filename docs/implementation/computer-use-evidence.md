@@ -28,10 +28,10 @@ no captured pixels, and no credentials.
 | `cargo clippy -p host-core --all-targets` | No new warnings (one pre-existing in `transcripts.rs`) |
 | `cargo fmt -p host-core -- --check` | Clean |
 | `pnpm build:js` | Passed |
-| `pnpm --filter @pi-desktop/shared test` | 1378 passed (6 new) |
-| `pnpm --filter @pi-desktop/computer-use test` | 27 passed |
-| `pnpm --filter @pi-desktop/i18n test` | 31 passed |
-| `pnpm --filter @pi-desktop/desktop typecheck` | Clean |
+| `pnpm --filter @pi-workspace/shared test` | 1378 passed (6 new) |
+| `pnpm --filter @pi-workspace/computer-use test` | 27 passed |
+| `pnpm --filter @pi-workspace/i18n test` | 31 passed |
+| `pnpm --filter @pi-workspace/desktop typecheck` | Clean |
 | `pnpm docs:check` / `check-locales` | Clean on this branch except the pre-existing duplicate ADR 0339, fixed separately |
 
 ## What ran on a device

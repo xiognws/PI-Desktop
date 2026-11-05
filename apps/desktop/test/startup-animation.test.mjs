@@ -22,7 +22,7 @@ import {
   STARTUP_ANIMATION_REVEAL_MS,
   STARTUP_ANIMATION_SCHEME,
   STARTUP_ANIMATION_URL,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { STARTUP_STALLED_MS } from "../src/lib/startup-watchdog.ts";
 import {
   INITIAL_STARTUP_ANIMATION_STATE,
