@@ -1201,3 +1201,114 @@ fn a_versioned_variant_under_an_umbrella_goes_into_that_skill() {
         assert!(error.contains("deploy-ios"), "{error}");
     });
 }
+
+#[test]
+fn remove_deletes_a_directory_skill_as_a_package() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut shape = input("Review", "global", None);
+        shape.shape = Some("dir".into());
+        let record = registry.create(shape).unwrap();
+        let document = PathBuf::from(&record.path);
+        registry
+            .write_resource(&record.id, None, None, "references/pitfalls.md", "lesson")
+            .unwrap();
+        let package = document.parent().unwrap().to_path_buf();
+        assert!(package.join("references/pitfalls.md").is_file());
+
+        assert!(registry.remove(&record.id, None, None).unwrap());
+        assert!(
+            !package.exists(),
+            "the document and the resources beside it are one skill"
+        );
+        assert!(
+            !registry.remove(&record.id, None, None).unwrap(),
+            "a second delete reports that there was nothing to delete"
+        );
+    });
+}
+
+#[test]
+fn remove_deletes_a_single_file_skill_and_keeps_the_library() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let record = registry.create(input("Notes", "global", None)).unwrap();
+        let document = PathBuf::from(&record.path);
+        let library = document.parent().unwrap().to_path_buf();
+
+        assert!(registry.remove(&record.id, None, None).unwrap());
+        assert!(!document.exists());
+        assert!(library.is_dir(), "the library itself survives");
+    });
+}
+
+#[test]
+fn remove_refuses_a_document_outside_the_skills_roots() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let stray = app.path().join("elsewhere/SKILL.md");
+        fs::create_dir_all(stray.parent().unwrap()).unwrap();
+        fs::write(&stray, "---\nname: Stray\n---\n\nnot a skill here\n").unwrap();
+        let root = capability_dir(CapabilityLevel::Global, None, "skills").unwrap();
+
+        let error = delete_skill_files(&stray, &[root]).unwrap_err().to_string();
+        assert!(error.contains("does not resolve inside a skills root"), "{error}");
+        assert!(stray.is_file(), "nothing was deleted");
+    });
+}
+
+#[test]
+fn remove_refuses_the_document_sitting_directly_in_the_root() {
+    let home = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let root = capability_dir(CapabilityLevel::Global, None, "skills").unwrap();
+        fs::create_dir_all(&root).unwrap();
+        let document = root.join("SKILL.md");
+        fs::write(&document, "---\nname: Stray\n---\n\nnot a package\n").unwrap();
+
+        let error = delete_skill_files(&document, &[root.clone()])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("directly in the skills root"), "{error}");
+        assert!(document.is_file(), "the stray document survives");
+    });
+}
+
+/// A junction makes `remove_dir_all` leave the library, which is how a delete turns
+/// into a wiped working directory. Junctions need no elevation on Windows, so this
+/// runs where the product does.
+#[cfg(windows)]
+#[test]
+fn remove_refuses_a_skill_directory_that_redirects() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let root = capability_dir(CapabilityLevel::Global, None, "skills").unwrap();
+        let outside = app.path().join("outside");
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("precious.txt"), "keep me").unwrap();
+        fs::create_dir_all(&root).unwrap();
+        let link = root.join("linked");
+        let status = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(&link)
+            .arg(&outside)
+            .status()
+            .unwrap();
+        assert!(status.success(), "junction creation failed");
+        let document = link.join("SKILL.md");
+        fs::write(&document, "---\nname: Linked\n---\n\nbody\n").unwrap();
+
+        let error = delete_skill_files(&document, &[root]).unwrap_err().to_string();
+        assert!(error.contains("symlink or junction"), "{error}");
+        assert!(document.is_file(), "nothing was deleted through the link");
+        assert!(outside.join("precious.txt").is_file(), "the target survives");
+        let _ = fs::remove_dir_all(&link);
+        let _ = fs::remove_file(outside.join("precious.txt"));
+    });
+}

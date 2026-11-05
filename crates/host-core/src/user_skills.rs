@@ -418,6 +418,96 @@ fn directory_skill_root(path: &Path, skills_dir: &Path) -> Option<PathBuf> {
     Some(dir.to_path_buf())
 }
 
+/// Is this path a link or a reparse point (Windows junction)?
+///
+/// `remove_dir_all` follows both, so a poisoned tree inside the library could
+/// otherwise delete a directory somewhere else entirely.
+fn is_redirect(path: &Path) -> bool {
+    let Ok(metadata) = path.symlink_metadata() else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // FILE_ATTRIBUTE_REPARSE_POINT: covers junctions, which Rust does not
+        // report as symlinks.
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        return metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// Remove one skill's files, refusing anything that is not a real skill inside a
+/// skills root.
+///
+/// The same last-line guard Hermes' delete path uses, for the same reason: a symlink
+/// or junction makes a recursive delete follow the link out of the library, and a
+/// path that resolves outside every known root — or to a root itself — would take
+/// every installed skill with it. A directory skill goes as a package, because the
+/// document and the resources beside it are one skill: leaving `references/` behind
+/// would only hand the tidy pass a set of orphans.
+fn delete_skill_files(document: &Path, roots: &[PathBuf]) -> Result<()> {
+    let resolve = |path: &Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    // Links are checked before the root test, and on the package directory as well as
+    // the document: `canonicalize` resolves *through* a link, so a redirected skill
+    // would otherwise be refused as "outside the root" — true, but not the thing to
+    // fix — and a junction directory holding a real SKILL.md would send
+    // `remove_dir_all` out of the library entirely.
+    if is_redirect(document) {
+        bail!(
+            "SKILL_INVALID: refusing to delete {}: it is a symlink or junction",
+            document.display()
+        );
+    }
+    let is_package = document
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("SKILL.md"));
+    let package = is_package.then(|| document.parent().unwrap_or(document));
+    if let Some(dir) = package {
+        if is_redirect(dir) {
+            bail!(
+                "SKILL_INVALID: refusing to delete {}: the skill directory is a symlink or junction",
+                dir.display()
+            );
+        }
+    }
+    let resolved = resolve(document);
+    let containing = roots.iter().find(|root| {
+        let root = resolve(root);
+        resolved != root && resolved.starts_with(&root)
+    });
+    let Some(containing) = containing else {
+        bail!(
+            "SKILL_INVALID: refusing to delete {}: it does not resolve inside a skills root",
+            document.display()
+        );
+    };
+    // `<root>/SKILL.md` is not a skill package: it is a stray document sitting
+    // directly in the library, and its package would be the root itself.
+    if let Some(dir) = package {
+        if dir == containing.as_path() || resolve(dir) == resolve(containing) {
+            bail!(
+                "SKILL_INVALID: refusing to delete {}: the document sits directly in the skills root",
+                document.display()
+            );
+        }
+        fs::remove_dir_all(dir)
+            .map_err(|error| anyhow::anyhow!("remove {}: {error}", dir.display()))?;
+        return Ok(());
+    }
+    // The flat form `<root>/<id>.md` is a real skill: only the document goes, and the
+    // library it sits in obviously stays. A failure is reported rather than swallowed,
+    // so a delete that could not happen never comes back as `true`.
+    fs::remove_file(document)
+        .map_err(|error| anyhow::anyhow!("remove {}: {error}", document.display()))?;
+    Ok(())
+}
+
 /// Accept only `references/<name>.md`-style resource paths.
 ///
 /// The review loop writes model-produced paths, so this is a security boundary,
@@ -1460,13 +1550,22 @@ impl UserSkillRegistry {
         let Some(record) = self.find(id, level, project_path)? else {
             return Ok(false);
         };
-        fs::remove_file(&record.path).ok();
-        let level = record
+        let record_level = record
             .level
             .as_deref()
             .map(|value| CapabilityLevel::parse(Some(value)))
             .transpose()?
             .unwrap_or(CapabilityLevel::Global);
+        let mut roots = vec![capability_dir(CapabilityLevel::Global, None, "skills")?];
+        if record_level == CapabilityLevel::Project {
+            if let Some(project) = record.project_path.as_deref() {
+                if let Ok(dir) = capability_dir(CapabilityLevel::Project, Some(project), "skills") {
+                    roots.push(dir);
+                }
+            }
+        }
+        delete_skill_files(&PathBuf::from(&record.path), &roots)?;
+        let level = record_level;
         let _ = self.find(id, Some(level), record.project_path.as_deref())?;
         Ok(true)
     }
