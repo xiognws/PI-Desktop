@@ -71,7 +71,7 @@ jobs:
         run: pnpm build:js
 
       - name: Typecheck Desktop
-        run: pnpm --filter @pi-desktop/desktop typecheck
+        run: pnpm --filter @pi-workspace/desktop typecheck
 
       - name: Lint
         run: pnpm lint
@@ -202,7 +202,7 @@ jobs:
           trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
 
           pnpm install --frozen-lockfile
-          pnpm --filter '@pi-desktop/desktop^...' --fail-if-no-match build
+          pnpm --filter '@pi-workspace/desktop^...' --fail-if-no-match build
 
           wait "$host_build_pid"
           trap - EXIT
@@ -213,7 +213,7 @@ jobs:
         # must not self-publish on tag builds (no token; softprops owns it).
         # The explicit architecture keeps the package and native Rust sidecar
         # aligned with the runner selected by this matrix entry.
-        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }}
+        run: pnpm --filter @pi-workspace/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }}
 
       - name: Package unsigned macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
@@ -224,7 +224,7 @@ jobs:
           set -euo pipefail
           # Artifact names are defined in apps/desktop/package.json: the mac
           # pattern labels ZIPs, and the dmg target pattern labels DMGs.
-          pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }}
+          pnpm --filter @pi-workspace/desktop run dist:mac -- --${{ matrix.arch }}
 
       - name: Diagnose macOS signing environment
         # Records the runner baseline (system, codesign, identities, keychain,
@@ -272,7 +272,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # electron-builder prints one "signing PI-Desktop.app" line and then
+          # electron-builder prints one "signing Pi-Workspace.app" line and then
           # goes quiet: @electron/osx-sign walks Contents and codesigns every
           # Mach-O serially, builder-util silently retries a failing pass up to
           # three times, and @electron/notarize zips, uploads, and waits for
@@ -302,7 +302,7 @@ jobs:
           # PI_SIGNING_TIMEOUT_SECONDS instead of waiting for the job timeout.
           node scripts/macos-signing-watchdog.mjs \
             --label "dist:mac-${{ matrix.arch }}" \
-            -- pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} \
+            -- pnpm --filter @pi-workspace/desktop run dist:mac -- --${{ matrix.arch }} \
               -c.mac.forceCodeSigning=true \
               -c.mac.notarize=true
 
@@ -366,16 +366,16 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          expected_dmg=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}.dmg)
-          expected_dmg_blockmap=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}.dmg.blockmap)
-          expected_zip=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}-mac.zip)
-          expected_zip_blockmap=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}-mac.zip.blockmap)
+          expected_dmg=(apps/desktop/release/Pi-Workspace-*-${{ matrix.arch }}.dmg)
+          expected_dmg_blockmap=(apps/desktop/release/Pi-Workspace-*-${{ matrix.arch }}.dmg.blockmap)
+          expected_zip=(apps/desktop/release/Pi-Workspace-*-${{ matrix.arch }}-mac.zip)
+          expected_zip_blockmap=(apps/desktop/release/Pi-Workspace-*-${{ matrix.arch }}-mac.zip.blockmap)
           if [[ "${#expected_dmg[@]}" -ne 1 || "${#expected_dmg_blockmap[@]}" -ne 1 || "${#expected_zip[@]}" -ne 1 || "${#expected_zip_blockmap[@]}" -ne 1 ]]; then
             echo "::error::Expected exactly one ${{ matrix.arch }} DMG, DMG blockmap, ZIP, and ZIP blockmap."
             printf '%s\n' apps/desktop/release/* || true
             exit 1
           fi
-          for artifact in apps/desktop/release/PI-Desktop-*; do
+          for artifact in apps/desktop/release/Pi-Workspace-*; do
             case "$artifact" in
               *-${{ matrix.arch }}.dmg|*-${{ matrix.arch }}.dmg.blockmap|*-${{ matrix.arch }}-mac.zip|*-${{ matrix.arch }}-mac.zip.blockmap) ;;
               *)
@@ -475,8 +475,8 @@ jobs:
 
           pnpm install --frozen-lockfile
           pnpm build:js
-          pnpm --filter @pi-desktop/agent-runtime bundle
-          pnpm --filter @pi-desktop/pi-host build
+          pnpm --filter @pi-workspace/agent-runtime bundle
+          pnpm --filter @pi-workspace/pi-host build
 
           wait "$host_build_pid"
           trap - EXIT

@@ -37,7 +37,7 @@ import {
   type SessionThinkingLevel,
   type ThinkingLevel,
   type ThinkingProtocol,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   CONTEXT_WINDOW_PRESETS,
   MAX_OUTPUT_PRESETS,

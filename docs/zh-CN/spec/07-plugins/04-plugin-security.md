@@ -366,7 +366,7 @@ MCP 调用相同的 IPC 校验、生命周期检查、完成事件和审计条�
 Electron 的 `globalShortcut`；插件永远拿不到键盘钩子、`before-input-event`、
 原始输入设备或按键事件流，因此无法通过这些 API 记录用户输入。插件只能把快捷键组合
 映射到自己已注册的一条命令；被操作系统保留、被
-PI-Desktop 当前占用（插件启动器默认为 `Alt+Space`，窗口显示 / 隐藏默认为 `Alt+Shift+W`；
+Pi-Workspace 当前占用（插件启动器默认为 `Alt+Space`，窗口显示 / 隐藏默认为 `Alt+Shift+W`；
 用户改绑后即可释放给插件）或已被另一个插件持有的快捷键组合会被拒绝，不会被抢占。
 注册根据具体原因返回 `SHORTCUT_CONFLICT`、`SHORTCUT_UNAVAILABLE` 或
 `INVALID_ACCELERATOR`；`LIMIT_EXCEEDED` 则表示超过每个插件最多 8 条的数量上限。

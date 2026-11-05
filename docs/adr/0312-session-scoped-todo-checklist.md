@@ -2,7 +2,7 @@
 
 - Status: Accepted for implementation
 - Date: 2026-09-29
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: Issue #1177
 
 ## Context

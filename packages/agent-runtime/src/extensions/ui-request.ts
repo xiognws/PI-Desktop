@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { TrustedExtensionUiRequestEnvelope, TrustedExtensionUiResponse } from "@pi-desktop/shared";
+import type { TrustedExtensionUiRequestEnvelope, TrustedExtensionUiResponse } from "@pi-workspace/shared";
 
 /** Request identity scopes cancellation to one invocation, including queued prompts. */
 export async function requestExtensionUi(

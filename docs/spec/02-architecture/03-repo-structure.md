@@ -7,7 +7,7 @@ Two workspaces share one repository: pnpm owns every JavaScript package
 `package.json` scripts fan out to both.
 
 ```text
-PI-Desktop/
+Pi-Workspace/
 ├── apps/
 │ └── desktop/                # Electron product shell
 │   ├── electron/
@@ -128,12 +128,12 @@ Cross-boundary contracts:
 
 ## 3. Runtime data (not in git)
 
-`PI_DESKTOP_DATA_DIR` overrides the default location: `~/.pi-desktop` for a
-packaged installation, `~/.pi-desktop-dev` for a development build, which is
+`PI_DESKTOP_DATA_DIR` overrides the default location: `~/.piworkspace` for a
+packaged installation, `~/.piworkspace-dev` for a development build, which is
 how `pnpm dev` runs beside the packaged app (D599).
 
 ```text
-~/.pi-desktop/
+~/.piworkspace/
  ├── pi.sqlite               # single DB, host-core owned (03-runtime/04, D086)
  ├── sessions/               # per-session transcript files (D119)
  ├── artifacts/              # plan and goal checkpoint artifacts
@@ -160,7 +160,7 @@ how `pnpm dev` runs beside the packaged app (D599).
 
 | Object | Convention |
 |---|---|
-| JS packages | `@pi-desktop/*` |
+| JS packages | `@pi-workspace/*` |
 | Rust crate | `pi-desktop-host-core` (or `host-core`) |
 | IPC channels | `pi-desktop/<domain>/<action>` |
 | i18n keys | `domain.section.key` |

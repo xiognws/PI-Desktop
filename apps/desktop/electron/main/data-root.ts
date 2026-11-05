@@ -1,12 +1,22 @@
 import { app } from "electron";
-import { cpSync, existsSync, mkdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import { APP_NAME } from "@pi-desktop/shared";
-import { resolveReleaseDataRoot } from "./data-paths";
+import { DATA_IDENTIFIER } from "@pi-workspace/shared";
+import {
+  adoptDirectory,
+  LEGACY_DEVELOPMENT_INSTALLATION_NAME,
+  LEGACY_DEVELOPMENT_MAIN_DIR_NAME,
+  LEGACY_INSTALLATION_DATA_DIR_NAME,
+  LEGACY_INSTALLATION_NAME,
+  resolveReleaseDataRoot,
+} from "./data-paths";
 
 /** Folder this installation owns on the data drive. */
-const ROOT_FOLDER = APP_NAME.replace(/[^a-zA-Z0-9.-]/g, "-");
+const ROOT_FOLDER = DATA_IDENTIFIER.replace(/[^a-zA-Z0-9.-]/g, "-");
+
+/** Folder the release before the rename owned on the same drive. */
+const LEGACY_ROOT_FOLDER = LEGACY_INSTALLATION_NAME.replace(/[^a-zA-Z0-9.-]/g, "-");
 
 /**
  * Fixed drives other than the one Windows runs from, in letter order.
@@ -28,37 +38,40 @@ function candidateRoots(): string[] {
   return roots;
 }
 
-/** Copy a legacy location into the new root once, so the move loses nothing. */
-function migrate(from: string, to: string, label: string): void {
-  if (existsSync(to)) return;
-  if (!existsSync(from)) return;
-  try {
-    cpSync(from, to, { recursive: true });
-    console.log(`[data-root] migrated ${label}: ${from} -> ${to}`);
-  } catch (error) {
-    console.warn(`[data-root] could not migrate ${label} (${from}):`, error);
-  }
-}
-
 /**
  * Point this process at a data root of its own before anything reads a path.
  *
  * A shipped build keeps the database, plugin data, Electron user data (lock
  * file, localStorage, caches) and the Playwright browsers in one folder on a
- * non-system drive. Existing installs are copied over on first launch, and when
+ * non-system drive. Existing installs are moved over on first launch, and when
  * no such drive exists the previous home-directory layout is kept — starting is
  * more important than where the files live.
+ *
+ * The folder is named by `DATA_IDENTIFIER`, never by the display name, so
+ * rebranding moves nothing. When the identifier itself changes, the whole
+ * previous root is adopted in one step: `rename` is atomic and free on the same
+ * volume and carries every child — database, userData, plugin data, browsers —
+ * at once, where a per-directory copy would leave whichever one it missed
+ * behind.
  *
  * Development builds are left alone: they already have their own profile, and a
  * checkout should not seize the release folder.
  */
 export function applyReleaseDataRoot(development: boolean): string | null {
   const explicitDataDir = process.env.PI_DESKTOP_DATA_DIR?.trim();
+  const explicitRoot = process.env.PI_DESKTOP_DATA_ROOT?.trim();
   const root = resolveReleaseDataRoot({
-    override: process.env.PI_DESKTOP_DATA_ROOT,
+    override: explicitRoot,
     candidates: candidateRoots(),
   });
   if (!root) return null;
+
+  // Only a root this build named itself can have a predecessor beside it. An
+  // explicit PI_DESKTOP_DATA_ROOT is the user's own directory and is used as
+  // given: adopting a sibling folder there would be a guess, not a migration.
+  if (!explicitRoot) {
+    adoptDirectory(root, [join(dirname(root), LEGACY_ROOT_FOLDER)], "data root");
+  }
 
   try {
     mkdirSync(root, { recursive: true });
@@ -77,20 +90,36 @@ export function applyReleaseDataRoot(development: boolean): string | null {
   // An explicit PI_DESKTOP_DATA_DIR is the user's own answer: honour it and
   // only relocate what nothing else pins down.
   if (!explicitDataDir) {
-    migrate(
-      join(homedir(), development ? ".pi-desktop-dev-main" : ".pi-desktop"),
+    adoptDirectory(
       dataDir,
+      [
+        join(
+          homedir(),
+          development
+            ? LEGACY_DEVELOPMENT_MAIN_DIR_NAME
+            : LEGACY_INSTALLATION_DATA_DIR_NAME,
+        ),
+      ],
       "database",
     );
     process.env.PI_DESKTOP_DATA_DIR = dataDir;
   }
-  migrate(
-    join(app.getPath("appData"), development ? `${APP_NAME} Dev` : APP_NAME),
+  adoptDirectory(
     userData,
+    [
+      join(
+        app.getPath("appData"),
+        development
+          ? LEGACY_DEVELOPMENT_INSTALLATION_NAME
+          : LEGACY_INSTALLATION_NAME,
+      ),
+    ],
     "user data",
   );
   const localAppData = process.env.LOCALAPPDATA;
-  if (localAppData) migrate(join(localAppData, "ms-playwright"), browsers, "browsers");
+  if (localAppData) {
+    adoptDirectory(browsers, [join(localAppData, "ms-playwright")], "browsers");
+  }
 
   if (!app.commandLine.hasSwitch("user-data-dir")) {
     app.setPath("userData", userData);

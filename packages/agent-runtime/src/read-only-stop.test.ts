@@ -1,6 +1,6 @@
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { afterEach, expect, it, vi } from "vitest";
-import type { AgentEventEnvelope } from "@pi-desktop/shared";
+import type { AgentEventEnvelope } from "@pi-workspace/shared";
 import { DesktopAgentRuntime } from "./runtime.js";
 
 type ToolName = "Read" | "Glob" | "Grep" | "Write";

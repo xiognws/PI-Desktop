@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-PI-Desktop uses the pi agent loop without adopting the CLI's session runtime
+Pi-Workspace uses the pi agent loop without adopting the CLI's session runtime
 or giving a JavaScript package ownership of desktop persistence. Package
 boundaries must keep that split clear as upstream packages evolve.
 
@@ -20,7 +20,7 @@ in `docs/project/pi-140-adoption.md`.
 - `@earendil-works/pi-ai` supplies provider transports, auth, message types,
   request retries, and token estimation. Hosted-search request and estimation
   behavior, and forwarding `serviceTier` through `streamSimple` for Fast mode
-  (ADR 0334), remain covered by PI-Desktop's pi-ai patch and contract tests.
+  (ADR 0334), remain covered by Pi-Workspace's pi-ai patch and contract tests.
 - Agent Runtime and subagents pass an explicit client identity: pi-ai keeps its
   detailed versioned `User-Agent`, while `attribution: null` suppresses
   pi-agent-core's default Pi attribution headers for OpenRouter, NVIDIA, and
@@ -59,7 +59,7 @@ atomic commits, task checkpoints, compaction, and recovery. Its Node adapters
 include SQLite and JSONL storage; the README states that one process owns a
 storage at a time and that cross-process locking is not provided.
 
-Those semantics differ from PI-Desktop's current boundary: Rust host-core owns
+Those semantics differ from Pi-Workspace's current boundary: Rust host-core owns
 the SQLite database and session records, while Node owns the in-memory agent
 loop. Do not open a second SQLite writer against host-core's database. Before
 adopting the durable harness, a separate ADR must compare these options:

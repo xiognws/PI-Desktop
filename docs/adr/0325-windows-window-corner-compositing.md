@@ -2,7 +2,7 @@
 
 - Status: Proposed; implementation candidate awaits Windows native qualification
 - Date: 2026-10-10
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: D635, D637, E2E-167, ADR 0248, ADR 0317
 
 ## Context

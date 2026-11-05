@@ -1,4 +1,4 @@
-import type { RemoteHostSshMetadata, RemoteHostTransport } from "@pi-desktop/shared";
+import type { RemoteHostSshMetadata, RemoteHostTransport } from "@pi-workspace/shared";
 import type { RemoteHostRecord } from "./remote-host-registry.js";
 import { assertSshArgument } from "./ssh-transport.js";
 

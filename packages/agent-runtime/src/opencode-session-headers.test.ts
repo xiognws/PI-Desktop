@@ -6,7 +6,7 @@ import {
   type Model,
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
-import { APP_VERSION } from "@pi-desktop/shared";
+import { APP_VERSION } from "@pi-workspace/shared";
 import { completeOneShot } from "./one-shot-complete.js";
 import {
   OPENCODE_CLIENT_HEADER,

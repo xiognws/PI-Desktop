@@ -79,8 +79,8 @@ import {
   ProjectRunCount,
   ProjectRunRail,
 } from "./ProjectRunIndicator";
-import { ErrorCodes, formatSessionLink } from "@pi-desktop/shared";
-import type { SessionSummary } from "@pi-desktop/shared";
+import { ErrorCodes, formatSessionLink } from "@pi-workspace/shared";
+import type { SessionSummary } from "@pi-workspace/shared";
 import type {
   ProjectMeta,
   ProjectSort,

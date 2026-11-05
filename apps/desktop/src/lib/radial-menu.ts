@@ -14,13 +14,13 @@ import {
   type AppSettings,
   type RadialMenuAction,
   type RadialMenuDirection,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /** Translation key per action, shared by the settings pickers and the ring. */
 export {
   RADIAL_MENU_ACTIONS,
   RADIAL_MENU_DIRECTIONS,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export const RADIAL_MENU_ACTION_LABEL_KEYS: Record<RadialMenuAction, string> = {
   "copy-conversation": "chat.copyConversation",

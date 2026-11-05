@@ -1,5 +1,5 @@
-import type { LiveWorkFeedback, LiveWorkOperationView } from "@pi-desktop/shared";
-import { LiveWorkFeedbackScheduler, type LiveWorkIntent, type LiveWorkPendingQuestion, type ScheduledLiveWorkFeedback } from "@pi-desktop/host-runtime";
+import type { LiveWorkFeedback, LiveWorkOperationView } from "@pi-workspace/shared";
+import { LiveWorkFeedbackScheduler, type LiveWorkIntent, type LiveWorkPendingQuestion, type ScheduledLiveWorkFeedback } from "@pi-workspace/host-runtime";
 import type { LiveReceiptDelivery } from "./types";
 import { spokenQuestion } from "./spoken-answer";
 import type { LiveCallServiceDeps, Slot } from "./call-service-internals";

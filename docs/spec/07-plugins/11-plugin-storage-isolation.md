@@ -6,7 +6,7 @@ Rust host-core owns the plugin registry, managed installation files, and all
 SQLite access. Electron Main's plugin broker owns plugin settings files and
 runtime bookkeeping. Plugins use public APIs, never host database handles.
 The data root belongs to the owning host instance; do not hard-code
-`~/.pi-desktop` or reread a process-global override to locate another instance's
+`~/.piworkspace` or reread a process-global override to locate another instance's
 catalog/cache. Development code remains at the loaded source directory.
 
 ```text

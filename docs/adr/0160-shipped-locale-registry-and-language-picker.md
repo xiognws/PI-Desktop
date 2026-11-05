@@ -2,7 +2,7 @@
 
 - Status: Accepted (amended by ADR 0182)
 - Date: 2026-09-05
-- Decision owners: PI-Desktop desktop/i18n maintainers
+- Decision owners: Pi-Workspace desktop/i18n maintainers
 - Related: D012, D073, ADR 0009
 
 ## Context
@@ -19,7 +19,7 @@ Traditional Chinese without requiring plugins to gain every shell locale.
 
 ## Decision
 
-1. `@pi-desktop/i18n` owns a `supportedLocales` registry: id, native name
+1. `@pi-workspace/i18n` owns a `supportedLocales` registry: id, native name
    (endonym, never translated), and English name. `resolveLocale` maps OS
    tags onto that list (`tr` / `tr-TR` → `tr`, Simplified Chinese tags →
    `zh-CN`, Traditional Chinese tags → `zh-TW`, else `en`).

@@ -1,6 +1,6 @@
 # 04. E2E Test Plan
 
-> Scope: MVP acceptance scenarios plus current shipped product increments for PI-Desktop
+> Scope: MVP acceptance scenarios plus current shipped product increments for Pi-Workspace
 > Status: Accepted (protocol/Electron automation is active; full desktop Playwright remains planned)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
@@ -1060,7 +1060,7 @@ levels does not waive the relevant E2E gate.
 | Requirement | Detail |
 |---|---|
 | Platform | macOS arm64 and Intel x64, Windows x64, and Linux x64 and arm64 release targets (D126/D285, D638 / ADR 0318) |
-| Profile | Clean `~/.pi-desktop` profile (no prior config) |
+| Profile | Clean `~/.piworkspace` profile (no prior config) |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |
 | Provider | At least one provider with a valid key (test account) |
@@ -1213,12 +1213,12 @@ identify the platform validation still needed.
   available for repackaging validation. The arm64 lane is E2E-192a.
 - **Steps**: 1) Run the tag release workflow. 2) Inspect the published GitHub
   Release assets. 3) Confirm the versioned
-  `PI-Desktop-X.Y.Z-linux-x64.asar` asset is present. 4) Place that archive in
+  `Pi-Workspace-X.Y.Z-linux-x64.asar` asset is present. 4) Place that archive in
   the target Electron resources layout with the target package's native host
   and other resources, then launch it with `electron <archive>.asar`.
 - **Expected**: The ASAR is copied byte-for-byte from
   `linux-unpacked/resources/app.asar`, is uploaded alongside the Linux
-  AppImage, deb, and rpm, and the system Electron opens the PI-Desktop application
+  AppImage, deb, and rpm, and the system Electron opens the Pi-Workspace application
   archive without requiring the bundled Electron executable.
 - **Specs linked**: `06-delivery/06-release-runbook.md`, `03-runtime/07-process-model.md`
 - **Acceptance**: Quality (release artifact and packaging compatibility)
@@ -1233,9 +1233,9 @@ identify the platform validation still needed.
 - **Steps**: 1) Run the tag release workflow. 2) Confirm the arm64 lane ran on
   an `aarch64` runner and that the packaged
   `target/release/pi-desktop-host-core` is an AArch64 binary. 3) Inspect the
-  published Release assets for `PI-Desktop-X.Y.Z-linux-arm64.AppImage`,
-  `pi-desktop_X.Y.Z_arm64.deb`, `pi-desktop-X.Y.Z-aarch64.rpm`,
-  `PI-Desktop-X.Y.Z-linux-arm64.asar`, and
+  published Release assets for `Pi-Workspace-X.Y.Z-linux-arm64.AppImage`,
+  `pi-workspace_X.Y.Z_arm64.deb`, `pi-workspace-X.Y.Z-aarch64.rpm`,
+  `Pi-Workspace-X.Y.Z-linux-arm64.asar`, and
   `pi-host-X.Y.Z-linux-arm64.tar.gz` with its `.sha256`. 4) Confirm
   `latest-linux.yml` still lists the x64 AppImage while
   `latest-linux-arm64.yml` lists the arm64 one. 5) Install the arm64 AppImage,
@@ -1258,14 +1258,14 @@ identify the platform validation still needed.
   for installation and launch.
 - **Steps**: 1) Build the Linux targets and inspect the RPM with `rpm -qip` and
   `rpm -qpl`. 2) Confirm the package contains the application archive,
-  host-core, `pi-desktop.desktop`, and the 512px `pi-desktop` icon. 3) Confirm
+  host-core, `pi-workspace.desktop`, and the 512px `pi-desktop` icon. 3) Confirm
   the RPM has no global `/usr/lib/.build-id` links. 4) Install the RPM on the
-  Fedora KDE/Wayland machine and launch PI-Desktop from its desktop entry.
+  Fedora KDE/Wayland machine and launch Pi-Workspace from its desktop entry.
   5) Inspect the taskbar grouping and the installed desktop entry.
 - **Expected**: The x64 RPM is produced with the documented name and uploads
   with the release artifacts. Its desktop entry contains `Icon=pi-desktop` and
   `StartupWMClass=pi-desktop`; the running Wayland window groups with the
-  PI-Desktop launcher and shows its icon instead of a generic Electron icon.
+  Pi-Workspace launcher and shows its icon instead of a generic Electron icon.
   The package remains notify-and-link for updates, and the bundled Electron
   binaries do not create global build-id links.
 - **Specs linked**: `01-product/01-product-scope.md`,
@@ -1300,8 +1300,8 @@ identify the platform validation still needed.
   ZIP artifacts for at least one native architecture.
 - **Steps**: 1) Inspect the DMG and confirm the app and Applications link are
   the only items in its window. 2) Inspect the ZIP root without extracting the
-  app and confirm neither `PI-Desktop-macOS-opening-help.txt` nor
-  `PI-Desktop-macOS-open.command` is present. 3) Confirm the app remains
+  app and confirm neither `Pi-Workspace-macOS-opening-help.txt` nor
+  `Pi-Workspace-macOS-open.command` is present. 3) Confirm the app remains
   installable from the ZIP.
 - **Expected**: The DMG contains the branded 720×440 background, the app, and
   the Applications link only. The ZIP contains the app but neither first-launch
@@ -1350,14 +1350,14 @@ identify the platform validation still needed.
 #### E2E-212: GitHub Release starts the CNB mirror pipeline
 
 - **Preconditions**: Repository secret `CNB_MIRROR_TOKEN` is configured on
-  `vastsa/PI-Desktop`; the CNB pipeline at `aixk/Pi-Desktop` listens for
+  `xiognws/Pi-Workspace`; the CNB pipeline at `aixk/Pi-Desktop` listens for
   `api_trigger_mirror`; a GitHub Release tag such as `vX.Y.Z` exists with
   uploaded artifacts.
 - **Steps**: 1) Publish or edit that GitHub Release, or dispatch
   `mirror-to-cnb.yml` with the same tag. 2) Inspect the Actions log for the
   resolved tag and the POST to `api.cnb.cool`. 3) Confirm the CNB pipeline
   starts with `MIRROR_TAGS` equal to that tag.
-- **Expected**: The job runs only on `vastsa/PI-Desktop`. Manual dispatch
+- **Expected**: The job runs only on `xiognws/Pi-Workspace`. Manual dispatch
   without a `vX.Y.Z` tag fails before calling CNB. A missing
   `CNB_MIRROR_TOKEN` fails closed. The JSON body is built with `jq` (not
   YAML string interpolation). GitHub Release artifacts and updater feeds are
@@ -1372,10 +1372,10 @@ identify the platform validation still needed.
 
 #### E2E-001: App launches and shows main window
 
-- **Preconditions**: macOS arm64 or Intel x64; no prior `~/.pi-desktop` profile. For the
+- **Preconditions**: macOS arm64 or Intel x64; no prior `~/.piworkspace` profile. For the
   development lane, workspace package build outputs are absent or older than
   their TypeScript sources.
-- **Steps**: 1) Launch PI-Desktop. In the development lane, use `pnpm dev`.
+- **Steps**: 1) Launch Pi-Workspace. In the development lane, use `pnpm dev`.
   2) Observe main window appears. In the macOS development lane, confirm the
   menu-bar tray icon appears.
 - **Expected**: Development launch rebuilds all workspace dependencies before
@@ -1430,7 +1430,7 @@ identify the platform validation still needed.
 
 #### E2E-004: First-run inline checklist appears
 
-- **Preconditions**: Fresh profile (no `~/.pi-desktop`).
+- **Preconditions**: Fresh profile (no `~/.piworkspace`).
 - **Steps**: 1) Launch app on fresh profile. 2) Observe onboarding checklist.
 - **Expected**: Inline checklist is displayed; provider/key items open Settings
   → Agent, and the optional plugin item opens the app-shell Plugins
@@ -1477,7 +1477,7 @@ identify the platform validation still needed.
 - **Preconditions**: Isolated settings profile and a local OpenAI-compatible fixture that lists a model without credentials; no live or paid provider.
 - **Steps**: 1) Open Settings → Model configuration → Add provider → Custom endpoint. 2) Enter a name and the fixture URL; leave the optional API key empty, without selecting an authentication mode. 3) Confirm model discovery succeeds without a key, select the returned model, and save. 4) Reopen and save without changes, then type a key and save; confirm API-key authentication is restored. 5) Edit an API-key provider and save with a blank input; confirm its key is retained. Reopen and confirm **Clear saved API key** is an icon-only button to the right of the input on the same row, with a localized accessible name and tooltip. Activate it, confirm focus returns to the input, and confirm subsequent discovery does not reuse the stored key. Close without saving and confirm no credential changed. Repeat Clear followed by Save, and Clear followed by a replacement key and Save. 6) Confirm the no-auth provider and model are offered by chat/default-model and subagent selectors. 7) Send a request through the no-auth provider fixture.
 - **Expected**: The custom form has no no-key switch and keeps the key input enabled. An empty or whitespace-only key with no saved credential automatically saves `authKind: "none"` without `secretValue`; a supplied key uses API-key authentication. A blank edit retains an existing key. Clear is staged until Save and a replacement key takes precedence over removal. The enabled no-auth provider with `hasSecret: false` remains selectable for chat, defaults, subagents, and image generation where its model supports that operation. Named cloud presets remain unchanged. Runtime requests contain no API-key or Authorization credentials.
-- **Automation**: `node --test apps/desktop/test/custom-provider-no-api-key-user-path.test.mjs` covers empty/whitespace keys, keyed creation, save/reopen, preservation, staged removal/cancellation, discovery without the old secret, and replacement. `pnpm test:e2e:provider-api-style` renders the production setup form in English and Simplified Chinese with a stubbed model-discovery/API boundary and verifies create/update payloads and chat/default/subagent selector eligibility. `pnpm --filter @pi-desktop/agent-runtime exec vitest run src/provider-binding.test.ts` verifies request headers; `apps/desktop/test/image-generation-default.test.mjs` covers no-auth image-model availability; `cargo test -p host-core --locked switching_provider_to_no_auth_clears_its_api_key` verifies Host persistence and secret removal.
+- **Automation**: `node --test apps/desktop/test/custom-provider-no-api-key-user-path.test.mjs` covers empty/whitespace keys, keyed creation, save/reopen, preservation, staged removal/cancellation, discovery without the old secret, and replacement. `pnpm test:e2e:provider-api-style` renders the production setup form in English and Simplified Chinese with a stubbed model-discovery/API boundary and verifies create/update payloads and chat/default/subagent selector eligibility. `pnpm --filter @pi-workspace/agent-runtime exec vitest run src/provider-binding.test.ts` verifies request headers; `apps/desktop/test/image-generation-default.test.mjs` covers no-auth image-model availability; `cargo test -p host-core --locked switching_provider_to_no_auth_clears_its_api_key` verifies Host persistence and secret removal.
 - **Specs linked**: `03-runtime/11-provider-model-system.md`, `03-runtime/12-provider-config-schema.md`, `03-runtime/13-model-catalog-and-selection.md`, `04-ux/06-settings-ia.md`.
 - **Acceptance**: B (model configuration), F (provider persistence), Security.
 - **Milestone**: M2.
@@ -1615,7 +1615,7 @@ identify the platform validation still needed.
 - **Expected**: Every OpenCode Go LLM request includes `x-opencode-session`
   equal to the conversation id (or a stable per-call id when no session
   exists), `x-opencode-client: pi-desktop`, and a `User-Agent` identifying
-  PI-Desktop. Follow-up turns reuse the same session header, and so does the
+  Pi-Workspace. Follow-up turns reuse the same session header, and so does the
   compaction summary request, which the harness would otherwise send with no
   headers at all. The generic OpenAI-compatible provider does not receive
   these headers. The gateway does
@@ -4462,7 +4462,7 @@ window; opening a normal panel afterward must still work.
 #### E2E-034: NDJSON log files are written and redacted
 
 - **Preconditions**: Fresh profile; provider configured; one chat turn completed.
-- **Steps**: 1) Run a prompt with a tool call. 2) Open `~/.pi-desktop/logs/`. 3) Inspect the categorized files under `app/`, `host/`, and `agent/`.
+- **Steps**: 1) Run a prompt with a tool call. 2) Open `~/.piworkspace/logs/`. 3) Inspect the categorized files under `app/`, `host/`, and `agent/`.
 - **Expected**: NDJSON records exist with `ts/level/channel/category/event/message`; a normal tool call produces one completion or failure record carrying `sessionId`/`toolCallId`, safe tool metadata, and bounded result/duration information; an interrupted tool remains traceable by the same id; no API key, authorization value, raw command output, or local absolute path appears; each category file rotates at 5 MB; lifecycle, permission, tool, provider, plugin, persistence, updater, and error records remain available without creating dedicated timing category files.
 - **Specs linked**: `03-runtime/09-logging-and-observability.md`
 - **Acceptance**: H (diagnostics)
@@ -4497,7 +4497,7 @@ window; opening a normal panel afterward must still work.
 - **Steps**: 1) Launch so the auto-updater check or model discovery issues a
   main-process `net.fetch` / Electron-updater request. 2) Confirm the native
   exception dialog does not appear. 3) Dismiss nothing; wait for a later
-  updater or discovery request. 4) Open `~/.pi-desktop/logs/app/runtime.log`.
+  updater or discovery request. 4) Open `~/.piworkspace/logs/app/runtime.log`.
 - **Expected**: No Electron "A JavaScript error occurred in the main process"
   dialog. The app stays running and does not quit. `runtime.log` contains an
   error record with `code: "NON_ASCII_HTTP_HEADER"` and `recoverable: true`.
@@ -4538,11 +4538,11 @@ window; opening a normal panel afterward must still work.
 - **Milestone**: M5
 - **Status**: Unit-covered (`tools::shell::tests`); scenario Documented
 
-#### E2E-044: Development launch uses PI-Desktop Dock branding
+#### E2E-044: Development launch uses Pi-Workspace Dock branding
 
 - **Preconditions**: macOS development checkout with canonical `build/icon_1024.png`.
 - **Steps**: 1) Run `pnpm dev`. 2) Inspect the running application's Dock icon.
-- **Expected**: The Dock shows the PI-Desktop brand icon, not Electron's default icon; packaged builds continue to use `build/icon.icns`.
+- **Expected**: The Dock shows the Pi-Workspace brand icon, not Electron's default icon; packaged builds continue to use `build/icon.icns`.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Acceptance**: Quality (development shell matches release branding)
 - **Milestone**: M5
@@ -4567,7 +4567,7 @@ window; opening a normal panel afterward must still work.
 - **Milestone**: M5
 - **Status**: Unit-covered (`user-select.test.mjs`); scenario Documented
 
-#### E2E-046: PI-Desktop renderer branding and composer icon boundary
+#### E2E-046: Pi-Workspace renderer branding and composer icon boundary
 
 - **Preconditions**: App running in both English and zh-CN locales, with an
   empty home and a docked transcript available.
@@ -4578,7 +4578,7 @@ window; opening a normal panel afterward must still work.
   frame is shown. 4) Focus the footer Settings and Plugins icons, then each
   project/Temporary session create control. 5) Open Settings and the composer
   input.
-- **Expected**: Visible shell identity reads `PI-Desktop`; the empty-home hero
+- **Expected**: Visible shell identity reads `Pi-Workspace`; the empty-home hero
   renders the theme-matching 100px `HomeMascotLogo` GIF with a short idle hold
   and a looping wave. Pointer hover does not alter the cadence or geometry,
   and reduced motion shows the matching still first frame.
@@ -5993,7 +5993,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   count; both toolbar actions remain enabled when relevant and clear the
   taskbar badge. The badge also clears when no unread outcomes remain. The
   underlying taskbar button keeps the
-  PI-Desktop `P` icon and PI-Desktop name while the overlay is present.
+  Pi-Workspace `P` icon and Pi-Workspace name while the overlay is present.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/01-ipc-protocol.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
@@ -6025,7 +6025,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   session, including after the notification has moved to Windows Action Center;
   no event opens the wrong currently selected session. Abort shows neither surface. OS suppression does
   not lose the durable row or surface a misleading app error. Every inspected
-  Windows system surface identifies `PI-Desktop`; no stock Electron application
+  Windows system surface identifies `Pi-Workspace`; no stock Electron application
   name or identity is exposed. Duplicate delivery is idempotent: one durable
   id owns at most one live native object, and mark-read/clear closes that
   object so a late activation or renderer event cannot show the old task again.
@@ -6139,7 +6139,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `PI_DESKTOP_START_MAXIMIZED=1` before launch so Main maximizes the hidden
   native window before renderer mount.
 - **Steps**: 1) On macOS, launch both `pnpm dev` and a packaged build. Confirm
-  the application-menu title is PI-Desktop, open About PI-Desktop, and inspect
+  the application-menu title is Pi-Workspace, open About Pi-Workspace, and inspect
   its name, version, and icon. Then open every system menu and invoke New Task, Open
   Project, Settings, global search, sidebar toggle, editing,
   zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
@@ -6171,9 +6171,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   while a window exists and after it closes. 7) Build each target on its
   native runner from a clean release-host directory. On Windows, inspect the
   installed app's taskbar button and Start menu shortcut icon.
-- **Expected**: macOS development and packaged launches show PI-Desktop as the
+- **Expected**: macOS development and packaged launches show Pi-Workspace as the
   native application identity, and the About panel uses the canonical
-  PI-Desktop icon; neither surface exposes the stock Electron name or icon.
+  Pi-Workspace icon; neither surface exposes the stock Electron name or icon.
   macOS follows native menu conventions and accelerators.
   Windows/Linux show no application menu inside the window; navigation and
   right-side controls do not collide with drag regions, keyboard shortcuts
@@ -6198,7 +6198,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   share one continuous 1px `border-subtle` separator; the control band's
   leading divider uses the same token and its bottom edge does not disappear
   under the window buttons. Unknown actions fail closed. The installed Windows
-  taskbar button and Start menu shortcut use the PI-Desktop icon, never
+  taskbar button and Start menu shortcut use the Pi-Workspace icon, never
   Electron's default icon. Each package contains the target-native host binary
   (`.exe` only on Windows). Passing this scenario on Windows/Linux proves
   shell readiness, not first-release qualification.
@@ -6692,10 +6692,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-069: Platform-specific sidebar header behavior
 
-- **Preconditions**: PI-Desktop is open with the expanded sidebar and a chat
+- **Preconditions**: Pi-Workspace is open with the expanded sidebar and a chat
   session is active.
 - **Steps**: 1) Open Extensions on macOS windowed mode. 2) Inspect the expanded
-  sidebar titlebar. 3) Confirm no PI-Desktop logo/title is visible and Collapse
+  sidebar titlebar. 3) Confirm no Pi-Workspace logo/title is visible and Collapse
   sidebar appears at the right of the traffic lights. 4) Enter
   fullscreen and inspect the same row. 5) On Windows/Linux, confirm the brand
   remains visible; activate it with a pointer, then with keyboard focus and
@@ -6720,7 +6720,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-098: Sidebar collapse and expand animate as a docked transition
 
-- **Preconditions**: PI-Desktop is open with the expanded sidebar and an active
+- **Preconditions**: Pi-Workspace is open with the expanded sidebar and an active
   chat session; `prefers-reduced-motion` is off.
 - **Steps**: 1) Click Collapse sidebar in the expanded sidebar header (or press
   the sidebar toggle shortcut). 2) Watch the sidebar during collapse. 3) Confirm
@@ -6746,7 +6746,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-208: Collapsed sidebar does not force a 640px chat band
 
-- **Preconditions**: PI-Desktop is open with an active chat session at a
+- **Preconditions**: Pi-Workspace is open with an active chat session at a
   viewport wide enough for the default 760px chat content band; reduced
   motion is off; the user has not resized the band.
 - **Steps**: 1) Record the width of the centered transcript or empty-home
@@ -6766,7 +6766,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-CHAT-content-width-handles: Dual edge handles resize the centered chat band
 
-- **Preconditions**: PI-Desktop is open on chat (empty home or a transcript)
+- **Preconditions**: Pi-Workspace is open on chat (empty home or a transcript)
   at a viewport wider than 760px. Reduced motion off.
 - **Steps**: 1) Confirm no divider is visible at rest. 2) Hover the left
   content edge and confirm a short faint capsule, then the right edge. 3) Drag
@@ -6788,7 +6788,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-UI-tooltip-never-outlives-its-trigger: A themed tooltip always retreats
 
-- **Preconditions**: PI-Desktop is open on a session with at least one message
+- **Preconditions**: Pi-Workspace is open on a session with at least one message
   toolbar, a sidebar with two retained projects, and a window that can lose
   focus (another application or an OS dialog).
 - **Steps**: 1) Hover an icon-only action and wait for its tooltip. 2) With the
@@ -6797,7 +6797,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   a row of adjacent actions. 4) Hover an action, then trigger a sidebar
   re-order or a project expand/collapse that moves its row in the DOM. 5) Hover an
   action, then press Escape. 6) Hover an action, switch to another application,
-  then return to PI-Desktop. 7) Repeat step 1 for the project path tooltip
+  then return to Pi-Workspace. 7) Repeat step 1 for the project path tooltip
   (long absolute path), a session row's overflow control, and a message-toolbar
   chip.
 - **Expected**: Each tooltip appears after its delay (300ms, 500ms for the
@@ -6816,7 +6816,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-UI-row-actions-do-not-swallow-the-row-click: A hidden row action is inert
 
-- **Preconditions**: PI-Desktop is open with two retained projects, each with
+- **Preconditions**: Pi-Workspace is open with two retained projects, each with
   at least three sessions, and one active conversation.
 - **Steps**: 1) Without hovering it, click the right-hand gutter of an idle
   session row where its overflow control will appear, and note which
@@ -6846,7 +6846,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-070: Native select menus follow the Windows theme across the app
 
-- **Preconditions**: PI-Desktop is running on Windows with light and dark
+- **Preconditions**: Pi-Workspace is running on Windows with light and dark
   themes available.
 - **Steps**: 1) In light theme, open remaining native selects (scheduled-task
   form) and confirm Settings pickers on General, 全局 AI, Model configuration,
@@ -7058,7 +7058,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Covers**: A, Quality / US-UI shell polish
 - **Preconditions**: App launch path available (dev or packaged).
 - **Steps**:
-  1. Launch PI-Desktop.
+  1. Launch Pi-Workspace.
   2. Observe the first painted renderer surface before bootstrap completes.
   3. Wait until sessions/settings bootstrap finishes.
   4. Repeat with OS `prefers-reduced-motion: reduce` when available.
@@ -7690,7 +7690,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-AGENTS-002: Global settings and project menus manage instruction files
 
-- **Preconditions**: PI-Desktop is running; a project can be opened.
+- **Preconditions**: Pi-Workspace is running; a project can be opened.
 - **Steps**:
   1. Open Settings -> Instructions without an active project and save global
      content.
@@ -7792,9 +7792,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      x86_64 packages contain only their declared architecture and that the
      Rust host matches the Electron app. Confirm the shared
      `apps/desktop/package.json` macOS configuration produces arm64 assets named
-     `PI-Desktop-X.Y.Z-arm64.dmg` and `PI-Desktop-X.Y.Z-arm64-mac.zip`, while
-     the Intel assets use `PI-Desktop-X.Y.Z-x64.dmg` and
-     `PI-Desktop-X.Y.Z-x64-mac.zip`; confirm the release directory has both
+     `Pi-Workspace-X.Y.Z-arm64.dmg` and `Pi-Workspace-X.Y.Z-arm64-mac.zip`, while
+     the Intel assets use `Pi-Workspace-X.Y.Z-x64.dmg` and
+     `Pi-Workspace-X.Y.Z-x64-mac.zip`; confirm the release directory has both
      DMG and ZIP artifacts and one merged `latest-mac.yml` feed whose URLs and
      checksums match those generated assets.
   4. Inspect the renderer output for its size controls: emitted JS is minified,
@@ -9929,7 +9929,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   Configure a provider that streams slowly enough to stop a partial answer. Run
   once on macOS and once on Windows.
 - **Steps**:
-  1. Immediately after PI-Desktop finishes booting, leave it unfocused and press
+  1. Immediately after Pi-Workspace finishes booting, leave it unfocused and press
      Option+Space on macOS or Alt+Space on Windows while another application
      owns the foreground window. Confirm the first invocation promptly reveals
      a fully rendered, centered launcher on the pointer's display without a
@@ -11156,7 +11156,7 @@ This test plan spec is accepted when:
   macOS sidebar places Collapse sidebar at the right in that same
   row, with no Logo/Home brand or back/forward buttons.
 
-### US-UI-17 PI-Desktop home hero logo
+### US-UI-17 Pi-Workspace home hero logo
 - On empty chat home, the 100px `HomeMascotLogo` GIF renders above the title
   as an eight-frame waving mascot with a short idle hold. Light and dark
   themes each use a dedicated GIF and still PNG.
@@ -11180,9 +11180,9 @@ This test plan spec is accepted when:
 ### US-UI-19 Permanent Stage Manager bounds restore (macOS only)
 - On macOS with Stage Manager, shrink or unfocus the PI window until width < 800 or height < 560.
 - Expect the shell to re-assert a Codex-like footprint (~1200×800, min 800×560 capped to the display work area) and keep restoring while still collapsed (not only during the first 20s after launch).
-- The recovery watchdog is macOS-only (D447). On Windows/Linux it must not run at all: the app must never re-layer or re-raise its own window unprompted. Focus another window, then confirm PI-Desktop stays behind it instead of jumping back to the top of the stack, and that a stacking check (`xprop -root _NET_CLIENT_LIST_STACKING`) never shows it returning to the top periodically.
+- The recovery watchdog is macOS-only (D447). On Windows/Linux it must not run at all: the app must never re-layer or re-raise its own window unprompted. Focus another window, then confirm Pi-Workspace stays behind it instead of jumping back to the top of the stack, and that a stacking check (`xprop -root _NET_CLIENT_LIST_STACKING`) never shows it returning to the top periodically.
 - Windows regression: trigger tiny-bounds recovery through show, focus, or
-  restore, then Alt+Tab to another app. PI-Desktop must stay behind that app
+  restore, then Alt+Tab to another app. Pi-Workspace must stay behind that app
   immediately and after four seconds. Ordinary focus must not resize or raise it;
   hidden/minimized windows keep their state. Recovery must never enable
   always-on-top off macOS.
@@ -11328,8 +11328,8 @@ This test plan spec is accepted when:
 - Placeholder and approval chip remain legible on light and dark plates.
 
 ### US-UI-39 Home mark + hero title optical
-- Empty-home PI-Desktop mark is visible (not near-invisible); stroke density remains readable without a decorative ghost effect.
-- Empty-home title with a project uses a readable project label span (short basenames may display as `PI-Desktop` for optical parity).
+- Empty-home Pi-Workspace mark is visible (not near-invisible); stroke density remains readable without a decorative ghost effect.
+- Empty-home title with a project uses a readable project label span (short basenames may display as `Pi-Workspace` for optical parity).
 
 ### US-UI-40 Home content width vs rem root
 - At 1200×690 light empty home, composer plate outer width is ~744–760px (not ~640px).
@@ -11420,7 +11420,7 @@ This test plan spec is accepted when:
 ### US-UI-46 Home-with-project composer chrome
 - Open a project on empty home (no transcript).
 - Expect no workspace controls attached to the plate; there is no legacy draft
-  mark, and the placeholder uses the PI-Desktop copy.
+  mark, and the placeholder uses the Pi-Workspace copy.
 - Model chip shows the active model ID; the footer uses the circular local-user
   glyph, two-line Custom / Local profile identity, disclosure chevron, and
   separate Help → Settings Info control.
@@ -12043,10 +12043,10 @@ This test plan spec is accepted when:
 - **Preconditions**: Built desktop app on macOS, Windows, and Linux; English
   and zh-CN locales are available; a normal main window is open.
 - **Steps**: 1) On Windows, maximize the focused main window and click its
-  taskbar button; confirm it minimizes while the PI-Desktop taskbar entry
+  taskbar button; confirm it minimizes while the Pi-Workspace taskbar entry
   remains. Click the same taskbar button again; after the restore settles,
   confirm the window remains maximized within the display work area and the
-  taskbar stays visible. Cover the window with another app, click the PI-Desktop
+  taskbar stays visible. Cover the window with another app, click the Pi-Workspace
   taskbar entry, and confirm it comes to the front without entering the tray. 2) On
 -  macOS, click the traffic-light minimize control and confirm it hides the
   window to the tray. On Windows/Linux, use the renderer minimize control and
@@ -12065,8 +12065,8 @@ This test plan spec is accepted when:
   while Quit exits. On macOS the menu bar icon is a readable transparent
   monochrome PI mark without the rounded application tile, and native minimize
   remains tray-resident. Show/click/double-click/app activation restores the
-  existing window; the localized menu contains Show PI-Desktop and Quit
-  PI-Desktop. Quit runs the normal shutdown sequence and leaves no orphan host,
+  existing window; the localized menu contains Show Pi-Workspace and Quit
+  Pi-Workspace. Quit runs the normal shutdown sequence and leaves no orphan host,
   sidecar, or tray process.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/07-process-model.md`,
@@ -12097,7 +12097,7 @@ This test plan spec is accepted when:
   duplicate process exits, and the running instance's session list, in-flight
   turn, and `pi.sqlite` are untouched. Step 4 starts normally as an independent
   instance against its own data directory. Step 5 also starts normally: the
-  development build takes its own `userData` and `~/.pi-desktop-dev`, so it
+  development build takes its own `userData` and `~/.piworkspace-dev`, so it
   neither waits for nor disturbs the running packaged app. Step 6 starts a clean
   single instance, proving the lock is released on exit and never leaves a stale
   block.
@@ -12142,7 +12142,7 @@ This test plan spec is accepted when:
 
 - **Preconditions**: App running on macOS with an installed system font
   distinct from the built-in token stack (for example PingFang SC); a clean
-  `~/.pi-desktop` profile.
+  `~/.piworkspace` profile.
 - **Steps**:
   1) Open Settings → General and confirm the Appearance card shows a Font row
      below Theme and Language with a trigger labeled "System default".
@@ -12191,7 +12191,7 @@ This test plan spec is accepted when:
 
 #### E2E-193: Appearance card sets a global type scale
 
-- **Preconditions**: App running with a clean `~/.pi-desktop` profile and an
+- **Preconditions**: App running with a clean `~/.piworkspace` profile and an
   open conversation that shows transcript text, the composer, and the sidebar.
 - **Steps**:
   1) Open Settings → General and confirm the Appearance card shows a Font
@@ -12249,7 +12249,7 @@ This test plan spec is accepted when:
   4) Switch to a second regular Space and confirm Option+Space shows the panel
      there.
   5) Minimize the main window into the tray, switch to another app, then Cmd+Tab
-     back to PI-Desktop and confirm the window returns focused; repeat with a
+     back to Pi-Workspace and confirm the window returns focused; repeat with a
      Dock click and with the tray Show item.
   6) With the main window hidden, press Option+Space and confirm only the
      launcher appears — the main window stays hidden until it is restored.
@@ -12257,7 +12257,7 @@ This test plan spec is accepted when:
   Dock and Cmd+Tab presence survives launcher warm-up and every launcher
   invocation; the launcher stays focusable, covers all regular Spaces and the
   app's own fullscreen window (overlaying another app's fullscreen Space is
-  out of scope and activates PI-Desktop instead); activation from Cmd+Tab, App
+  out of scope and activates Pi-Workspace instead); activation from Cmd+Tab, App
   Exposé, the Dock, or the tray restores a tray-hidden window, while launcher
   and plugin-panel activation leaves it hidden.
 - **Specs linked**: `03-runtime/07-process-model.md`, ADR 0086, ADR 0078,
@@ -13343,7 +13343,7 @@ This test plan spec is accepted when:
 
 #### E2E-157: Global scrollbars stay quiet while remaining discoverable
 
-- **Preconditions**: PI-Desktop is open with the expanded sidebar, more
+- **Preconditions**: Pi-Workspace is open with the expanded sidebar, more
   temporary sessions than the five-row cap, and enough retained project
   sessions to overflow the Projects region.
 - **Steps**: 1) Inspect the idle Sessions and Projects scrollbars in light and
@@ -13372,7 +13372,7 @@ This test plan spec is accepted when:
 
 #### E2E-158: Temporary sessions use isolated scratch workspaces
 
-- **Preconditions**: PI-Desktop has a project open, a temporary session can be
+- **Preconditions**: Pi-Workspace has a project open, a temporary session can be
   created, and the host data directory is known. The temporary session starts
   with an empty transcript.
 - **Steps**:
@@ -13406,7 +13406,7 @@ This test plan spec is accepted when:
 
 #### E2E-159: A long transcript keeps a bounded mounted window
 
-- **Preconditions**: PI-Desktop is open on a session whose transcript is
+- **Preconditions**: Pi-Workspace is open on a session whose transcript is
   substantially longer than one `session.get` page (several hundred messages,
   including fenced code blocks and expanded tool activity), on a memory-
   constrained Windows machine where the regression was reported.
@@ -13456,7 +13456,7 @@ This test plan spec is accepted when:
 
 #### E2E-160: Dragging the window across displays keeps the dropped position
 
-- **Preconditions**: PI-Desktop is open on a machine with two displays arranged
+- **Preconditions**: Pi-Workspace is open on a machine with two displays arranged
   side by side, ideally with different work areas (a menu bar or taskbar on one
   only, or different resolutions). Run the case once with the work panel closed
   and once with it open at a committed width.
@@ -13492,7 +13492,7 @@ This test plan spec is accepted when:
 
 #### E2E-167: Window edge resize stays smooth and persists the settled bounds
 
-- **Preconditions**: PI-Desktop is open in a normal, non-maximized window on
+- **Preconditions**: Pi-Workspace is open in a normal, non-maximized window on
   macOS, Windows, or Linux. On Windows, the left, bottom, and right rim must
   have no visible native border. Run the case with the work panel closed and once
   with it open at a committed width.
@@ -13563,7 +13563,7 @@ This test plan spec is accepted when:
 
 #### E2E-168: Expanded sidebar width follows an anchored resize gesture
 
-- **Preconditions**: PI-Desktop is open in the chat shell with the sidebar
+- **Preconditions**: Pi-Workspace is open in the chat shell with the sidebar
   expanded and a retained project/session visible.
 - **Steps**:
   1. Drag the sidebar's right-edge handle from its default width toward both
@@ -13857,7 +13857,7 @@ are withdrawn with ADR 0165.
 
 #### E2E-170: Shell titlebars use borderless chrome
 
-- **Preconditions**: PI-Desktop is open in chat, at least one destination page,
+- **Preconditions**: Pi-Workspace is open in chat, at least one destination page,
   and Settings on a supported light or dark theme. On Windows/Linux, renderer-
   drawn window controls are visible.
 - **Steps**: 1) Inspect the top band on the chat, destination, and Settings
@@ -13959,7 +13959,7 @@ are withdrawn with ADR 0165.
   4) Activate Open GitHub.
 - **Expected**: The row is indexed by Settings search and stays on Info. The
   action calls `pi-desktop/app/openFeedback` with no URL from the renderer.
-  Main opens `https://github.com/vastsa/PI-Desktop/issues/new` with
+  Main opens `https://github.com/xiognws/Pi-Workspace/issues/new` with
   `template=bug_report.yml` and prefills `app-version`, `os`, and
   `environment`. The GitHub bug form still requires description, reproduction
   steps, expected, actual, version, and OS; blank issues remain disabled.
@@ -14443,7 +14443,7 @@ are withdrawn with ADR 0165.
   - The assistant chip under the transcript still shows parent-only provider
     usage.
   - Token Insights is the heatmap / KPI dashboard. When the plugin is
-    installed, PI-Desktop remainders from the host turns table appear there
+    installed, Pi-Workspace remainders from the host turns table appear there
     without rewriting `message.usage`.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
   `03-runtime/01-ipc-protocol.md`, `03-runtime/06-host-rpc-protocol.md`,
@@ -14517,7 +14517,7 @@ are withdrawn with ADR 0165.
 
 #### E2E-189: Bundled Advisor plugin is temporarily unavailable
 
-- **Preconditions**: A packaged or development build of PI-Desktop.
+- **Preconditions**: A packaged or development build of Pi-Workspace.
 - **Steps**:
   1. Inspect the bundled plugin resources and confirm `pi.advisor` is absent.
   2. Open the command palette and plugin settings. Confirm `/advisor`, the
@@ -14623,7 +14623,7 @@ are withdrawn with ADR 0165.
   `~/.pi/agent/auth.json` plus `~/.pi/agent/models-store.json`, or
   `~/.cc-switch/cc-switch.db`, including two API-key profiles with the same
   endpoint and different keys, one auth-only Pi API-key provider, and
-  optionally one OAuth-only vendor. PI-Desktop may already have an equivalent
+  optionally one OAuth-only vendor. Pi-Workspace may already have an equivalent
   provider.
 - **Steps**:
   1. Open Settings → Models and expand **Import from other tools**. Confirm
@@ -14738,7 +14738,7 @@ are withdrawn with ADR 0165.
   4. Repeat a link click with Ctrl/Cmd, Shift, and Alt held.
   5. Render and use links whose HTTP(S) destination is wrapped as a nested
      linked-host Markdown destination, such as
-     `[#1106](([github.com](https://github.com/vastsa/PI-Desktop/issues/1106)))`.
+     `[#1106](([github.com](https://github.com/xiognws/Pi-Workspace/issues/1106)))`.
 - **Expected**:
   - Wrapped linked-host destinations resolve to their inner HTTP(S) URL before
     sanitization, so the link is clickable and its right-click menu offers both
@@ -14926,13 +14926,13 @@ are withdrawn with ADR 0165.
 #### E2E-211: Windows portable ZIP launches after extraction (D603)
 
 - **Preconditions**: A Windows x64 tag or `dist:win` package has produced both
-  `PI-Desktop-Setup-<version>.exe` and `PI-Desktop-Portable-<version>.zip` from
+  `Pi-Workspace-Setup-<version>.exe` and `Pi-Workspace-Portable-<version>.zip` from
   the shared electron-builder config; a clean user profile is available; the
   account is a standard user without administrator elevation.
 - **Steps**: 1) Inspect the release directory and `latest.yml`. 2) Extract the
   portable ZIP to a user-writable directory without running the NSIS installer.
-  3) Launch the extracted `PI-Desktop.exe`. 4) Confirm there is no
-  administrator prompt and that the running app has the PI-Desktop icon and
+  3) Launch the extracted `Pi-Workspace.exe`. 4) Confirm there is no
+  administrator prompt and that the running app has the Pi-Workspace icon and
   taskbar entry. 5) Open Settings → Info and confirm Manual is selected by
   default; briefly select Automatic to inspect its replacement warning, then
   restore Manual. 6) Invoke Check for Updates. 7) Confirm Settings → Info offers
@@ -14940,13 +14940,13 @@ are withdrawn with ADR 0165.
   extracted executable.
 - **Expected**: Both Windows artifacts are space-free and uploaded. `latest.yml`
   points at the NSIS installer only. The extracted ZIP app starts without a
-  setup wizard or administrator prompt, keeps the normal PI-Desktop taskbar
+  setup wizard or administrator prompt, keeps the normal Pi-Workspace taskbar
   identity/icon, uses the existing application data directory, and reports
   update preference `manual` by default and effective update mode `manual`.
   Its `resources/app-update.yml` points to the same GitHub feed, so the manual
   check settles as up-to-date or available instead of failing with `ENOENT`.
   When an update is available, Settings offers the Releases page; it does not
-  download or run `PI-Desktop-Setup-<version>.exe`. Relaunch restores sessions
+  download or run `Pi-Workspace-Setup-<version>.exe`. Relaunch restores sessions
   from that same profile.
 - **Specs linked**: `01-product/01-product-scope.md`,
   `06-delivery/06-release-runbook.md`, `03-runtime/07-process-model.md`,
@@ -15108,7 +15108,7 @@ are withdrawn with ADR 0165.
 - **Preconditions**: A clean Windows 11 x64 or ARM64 machine/profile without a
   separately installed Visual C++ Redistributable, Node.js, or another local
   agent runtime; the x64 NSIS installer is available.
-- **Steps**: 1) Install PI-Desktop. 2) Launch it for the first time. 3) Wait
+- **Steps**: 1) Install Pi-Workspace. 2) Launch it for the first time. 3) Wait
   for the startup splash to yield to the main shell. 4) Inspect the runtime
   logs, then open Settings → Info.
 - **Expected**: The bundled x64 `pi-desktop-host-core.exe` starts and completes
@@ -15182,7 +15182,7 @@ are withdrawn with ADR 0165.
 
 #### E2E-220: Local MCP control drives a running desktop
 
-- **Preconditions**: Start PI-Desktop with
+- **Preconditions**: Start Pi-Workspace with
   `PI_DESKTOP_MCP_CONTROL=1` and a clean profile. A local project directory is
   available, the Electron user-data directory is writable, and the desktop
   has completed backend boot.
@@ -15216,7 +15216,7 @@ are withdrawn with ADR 0165.
 
 #### E2E-MCP-session-get-projects-large-compaction
 
-- **Preconditions**: Start PI-Desktop with `PI_DESKTOP_MCP_CONTROL=1`. A durable
+- **Preconditions**: Start Pi-Workspace with `PI_DESKTOP_MCP_CONTROL=1`. A durable
   session exists whose `session.compaction` record (`summary` / `retainedTail` /
   `details.modifiedFiles`) alone serializes to more than the 512 KiB MCP result
   limit. A second durable session exists whose `session.compactions` history
@@ -15517,12 +15517,12 @@ are withdrawn with ADR 0165.
 
 #### E2E-239: An older build names the newer data schema instead of looping
 
-- **Preconditions**: a data directory last opened by a newer PI-Desktop whose
+- **Preconditions**: a data directory last opened by a newer Pi-Workspace whose
   host-core migrated it past the schema this build supports.
 - **Steps**: 1) Launch the older packaged app on that data directory.
   2) Observe the banner and `logs/app/runtime.log`.
 - **Expected**: host-core exits once; no further restart attempts are logged.
-  The fatal banner says this PI-Desktop is older than the local data, shows
+  The fatal banner says this Pi-Workspace is older than the local data, shows
   both schema numbers, and tells the user to install the newer version. The
   data directory is not modified.
 - **Specs linked**: `03-runtime/07-process-model.md` (boot outcomes)
@@ -16405,7 +16405,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 
 #### E2E-PLAN-005: Plan-mode plugin tools with `planSafeActions` are read-only (D384)
 
-- **Preconditions**: PI-Desktop is built with the bundled Browser
+- **Preconditions**: Pi-Workspace is built with the bundled Browser
   plugin (`pi.browser`) enabled and a workspace that exposes one
   http(s) URL the planner can reach. The catalog list is the default
   bundled one; no third-party plugin needs to be installed for this
@@ -17446,7 +17446,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   `session_start`, contributes a skill through `resources_discover`, and uses
   the 0.87 `turn_end` boundary to propose a `context_edit` for the settled
   assistant entry.
-- **Steps:** Start PI-Desktop with fixture-only agent/session directories;
+- **Steps:** Start Pi-Workspace with fixture-only agent/session directories;
   refresh sessions; open the native row beside a Desktop row; submit one text
   prompt; stop or let the faux response settle; send the same text again with
   a retryable response before success; reselect/refresh repeatedly; reopen through
@@ -17503,7 +17503,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions:** An isolated Pi agent directory contains a valid native v3
   session and a copied JSONL file under a nested directory with the same
   `header.id`.
-- **Steps:** Start PI-Desktop with the fixture-only agent directory, refresh the
+- **Steps:** Start Pi-Workspace with the fixture-only agent directory, refresh the
   session list, open the listed native session, and search its transcript.
 - **Expected:** The list contains one row for that native id. Detail and search
   resolve through the selected file; duplicate files remain byte-identical and
@@ -18472,7 +18472,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 #### E2E-CHAT-user-link-selection: URLs in user messages are selectable text
 
-- **Steps**: Send `介绍一下这个项目：https://github.com/vastsa/PI-Desktop` in a user message. Drag from the start of the message past the end of the URL, then copy. Click the URL once afterwards.
+- **Steps**: Send `介绍一下这个项目：https://github.com/xiognws/Pi-Workspace` in a user message. Drag from the start of the message past the end of the URL, then copy. Click the URL once afterwards.
 - **Expected**: The selection highlights the prose and the URL together, and the copied text is the whole message including the URL. A plain click on the URL still opens it through the Link open destination.
 - **Coverage**: `transcript-style.test.mjs` asserts `.chat-text-link` opts back into text selection over the unselectable `button` baseline; drag-and-copy checked in Chromium against the full renderer stylesheet (issue #1243).
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3.
@@ -18614,7 +18614,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 Task delegation, and saved-history recovery. No real model or search service.
 
 **Entry:** `pnpm test:e2e:hosted-search`, which rebuilds the shared
-package and `@pi-desktop/agent-runtime` sidecar bundle. The test starts that
+package and `@pi-workspace/agent-runtime` sidecar bundle. The test starts that
 bundle over its ordinary stdio RPC interface, with an isolated data root,
 a synthetic Host and a loopback-only Responses endpoint. Source-only mocks
 or an already installed desktop application do not satisfy this test.
@@ -18683,8 +18683,8 @@ renderer's durable transcript reads. No real model or provider is contacted.
 **Automation:** `node --test apps/desktop/test/slash-command-source.test.mjs`,
 `node --test apps/desktop/test/session-transcript-empty-read.test.mjs`,
 `node --test apps/desktop/test/plugin-timeout-budgets.test.mjs`,
-`pnpm --filter @pi-desktop/shared test`, and
-`pnpm --filter @pi-desktop/host-runtime test`.
+`pnpm --filter @pi-workspace/shared test`, and
+`pnpm --filter @pi-workspace/host-runtime test`.
 
 ## E2E-PROVIDER-endpoint-guidance-and-search
 

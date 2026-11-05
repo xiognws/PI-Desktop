@@ -35,7 +35,7 @@ function harness(overrides = {}) {
   const runtime = { loadFullSessionMessages: async () => previous, cacheSessionTranscript() {}, sessionTranscriptCache: new Map(), submittedComposerDrafts: new Map(), ...overrides.runtime };
   const { createTranscriptSlice } = load("../src/stores/slices/transcript-slice.ts", {
     i18next: { default: { t: (key) => key } }, "../../lib/api": { api },
-    "../../lib/remote-session-safety": safety, "@pi-desktop/shared": {},
+    "../../lib/remote-session-safety": safety, "@pi-workspace/shared": {},
     "../../lib/composer-smart-stop": smartStop, "../../lib/pending-permissions": permissions,
     "../../lib/session-transcript": transcript, "../../lib/workspace-review": {},
     "../../lib/context-usage": { settleStoppedAssistantMetrics: (message) => message }, "../runtime/transcript-action": {},
@@ -73,7 +73,7 @@ for (const outcome of ["success", "exception", "reply_started"]) {
   });
 }
 const { registerSessionIpc } = load("../electron/main/ipc/session-ipc.ts", {
-  electron: { shell: {} }, "node:fs": fs, "node:path": path, "@pi-desktop/shared": { ErrorCodes, IPC }, "../importers": {}, "../services/session-collaboration": {}, "../bootstrap/remote-hosts.js": {}, "../services/session-search": {},
+  electron: { shell: {} }, "node:fs": fs, "node:path": path, "@pi-workspace/shared": { ErrorCodes, IPC }, "../importers": {}, "../services/session-collaboration": {}, "../bootstrap/remote-hosts.js": {}, "../services/session-search": {},
 });
 function ipcHarness(pending = false, result = { ok: true }) {
   const handlers = new Map(); const events = [];
@@ -150,7 +150,7 @@ test("refused conditional retraction rolls back its fence so late old-turn callb
 
 test("new ID mutations preserve the existing remote read-only capability boundary", () => {
   const { guardRemoteInvocation } = load("../src/lib/remote-ipc-safety.ts", {
-    "@pi-desktop/shared": { IPC }, i18next: { default: { t: () => "Remote history is read-only" } },
+    "@pi-workspace/shared": { IPC }, i18next: { default: { t: () => "Remote history is read-only" } },
   });
   for (const channel of [IPC.invoke.sessionDeleteMessage, IPC.invoke.sessionRetractPendingPrompt]) {
     assert.throws(() => guardRemoteInvocation(channel, { sessionId: "remote:host:session", messageId: "m" }), { code: "CAPABILITY_UNAVAILABLE" });
@@ -173,10 +173,10 @@ test("the real store/API/preload/IPC path uploads bounded ids with more than 64 
       const key = Object.keys(IPC.invoke).find((key) => IPC.invoke[key] === channel);
       assert.ok(["sessionDeleteMessage", "sessionRetractPendingPrompt", "sessionActivateRevision"].includes(key));
       return { ok: true, data: await ipc.invoke(key, input) };
-    } } }, "@pi-desktop/shared": shared, "@pi-desktop/shared/protocol": shared,
+    } } }, "@pi-workspace/shared": shared, "@pi-workspace/shared/protocol": shared,
   });
   const { api } = load("../src/lib/api.ts", {
-    "@pi-desktop/shared": shared, "./plan-history": {}, "./remote-session-safety": safety,
+    "@pi-workspace/shared": shared, "./plan-history": {}, "./remote-session-safety": safety,
     "./remote-ipc-safety": { guardRemoteInvocation() {} },
   }, { window: { piDesktop: bridge } });
   const h = harness({ state: { messages: huge }, runtime: { loadFullSessionMessages: async () => huge }, api });

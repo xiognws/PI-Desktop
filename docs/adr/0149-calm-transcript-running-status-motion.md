@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-09-04
 - Amended: 2026-10-21
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Related: D071, D290, E2E-053, E2E-083
 
 ## Context

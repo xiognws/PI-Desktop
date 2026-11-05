@@ -8,8 +8,8 @@ import type {
   ProposalKind,
   SessionSummary,
   UiMessage,
-} from "@pi-desktop/shared";
-import { isRenderableAttachment, modeForProposalKind } from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
+import { isRenderableAttachment, modeForProposalKind } from "@pi-workspace/shared";
 import type { ComposerDraftSnapshot } from "../../lib/composer-smart-stop";
 import { normalizeProjectPath } from "../../lib/sidebar-session-groups";
 import {

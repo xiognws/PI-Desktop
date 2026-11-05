@@ -40,7 +40,7 @@ import {
   deepseekRequestCompat,
   zhipuRequestCompat,
   type ThinkingLevel,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { genericModelConfig } from "./model-capabilities.js";
 import { sessionAffinityCompat } from "./session-affinity.js";
 import type { ModelConfig } from "./thinking-level.js";

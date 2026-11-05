@@ -6,7 +6,7 @@ import {
   artifactFileName,
   artifactOpKey,
   type ArtifactRow,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 import { IconClipboard, IconFileText, IconFolder, IconRefresh } from "../components/icons";
 import { Input, TooltipButton } from "../components/ui";

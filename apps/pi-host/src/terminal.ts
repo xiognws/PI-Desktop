@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 
-import { RacpError } from "@pi-desktop/agent-host";
-import type { RacpTerminalAccess, TerminalOpenResult } from "@pi-desktop/racp";
-import { RACP_DEFAULT_LIMITS } from "@pi-desktop/shared";
+import { RacpError } from "@pi-workspace/agent-host";
+import type { RacpTerminalAccess, TerminalOpenResult } from "@pi-workspace/racp";
+import { RACP_DEFAULT_LIMITS } from "@pi-workspace/shared";
 
 /** The subset of `node-pty` this module uses; the package is loaded lazily. */
 type Pty = {

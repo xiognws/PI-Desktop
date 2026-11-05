@@ -84,7 +84,7 @@ import {
   PLUGIN_COMPOSER_SUGGESTION_TTL_MAX_MS,
   type PluginSkillContrib,
   type PluginThemeVariableContrib,
-} from "@pi-desktop/plugin-sdk";
+} from "@pi-workspace/plugin-sdk";
 import {
   isAllowedKeybinding,
   isReservedKeybinding,
@@ -95,13 +95,13 @@ import {
   type PluginComposerTransformMeta,
   type PluginWorkspaceInfo,
   BUILTIN_SPEECH_PROTOCOL_IDS,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   previewFile,
   resolveRealPathForCreateWithinRoot,
   resolveRealPathWithinRoot,
   resolveWithinRoot,
-} from "@pi-desktop/host-runtime";
+} from "@pi-workspace/host-runtime";
 import { pluginChildEnv } from "./child-process-env";
 import {
   readThemeAssetBytes,

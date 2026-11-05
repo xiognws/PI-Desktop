@@ -1,5 +1,5 @@
-import type { PluginProjectInfo } from "@pi-desktop/plugin-sdk";
-import type { ProjectGroupRecord, ProjectRecord } from "@pi-desktop/shared";
+import type { PluginProjectInfo } from "@pi-workspace/plugin-sdk";
+import type { ProjectGroupRecord, ProjectRecord } from "@pi-workspace/shared";
 import type { GroupHost } from "../workspace-roots";
 
 /** Read durable projects without activating a workspace or granting file access. */

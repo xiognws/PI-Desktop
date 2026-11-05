@@ -117,7 +117,7 @@ describe("allowed commands", () => {
     "git log --oneline -5",
     "git branch -d stale-branch",
     "npm test",
-    "pnpm --filter @pi-desktop/desktop typecheck",
+    "pnpm --filter @pi-workspace/desktop typecheck",
     "rm build.log",
     "ls -la",
     "grep shutdown src/",

@@ -5,7 +5,7 @@
 
 ## 1. 目标
 
-1. 为 PI-Desktop 中的视觉标记、组件基础和布局指标提供**单一事实来源**
+1. 为 Pi-Workspace 中的视觉标记、组件基础和布局指标提供**单一事实来源**
 2. 确保浅色和深色主题的**高可读性和对比度** - 这是开发人员工作站，而不是营销界面
 3. 将所有设计决策映射到 **Tailwind CSS 标记**，以便规范 → 实现明确
 4.启用**未来类似shadcn的原始提取**，无需重新指定基础
@@ -36,7 +36,7 @@
 
 ### 3. 1 文本选择
 
-PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
+Pi-Workspace 的行为类似于桌面应用程序 shell，因此意外拖动
 默认情况下，chrome 会禁止选择。选择合同为：
 
 - 导航、标题栏镶边、按钮、标签、徽章、菜单等
@@ -84,25 +84,25 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
 
 ### 3. 3 产品标识和标志
 
-可见的产品标识是 **PI-Desktop**，即使外壳借用了
+可见的产品标识是 **Pi-Workspace**，即使外壳借用了
 法典作为视觉参考。身份契约故意很小：
 
 - 侧边栏外壳名称、设置副本和输入框占位符使用
-  `PI-Desktop`； `Codex` 保留用于外部会话导入源或
+  `Pi-Workspace`； `Codex` 保留用于外部会话导入源或
 历史设计参考文本。
 - `build/icon_1024.png` 是规范的 shell 徽标母版；渲染器导入由其派生的
   192x192 标记，位于 `src/assets/brand/`（ADR 0125）。 `BrandLogo` 导入它们
   通过Vite所以渲染器捆绑，开发Dock，并打包
   应用程序都使用相同的视觉资产。
-- 在 macOS 上，开发和打包发布均将 `PI-Desktop` 公开为
-  本机应用程序菜单名称。本机“关于”面板使用 PI-Desktop
+- 在 macOS 上，开发和打包发布均将 `Pi-Workspace` 公开为
+  本机应用程序菜单名称。本机“关于”面板使用 Pi-Workspace
   名称、版本和规范图标；没有可见库存 Electron 名称或图标。
   开发启动使用生成的品牌主机包，因为 AppKit
   从主机包而不是 Electron 运行时 API 中读取此标识。
-- 在 Windows、Electron 主寄存器上，规范的 `net.aiuo.pi-desktop`
+- 在 Windows、Electron 主寄存器上，规范的 `net.aiuo.pi-workspace`
   准备就绪之前的 AppUserModelID。运行时 ID、打包的可执行文件名称、
   和 NSIS 快捷方式标识保持一致，以便本机通知，
-  通知设置和任务栏组将应用程序标识为 `PI-Desktop`
+  通知设置和任务栏组将应用程序标识为 `Pi-Workspace`
   而不是 Electron。
 - 空首页英雄使用 100px 的 `HomeMascotLogo` GIF：由浅色和深色八帧挥手
   动作合成，首帧短暂停留后循环播放。CSS 根据
@@ -479,7 +479,7 @@ WebKit 与 Chromium 会忽略伪元素，该表面退回为常显的原生滚动
 在同一行。 macOS 行省略侧边栏 logo/title，保留 `88px`
 在窗口模式下的本机 chrome 左侧，并回收该填充
 全屏。 该预留量是共享 token `--ds-window-lead-inset` —— 灯簇 `76px` 右缘
-（与主进程放置按钮所用的是同一份 `@pi-desktop/shared` 几何）加 `12px` 留白。
+（与主进程放置按钮所用的是同一份 `@pi-workspace/shared` 几何）加 `12px` 留白。
 Windows/Linux 将身份和侧边栏操作保留在第一位置
 行并为三个无框窗口控件保留最右边的 112px。每个
 control 拥有 46px 高保留带的全部份额。展开的工作面板标题使用可横向滚动的
@@ -966,7 +966,7 @@ Linux 保留淡入淡出和滑动退出。
   border box excludes shell actions plus an 8px gap in both sidebar states on
   every platform. The left inset is 8px except collapsed-sidebar windowed macOS
   (88px through `--ds-window-lead-inset`: the shared 76px native cluster edge
-  plus 12px, from the same `@pi-desktop/shared` geometry used by main).
+  plus 12px, from the same `@pi-workspace/shared` geometry used by main).
   The expanded action lane uses the shared 28px control size plus 8px; the
   collapsed lane uses two controls, 4px spacing and an 8px gap.
   Right native-control exclusion is unchanged. Header-height background

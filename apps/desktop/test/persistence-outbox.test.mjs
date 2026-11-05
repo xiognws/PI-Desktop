@@ -569,7 +569,7 @@ test("image dead letters persist once and remain exact after reload and a later 
   const dead = JSON.parse(await readFile(path, "utf8"));
   assert.equal(dead.length, 2);
   // The public codec is also the recovery reader for manual dead-letter replay.
-  const { decodeBinaryStorage } = await import("@pi-desktop/host-runtime");
+  const { decodeBinaryStorage } = await import("@pi-workspace/host-runtime");
   assert.deepEqual(decodeBinaryStorage(dead[0]).message, message);
   assert.equal(dead[1].message.id, "m");
 });

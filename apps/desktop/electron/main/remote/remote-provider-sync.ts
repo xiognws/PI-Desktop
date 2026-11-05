@@ -3,7 +3,7 @@ import {
   parseProviderImportPayload, parseProviderImportSummary,
   type ProviderCreateInput, type ProviderImportPayload, type ProviderImportSummary,
   type ProviderPublic, type RemoteHostSshMetadata,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { SshTarget, SshTransport } from "./ssh-transport.js";
 import { sshTargetOf } from "./ssh-tunnel.js";
 

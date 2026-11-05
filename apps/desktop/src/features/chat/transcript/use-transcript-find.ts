@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
-import { stepFindIndex } from "@pi-desktop/shared";
+import { stepFindIndex } from "@pi-workspace/shared";
 
 import { useTranscriptFindRequest } from "../../../lib/transcript-find-request";
 import { transcriptSearchRanges } from "../../../lib/transcript-search-highlight";

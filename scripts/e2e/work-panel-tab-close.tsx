@@ -2,9 +2,9 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { catalogs } from "@pi-desktop/i18n";
+import { catalogs } from "@pi-workspace/i18n";
 import { WorkPanel } from "../../apps/desktop/src/components/workpanel/WorkPanel";
-import { IPC, type WorkPanelTabMenuAction, type WorkPanelTabMenuRequest } from "@pi-desktop/shared";
+import { IPC, type WorkPanelTabMenuAction, type WorkPanelTabMenuRequest } from "@pi-workspace/shared";
 import { pluginWorkPanelTab, toolWorkPanelTab } from "../../apps/desktop/src/lib/work-panel-tabs";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 
@@ -298,7 +298,7 @@ async function runPluginViewMenuLayerPath(): Promise<PluginViewMenuLayerResult> 
         viewId: "browser",
         ref: "pi.browser/browser",
         title: "Browser",
-        pluginName: "PI-Desktop",
+        pluginName: "Pi-Workspace",
         order: 0,
       }],
     });

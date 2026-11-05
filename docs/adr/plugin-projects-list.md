@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-30
-- Related: [Issue 1996](https://github.com/vastsa/PI-Desktop/issues/1996),
+- Related: [Issue 1996](https://github.com/xiognws/Pi-Workspace/issues/1996),
   [ADR 0201](0201-plugin-project-ids-and-session-refresh.md),
   [ADR 0263](0263-project-folder-roots-for-plugin-views.md)
 

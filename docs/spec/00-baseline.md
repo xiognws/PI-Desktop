@@ -1,4 +1,4 @@
-# PI-Desktop Baseline Freeze
+# Pi-Workspace Baseline Freeze
 
 - Baseline Version: `0.4.22`
 - Date: `2026-10-08`
@@ -127,7 +127,7 @@
 
 ## Frozen Decisions
 
-1. Product name: **PI-Desktop**
+1. Product name: **Pi-Workspace**
 2. Desktop shell: **Electron**
 3. UI: **React + TypeScript + Vite + Tailwind**
 4. UI language default: **English**

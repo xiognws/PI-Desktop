@@ -6,7 +6,7 @@
 
 ## Context
 
-PI-Desktop's displayed and effective chat limits came from the pinned pi-ai
+Pi-Workspace's displayed and effective chat limits came from the pinned pi-ai
 catalog. Its sibling models can share adapter defaults such as a 272,000-token
 context window even when the selected model's published record has a different
 limit. This affects Settings, the context inspector, session launch and

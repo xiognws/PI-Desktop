@@ -15,7 +15,7 @@ import {
   createVirtualModules,
   setMissingCodingAgentApiReporter,
 } from "./loader.js";
-import { TRUSTED_EXTENSION_KERNEL_VERSION } from "@pi-desktop/shared";
+import { TRUSTED_EXTENSION_KERNEL_VERSION } from "@pi-workspace/shared";
 
 let root: string;
 

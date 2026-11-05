@@ -29,7 +29,7 @@ test("speech IPC is on the typed whitelist and renderer API", async () => {
 
 
 test("settings reject an illegal speech protocol id", async () => {
-  const { validateSpeechSettings } = await import("@pi-desktop/shared");
+  const { validateSpeechSettings } = await import("@pi-workspace/shared");
   assert.throws(
     () =>
       validateSpeechSettings({

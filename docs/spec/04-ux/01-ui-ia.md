@@ -42,7 +42,7 @@ destination, chat as the home surface, tools and permissions inline.
   discoverable through Settings → Project archive.
   Collapsible to an icon rail (Cmd/Ctrl+B). Its expanded column is user-resizable
   from 240px to 520px (default 275px); dragging below 160px collapses it.
-- **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero and
+- **Product identity**: runtime shell copy uses `Pi-Workspace`; the home hero and
   sidebar reuse the derived `src/assets/brand/logo-*.png` marks, while composer prompt
   rows have no leading brand icon and session-creation controls use a dedicated
   message-plus icon. On
@@ -95,7 +95,7 @@ destination, chat as the home surface, tools and permissions inline.
   exclusion is unchanged. Header paint fills the excluded lane without an
   opaque overlay hiding tabs or panel actions. The macOS inset uses the shared
   `--ds-window-lead-inset` token — the cluster's 76px right edge (from
-  `@pi-desktop/shared`) plus a 12px gap — and the main process positions the
+  `@pi-workspace/shared`) plus a 12px gap — and the main process positions the
   buttons from that same shared geometry.
 - **Work panel**: docked right column (not an overlay) opened by an artifact,
   the viewport-fixed toggle, or `Cmd/Ctrl + J`. File, URL, browser-preview, and

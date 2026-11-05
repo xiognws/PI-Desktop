@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { PLUGIN_RENDERER_ACTIONS, validateManifest } from "@pi-desktop/plugin-sdk";
+import { PLUGIN_RENDERER_ACTIONS, validateManifest } from "@pi-workspace/plugin-sdk";
 import { composerToolbar } from "./helpers/composer-toolbar.mjs";
 import { fakeLayerDocument } from "./helpers/fake-layer-document.mjs";
 import { slotMounts, slotSsr } from "./helpers/slot-ssr.mjs";

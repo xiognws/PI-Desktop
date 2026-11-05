@@ -328,7 +328,7 @@ pi 0.84.4+ 只在循环将要在同一次运行中开启另一个助手回合时
 
 1. pi 在助手消息和所有工具之后发出并等待 `turn_end`
    该回合的结果已完成
-2. PI-Desktop 根据完整转录本和最新转录本重建上下文
+2. Pi-Workspace 根据完整转录本和最新转录本重建上下文
    有效的检查点并估计下一个请求预算
 3.低于硬边界，并且没有待处理的模型请求，下一回合
    收益不变
@@ -469,7 +469,7 @@ z.ai 等提供商不会先按溢出恢复、随后又被报告为通用的 `PROV
 计为运行状态，直到持久持久性完成。
 
 检查点携带的文件清单由 pi 自己的收集器从被摘要的区间里读出，它只认小写拼写
-`read` / `write` / `edit`——也就是 pi 自己工具的名字。PI-Desktop 注册的是
+`read` / `write` / `edit`——也就是 pi 自己工具的名字。Pi-Workspace 注册的是
 `Read` / `Write` / `Edit`，因此运行时**只在交给 pi 的准备阶段**转换这三个名字
 （`withPiFileOpToolNames`）：存储内容不变，其它工具名一律保持我们注册的拼写。
 缺少这一步时，检查点的 `readFiles` / `modifiedFiles` 与摘要里的 `<read-files>` 段
@@ -1186,7 +1186,7 @@ sidecar 无法选择不同的根。在一次提示期间，路径解析
 空的、不可读的以及根目录外的指令文件仍会被跳过。全局文件与项目条目各有独立的
 32 KiB UTF-8 预算，过大的全局文件不会挤掉项目指令。超出剩余预算的文件按 UTF-8
 字符边界截断，并在末尾附加
-`[PI-Desktop truncated <source>: loaded the first <n> of <total> bytes; ...]`
+`[Pi-Workspace truncated <source>: loaded the first <n> of <total> bytes; ...]`
 提示；被截断文件之后的项目文件不再加载。源路径标记在 `# Project instructions` 下。
 sidecar 从不直接读取工作区指令。改变的根链
 在下一个提示时重新创建空闲运行时；嵌套指令已解决

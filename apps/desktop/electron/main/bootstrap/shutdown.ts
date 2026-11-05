@@ -1,9 +1,9 @@
 import { app, globalShortcut, type Tray } from "electron";
-import type { CloseBehavior } from "@pi-desktop/shared";
+import type { CloseBehavior } from "@pi-workspace/shared";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { BrowserHost } from "../browser-host";
 import type { HostProcess } from "../host-process";
-import type { InflightCheckpointer } from "@pi-desktop/host-runtime";
+import type { InflightCheckpointer } from "@pi-workspace/host-runtime";
 import type { Logger } from "../logger";
 import type { PersistenceOutbox } from "../persistence-outbox";
 import type { PluginPanelHost } from "../plugin-panel-host";

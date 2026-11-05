@@ -1,4 +1,4 @@
-import type { ReviewChangeStatus, UiMessage } from "@pi-desktop/shared";
+import type { ReviewChangeStatus, UiMessage } from "@pi-workspace/shared";
 import { reviewChangeFromMessage } from "./workspace-review.ts";
 
 /** Rows shown before the per-turn summary folds the rest into `+N more`. */

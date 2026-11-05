@@ -2,7 +2,7 @@ import i18n from "i18next";
 import { api } from "./api";
 import { useAppStore } from "../stores/app-store";
 import { toggleSessionFastMode } from "./fast-mode-command";
-import { trustedExtensionCommandName, type Mode } from "@pi-desktop/shared";
+import { trustedExtensionCommandName, type Mode } from "@pi-workspace/shared";
 
 /**
  * First-party command execution shared by the command palette and the

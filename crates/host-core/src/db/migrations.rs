@@ -1091,7 +1091,7 @@ pub(crate) fn migrate_v27_to_v28(conn: &Connection, path: &Path) -> Result<()> {
 
 /// The non-empty stand-in a strict DeepSeek-compatible relay is fed for a turn
 /// whose thinking was never retained. Mirrors
-/// `DEEPSEEK_REASONING_REPLAY_PLACEHOLDER` in `@pi-desktop/shared`.
+/// `DEEPSEEK_REASONING_REPLAY_PLACEHOLDER` in `@pi-workspace/shared`.
 const REASONING_REPLAY_PLACEHOLDERS: [&str; 2] = [
     "[reasoning not retained for this turn]",
     "[reasoning retained for this turn]",

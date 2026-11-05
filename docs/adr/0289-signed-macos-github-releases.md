@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-18
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Decision: D450
 - Amends: ADR 0022, ADR 0145, ADR 0191, ADR 0204, D078
 - Related: D120, D126, D164, D364, ADR 0197, ADR 0232, ADR 0257, ADR 0278, E2E-196a, E2E-196c, E2E-067A
@@ -18,7 +18,7 @@ certificate must stay possible (D078). Contributors must not commit
 certificate material.
 
 A Developer ID Application certificate for team `DUV63RKYTW` is now available
-for the official `vastsa/PI-Desktop` release lane.
+for the official `xiognws/Pi-Workspace` release lane.
 
 ## Decision
 
@@ -67,7 +67,7 @@ for the official `vastsa/PI-Desktop` release lane.
 
 ## Consequences
 
-- Users who download a tagged DMG should open PI-Desktop without a
+- Users who download a tagged DMG should open Pi-Workspace without a
   Gatekeeper “unidentified developer” or quarantine-damaged warning.
 - Packaged macOS installs can check GitHub Releases, download the arch ZIP,
   and restart into the new version. Existing unsigned installs may still need

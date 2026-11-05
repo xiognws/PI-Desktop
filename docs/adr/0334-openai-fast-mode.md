@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-17
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: [ADR 0329](0329-session-worktree-isolation.md) ·
   [03-runtime/11-provider-model-system](../spec/03-runtime/11-provider-model-system.md) ·
   [04-ux/04-builtin-commands](../spec/04-ux/04-builtin-commands.md) ·
@@ -14,7 +14,7 @@ OpenAI serves a faster priority tier that Codex CLI and the OpenAI API call
 Fast mode. On the wire it is the Responses body field `service_tier:
 "priority"`; the Codex backend rejects `"fast"`. The tier costs more: a ChatGPT
 subscription spends its plan limits faster, and the OpenAI API bills a higher
-per-token price. PI-Desktop never asked for a tier. pi-ai's Responses and
+per-token price. Pi-Workspace never asked for a tier. pi-ai's Responses and
 Codex adapters already accept `serviceTier` and price the tier the response
 reports, but `streamSimple` dropped the option while building its base options.
 

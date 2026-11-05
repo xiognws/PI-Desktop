@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import { IPC, IPC_WHITELIST } from "@pi-desktop/shared/protocol";
+import { IPC, IPC_WHITELIST } from "@pi-workspace/shared/protocol";
 
 const LOCALE_ARGUMENT_PREFIX = "--pi-desktop-locale=";
 
@@ -56,6 +56,7 @@ const api = {
   },
 };
 
+// Frozen: plugins and the renderer call this namespace (ADR 0381).
 contextBridge.exposeInMainWorld("piDesktop", api);
 
 export type PiDesktopPreloadApi = typeof api;

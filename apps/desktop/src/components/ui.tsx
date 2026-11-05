@@ -24,6 +24,7 @@ export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
+// Frozen: plugin CSS and component tests address this DOM id (ADR 0381).
 const OVERLAY_ROOT_ID = "pi-desktop-overlays";
 
 function overlayRoot(): HTMLElement {

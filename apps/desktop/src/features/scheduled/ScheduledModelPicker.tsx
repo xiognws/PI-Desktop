@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { imageGenerationBindings } from "@pi-desktop/shared";
+import { imageGenerationBindings } from "@pi-workspace/shared";
 import { useAppStore } from "../../stores/app-store";
 import {
   composerModelDisplayName,

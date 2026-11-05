@@ -1,4 +1,4 @@
-import type { RacpItemSummary } from "@pi-desktop/shared";
+import type { RacpItemSummary } from "@pi-workspace/shared";
 
 const MAX_SUMMARY_LENGTH = 480;
 

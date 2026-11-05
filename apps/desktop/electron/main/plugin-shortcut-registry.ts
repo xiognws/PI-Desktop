@@ -23,7 +23,7 @@ import {
   keybindingToElectronAccelerator,
   normalizeKeybinding,
   type ShortcutPlatform,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /** A voice assistant needs a handful of accelerators, not a keyboard map. */
 export const MAX_PLUGIN_GLOBAL_SHORTCUTS = 8;
@@ -132,7 +132,7 @@ export class PluginShortcutRegistry {
         { pluginId, accelerator, code: "SHORTCUT_CONFLICT" },
         new PluginShortcutError(
           "SHORTCUT_CONFLICT",
-          `${accelerator} is already used by PI-Desktop`,
+          `${accelerator} is already used by Pi-Workspace`,
         ),
       );
     }

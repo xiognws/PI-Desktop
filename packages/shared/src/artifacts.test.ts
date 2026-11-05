@@ -13,7 +13,7 @@ function row(over: Partial<ArtifactRow> = {}): ArtifactRow {
   return {
     sessionId: "s1",
     sessionTitle: "Refactor the picker",
-    path: "D:\\Code\\PI-Desktop\\apps\\desktop\\src\\a.tsx",
+    path: "D:\\Code\\Pi-Workspace\\apps\\desktop\\src\\a.tsx",
     op: "write",
     updatedAt: "2026-10-29T01:00:00.000Z",
     ...over,
@@ -90,12 +90,12 @@ describe("groupArtifactsBySession", () => {
 
   it("names the project once per session group", () => {
     const groups = groupArtifactsBySession([
-      row({ projectName: "PI-Desktop", projectPath: "D:\\Code\\PI-Desktop" }),
-      row({ path: "/a/two.ts", projectName: "PI-Desktop", projectPath: "D:\\Code\\PI-Desktop" }),
+      row({ projectName: "Pi-Workspace", projectPath: "D:\\Code\\Pi-Workspace" }),
+      row({ path: "/a/two.ts", projectName: "Pi-Workspace", projectPath: "D:\\Code\\Pi-Workspace" }),
       row({ sessionId: "s2", sessionTitle: "Other", projectName: null, projectPath: null }),
     ]);
-    expect(groups[0]?.projectName).toBe("PI-Desktop");
-    expect(groups[0]?.projectPath).toBe("D:\\Code\\PI-Desktop");
+    expect(groups[0]?.projectName).toBe("Pi-Workspace");
+    expect(groups[0]?.projectPath).toBe("D:\\Code\\Pi-Workspace");
     expect(groups[1]?.projectName).toBeNull();
   });
 

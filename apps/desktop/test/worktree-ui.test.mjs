@@ -5,8 +5,8 @@ import { createElement, Fragment } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import i18n from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { catalogs } from "@pi-desktop/i18n";
-import { IPC } from "@pi-desktop/shared";
+import { catalogs } from "@pi-workspace/i18n";
+import { IPC } from "@pi-workspace/shared";
 import { createServer } from "vite";
 
 // ADR 0329 renderer surface: badge, menus, create flow, merge failures, and
@@ -59,7 +59,7 @@ before(async () => {
     store: await server.ssrLoadModule("/src/stores/app-store.ts"),
     behind: await server.ssrLoadModule("/src/features/worktree/WorktreeBehind.tsx"),
     worktreeUi: await server.ssrLoadModule("/src/features/worktree/worktree-ui-store.ts"),
-    shared: await import("@pi-desktop/shared"),
+    shared: await import("@pi-workspace/shared"),
   };
   // Same interpolation setting as the app (main.tsx): React escapes output.
   await i18n.init({

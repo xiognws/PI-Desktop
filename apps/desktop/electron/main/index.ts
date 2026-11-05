@@ -25,7 +25,7 @@ import {
   type CloseBehavior,
   type KeybindingOverrides,
   type PlanExecutionFinishStatus,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { AgentExtensionBridge } from "./agent-extensions";
 import {
   knownProjectGroups,
@@ -46,7 +46,7 @@ import {
   WINDOW_MIN_WIDTH,
   type WorkPanelReservationState,
 } from "./work-panel-window";
-import { InflightCheckpointer } from "@pi-desktop/host-runtime";
+import { InflightCheckpointer } from "@pi-workspace/host-runtime";
 import { withGitBranch } from "./workspace-git";
 import { hasSingleInstanceLock, isDevelopmentBuild } from "./installation";
 import { getStorageBootstrap } from "./storage/bootstrap";
@@ -63,7 +63,7 @@ import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
 import { createSidecarRuntime } from "./runtime/sidecar";
 import { createEventPersistence } from "./runtime/event-persistence";
-import { catalogs, resolveLocale } from "@pi-desktop/i18n";
+import { catalogs, resolveLocale } from "@pi-workspace/i18n";
 import { createPlanRuntime } from "./runtime/plans";
 import { createRuntimeLifecycle } from "./runtime/lifecycle";
 import {

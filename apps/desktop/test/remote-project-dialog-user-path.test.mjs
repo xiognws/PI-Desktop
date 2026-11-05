@@ -15,8 +15,8 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { catalogs, flattenCatalog } from "@pi-desktop/i18n";
-import { IPC } from "@pi-desktop/shared";
+import { catalogs, flattenCatalog } from "@pi-workspace/i18n";
+import { IPC } from "@pi-workspace/shared";
 import { ProjectCreateDialog } from "../../apps/desktop/src/components/ProjectCreateDialog";
 import { FilesTab } from "../../apps/desktop/src/components/workpanel/FilesTab";
 import { ProjectEditDialog } from "../../apps/desktop/src/components/ProjectEditDialog";
@@ -187,8 +187,8 @@ test("the project create dialog opens a remote project and creates a local proje
       outfile: join(temp, "renderer.js"), bundle: true, platform: "browser", format: "esm", jsx: "automatic",
       define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
       alias: {
-        "@pi-desktop/i18n": join(root, "packages/i18n/src"),
-        "@pi-desktop/shared": join(root, "packages/shared/src"),
+        "@pi-workspace/i18n": join(root, "packages/i18n/src"),
+        "@pi-workspace/shared": join(root, "packages/shared/src"),
         react: join(root, "apps/desktop/node_modules/react"),
         "react-dom": join(root, "apps/desktop/node_modules/react-dom"),
         i18next: join(root, "apps/desktop/node_modules/i18next"),

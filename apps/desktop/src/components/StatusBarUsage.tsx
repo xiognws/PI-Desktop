@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SessionUsageTotals } from "@pi-desktop/shared";
+import type { SessionUsageTotals } from "@pi-workspace/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import { latestTurnContextInspector } from "../lib/latest-turn-context";
@@ -10,7 +10,7 @@ import {
   resolveContextUsageDisplay,
 } from "../lib/context-usage";
 import { compactTokens, formatElapsed, sessionTokensUsed } from "../lib/status-bar";
-import { IPC } from "@pi-desktop/shared/protocol";
+import { IPC } from "@pi-workspace/shared/protocol";
 import { ContextUsageInspector } from "./ContextUsageInspector";
 
 /**

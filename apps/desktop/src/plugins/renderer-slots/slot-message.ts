@@ -4,8 +4,8 @@
  * for, its text and its time. Nothing else of the host's message crosses into
  * plugin code.
  */
-import type { PluginSlotMessage } from "@pi-desktop/plugin-sdk";
-import type { UiMessage } from "@pi-desktop/shared";
+import type { PluginSlotMessage } from "@pi-workspace/plugin-sdk";
+import type { UiMessage } from "@pi-workspace/shared";
 
 export function slotMessage<Role extends PluginSlotMessage["role"]>(
   role: Role,

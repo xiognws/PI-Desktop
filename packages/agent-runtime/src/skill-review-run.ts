@@ -22,7 +22,7 @@
  *   the write is *refused* otherwise: that guard is the next slice of work.
  */
 
-import type { SubagentDefinition } from "@pi-desktop/shared";
+import type { SubagentDefinition } from "@pi-workspace/shared";
 
 /** Tool the review may call, and what each one is for. */
 export const REVIEW_SKILL_TOOLS = ["Skill", "skill_manage"] as const;

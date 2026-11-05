@@ -63,7 +63,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',method:'test.trust',params:{s
   });
   await build({ entryPoints: [join(root, "scripts/e2e/provider-certificate-sidecar.ts")],
     outfile: join(temp, "parent.mjs"), bundle: true, platform: "node", format: "esm",
-    alias: { "@pi-desktop/host-runtime": join(root, "packages/host-runtime/src/agent-sidecar.ts") },
+    alias: { "@pi-workspace/host-runtime": join(root, "packages/host-runtime/src/agent-sidecar.ts") },
     // Inject only the cjs interop the ESM bundle still needs. `dirname` and
     // `fileURLToPath` stay out of the banner: the bundled main sources import
     // them from `node:path` / `node:url` themselves, and a same-scope redeclare

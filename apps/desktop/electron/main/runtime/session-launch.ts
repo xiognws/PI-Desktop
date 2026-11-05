@@ -17,7 +17,7 @@ import {
   type SessionThinkingLevel,
   type UserSkillRecord,
   type UserSubagentRecord,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   capabilitiesFromModelConfig,
   clampThinkingLevel,
@@ -31,7 +31,7 @@ import {
   skillReviewPolicyFrom,
   visionFromModelConfig,
   type UserSubagentDocument,
-} from "@pi-desktop/agent-runtime";
+} from "@pi-workspace/agent-runtime";
 import { builtinSkills, effectiveDisabledBuiltinSkills, VISUALIZE_SKILL_ID } from "../builtin-skills";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import {

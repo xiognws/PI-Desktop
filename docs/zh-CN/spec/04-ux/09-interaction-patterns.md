@@ -360,7 +360,7 @@
    仍会创建持久行，但不会出现本机横幅。asktool、工具权限和 Plan 审批询问
    使用带有 `kind: "interactive"` 的同一个 Electron 表面：确切的聚焦当前
    会话保持静默，而聚焦于其他会话时可以收到横幅。在 Windows 上，每个横幅
-   都归因于与 NSIS 包和任务栏标识共享的规范 PI-Desktop AppUserModelID。
+   都归因于与 NSIS 包和任务栏标识共享的规范 Pi-Workspace AppUserModelID。
    Electron 每个持久 id 最多保留一个任务本机对象；成功的已读、全部已读和
    清除操作会关闭匹配对象，并保留 tombstone 以抵御迟到/重放投递。
 5. 单击本机通知 shows/restores 并聚焦于主通知
@@ -1012,7 +1012,7 @@ Mode/provider/model/permission/shell 配置和新提示仍然存在
   excludes shell actions plus an 8px gap in both sidebar states on all platforms.
   The left inset is 8px except collapsed-sidebar windowed macOS (88px through
   `--ds-window-lead-inset`: the 76px native cluster edge from
-  `@pi-desktop/shared` plus a 12px gap).
+  `@pi-workspace/shared` plus a 12px gap).
   Native clicks must operate controls and empty-header drags must move the
   window; DOM/CDP clicks alone are not native hit-test proof.
 

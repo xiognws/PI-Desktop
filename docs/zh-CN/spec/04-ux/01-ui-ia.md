@@ -46,7 +46,7 @@
   可通过设置 → 项目存档发现。
   可折叠到图标导轨 (Cmd/Ctrl+B)。展开列固定为 275px；历史版本保存的
   可调宽度偏好会被忽略。
-- **产品标识**：运行时 shell 复制使用 `PI-Desktop`；主场英雄和
+- **产品标识**：运行时 shell 复制使用 `Pi-Workspace`；主场英雄和
   侧边栏重复使用派生的 `src/assets/brand/logo-*.png` 标记，而输入框提示
   行没有领先的品牌图标，会话创建控件使用专用的
 消息加号图标。开
@@ -75,7 +75,7 @@
   sidebar states, including expanded-sidebar New Task, on every platform.
   The left inset is 8px except collapsed-sidebar windowed macOS (88px), using
   `--ds-window-lead-inset`: the shared native cluster's 76px edge plus 12px.
-  The main process uses the same geometry from `@pi-desktop/shared`.
+  The main process uses the same geometry from `@pi-workspace/shared`.
   Right native-control exclusion is unchanged; header-height background paint
   fills the left lane without an opaque overlay covering panel controls.
   窗口级控件条始终挂在各面板堆叠上下文之外，覆盖面板打开、预览、还原和设置页切换。

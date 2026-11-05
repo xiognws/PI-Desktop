@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-16
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: [ADR 0109](0109-open-files-with-the-os-associated-application.md) ·
   [ADR 0170](0170-work-panel-browser-as-bundled-plugin.md) ·
   [ADR 0264](0264-host-mediated-actions-follow-the-browsed-folder.md) ·

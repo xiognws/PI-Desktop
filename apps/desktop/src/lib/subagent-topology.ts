@@ -1,4 +1,4 @@
-import type { UiMessage } from "@pi-desktop/shared";
+import type { UiMessage } from "@pi-workspace/shared";
 import type { AssistantActivityItem } from "./assistant-turns";
 import {
   delegationLifecycleKind,

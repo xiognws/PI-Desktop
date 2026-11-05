@@ -1,6 +1,6 @@
 import { createServer, type ServerResponse } from "node:http";
 import { afterEach, expect, it } from "vitest";
-import type { AgentEventEnvelope, UiMessage } from "@pi-desktop/shared";
+import type { AgentEventEnvelope, UiMessage } from "@pi-workspace/shared";
 import { DesktopAgentRuntime } from "./runtime.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
 

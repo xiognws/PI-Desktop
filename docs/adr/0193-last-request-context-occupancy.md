@@ -3,7 +3,7 @@
 - Status: Accepted (amended 2026-10-11: occupancy no longer adds
   `reasoningTokens`, which the reported output already contains)
 - Date: 2026-09-09
-- Deciders: PI-Desktop renderer and UX maintainers
+- Deciders: Pi-Workspace renderer and UX maintainers
 - Amends: D103, D184, D244, D347, ADR 0047, ADR 0103, ADR 0184
 - Related: D355, E2E-060d, US-UI-61
 

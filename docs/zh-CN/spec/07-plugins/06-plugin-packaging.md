@@ -60,7 +60,7 @@ Agent 扩展有独立 TypeScript 加载器，显式导入 pi 扩展另有受限�
 
 ## 7. CLI 与发布交接
 
-完成仓库常规配置后，从 PI-Desktop 仓库根目录运行：
+完成仓库常规配置后，从 Pi-Workspace 仓库根目录运行：
 
 ```bash
 pnpm pi-plugin check ../my-plugin

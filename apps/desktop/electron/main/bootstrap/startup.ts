@@ -10,7 +10,7 @@ import {
   type CloseBehavior,
   type KeybindingOverrides,
   type NativeMenuAction,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { installApplicationMenu } from "../application-menu";
 import { installGenUiProtocol } from "../gen-ui-protocol";
 import { installPluginAssetProtocol } from "../plugin-asset-protocol";

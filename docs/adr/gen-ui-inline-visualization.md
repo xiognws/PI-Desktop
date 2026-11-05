@@ -7,7 +7,7 @@
 
 Models can explain dynamic systems, tunable parameters, and spatial
 relationships far better with a small interactive page than with prose,
-Markdown tables, or Mermaid. PI-Desktop cannot show such a page in the
+Markdown tables, or Mermaid. Pi-Workspace cannot show such a page in the
 transcript: assistant text renders through Markdown only, the transcript has no
 embedded frames, and MCP Apps `ui://` resources are not supported.
 
@@ -15,7 +15,7 @@ Codex and ZCode solve the same problem the same way. The model writes an HTML
 *fragment* to a host-owned, per-session directory and references it from the
 final reply. The host validates the file, wraps it in a host shell with a
 strict Content Security Policy and theme variables, and renders it in an
-isolated frame inside the message. PI-Desktop adopts that architecture and
+isolated frame inside the message. Pi-Workspace adopts that architecture and
 adapts ZCode's Apache-2.0 visualize kit (stylesheet, tooltip and tab runtime,
 and a condensed skill text); the Codex text is proprietary and is not used.
 Attribution lives in `apps/desktop/resources/gen-ui/NOTICE.md`.

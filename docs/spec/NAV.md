@@ -1,4 +1,4 @@
-# PI-Desktop Spec Navigation
+# Pi-Workspace Spec Navigation
 
 ## Overview
 - [README.md](README.md)

@@ -1,10 +1,10 @@
 {
-  "name": "@pi-desktop/desktop",
+  "name": "@pi-workspace/desktop",
   "version": "0.21.0",
-  "desktopName": "pi-desktop.desktop",
+  "desktopName": "pi-workspace.desktop",
   "private": true,
-  "description": "PI-Desktop Electron application",
-  "homepage": "https://github.com/vastsa/PI-Desktop",
+  "description": "Pi-Workspace Electron application",
+  "homepage": "https://github.com/xiognws/Pi-Workspace",
   "author": {
     "name": "vastsa",
     "email": "hhxk666@gmail.com"
@@ -12,7 +12,7 @@
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
-    "build:deps": "pnpm --filter '@pi-desktop/desktop^...' build",
+    "build:deps": "pnpm --filter '@pi-workspace/desktop^...' build",
     "predev": "pnpm run build:deps && cargo build --manifest-path ../../Cargo.toml -p host-core",
     "dev": "node ../../scripts/dev-electron.mjs",
     "build": "electron-vite build",
@@ -39,15 +39,15 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "1.4.0",
     "@earendil-works/pi-mcp": "1.4.0",
-    "@pi-desktop/agent-host": "workspace:*",
-    "@pi-desktop/agent-runtime": "workspace:*",
-    "@pi-desktop/host-runtime": "workspace:*",
-    "@pi-desktop/i18n": "workspace:*",
-    "@pi-desktop/plugin-devkit": "workspace:*",
-    "@pi-desktop/plugin-sdk": "workspace:*",
-    "@pi-desktop/racp": "workspace:*",
-    "@pi-desktop/shared": "workspace:*",
-    "@pi-desktop/voice-runtime": "workspace:*",
+    "@pi-workspace/agent-host": "workspace:*",
+    "@pi-workspace/agent-runtime": "workspace:*",
+    "@pi-workspace/host-runtime": "workspace:*",
+    "@pi-workspace/i18n": "workspace:*",
+    "@pi-workspace/plugin-devkit": "workspace:*",
+    "@pi-workspace/plugin-sdk": "workspace:*",
+    "@pi-workspace/racp": "workspace:*",
+    "@pi-workspace/shared": "workspace:*",
+    "@pi-workspace/voice-runtime": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -81,16 +81,16 @@
     "zustand": "^5.0.15"
   },
   "build": {
-    "appId": "net.xiognws.pi-desktop",
-    "productName": "PI-Desktop",
+    "appId": "net.aiuo.pi-workspace",
+    "productName": "Pi-Workspace",
     "directories": {
       "output": "release"
     },
     "publish": [
       {
         "provider": "github",
-        "owner": "vastsa",
-        "repo": "PI-Desktop"
+        "owner": "xiognws",
+        "repo": "Pi-Workspace"
       }
     ],
     "extraMetadata": {
@@ -151,7 +151,7 @@
       }
     ],
     "mac": {
-      "artifactName": "PI-Desktop-${version}-${arch}-mac.${ext}",
+      "artifactName": "Pi-Workspace-${version}-${arch}-mac.${ext}",
       "target": [
         {
           "target": "dmg"
@@ -167,8 +167,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSLocalNetworkUsageDescription": "PI-Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / PI-Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
-        "NSMicrophoneUsageDescription": "PI-Desktop uses the microphone for Live voice calls and authorized plugin audio access. / PI-Desktop 使用麦克风进行实时语音通话，以及你已授权的插件音频访问。",
+        "NSLocalNetworkUsageDescription": "Pi-Workspace needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / Pi-Workspace 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
+        "NSMicrophoneUsageDescription": "Pi-Workspace uses the microphone for Live voice calls and authorized plugin audio access. / Pi-Workspace 使用麦克风进行实时语音通话，以及你已授权的插件音频访问。",
         "NSBonjourServices": [
           "_http._tcp",
           "_https._tcp"
@@ -186,7 +186,7 @@
       ]
     },
     "dmg": {
-      "artifactName": "PI-Desktop-${version}-${arch}.${ext}",
+      "artifactName": "Pi-Workspace-${version}-${arch}.${ext}",
       "background": "build/dmg-background.png",
       "icon": "build/icon.icns",
       "window": {
@@ -209,8 +209,8 @@
       ]
     },
     "win": {
-      "executableName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}",
+      "executableName": "Pi-Workspace",
+      "artifactName": "Pi-Workspace-Portable-${version}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -254,28 +254,28 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Setup-${version}.${ext}"
+      "shortcutName": "Pi-Workspace",
+      "artifactName": "Pi-Workspace-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}"
+      "artifactName": "Pi-Workspace-Portable-${version}.${ext}"
     },
     "deb": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop_${version}_${arch}.${ext}"
+      "packageName": "pi-workspace",
+      "artifactName": "pi-workspace_${version}_${arch}.${ext}"
     },
     "rpm": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop-${version}-${arch}.${ext}",
+      "packageName": "pi-workspace",
+      "artifactName": "pi-workspace-${version}-${arch}.${ext}",
       "fpm": [
         "--rpm-rpmbuild-define",
         "_build_id_links none"
       ]
     },
     "linux": {
-      "executableName": "pi-desktop",
+      "executableName": "pi-workspace",
       "syncDesktopName": true,
-      "artifactName": "PI-Desktop-${version}-linux-${arch}.${ext}",
+      "artifactName": "Pi-Workspace-${version}-linux-${arch}.${ext}",
       "target": [
         {
           "target": "AppImage"

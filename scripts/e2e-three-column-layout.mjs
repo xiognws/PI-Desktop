@@ -17,7 +17,7 @@
  *     collapsing the sidebar again restores it, and divider drags still stop
  *     at the 244px minimum.
  *
- * Prereqs: `pnpm --filter @pi-desktop/desktop build` (or `pnpm build:js`) and a
+ * Prereqs: `pnpm --filter @pi-workspace/desktop build` (or `pnpm build:js`) and a
  * host-core binary (target/debug, target/release, or PI_DESKTOP_HOST_BIN).
  */
 import { spawn } from "node:child_process";
@@ -311,7 +311,7 @@ function check(ok, label, detail = "") {
 
 async function main() {
   if (!existsSync(join(appDir, "out/main/index.js"))) {
-    console.error("desktop app not built. Run: pnpm --filter @pi-desktop/desktop build");
+    console.error("desktop app not built. Run: pnpm --filter @pi-workspace/desktop build");
     process.exit(1);
   }
   if (!existsSync(electronBin)) {

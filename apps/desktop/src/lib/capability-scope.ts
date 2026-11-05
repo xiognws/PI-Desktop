@@ -1,4 +1,4 @@
-import type { AgentCapabilityLevel, AgentCapabilityQuery } from "@pi-desktop/shared";
+import type { AgentCapabilityLevel, AgentCapabilityQuery } from "@pi-workspace/shared";
 
 /**
  * The query a capability request carries for one row of its own level.

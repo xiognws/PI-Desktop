@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, type AssistantMessage } from "@earendil-works/pi-ai";
 import { validateHostedSearchMessages } from "@earendil-works/pi-ai/utils/hosted-search";
-import type { AgentEventEnvelope } from "@pi-desktop/shared";
+import type { AgentEventEnvelope } from "@pi-workspace/shared";
 import { buildSessionContext } from "./session-context.js";
 import { recoverMalformedToolCalls } from "./tool-call-recovery.js";
 import type { CompactionEntry } from "./pi-runtime-types.js";

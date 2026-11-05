@@ -15,8 +15,8 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { catalogs, flattenCatalog } from "@pi-desktop/i18n";
-import { BUILTIN_MCP_CATALOG, IPC } from "@pi-desktop/shared";
+import { catalogs, flattenCatalog } from "@pi-workspace/i18n";
+import { BUILTIN_MCP_CATALOG, IPC } from "@pi-workspace/shared";
 import { AgentMcpPage } from "../../apps/desktop/src/components/settings/AgentMcpPage";
 import { McpMarketPanel } from "../../apps/desktop/src/components/settings/McpMarketPanel";
 import { ToastHost } from "../../apps/desktop/src/components/Toast";
@@ -145,8 +145,8 @@ test("MCP market installation follows the explicit filter and keeps All global",
       outfile: join(temp, "renderer.js"), bundle: true, platform: "browser", format: "esm", jsx: "automatic",
       define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "true" },
       alias: {
-        "@pi-desktop/i18n": join(root, "packages/i18n/src"),
-        "@pi-desktop/shared": join(root, "packages/shared/src"),
+        "@pi-workspace/i18n": join(root, "packages/i18n/src"),
+        "@pi-workspace/shared": join(root, "packages/shared/src"),
         react: join(root, "apps/desktop/node_modules/react"),
         "react-dom": join(root, "apps/desktop/node_modules/react-dom"),
         i18next: join(root, "apps/desktop/node_modules/i18next"),

@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
-import type { LiveTranscriptEvent } from "@pi-desktop/shared";
-import type { LiveWireEvent } from "@pi-desktop/voice-runtime/live";
+import type { LiveTranscriptEvent } from "@pi-workspace/shared";
+import type { LiveWireEvent } from "@pi-workspace/voice-runtime/live";
 import type { Slot } from "./call-service-internals";
 
 const MAX_TRANSCRIPT_SEGMENTS = 200;

@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-12
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 
 ## Context
 

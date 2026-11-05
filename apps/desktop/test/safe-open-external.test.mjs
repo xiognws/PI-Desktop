@@ -29,8 +29,8 @@ const updaterSource = read("../electron/main/updater.ts");
 
 test("parseAllowedExternalUrl permits http, https, and mailto", () => {
   assert.equal(
-    parseAllowedExternalUrl("https://github.com/vastsa/PI-Desktop"),
-    "https://github.com/vastsa/PI-Desktop",
+    parseAllowedExternalUrl("https://github.com/xiognws/Pi-Workspace"),
+    "https://github.com/xiognws/Pi-Workspace",
   );
   assert.equal(parseAllowedExternalUrl("https://claude.ai"), "https://claude.ai/");
   assert.equal(

@@ -691,7 +691,7 @@ export const zhCNEntries: ChangelogEntry[] = [
       "支持登录多个供应商账号，并为每个供应商选择实际使用的账号。",
       "根据模型能力决定是否支持图片附件。",
       "在输入框中直接选择支持该功能的模型的推理强度。",
-      "每个数据目录只运行一个 PI-Desktop 实例，避免会话冲突。",
+      "每个数据目录只运行一个 Pi-Workspace 实例，避免会话冲突。",
       "重新整理设置分组，简化供应商账号管理。",
       "让内置子代理遵循父级对话的权限模式。",
     ],
@@ -735,7 +735,7 @@ export const zhCNEntries: ChangelogEntry[] = [
       "在启动器中记住最近使用的插件，加快访问速度。",
       "为开发者模式添加复制会话路径的上下文菜单。",
       "修复字体选择器裁剪和系统默认重置问题。",
-      "关闭窗口后保持 macOS PI-Desktop 在 Dock 和 Cmd+Tab 中可见。",
+      "关闭窗口后保持 macOS Pi-Workspace 在 Dock 和 Cmd+Tab 中可见。",
       "发送消息后收起输入框时保持聊天记录停留在最新位置。",
       "为工作面板添加真实的空状态界面和更清晰的引导。",
     ],
@@ -775,7 +775,7 @@ export const zhCNEntries: ChangelogEntry[] = [
     date: "2026-08-12",
     highlights: [
       "修复 Windows 下的 Alt+Space 全局插件启动器，即使当前焦点在其他应用也能唤起。",
-      "最小化后可通过系统托盘访问 PI-Desktop，并支持 macOS、Windows 和 Linux。",
+      "最小化后可通过系统托盘访问 Pi-Workspace，并支持 macOS、Windows 和 Linux。",
       "优化浅色和深色主题下原生选择菜单的可读性。",
     ],
   },
@@ -851,8 +851,8 @@ export const zhCNEntries: ChangelogEntry[] = [
     version: "0.4.1",
     date: "2026-08-02",
     highlights: [
-      "将 GitHub Releases 与自动更新链接统一到正式的 PI-Desktop 仓库。",
-      "更新项目、插件和发布文档中的仓库名称，统一使用 PI-Desktop。",
+      "将 GitHub Releases 与自动更新链接统一到正式的 Pi-Workspace 仓库。",
+      "更新项目、插件和发布文档中的仓库名称，统一使用 Pi-Workspace。",
     ],
   },
   {

@@ -15,7 +15,7 @@ import {
   type SessionThinkingLevel,
   type UserSkillRecord,
   type UserSubagentRecord,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   capabilitiesFromModelConfig,
   clampThinkingLevel,
@@ -28,7 +28,7 @@ import {
   visionFromModelConfig,
   type RuntimeProviderConfig,
   type UserSubagentDocument,
-} from "@pi-desktop/agent-runtime";
+} from "@pi-workspace/agent-runtime";
 
 import type { HostRpc } from "./host-ports.js";
 

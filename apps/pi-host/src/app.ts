@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 
-import { AgentHost, type ApprovalPort } from "@pi-desktop/agent-host";
+import { AgentHost, type ApprovalPort } from "@pi-workspace/agent-host";
 import {
   AgentSidecar,
   HostProcess,
@@ -11,9 +11,9 @@ import {
   createHostQueueStore,
   createHostSessionPort,
   listPendingToolRequests,
-} from "@pi-desktop/host-runtime";
-import { DeviceTokenAuthenticator, RacpServer, bindRacpWebSocket, type RacpHostOperations, type WsBinding } from "@pi-desktop/racp";
-import { APP_VERSION, type AgentEventEnvelope } from "@pi-desktop/shared";
+} from "@pi-workspace/host-runtime";
+import { DeviceTokenAuthenticator, RacpServer, bindRacpWebSocket, type RacpHostOperations, type WsBinding } from "@pi-workspace/racp";
+import { APP_VERSION, type AgentEventEnvelope } from "@pi-workspace/shared";
 
 import type { PiHostConfig } from "./config.js";
 import { FileCredentialStore, loadOrCreateHostId } from "./credentials.js";
@@ -161,7 +161,7 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
       void supervisor.superviseRestart("sidecar");
     });
     sidecar.setProjectInstructionResolver(async ({ projectPath, path }) => {
-      const { loadInstructionChain } = await import("@pi-desktop/agent-runtime");
+      const { loadInstructionChain } = await import("@pi-workspace/agent-runtime");
       return loadInstructionChain(projectPath, path);
     });
     sidecar.setLocalTool("Skill", async ({ args, sessionId }) => {

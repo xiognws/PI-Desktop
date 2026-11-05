@@ -450,7 +450,7 @@ impl PluginManager {
         }
         if !host_supports_version(&selected) {
             bail!(
-                "PLUGIN_HOST_TOO_OLD: version {} requires PI-Desktop {} or newer, this host is {}",
+                "PLUGIN_HOST_TOO_OLD: version {} requires Pi-Workspace {} or newer, this host is {}",
                 selected.version,
                 selected.min_pi_desktop.as_deref().unwrap_or("newer"),
                 crate::state::HOST_VERSION

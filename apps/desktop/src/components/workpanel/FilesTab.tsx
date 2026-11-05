@@ -7,7 +7,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { formatBytes, type FsEntry, type FsReadResult } from "@pi-desktop/shared";
+import { formatBytes, type FsEntry, type FsReadResult } from "@pi-workspace/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { Markdown } from "../Markdown";

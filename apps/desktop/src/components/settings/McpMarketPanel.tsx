@@ -14,7 +14,7 @@ import {
   type MarketSource,
   type McpCatalogCategory,
   type McpCatalogEntry,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import {

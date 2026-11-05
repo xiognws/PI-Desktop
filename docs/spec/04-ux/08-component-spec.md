@@ -76,7 +76,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   excludes the shell action lane in both sidebar states on every platform.
   On macOS, collapsed-sidebar preview reserves 88px in windowed mode and 8px
   in fullscreen through the shared `--ds-window-lead-inset` token — the
-  traffic-light cluster's right edge (76px, from `@pi-desktop/shared`) plus a
+  traffic-light cluster's right edge (76px, from `@pi-workspace/shared`) plus a
   12px gap. The main process uses that same shared geometry.
 - Work panel resize: its inner left-edge handle changes the committed panel
   width in the renderer, so dragging left gives the panel more internal space
@@ -155,7 +155,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 | Platform | Top-level chrome | Application menu |
 |---|---|---|
-| macOS | Native inset traffic lights at `{x:16,y:16}`; expanded sidebar Collapse control at right, with no logo/title; work-panel toggle is viewport-fixed at the window's top-right | System menu: PI-Desktop, File, Edit, View, Window, Help |
+| macOS | Native inset traffic lights at `{x:16,y:16}`; expanded sidebar Collapse control at right, with no logo/title; work-panel toggle is viewport-fixed at the window's top-right | System menu: Pi-Workspace, File, Edit, View, Window, Help |
 | Windows | Frameless 46px titlebar; sidebar actions at left; work-panel toggle then minimize/maximize/close stay viewport-fixed at the window's top-right | None inside the window |
 | Linux | Frameless 46px titlebar; sidebar actions at left; work-panel toggle then minimize/maximize/close stay viewport-fixed at the window's top-right | None inside the window |
 
@@ -423,7 +423,7 @@ their hit areas remain in the layout so revealing them does not shift labels.
 Expanded (~275px, D034/D070):
 +---------------------------+
 | [lights]             [◧] |  macOS
-| [π] PI-Desktop       [◧] |  Windows/Linux
+| [π] Pi-Workspace       [◧] |  Windows/Linux
 | PINNED                   |
 |   • Pinned task  project-A|
 | SESSIONS         [msg+][↕]|
@@ -521,7 +521,7 @@ visually distinct from list content.
   transcript prefetch. Selection reuses an in-flight or recent cached result,
   revalidates it in the background, and never waits for an older superseded
   session read before starting the latest read.
-- On Windows/Linux, click the PI-Desktop brand to return the main pane to the
+- On Windows/Linux, click the Pi-Workspace brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
   intentionally omits this brand control from the sidebar header
 - Click the footer Plugins icon immediately right of Settings to open the
@@ -714,7 +714,7 @@ visually distinct from list content.
 
 ### 3.7 Brand and icon contract
 
-- The visible shell name is `PI-Desktop`; Codex is not used as the renderer
+- The visible shell name is `Pi-Workspace`; Codex is not used as the renderer
   identity.
 - A control with no label states `.icon-btn-square`, which pins both axes to
   `--ds-control-size` (28px). `.icon-btn` on its own takes its width from its

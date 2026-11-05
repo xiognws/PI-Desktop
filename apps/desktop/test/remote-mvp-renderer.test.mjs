@@ -21,7 +21,7 @@ await build({
     export { selectRemoteSession as selectRemote } from './apps/desktop/src/components/settings/RemoteHostSessions';
     export { sessionAllows, safeSessionSummary } from './apps/desktop/src/lib/remote-session-safety';
     export { sessionMatchesProject, projectPathsForNewSessions } from './apps/desktop/src/lib/sidebar-session-groups';
-    export { IPC } from '@pi-desktop/shared';
+    export { IPC } from '@pi-workspace/shared';
     import React from 'react';
     import { renderToStaticMarkup } from 'react-dom/server';
     import i18n from 'i18next';
@@ -29,7 +29,7 @@ await build({
     import { remoteEn } from './apps/desktop/src/locales/remote';
     import { RemoteHostSessions } from './apps/desktop/src/components/settings/RemoteHostSessions';
     import { ChatSurface } from './apps/desktop/src/components/ChatSurface';
-    import { catalogs } from '@pi-desktop/i18n';
+    import { catalogs } from '@pi-workspace/i18n';
     export async function render(kind, props) {
       await i18n.use(initReactI18next).init({lng:'en', fallbackLng:'en', resources:{en:{remote:remoteEn, translation:catalogs.en}}, interpolation:{escapeValue:false}});
       Object.assign(useAppStore.getInitialState(), useAppStore.getState(), kind === 'host' ? {} : {sessions:[props.session], activeSessionId:props.session.id, retainedSessionIds:[props.session.id], messages:[]});
@@ -37,7 +37,7 @@ await build({
     }
   `, resolveDir: root, loader: "tsx" },
   outfile: output, bundle: true, platform: "node", format: "esm", jsx: "automatic",
-  alias: { "@pi-desktop/shared": join(root, "packages/shared/src/index.ts"), "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"), react: join(root, "apps/desktop/node_modules/react"), "react-dom": join(root, "apps/desktop/node_modules/react-dom"), "react-i18next": join(root, "apps/desktop/node_modules/react-i18next"), i18next: join(root, "apps/desktop/node_modules/i18next") },
+  alias: { "@pi-workspace/shared": join(root, "packages/shared/src/index.ts"), "@pi-workspace/i18n": join(root, "packages/i18n/src/index.ts"), react: join(root, "apps/desktop/node_modules/react"), "react-dom": join(root, "apps/desktop/node_modules/react-dom"), "react-i18next": join(root, "apps/desktop/node_modules/react-i18next"), i18next: join(root, "apps/desktop/node_modules/i18next") },
   loader: { ".css": "empty", ".gif": "dataurl", ".png": "dataurl" },
     plugins: [{ name: "fixture-vite-url", setup(builder) {
       builder.onResolve({ filter: /\?url$/ }, ({ path }) => ({ path, namespace: "fixture-url" }));

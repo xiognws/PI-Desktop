@@ -8,7 +8,7 @@ const shotSrc = '/readme/home.webp'
     <img
       class="hero-visual__shot"
       :src="shotSrc"
-      alt="PI-Desktop workspace"
+      alt="Pi-Workspace workspace"
       width="2560"
       height="1440"
       decoding="async"

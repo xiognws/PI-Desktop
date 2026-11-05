@@ -39,8 +39,8 @@ try {
     },
     loader: { ".css": "empty" },
     alias: {
-      "@pi-desktop/shared": join(root, "packages/shared/src/index.ts"),
-      "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
+      "@pi-workspace/shared": join(root, "packages/shared/src/index.ts"),
+      "@pi-workspace/i18n": join(root, "packages/i18n/src/index.ts"),
       react: join(root, "apps/desktop/node_modules/react"),
       "react-dom": join(root, "apps/desktop/node_modules/react-dom"),
       i18next: join(root, "apps/desktop/node_modules/i18next"),

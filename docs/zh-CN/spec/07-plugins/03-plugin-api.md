@@ -102,7 +102,7 @@ pi.plugin.getDataPath(): Promise<string> // plugin-private directory
 `description` / `enum[].label` 是作者语言纯字符串，宿主不会在这些字段上解析 locale
 map。需要本地化设置页的插件使用自己的面板/视图并读取 `pi.app.getLocale`，
 主题设置通过数据型 `scenicThemes` 交给宿主渲染；`settingsDestinations` 不是已实现的公开贡献
-（ADR 0287）。快捷键仅属于插件域：只有在 PI-Desktop 窗口聚焦且插件激活范围匹配当前项目时，
+（ADR 0287）。快捷键仅属于插件域：只有在 Pi-Workspace 窗口聚焦且插件激活范围匹配当前项目时，
 才会调用声明的命令；本版本不会注册操作系统全局快捷键。用户编辑后，主机会向插件发送
 `plugin:settingsChanged`，便于刷新内存中的配置。
 
@@ -1157,7 +1157,7 @@ type PluginGlobalShortcut = {
 也只是属于该插件的一条命令。
 
 `command` 必须已经由调用插件注册；否则以 `INVALID_ARGUMENT` 失败。被操作
-系统保留、被 PI-Desktop 自己当前占用（默认 `Alt+Space` 打开插件启动器、
+系统保留、被 Pi-Workspace 自己当前占用（默认 `Alt+Space` 打开插件启动器、
 `Alt+Shift+W` 呼出或隐藏窗口；用户改绑后释放出来的加速键可以再次被插件使用）或
 已被另一个插件持有的加速键会被拒绝而不是被抢走，被拒绝的重新注册会保留原来
 的绑定。拒绝是返回的结果，不是抛出的异常：

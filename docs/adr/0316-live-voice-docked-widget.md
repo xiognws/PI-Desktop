@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-01
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Related: [ADR 0086](0086-macos-regular-activation-policy.md) ·
   [ADR 0275](0275-plugin-panel-floating-widget.md) ·
   [03-runtime/live-voice](../spec/03-runtime/live-voice.md) ·

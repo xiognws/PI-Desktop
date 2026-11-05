@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { register } from "node:module";
 import test from "node:test";
 import { createElement } from "react";
-import { catalogs } from "@pi-desktop/i18n";
+import { catalogs } from "@pi-workspace/i18n";
 import { slotSsr } from "./helpers/slot-ssr.mjs";
 
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));

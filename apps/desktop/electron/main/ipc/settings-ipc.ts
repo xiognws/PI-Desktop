@@ -1,9 +1,9 @@
-import { IPC, type UpdatePreference } from "@pi-desktop/shared";
+import { IPC, type UpdatePreference } from "@pi-workspace/shared";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
 import type { IpcRegistrar } from "./types";
 import type { LiveCallService } from "../live-voice/call-service";
-import type { AppSettings } from "@pi-desktop/shared";
+import type { AppSettings } from "@pi-workspace/shared";
 import { currentSystemProxyRelayUrl } from "../network-proxy";
 
 export type SettingsIpcDependencies = {

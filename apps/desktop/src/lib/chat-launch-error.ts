@@ -1,4 +1,4 @@
-import { OAUTH_AUTH_KIND } from "@pi-desktop/shared";
+import { OAUTH_AUTH_KIND } from "@pi-workspace/shared";
 import { sameComposerModelId } from "./composer-models";
 
 type TranscriptMessage = {

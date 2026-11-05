@@ -22,14 +22,14 @@ function load(relative, imports) {
 }
 
 const { createSessionCoordination } = load("../../electron/main/runtime/session-coordination.ts", {
-  "@pi-desktop/shared": shared,
+  "@pi-workspace/shared": shared,
   "../notification-policy": load("../../electron/main/notification-policy.ts", {}),
 });
 const { registerSessionIpc } = load("../../electron/main/ipc/session-ipc.ts", {
   electron: { shell: {} },
   "node:fs": fs,
   "node:path": path,
-  "@pi-desktop/shared": shared,
+  "@pi-workspace/shared": shared,
   "../importers": {},
   "../services/session-collaboration": {},
   "../bootstrap/remote-hosts.js": {},

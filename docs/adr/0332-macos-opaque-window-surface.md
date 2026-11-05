@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-16
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: issue #1064, D665, D666, D667, D304, D348, ADR 0248 (theme assets and window
   background), ADR 0260 (plugin runtime theme APIs),
   `docs/spec/04-ux/07-ui-design-system.md`,
@@ -24,8 +24,8 @@ Silicon machine, an idle focused window held GPU at
 
 ```text
 desktop idle baseline       avg 3.6%   max  9.3%
-PI-Desktop focused, idle    avg 40.9%  max 55.6%
-PI-Desktop minimized        avg 3.2%   max  6.1%
+Pi-Workspace focused, idle    avg 40.9%  max 55.6%
+Pi-Workspace minimized        avg 3.2%   max  6.1%
 ```
 
 Idle page content was not the cause: with the window focused and no session

@@ -4,7 +4,7 @@
 
 ## 1. 目的
 
-PI-Desktop 使用 pi Agent 循环，但不把 CLI 会话运行时或桌面持久化交给
+Pi-Workspace 使用 pi Agent 循环，但不把 CLI 会话运行时或桌面持久化交给
 JavaScript 包。上游包演进时，必须保持这一职责划分清晰。
 
 ## 2. 当前职责
@@ -17,7 +17,7 @@ Sidecar 将 `@earendil-works/pi-agent-core`、`pi-ai` 与 `pi-coding-agent` 精�
   类型。Agent Runtime 自行维护桌面专用的上下文投影、压缩和 prompt 模板展开。
 - `@earendil-works/pi-ai` 提供提供商传输、认证、消息类型、请求重试和 token 估算。
   Hosted search 请求与估算行为，以及为 Fast 模式让 `streamSimple` 转发 `serviceTier`
-  （ADR 0334），继续由 PI-Desktop 的 pi-ai 补丁和契约测试覆盖。
+  （ADR 0334），继续由 Pi-Workspace 的 pi-ai 补丁和契约测试覆盖。
 - Agent Runtime 和 subagent 显式传入客户端身份：保留 pi-ai 的详细版本化
   `User-Agent`，并以 `attribution: null` 关闭 pi-agent-core 默认的 Pi 归属请求头。
 - Rust `host-core` 仍然是 SQLite 和权威持久会话状态的唯一所有者。Node sidecar
@@ -41,7 +41,7 @@ pi-agent-core helper 的直接替代品。其[上游 README](https://github.com/
 原子提交、任务检查点、压缩和恢复；Node adapter 包括 SQLite 与 JSONL 存储。README
 同时说明，同一份存储一次由一个进程持有，且没有跨进程锁。
 
-这些语义与 PI-Desktop 的当前边界不同：Rust host-core 拥有 SQLite 数据库和会话
+这些语义与 Pi-Workspace 的当前边界不同：Rust host-core 拥有 SQLite 数据库和会话
 记录，Node 只拥有内存中的 Agent 循环。不能对 host-core 数据库开启第二个 SQLite
 写入者。采用 durable harness 前，需通过单独 ADR 比较以下选择：
 
@@ -63,7 +63,7 @@ pi-agent-core helper 的直接替代品。其[上游 README](https://github.com/
 1. 用桌面自有的读写实现替换 `native-pi-session.ts` 中的 `AgentSession`、
    `SessionManager`、`ModelRuntime`、资源加载器、trust-manager 和原生压缩调用；
    实现应读取既有原生 Pi JSONL 格式，并使用稳定的 pi Agent 循环。
-2. 保持扩展 SDK 契约向后兼容，同时让运行时 shim 和导出的扩展类型归 PI-Desktop
+2. 保持扩展 SDK 契约向后兼容，同时让运行时 shim 和导出的扩展类型归 Pi-Workspace
    所有。保留现有 virtual-module 行为与发现规则。
 3. 一并移除直接依赖、更新包固定版本和补丁，然后对新依赖图运行原生会话、可信扩展、
    compaction、构建和 package bundle 检查。

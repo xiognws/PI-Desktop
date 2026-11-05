@@ -16,7 +16,7 @@ A long pi agent run can contain many model/tool turns before `agent_end`.
 Compacting only between user prompts or after the run is already terminal does
 not protect the next provider request inside that loop. The observed Bedrock
 failure reached 1,077,172 tokens against a 1,000,000-token provider maximum,
-so the provider rejected the request before PI-Desktop had a recovery point.
+so the provider rejected the request before Pi-Workspace had a recovery point.
 
 At the time of this decision, pi-agent-core supplied session-context
 reconstruction, token estimation, cut-point selection, summary generation,
@@ -29,11 +29,11 @@ OpenCode Dynamic Context Pruning (DCP), inspected at commit
 patterns: evaluate context each turn, inject deduplicated guidance before the
 emergency boundary, and let the model request context management. It is an
 OpenCode plugin under AGPL-3.0, so directly linking or copying it would add an
-incompatible runtime and licensing boundary to PI-Desktop.
+incompatible runtime and licensing boundary to Pi-Workspace.
 
 ## Decision
 
-PI-Desktop owns its context projection, estimation, compaction preparation and
+Pi-Workspace owns its context projection, estimation, compaction preparation and
 summary generation, and independently implements the desktop-specific
 controller. pi-agent-core supplies the agent loop and stable agent types.
 
@@ -72,7 +72,7 @@ controller. pi-agent-core supplies the agent loop and stable agent types.
 - A final tool-result batch is kept with its assistant tool-call carrier. If
   that atomic batch exceeds the normal retained-tail target, the runtime lets
   pi move the cut point to the carrier. If the batch itself reaches half the
-  hard budget, PI-Desktop creates a checkpoint-only bounded copy: each result
+  hard budget, Pi-Workspace creates a checkpoint-only bounded copy: each result
   keeps its tool identity/error envelope and a fair share of head/tail text
   with an explicit checkpoint-truncation marker, while duplicate diagnostic
   details are omitted. The original durable messages and visible transcript
@@ -112,7 +112,7 @@ controller. pi-agent-core supplies the agent loop and stable agent types.
 - Provider token accounting on retained assistant messages is cleared while
   reconstructing a checkpoint, because that usage described the pre-compacted
   request and would otherwise overcount the restored context.
-- OpenCode DCP updates do not flow into PI-Desktop automatically. Any future
+- OpenCode DCP updates do not flow into Pi-Workspace automatically. Any future
   behavioral adoption requires a fresh independent implementation review.
 
 ## Alternatives
@@ -120,7 +120,7 @@ controller. pi-agent-core supplies the agent loop and stable agent types.
 ### Integrate OpenCode DCP directly
 
 Rejected because it targets OpenCode's plugin hooks and persistence model and
-is AGPL-3.0. PI-Desktop needs a Rust-host durability contract and pi-specific
+is AGPL-3.0. Pi-Workspace needs a Rust-host durability contract and pi-specific
 turn lifecycle, so an adapter would retain most of the implementation cost
 while adding license and upgrade coupling.
 

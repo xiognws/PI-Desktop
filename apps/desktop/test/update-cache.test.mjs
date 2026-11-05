@@ -67,15 +67,15 @@ test("cache override requires an absolute path and uses app-update.yml's directo
   // the host's current drive there, which is what the app will actually read.
   assert.equal(resolveUpdateCacheOverride("/mnt/PI cache"), resolve("/mnt/PI cache"));
   assert.equal(
-    readUpdaterCacheDirName("provider: github\nupdaterCacheDirName: '@pi-desktopdesktop-updater'\n"),
-    "@pi-desktopdesktop-updater",
+    readUpdaterCacheDirName("provider: github\nupdaterCacheDirName: '@pi-workspacedesktop-updater'\n"),
+    "@pi-workspacedesktop-updater",
   );
   assert.equal(readUpdaterCacheDirName("provider: github\n"), null);
   assert.equal(readUpdaterCacheDirName("updaterCacheDirName: ../outside"), null);
   assert.equal(readUpdaterCacheDirName("updaterCacheDirName: nested/path"), null);
   assert.equal(
-    updateCacheDirFor("/mnt/cache", "@pi-desktopdesktop-updater"),
-    join("/mnt/cache", "@pi-desktopdesktop-updater"),
+    updateCacheDirFor("/mnt/cache", "@pi-workspacedesktop-updater"),
+    join("/mnt/cache", "@pi-workspacedesktop-updater"),
   );
   assert.equal(sameUpdateCacheDir("C:/Cache/UPDATER", "c:/cache/updater", "win32"), true);
   assert.equal(sameUpdateCacheDir("/Cache/UPDATER", "/cache/updater", "linux"), false);
@@ -86,7 +86,7 @@ test("discarding a completed update removes only the pending installers", async 
     const cache = join(root, "cache");
     const pending = join(cache, "pending");
     await mkdir(pending, { recursive: true });
-    await writeFile(join(pending, "PI-Desktop-Setup-0.15.8.exe"), "installer");
+    await writeFile(join(pending, "Pi-Workspace-Setup-0.15.8.exe"), "installer");
     await writeFile(join(pending, "update-info.json"), "{}");
     await writeFile(join(cache, "installer.exe"), "differential baseline");
     await writeFile(join(cache, "current.blockmap"), "block map");
@@ -147,7 +147,7 @@ test("cache maintenance reads the packaged updater name, adopts baselines, then 
     const resources = join(root, "resources");
     const legacyBase = join(root, "legacy-base");
     const activeBase = join(root, "active-base");
-    const cacheName = "@pi-desktopdesktop-updater";
+    const cacheName = "@pi-workspacedesktop-updater";
     const legacyCache = join(legacyBase, cacheName);
     const activeCache = join(activeBase, cacheName);
     await mkdir(resources, { recursive: true });

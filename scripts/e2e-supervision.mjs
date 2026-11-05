@@ -17,7 +17,7 @@ const root = repositoryRoot();
 const { appDir, electronBinary: electronBin } = resolveElectronBinary(root);
 
 if (!existsSync(join(appDir, "out/main/index.js"))) {
-  console.error("desktop app not built. Run: pnpm --filter @pi-desktop/desktop build");
+  console.error("desktop app not built. Run: pnpm --filter @pi-workspace/desktop build");
   process.exit(1);
 }
 if (!existsSync(electronBin)) {

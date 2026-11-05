@@ -1,4 +1,4 @@
-import type { ProjectGroupRecord, WorkspacePluginFilesRequest } from "@pi-desktop/shared";
+import type { ProjectGroupRecord, WorkspacePluginFilesRequest } from "@pi-workspace/shared";
 import type { PluginRemoteFilesRead } from "../plugin-remote-files";
 
 type Host = { call<T>(method: string, input?: unknown): Promise<T> };

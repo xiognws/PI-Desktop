@@ -5,7 +5,7 @@
  * published benchmark numbers, so nothing here touches SQLite or the provider
  * schema. Everything fetched is cached as one JSON file under the app's user
  * data directory, and the refresh policy itself lives in
- * `@pi-desktop/shared` so it is unit-tested without Electron.
+ * `@pi-workspace/shared` so it is unit-tested without Electron.
  *
  * Network goes through the same strict public-HTTPS client the other
  * third-party catalogs use: no private or loopback address, redirects
@@ -19,7 +19,7 @@ import {
   loadModelBenchmarkTable,
   type ModelBenchmarkCacheEntry,
   type ModelBenchmarkLoad,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { relaxedNetworkPolicyEnabled } from "./endpoint-policy";
 import { fetchPinnedDirect } from "./public-https-direct";
 import { createPublicHttpsClient } from "./public-https-fetch";

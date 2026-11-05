@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { RuntimeHost } from "./host-client.js";
-import { FILE_BATCH_VERSION, type FileBatchRegistration } from "@pi-desktop/shared";
+import { FILE_BATCH_VERSION, type FileBatchRegistration } from "@pi-workspace/shared";
 
 type Batch = { id: string; seal?: Promise<unknown>; failure?: Error; calls: Map<object, string> };
 type Call = { batch: Batch; id: string; ticket: string };

@@ -1,5 +1,5 @@
 /**
- * Autotest — PI-Desktop plugin entry.
+ * Autotest — Pi-Workspace plugin entry.
  *
  * Owns the platform backend process: the host starts this plugin's resident
  * service (`contributes.services[0]`), which launches the FastAPI backend from

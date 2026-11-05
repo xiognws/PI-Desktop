@@ -1,4 +1,4 @@
-import { matchNamedPreset } from "@pi-desktop/shared";
+import { matchNamedPreset } from "@pi-workspace/shared";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import { describe, expect, it } from "vitest";
 

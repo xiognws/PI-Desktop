@@ -4,10 +4,21 @@ export const SCHEMA_VERSION = 16 as const;
 // an AppUserModelID, and a machine that ever ran this project from source has
 // "Electron" cached for the upstream id (dev runs use the same constant through
 // `node_modules/electron`), which no amount of clearing the icon cache fixes.
-// The fork advertises its own id so the shell resolves a fresh identity from the
-// executable instead of a stale one.
-export const APP_ID = "net.xiognws.pi-desktop";
-export const APP_NAME = "PI-Desktop";
+// The rename gives the build an id no shell has cached, so it resolves a fresh
+// identity from the executable instead of a stale one.
+export const APP_ID = "net.aiuo.pi-workspace";
+export const APP_NAME = "Pi-Workspace";
+
+/**
+ * Storage identity, deliberately independent of `APP_NAME`.
+ *
+ * The display name is branding and may change again; this value names the
+ * directories a user's data already lives in, so changing it relocates real
+ * files. Keep it stable, and when it must change, retire the old value into
+ * the legacy list in `data-paths.ts` so the next launch can adopt the profile
+ * instead of abandoning it.
+ */
+export const DATA_IDENTIFIER = "PiWorkspace";
 export const APP_VERSION = "0.21.0";
 
 export const APP_MENU_COMMANDS = [
@@ -71,6 +82,11 @@ export type LifecycleDialogRequest = {
   kind: LifecycleDialogKind;
 };
 export type LifecycleDialogDismiss = { requestId: string };
+/**
+ * IPC channel names, frozen as a wire contract: main, preload and the renderer
+ * address each other by these strings, and the `pi-desktop/` prefix survives the
+ * product rename for that reason (ADR 0381).
+ */
 export const IPC = {
   invoke: {
     storageGet: "pi-desktop/storage/get",

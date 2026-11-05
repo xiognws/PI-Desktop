@@ -2,7 +2,7 @@
 
 - Status: Accepted for implementation
 - Date: 2026-09-17
-- Deciders: PI-Desktop desktop UI maintainers
+- Deciders: Pi-Workspace desktop UI maintainers
 - Amends: ADR 0233, ADR 0247
 
 ## Context

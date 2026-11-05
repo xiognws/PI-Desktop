@@ -10,7 +10,7 @@
  * `runSkillImport` and `runMcpImport` are exported so the unit test can drive
  * them against a stub host without booting a real sidecar.
  */
-import { IPC } from "@pi-desktop/shared";
+import { IPC } from "@pi-workspace/shared";
 import type { HostProcess } from "../host-process";
 import {
   scanExternalMcp,

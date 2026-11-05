@@ -27,7 +27,7 @@ import type {
   RacpTurnAdmission,
   UiMessage,
   VoiceOrigin,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   RACP_ACTIVE_TURN_STATUSES,
   RACP_DEFAULT_LIMITS,
@@ -38,7 +38,7 @@ import {
   effectiveRemotePermissionMode,
   racpKindForAgentEvent,
   rolesAllowOperation,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 import { ApprovalBroker, type ApprovalPort } from "./approvals.js";
 import { racpError } from "./errors.js";

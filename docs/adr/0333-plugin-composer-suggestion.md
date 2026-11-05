@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-24
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: [ADR 0324](0324-plugin-owned-composer-prompt-enhancement.md) ·
   [ADR 0331](0331-plugin-session-follow-and-work-panel-reveal.md) ·
   [07-plugins/03-plugin-api](../spec/07-plugins/03-plugin-api.md) ·

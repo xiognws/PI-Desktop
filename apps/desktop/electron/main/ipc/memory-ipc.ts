@@ -6,7 +6,7 @@
  * than passed through: the host validates again, but the IPC boundary should
  * not hand it shapes the renderer invented.
  */
-import { IPC } from "@pi-desktop/shared";
+import { IPC } from "@pi-workspace/shared";
 
 import type { HostProcess } from "../host-process";
 import type { IpcRegistrar } from "./types";

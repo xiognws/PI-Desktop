@@ -9,7 +9,7 @@ import {
   type ActivationScope,
   type ActivationState,
   type ProjectRecord,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { TooltipButton, cx } from "../ui";
 import { AnchoredMenu } from "../settings/AnchoredMenu";
 import {

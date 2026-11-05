@@ -1,4 +1,4 @@
-import type { SessionSearchPage } from "@pi-desktop/shared";
+import type { SessionSearchPage } from "@pi-workspace/shared";
 
 /** Match the host's Unicode lowercase literal search. */
 export function foldSearchText(text: string): string {

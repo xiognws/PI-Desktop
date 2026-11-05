@@ -1,4 +1,4 @@
-import { IPC, type ModelBenchmarkLoad } from "@pi-desktop/shared";
+import { IPC, type ModelBenchmarkLoad } from "@pi-workspace/shared";
 import { loadModelBenchmarks } from "../model-benchmarks-service";
 import type { IpcRegistrar } from "./types";
 

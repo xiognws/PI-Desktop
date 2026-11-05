@@ -6,7 +6,7 @@
 
 ## 目的
 
-Live Voice 可以通过现有后端向 PI-Desktop 会话提交有界工作请求。若 Composer 当前有会话，通话开始时默认以该会话为工作目标；用户可在通话中通过语音切换目标。Live Provider 负责语音交流；现有 Agent Runtime 继续在目标会话当前模型和权限策略下执行文件、Shell、MCP、插件、Skill 和子代理工作。
+Live Voice 可以通过现有后端向 Pi-Workspace 会话提交有界工作请求。若 Composer 当前有会话，通话开始时默认以该会话为工作目标；用户可在通话中通过语音切换目标。Live Provider 负责语音交流；现有 Agent Runtime 继续在目标会话当前模型和权限策略下执行文件、Shell、MCP、插件、Skill 和子代理工作。
 
 ## 作用域与授权
 

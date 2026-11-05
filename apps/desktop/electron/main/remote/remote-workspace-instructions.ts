@@ -1,5 +1,5 @@
-import type { ProjectInstructions } from "@pi-desktop/agent-runtime";
-import type { WorkspaceFilesRequest } from "@pi-desktop/shared";
+import type { ProjectInstructions } from "@pi-workspace/agent-runtime";
+import type { WorkspaceFilesRequest } from "@pi-workspace/shared";
 
 const SOURCES = new Set(["AGENTS.override.md", "AGENTS.md", "CLAUDE.md", ".claude/CLAUDE.md"]);
 

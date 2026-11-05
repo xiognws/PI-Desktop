@@ -200,7 +200,7 @@ async fn entries(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, Js
 /// A whole-list write keeps the batch semantics honest: the caller already holds
 /// the list (it is in the model's prompt), frees space and spends it in one
 /// call, and the host validates only the final result — the same contract as
-/// `applyMemoryBatch` in `@pi-desktop/agent-runtime`. A budget violation is the
+/// `applyMemoryBatch` in `@pi-workspace/agent-runtime`. A budget violation is the
 /// model's mistake, so it reports as invalid params rather than an internal
 /// failure.
 async fn write_entries(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {

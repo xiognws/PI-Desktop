@@ -13,7 +13,7 @@ import type {
   PluginReviewPage,
   PluginReviewQuery,
   PluginReviewSummary,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /** The sentiment filter the center accepts; `all` asks for every visible row. */
 export type ReviewSentiment = "all" | "positive" | "neutral" | "negative";

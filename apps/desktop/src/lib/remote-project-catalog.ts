@@ -1,4 +1,4 @@
-import type { RemoteHostSummary, RacpProjectSummary, SessionSummary } from "@pi-desktop/shared";
+import type { RemoteHostSummary, RacpProjectSummary, SessionSummary } from "@pi-workspace/shared";
 import type { RemoteProjectTarget } from "./remote-project-session";
 import { isRemoteSession } from "./remote-session-safety";
 

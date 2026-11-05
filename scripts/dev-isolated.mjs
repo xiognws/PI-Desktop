@@ -24,13 +24,13 @@ import { join } from "node:path";
  * runner needs. `PI_DESKTOP_DATA_DIR` and `PLAYWRIGHT_BROWSERS_PATH` still win,
  * and the home-directory defaults remain for machines without the data root.
  */
-const DATA_ROOT = process.env.PI_DESKTOP_DATA_ROOT?.trim() || "D:/PI-Desktop";
+const DATA_ROOT = process.env.PI_DESKTOP_DATA_ROOT?.trim() || "D:/Pi-Workspace";
 const onDataRoot = existsSync(DATA_ROOT);
 const dataDir = process.env.PI_DESKTOP_DATA_DIR?.trim()
   || (onDataRoot ? join(DATA_ROOT, "data") : join(homedir(), ".pi-desktop-dev-main"));
 const browsers = process.env.PLAYWRIGHT_BROWSERS_PATH?.trim()
   || (onDataRoot ? join(DATA_ROOT, "ms-playwright") : undefined);
-const child = spawn("pnpm", ["--filter", "@pi-desktop/desktop", "dev"], {
+const child = spawn("pnpm", ["--filter", "@pi-workspace/desktop", "dev"], {
   stdio: "inherit",
   shell: true,
   env: {

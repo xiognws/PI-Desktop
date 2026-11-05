@@ -11,7 +11,7 @@ import {
   toToolDeclaration,
   type AssistantMessage,
 } from "@earendil-works/pi-ai";
-import { formatSessionMessage, type SessionMessageOrigin } from "@pi-desktop/shared";
+import { formatSessionMessage, type SessionMessageOrigin } from "@pi-workspace/shared";
 import { estimateContextTokens as estimateTranscriptTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { buildSessionContext } from "./session-context.js";
 import { estimateContextTokens as estimateAgentContextTokens, estimateTokens } from "./pi-runtime-estimates.js";
@@ -125,7 +125,7 @@ import {
   DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
   MAX_RESUMABLE_CHAINS_PER_AGENT,
   MAX_SUBAGENT_CONCURRENCY,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type {
   AgentEventEnvelope,
   ContextCompactionRecord,
@@ -136,7 +136,7 @@ import type {
   SessionThinkingLevel,
   SubagentDefinition,
   UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 const provider: RuntimeProviderConfig = {
   id: "local",
@@ -1455,7 +1455,7 @@ describe("custom system prompt files (issue #542)", () => {
     const prompt = promptOf(runtime);
 
     expect(prompt).toContain(persona);
-    expect(prompt).not.toContain("You are PI-Desktop");
+    expect(prompt).not.toContain("You are Pi-Workspace");
     // Operational rules from the default prompt must survive the replacement.
     expect(prompt).toContain("Complete the requested work and relevant checks");
     expect(prompt).toContain("Before each tool batch, briefly state its purpose");
@@ -1478,10 +1478,10 @@ describe("custom system prompt files (issue #542)", () => {
     const prompt = promptOf(runtime);
 
     expect(prompt).toContain(appendix);
-    expect(prompt).toContain("You are PI-Desktop");
+    expect(prompt).toContain("You are Pi-Workspace");
     expect(prompt).toContain("Run unit tests.");
     expect(prompt.indexOf(appendix)).toBeGreaterThan(
-      prompt.indexOf("You are PI-Desktop"),
+      prompt.indexOf("You are Pi-Workspace"),
     );
     expect(prompt.indexOf("Run unit tests.")).toBeGreaterThan(
       prompt.indexOf(appendix),
@@ -1498,7 +1498,7 @@ describe("custom system prompt files (issue #542)", () => {
 
     expect(prompt).toContain(persona);
     expect(prompt).toContain(appendix);
-    expect(prompt).not.toContain("You are PI-Desktop");
+    expect(prompt).not.toContain("You are Pi-Workspace");
 
     await runtime.dispose();
   });
@@ -1507,7 +1507,7 @@ describe("custom system prompt files (issue #542)", () => {
     const runtime = createRuntime();
     const prompt = promptOf(runtime);
 
-    expect(prompt).toContain("You are PI-Desktop");
+    expect(prompt).toContain("You are Pi-Workspace");
     expect(prompt).toContain("File references: when citing a real local file, use a Markdown link");
     expect(prompt).not.toContain("MARKER-XYZ-123");
 
@@ -2282,7 +2282,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
   });
 
   it("keeps the root prompt after reading a file outside the project", async () => {
-    const root = await mkdtemp(join(tmpdir(), "pi-desktop-instructions-"));
+    const root = await mkdtemp(join(tmpdir(), "pi-workspace-instructions-"));
     const outside = await mkdtemp(join(tmpdir(), "pi-desktop-attachment-"));
     try {
       await mkdir(join(root, "nested"));

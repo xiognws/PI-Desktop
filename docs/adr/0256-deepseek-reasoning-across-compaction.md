@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-15
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Amends: D389 / ADR 0136 / ADR 0064
 - Fixes: #296
 - Amended by: D677 (#1945) — decision 3 now normalizes every row to the

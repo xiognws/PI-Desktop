@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-12
-- Issue: https://github.com/vastsa/PI-Desktop/issues/164
+- Issue: https://github.com/xiognws/Pi-Workspace/issues/164
 
 ## Context
 

@@ -7,7 +7,7 @@ import {
   readNdjsonLines,
   rpcTimeoutMs,
   stripProxyEnv,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 const HOST_DISPOSE_GRACE_MS = 3_000;
 const HOST_FORCE_KILL_GRACE_MS = 1_000;

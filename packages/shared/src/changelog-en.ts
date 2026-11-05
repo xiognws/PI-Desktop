@@ -691,7 +691,7 @@ export const enEntries: ChangelogEntry[] = [
       "Sign in to multiple vendor accounts and choose the account used for each provider.",
       "Use each model's capabilities to decide when image attachments are supported.",
       "Choose reasoning effort directly from the composer for models that expose it.",
-      "Keep one PI-Desktop instance per data directory to prevent conflicting sessions.",
+      "Keep one Pi-Workspace instance per data directory to prevent conflicting sessions.",
       "Organize Settings into clearer groups and simplify provider account management.",
       "Keep built-in subagents aligned with the parent conversation's permission mode.",
     ],
@@ -735,7 +735,7 @@ export const enEntries: ChangelogEntry[] = [
       "Remember recently used plugins in the launcher for faster access.",
       "Add copy session path to the context menu for developer mode.",
       "Fix font picker clipping and System default reset issues.",
-      "Keep macOS PI-Desktop in the Dock and Cmd+Tab after window close.",
+      "Keep macOS Pi-Workspace in the Dock and Cmd+Tab after window close.",
       "Keep chat transcript pinned when composer collapses after sending.",
       "Give the work panel a real empty state with clearer guidance.",
     ],
@@ -775,7 +775,7 @@ export const enEntries: ChangelogEntry[] = [
     date: "2026-08-12",
     highlights: [
       "Restore the Windows Alt+Space global plugin launcher, including when another app is focused.",
-      "Keep PI-Desktop available from the system tray when minimized across macOS, Windows, and Linux.",
+      "Keep Pi-Workspace available from the system tray when minimized across macOS, Windows, and Linux.",
       "Improve native select menu readability in light and dark themes.",
     ],
   },
@@ -851,8 +851,8 @@ export const enEntries: ChangelogEntry[] = [
     version: "0.4.1",
     date: "2026-08-02",
     highlights: [
-      "Update GitHub Releases and auto-update links to the canonical PI-Desktop repository.",
-      "Refresh project, plugin, and release documentation to use the PI-Desktop repository name.",
+      "Update GitHub Releases and auto-update links to the canonical Pi-Workspace repository.",
+      "Refresh project, plugin, and release documentation to use the Pi-Workspace repository name.",
     ],
   },
   {

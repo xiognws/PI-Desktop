@@ -4,7 +4,7 @@
  * Runs in Electron main because the parser is a native addon
  * (`@ast-grep/napi`), and main is where the other filesystem-facing local tools
  * already run. The pure decisions (which files, which grammar, how to render)
- * live in `@pi-desktop/shared`; this module owns the walk and the parse.
+ * live in `@pi-workspace/shared`; this module owns the walk and the parse.
  *
  * Safety: only files inside the session's own roots are opened, the walk skips
  * build output and dependency directories, and both the file count and the
@@ -24,7 +24,7 @@ import {
   formatAstSearchMatches,
   isPathInsideRoots,
   type AstSearchMatch,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export type AstSearchResult = {
   ok: boolean;

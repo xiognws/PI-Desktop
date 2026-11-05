@@ -28,7 +28,7 @@ test("slash source lists only ready MCP servers in the current project without c
 
 const { expandMcpInvocation } = await import("../electron/main/composer-mcp.ts");
 const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
-const { findSkillMentions, formatCommandInsert, IPC } = await import("@pi-desktop/shared");
+const { findSkillMentions, formatCommandInsert, IPC } = await import("@pi-workspace/shared");
 
 test("selection uses stable encoded IDs even when labels match", async () => {
   const records = [record("docs one"), record("docs/two")];

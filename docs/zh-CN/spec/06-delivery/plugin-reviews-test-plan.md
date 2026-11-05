@@ -43,8 +43,8 @@ RPC/HTTP 客户端、Electron IPC 桥、渲染器数据层、已安装网格/详
 
 ### 2.1 Windows 调用变通（tsc / electron-vite）
 
-标准脚本是 `pnpm --filter @pi-desktop/desktop typecheck`、
-`pnpm --filter @pi-desktop/desktop build` 以及仓库级 `pnpm test`。当 Windows 上的
+标准脚本是 `pnpm --filter @pi-workspace/desktop typecheck`、
+`pnpm --filter @pi-workspace/desktop build` 以及仓库级 `pnpm test`。当 Windows 上的
 pnpm 脚本垫片无法解析时，用 `node` 直接调用 worktree 本地二进制——输入输出一致，
 不改任何配置：
 

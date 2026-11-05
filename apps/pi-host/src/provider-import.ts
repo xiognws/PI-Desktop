@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import {
   PROVIDER_SYNC_MAX_BYTES, isSyncableProvider, parseProviderImportPayload, parseProviderImportSummary,
   type ProviderImportPayload, type ProviderImportSummary, type ProviderPublic,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export type HostCaller = { call<T = unknown>(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<T> };
 export const IMPORT_DEADLINE_MS = 30_000;

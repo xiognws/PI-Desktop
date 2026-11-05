@@ -545,7 +545,7 @@ describe("native continuation review regressions", () => {
 
   it("settles retries once, rejects overlap without disposal, acknowledges distinct durable users, and keeps own idle lease usable", async () => {
     const f = await configuredFixture();
-    const events: import("@pi-desktop/shared").AgentEventEnvelope[] = [];
+    const events: import("@pi-workspace/shared").AgentEventEnvelope[] = [];
     let calls = 0;
     const requestTools: unknown[] = [];
     let release!: () => void;
@@ -885,7 +885,7 @@ describe("native fork children", () => {
       return stream;
     });
     const service = new NativePiSessionService(f);
-    const events: import("@pi-desktop/shared").AgentEventEnvelope[] = [];
+    const events: import("@pi-workspace/shared").AgentEventEnvelope[] = [];
     try {
       const [summary] = await service.list();
       await service.prompt(summary.id, "stream me", (envelope) => events.push(envelope), "optimistic-stream");
@@ -1300,7 +1300,7 @@ describe("independent native ownership, identity and tool regressions", () => {
     const f = await configuredFixture();
     vi.spyOn(ModelRuntime.prototype, "streamSimple").mockImplementation(() => fauxStream());
     const service = new NativePiSessionService(f);
-    const events: import("@pi-desktop/shared").AgentEventEnvelope[] = [];
+    const events: import("@pi-workspace/shared").AgentEventEnvelope[] = [];
     try {
       const [summary] = await service.list();
       for (const optimisticId of ["caller-1", "caller-2"]) {

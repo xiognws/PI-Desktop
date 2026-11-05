@@ -13,7 +13,7 @@ import {
   type AppSettings,
   type RadialMenuAction,
   type RadialMenuPreferences,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { SettingsCard, SettingsRow } from "../../features/settings/primitives";
 import { SettingsToggle } from "../ui";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";

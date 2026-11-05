@@ -14,7 +14,7 @@ import {
   type ImageGenerationBinding,
   type ModelBinding,
   type ProviderPublic,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { useRowBusy } from "../../hooks/use-row-busy";

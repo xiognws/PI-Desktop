@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { IPC } from "@pi-desktop/shared";
+import { IPC } from "@pi-workspace/shared";
 import { registerWorktreeIpc } from "../electron/main/ipc/worktree-ipc.ts";
 
 function setup(responses = {}) {

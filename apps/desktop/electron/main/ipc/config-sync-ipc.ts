@@ -1,4 +1,4 @@
-import { IPC } from "@pi-desktop/shared";
+import { IPC } from "@pi-workspace/shared";
 import type { HostProcess } from "../host-process";
 import type { IpcRegistrar } from "./types";
 

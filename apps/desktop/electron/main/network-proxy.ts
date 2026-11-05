@@ -20,16 +20,16 @@ import {
   validateNetworkProxy,
   type ChromiumProxyConfig,
   type NetworkProxySettings,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   startAuthenticatedProxyRelay,
   type AuthenticatedProxyRelay,
-} from "@pi-desktop/agent-runtime";
+} from "@pi-workspace/agent-runtime";
 import { applyUserEndpointPolicyFromAppSettings } from "./endpoint-policy";
 import {
   startSystemProxyRelay,
   type SystemProxyRelay,
-} from "@pi-desktop/agent-runtime/system-proxy-relay";
+} from "@pi-workspace/agent-runtime/system-proxy-relay";
 
 const originalEnv = snapshotProxyEnv(process.env);
 let applied: NetworkProxySettings = { mode: "system" };

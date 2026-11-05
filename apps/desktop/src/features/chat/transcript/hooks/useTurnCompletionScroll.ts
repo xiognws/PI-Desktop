@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import type { UiMessage } from "@pi-desktop/shared";
+import type { UiMessage } from "@pi-workspace/shared";
 import {
   scrollTurnPromptIntoView,
   settledTurn,

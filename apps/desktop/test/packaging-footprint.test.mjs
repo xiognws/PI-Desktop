@@ -38,10 +38,10 @@ test("packaging keeps native voice modules as runtime dependencies", () => {
   ]);
 
   for (const dependency of [
-    "@pi-desktop/agent-runtime",
-    "@pi-desktop/i18n",
-    "@pi-desktop/plugin-sdk",
-    "@pi-desktop/shared",
+    "@pi-workspace/agent-runtime",
+    "@pi-workspace/i18n",
+    "@pi-workspace/plugin-sdk",
+    "@pi-workspace/shared",
     "mermaid",
     "pinyin-pro",
     "react",
@@ -128,12 +128,12 @@ test("main bundles JavaScript dependencies and externalizes runtime modules", ()
 test("sandbox preload entries use standalone shared subpath bundles", () => {
   const sharedExports = sharedPackageJson.exports ?? {};
 
-  assert.match(preloadSource, /from "@pi-desktop\/shared\/protocol"/);
-  assert.match(pluginPanelPreloadSource, /from "@pi-desktop\/shared\/theme"/);
+  assert.match(preloadSource, /from "@pi-workspace\/shared\/protocol"/);
+  assert.match(pluginPanelPreloadSource, /from "@pi-workspace\/shared\/theme"/);
   assert.ok(sharedExports["./protocol"], "protocol must be available as a shared subpath");
   assert.ok(sharedExports["./theme"], "theme must be available as a shared subpath");
-  assert.doesNotMatch(preloadSource, /from "@pi-desktop\/shared"/);
-  assert.doesNotMatch(pluginPanelPreloadSource, /from "@pi-desktop\/shared"/);
+  assert.doesNotMatch(preloadSource, /from "@pi-workspace\/shared"/);
+  assert.doesNotMatch(pluginPanelPreloadSource, /from "@pi-workspace\/shared"/);
 });
 
 test("packaging keeps only shipped locales and excludes non-runtime artifacts", () => {
@@ -247,7 +247,7 @@ test("macOS DMG remains a two-icon install and artifacts omit first-launch guida
   assert.equal(packageJson.build.mac.extraDistFiles, undefined);
   assert.doesNotMatch(
     JSON.stringify(packageJson.build),
-    /PI-Desktop-macOS-open\.command|PI-Desktop-macOS-opening-help\.txt/,
+    /Pi-Workspace-macOS-open\.command|Pi-Workspace-macOS-opening-help\.txt/,
     "macOS package configuration must not ship first-launch guidance assets",
   );
   assert.equal(packageJson.build.dmg.background, "build/dmg-background.png");
@@ -261,7 +261,7 @@ test("macOS DMG remains a two-icon install and artifacts omit first-launch guida
   ]);
   assert.doesNotMatch(
     JSON.stringify(packageJson.build.dmg.contents),
-    /PI-Desktop-macOS-open\.command|Open PI-Desktop\.command|opening-help|If app won't open/,
+    /Pi-Workspace-macOS-open\.command|Open Pi-Workspace\.command|opening-help|If app won't open/,
     "the DMG must not expose first-launch guidance assets",
   );
   assert.deepEqual([...dmgBackground.subarray(0, 8)], [

@@ -1,7 +1,7 @@
 # Autotest plugin
 
 Hosts the Autotest platform (automotive ECU / cockpit HMI test platform) inside
-PI-Desktop.
+Pi-Workspace.
 
 ## Contributions
 

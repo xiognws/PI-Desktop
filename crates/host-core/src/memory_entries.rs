@@ -17,7 +17,7 @@
 //! stops trying to write.
 //!
 //! The editing semantics (add/replace/patch/remove, tolerant matching, batch
-//! atomicity) live in `@pi-desktop/agent-runtime` (`memory-store.ts`) where the
+//! atomicity) live in `@pi-workspace/agent-runtime` (`memory-store.ts`) where the
 //! model-facing tool runs. This module owns only persistence: a whole-list read
 //! and a whole-list write, both bounded by the target's budget.
 
@@ -27,11 +27,11 @@ use rusqlite::params;
 use crate::db::{now_ms, Database};
 
 /// Separates entries in the stored document. Mirrors `ENTRY_DELIMITER` in
-/// `@pi-desktop/agent-runtime`.
+/// `@pi-workspace/agent-runtime`.
 pub const ENTRY_DELIMITER: &str = "\n§\n";
 
 /// Whole-store character budgets. Mirrors `MEMORY_CHAR_LIMIT` / `USER_CHAR_LIMIT`
-/// in `@pi-desktop/agent-runtime`; the two must not drift, or the tool accepts a
+/// in `@pi-workspace/agent-runtime`; the two must not drift, or the tool accepts a
 /// write the host then refuses.
 pub const MEMORY_CHAR_LIMIT: usize = 2200;
 pub const USER_CHAR_LIMIT: usize = 1375;

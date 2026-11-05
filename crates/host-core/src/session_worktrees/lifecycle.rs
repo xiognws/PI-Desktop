@@ -352,7 +352,7 @@ pub async fn create_session_worktree(
                 "worktree",
                 "lock",
                 "--reason",
-                &format!("PI-Desktop session {session_id}"),
+                &format!("Pi-Workspace session {session_id}"),
                 &root_text,
             ],
         )

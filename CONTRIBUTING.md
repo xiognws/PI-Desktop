@@ -1,9 +1,9 @@
-# Contributing to PI-Desktop
+# Contributing to Pi-Workspace
 
-Thanks for helping improve PI-Desktop. This guide applies to human and AI
+Thanks for helping improve Pi-Workspace. This guide applies to human and AI
 contributors working on the repository.
 
-PI-Desktop is released software with real users. Prefer small, reviewable
+Pi-Workspace is released software with real users. Prefer small, reviewable
 changes that preserve existing behavior, user data, security boundaries, and
 public interfaces.
 
@@ -64,8 +64,8 @@ git switch main
 git fetch origin main
 git merge --ff-only origin/main
 git worktree add -b <type>/<short-description> \
-  ../PI-Desktop-worktrees/<short-description> origin/main
-cd ../PI-Desktop-worktrees/<short-description>
+  ../Pi-Workspace-worktrees/<short-description> origin/main
+cd ../Pi-Workspace-worktrees/<short-description>
 ```
 
 That fast-forward fails once local `main` carries its own integration merge of
@@ -211,7 +211,7 @@ From a clean primary checkout:
 git fetch origin main
 git switch main
 git merge origin/main
-git worktree remove ../PI-Desktop-worktrees/<short-description>
+git worktree remove ../Pi-Workspace-worktrees/<short-description>
 git branch -d <type>/<short-description>
 git worktree prune
 ```

@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { decodeBinaryStorage, encodeBinaryStorage } from "@pi-desktop/host-runtime";
-import { ErrorCodes } from "@pi-desktop/shared";
+import { decodeBinaryStorage, encodeBinaryStorage } from "@pi-workspace/host-runtime";
+import { ErrorCodes } from "@pi-workspace/shared";
 import type { HostProcess } from "./host-process";
 
 type MessageAppend = {

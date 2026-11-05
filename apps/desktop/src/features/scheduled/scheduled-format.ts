@@ -1,4 +1,4 @@
-import type { ScheduledTask, ScheduledTaskSchedule } from "@pi-desktop/shared";
+import type { ScheduledTask, ScheduledTaskSchedule } from "@pi-workspace/shared";
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;

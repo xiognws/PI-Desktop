@@ -10,7 +10,7 @@
  * recognizes them.
  */
 
-/** Custom scheme reserved for PI-Desktop links (deep link registration is A). */
+/** Custom scheme reserved for Pi-Workspace links (deep link registration is A). */
 export const SESSION_LINK_SCHEME = "pi-desktop";
 /** Path segment that marks a session link. */
 export const SESSION_LINK_HOST = "session";

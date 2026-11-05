@@ -16,8 +16,8 @@ try {
       import { flushSync } from "react-dom";
       import i18n from "i18next";
       import { initReactI18next } from "react-i18next";
-      import { catalogs, flattenCatalog } from "@pi-desktop/i18n";
-      import { PROTOCOL_VERSION } from "@pi-desktop/shared";
+      import { catalogs, flattenCatalog } from "@pi-workspace/i18n";
+      import { PROTOCOL_VERSION } from "@pi-workspace/shared";
       import { Sidebar } from "./apps/desktop/src/components/Sidebar";
       import { useAppStore } from "./apps/desktop/src/stores/app-store";
       import { api } from "./apps/desktop/src/lib/api";

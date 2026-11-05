@@ -39,7 +39,7 @@ import {
   normalizeSubagentName,
   withoutReasoningReplayPlaceholder,
   type UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { isRecord, timestampMs, toJsonObject, toJsonValue, usageToPi } from "./agent-messages.js";
 import { restoredToolResultContent } from "./tool-result-content.js";
 import type { ContextBudgetLimits } from "./context-budget.js";
