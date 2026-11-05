@@ -31,6 +31,11 @@ import {
   type MemoryResult,
   type MemoryTarget,
 } from "./memory-store.js";
+import { scrubSecretsInBatch } from "@pi-desktop/shared";
+
+/** Appended to a result whose content had a credential masked out of it. */
+const MEMORY_SCRUB_NOTE =
+  "\n\nA credential-shaped string in this content was replaced with ***REDACTED*** before saving: memory is re-sent to the model on every later turn.";
 
 /** How many characters of the store the tool result may echo back. */
 const MAX_ECHO_CHARS = 4000;
@@ -296,8 +301,16 @@ export function createMemoryTool(host: MemoryToolHost): AgentTool {
           details: { errorCode: `MEMORY_${applied.failureClass.toUpperCase()}` },
         };
       }
+      // Memory becomes prompt content, so it is re-sent to the provider on every later
+      // turn. Credential-shaped text is masked on the way in, with the same vocabulary
+      // the log redactor uses, in the other direction: what leaves the process rather
+      // than what is written to a local file. A token caught anywhere in the batch is
+      // masked everywhere in it, because the model often states a key once with its
+      // label and then repeats it bare in the next entry.
+      const safeEntries = scrubSecretsInBatch(applied.entries);
+      const masked = safeEntries.some((entry, index) => entry !== applied.entries[index]);
       try {
-        await host.call("memory.writeEntries", { target, entries: applied.entries });
+        await host.call("memory.writeEntries", { target, entries: safeEntries });
       } catch (error) {
         return {
           content: [
@@ -311,8 +324,13 @@ export function createMemoryTool(host: MemoryToolHost): AgentTool {
         };
       }
       return {
-        content: [{ type: "text", text: renderMemoryResult(target, applied) }],
-        details: { entries: applied.entries.length, target },
+        content: [
+          {
+            type: "text",
+            text: renderMemoryResult(target, applied) + (masked ? MEMORY_SCRUB_NOTE : ""),
+          },
+        ],
+        details: { entries: applied.entries.length, target, ...(masked ? { masked: true } : {}) },
       };
     },
   };

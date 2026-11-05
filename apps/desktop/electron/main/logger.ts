@@ -9,6 +9,13 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { localTimestamp } from "./log-timestamp.ts";
+import {
+  BEARER_RE,
+  SECRET_ASSIGNMENT_RE,
+  SECRET_KEY_RE,
+  SECRET_VALUE_RE,
+  URL_CREDENTIAL_RE,
+} from "@pi-desktop/shared";
 
 // NDJSON file logging per docs/spec/03-runtime/09-logging-and-observability.md.
 // Each channel is split into focused category files instead of one crowded
@@ -123,14 +130,6 @@ export function ignoreBrokenStdio(): void {
   }
 }
 
-const SECRET_KEY_RE =
-  /token|secret|password|api[_-]?key|authorization|cookie|credential|private[_-]?key|client[_-]?secret/i;
-const SECRET_VALUE_RE =
-  /\b(?:sk|rk|pk)-[A-Za-z0-9_-]{10,}\b|\b(?:gh[pousr]_|github_pat_|glpat-|xox[baprs]-|AIza|ya29\.)[A-Za-z0-9._-]{8,}\b/g;
-const SECRET_ASSIGNMENT_RE =
-  /\b((?:access[_-]?token|refresh[_-]?token|id[_-]?token|token|secret|password|api[_-]?key|apikey|authorization|proxy-authorization|cookie|set-cookie|credential|private[_-]?key|client[_-]?secret)\s*[:=]\s*)[^\s,;&}"']+/gi;
-const BEARER_RE = /\b(?:bearer|basic)\s+[A-Za-z0-9+/_=.-]{8,}/gi;
-const URL_CREDENTIAL_RE = /(https?:\/\/)[^/\s:@]+:[^@\s]+@/gi;
 const PATH_KEY_RE = /(?:path|cwd|root|file|filename|directory|dir|workspace|project|datadir|logdir)$/i;
 const ABSOLUTE_PATH_RE = /(^|[\s("'=])((?:\/|[A-Za-z]:[\\/]|\\\\)[^\s"'=,;)}]*)/g;
 const ANSI_ESCAPE_RE = /\u001B\[[0-?]*[ -/]*[@-~]/g;

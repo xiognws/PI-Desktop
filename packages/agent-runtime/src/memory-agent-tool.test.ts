@@ -210,3 +210,52 @@ describe("createMemoryTool", () => {
     expect(text).toContain("was not saved");
   });
 });
+
+describe("the memory tool scrubs what it stores", () => {
+  function harness() {
+    const writes: Array<{ target: string; entries: string[] }> = [];
+    const host = {
+      call: async (method: string, params: never) => {
+        if (method === "memory.entries") return { entries: [] };
+        if (method === "memory.writeEntries") {
+          writes.push(params as { target: string; entries: string[] });
+          return {};
+        }
+        return {};
+      },
+    };
+    return { writes, tool: createMemoryTool(host as never) };
+  }
+
+  it("masks a credential before it reaches the host, and says so", async () => {
+    const { writes, tool } = harness();
+    const result = (await (tool.execute as never as (
+      id: string,
+      params: unknown,
+    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>)(
+      "call-1",
+      { target: "memory", action: "add", content: "the provider key is sk-ABCDEFGHIJKLMNOPQRST" },
+    ));
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0].entries[0]).not.toContain("sk-ABCDEFGHIJKLMNOPQRST");
+    expect(writes[0].entries[0]).toContain("***REDACTED***");
+    expect(result.content[0].text).toContain("***REDACTED***");
+    expect(result.details.masked).toBe(true);
+  });
+
+  it("says nothing extra when there was nothing to mask", async () => {
+    const { writes, tool } = harness();
+    const result = (await (tool.execute as never as (
+      id: string,
+      params: unknown,
+    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>)(
+      "call-2",
+      { target: "memory", action: "add", content: "the relay board is external-only" },
+    ));
+
+    expect(writes[0].entries[0]).toContain("external-only");
+    expect(result.content[0].text).not.toContain("***REDACTED***");
+    expect(result.details.masked).toBeUndefined();
+  });
+});
