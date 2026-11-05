@@ -4,10 +4,12 @@ import {
   REVIEW_MAX_ITERATIONS,
   REVIEW_READONLY_TOOLS,
   REVIEW_TOOL_ALLOWLIST,
+  SKILL_REVIEW_NO_LOOK_RETRY,
   SKILL_REVIEW_PROMPT,
   SKILL_REVIEW_TOOL_NOTE,
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
   REVIEW_DEFAULT_MIN_TOOL_CALLS,
+  ReviewActionCollector,
   canReview,
   describeReviewAction,
   skillReviewPolicyFrom,
@@ -246,5 +248,28 @@ describe("skillReviewPolicyFrom", () => {
       const policy = skillReviewPolicyFrom({ skillReviewAfterToolCalls: bad });
       expect(policy.afterToolCalls).toBe(REVIEW_DEFAULT_MIN_TOOL_CALLS);
     }
+  });
+});
+
+describe("the review cannot skip without looking", () => {
+  it("opens the prompt by requiring a library read", () => {
+    const opening = SKILL_REVIEW_PROMPT.split("\n\n")[0];
+    expect(opening.startsWith("Before anything else")).toBe(true);
+    expect(opening).toContain("`Skill`");
+    expect(opening).toMatch(/read first/i);
+  });
+
+  it("sends one correction that names the read it skipped", () => {
+    expect(SKILL_REVIEW_NO_LOOK_RETRY).toContain("without calling any tool");
+    expect(SKILL_REVIEW_NO_LOOK_RETRY).toContain("`Skill`");
+  });
+
+  it("counts completed tool calls, so a lookless answer is detectable", () => {
+    const collector = new ReviewActionCollector();
+    expect(collector.toolCallCount()).toBe(0);
+    collector.record({ type: "tool_start", toolCallId: "a", toolName: "Skill" });
+    expect(collector.toolCallCount()).toBe(0);
+    collector.record({ type: "tool_end", toolCallId: "a" });
+    expect(collector.toolCallCount()).toBe(1);
   });
 });

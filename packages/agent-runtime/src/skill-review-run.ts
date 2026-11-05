@@ -124,7 +124,18 @@ If a tool failed because of setup state, capture the FIX (install command, confi
  * `Skill` loads a document, `skill_manage` writes one, `memory` records a fact
  * about the user or the environment.
  */
-export const SKILL_REVIEW_PROMPT = `Review the conversation above and update the skill library. Be ACTIVE — most sessions produce at least one skill update, even if small. A pass that does nothing is a missed learning opportunity, not a neutral outcome.
+/**
+ * What the review is told when it answered without calling a single tool.
+ *
+ * Repeated once, then the pass is recorded as `no-tool-calls`. Kept short on
+ * purpose: it is a correction, not a second set of instructions.
+ */
+export const SKILL_REVIEW_NO_LOOK_RETRY =
+  'You answered without calling any tool, so you have not seen what the library already covers. Call `Skill` for the most relevant candidate (or `Grep` the skills directory) now, read what comes back, then decide. If the library genuinely needs nothing, say \'Nothing to save.\' after that.';
+
+export const SKILL_REVIEW_PROMPT = `Before anything else: look at the library. Call \`Skill\` with no arguments to list what exists, or \`Grep\` the skills directory for the topic of this session. Judging whether a lesson is already covered without reading it is the one failure this pass cannot detect from inside — so read first, then decide.
+
+Review the conversation above and update the skill library. Be ACTIVE — most sessions produce at least one skill update, even if small. A pass that does nothing is a missed learning opportunity, not a neutral outcome.
 
 Target shape of the library: CLASS-LEVEL skills, each with a SKILL.md of always-on rules and a small \`references/\` set of topical depth. Not a flat list of narrow one-session skills, and not an umbrella hoarding a references/ file per session. This shapes HOW you update, not WHETHER you update.
 
@@ -285,6 +296,11 @@ export class ReviewActionCollector {
     args: unknown;
     isError?: boolean;
   }> = [];
+
+  /** Completed tool calls. Zero means the fork answered without reading anything. */
+  toolCallCount(): number {
+    return this.calls.length;
+  }
 
   /** Feed one event from the fork; anything that is not a tool boundary is ignored. */
   record(event: {

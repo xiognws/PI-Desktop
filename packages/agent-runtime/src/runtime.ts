@@ -41,6 +41,7 @@ import {
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
   REVIEW_DEFAULT_MIN_TOOL_CALLS,
   SKILL_REVIEW_DEFINITION,
+  SKILL_REVIEW_NO_LOOK_RETRY,
   SKILL_REVIEW_PROMPT,
   SKILL_REVIEW_TOOL_NOTE,
   ReviewActionCollector,
@@ -2535,13 +2536,17 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     const controller = new AbortController();
     this.skillReviewAbort = controller;
     this.skillReviewRunning = true;
-    const collector = new ReviewActionCollector();
     try {
+      // Two attempts at most: the first may answer without reading, the second is
+      // the same pass with the correction appended. Nothing loops past that, so a
+      // model that will not look costs one extra completion and then stops.
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const collector = new ReviewActionCollector();
       const run = new SubagentRun({
         definition: SKILL_REVIEW_DEFINITION,
         sessionId: this.sessionId,
         parentToolCallId: "skill-review",
-        task: SKILL_REVIEW_PROMPT,
+        task: SKILL_REVIEW_PROMPT + (attempt === 1 ? "" : `\n\n${SKILL_REVIEW_NO_LOOK_RETRY}`),
         systemPrompt: SKILL_REVIEW_TOOL_NOTE,
         tools,
         provider: this.provider,
@@ -2554,12 +2559,23 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       const summary = collector.actions().map(describeReviewAction);
       if (summary.length > 0) {
         this.emit({ type: "skill_review", outcome: "applied", actions: summary });
+      } else if (result.status === "completed" && collector.toolCallCount() === 0 && attempt < 2) {
+        // A completion that never touched a tool read nothing: the model answered from
+        // the prompt alone. One correction is worth spending on, because "nothing to
+        // save" and "never looked" are indistinguishable downstream.
+        continue;
       } else {
         this.emit({
           type: "skill_review",
           outcome: "skipped",
-          reason: result.status === "completed" ? "nothing-to-save" : result.status,
+          reason:
+            result.status !== "completed"
+              ? result.status
+              : collector.toolCallCount() === 0
+                ? "no-tool-calls"
+                : "nothing-to-save",
         });
+      }
       }
     } catch (error) {
       this.emit({
