@@ -16,6 +16,13 @@ import {
   schemaTooNewOf,
 } from "../host-boot-diagnostics";
 import type { Logger } from "../logger";
+import {
+  describeUnfinishedRun,
+  readLastExitReason,
+  readRunMarker,
+  setRunMarkerDirectory,
+  writeRunMarker,
+} from "../run-marker.js";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import { syncPluginDisplayLocale } from "../plugin-display-locale";
@@ -219,6 +226,20 @@ export function createRuntimeLifecycle({
     logger.app("lifecycle", "info", "app boot " + APP_NAME + " " + APP_VERSION, {
       data: { protocolVersion: PROTOCOL_VERSION },
     });
+    // The previous run leaves a breadcrumb behind unless it quit gracefully, so
+    // a crash or a hard kill is visible on this start instead of being inferred
+    // from silence later.
+    setRunMarkerDirectory(dataDir);
+    const unfinishedRun = describeUnfinishedRun(readRunMarker());
+    if (unfinishedRun) {
+      const deliberate = readLastExitReason();
+      logger.app("lifecycle", "warn", "unfinished previous run", {
+        data: deliberate
+          ? `${unfinishedRun}; last deliberate exit ${deliberate.at}: ${deliberate.reason}`
+          : unfinishedRun,
+      });
+    }
+    writeRunMarker(APP_VERSION);
     await startHost();
     // Plugin rows are resolved in the host, so the app language is pushed once
     // the process answers. The startup sequence re-applies it with the stored

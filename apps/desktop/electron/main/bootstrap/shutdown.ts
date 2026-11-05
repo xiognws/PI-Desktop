@@ -17,6 +17,7 @@ import type { McpOAuthManager } from "../mcp-oauth";
 import { getActiveRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
 import { runConfirmedQuitTeardown } from "./confirmed-quit";
 import type { LiveCallService } from "../live-voice/call-service";
+import { clearRunMarker } from "../run-marker.js";
 
 const QUIT_TURN_SETTLE_BUDGET_MS = 2_000;
 
@@ -145,6 +146,8 @@ export function registerShutdownHandlers({
     // Persist the confirmed shutdown before any awaited cleanup so a forced
     // process termination still leaves an observable lifecycle boundary.
     logger.app("lifecycle", "info", "app shutdown");
+    // Reaching here means the run ended on purpose: no breadcrumb for the next start.
+    clearRunMarker();
     // The quit can no longer be cancelled; services that must survive a
     // cancelled confirmation stop only from here (issue #2048).
     runConfirmedQuitTeardown(logger);
