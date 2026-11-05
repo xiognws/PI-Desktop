@@ -58,6 +58,7 @@ import { ActionSlotSide } from "./ActionBarSlots";
 import { EntryExtraStack } from "./EntryExtraStack";
 import { TurnChangesCard } from "./TurnChangesCard";
 import { slotMessage } from "../../../plugins/renderer-slots/slot-message";
+import { SkillReviewRow } from "./SkillReviewRow";
 
 type AssistantTurnProps = {
   entry: AssistantTurnEntry;
@@ -463,6 +464,7 @@ export const AssistantTurn = memo(function AssistantTurn({
             <ActionSlotSide slot="assistantAction" side="right" message={slotReply} />
           </div>
         ) : null}
+        <SkillReviewRow turnId={entry.id} />
         {slotReply ? <EntryExtraStack message={slotReply} /> : null}
       </div>
     </div>

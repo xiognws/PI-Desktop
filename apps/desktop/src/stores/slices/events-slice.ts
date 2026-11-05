@@ -234,6 +234,25 @@ export function createEventsSlice({
         }
       }
       const event = envelope.event;
+      if (event.type === "skill_review") {
+        // Keyed by turn: the row belongs under the turn the review was about, and the
+        // review always reports after that turn ended. In memory only — the durable
+        // record is the skill-review log.
+        const turnId = envelope.turnId;
+        if (turnId) {
+          set((state) => ({
+            skillReviewByTurn: {
+              ...state.skillReviewByTurn,
+              [turnId]: {
+                outcome: event.outcome,
+                ...(event.reason ? { reason: event.reason } : {}),
+                actions: event.actions ?? [],
+              },
+            },
+          }));
+        }
+        return;
+      }
       if (event.type === "agent_end" || event.type === "error") {
         runtime.submittedComposerDrafts.delete(envelope.sessionId);
       }

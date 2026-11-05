@@ -119,6 +119,13 @@ export type DraftSessionConfiguration = {
 };
 
 
+export type SkillReviewNotice = {
+  outcome: "applied" | "skipped" | "failed";
+  reason?: string;
+  /** One short description per write the review made. */
+  actions: string[];
+};
+
 export type AppState = {
   ready: boolean;
   version?: AppVersionInfo;
@@ -156,6 +163,14 @@ export type AppState = {
   isRunning: boolean;
   /** Run state per session id — sessions run independent agents. */
   runningSessions: Record<string, boolean>;
+
+  /**
+   * The self-improvement review's verdict for a finished turn, so the transcript can
+   * say whether it looked and what it concluded. A review that wrote nothing is the
+   * common outcome, and without this row it is indistinguishable from one that never
+   * ran. Memory only: the durable record is the skill-review log.
+   */
+  skillReviewByTurn: Record<string, SkillReviewNotice>;
   /** Runtime-owned phase for explaining quiet intervals in active turns. */
   agentStatuses: Record<string, AgentStatus>;
   /** Latest in-memory result for each session, used by the active transcript. */

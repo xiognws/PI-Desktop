@@ -22,6 +22,7 @@ export function createInitialState(): AppStateData {
     recentModels: loadRecentModels(),
     healthOk: false,
     sessions: [],
+    skillReviewByTurn: {},
     sessionMeta: initialSidebarPreferences.sessionMeta,
     sessionView: {
       ...initialSidebarPreferences.sessionView,

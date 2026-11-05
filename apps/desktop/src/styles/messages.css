@@ -3911,3 +3911,30 @@
     opacity: 0.7;
   }
 }
+
+/* The self-improvement review's verdict under a finished turn. Deliberately the
+   quietest row in the transcript: it is a report, not a message, and a silent
+   review is the normal case. */
+.skill-review-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0 6px;
+  padding-left: 2px;
+  font-size: var(--text-xs, 11px);
+  color: var(--muted-foreground);
+  line-height: 1.4;
+}
+
+.skill-review-row[data-outcome="applied"] .skill-review-text {
+  color: var(--accent);
+}
+
+.skill-review-detail {
+  max-width: 60ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
