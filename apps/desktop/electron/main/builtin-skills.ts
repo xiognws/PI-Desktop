@@ -1,14 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseSkillFrontmatter } from "@pi-desktop/plugin-sdk";
-import { GEN_UI_SKILL_ID } from "@pi-desktop/shared";
-import type { PluginSkillDef } from "@pi-desktop/agent-runtime";
+import { parseSkillFrontmatter } from "@pi-workspace/plugin-sdk";
+import { GEN_UI_SKILL_ID } from "@pi-workspace/shared";
+import type { PluginSkillDef } from "@pi-workspace/agent-runtime";
 import type { LoadedSkillDocument } from "./skill-document";
 import { getModuleDirectory } from "./module-path";
 import { pluginWorkspaceContains } from "./plugin-workspace-contains";
 
 /**
- * Skills PI-Desktop ships itself.
+ * Skills Pi-Workspace ships itself.
  *
  * These ride the same catalog-plus-`Skill`-tool path as plugin-contributed
  * skills (D174), so a first-party skill and a third-party one are

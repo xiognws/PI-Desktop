@@ -18,7 +18,7 @@ await build({
   entryPoints: [join(root, "scripts/e2e/project-edit.tsx")],
   outfile: join(temp, "renderer.js"), bundle: true, platform: "browser", format: "esm",
   jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' },
-  alias: { "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
+  alias: { "@pi-workspace/i18n": join(root, "packages/i18n/src/index.ts"),
     react: join(root, "apps/desktop/node_modules/react"),
     "react-dom": join(root, "apps/desktop/node_modules/react-dom") },
   nodePaths: [join(root, "apps/desktop/node_modules")],

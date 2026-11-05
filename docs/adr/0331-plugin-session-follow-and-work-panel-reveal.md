@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-18
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: [ADR 0104](0104-plugin-contributed-work-panel-views.md) ·
   [ADR 0263](0263-project-folder-roots-for-plugin-views.md) ·
   [ADR 0330](0330-open-html-files-in-work-panel-browser-from-plugins.md) ·

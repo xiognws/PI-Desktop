@@ -1,4 +1,4 @@
-import type { UiMessage } from "@pi-desktop/shared";
+import type { UiMessage } from "@pi-workspace/shared";
 
 /** Longest preview the pinned strip renders; the full prompt stays in the bubble. */
 export const PINNED_PROMPT_PREVIEW_CHARS = 240;

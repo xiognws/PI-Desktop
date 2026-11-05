@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { ErrorCodes } from "@pi-desktop/shared";
+import { ErrorCodes } from "@pi-workspace/shared";
 import { shellQuote } from "./pi-host-bootstrap-script.js";
 import { checksumMatches, normalizeChecksum } from "./pi-host-release.js";
 import type { SshTransport } from "./ssh-transport.js";

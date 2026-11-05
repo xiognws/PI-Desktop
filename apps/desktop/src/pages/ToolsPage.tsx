@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ToolPackageSummary, ToolPackageTool } from "@pi-desktop/shared";
+import type { ToolPackageSummary, ToolPackageTool } from "@pi-workspace/shared";
 
 import { IconRefresh, IconWrench } from "../components/icons";
 import { Badge, SettingsToggle, TooltipButton } from "../components/ui";

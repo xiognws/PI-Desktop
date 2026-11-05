@@ -16,7 +16,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { UiMessage } from "@pi-desktop/shared";
+import type { UiMessage } from "@pi-workspace/shared";
 import { useOpenPreviewTarget } from "../../../hooks/use-preview-target";
 import { useChatFileMenu } from "../../../hooks/use-chat-file-menu";
 import { ContextMenu, useContextMenu } from "../../../components/ContextMenu";

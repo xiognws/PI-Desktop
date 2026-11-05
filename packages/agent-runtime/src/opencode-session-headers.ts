@@ -10,7 +10,7 @@ import type { Api, Model, ProviderHeaders, SimpleStreamOptions } from "@earendil
 import {
   APP_VERSION,
   OPENCODE_GO_API_STYLE,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
 
 export const OPENCODE_SESSION_HEADER = "x-opencode-session";

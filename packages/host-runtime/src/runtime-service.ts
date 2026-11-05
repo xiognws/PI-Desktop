@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { RuntimePort, TurnStartRequest, TurnSteerRequest } from "@pi-desktop/agent-host";
+import type { RuntimePort, TurnStartRequest, TurnSteerRequest } from "@pi-workspace/agent-host";
 import {
   ErrorCodes,
   compactionRecordId,
@@ -10,7 +10,7 @@ import {
   type AskToolResolution,
   type Risk,
   type UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 import type { LaunchResolver } from "./launch-resolver.js";
 import { resolveSessionMessageInput } from "./session-message-input.js";

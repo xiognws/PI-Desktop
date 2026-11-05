@@ -13,7 +13,7 @@ import {
   formatBytes as formatByteSize,
   type PluginInstallMirror,
   type PluginInstallProgress,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /** What the dialog asks the host for, and what a retry asks for again. */
 export type PluginInstallRequest = {

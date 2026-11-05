@@ -35,7 +35,7 @@ in [the design review](pi-coding-agent-design-review.md), not enabled.
 
 ## Candidate and environment
 
-- Worktree: `PI-Desktop-worktrees/pi-0991-resume`.
+- Worktree: `Pi-Workspace-worktrees/pi-0991-resume`.
 - Branch: `refactor/pi-0991-resume`.
 - Base main: `e77404ea3c4834a6213759868a66cde8da759056`.
 - Original Claude session: `d4616efd-1246-40aa-b2e2-3a3767555595`;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { StorageInfo } from "@pi-desktop/shared";
+import type { StorageInfo } from "@pi-workspace/shared";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui";
 import { SettingsCard, SettingsRow } from "./primitives";
@@ -9,7 +9,7 @@ type StorageAction = "migrate" | "cache" | "backup";
 
 /**
  * IEC units and locale-formatted digits, unlike `formatBytes` in
- * `@pi-desktop/shared`, which renders `KB` / `MB` / `GB` with fixed ASCII
+ * `@pi-workspace/shared`, which renders `KB` / `MB` / `GB` with fixed ASCII
  * fractions. Storage figures are compared against Finder and Explorer, so
  * this keeps its own formatter rather than inheriting the shared one.
  */

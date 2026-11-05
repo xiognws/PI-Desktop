@@ -1,5 +1,5 @@
 import i18n from "i18next";
-import { fastModeBillingOn, type ProviderPublic } from "@pi-desktop/shared";
+import { fastModeBillingOn, type ProviderPublic } from "@pi-workspace/shared";
 import { useAppStore } from "../stores/app-store";
 import { sameComposerModelId } from "./composer-models";
 import { isRemoteSession } from "./remote-session-safety";

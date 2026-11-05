@@ -9,7 +9,7 @@ import {
   resolveKeybinding,
   type KeybindingOverrides,
   type ShortcutPlatform,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { WindowLifecycleState } from "./window";
@@ -112,7 +112,7 @@ export function createLauncher({
         // never let Electron transform the process type. Without
         // `skipTransformProcessType`, `visibleOnFullScreen` runs
         // TransformProcessType(kProcessTransformToUIElementApplication) on the
-        // whole process, which removes PI-Desktop from the Dock and Cmd+Tab for
+        // whole process, which removes Pi-Workspace from the Dock and Cmd+Tab for
         // as long as this window exists — and the launcher is prewarmed during
         // boot, so that would apply to every session (ADR 0086).
         window.setVisibleOnAllWorkspaces(true, {

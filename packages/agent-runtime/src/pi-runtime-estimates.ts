@@ -6,7 +6,7 @@ import {
 import { LocalRequestError } from "@earendil-works/pi-ai";
 import { validateHostedSearchMessages } from "@earendil-works/pi-ai/utils/hosted-search";
 import type { Api, Message, Model } from "@earendil-works/pi-ai";
-import { contextOccupancyTokens } from "@pi-desktop/shared";
+import { contextOccupancyTokens } from "@pi-workspace/shared";
 
 /** Keep character caps aligned with pi-ai 1.1.0's text-token estimator. */
 export const ESTIMATED_TEXT_CHARS_PER_TOKEN = 3.5;

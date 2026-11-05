@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { SessionSearchHit, SessionSummary } from "@pi-desktop/shared";
+import type { SessionSearchHit, SessionSummary } from "@pi-workspace/shared";
 import { IconChat } from "./icons";
 import { SearchHighlight } from "./SearchHighlight";
 

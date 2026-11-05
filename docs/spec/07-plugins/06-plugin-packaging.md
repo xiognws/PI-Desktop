@@ -80,7 +80,7 @@ lifecycle callback.
 
 ## 7. CLI and publisher handoff
 
-Run these commands from the PI-Desktop repository root after its normal setup:
+Run these commands from the Pi-Workspace repository root after its normal setup:
 
 ```bash
 pnpm pi-plugin check ../my-plugin

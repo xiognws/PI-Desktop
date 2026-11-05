@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import i18n from "i18next";
-import { catalogs } from "@pi-desktop/i18n";
+import { catalogs } from "@pi-workspace/i18n";
 import {
   isDefaultSessionTitle,
   promptFallbackSessionTitle,

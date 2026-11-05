@@ -7,7 +7,7 @@
  * shape the renderer invented — the host validates again, but a mistyped field
  * should not travel at all.
  */
-import { IPC } from "@pi-desktop/shared";
+import { IPC } from "@pi-workspace/shared";
 
 import type { HostProcess } from "../host-process";
 import type { IpcRegistrar } from "./types";

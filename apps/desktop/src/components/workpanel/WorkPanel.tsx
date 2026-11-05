@@ -25,7 +25,7 @@ import {
   subagentTabDisplayLabels,
   toolWorkPanelTab,
 } from "../../lib/work-panel-tabs";
-import type { PluginViewMeta } from "@pi-desktop/shared";
+import type { PluginViewMeta } from "@pi-workspace/shared";
 import { api } from "../../lib/api";
 import { pluginViewIcon, pluginViewInitial } from "../../lib/plugin-view-icons";
 import { useAppStore } from "../../stores/app-store";

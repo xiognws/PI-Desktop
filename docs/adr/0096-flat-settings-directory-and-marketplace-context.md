@@ -6,7 +6,7 @@
 
 - Status: Accepted for Settings IA; marketplace-source placement superseded
 - Date: 2026-08-18
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Related: D166, D168, D238, ADR 0036, ADR 0058
 
 ## Context

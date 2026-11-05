@@ -9,7 +9,7 @@ import type {
   PluginReviewSummary,
   PluginServiceStatus,
   PluginSummary,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   CAPABILITY_ORDER,
   FS_MODES,

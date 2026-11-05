@@ -5,14 +5,14 @@
  * error, and retry snapshots.
  */
 
-import type { AgentEventEnvelope } from "@pi-desktop/shared";
+import type { AgentEventEnvelope } from "@pi-workspace/shared";
 import {
   STREAM_COALESCE_INTERVAL_MS,
   hasMessageUpdateDeltas,
   mergeMessageUpdates,
   toWireMessageUpdate,
   type MessageUpdateEvent,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export type StreamCoalescerStats = {
   accepted: number;

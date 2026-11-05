@@ -1,6 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 import { isAbsolute, resolve, sep } from "node:path";
-import type { PluginMcpServerContrib } from "@pi-desktop/plugin-sdk";
+import type { PluginMcpServerContrib } from "@pi-workspace/plugin-sdk";
 import { minimalChildEnv } from "./child-process-env.ts";
 import {
   MCP_STDIO_HOST_ENV_KEYS,
@@ -643,7 +643,7 @@ export class McpServerClient {
         {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: {},
-          clientInfo: { name: "PI-Desktop", version: "1" },
+          clientInfo: { name: "Pi-Workspace", version: "1" },
         },
         timeoutMs,
       );

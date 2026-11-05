@@ -12,7 +12,7 @@ import { normalizeChangelogVersion, resolveChangelogLocale } from "./changelog-r
 export { normalizeChangelogVersion, resolveChangelogLocale } from "./changelog-runtime.js";
 
 /**
- * Shipped-locale product changelog for PI-Desktop app releases.
+ * Shipped-locale product changelog for Pi-Workspace app releases.
  *
  * English is the source of truth (ADR 0009). The translated catalogs mirror
  * the same versions and bullet counts so in-app "what's new" can follow the

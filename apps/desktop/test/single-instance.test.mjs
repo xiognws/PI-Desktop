@@ -21,7 +21,7 @@ const bundledEntry = await build({
   // A CJS build also rejects an accidentally reintroduced top-level await.
   bundle: true, platform: "node", format: "cjs", write: false,
   plugins: [{ name: "installation-external-boundaries", setup(builder) {
-    builder.onResolve({ filter: /^@pi-desktop\/shared$/ }, () => ({ path: fileURLToPath(new URL("../../../packages/shared/src/protocol.ts", import.meta.url)) }));
+    builder.onResolve({ filter: /^@pi-workspace\/shared$/ }, () => ({ path: fileURLToPath(new URL("../../../packages/shared/src/protocol.ts", import.meta.url)) }));
     builder.onResolve({ filter: /^electron$|^\.\/(logger|main-process-errors|index|storage\/bootstrap)$/ }, (args) => ({ path: args.path, namespace: "installation-test-boundary" }));
     builder.onLoad({ filter: /.*/, namespace: "installation-test-boundary" }, (args) => {
       if (args.path === "electron") return { contents: "export const app = globalThis.__installationHarness.app; export class BrowserWindow { static getAllWindows() { return []; } }" };
@@ -188,10 +188,10 @@ test("development installation applies its separate profile before requesting th
   if (pathIndex >= 0) {
     assert.ok(pathIndex < lockIndex, "the data root is settled before the lock");
     // A checkout publishes `<root>/userdata-dev`; the app-data fallback keeps the
-    // historical "PI-Desktop Dev" profile.
+    // historical "Pi-Workspace Dev" profile.
     const applied = value.calls[pathIndex][2];
     assert.ok(
-      applied.endsWith("userdata-dev") || applied.endsWith("PI-Desktop Dev"),
+      applied.endsWith("userdata-dev") || applied.endsWith("Pi-Workspace Dev"),
       `unexpected development profile: ${applied}`,
     );
   }

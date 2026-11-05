@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { setImmediate as nextTurn } from "node:timers/promises";
-import type { AgentEventEnvelope, UiMessage } from "@pi-desktop/shared";
+import type { AgentEventEnvelope, UiMessage } from "@pi-workspace/shared";
 import { TurnEventPipeline } from "./turn-events.js";
 
 it("keeps the host alive until a streaming checkpoint finishes during disposal", async () => {

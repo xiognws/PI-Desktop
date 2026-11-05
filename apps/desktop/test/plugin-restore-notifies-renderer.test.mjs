@@ -45,7 +45,7 @@ test("startup plugin restore notifies the renderer after every enabled plugin lo
   const createRuntimeLifecycle = loadLifecycle({
     "node:fs": { mkdirSync() {} },
     "node:path": { join: (...parts) => parts.join("/") },
-    "@pi-desktop/shared": {
+    "@pi-workspace/shared": {
       APP_NAME: "PI Desktop",
       APP_VERSION: "0.0.0-test",
       ErrorCodes: { HOST_UNAVAILABLE: "HOST_UNAVAILABLE" },
@@ -62,7 +62,7 @@ test("startup plugin restore notifies the renderer after every enabled plugin lo
       schemaTooNewOf: () => null,
     },
     "../plugin-display-locale": { syncPluginDisplayLocale: async () => {} },
-    "@pi-desktop/host-runtime": {
+    "@pi-workspace/host-runtime": {
       RuntimeSupervisor: class {
         superviseRestart() {
           return Promise.resolve();

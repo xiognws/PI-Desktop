@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { findPosition } from "@pi-desktop/shared";
+import { findPosition } from "@pi-workspace/shared";
 
 import { IconArrowDown, IconArrowUp, IconX } from "../../../components/icons";
 import { Button, Input, TooltipButton } from "../../../components/ui";

@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { catalogs } from "@pi-desktop/i18n";
+import { catalogs } from "@pi-workspace/i18n";
 import { createServer } from "vite";
 import { fileURLToPath } from "node:url";
 
@@ -51,11 +51,11 @@ test("TeX math and wrapped HTTP links render through the production Markdown pip
     // A nested linked-host destination must be normalized before the
     // production rehype sanitizer removes its invalid wrapper href.
     const wrappedLink = render(
-      "[#1106](([github.com](https://github.com/vastsa/PI-Desktop/issues/1106)))",
+      "[#1106](([github.com](https://github.com/xiognws/Pi-Workspace/issues/1106)))",
     );
     assert.match(
       wrappedLink,
-      /<a[^>]*href="https:\/\/github\.com\/vastsa\/PI-Desktop\/issues\/1106"/,
+      /<a[^>]*href="https:\/\/github\.com\/xiognws\/Pi-Workspace\/issues\/1106"/,
     );
     assert.match(wrappedLink, /target="_blank"/);
 

@@ -7,7 +7,7 @@
  * what this conversation may not pull, and attaches a bounded excerpt that
  * travels with the message from then on.
  */
-import { parseSessionLinks, type MessageAttachment } from "@pi-desktop/shared";
+import { parseSessionLinks, type MessageAttachment } from "@pi-workspace/shared";
 import type { HostProcess } from "./host-process";
 import type { Logger } from "./logger";
 

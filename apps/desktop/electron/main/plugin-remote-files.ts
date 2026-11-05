@@ -1,7 +1,7 @@
 import * as Value from "typebox/value";
 import { WorkspacePluginFilesResultSchema,
-  type WorkspacePluginFilesRequest, type WorkspacePluginFilesResult } from "@pi-desktop/shared";
-import type { PluginFsReadOptions } from "@pi-desktop/plugin-sdk";
+  type WorkspacePluginFilesRequest, type WorkspacePluginFilesResult } from "@pi-workspace/shared";
+import type { PluginFsReadOptions } from "@pi-workspace/plugin-sdk";
 
 export type PluginRemoteFilesRequest = Omit<WorkspacePluginFilesRequest, "path"> & { workspacePath: string };
 export type PluginRemoteFilesRead = (request: PluginRemoteFilesRequest) => Promise<unknown>;

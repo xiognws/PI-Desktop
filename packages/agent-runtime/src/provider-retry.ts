@@ -9,7 +9,7 @@ import {
   type Model,
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
-import { PROVIDER_RETRY_MAX_RETRIES } from "@pi-desktop/shared";
+import { PROVIDER_RETRY_MAX_RETRIES } from "@pi-workspace/shared";
 import {
   classifyAgentError,
   type ClassifiedAgentError,

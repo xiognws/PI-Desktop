@@ -5,7 +5,7 @@ import {
   type ModelBinding,
   type ModelInfo,
   type ModelModality,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { ModelConfig, ThinkingCapabilitySet } from "./thinking-level.js";
 export { transcriptConfigFromPi } from "./transcript-compat.js";
 

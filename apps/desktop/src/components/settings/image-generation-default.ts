@@ -27,7 +27,7 @@ import {
   type ImageProviderFacts,
   type ProviderPublic,
   modelWireIdsEqual as sameComposerModelId,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /**
  * True when `provider` can actually run `modelId` for image generation now.

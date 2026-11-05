@@ -1,7 +1,7 @@
 import { app, dialog, shell } from "electron";
 import { importSkillFolders, readLastSkillImportDirectory, writeLastSkillImportDirectory } from "../skill-folder-import";
-import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type UserSkillRecord, type UserSubagentRecord } from "@pi-desktop/shared";
-import { loadSubagentDefinitions, type UserSubagentDocument } from "@pi-desktop/agent-runtime";
+import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type UserSkillRecord, type UserSubagentRecord } from "@pi-workspace/shared";
+import { loadSubagentDefinitions, type UserSubagentDocument } from "@pi-workspace/agent-runtime";
 import { builtinSkillCatalog } from "../builtin-skills";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";

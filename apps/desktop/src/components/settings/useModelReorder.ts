@@ -1,4 +1,4 @@
-import type { ModelBinding } from "@pi-desktop/shared";
+import type { ModelBinding } from "@pi-workspace/shared";
 import { useListReorder } from "../../hooks/use-list-reorder";
 import { reorderItem } from "../../lib/list-reorder";
 

@@ -3,13 +3,13 @@ import {
   codexDelegationFeedback,
   codexWorkFeedbackMessage,
   isPlaybackSignalActive,
-} from "@pi-desktop/voice-runtime/live";
+} from "@pi-workspace/voice-runtime/live";
 import type {
   LiveCallView,
   LiveControlEvent,
   LiveStatus,
   LiveTranscriptSegment,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { api } from "../../../lib/api";
 import { useAppStore } from "../../../stores/app-store";
 import { liveVoiceApi, liveError } from "./live-voice-api";

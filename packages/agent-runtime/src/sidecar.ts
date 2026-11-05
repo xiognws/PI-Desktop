@@ -19,7 +19,7 @@ import {
   type RuntimeProviderConfig,  type SkillReviewPolicy,
 } from "./runtime.js";
 import type { PluginSkillDef } from "./plugin-skills-prompt.js";
-import type { SessionMessageOrigin, TrustedExtensionSpec } from "@pi-desktop/shared";
+import type { SessionMessageOrigin, TrustedExtensionSpec } from "@pi-workspace/shared";
 import type { ProjectInstructions } from "./project-instructions.js";
 import type { CustomSystemPrompt } from "./custom-system-prompt.js";
 import {
@@ -36,7 +36,7 @@ import {
   normalizeNetworkProxy,
   OAUTH_AUTH_KIND,
   readNdjsonLines,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type {
   AgentEventEnvelope,
   AskToolResolution,
@@ -48,7 +48,7 @@ import type {
   PlanExecution,
   SessionThinkingLevel,
   UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 type RuntimeMap = Map<string, DesktopAgentRuntime>;
 

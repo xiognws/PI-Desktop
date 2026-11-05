@@ -4,8 +4,8 @@ import {
   HostProcess as RuntimeHostProcess,
   type DiagnosedHostFailure,
   type StderrHandler,
-} from "@pi-desktop/host-runtime";
-import { ErrorCodes } from "@pi-desktop/shared";
+} from "@pi-workspace/host-runtime";
+import { ErrorCodes } from "@pi-workspace/shared";
 import {
   GlibcUnsupportedError,
   glibcMissingSymbol,
@@ -19,7 +19,7 @@ export type {
   HostNotificationHandler,
   ProcessExitHandler,
   StderrHandler,
-} from "@pi-desktop/host-runtime";
+} from "@pi-workspace/host-runtime";
 
 export function resolveHostBinary(): string {
   if (process.env.PI_DESKTOP_HOST_BIN && existsSync(process.env.PI_DESKTOP_HOST_BIN)) {
@@ -126,7 +126,7 @@ function resolveBuiltinToolsDir(): string | null {
 
 /**
  * The desktop's host-core child: the shared stdio transport from
- * `@pi-desktop/host-runtime` plus the two things only Electron knows — where
+ * `@pi-workspace/host-runtime` plus the two things only Electron knows — where
  * this build keeps the binary and its bundled plugins, and how to name the
  * boot refusals the renderer phrases.
  */

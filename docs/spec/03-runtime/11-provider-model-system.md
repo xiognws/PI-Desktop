@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-PI-Desktop must support **all major market model vendors and models** that users commonly need, without hardcoding a tiny allowlist as product ceiling.
+Pi-Workspace must support **all major market model vendors and models** that users commonly need, without hardcoding a tiny allowlist as product ceiling.
 
 Strategy:
 
@@ -120,7 +120,7 @@ Completions requests use `thinkingFormat: "zai"` and `zaiToolStream: true`.
 DeepSeek-family Completions requests set
 `requiresReasoningContentOnAssistantMessages: true` when the row's `vendorKey`,
 base URL, model id, or catalog `family` identifies DeepSeek. pi-ai only
-auto-detects `provider === "deepseek"` or a `deepseek.com` URL, and PI-Desktop
+auto-detects `provider === "deepseek"` or a `deepseek.com` URL, and Pi-Workspace
 stores a UUID as `model.provider`, so aggregators and custom gateways would
 otherwise omit `reasoning_content` on assistant turns that produced no thinking.
 Non-official DeepSeek endpoints also set `requiresNonEmptyReasoningReplay` so
@@ -212,7 +212,7 @@ Any vendor not listed but reachable by:
 ## 6. Model support policy
 
 ### 6.1 No hard model allowlist ceiling
-PI-Desktop must not permanently restrict users to a short fixed model list.
+Pi-Workspace must not permanently restrict users to a short fixed model list.
 
 ### 6.2 Catalog responsibilities
 
@@ -238,7 +238,7 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
 5. Chat, image and classifier models are selected by operation type even when
    they share a model ID. pi-ai remains responsible for OAuth, wire identity,
    transport and typed non-chat operations that models.dev does not describe.
-   PI-Desktop's optional Jev integration uses pi-ai's built-in
+   Pi-Workspace's optional Jev integration uses pi-ai's built-in
    `typesafe/jev-latest` classifier directly; it is never listed or selectable
    as a chat provider/model, and it owns no provider row even though it is
    added from the same service chooser. The key is checked against TypeSafe
@@ -379,7 +379,7 @@ type ThinkingLevel =
 ```
 
 The compatibility fields above are retained as a persisted-schema compatibility
-surface for older clients. PI-Desktop no longer reads them as runtime model
+surface for older clients. Pi-Workspace no longer reads them as runtime model
 overrides. `ModelInfo` reasoning support and supported thinking levels describe
 the resolved models.dev record; effective provider/session capability comes from
 the exact `ModelBinding`. Unknown free-form ids start with the generic shape and

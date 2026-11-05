@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
-import { IPC, IPC_WHITELIST } from "@pi-desktop/shared";
+import { IPC, IPC_WHITELIST } from "@pi-workspace/shared";
 
 /**
  * The review channels are a thin pass-through: the renderer names plugin ids
@@ -21,7 +21,7 @@ function loadMarketIpc() {
   });
   const module = { exports: {} };
   const dependencies = {
-    "@pi-desktop/shared": {
+    "@pi-workspace/shared": {
       IPC,
       ErrorCodes: {},
       trustedExtensionCommandId: (name) => `builtin.${name}`,

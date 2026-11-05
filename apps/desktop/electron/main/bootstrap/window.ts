@@ -9,7 +9,7 @@ import {
   IPC,
   MAC_TRAFFIC_LIGHT_POSITION,
   type CloseBehavior,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { BrowserHost } from "../browser-host";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
@@ -209,7 +209,7 @@ export async function createWindow({
     // One frameless look everywhere: macOS keeps inset traffic lights;
     // Windows/Linux hide native chrome entirely — the renderer draws its
     // own Codex-style window controls (see WindowControls.tsx).
-    // The traffic-light position comes from @pi-desktop/shared so the space
+    // The traffic-light position comes from @pi-workspace/shared so the space
     // the renderer reserves for the buttons (styles/tokens.css) is derived
     // from the same numbers that place them.
     ...(process.platform === "darwin"

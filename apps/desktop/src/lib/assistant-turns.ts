@@ -3,12 +3,12 @@ import type {
   HostedSearchRound,
   MessageUsage,
   UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   addUsage,
   hostedSearchRounds,
   withoutReasoningReplayPlaceholder,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { getToolAction, isDelegationStartTool } from "./tool-display";
 import { messageContentFacts } from "./transcript-summary";
 

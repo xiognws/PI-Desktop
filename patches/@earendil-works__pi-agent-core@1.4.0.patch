@@ -6,7 +6,7 @@ index 48f56a252dacdc19f55df9d97bc034932dce21a4..c833c36ffa4f43a48c41ee13277680af
              case "toolcall_start":
              case "toolcall_delta":
              case "toolcall_end":
-+            // Hosted web search (PI-Desktop): the pi-ai adapters push
++            // Hosted web search (Pi-Workspace): the pi-ai adapters push
 +            // `hosted_search_update` when a provider-side search block starts
 +            // or completes. Forward it like any other progress event so the
 +            // application renders each search round as it happens instead of

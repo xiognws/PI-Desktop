@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-13
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Related: issue #1627 · [ADR 0170](0170-work-panel-browser-as-bundled-plugin.md) ·
   [ADR 0028](0028-session-scoped-work-panel-contexts.md)
 

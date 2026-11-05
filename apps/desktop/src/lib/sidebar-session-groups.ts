@@ -1,4 +1,4 @@
-import type { SessionSummary } from "@pi-desktop/shared";
+import type { SessionSummary } from "@pi-workspace/shared";
 import { isRemoteSession } from "./remote-session-safety.ts";
 import type { ProjectMeta, SessionMeta } from "./sidebar-preferences";
 

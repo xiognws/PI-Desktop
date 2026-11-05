@@ -1,4 +1,4 @@
 provider: github
-owner: vastsa
-repo: PI-Desktop
-updaterCacheDirName: '@pi-desktopdesktop-updater'
+owner: xiognws
+repo: Pi-Workspace
+updaterCacheDirName: '@pi-workspacedesktop-updater'

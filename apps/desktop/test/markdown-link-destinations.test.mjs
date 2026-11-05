@@ -28,14 +28,14 @@ const processor = unified()
 
 test("wrapped linked-host HTTP destinations become clickable HTTP links", () => {
   const source = [
-    "[#1106](([github.com](https://github.com/vastsa/PI-Desktop/issues/1106)))",
-    "[#1107](([github.com](https://github.com/vastsa/PI-Desktop/issues/1107)))",
+    "[#1106](([github.com](https://github.com/xiognws/Pi-Workspace/issues/1106)))",
+    "[#1107](([github.com](https://github.com/xiognws/Pi-Workspace/issues/1107)))",
   ].join("\n");
   const tree = processor.runSync(processor.parse(source));
 
   assert.deepEqual(collectLinks(tree), [
-    "https://github.com/vastsa/PI-Desktop/issues/1106",
-    "https://github.com/vastsa/PI-Desktop/issues/1107",
+    "https://github.com/xiognws/Pi-Workspace/issues/1106",
+    "https://github.com/xiognws/Pi-Workspace/issues/1107",
   ]);
 });
 

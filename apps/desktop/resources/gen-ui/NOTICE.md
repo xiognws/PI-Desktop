@@ -16,17 +16,17 @@ reproduced verbatim here:
 >
 > The browser libraries in `assets/vendor/` retain their separate licenses: Floating UI Core and DOM use MIT; Lucide and D3 use ISC. Each library's license text is stored beside its script and recorded in `assets/vendor/manifest.json`.
 
-Changes made for PI-Desktop:
+Changes made for Pi-Workspace:
 
 - Element IDs renamed from `zcode-visualization-*` to
   `pi-desktop-visualization-*`.
 - The variant carousel and the Lucide icon library were removed from the kit
   and the stylesheet.
-- The skill text was edited for the PI-Desktop host: host API, parameter
+- The skill text was edited for the Pi-Workspace host: host API, parameter
   tweaks, calendar widget, standalone export, network-loaded map data, and the
   CDN allowlist were removed, and the text was condensed; the visualization
-  directory, reference line, and sandbox rules describe PI-Desktop.
-- The skill's chart guidance was rewritten around PI-Desktop's own `viz`
+  directory, reference line, and sandbox rules describe Pi-Workspace.
+- The skill's chart guidance was rewritten around Pi-Workspace's own `viz`
   helpers (`visualize-helpers.js`, not part of the upstream kit), and
   `visualize.css` gained styles for their axes, legends, and value labels.
 - The shell writes the fragment into the kit's `#widget` container, as the

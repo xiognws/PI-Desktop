@@ -1,4 +1,4 @@
-import type { PlanHistoryEntry, PlanProposal, UiMessage } from "@pi-desktop/shared";
+import type { PlanHistoryEntry, PlanProposal, UiMessage } from "@pi-workspace/shared";
 
 /** Only host-owned submission tools carry contract snapshots. */
 export function planSubmission(message: UiMessage): PlanProposal | undefined {

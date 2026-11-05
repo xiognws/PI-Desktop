@@ -7,12 +7,12 @@ import {
 import {
   APP_NAME,
   type ComposerPasteFile,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type {
   PluginNativeNotificationInput,
   PluginNativeNotificationResult,
   PluginNotificationPermission,
-} from "@pi-desktop/plugin-sdk";
+} from "@pi-workspace/plugin-sdk";
 import { ClipboardHistory } from "../clipboard-history";
 import { parseAllowedExternalUrl } from "../safe-open-external";
 import type { Logger } from "../logger";

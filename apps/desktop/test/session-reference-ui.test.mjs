@@ -13,8 +13,8 @@ import * as React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { catalogs } from "@pi-desktop/i18n";
-import { formatSessionLink, isRenderableAttachment } from "@pi-desktop/shared";
+import { catalogs } from "@pi-workspace/i18n";
+import { formatSessionLink, isRenderableAttachment } from "@pi-workspace/shared";
 import { splitChatText } from "../src/lib/chat-links.ts";
 import { getExtraMessageAttachments } from "../src/features/chat/transcript/extra-attachments.ts";
 import { isRemoteSession, safeSessionSummary, sessionAllows } from "../src/lib/remote-session-safety.ts";
@@ -71,7 +71,7 @@ const shared = load(new URL("../src/features/chat/transcript/shared.tsx", import
   react: React,
   "react/jsx-runtime": jsxRuntime,
   "react-i18next": { useTranslation: () => ({ t, i18n: { language: locale } }) },
-  "@pi-desktop/shared": await import("@pi-desktop/shared"),
+  "@pi-workspace/shared": await import("@pi-workspace/shared"),
   "./disclosure": {},
   "./TextShimmer": {
     TextShimmer: ({ text }) => React.createElement("span", null, text),
@@ -123,7 +123,7 @@ const { MessageRow } = load(new URL("../src/features/chat/transcript/MessageRow.
   react: React,
   "react/jsx-runtime": jsxRuntime,
   "react-i18next": { useTranslation: () => ({ t, i18n: { language: locale } }) },
-  "@pi-desktop/shared": await import("@pi-desktop/shared"),
+  "@pi-workspace/shared": await import("@pi-workspace/shared"),
   "../../../hooks/use-preview-target": { useOpenChatFileRef: () => () => {} },
   "../../../lib/chat-links": { splitChatText: () => [] },
   "../../../components/Markdown": { Markdown: ({ source }) => source },

@@ -5,7 +5,7 @@ import {
   type DragEvent as ReactDragEvent,
 } from "react";
 import type { TFunction } from "i18next";
-import { parseSessionLinks, sessionLinkSpans } from "@pi-desktop/shared";
+import { parseSessionLinks, sessionLinkSpans } from "@pi-workspace/shared";
 import { materializeDraftSession, useAppStore } from "../../../../stores/app-store";
 import { api } from "../../../../lib/api";
 import {

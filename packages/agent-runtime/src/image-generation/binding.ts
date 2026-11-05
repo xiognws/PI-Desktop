@@ -1,7 +1,7 @@
 import type { ImageApi, ImageModel, Models } from "@earendil-works/pi-ai";
 import * as openrouterImages from "@earendil-works/pi-ai/api/openrouter-images";
 import { createAccountModels, type RuntimeProviderConfig } from "../provider-binding.js";
-import { CODEX_IMAGE_VENDOR_KEY } from "@pi-desktop/shared";
+import { CODEX_IMAGE_VENDOR_KEY } from "@pi-workspace/shared";
 import {
   OPENAI_IMAGES_API,
   codexImagesBaseUrl,

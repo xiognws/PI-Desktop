@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEEPSEEK_REASONING_REPLAY_PLACEHOLDER } from "@pi-desktop/shared";
+import { DEEPSEEK_REASONING_REPLAY_PLACEHOLDER } from "@pi-workspace/shared";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { convertMessages } from "@earendil-works/pi-ai/api/openai-completions";
 import { genericModelConfig, modelConfigFromPi, modelConfigWithBinding } from "./model-capabilities.js";

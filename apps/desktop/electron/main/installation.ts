@@ -1,6 +1,7 @@
 import { app } from "electron";
-import { APP_ID, APP_NAME } from "@pi-desktop/shared";
-import { applyDevelopmentUserData, desktopDataDir } from "./data-paths";
+import { homedir } from "node:os";
+import { APP_ID, APP_NAME } from "@pi-workspace/shared";
+import { adoptLegacyHomeProfile, applyDevelopmentUserData, desktopDataDir } from "./data-paths";
 import { applyReleaseDataRoot } from "./data-root";
 import { ignoreBrokenStdio } from "./logger";
 import { installMainProcessErrorHandlers } from "./main-process-errors";
@@ -21,8 +22,15 @@ const dataDirWasExplicit = Boolean(process.env.PI_DESKTOP_DATA_DIR?.trim());
 // keeps its own development profile. Must run before any writer resolves a path.
 const dataRoot = applyReleaseDataRoot(isDevelopmentBuild);
 // Only when this machine has no data drive does a development build fall back
-// to the app-data profile it has always used.
-if (!dataRoot) applyDevelopmentUserData(app, isDevelopmentBuild);
+// to the app-data profile it has always used — and there the profile name is
+// the only thing that ever moved, so a profile from before the rename is
+// adopted instead of being silently recreated empty.
+if (!dataRoot) {
+  if (!process.env.PI_DESKTOP_DATA_DIR?.trim()) {
+    adoptLegacyHomeProfile(homedir(), isDevelopmentBuild);
+  }
+  applyDevelopmentUserData(app, isDevelopmentBuild);
+}
 if (process.platform === "win32") app.setAppUserModelId(APP_ID);
 
 export const singleInstanceRequired = !dataDirWasExplicit;

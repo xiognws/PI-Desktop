@@ -1,9 +1,9 @@
-# PI-Desktop 插件开发：从零到一
+# Pi-Workspace 插件开发：从零到一
 
 > **翻译说明：** 本页是与 [英文源页面](/plugin-development) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
 
-本指南提供从空文件夹到经过测试的 `.piplug` 安装包的最短完整路径，介绍 PI-Desktop 当前
+本指南提供从空文件夹到经过测试的 `.piplug` 安装包的最短完整路径，介绍 Pi-Workspace 当前
 交付的插件运行时。SDK 类型、宿主校验器、运行时分发代码和可执行测试是实现依据。
 当本指南与规格不一致时，以 [`docs/spec/07-plugins`](/zh-CN/spec/07-plugins/README)
 中的规范性契约为准。
@@ -50,25 +50,25 @@ Electron 窗口中。来自这两种运行环境的调用都经过宿主管理�
 
 对于推荐的应用优先路径，您需要：
 
-- 正在运行的 PI-Desktop 版本；
+- 正在运行的 Pi-Workspace 版本；
 - 插件的空文件夹；和
 - 文本编辑器。
-- 若要导入带 npm 依赖的 pi 扩展目录，`PATH` 中必须有系统 `npm` 可执行文件。发布版不附带独立 Node/npm；缺少 npm 时，PI-Desktop 会报告警告，导入扩展的依赖无法加载。
+- 若要导入带 npm 依赖的 pi 扩展目录，`PATH` 中必须有系统 `npm` 可执行文件。发布版不附带独立 Node/npm；缺少 npm 时，Pi-Workspace 会报告警告，导入扩展的依赖无法加载。
 
 仓库 CLI 路径使用根目录 `package.json` 中 `engines` 和 `packageManager`
 声明的 Node.js、pnpm 版本，并需要检出本仓库。devkit 和 SDK 目前是私有工作区包，
-不能假设 `npm install @pi-desktop/plugin-devkit` 在本仓库之外可用。
+不能假设 `npm install @pi-workspace/plugin-devkit` 在本仓库之外可用。
 
 ## 3. 创建第一个插件
 
-### 选项 A：在 PI-Desktop 中创建它
+### 选项 A：在 Pi-Workspace 中创建它
 
 1. 打开 **插件**（扩展页面）。
 2. 打开标题溢出菜单并选择 **从模板新建插件**。
 3. 选择 `panel-basic`。
 4. 选择一个空文件夹。
 
-PI-Desktop 编写起始文件，加载文件夹作为开发插件，
+Pi-Workspace 编写起始文件，加载文件夹作为开发插件，
 并将该文件夹作为活动项目打开。该插件立即生效。
 
 四个内置模板是：
@@ -85,17 +85,17 @@ PI-Desktop 编写起始文件，加载文件夹作为开发插件，
 
 ### 选项 B：使用存储库 CLI 创建它
 
-从 PI-Desktop 存储库根目录：
+从 Pi-Workspace 存储库根目录：
 
 ```bash
 pnpm install
-pnpm --filter @pi-desktop/plugin-devkit... build
+pnpm --filter @pi-workspace/plugin-devkit... build
 pnpm pi-plugin init panel-basic ../my-first-plugin \
   --id local.my-first-plugin \
   --name "My First Plugin"
 ```
 
-然后打开PI-Desktop，进入**插件**，选择**加载开发插件**，然后
+然后打开Pi-Workspace，进入**插件**，选择**加载开发插件**，然后
 选择 `../my-first-plugin`。
 
 发布插件时使用反向域名形式的 ID，例如 `com.example.workspace-summary`。私有插件可约定
@@ -120,7 +120,7 @@ my-first-plugin/
 - `renderer/index.html` 在隔离面板窗口中运行。
 - `README.md` 解释了如何开发和打包这个特定的插件。
 
-分发包必须包含可直接执行的 JavaScript、HTML、CSS 和资源。PI-Desktop 加载插件时不会
+分发包必须包含可直接执行的 JavaScript、HTML、CSS 和资源。Pi-Workspace 加载插件时不会
 安装依赖或编译 TypeScript。使用 TypeScript 或第三方包时，应先将其打包或编译到插件目录，
 再执行检查和打包。
 
@@ -210,7 +210,7 @@ module.exports = { onLoad, onUnload };
 
 ### `renderer/index.html`
 
-PI-Desktop 在 macOS、Windows 和 Linux 上都使用无边框窗口承载面板。
+Pi-Workspace 在 macOS、Windows 和 Linux 上都使用无边框窗口承载面板。
 主机精确保留透明的 46 CSS 像素拖拽带，并只在右上角渲染最简胶囊，
 其中包含最小化、最大化/还原和关闭三个按钮。面板标题、工具栏、背景
 以及其他可见界面都由插件实现。新页面应声明 `<meta name="pi-plugin-chrome" content="v2">`，
@@ -406,7 +406,7 @@ const dataPath = await pi.plugin.getDataPath();
 }
 ```
 
-插件快捷键只在聚焦的 PI-Desktop 窗口中生效，并会避让应用快捷键；系统级快捷键使用独立的 `contributes.globalShortcuts`、`pi.keyboard` 和
+插件快捷键只在聚焦的 Pi-Workspace 窗口中生效，并会避让应用快捷键；系统级快捷键使用独立的 `contributes.globalShortcuts`、`pi.keyboard` 和
 `keyboard.globalShortcut` 权限（§6.17）。
 用户编辑后插件会收到 `plugin:settingsChanged`。请勿将凭据放入 `manifest.json` 或源代码管理。
 
@@ -442,7 +442,7 @@ HTTP(S) 和 `mailto:` URL。
 返回的权限状态仅尽力反映实际情况，因为 Electron 没有跨平台的只读操作系统权限查询 API；
 `unknown` 表示平台尚未上报结果，且
 `unsupported` 表示桌面通知不可用。原生插件
-通知不会添加到 PI-Desktop 的持久任务通知收件箱中。点击已交付的通知会恢复并聚焦主窗口，
+通知不会添加到 Pi-Workspace 的持久任务通知收件箱中。点击已交付的通知会恢复并聚焦主窗口，
 但不会激活会话。
 
 面板桥还暴露 `ui.showToast`、`ui.closePanel`、
@@ -473,11 +473,11 @@ HTTP(S) 和 `mailto:` URL。
 - `scope` 里的 glob 相对 root。`*` 匹配一个路径段，`**` 跨分隔符匹配。
 - **读取**可以声明整棵树，**写入和删除不行** —— 整棵树的模式无法通过校验：
   让宽松读取变得安全的是出网白名单，而没有任何东西能让宽松写入变得安全。
-- 声明范围之外的访问不是错误：PI-Desktop 会问用户（拒绝 / 允许一次 /
+- 声明范围之外的访问不是错误：Pi-Workspace 会问用户（拒绝 / 允许一次 /
   本会话允许）。请把需要的范围声明出来，别让插件每次调用都打断用户；
   同时要预期拒绝会以 `PERMISSION_DENIED` 的形式返回。
 - 有些路径无论你声明什么都会被拒绝：`.env*`、SSH 与云凭证、`*.pem`、
-  `.git/**`，以及 PI-Desktop 自己的数据目录。它们也不会出现在 `fs.glob`
+  `.git/**`，以及 Pi-Workspace 自己的数据目录。它们也不会出现在 `fs.glob`
   的结果里。
 
 **删除。** `own: true` 允许你删除插件自己写过的文件，不需要 scope、不需要
@@ -531,7 +531,7 @@ HTTP(S) 和 `mailto:` URL。
 依赖重定向策略前，必须先查询能力。旧宿主可能忽略未知字段，不能回退到原始网络请求。
 
 ```js
-if (typeof pi.net.getCapabilities !== "function") throw new Error("Upgrade PI-Desktop");
+if (typeof pi.net.getCapabilities !== "function") throw new Error("Upgrade Pi-Workspace");
 const capabilities = await pi.net.getCapabilities();
 if (!capabilities.fetchRedirectModes.includes("error")) throw new Error("Unsupported host");
 const response = await pi.net.fetch({ url: endpoint, redirect: "error" });
@@ -651,7 +651,7 @@ body {
 会话会被拒绝。首次位置通过 URL 参数 `piViewOpen` 传入，加载后的新位置通过
 `view:open` 事件 `{ path }` 传入，不重载页面，也不丢弃未保存状态。
 
-`examples/plugins/hello` 在 `views/greetings.html` 提供可运行的视图。PI-Desktop 自带的文件
+`examples/plugins/hello` 在 `views/greetings.html` 提供可运行的视图。Pi-Workspace 自带的文件
 视图也以相同方式实现为内置插件：`apps/desktop/resources/plugins/pi.file-manager` 是通过
 公开桥接访问工作区的完整示例，而非演示桩。它使用 `fs.openDefault` 和 `fs.reveal` 完成只能
 由宿主执行的两项操作，并使用插件自己的 `onPanelInvoke` 操作。自定义通道必须自行校验载荷；
@@ -804,7 +804,7 @@ export default function (pi) {
   `registerMessageRenderer`、`navigateTree` 及其他仅终端可用的界面）是空操作，在插件行
   的详情中显示诊断，绝不因此抛出异常。
 - **导入已有 pi 扩展**时，应先对照规格 16 的受支持成员表：插件页 → 溢出菜单 →“导入 pi 扩展”会把文件或目录包成
-  生成的插件。若目录声明了生产或可选依赖，PI-Desktop 会先运行
+  生成的插件。若目录声明了生产或可选依赖，Pi-Workspace 会先运行
   `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit --no-fund
   --ignore-scripts`，校验生成的 registry-only lockfile，再以相同安全参数运行 `npm ci`。
   生产、可选、开发和 peer 字段中的直接依赖 spec 都会校验，git 解析会被禁用，绝不运行
@@ -814,7 +814,7 @@ export default function (pi) {
 
 ### 6.12 渲染器插槽
 
-上面每一种界面都是插件自己拥有的窗口或页面。**渲染模块**则绘制在 PI-Desktop 自己的窗口里：
+上面每一种界面都是插件自己拥有的窗口或页面。**渲染模块**则绘制在 Pi-Workspace 自己的窗口里：
 输入区工具栏上的控件、消息操作栏上的条目、助手回复下方的区块、自有 Agent 工具的卡片、
 代码块的渲染器，或者你自己管理的角落浮层。
 
@@ -1081,7 +1081,7 @@ CDP 使用允许列表，Cookie、存储、目标管理、网络拦截仍拒绝�
 若没有另行审核的 `net.anyHost` 例外授权，未声明网络范围就不能出网。未声明文件范围时，
 插件没有持续生效的文件访问授权；范围外的文件操作仍需通过宿主管理的用户确认。
 
-只申请必要的最小权限集。向已加载的开发插件添加权限不会通过热重载生效：PI-Desktop 会
+只申请必要的最小权限集。向已加载的开发插件添加权限不会通过热重载生效：Pi-Workspace 会
 停止自动重载，以便用户审核新增授权。使用插件行的 **更多 → 重新加载（More → Reload）**
 显式审核并重新加载已登记的文件夹，或再次加载开发目录。扩大 `manifest.fs` 范围也视为添加
 权限。删除权限在重新加载后生效。
@@ -1220,7 +1220,7 @@ SHA-256 并发布该版本，再把目录与安装包同步到
 | 面板打不开 | 缺少文件、`ui.panel` 或权限 | 声明面板路径和 `ui.panel`；重新加载以审核新增授权 |
 | 工作面板菜单中没有视图 | 缺少 `ui.view`、入口文件不存在，或插件激活范围不包含当前项目 | 声明 `ui.view`，确认 `views[].entry` 存在，将范围设为全局或当前项目 |
 | 视图显示字母方块而不是图标 | `views[].icon` 名称不在支持列表中 | 使用支持的图标名称；`pi-plugin check` 会警告未知名称 |
-| `pluginBridge` 不可用 | 在普通浏览器中打开的 HTML | 在 PI-Desktop 面板内测试桥接调用 |
+| `pluginBridge` 不可用 | 在普通浏览器中打开的 HTML | 在 Pi-Workspace 面板内测试桥接调用 |
 | 工具没有出现 | 缺少贡献声明、注册或授权 | 对齐 `agentTools`、`registerTool` 和 `agent.tool.register`；使用 Agent 模式 |
 | 技能未被选用 | 缺少权限或元数据不够明确 | 添加 `agent.prompt.inject` 和具体的 `name` / `description` front matter |
 | 保存时报 `PERMISSION_DENIED` | manifest 扩大了权限或文件范围 | 使用更多 → 重新加载，或再次加载文件夹，审核新增授权 |
@@ -1231,7 +1231,7 @@ SHA-256 并发布该版本，再把目录与安装包同步到
 
 ## 12. 参考索引
 
-- [示例插件](https://github.com/vastsa/PI-Desktop/tree/main/examples/plugins)
+- [示例插件](https://github.com/xiognws/Pi-Workspace/tree/main/examples/plugins)
 - [插件系统概述](/zh-CN/spec/07-plugins/01-plugin-system)
 - [Manifest Schema](/zh-CN/spec/07-plugins/02-plugin-manifest-schema)
 - [主机 API](/zh-CN/spec/07-plugins/03-plugin-api)
@@ -1239,7 +1239,7 @@ SHA-256 并发布该版本，再把目录与安装包同步到
 - [包装](/zh-CN/spec/07-plugins/06-plugin-packaging)
 - [开发者体验](/zh-CN/spec/07-plugins/10-plugin-devex)
 - [权限](/zh-CN/spec/07-plugins/13-plugin-permissions-matrix)
-- [Hello 参考插件](https://github.com/vastsa/PI-Desktop/tree/main/examples/plugins/hello)
+- [Hello 参考插件](https://github.com/xiognws/Pi-Workspace/tree/main/examples/plugins/hello)
 
 ## 13. 完整 SDK 接口与源码索引
 

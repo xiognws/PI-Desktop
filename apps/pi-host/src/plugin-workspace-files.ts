@@ -1,10 +1,10 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { RacpError } from "@pi-desktop/agent-host";
-import { previewFile } from "@pi-desktop/host-runtime";
-import { isDeniedFsPath, isFsPathInScope, PLUGIN_FS_LIST_MAX_ENTRIES } from "@pi-desktop/plugin-sdk";
-import type { WorkspacePluginFilesRequest, WorkspacePluginFilesResult } from "@pi-desktop/shared";
-import type { RacpHostOperations } from "@pi-desktop/racp";
+import { RacpError } from "@pi-workspace/agent-host";
+import { previewFile } from "@pi-workspace/host-runtime";
+import { isDeniedFsPath, isFsPathInScope, PLUGIN_FS_LIST_MAX_ENTRIES } from "@pi-workspace/plugin-sdk";
+import type { WorkspacePluginFilesRequest, WorkspacePluginFilesResult } from "@pi-workspace/shared";
+import type { RacpHostOperations } from "@pi-workspace/racp";
 
 const SKIPPED_DIRECTORIES = new Set([".git", "node_modules", ".venv", "__pycache__"]);
 const forbidden = () => new RacpError("REMOTE_PATH_FORBIDDEN", "path is outside the plugin's readable workspace");

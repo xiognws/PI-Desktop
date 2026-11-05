@@ -7,7 +7,7 @@ import {
   normalizeGlobalPermissionMode,
   normalizeProposalKind,
   type PlanExecution,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

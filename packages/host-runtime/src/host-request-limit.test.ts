@@ -1,4 +1,4 @@
-import { MAX_HOST_STDIN_LINE_BYTES } from "@pi-desktop/shared";
+import { MAX_HOST_STDIN_LINE_BYTES } from "@pi-workspace/shared";
 import { describe, expect, it } from "vitest";
 import { HostProcess } from "./host-process.js";
 

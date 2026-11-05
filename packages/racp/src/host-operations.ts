@@ -1,4 +1,4 @@
-import type { Principal, SessionSummary } from "@pi-desktop/agent-host";
+import type { Principal, SessionSummary } from "@pi-workspace/agent-host";
 import type {
   FsEntry,
   FsReadResult,
@@ -6,7 +6,7 @@ import type {
   WorkspaceDiff,
   WorkspaceToolExecute, WorkspaceToolAbort, WorkspaceToolResult, CommandShellOption, WorkspaceFilesRequest,
   WorkspacePluginFilesRequest, WorkspacePluginFilesResult,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /**
  * Everything the RACP server delegates to the Host besides the Agent Host

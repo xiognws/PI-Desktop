@@ -2,7 +2,7 @@
 
 - Status: Accepted; behavior superseded in part by ADR 0249
 - Date: 2026-09-12
-- Deciders: PI-Desktop desktop UI maintainers
+- Deciders: Pi-Workspace desktop UI maintainers
 - Amends: ADR 0011, ADR 0016
 
 ## Context

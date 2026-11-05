@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import {
   serializeComposerFileReferences,
   serializeInlineComposerFileReferences,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { AppState } from "../../../../stores/app-store";
 import { api } from "../../../../lib/api";
 import { runExtensionCommand, runPaletteCommand } from "../../../../lib/commands";

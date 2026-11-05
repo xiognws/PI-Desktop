@@ -2,7 +2,7 @@
 
 ## 1. Goals
 
-1. Provide a **single source of truth** for visual tokens, component foundations, and layout metrics across PI-Desktop
+1. Provide a **single source of truth** for visual tokens, component foundations, and layout metrics across Pi-Workspace
 2. Ensure **high readability and contrast** in both light and dark themes — this is a developer workstation, not a marketing surface
 3. Map all design decisions to **Tailwind CSS tokens** so that spec → implementation is unambiguous
 4. Enable **future shadcn-like primitive extraction** without re-specifying foundations
@@ -44,7 +44,7 @@ AI-generated page surfaces use concise, task-oriented copy:
 
 ### 3.2 Text selection
 
-PI-Desktop behaves like a desktop application shell, so accidental drag
+Pi-Workspace behaves like a desktop application shell, so accidental drag
 selection is suppressed for chrome by default. The selection contract is:
 
 - Navigation, titlebar chrome, buttons, labels, badges, menus, and other
@@ -104,26 +104,26 @@ empty rail outside the panel surface.
 
 ### 3.4 Product identity and marks
 
-The visible product identity is **PI-Desktop**, even where the shell borrows
+The visible product identity is **Pi-Workspace**, even where the shell borrows
 Codex as a visual reference. The identity contract is deliberately small:
 
 - The sidebar shell name, settings copy, and composer placeholder use
-  `PI-Desktop`; `Codex` is reserved for the external session-import source or
+  `Pi-Workspace`; `Codex` is reserved for the external session-import source or
   historical design-reference text.
 - `build/icon_1024.png` is the canonical shell logo master; the renderer
   imports the 192x192 marks derived from it under `src/assets/brand/`
   (ADR 0125). `BrandLogo` imports those
   through Vite so the renderer bundle, development Dock, and packaged
   application all use the same visual asset.
-- On macOS, both development and packaged launches expose `PI-Desktop` as the
-  native application-menu name. The native About panel uses the PI-Desktop
+- On macOS, both development and packaged launches expose `Pi-Workspace` as the
+  native application-menu name. The native About panel uses the Pi-Workspace
   name, version, and canonical icon; no stock Electron name or icon is visible.
   Development launches use a generated branded host bundle because AppKit
   reads this identity from the host bundle rather than Electron runtime APIs.
-- On Windows, Electron Main registers the canonical `net.aiuo.pi-desktop`
+- On Windows, Electron Main registers the canonical `net.aiuo.pi-workspace`
   AppUserModelID before readiness. The runtime ID, packaged executable name,
   and NSIS shortcut identity stay aligned so native notifications,
-  notification settings, and taskbar groups identify the app as `PI-Desktop`
+  notification settings, and taskbar groups identify the app as `Pi-Workspace`
   rather than Electron.
 - The empty-home hero uses a 100px `HomeMascotLogo` GIF: an eight-frame waving
   mascot compiled from the supplied light and dark action sets, with a short
@@ -532,7 +532,7 @@ the expanded sidebar's Collapse sidebar icon button right-aligned
 in that same row. The macOS row omits the sidebar logo/title, reserves `88px`
 on the left for native chrome in windowed mode, and reclaims that padding in
 fullscreen. That reserve is the shared `--ds-window-lead-inset` token — the
-cluster's `76px` right edge (the same `@pi-desktop/shared` geometry the main
+cluster's `76px` right edge (the same `@pi-workspace/shared` geometry the main
 process positions the buttons with) plus `12px` of breathing room. Windows/Linux
 keep the identity and sidebar actions in their first row and reserve the
 rightmost 120px for three frameless-window controls. The
@@ -1103,7 +1103,7 @@ owns the preview pane's drag area. Its border box, not just its padding, exclude
 the left action lane plus an 8px gap in both sidebar states on all platforms.
 The left inset is 8px except for collapsed-sidebar windowed macOS (88px).
 That macOS reserve is the shared `--ds-window-lead-inset` token — the traffic-light
-cluster's 76px right edge (native geometry from `@pi-desktop/shared`, the same
+cluster's 76px right edge (native geometry from `@pi-workspace/shared`, the same
 constants the main process positions the buttons with) plus a 12px gap.
 The action lane uses the shared 28px control size plus an 8px gap when expanded,
 and the shared preview action lane (two controls, 4px spacing, 8px gap) when collapsed.
@@ -1459,7 +1459,7 @@ adjacent form inputs; dense surfaces may override that metric locally.
 - Floating composer plate: Codex elevated-primary (`#212121f5` / `color-mix(gray-800 96%, transparent)`) with standard elevation-prominent (`0 0 0 .5px` stroke + `0 3px 7.5px #0000000a` + `0 0 20px #0000000d`); no heavier night-only lift
 - Light workspace chips capsule: elevated gray `#f4f4f4` (not pure white-on-white)
 - Combined workspace chips: elevated translucent plate over main, not flat main gray
-- Stage Manager (macOS only): host re-asserts min bounds while collapsed (permanent watchdog). The watchdog and temporary recovery pin are macOS-only; Windows/Linux bounds recovery stays at the normal window layer so switching to another app never leaves PI-Desktop above it (D447).
+- Stage Manager (macOS only): host re-asserts min bounds while collapsed (permanent watchdog). The watchdog and temporary recovery pin are macOS-only; Windows/Linux bounds recovery stays at the normal window layer so switching to another app never leaves Pi-Workspace above it (D447).
 
 ## Destination pages
 

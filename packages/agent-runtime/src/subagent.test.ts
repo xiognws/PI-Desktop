@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Type } from "typebox";
-import type { AgentEventEnvelope, SubagentDefinition } from "@pi-desktop/shared";
+import type { AgentEventEnvelope, SubagentDefinition } from "@pi-workspace/shared";
 import { createAssistantMessageEventStream, type Message } from "@earendil-works/pi-ai";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {

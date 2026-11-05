@@ -16,7 +16,7 @@ import {
   TYPESAFE_JEV_MODEL_ID,
   TYPESAFE_SYSTEM_ONE_URL,
   type JevKeyCheckResult,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export const JEV_PROBE_TIMEOUT_MS = 20_000;
 
@@ -32,7 +32,7 @@ export type JevProbeOptions = {
 };
 
 /**
- * The smallest valid System One request: `bool` is PI-Desktop's public name for
+ * The smallest valid System One request: `bool` is Pi-Workspace's public name for
  * the wire-level `noul` question (see pi-ai's System One transport).
  */
 function probeRequestBody() {

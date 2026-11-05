@@ -1,5 +1,5 @@
 {
-  "name": "@pi-desktop/voice-runtime",
+  "name": "@pi-workspace/voice-runtime",
   "version": "0.21.0",
   "private": true,
   "type": "module",

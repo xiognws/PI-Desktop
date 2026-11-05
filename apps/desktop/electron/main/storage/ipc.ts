@@ -1,6 +1,6 @@
 import { app, dialog } from "electron";
 import { randomUUID } from "node:crypto";
-import { IPC, type StorageInfo } from "@pi-desktop/shared";
+import { IPC, type StorageInfo } from "@pi-workspace/shared";
 import type { IpcRegistrar } from "../ipc/types";
 import type { BrowserWindow } from "electron";
 import { cacheSize, validateTarget } from "./files";

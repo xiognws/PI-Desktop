@@ -77,7 +77,7 @@ test("the page renders host rows and never mutates them", () => {
   assert.doesNotMatch(hookSource, /save|update|delete|forget/i);
   // Grouping and filtering are pure helpers from shared, not inline in the view.
   assert.match(hookSource, /groupArtifactsBySession\(filterArtifacts\(rows, query\)\)/);
-  assert.match(pageSource, /from "@pi-desktop\/shared"/);
+  assert.match(pageSource, /from "@pi-workspace\/shared"/);
   assert.match(pageSource, /artifactFileName\(row\.path\)/);
   assert.match(pageSource, /artifactDirectory\(row\.path\)/);
   assert.match(pageSource, /artifactOpKey\(row\.op\)/);

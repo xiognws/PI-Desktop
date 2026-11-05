@@ -113,7 +113,7 @@ settings surface uses its own panel/view and reads `pi.app.getLocale`.
 The data-only `scenicThemes` contribution has a host-rendered Settings surface;
 `settingsDestinations` is not an implemented public contribution (ADR 0287).
 Shortcut settings are plugin-local: they invoke the declared
-`command` only while the PI-Desktop app window is focused and while the plugin's
+`command` only while the Pi-Workspace app window is focused and while the plugin's
 activation scope matches the current project. They are never registered as
 OS-global shortcuts in this release. The host emits `plugin:settingsChanged`
 after a user edit so a plugin can refresh in-memory configuration.
@@ -1345,7 +1345,7 @@ command belonging to that plugin.
 
 `command` must already be registered by the calling plugin; anything else fails
 `INVALID_ARGUMENT`. An accelerator reserved by the operating system, one
-PI-Desktop itself currently spends (by default `Alt+Space` opens the plugin
+Pi-Workspace itself currently spends (by default `Alt+Space` opens the plugin
 launcher and `Alt+Shift+W` shows or hides the window; once the user rebinds one of
 them, the freed accelerator is available again), or one held by another plugin
 is refused rather than taken over, and a refused re-registration leaves the

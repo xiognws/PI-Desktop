@@ -2,7 +2,7 @@
 
 - Status: Accepted for implementation
 - Date: 2026-08-12
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Related: D230, D256, ADR 0021, ADR 0025, ADR 0078, ADR 0123
 
 ## Context
@@ -101,5 +101,5 @@ matches the desired behavior.
 - Close on Windows/Linux either hides to tray or quits, per user choice,
   remembered across launches and changeable in Settings.
 - The tray menu and the first-close dialog reuse the existing
-  `@pi-desktop/i18n` catalogs (English and Simplified Chinese).
+  `@pi-workspace/i18n` catalogs (English and Simplified Chinese).
 - No host protocol, storage schema, or macOS behavior changes.

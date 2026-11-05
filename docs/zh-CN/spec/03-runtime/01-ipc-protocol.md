@@ -741,10 +741,10 @@ Electron 拥有本机表面，而渲染器则派生本地化表面
 `activated` 之前恢复/显示并聚焦窗口。交互询问不会创建持久任务收件箱行；
 计划提醒和插件本机通知仍是独立合约。本机交付是尽力而为；耐用的
 收件箱仍是操作系统抑制横幅时的权威来源。在 Windows 上，
-Electron 主将 `net.aiuo.pi-desktop` 注册为进程 AppUserModelID
+Electron 主将 `net.aiuo.pi-workspace` 注册为进程 AppUserModelID
 在准备就绪之前和创建任何窗口之前。 ID 与 NSIS 匹配
 包标识所以通知属性、通知设置、任务栏
-分组，安装的快捷方式解析为 `PI-Desktop`，而不是库存
+分组，安装的快捷方式解析为 `Pi-Workspace`，而不是库存
 Electron 主机。
 
 任务本机对象按持久 notification id 保留，每个 id 最多一个活动对象。
@@ -1814,14 +1814,14 @@ app/openFeedback() -> { ok: true }
 ```
 
 Electron Main 构造固定的 GitHub bug 表单 URL
-（`https://github.com/vastsa/PI-Desktop/issues/new?template=bug_report.yml`），
+（`https://github.com/xiognws/Pi-Workspace/issues/new?template=bug_report.yml`），
 并用 `shell.openExternal` 打开。查询字段 `app-version`、`os` 和 `environment`
 由主进程版本信息填充。渲染器不能提供 URL。离开该 origin 或模板的构造会被拒绝。
 此通道不进入 host-core，也不改变 host RPC 协议版本。
 
 ## 13d. 本地 MCP 控制 API（D370）
 
-PI-Desktop 可以为外部 Agent 暴露本地自动化接口，而不改变渲染器 preload
+Pi-Workspace 可以为外部 Agent 暴露本地自动化接口，而不改变渲染器 preload
 契约或 host RPC 协议。服务默认关闭，只有 Electron 进程收到以下配置时才启动：
 
 ```text

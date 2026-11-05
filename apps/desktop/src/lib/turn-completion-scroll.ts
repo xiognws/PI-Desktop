@@ -1,4 +1,4 @@
-import type { UiMessage } from "@pi-desktop/shared";
+import type { UiMessage } from "@pi-workspace/shared";
 
 /**
  * Turn-completion reading position (issue #1889). A reader who followed a

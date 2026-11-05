@@ -3,7 +3,7 @@ import {
   type MarketPluginSummary,
   type PluginCapability,
   type PluginSummary,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export type TabId = "installed" | "market";
 
@@ -23,7 +23,7 @@ export const GROUP_LABEL_KEYS: Record<GroupId, string> = {
   disabled: "plugins.groupDisabled",
 };
 
-/** Mirrors TEMPLATE_NAMES in @pi-desktop/plugin-devkit; main rejects anything else. */
+/** Mirrors TEMPLATE_NAMES in @pi-workspace/plugin-devkit; main rejects anything else. */
 export const TEMPLATE_IDS = [
   "panel-basic",
   "agent-tool-basic",
@@ -79,7 +79,7 @@ export const PERMISSION_RISK: Record<string, RiskTier> = {
   "composer.suggest": "medium",
   // Per-turn counters and session titles only, per the usage.read matrix row.
   "usage.read": "medium",
-  // Two capabilities that reach outside PI-Desktop's own window or read its
+  // Two capabilities that reach outside Pi-Workspace's own window or read its
   // live audio stream sit at the top tier with the other outbound paths.
   "net.websocket": "high",
   "audio.capture.background": "high",

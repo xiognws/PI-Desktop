@@ -22,7 +22,7 @@ async function main(): Promise<void> {
         "pi-host — headless PI Agent Host (RACP-WS on loopback)",
         "  provider-import          import selected providers from SSH stdin",
         "",
-        "  --data-dir <dir>          host data directory (default ~/.pi-desktop)",
+        "  --data-dir <dir>          host data directory (default ~/.piworkspace)",
         "  --port <n>                loopback port (default 0 = pick free)",
         "  --host <addr>             bind address; loopback only",
         "  --pair                    print a single-use pairing token at start",
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
   const config = resolveConfig(args);
   const { startPiHost } = await import("./app.js");
   const app = await startPiHost(config);
-  process.stdout.write(`PI_HOST_READY ${JSON.stringify({ hostId: app.hostId, host: app.address.host, port: app.address.port, version: (await import("@pi-desktop/shared")).APP_VERSION })}\n`);
+  process.stdout.write(`PI_HOST_READY ${JSON.stringify({ hostId: app.hostId, host: app.address.host, port: app.address.port, version: (await import("@pi-workspace/shared")).APP_VERSION })}\n`);
   if (config.pair) {
     const pairing = await app.issuePairingToken(config.pairingLifetimeMs);
     process.stdout.write(`PI_HOST_PAIRING_TOKEN ${JSON.stringify(pairing)}\n`);

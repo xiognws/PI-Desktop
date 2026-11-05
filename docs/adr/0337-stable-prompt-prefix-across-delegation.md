@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-25
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: ADR 0279 (resumable subagent delegations), ADR 0089 (delegation
   tools), `docs/spec/03-runtime/02-agent-runtime.md`
 - Amends: ADR 0279 §9
@@ -15,7 +15,7 @@ the parent sees what it can continue without calling a tool.
 
 That recomposition breaks provider prompt caching. Anthropic, OpenAI, and the
 gateways in front of them cache a conversation by the exact byte prefix of the
-request: instructions, then tools, then messages. PI-Desktop does not rewrite
+request: instructions, then tools, then messages. Pi-Workspace does not rewrite
 the leading system message in place — `syncSystemSections` appends a new
 system message carrying only the changed sections
 (`packages/agent-runtime/src/system-transcript.ts`). Which one of two request

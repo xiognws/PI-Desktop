@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-13
-- Related issue: [#306](https://github.com/vastsa/PI-Desktop/issues/306)
+- Related issue: [#306](https://github.com/xiognws/Pi-Workspace/issues/306)
 - Amends: [ADR 0016](0016-sidebar-organization-and-multi-project-tabs.md)
 
 ## Context

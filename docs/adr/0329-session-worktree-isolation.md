@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-12
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Related: ADR 0062 (parallel delegates), ADR 0089 (delegation tools),
   D114 (per-session scratch), `docs/spec/03-runtime/03-tools-and-permissions.md` §4d
 
@@ -25,7 +25,7 @@ the project directory.
 
 1. An isolated session is opt-in per new session, default off. It owns one git
    worktree on branch `pi-desktop/<id>`, created by host-core under
-   `~/.pi-desktop/worktrees/<project-key>/` from the project's current branch
+   `~/.piworkspace/worktrees/<project-key>/` from the project's current branch
    tip. Uncommitted project changes are not carried over.
 2. host-core owns all git execution, worktree paths, and the `worktrees`
    registry (schema v24). The renderer and the agent runtime send only a

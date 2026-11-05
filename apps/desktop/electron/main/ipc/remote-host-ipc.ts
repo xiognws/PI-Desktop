@@ -24,7 +24,7 @@ import {
   type RemoteHostPairResult,
   type RemoteHostRemoveRequest,
   type RemoteHostSummary,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { app } from "electron";
 import {
   getActiveRemoteHostsBoot,

@@ -1,4 +1,4 @@
-import { formatBytes as formatByteSize, type UiMessage } from "@pi-desktop/shared";
+import { formatBytes as formatByteSize, type UiMessage } from "@pi-workspace/shared";
 import {
   delegationLifecycleKind,
   getToolAction,

@@ -499,7 +499,7 @@ The complete visible transcript and the model context are separate views of
 the same session. A durable checkpoint summarizes older model context while
 the renderer continues to show every original user, assistant, and tool row.
 
-PI-Desktop uses pi-agent-core for the agent loop and stable agent/event/tool
+Pi-Workspace uses pi-agent-core for the agent loop and stable agent/event/tool
 types, and pi-ai for provider-facing requests and message estimation. The
 runtime owns its context projection, LLM-message conversion, token-estimation
 adapter, compaction cut-point selection, and summary generation because the
@@ -523,7 +523,7 @@ For every pi loop turn:
 
 1. pi emits and awaits `turn_end` after the assistant message and all tool
    results for that turn are complete
-2. PI-Desktop rebuilds the context from the full transcript plus the newest
+2. Pi-Workspace rebuilds the context from the full transcript plus the newest
    valid checkpoint and estimates the next request budget
 3. below 90% of `hardLimit`, and with no pending model request, the next turn
    proceeds unchanged (a budget reminder may be added to that request)
@@ -728,7 +728,7 @@ counts as running state until durable persistence completes.
 
 The file list a checkpoint carries is read out of the summarized range by pi's
 own collector, which recognizes the lowercase spellings `read` / `write` /
-`edit` — the names pi's tools carry. PI-Desktop registers `Read` / `Write` /
+`edit` — the names pi's tools carry. Pi-Workspace registers `Read` / `Write` /
 `Edit`, so the runtime converts exactly those three on the way into pi's
 preparation (`withPiFileOpToolNames`): nothing stored changes, and every other
 tool name is left spelled the way we register it. Without that conversion a
@@ -1855,7 +1855,7 @@ out-of-root files are skipped. The global file and the combined project
 entries have independent 32 KiB UTF-8 budgets, so an oversized global file
 never removes project instructions. A file that exceeds its remaining budget is
 cut on a UTF-8 character boundary and followed by a
-`[PI-Desktop truncated <source>: loaded the first <n> of <total> bytes; ...]`
+`[Pi-Workspace truncated <source>: loaded the first <n> of <total> bytes; ...]`
 notice; project files after a truncated one are not loaded. Source paths are
 labelled under `# Project instructions`.
 The sidecar never reads workspace instructions directly. A changed root chain

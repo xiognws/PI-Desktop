@@ -45,8 +45,8 @@ row. If a title no longer matches the source, update the row.
 
 ### 2.1 Windows invocation workaround (tsc / electron-vite)
 
-Canonical scripts are `pnpm --filter @pi-desktop/desktop typecheck`,
-`pnpm --filter @pi-desktop/desktop build`, and the repo `pnpm test`. When the
+Canonical scripts are `pnpm --filter @pi-workspace/desktop typecheck`,
+`pnpm --filter @pi-workspace/desktop build`, and the repo `pnpm test`. When the
 pnpm script shim does not resolve on Windows, invoke the worktree-local binaries
 directly with `node` — same inputs and outputs, no configuration change:
 

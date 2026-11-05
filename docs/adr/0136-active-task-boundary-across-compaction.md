@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-31
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Amends: ADR 0064 / D203
 
 ## Context

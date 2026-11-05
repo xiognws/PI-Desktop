@@ -1,4 +1,4 @@
-import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
+import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-workspace/shared";
 import {
   findSubagentProviderSource,
   modelConfigWithBinding,
@@ -6,7 +6,7 @@ import {
   subagentProviderLookupError,
   classifySidecarCrash,
   sidecarCrashErrorCode,
-} from "@pi-desktop/agent-runtime";
+} from "@pi-workspace/agent-runtime";
 import {
   assertBuiltinSkillEnabled,
   loadBuiltinSkillBody,
@@ -21,7 +21,7 @@ import { relaxedNetworkPolicyEnabled } from "../endpoint-policy";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { BrowserHost } from "../browser-host";
-import type { InflightCheckpointer } from "@pi-desktop/host-runtime";
+import type { InflightCheckpointer } from "@pi-workspace/host-runtime";
 import { summarizeToolResult, type Logger } from "../logger";
 import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";

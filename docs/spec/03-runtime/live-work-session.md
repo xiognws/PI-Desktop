@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Live Voice may submit a bounded work request to a PI-Desktop session through
+Live Voice may submit a bounded work request to a Pi-Workspace session through
 its existing backend. At call start, the current Composer session is the default
 work target when one exists; the user can switch targets by voice during the
 call. The Live provider remains a voice interface; the existing Agent Runtime

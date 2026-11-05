@@ -44,7 +44,7 @@ From the repository root, with the existing host toolchain/dependencies:
 
 ```sh
 pnpm build:js
-pnpm --filter @pi-desktop/agent-runtime bundle
+pnpm --filter @pi-workspace/agent-runtime bundle
 cargo build -p host-core --locked
 node apps/pi-host/scripts/bundle.mjs --host-core "$PWD/target/debug/pi-desktop-host-core" --out "$PWD/apps/pi-host/dist-bundle/candidate"
 PI_HOST_E2E_BUNDLE="$PWD/apps/pi-host/dist-bundle/candidate" node scripts/e2e-remote-mvp.mjs

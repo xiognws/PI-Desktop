@@ -1,5 +1,5 @@
 import type { BrowserWindow } from "electron";
-import type { WorkPanelTabMenuRequest } from "@pi-desktop/shared";
+import type { WorkPanelTabMenuRequest } from "@pi-workspace/shared";
 import { scaleBoundsToDip } from "./plugin-view-bounds";
 
 type WindowCloseEvents = Pick<BrowserWindow, "once" | "removeListener">;

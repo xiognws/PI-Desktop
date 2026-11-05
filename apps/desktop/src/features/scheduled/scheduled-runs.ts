@@ -1,4 +1,4 @@
-import type { ScheduledTask, ScheduledTaskRun } from "@pi-desktop/shared";
+import type { ScheduledTask, ScheduledTaskRun } from "@pi-workspace/shared";
 
 export type ScheduledRunStatus = ScheduledTaskRun["status"];
 

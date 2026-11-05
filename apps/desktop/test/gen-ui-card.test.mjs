@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createElement } from "react";
-import { catalogs } from "@pi-desktop/i18n";
+import { catalogs } from "@pi-workspace/i18n";
 import { slotSsr } from "./helpers/slot-ssr.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");

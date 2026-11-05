@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Agent } from "@earendil-works/pi-agent-core";
 import type { Api, AssistantMessage, Model } from "@earendil-works/pi-ai";
-import type { CommandShellOption, UiMessage } from "@pi-desktop/shared";
+import type { CommandShellOption, UiMessage } from "@pi-workspace/shared";
 
 import {
   MAX_PROVIDER_REPLAY_BYTES,

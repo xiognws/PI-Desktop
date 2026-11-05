@@ -4,7 +4,7 @@ import {
   filterArtifacts,
   groupArtifactsBySession,
   type ArtifactRow,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 import { api } from "../../lib/api";
 

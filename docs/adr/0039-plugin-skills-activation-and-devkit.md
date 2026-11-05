@@ -21,7 +21,7 @@ nothing in the repository could write the store-only zip it accepts. There were
 no templates, no manifest validation ahead of install, and every source edit to
 a development plugin required re-picking its folder through the native dialog.
 
-The two gaps are the same gap: PI-Desktop asked users to write plugins without
+The two gaps are the same gap: Pi-Workspace asked users to write plugins without
 giving them the loop — scaffold, run, inspect, package.
 
 ## Decision
@@ -46,7 +46,7 @@ giving them the loop — scaffold, run, inspect, package.
    `Skill` tool reads the file and rechecks permissions at call time. Removing
    the last catalog entry also removes the executable `Skill` declaration.
 4. **Plugin authoring ships as a first-party devkit, not as a plugin.**
-   `@pi-desktop/plugin-devkit` owns scaffold, check and pack; three surfaces
+   `@pi-workspace/plugin-devkit` owns scaffold, check and pack; three surfaces
    share that one implementation — the `pi-plugin` CLI, the `PluginScaffold` /
    `PluginCheck` / `PluginPack` agent tools served from Electron main, and the
    plugins-page template action.

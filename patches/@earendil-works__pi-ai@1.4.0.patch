@@ -51,7 +51,7 @@ index 841da8964d2b403c45a18d4d1735c1fabc441a9a..02f20bdcd2c1d294754ca05579f56270
                          output.content.push(block);
                          stream.push({ type: "toolcall_start", contentIndex: output.content.length - 1, partial: output });
                      }
-+                    // Hosted web search (PI-Desktop): server-side search blocks
++                    // Hosted web search (Pi-Workspace): server-side search blocks
 +                    // are captured whole. The paired `server_tool_use` +
 +                    // `web_search_tool_result` blocks round-trip verbatim via
 +                    // the hostedSearch block so multi-turn conversations keep
@@ -129,7 +129,7 @@ index 841da8964d2b403c45a18d4d1735c1fabc441a9a..02f20bdcd2c1d294754ca05579f56270
 +                                partial: output,
 +                            });
 +                        }
-+                        // Hosted web search (PI-Desktop): server_tool_use input
++                        // Hosted web search (Pi-Workspace): server_tool_use input
 +                        // (the query) streams as input_json_delta like any tool
 +                        // call; accumulate it so the row can show the query live.
 +                        else if (block && block.type === "hostedSearch" && block.phase === "server_tool_use") {
@@ -149,7 +149,7 @@ index 841da8964d2b403c45a18d4d1735c1fabc441a9a..02f20bdcd2c1d294754ca05579f56270
 +                            block.thinkingSignature += event.delta.signature ?? "";
 +                        }
 +                    }
-+                    // Hosted web search (PI-Desktop): citations arrive as deltas
++                    // Hosted web search (Pi-Workspace): citations arrive as deltas
 +                    // on the text block that follows the search result. Collect
 +                    // them on the message for the application to render.
 +                    else if (event.delta.type === "citations_delta") {
@@ -217,7 +217,7 @@ index 841da8964d2b403c45a18d4d1735c1fabc441a9a..02f20bdcd2c1d294754ca05579f56270
              params.tools = convertToolDefinitions(tools, toolCacheControl);
          }
      }
-+    // Hosted web search (PI-Desktop): attach the server-side tool when the
++    // Hosted web search (Pi-Workspace): attach the server-side tool when the
 +    // model record opts in. A hosted tool has no client execute; its blocks
 +    // are extracted by the stream loop below and replayed by convertMessages.
 +    if (model.webSearch === true) {
@@ -233,7 +233,7 @@ index 841da8964d2b403c45a18d4d1735c1fabc441a9a..02f20bdcd2c1d294754ca05579f56270
                          input: block.arguments ?? {},
                      });
                  }
-+                // Hosted web search (PI-Desktop): replay both halves of the
++                // Hosted web search (Pi-Workspace): replay both halves of the
 +                // pair in place, in their original order. `server_tool_use`
 +                // carries the query; the result block carries the encrypted
 +                // content Anthropic requires verbatim on later turns.
@@ -328,7 +328,7 @@ index c88f27ee93a6f267f6abf9f69b13d0ad2303c8b2..e557d917026f8c315f56a95ce03bd197
              supportsOpenAIGrammarTools: model.compat?.supportsOpenAIGrammarTools ?? false,
          });
      }
-+    // Hosted web search (PI-Desktop): attach the server-side tool when the model record opts in.
++    // Hosted web search (Pi-Workspace): attach the server-side tool when the model record opts in.
 +    if (model.webSearch === true) {
 +        params.tools = [...(params.tools ?? []), { type: "web_search" }];
 +    }
@@ -368,7 +368,7 @@ index 45bcd08b85b478f0f96006881d489820f1264d2c..24d06138833cd9cad81bb519ce5dc584
              supportsOpenAIGrammarTools,
          });
      }
-+    // Hosted web search (PI-Desktop): attach the server-side Responses tool only when opted in.
++    // Hosted web search (Pi-Workspace): attach the server-side Responses tool only when opted in.
 +    if (model.webSearch === true) {
 +        body.tools = [...(body.tools ?? []), { type: "web_search" }];
 +        body.include = [...new Set([...body.include, "web_search_call.action.sources"])];
@@ -428,7 +428,7 @@ index 793ed0a6060e5d2e61b09e2d93514610527873df..78c6a829151d8bb57357d9a379997da4
 +    // real echo set requiresNonEmptyReasoningReplay and receive a documented
 +    // placeholder instead of a silent empty string (#296).
 +    // Placeholder text must match DEEPSEEK_REASONING_REPLAY_PLACEHOLDER in
-+    // @pi-desktop/shared provider-presets.
++    // @pi-workspace/shared provider-presets.
 +    const reasoningFields = ["reasoning_content", "reasoning_text", "reasoning"];
 +    // The history can mix field names: a rebuilt row is stamped
 +    // reasoning_content while a live row keeps the field the relay streamed.
@@ -505,7 +505,7 @@ index b7b27ca98c8f4069a806a01913632a2d9200379c..da6ba8ba9abc8e897c9a72383038448f
                          phase: parsedSignature?.phase,
                      });
                  }
-+                // Hosted web search (PI-Desktop): replay the search item in
++                // Hosted web search (Pi-Workspace): replay the search item in
 +                // place so follow-up turns keep the search state.
 +                else if (block.type === "hostedSearch") {
 +                    const projection = hostedSearchReplayProjection(block, { api: "openai-responses", isSameModel });
@@ -519,7 +519,7 @@ index b7b27ca98c8f4069a806a01913632a2d9200379c..da6ba8ba9abc8e897c9a72383038448f
              stream.push({ type: "toolcall_start", contentIndex: slot.contentIndex, partial: output });
              return slot;
          }
-+        // Hosted web search (PI-Desktop): a server-side search call. The raw
++        // Hosted web search (Pi-Workspace): a server-side search call. The raw
 +        // item is kept whole; `response.web_search_call.*` status events and
 +        // the done item update the same slot. Replay pushes the item back as
 +        // an output item so multi-turn search state survives.
@@ -586,7 +586,7 @@ index b7b27ca98c8f4069a806a01913632a2d9200379c..da6ba8ba9abc8e897c9a72383038448f
                  partial: output,
              });
          }
-+        // Hosted web search (PI-Desktop): citation annotations arrive while
++        // Hosted web search (Pi-Workspace): citation annotations arrive while
 +        // the text streams. They are collected on the output message so the
 +        // application can render sources without parsing text offsets.
 +        else if (event.type === "response.output_text.annotation.added") {
@@ -637,7 +637,7 @@ index b7b27ca98c8f4069a806a01913632a2d9200379c..da6ba8ba9abc8e897c9a72383038448f
                  });
                  outputSlots.delete(event.output_index);
              }
-+            // Hosted web search (PI-Desktop): finalize the slot with the
++            // Hosted web search (Pi-Workspace): finalize the slot with the
 +            // done item so replay carries the server's final representation.
 +            else if (item.type === "web_search_call" && slot?.type === "hostedSearch") {
 +                slot.block.status = item.status ?? slot.block.status;
@@ -740,7 +740,7 @@ index b418bfb7ca4e378b5b5c3115b79a6bcc7af17775..17cb84b3ba3f42ae602030680112edf8
              supportsOpenAIGrammarTools: compat.supportsOpenAIGrammarTools,
          });
      }
-+    // Hosted web search (PI-Desktop): attach the server-side tool when the
++    // Hosted web search (Pi-Workspace): attach the server-side tool when the
 +    // model record opts in. The Responses `web_search` tool definition is a
 +    // bare tagged object; it never passes through convertResponsesTools.
 +    if (model.webSearch === true) {

@@ -1,5 +1,5 @@
 import { readAppSourceSync, readSettingsSourceSync, readStoreSourceSync, readMainSourceSync } from "./helpers/source-contracts.mjs";
-import { sanitizeThemeCss } from "@pi-desktop/plugin-sdk";
+import { sanitizeThemeCss } from "@pi-workspace/plugin-sdk";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync, realpathSync } from "node:fs";

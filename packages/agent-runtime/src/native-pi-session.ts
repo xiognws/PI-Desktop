@@ -39,7 +39,7 @@ import type {
   SessionSummary,
   ThinkingLevel,
   UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   NativePiSessionLease,
   guardNativePiSessionManager,

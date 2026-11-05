@@ -11,11 +11,11 @@ import type {
   MessageAttachment,
   MessageUsage,
   UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   formatCompactTokenCount,
   isCertificateVerificationError,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { useOpenChatFileRef, useOpenPreviewTarget } from "../../../hooks/use-preview-target";
 import { useChatFileMenu } from "../../../hooks/use-chat-file-menu";
 import { ContextMenu } from "../../../components/ContextMenu";

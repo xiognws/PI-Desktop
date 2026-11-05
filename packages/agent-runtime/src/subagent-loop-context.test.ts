@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { SubagentDefinition } from "@pi-desktop/shared";
+import type { SubagentDefinition } from "@pi-workspace/shared";
 import { SubagentRun } from "./subagent.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
 

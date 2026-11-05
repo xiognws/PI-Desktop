@@ -12,7 +12,7 @@ do not claim acceptance for the multi-backend extension.
 ## Multi-backend session-targeting extension candidate (2026-09-30)
 
 - Worktree: `feat/live-voice-all-sessions` at
-  `/Users/lan/Project/AI/PI-Desktop-worktrees/live-voice-all-sessions-20260930`,
+  `/Users/lan/Project/AI/Pi-Workspace-worktrees/live-voice-all-sessions-20260930`,
   based on `e93295ad9`; changes remain uncommitted.
 - The current Composer session is the default target. Main revalidates it against
   Desktop/Native Pi/Remote catalogs. Voice switching uses opaque references;
@@ -32,7 +32,7 @@ do not claim acceptance for the multi-backend extension.
 ## Historical v2.1 candidate snapshot
 
 - Branch/worktree: `codex/live-voice-v21-reliability` at
-  `/Users/lan/.codex/worktrees/live-voice-v21-refresh/PI-Desktop`.
+  `/Users/lan/.codex/worktrees/live-voice-v21-refresh/Pi-Workspace`.
 - Candidate commit: `61aaa6eb64441c0534c0e3118f941a2ba33fc301`.
 - Base: `b360e04eb11edb8256b85ad314a8fdda7dc54e30`; `pnpm check:pr-base`
   confirms the base is an ancestor of the candidate.
@@ -87,7 +87,7 @@ was run after that base was incorporated.
 |---|---|
 | `pnpm build:js` | Passed. VitePress reported its existing missing `gitignore` highlighter and large-chunk warnings. |
 | `pnpm -r --if-present test` | Passed all workspace suites; desktop 3,179, shared 1,124, agent-runtime 1,113, and plugin SDK 374 tests passed, as did the remaining suites. |
-| `pnpm --filter @pi-desktop/desktop typecheck` | Passed. |
+| `pnpm --filter @pi-workspace/desktop typecheck` | Passed. |
 | `pnpm lint` | Passed, including Biome and desktop style-token validation. |
 | `pnpm docs:check` | Passed: 83 English/Chinese specification pairs and 534 documentation pages; existing ADR format notes remain advisory. |
 | `pnpm check:agent-policy` | Passed. |
@@ -99,7 +99,7 @@ was run after that base was incorporated.
 
 ## PR integration candidate validation
 
-- PR: [#1220](https://github.com/vastsa/PI-Desktop/pull/1220).
+- PR: [#1220](https://github.com/xiognws/Pi-Workspace/pull/1220).
 - Candidate: GitHub merge ref `6c06747940579574a812e0495d1449fba6d50b8c`,
   with base `b360e04eb11edb8256b85ad314a8fdda7dc54e30` and head
   `7c0e79e3aaed1826be7da0bb360b79d453ad5c46`.
@@ -132,7 +132,7 @@ state.
 ## Candidate and base
 
 - Request branch: `codex/live-voice-v1`; dedicated worktree:
-  `/Users/lan/.codex/worktrees/live-voice-v1/PI-Desktop`.
+  `/Users/lan/.codex/worktrees/live-voice-v1/Pi-Workspace`.
 - Phase-2 implementation base: `1ec74701f` (the v1 implementation commit).
 - Latest fetched `origin/main`: `8fcca3d25c98d66c46d0f9cddab76167b6ddb294`;
   it is included in the request candidate through merge commit
@@ -141,9 +141,9 @@ state.
   The provider integration fixture and W2 case-level audit are part of the
   current candidate; the fixture does not instantiate the production Main
   work-bridge or concrete provider transport adapters.
-- Existing pull request: [#1161](https://github.com/vastsa/PI-Desktop/pull/1161),
+- Existing pull request: [#1161](https://github.com/xiognws/Pi-Workspace/pull/1161),
   open on `codex/live-voice-v1`. This task updates that PR and does not merge it.
-- The worktree has an untracked `PI-Desktop-Live-Voice-v1-Spec.md`; it is not a
+- The worktree has an untracked `Pi-Workspace-Live-Voice-v1-Spec.md`; it is not a
   task deliverable and is excluded from the change.
 
 ## Implemented paths
@@ -240,7 +240,7 @@ state.
 |---|---|
 | `node --test test/live-work-provider-integration.test.mjs` (from `apps/desktop`) | 4 passed: Codex Live, Gemini Live, Realtime GA, and Realtime compat-v1. These use real protocol parsers/encoders, the coordinator, and AgentHost admission/terminal APIs; the work port, Runtime prompt, and provider transport are fixtures. |
 | `pnpm -r --if-present test` | Passed all workspace suites on the current candidate; desktop: 3,173 passed, 0 failed; docs: 11 passed, 0 failed. |
-| `pnpm --filter @pi-desktop/desktop typecheck` | Passed on the current candidate. |
+| `pnpm --filter @pi-workspace/desktop typecheck` | Passed on the current candidate. |
 | `pnpm build:js` | Passed on the current candidate; docs, workspace packages, Electron main, preload, and renderer built. Existing VitePress highlighting and large-chunk warnings remain. |
 | `pnpm lint` | Passed, including style-token validation. |
 | `cargo fmt --check` | Passed on the current candidate. |

@@ -2,7 +2,7 @@
 
 ## Purpose and baseline
 
-PI-Desktop is a local-first Electron application. Settings and preload express
+Pi-Workspace is a local-first Electron application. Settings and preload express
 user intent; Electron Main schedules cold filesystem maintenance; Rust Host Core
 owns SQLite and structured-path relocation. The original Electron userData
 directory remains the installation lock and bootstrap-pointer anchor.

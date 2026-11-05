@@ -8,7 +8,7 @@ import {
   type SessionSummary,
   type TraySessionGroup,
   type TraySessionPreferences,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import type { HostProcess } from "./host-process";
 import type { Logger } from "./logger";
 

@@ -151,7 +151,7 @@ export type UserSkillRecord = {
   updatedAt: string;
 };
 
-/** A skill bundled with PI-Desktop and enabled globally by default. */
+/** A skill bundled with Pi-Workspace and enabled globally by default. */
 export type BuiltinSkillRecord = {
   id: string;
   name: string;

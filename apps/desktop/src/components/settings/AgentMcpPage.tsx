@@ -5,7 +5,7 @@ import {
   type AgentCapabilityLevel,
   type McpServerRecord,
   type McpServerStatus,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { api } from "../../lib/api";
 import {
   capabilityQuery,

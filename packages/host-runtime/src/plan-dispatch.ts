@@ -1,4 +1,4 @@
-import { ErrorCodes, type PlanExecution, type PlanExecutionFinishStatus } from "@pi-desktop/shared";
+import { ErrorCodes, type PlanExecution, type PlanExecutionFinishStatus } from "@pi-workspace/shared";
 
 import type { HostRpc } from "./host-ports.js";
 import type { LaunchResolver } from "./launch-resolver.js";

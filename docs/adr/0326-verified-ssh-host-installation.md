@@ -2,7 +2,7 @@
 
 - Status: Accepted for experimental implementation; Linux SSH qualification and release publication pending
 - Date: 2026-10-11
-- Deciders: PI-Desktop maintainers (user-authorized Remote SSH optimization plan)
+- Deciders: Pi-Workspace maintainers (user-authorized Remote SSH optimization plan)
 - Amends: [ADR 0292](0292-ssh-remote-host-bootstrap.md), specifically the executable-upload prohibition and remote GitHub-access prerequisite; the corresponding D375 deployment choice
 - Related: [ADR 0293](0293-ssh-password-authentication.md), [Local Agent remote workspace tools](local-agent-remote-workspace-tools.md), [architecture §5.2](../spec/02-architecture/05-remote-agent-control.md#52-remote-host-over-an-ssh-tunnel-first-remote-topology), [security §3.4](../spec/05-security/02-remote-control-security.md#34-ssh-bootstrap-pairing-first-remote-topology)
 

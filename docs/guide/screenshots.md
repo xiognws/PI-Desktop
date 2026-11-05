@@ -1,6 +1,6 @@
 ---
 title: Screens
-description: Every PI-Desktop surface, captured from the running app.
+description: Every Pi-Workspace surface, captured from the running app.
 ---
 
 # Screens
@@ -21,9 +21,9 @@ English while the sample conversation is Chinese. The
 The home screen is the first surface a new install shows: a hero, the composer,
 and the sidebar with sessions grouped by project.
 
-![PI-Desktop home in the light theme](../public/screenshots/app/en/home-light.webp)
+![Pi-Workspace home in the light theme](../public/screenshots/app/en/home-light.webp)
 
-![PI-Desktop home in the dark theme](../public/screenshots/app/en/home-dark.webp)
+![Pi-Workspace home in the dark theme](../public/screenshots/app/en/home-dark.webp)
 
 ![The chat destination in the dark theme](../public/screenshots/app/en/dark-home.webp)
 
@@ -159,7 +159,7 @@ Build the renderer, make sure `target/debug/pi-desktop-host-core` exists, create
 `/tmp/codex-screens`, then run the app once per locale and publish each pass:
 
 ```bash
-pnpm --filter @pi-desktop/desktop build
+pnpm --filter @pi-workspace/desktop build
 mkdir -p /tmp/codex-screens
 
 # English pass; append --lang=zh-CN for the Chinese pass.

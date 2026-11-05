@@ -490,7 +490,7 @@ function mentionsDeepSeek(value: string | undefined): boolean {
  * produced no thinking (#223 / D389). OpenCode and third-party relays for the
  * same model family reject empty echoes and require a non-empty value (#296).
  * pi-ai auto-detects only `provider === "deepseek"` or a `deepseek.com` URL;
- * PI-Desktop stores a UUID as `model.provider`, so aggregators and custom
+ * Pi-Workspace stores a UUID as `model.provider`, so aggregators and custom
  * gateways never match. Detect the family from vendorKey, URL, model id, or
  * catalog family without changing `thinkingFormat`.
  */

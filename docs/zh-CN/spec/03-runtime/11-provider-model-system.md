@@ -5,7 +5,7 @@
 
 ## 1. Goal
 
-PI-Desktop 必须支持用户通常需要的**所有主要市场模型供应商和模型**，而无需将一个微小的允许列表硬编码为产品上限。
+Pi-Workspace 必须支持用户通常需要的**所有主要市场模型供应商和模型**，而无需将一个微小的允许列表硬编码为产品上限。
 
 策略：
 
@@ -113,7 +113,7 @@ OpenAI 风格的 Copilot 线路 API 仍将令牌作为请求密钥签名；所�
 使用 `thinkingFormat: "zai"` 与 `zaiToolStream: true`。DeepSeek 系 Completions
 在 `vendorKey`、Base URL、模型 ID 或目录 `family` 能识别为 DeepSeek 时设置
 `requiresReasoningContentOnAssistantMessages: true`。pi-ai 只根据
-`provider === "deepseek"` 或 `deepseek.com` URL 自动检测，而 PI-Desktop 把 UUID
+`provider === "deepseek"` 或 `deepseek.com` URL 自动检测，而 Pi-Workspace 把 UUID
 存成 `model.provider`，因此聚合网关与自定义端点会在无思考内容的助手回合漏掉
 `reasoning_content`。非官方 DeepSeek 端点还会设置 `requiresNonEmptyReasoningReplay`，
 用文档化的非空占位符而不是 `""` 填补缺失推理（OpenCode / 第三方中转在压缩后拒绝空回传；
@@ -189,7 +189,7 @@ adaptive 思考；这覆盖缺少元数据的未发布 Claude 中继模型 ID。
 ## 6. 模型支持策略
 
 ### 6.1 无硬性模型许可名单上限
-PI-Desktop 不得把用户永久限制在一份简短的固定模型列表上。
+Pi-Workspace 不得把用户永久限制在一份简短的固定模型列表上。
 
 ### 6.2 Catalog responsibilities
 
@@ -318,7 +318,7 @@ type ThinkingLevel =
   | "max"
 ```
 
-上面这些兼容性字段，是为老客户端保留的持久化模式兼容面。PI-Desktop 不再把
+上面这些兼容性字段，是为老客户端保留的持久化模式兼容面。Pi-Workspace 不再把
 它们当作运行时的模型覆盖来读取。`ModelInfo` 的推理支持与受支持的思考级别
 描述的是解析出的 Pi catalog 记录；有效的 provider/会话能力则来自那个确切的
 `ModelBinding`。未知的自由格式 id 以通用形态起步，不带任何推断出的推理能力；

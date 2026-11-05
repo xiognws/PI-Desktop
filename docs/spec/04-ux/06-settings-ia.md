@@ -770,7 +770,7 @@ system while preserving their different data ownership:
   form state is announced from the shared error region.
 
 ### Instructions (`instructions` tab)
-- Edit the global instruction Markdown used by every PI-Desktop Agent session.
+- Edit the global instruction Markdown used by every Pi-Workspace Agent session.
 - Show the resolved instruction-file path and save through the host-backed
   instruction API; project instructions remain managed from the active project
   menu and are resolved after the global layer.

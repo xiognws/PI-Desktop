@@ -1,5 +1,5 @@
 {
-  "name": "pi-desktop",
+  "name": "pi-workspace",
   "private": true,
   "version": "0.21.0",
   "description": "Local-first AI coding agent desktop client",
@@ -10,10 +10,10 @@
   },
   "scripts": {
     "dev": "node scripts/dev-isolated.mjs",
-    "dev:shared": "pnpm --filter @pi-desktop/desktop dev",
-    "preview": "pnpm --filter @pi-desktop/desktop run preview",
-    "pack": "pnpm --filter @pi-desktop/desktop run pack",
-    "dist": "pnpm --filter @pi-desktop/desktop run dist",
+    "dev:shared": "pnpm --filter @pi-workspace/desktop dev",
+    "preview": "pnpm --filter @pi-workspace/desktop run preview",
+    "pack": "pnpm --filter @pi-workspace/desktop run pack",
+    "dist": "pnpm --filter @pi-workspace/desktop run dist",
     "pi-plugin": "pi-plugin",
     "build": "pnpm -r --if-present build && cargo build --release -p host-core",
     "build:js": "pnpm -r --if-present build",
@@ -88,10 +88,10 @@
     "check:agent-policy": "node scripts/check-agent-policy-sync.mjs",
     "check:pr-base": "node scripts/check-pr-base-main.mjs",
     "check:powershell-encoding": "node scripts/check-powershell-encoding.mjs",
-    "docs:dev": "pnpm --filter @pi-desktop/docs dev",
-    "docs:build": "pnpm --filter @pi-desktop/docs build",
-    "docs:preview": "pnpm --filter @pi-desktop/docs preview",
-    "docs:check": "pnpm --filter @pi-desktop/docs check:locales && pnpm --filter @pi-desktop/docs check:docs",
+    "docs:dev": "pnpm --filter @pi-workspace/docs dev",
+    "docs:build": "pnpm --filter @pi-workspace/docs build",
+    "docs:preview": "pnpm --filter @pi-workspace/docs preview",
+    "docs:check": "pnpm --filter @pi-workspace/docs check:locales && pnpm --filter @pi-workspace/docs check:docs",
     "lint": "pnpm lint:biome && pnpm check:powershell-encoding && pnpm -r --if-present lint",
     "host:dev": "cargo run -p host-core",
     "clean": "pnpm -r --if-present clean && cargo clean",
@@ -120,6 +120,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",
-    "@pi-desktop/plugin-devkit": "workspace:*"
+    "@pi-workspace/plugin-devkit": "workspace:*"
   }
 }

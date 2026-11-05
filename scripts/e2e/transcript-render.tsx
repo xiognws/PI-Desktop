@@ -8,12 +8,12 @@ import { flushSync } from "react-dom";
 import { useState } from "react";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
-import { en } from "@pi-desktop/i18n";
+import { en } from "@pi-workspace/i18n";
 import type {
   AgentActivity,
   AgentEventEnvelope,
   UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   ContextMenu,
   useContextMenu,
@@ -50,7 +50,7 @@ function assert(value: unknown, message: string): asserts value {
 async function markdownLinkInteractionProbe(
   i18n: ReturnType<typeof createInstance>,
 ) {
-  const destination = "https://github.com/vastsa/PI-Desktop/issues/1106";
+  const destination = "https://github.com/xiognws/Pi-Workspace/issues/1106";
   const initialState = useAppStore.getState();
   const openedUrls: string[] = [];
   const host = document.createElement("div");
@@ -72,7 +72,7 @@ async function markdownLinkInteractionProbe(
       root.render(
         <I18nextProvider i18n={i18n}>
           <Markdown
-            source="[#1106](([github.com](https://github.com/vastsa/PI-Desktop/issues/1106)))"
+            source="[#1106](([github.com](https://github.com/xiognws/Pi-Workspace/issues/1106)))"
           />
         </I18nextProvider>,
       ),

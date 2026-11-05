@@ -2,13 +2,13 @@
 
 - Status: Accepted (D638)
 - Date: 2026-10-01
-- Deciders: PI-Desktop core
+- Deciders: Pi-Workspace core
 - Related: D126, D285, D375, D603, ADR 0022, ADR 0145, ADR 0284, ADR 0292, issue #1281, E2E-192a
 
 ## Context
 
 Tag releases publish Linux x64 only. Issue #1281 asks for a Linux arm64 build:
-the reporter runs PI-Desktop inside a Linux container on a rooted arm64 Android
+the reporter runs Pi-Workspace inside a Linux container on a rooted arm64 Android
 tablet, where no x64 artifact can execute and emulation is not a usable path for
 an Electron app.
 
@@ -23,7 +23,7 @@ than a new flag on one job:
    `--x64` / `--arm64` flag. Pinning both architectures would make each Linux
    lane build the other architecture around its own native sidecar.
 3. The AppImage target's default artifact name carries no architecture, so two
-   Linux lanes would publish the same `PI-Desktop-<version>.AppImage` file name
+   Linux lanes would publish the same `Pi-Workspace-<version>.AppImage` file name
    and the publish job's merged download would keep only whichever lane arrived
    last.
 
@@ -42,9 +42,9 @@ on x64 and `latest-linux-<arch>.yml` on every other architecture
    The workflow passes the matching `--x64` or `--arm64` flag to
    electron-builder, which is the same rule ADR 0145 set for macOS.
 3. `build.linux.artifactName` becomes
-   `PI-Desktop-${version}-linux-${arch}.${ext}`, so the AppImage assets are
-   `PI-Desktop-<version>-linux-x64.AppImage` and
-   `PI-Desktop-<version>-linux-arm64.AppImage`. The deb and rpm targets keep
+   `Pi-Workspace-${version}-linux-${arch}.${ext}`, so the AppImage assets are
+   `Pi-Workspace-<version>-linux-x64.AppImage` and
+   `Pi-Workspace-<version>-linux-arm64.AppImage`. The deb and rpm targets keep
    their own patterns and expand `${arch}` through FPM's arch names
    (`amd64`/`arm64` and `x86_64`/`aarch64`).
 4. Each Linux job verifies the updater feed it is about to publish —
@@ -55,7 +55,7 @@ on x64 and `latest-linux-<arch>.yml` on every other architecture
 5. `scripts/export-linux-asar.mjs` takes the lane architecture, reads the
    archive from electron-builder's own unpacked directory
    (`linux-unpacked` for x64, `linux-arm64-unpacked` for arm64), and publishes
-   `PI-Desktop-<version>-linux-<arch>.asar`.
+   `Pi-Workspace-<version>-linux-<arch>.asar`.
 6. `release.yml`'s `pi-host-bundle` job builds both Linux architectures, and
    `PUBLISHED_TARGETS` in `apps/desktop/electron/main/remote/pi-host-release.ts`
    lists `linux-x64` and `linux-arm64`. An arm64 desktop can therefore
@@ -69,8 +69,8 @@ on x64 and `latest-linux-<arch>.yml` on every other architecture
 
 - arm64 Linux users install native AppImage, deb, and rpm packages from every
   tag release, and the AppImage updates in place through its own feed.
-- The x64 AppImage asset is renamed from `PI-Desktop-<version>.AppImage` to
-  `PI-Desktop-<version>-linux-x64.AppImage`. Download links that carry the old
+- The x64 AppImage asset is renamed from `Pi-Workspace-<version>.AppImage` to
+  `Pi-Workspace-<version>-linux-x64.AppImage`. Download links that carry the old
   name must be updated; in-app updates are unaffected because the updater reads
   the published feed rather than a hard-coded file name.
 - Every tag release carries one `pi-host-<version>-linux-arm64.tar.gz` bundle

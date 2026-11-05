@@ -9,9 +9,9 @@ import {
   type CommandShellOption, isCommandShellOption,
   type WorkspaceFilesRequest,
   type WorkspacePluginFilesRequest,
-} from "@pi-desktop/shared";
-import { wsClientTransport } from "@pi-desktop/racp";
-import type { HostRpcPort } from "@pi-desktop/agent-host";
+} from "@pi-workspace/shared";
+import { wsClientTransport } from "@pi-workspace/racp";
+import type { HostRpcPort } from "@pi-workspace/agent-host";
 import type { BackendRouter } from "../remote/backend-router.js";
 import { makeRemoteSessionId, parseRemoteSessionId } from "../remote/backend-router.js";
 import { createRacpRemoteHostClient, exchangePairingToken, type RacpRemoteHostClient } from "../remote/racp-remote-host-client.js";

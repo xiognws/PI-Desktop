@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { register } from "node:module";
 import test from "node:test";
 
-import { IPC } from "@pi-desktop/shared";
+import { IPC } from "@pi-workspace/shared";
 
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const { registerToolPackagesIpc } = await import(

@@ -21,10 +21,10 @@ await mkdir(sourceRoot, { recursive: true });
 await build({ entryPoints: [join(root, "scripts/e2e/storage-directory.jsx")],
   outfile: join(artifacts, "renderer.js"), bundle: true, platform: "browser", format: "esm", jsx: "automatic",
   define: { "process.env.NODE_ENV": '"production"', "import.meta.env.DEV": "false" },
-  alias: { "@pi-desktop/shared": join(root, "packages/shared/src/index.ts"),
-    "@pi-desktop/shared/changelog-loader": join(root, "packages/shared/src/changelog-loader.ts"),
-    "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
-    "@pi-desktop/voice-runtime/live": join(root, "packages/voice-runtime/src/live/index.ts"),
+  alias: { "@pi-workspace/shared": join(root, "packages/shared/src/index.ts"),
+    "@pi-workspace/shared/changelog-loader": join(root, "packages/shared/src/changelog-loader.ts"),
+    "@pi-workspace/i18n": join(root, "packages/i18n/src/index.ts"),
+    "@pi-workspace/voice-runtime/live": join(root, "packages/voice-runtime/src/live/index.ts"),
     react: join(root, "apps/desktop/node_modules/react"),
     "react-dom": join(root, "apps/desktop/node_modules/react-dom"),
     i18next: join(root, "apps/desktop/node_modules/i18next"),
@@ -42,7 +42,7 @@ await writeFile(join(artifacts, "index.html"), '<!doctype html><html data-platfo
 const main = join(artifacts, "main.mjs");
 await build({ entryPoints: [join(root, "scripts/e2e/storage-directory-main.mjs")], outfile: main,
   bundle: true, platform: "node", format: "esm", external: ["electron", "original-fs"],
-  alias: { "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"), "@pi-desktop/shared": join(root, "packages/shared/src/protocol.ts") },
+  alias: { "@pi-workspace/i18n": join(root, "packages/i18n/src/index.ts"), "@pi-workspace/shared": join(root, "packages/shared/src/protocol.ts") },
   plugins: [{ name: "fixture-host-location", setup(builder) {
     builder.onResolve({ filter: /host-process$/ }, () => ({ path: "host-location", namespace: "fixture" }));
     builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({ contents: "export function resolveHostBinary() { return process.env.PI_DESKTOP_HOST_BIN; }" }));

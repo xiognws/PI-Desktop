@@ -3,7 +3,7 @@
 > **翻译说明：** 本页是与 [英文源规格](/spec/06-delivery/04-e2e-test-plan) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
 
-> 范围：MVP 接受场景加上 PI-Desktop 当前发货的产品增量
+> 范围：MVP 接受场景加上 Pi-Workspace 当前发货的产品增量
 > 状态：已接受（protocol/Electron 自动化已激活；完整桌面 Playwright 仍在计划中）
 > 交叉引用：[验收标准](/zh-CN/spec/06-delivery/02-acceptance-criteria) · [里程碑](/zh-CN/spec/06-delivery/01-mvp-milestones) · [ai-开发工作流程](/zh-CN/spec/06-delivery/03-ai-development-workflow) · [变更清单](/zh-CN/spec/06-delivery/05-change-checklist)
 
@@ -258,7 +258,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 | 要求 | 详情 |
 |---|---|
 | 平台 | macOS arm64、Intel x64、Windows x64 和 Linux x64 及 arm64 发行目标 (D126/D285、D638 / ADR 0318) |
-| 公司简介 | 干净的 `~/.pi-desktop` 配置文件（无需事先配置） |
+| 公司简介 | 干净的 `~/.piworkspace` 配置文件（无需事先配置） |
 | 固定装置 | 示例项目目录 (`examples/fixtures/sample-project/`) |
 | 示例插件 | 从本地路径加载 `examples/plugins/hello` |
 | 提供商 | 至少一个拥有有效密钥的提供商（测试帐户） |
@@ -355,10 +355,10 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 
 #### E2E-001：应用程序启动并显示主窗口
 
-- **先决条件**：macOS arm64 或 Intel x64；没有先前的 `~/.pi-desktop` 配置文件。对于
+- **先决条件**：macOS arm64 或 Intel x64；没有先前的 `~/.piworkspace` 配置文件。对于
   开发通道、工作区包构建输出不存在或早于
   他们的 TypeScript 来源。
-- **步骤**：1) 启动 PI-Desktop。在开发通道中，使用 `pnpm dev`。
+- **步骤**：1) 启动 Pi-Workspace。在开发通道中，使用 `pnpm dev`。
   2) 观察主窗口出现。
 - **预期**：开发启动之前会重建所有工作区依赖项
   host-core 和 Electron 启动。窗口首先显示品牌启动画面
@@ -400,7 +400,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 
 #### E2E-004：出现首次运行内联检查表
 
-- **先决条件**：新鲜的配置文件（无 `~/.pi-desktop`）。
+- **先决条件**：新鲜的配置文件（无 `~/.piworkspace`）。
 - **步骤**：1) 在新的配置文件上启动应用程序。 2) 遵守新手引导清单。
 - **预期**：显示内嵌清单； provider/key 项目打开设置
   → Agent，可选插件项打开app-shell Plugins
@@ -1930,7 +1930,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 #### E2E-034：NDJSON 日志文件已写入并经过编辑
 
 - **先决条件**：新鲜的个人资料；提供商已配置；一轮聊天结束。
-- **步骤**：1) 通过工具调用运行提示。 2) 打开 `~/.pi-desktop/logs/`。 3) 检查 `app/`、`host/` 和 `agent/` 下的分类文件。
+- **步骤**：1) 通过工具调用运行提示。 2) 打开 `~/.piworkspace/logs/`。 3) 检查 `app/`、`host/` 和 `agent/` 下的分类文件。
 - **预期**：NDJSON 记录与 `ts/level/channel/category/event/message` 一起存在；正常工具调用只产生一条携带 `sessionId`/`toolCallId`、安全工具元数据和有界结果/时长信息的完成或失败记录；中断工具仍可由同一 ID 追踪；没有出现 API key、Authorization 值、原始命令输出或本机绝对路径；每个类别文件在 5 MB 轮换。生命周期、权限、工具、provider、plugin、持久化、更新器和错误记录仍可用，且正常运行不会创建独立的 timing 类别文件。
 - **链接规格**：`03-runtime/09-logging-and-observability.md`
 - **接受**：H（诊断）
@@ -1960,7 +1960,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
   `TypeError: Cannot convert argument to a ByteString`。
 - **步骤**：1) 启动，使自动更新检查或模型发现发出主进程 `net.fetch` /
   electron-updater 请求。2) 确认没有原生异常对话框。3) 无需关闭任何框；等待
-  下一次更新或发现请求。4) 打开 `~/.pi-desktop/logs/app/runtime.log`。
+  下一次更新或发现请求。4) 打开 `~/.piworkspace/logs/app/runtime.log`。
 - **预期**：不会出现 Electron “A JavaScript error occurred in the main process”
   对话框。应用保持运行、不会退出。`runtime.log` 中有
   `code: "NON_ASCII_HTTP_HEADER"` 且 `recoverable: true` 的错误记录。后续
@@ -2052,9 +2052,9 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **步骤**：1) 运行标签发布工作流程。2) 确认 arm64 通道运行在
   `aarch64` 运行器上，且打包出的
   `target/release/pi-desktop-host-core` 是 AArch64 二进制。3) 检查
-  已发布的 Release 资产中是否有 `PI-Desktop-X.Y.Z-linux-arm64.AppImage`、
-  `pi-desktop_X.Y.Z_arm64.deb`、`pi-desktop-X.Y.Z-aarch64.rpm`、
-  `PI-Desktop-X.Y.Z-linux-arm64.asar`，以及带 `.sha256` 的
+  已发布的 Release 资产中是否有 `Pi-Workspace-X.Y.Z-linux-arm64.AppImage`、
+  `pi-workspace_X.Y.Z_arm64.deb`、`pi-workspace-X.Y.Z-aarch64.rpm`、
+  `Pi-Workspace-X.Y.Z-linux-arm64.asar`，以及带 `.sha256` 的
   `pi-host-X.Y.Z-linux-arm64.tar.gz`。4) 确认
   `latest-linux.yml` 仍列出 x64 AppImage，而
   `latest-linux-arm64.yml` 列出 arm64 的那个。5) 在 arm64 Linux 机器上安装 arm64
@@ -2075,13 +2075,13 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **先决条件**：Linux x64 软件包验证运行或标签发布可以在 Ubuntu 22.04
   上完成；有一台干净的 Fedora 44 KDE/Wayland 机器用于安装和启动。
 - **步骤**：1) 构建 Linux 目标，并使用 `rpm -qip` 和 `rpm -qpl` 检查 RPM。
-  2) 确认软件包包含应用归档、host-core、`pi-desktop.desktop` 和 512px
+  2) 确认软件包包含应用归档、host-core、`pi-workspace.desktop` 和 512px
   的 `pi-desktop` 图标。3) 确认 RPM 没有全局 `/usr/lib/.build-id` 链接。
-  4) 在 Fedora KDE/Wayland 机器上安装 RPM，并从桌面项启动 PI-Desktop。
+  4) 在 Fedora KDE/Wayland 机器上安装 RPM，并从桌面项启动 Pi-Workspace。
   5) 检查任务栏分组和已安装的桌面项。
 - **预期**：生成具有文档所述名称的 x64 RPM，并与发布工件一起上传。桌面项
   包含 `Icon=pi-desktop` 和 `StartupWMClass=pi-desktop`；运行中的 Wayland
-  窗口与 PI-Desktop 启动器正确分组并显示其图标，而不是通用 Electron 图标。
+  窗口与 Pi-Workspace 启动器正确分组并显示其图标，而不是通用 Electron 图标。
   软件包更新仍采用通知并打开链接的模式，捆绑的 Electron 二进制文件不会生成
   全局 build-id 链接。
 - **链接规格**：`01-product/01-product-scope.md`、
@@ -2102,11 +2102,11 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M5
 - **状态**：单位覆盖（`tools::shell::tests`）；场景已记录
 
-#### E2E-044：开发启动使用 PI-Desktop Dock 品牌
+#### E2E-044：开发启动使用 Pi-Workspace Dock 品牌
 
 - **先决条件**：macOS 开发与规范的 `build/icon_1024.png` 进行检验。
 - **步骤**：1) 运行 `pnpm dev`。 2) 检查正在运行的应用程序的 Dock 图标。
-- **预期**：Dock 显示 PI-Desktop 品牌图标，而不是 Electron 的默认图标；打包版本继续使用 `build/icon.icns`。
+- **预期**：Dock 显示 Pi-Workspace 品牌图标，而不是 Electron 的默认图标；打包版本继续使用 `build/icon.icns`。
 - **链接规格**：`06-delivery/06-release-runbook.md`
 - **验收**：质量（开发外壳与发布品牌相匹配）
 - **里程碑**：M5
@@ -2131,7 +2131,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M5
 - **状态**：单位覆盖（`user-select.test.mjs`）；场景已记录
 
-#### E2E-046：PI-Desktop 渲染器品牌和输入框图标边界
+#### E2E-046：Pi-Workspace 渲染器品牌和输入框图标边界
 
 - **先决条件**：应用程序在英语和中中文语言环境中运行，并带有
   空荡荡的家和可用的停靠成绩单。
@@ -2141,7 +2141,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
   效果并确认显示静止首帧。 4）关注页脚设置和插件
   图标，然后每个 project/Temporary 会话创建控件。 5）打开设置
   和输入框输入。
-- **预期**：可见 shell 标识为 `PI-Desktop`；空荡荡的家英雄
+- **预期**：可见 shell 标识为 `Pi-Workspace`；空荡荡的家英雄
   渲染与当前主题匹配的 100px `HomeMascotLogo` GIF，首帧短暂停留后循环挥手；
   指针悬停不改变节奏或几何形状，减少运动时显示对应静止首帧。
   expanded/collapsed
@@ -3101,7 +3101,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   激活匹配会话之前的主窗口，即使通知已经进入 Windows 操作中心；
   没有事件打开错误当前选定的会话。中止不显示两个表面。操作系统抑制确实
   不会丢失持久行或出现误导性应用程序错误。每检查一次
-  Windows系统表面识别`PI-Desktop`；无库存 Electron 应用程序
+  Windows系统表面识别`Pi-Workspace`；无库存 Electron 应用程序
   姓名或身份被暴露。重复投递必须幂等：一个 durable id 最多拥有一个活动的本机对象，标记已读/清除会关闭该对象，迟到的激活或渲染器事件不能再次显示旧任务。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`，
   `04-ux/07-ui-design-system.md`、`04-ux/09-interaction-patterns.md`、
@@ -3185,7 +3185,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   `PI_DESKTOP_START_MAXIMIZED=1` 在启动之前，以便 Main 最大化隐藏
   渲染器安装之前的本机窗口。
 - **步骤**：1) 在 macOS 上，启动 `pnpm dev` 和打包版本。确认
-  应用程序菜单标题为 PI-Desktop，打开“关于 PI-Desktop”，然后检查
+  应用程序菜单标题为 Pi-Workspace，打开“关于 Pi-Workspace”，然后检查
   它的名称、版本和图标。然后打开每个系统菜单并调用“新建任务”、“打开”
   项目、设置、全局搜索、侧边栏切换、编辑、
   zoom/fullscreen、窗口、帮助、日志和检查更新操作。验证
@@ -3215,9 +3215,9 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   当窗口存在时以及窗口关闭后。 7) 在其基础上构建每个目标
   来自干净的发布主机目录的本机运行器。在 Windows 上检查已安装应用的
   任务栏按钮和“开始”菜单快捷方式图标。
-- **预期**：macOS 开发和打包发布显示 PI-Desktop 作为
+- **预期**：macOS 开发和打包发布显示 Pi-Workspace 作为
   本机应用程序标识，并且“关于”面板使用规范
-PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标。
+Pi-Workspace 图标；两个表面都不会暴露库存 Electron 名称或图标。
   macOS 遵循本机菜单约定和加速器。
   Windows/Linux 窗口内不显示应用程序菜单；导航和
   右侧控件不会与拖动区域、键盘快捷键发生冲突
@@ -3234,7 +3234,7 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   有易于理解的名称；第一个用户或助理成绩单行从不
   在它们下面绘制，扩展页面标题操作或
   插件详细信息表关闭按钮。未知操作失败关闭。已安装 Windows 应用的任务栏按钮
-  和“开始”菜单快捷方式使用 PI-Desktop 图标，而不是 Electron 默认图标。每个包装
+  和“开始”菜单快捷方式使用 Pi-Workspace 图标，而不是 Electron 默认图标。每个包装
   包含目标本机主机二进制文件（`.exe` 仅在 Windows 上）。通过这个场景 Windows/Linux
   证明 shell 已准备就绪，而不是首次发布资格。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`，
@@ -3510,10 +3510,10 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
 
 #### E2E-069：特定于平台的侧边栏标题行为
 
-- **先决条件**：PI-Desktop 已打开，并带有扩展的侧边栏和聊天室
+- **先决条件**：Pi-Workspace 已打开，并带有扩展的侧边栏和聊天室
   会话处于活动状态。
 - **步骤**： 1) 在 macOS 窗口模式下打开扩展。 2）检查展开的
-  侧边栏标题栏。 3) 确认没有 PI-Desktop logo/title 可见，折叠
+  侧边栏标题栏。 3) 确认没有 Pi-Workspace logo/title 可见，折叠
   侧边栏出现在交通灯的右侧。 4) 输入
   全屏并检查同一行。 5) 在Windows/Linux上，确认品牌
   仍然可见；用指针激活它，然后用键盘焦点激活它
@@ -3537,7 +3537,7 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
 
 #### E2E-098：侧边栏折叠和展开动画作为停靠过渡
 
-- **先决条件**：PI-Desktop 打开并带有扩展的侧边栏和活动的
+- **先决条件**：Pi-Workspace 打开并带有扩展的侧边栏和活动的
   聊天会话； `prefers-reduced-motion` 已关闭。
 - **步骤**： 1) 单击展开的侧边栏标题中的折叠侧边栏（或按
   侧边栏切换快捷方式）。 2）折叠时观察侧边栏。 3) 确认
@@ -3563,7 +3563,7 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
 
 #### E2E-070：本机选择菜单在整个应用程序中遵循 Windows 主题
 
-- **先决条件**：PI-Desktop 在 Windows 上运行，有光和暗
+- **先决条件**：Pi-Workspace 在 Windows 上运行，有光和暗
   可用的主题。
 - **步骤**：1）在浅色主题中，打开仍存在的本机选择（计划任务表单），并确认设置里的常规、全局 AI 和技能导入模式选择器都是应用内菜单而不是平台 `<select>`。2）以深色主题重复剩余本机列表。3）切换主题后无需重启即可再次打开每个列表。
 - **预期**：设置里的紧凑选择器使用共享锚定菜单。每个仍存在的关闭本机触发器和打开的本机选项列表都使用活动主题的可读 foreground/background 配对。没有黑暗主题列表退回到带有浅色文本的浅色 Windows 表面，没有浅色主题列表使用深色主题墨水，更改主题会更新后续打开。同样的结果适用于设置之外的本机选择。
@@ -3698,7 +3698,7 @@ IPC 请求无法关闭。
 - **封面**：A，品质/US-UI 外壳抛光
 - **先决条件**：应用程序启动路径可用（开发或打包）。
 - **步骤**：
-  1.启动PI-Desktop。
+  1.启动Pi-Workspace。
   2. 在引导完成之前观察第一个绘制的渲染器表面。
   3. 等待 sessions/settings 引导程序完成。
   4. 如果可用，请对 OS `prefers-reduced-motion: reduce` 重复此操作。
@@ -4090,7 +4090,7 @@ IPC 请求无法关闭。
 
 #### E2E-AGENTS-002：全局设置和项目菜单管理指令文件
 
-- **先决条件**：PI-Desktop 正在运行；可以打开一个项目。
+- **先决条件**：Pi-Workspace 正在运行；可以打开一个项目。
 - **步骤**：
   1. 在没有活动项目的情况下打开设置 -> 说明并保存全局
      内容。
@@ -4186,8 +4186,8 @@ IPC 请求无法关闭。
 
 - **先决条件**：未签名的 macOS 调试打包已为至少一个本机架构生成 DMG 和 ZIP 工件。
 - **步骤**：1) 检查 DMG，确认窗口里只有应用与 Applications 链接。2) 不解压应用内容，
-  检查 ZIP 根目录，确认既没有 `PI-Desktop-macOS-opening-help.txt`，也没有
-  `PI-Desktop-macOS-open.command`。3) 确认 ZIP 中的应用仍可正常安装。
+  检查 ZIP 根目录，确认既没有 `Pi-Workspace-macOS-opening-help.txt`，也没有
+  `Pi-Workspace-macOS-open.command`。3) 确认 ZIP 中的应用仍可正常安装。
 - **预期**：DMG 使用带品牌的 720×440 背景，只包含应用与 Applications 链接；ZIP 包含
   应用，但两种首次启动指引文件都不存在。签名和未签名 macOS 工件均遵循此规则；签名、
   公证和更新程序行为保持不变。
@@ -4208,13 +4208,13 @@ IPC 请求无法关闭。
 
 #### E2E-212：GitHub Release 启动 CNB 镜像流水线
 
-- **前提条件**：`vastsa/PI-Desktop` 已配置仓库密钥 `CNB_MIRROR_TOKEN`；
+- **前提条件**：`xiognws/Pi-Workspace` 已配置仓库密钥 `CNB_MIRROR_TOKEN`；
   `aixk/Pi-Desktop` 上的 CNB 流水线监听 `api_trigger_mirror`；已有带上传
   工件的 GitHub Release 标签（例如 `vX.Y.Z`）。
 - **步骤**：1) 发布或编辑该 GitHub Release，或对 `mirror-to-cnb.yml` 传入
   同一标签手动运行。2) 检查 Actions 日志中的解析标签以及对
   `api.cnb.cool` 的 POST。3) 确认 CNB 流水线以该标签作为 `MIRROR_TAGS` 启动。
-- **预期**：作业仅在 `vastsa/PI-Desktop` 上运行。没有 `vX.Y.Z` 标签的手动
+- **预期**：作业仅在 `xiognws/Pi-Workspace` 上运行。没有 `vX.Y.Z` 标签的手动
   运行会在调用 CNB 之前失败。缺少 `CNB_MIRROR_TOKEN` 时失败退出。JSON
   请求体由 `jq` 构造（不是 YAML 字符串插值）。GitHub Release 工件和更新源
   不变；CNB 只是同一标签的镜像。
@@ -4242,9 +4242,9 @@ IPC 请求无法关闭。
      可执行文件和 `Resources/bin/pi-desktop-host-core`；确认 arm64 和
      x86_64 软件包只包含声明的架构，且 Rust 主机与 Electron 应用一致。
      确认共享的 `apps/desktop/package.json` macOS 配置生成 arm64 文件
-     `PI-Desktop-X.Y.Z-arm64.dmg` 和 `PI-Desktop-X.Y.Z-arm64-mac.zip`，
-     Intel 工件使用 `PI-Desktop-X.Y.Z-x64.dmg` 和
-     `PI-Desktop-X.Y.Z-x64-mac.zip`；确认发布目录包含 DMG、ZIP 和合并后的
+     `Pi-Workspace-X.Y.Z-arm64.dmg` 和 `Pi-Workspace-X.Y.Z-arm64-mac.zip`，
+     Intel 工件使用 `Pi-Workspace-X.Y.Z-x64.dmg` 和
+     `Pi-Workspace-X.Y.Z-x64-mac.zip`；确认发布目录包含 DMG、ZIP 和合并后的
      `latest-mac.yml` 更新源，且更新源中的 URL 和校验和与这些打包工件一致。
   4. 配置环回装置提供程序，禁用外部出口，然后
      从干净的配置文件启动。英文和简体切换
@@ -5622,7 +5622,7 @@ eleven-tool-round desktop paths are verified by
   名称是 `无限画布`。配置一个流传输速度足够慢以停止的提供程序
   部分答案。在 macOS 上运行一次，在 Windows 上运行一次。
 - **步骤**：
-  1. 在 PI-Desktop 未聚焦的情况下，在 macOS 上按 Option+Space 或在
+  1. 在 Pi-Workspace 未聚焦的情况下，在 macOS 上按 Option+Space 或在
      Windows，而另一个应用程序拥有前台窗口。确认一个
      居中的启动器出现在指针的显示屏上，没有本机关闭，
      最小化、最大化、调整大小或任务栏控件，并且 Windows 不显示
@@ -6255,7 +6255,7 @@ eleven-tool-round desktop paths are verified by
   macOS 侧边栏将折叠侧边栏放在右侧相同的位置
   行，没有 Logo/Home 品牌或 back/forward 按钮。
 
-### US-UI-17 PI-Desktop 家庭英雄标志
+### US-UI-17 Pi-Workspace 家庭英雄标志
 - 在空聊天主页上，100px `HomeMascotLogo` GIF 在标题上方呈现
   八帧挥手吉祥物，并在首帧稍作停留。浅色和深色主题各使用一套
   GIF 和静止 PNG。
@@ -6281,7 +6281,7 @@ eleven-tool-round desktop paths are verified by
 ### US-UI-19 永久舞台管理器边界恢复（仅 macOS）
 - 在使用 Stage Manager 的 macOS 上，缩小或取消聚焦 PI 窗口，直到宽度 < 800 或高度 < 560。
 - 预计外壳会重新声明类似 Codex 的足迹（~1200×800，最小 800×560，按显示器工作区裁剪）并在仍然折叠的情况下继续恢复（不仅在发射后的前 20 秒内）。
-- 该恢复看门狗仅限 macOS（D447）。在 Windows/Linux 上它必须完全不运行：应用绝不能在无人操作时重新调整或抬升自己的窗口。聚焦其他窗口，确认 PI-Desktop 留在其后方而不是跳回窗口栈顶端，并且栈序检查（`xprop -root _NET_CLIENT_LIST_STACKING`）不会显示它周期性回到顶端。
+- 该恢复看门狗仅限 macOS（D447）。在 Windows/Linux 上它必须完全不运行：应用绝不能在无人操作时重新调整或抬升自己的窗口。聚焦其他窗口，确认 Pi-Workspace 留在其后方而不是跳回窗口栈顶端，并且栈序检查（`xprop -root _NET_CLIENT_LIST_STACKING`）不会显示它周期性回到顶端。
 
 ### US-UI-20 深色浮动编辑框
 - 在聊天主页切换到深色主题。
@@ -6406,8 +6406,8 @@ eleven-tool-round desktop paths are verified by
 - 占位符和批准芯片在浅色和深色板上仍然清晰可见。
 
 ### US-UI-39 主标记 + 英雄标题光学
-- 空置 PI-Desktop 标记可见（并非几乎不可见）；笔划密度保持可读，没有装饰性重影效果。
-- 项目的空主标题使用可读的项目标签范围（短基本名称可能显示为 `PI-Desktop` 以实现光学奇偶校验）。
+- 空置 Pi-Workspace 标记可见（并非几乎不可见）；笔划密度保持可读，没有装饰性重影效果。
+- 项目的空主标题使用可读的项目标签范围（短基本名称可能显示为 `Pi-Workspace` 以实现光学奇偶校验）。
 
 ### US-UI-40 主页内容宽度与 rem root
 - 在 1200×690 光空的家里，输入框板外部宽度为〜744–760px（不是〜640px）。
@@ -6476,7 +6476,7 @@ eleven-tool-round desktop paths are verified by
 ### US-UI-46 Home-with-project Composer chrome
 - 在空荡荡的家里打开一个项目（没有成绩单）。
 - 预计板上没有连接工作区控件；没有遗留草案
-  标记，占位符使用 PI-Desktop 副本。
+  标记，占位符使用 Pi-Workspace 副本。
 - 模型芯片显示当前模型ID；页脚使用循环本地用户
   字形、两行自定义/本地配置文件标识、披露 V 形符号和
   单独的“帮助”→“设置信息”控件。
@@ -6907,9 +6907,9 @@ eleven-tool-round desktop paths are verified by
 - **先决条件**：在 macOS、Windows 和 Linux 上构建桌面应用程序；英语
   和 zh-CN 语言环境可用；正常的主窗口打开。
 - **步骤**：1）在 Windows 上最大化主窗口，然后单击其任务栏按钮；确认窗口最小化，
-  PI-Desktop 的任务栏项仍然存在。再次单击同一任务栏按钮；还原过渡结束后，确认
+  Pi-Workspace 的任务栏项仍然存在。再次单击同一任务栏按钮；还原过渡结束后，确认
   窗口仍在最大化状态、边界符合显示器工作区，且任务栏仍可见。用其他应用覆盖窗口，
-  再单击 PI-Desktop 的任务栏项，确认窗口回到前台且没有隐藏到托盘。2）在 macOS 上
+  再单击 Pi-Workspace 的任务栏项，确认窗口回到前台且没有隐藏到托盘。2）在 macOS 上
   单击交通灯最小化控件，确认窗口隐藏到托盘。3）在 Windows/Linux 上使用渲染器最小化控件，
   确认原生任务栏项仍然存在；再次单击后确认同一窗口还原并聚焦。选择“关闭到托盘”并关闭
   Windows/Linux 窗口，确认任务栏项消失且可从托盘恢复；选择“退出”并重复，确认进程退出。
@@ -6920,7 +6920,7 @@ eleven-tool-round desktop paths are verified by
   工作区，任务栏保持可见。单击被覆盖窗口的任务栏项会将窗口带到前台。Windows/Linux 上
   只有“关闭到托盘”会隐藏窗口；“退出”会结束进程。macOS 菜单栏图标是清晰的透明单色 PI
   标记，不带圆角应用磁贴，原生最小化仍隐藏到托盘。“显示”、托盘图标点击/双击及应用激活
-  会恢复现有窗口；本地化菜单包含“显示 PI-Desktop”和“退出 PI-Desktop”。退出按正常顺序关闭，
+  会恢复现有窗口；本地化菜单包含“显示 Pi-Workspace”和“退出 Pi-Workspace”。退出按正常顺序关闭，
   不留下孤立的主机、sidecar 或托盘进程。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`、`03-runtime/07-process-model.md`、
   `04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`、
@@ -6944,7 +6944,7 @@ eleven-tool-round desktop paths are verified by
   日志文件：已有窗口被恢复并聚焦，重复的进程退出，运行中实例的会话列表、进行中
   的轮次和 `pi.sqlite` 都不受影响。步骤 4 作为面向自有数据目录的独立实例正常
   启动。步骤 5 同样正常启动：开发构建使用自己的 `userData` 与
-  `~/.pi-desktop-dev`，既不等待也不打扰正在运行的正式版。步骤 6 干净地启动单个
+  `~/.piworkspace-dev`，既不等待也不打扰正在运行的正式版。步骤 6 干净地启动单个
   实例，证明锁在退出时释放，不会留下过期阻塞。
 - **链接规格**：`03-runtime/07-process-model.md`、
   `08-meta/decisions-log.md`（D236、D599、D002）、ADR 0094
@@ -6986,7 +6986,7 @@ eleven-tool-round desktop paths are verified by
 #### E2E-126：外观卡片选择全局界面字体
 
 - **前置条件**：应用在 macOS 上运行，系统装有与内置令牌栈不同的字体
-  （例如 PingFang SC）；使用干净的 `~/.pi-desktop` 配置。
+  （例如 PingFang SC）；使用干净的 `~/.piworkspace` 配置。
 - **步骤**：
   1) 打开设置 → 常规，确认外观卡片在主题与语言下方显示一个字体行，
      触发器标签为「跟随系统」。
@@ -7019,7 +7019,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-193：外观卡片设置全局文字缩放
 
-- **前置条件**：干净的 `~/.pi-desktop` 配置，并有一条能看到会话内容、输入框和侧栏的对话。
+- **前置条件**：干净的 `~/.piworkspace` 配置，并有一条能看到会话内容、输入框和侧栏的对话。
 - **步骤**：
   1) 打开设置 → 常规，确认外观卡片在字体行下方显示字体大小，「大杯」选中，滑杆为 100%。
   2) 选择「超大杯」。确认会话、输入框、设置标签、侧栏会话标题和 Lucide 图标无需重载即按相对阶一起变大，控件显示 115%。
@@ -7335,7 +7335,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-160：跨显示器拖动窗口保持放下的位置
 
-- **前置条件**：PI-Desktop 在拥有两块并排显示器的机器上打开，最好两块显示器的
+- **前置条件**：Pi-Workspace 在拥有两块并排显示器的机器上打开，最好两块显示器的
   工作区域不同（只有一块带菜单栏或任务栏，或分辨率不同）。工作面板关闭和
   以确定宽度打开各执行一次。
 - **步骤**：
@@ -7399,7 +7399,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-167：原生边缘调整大小保持流畅并保存稳定边界
 
-- **前置条件**：PI-Desktop 在 macOS、Windows 或 Linux 上以普通、未最大化
+- **前置条件**：Pi-Workspace 在 macOS、Windows 或 Linux 上以普通、未最大化
   窗口打开。工作面板关闭时执行一次，以确定宽度打开时再执行一次。
 - **步骤**：
   1. 缓慢拖动每个可用窗口边缘和一个角落，中途短暂停顿后松开鼠标。
@@ -7425,7 +7425,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-168：展开侧边栏宽度跟随锚定的调整手势
 
-- **前置条件**：PI-Desktop 在聊天 Shell 中打开，侧边栏已展开，并显示一个保留的项目/会话。
+- **前置条件**：Pi-Workspace 在聊天 Shell 中打开，侧边栏已展开，并显示一个保留的项目/会话。
 - **步骤**：
   1. 从默认宽度拖动侧边栏右边缘手柄向两个方向调整，包含一次中途短暂停顿的慢速拖动，然后释放。
   2. 确认主窗格连续回流，指针按下时侧边栏没有跳变。
@@ -7570,7 +7570,7 @@ eleven-tool-round desktop paths are verified by
 
 - **前提条件**：可以打开设置；本机可以启动系统浏览器。
 - **步骤**：1）打开设置 → 信息。2）确认「应用」行显示当前版本。3）用设置搜索查找「问题反馈」。4）点击「打开 GitHub」。
-- **预期**：该行可被设置搜索索引，并停留在信息页。动作调用 `pi-desktop/app/openFeedback`，渲染器不提供 URL。Main 打开 `https://github.com/vastsa/PI-Desktop/issues/new`，带 `template=bug_report.yml`，并预填 `app-version`、`os` 和 `environment`。GitHub bug 表单仍要求描述、复现步骤、预期、实际、版本和操作系统；空白 issue 保持禁用。
+- **预期**：该行可被设置搜索索引，并停留在信息页。动作调用 `pi-desktop/app/openFeedback`，渲染器不提供 URL。Main 打开 `https://github.com/xiognws/Pi-Workspace/issues/new`，带 `template=bug_report.yml`，并预填 `app-version`、`os` 和 `environment`。GitHub bug 表单仍要求描述、复现步骤、预期、实际、版本和操作系统；空白 issue 保持禁用。
 - **链接规格**：`04-ux/06-settings-ia.md`、`03-runtime/01-ipc-protocol.md`、
   `06-delivery/03-ai-development-workflow.md`、`08-meta/decisions-log.md`（D313）、ADR 0157
 - **验收**：H（诊断）、质量
@@ -7768,7 +7768,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-189：随应用打包的 Advisor 插件暂时不可用
 
-- **前提条件**：PI-Desktop 的打包版或开发构建。
+- **前提条件**：Pi-Workspace 的打包版或开发构建。
 - **步骤**：
   1. 检查随应用打包的插件资源，确认不存在 `pi.advisor`。
   2. 打开命令面板和插件设置，确认不存在 `/advisor`、Advisor 插件及其
@@ -7883,7 +7883,7 @@ eleven-tool-round desktop paths are verified by
 
 - **前提条件**：全新的 Windows 11 x64 或 ARM64 机器/配置，没有单独安装 Visual C++
   Redistributable、Node.js 或其他本地代理运行时；已有 x64 NSIS 安装程序。
-- **步骤**：1）安装 PI-Desktop。2）首次启动。3）等待启动 splash 让出给主 shell。4）检查运行时和
+- **步骤**：1）安装 Pi-Workspace。2）首次启动。3）等待启动 splash 让出给主 shell。4）检查运行时和
   timing 日志，然后打开“设置 → 信息”。
 - **预期**：捆绑的 x64 `pi-desktop-host-core.exe` 启动并完成 `app.handshake`，没有
   `0xC0000135`（`STATUS_DLL_NOT_FOUND`）；shell 不会停留在“无法连接本地服务”，主机状态健康，
@@ -7896,18 +7896,18 @@ eleven-tool-round desktop paths are verified by
 #### E2E-211：Windows 便携版 ZIP 解压后即可启动（D603）
 
 - **前提条件**：Windows x64 标签或 `dist:win` 包已从共享 electron-builder 配置
-  产出 `PI-Desktop-Setup-<version>.exe` 和 `PI-Desktop-Portable-<version>.zip`；
+  产出 `Pi-Workspace-Setup-<version>.exe` 和 `Pi-Workspace-Portable-<version>.zip`；
   有干净用户配置；账户是无需管理员提升的标准用户。
 - **步骤**：1) 检查发布目录和 `latest.yml`。2) 将便携版 ZIP 解压到用户可写目录，
-  不运行 NSIS 安装程序。3) 启动解压后的 `PI-Desktop.exe`。4) 确认没有管理员提示，
-  且运行中的应用显示 PI-Desktop 图标和任务栏入口。5) 打开设置 → 关于，确认默认选择
+  不运行 NSIS 安装程序。3) 启动解压后的 `Pi-Workspace.exe`。4) 确认没有管理员提示，
+  且运行中的应用显示 Pi-Workspace 图标和任务栏入口。5) 打开设置 → 关于，确认默认选择
   手动；短暂选择自动并查看替换警告，再恢复手动。6) 调用检查更新。7) 确认设置 → 关于
   提供发布页而不是“重启以更新”。8) 退出并再次启动解压后的可执行文件。
 - **预期**：两个 Windows 工件都无空格并已上传。`latest.yml` 只指向 NSIS 安装程序。
-  ZIP 解压后的应用无需安装向导或管理员提示即可启动，保持正常的 PI-Desktop 任务栏
+  ZIP 解压后的应用无需安装向导或管理员提示即可启动，保持正常的 Pi-Workspace 任务栏
   标识和图标，使用现有应用数据目录，并默认选择更新偏好 `manual`、报告有效更新模式
   `manual`。可用更新不会下载或运行
-  `PI-Desktop-Setup-<version>.exe`。再次启动从同一配置恢复会话。
+  `Pi-Workspace-Setup-<version>.exe`。再次启动从同一配置恢复会话。
 - **链接规格**：`01-product/01-product-scope.md`、
   `06-delivery/06-release-runbook.md`、`03-runtime/07-process-model.md`、
   ADR 0197 / D603
@@ -8027,7 +8027,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-209：从本地智能体存储导入模型配置
 
-- **前提条件**：至少有一个受支持的本地配置，来源包括 `~/.claude/settings.json`、`~/.codex/config.toml` 的 `[model_providers.*]`、`~/.config/opencode/opencode.json`、`~/.pi/agent/models.json` 或 `~/.cc-switch/cc-switch.db`；其中包含同一端点、不同 API key 的两个配置档案，并可选包含一个仅 OAuth 的厂商。PI-Desktop 中可以已有等价提供商。
+- **前提条件**：至少有一个受支持的本地配置，来源包括 `~/.claude/settings.json`、`~/.codex/config.toml` 的 `[model_providers.*]`、`~/.config/opencode/opencode.json`、`~/.pi/agent/models.json` 或 `~/.cc-switch/cc-switch.db`；其中包含同一端点、不同 API key 的两个配置档案，并可选包含一个仅 OAuth 的厂商。Pi-Workspace 中可以已有等价提供商。
 - **步骤**：1) 打开设置 → 模型并展开“从其他工具导入”，确认扫描前工作台为空闲状态。2) 扫描模型配置，确认来源组默认展开、候选行显示名称/模型数/主机/API key 或 No API key 徽章，且界面和扫描 IPC payload 都没有秘密值。3) 导入选中的提供商，确认同端点的不同密钥成为独立记录并可在 Composer 模型菜单中选择；再次导入同一选择，确认未变化的凭据被跳过。4) 若应用此前没有默认模型，确认首个导入提供商成为默认；若已有默认值，确认其不变。5) 确认仅 OAuth 的来源账户不会出现在候选列表中。
 - **预期**：只有显式扫描（D007）。已存储的 API key 写入宿主密钥库。只有等价提供商（归一化 URL + API 风格 + 相同凭据）会跳过；同端点的不同凭据保持独立。协议与 schema 版本不升级。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md` §18.5、`03-runtime/01-ipc-protocol.md`、`03-runtime/11-provider-model-system.md`、ADR 0179、D342
@@ -8057,7 +8057,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-220：本地 MCP 控制驱动运行中的桌面
 
-- **前提条件**：使用 `PI_DESKTOP_MCP_CONTROL=1` 和干净配置启动 PI-Desktop。
+- **前提条件**：使用 `PI_DESKTOP_MCP_CONTROL=1` 和干净配置启动 Pi-Workspace。
   有可用的本地项目目录，Electron 用户数据目录可写，桌面已完成后端启动。
 - **步骤**：1）读取 `mcp-control.json`，使用其中的 URL 和 bearer token。2）调用
   `initialize`、`tools/list` 和 `pi_control_describe`。3）调用 `pi_project_open` 打开
@@ -8081,7 +8081,7 @@ eleven-tool-round desktop paths are verified by
 
 #### E2E-MCP-session-get-projects-large-compaction：超大 compaction 记录不再让 pi_session_get 整包截断
 
-- **前提条件**：使用 `PI_DESKTOP_MCP_CONTROL=1` 启动 PI-Desktop。存在一个持久会话，其
+- **前提条件**：使用 `PI_DESKTOP_MCP_CONTROL=1` 启动 Pi-Workspace。存在一个持久会话，其
   `session.compaction` 记录（`summary` / `retainedTail` / `details.modifiedFiles`）单独
   序列化即超过 512 KiB 的 MCP 结果上限。
 - **步骤**：1）读取 `mcp-control.json`，用其 URL 和 bearer token 完成 MCP 握手。2）对该会话
@@ -8457,12 +8457,12 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 #### E2E-239：旧版构建会指出数据 schema 更新，而不是循环重启
 
-- **前提条件**：数据目录上次由更新版 PI-Desktop 打开，其 host-core 已把
+- **前提条件**：数据目录上次由更新版 Pi-Workspace 打开，其 host-core 已把
   schema 迁移到超出当前构建支持的版本。
 - **步骤**：1）用旧版打包应用打开该数据目录。2）观察横幅和
   `logs/app/runtime.log`。
 - **预期**：host-core 只退出一次；日志中没有后续重启尝试。致命横幅说明当前
-  PI-Desktop 比本地数据更旧，显示两个 schema 版本号，并提示安装更新版本。数据
+  Pi-Workspace 比本地数据更旧，显示两个 schema 版本号，并提示安装更新版本。数据
   目录未被修改。
 - **链接规格**：`03-runtime/07-process-model.md`（启动结果）
 - **验收**：B
@@ -9895,7 +9895,7 @@ Follow the [current S3 acceptance scenario](/spec/06-delivery/04-e2e-test-plan#e
 **自动化：** `node --test apps/desktop/test/slash-command-source.test.mjs`、
 `node --test apps/desktop/test/session-transcript-empty-read.test.mjs`、
 `node --test apps/desktop/test/plugin-timeout-budgets.test.mjs`、
-`pnpm --filter @pi-desktop/shared test`、`pnpm --filter @pi-desktop/host-runtime test`。
+`pnpm --filter @pi-workspace/shared test`、`pnpm --filter @pi-workspace/host-runtime test`。
 
 ## E2E-PROVIDER-endpoint-guidance-and-search
 

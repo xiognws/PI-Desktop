@@ -18,7 +18,7 @@ const {
   PLUGIN_COMPOSER_SUGGESTION_MAX_CHARS,
   PLUGIN_COMPOSER_SUGGESTION_TTL_MS,
   PLUGIN_COMPOSER_SUGGESTION_TTL_MAX_MS,
-} = await import("@pi-desktop/plugin-sdk");
+} = await import("@pi-workspace/plugin-sdk");
 
 function forkPluginProcess({ entry }) {
   const child = fork(entry, [], { stdio: ["ignore", "pipe", "pipe", "ipc"] });

@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { PlanningState, RadialMenuAction, UiMessage } from "@pi-desktop/shared";
-import { proposalKindForMode } from "@pi-desktop/shared";
+import type { PlanningState, RadialMenuAction, UiMessage } from "@pi-workspace/shared";
+import { proposalKindForMode } from "@pi-workspace/shared";
 import { ConversationMinimap } from "../../../components/ConversationMinimap";
 import { RadialMenu, type RadialMenuSlot } from "../../../components/RadialMenu";
 import { PermissionCard } from "../../../components/PermissionCard";

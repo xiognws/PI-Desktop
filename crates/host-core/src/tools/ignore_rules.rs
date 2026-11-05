@@ -10,13 +10,15 @@
 //!    the same way it already bypasses parent `.gitignore` rules.
 //! 3. Workspace rules: a gitignore-style `.pi-desktopignore` at the workspace
 //!    root, honored by unscoped walks.
-//! 4. User global rules: `<data_dir>/ignore` (`~/.pi-desktop/ignore` by
+//! 4. User global rules: `<data_dir>/ignore` (`~/.piworkspace/ignore` by
 //!    default), honored by unscoped walks.
 
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 
 /// Workspace-root ignore file name (spec 15 §5).
+/// Frozen: a file users create inside their own workspaces, so the spelling is
+/// part of the tool contract rather than branding (ADR 0381).
 pub const WORKSPACE_IGNORE_FILE: &str = ".pi-desktopignore";
 
 /// Exact file names on the security denylist (spec 15 §3).

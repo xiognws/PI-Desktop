@@ -1,4 +1,4 @@
-# PI-Desktop Docs
+# Pi-Workspace Docs
 
 `docs/` is a VitePress project. The published site starts at [`index.md`](index.md);
 the repository's English technical source of truth remains organized under

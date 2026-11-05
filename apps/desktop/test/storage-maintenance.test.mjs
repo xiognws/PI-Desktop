@@ -16,12 +16,12 @@ async function assertMode(target, expected) {
 const { build } = createRequire(new URL("../../../packages/agent-runtime/package.json", import.meta.url))("esbuild");
 const storageDirectory = fileURLToPath(new URL("../electron/main/storage/", import.meta.url));
 const result = await build({
-  stdin: { contents: ['files', 'preferences', 'bootstrap', 'startup-recovery', 'ipc'].map((name) => `export * from "./${name}";`).join("\n") + '\nexport { IPC } from "@pi-desktop/shared";\nexport { catalogs } from "@pi-desktop/i18n";', resolveDir: storageDirectory, loader: "ts" },
+  stdin: { contents: ['files', 'preferences', 'bootstrap', 'startup-recovery', 'ipc'].map((name) => `export * from "./${name}";`).join("\n") + '\nexport { IPC } from "@pi-workspace/shared";\nexport { catalogs } from "@pi-workspace/i18n";', resolveDir: storageDirectory, loader: "ts" },
   bundle: true, platform: "node", format: "esm", write: false,
   alias: { "original-fs": "node:fs" },
   plugins: [{ name: "external-storage-boundaries", setup(builder) {
-    builder.onResolve({ filter: /^@pi-desktop\/shared$/ }, () => ({ path: fileURLToPath(new URL("../../../packages/shared/src/protocol.ts", import.meta.url)) }));
-    builder.onResolve({ filter: /^@pi-desktop\/i18n$/ }, () => ({ path: fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)) }));
+    builder.onResolve({ filter: /^@pi-workspace\/shared$/ }, () => ({ path: fileURLToPath(new URL("../../../packages/shared/src/protocol.ts", import.meta.url)) }));
+    builder.onResolve({ filter: /^@pi-workspace\/i18n$/ }, () => ({ path: fileURLToPath(new URL("../../../packages/i18n/src/index.ts", import.meta.url)) }));
     builder.onResolve({ filter: /^(electron|node:child_process)$|host-process$/ }, (args) => {
       if (args.path === "node:child_process" && args.importer.endsWith("link-types.ts")) return { path: args.path, external: true };
       return { path: args.path, namespace: "storage-test-boundary" };
@@ -186,7 +186,7 @@ test("recovery can select a data directory and keep the installation browser pro
   assert.deepEqual(harness.paths, [["sessionData", value.roots.browser]]);
 });
 
-test("recovery rejects a selected folder without an existing PI-Desktop database", { timeout: 60_000 }, async (t) => {
+test("recovery rejects a selected folder without an existing Pi-Workspace database", { timeout: 60_000 }, async (t) => {
   const value = await fixture(t, { dataMissing: true }); resetHarness(value.anchor);
   const invalidRoot = join(value.root, "not-a-profile");
   await mkdir(invalidRoot);

@@ -1,6 +1,6 @@
 import { memo, useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReviewChangeStatus, UiMessage } from "@pi-desktop/shared";
+import type { ReviewChangeStatus, UiMessage } from "@pi-workspace/shared";
 import { IconChevronDown, IconChevronRight } from "../../../components/icons";
 import { Button, cx } from "../../../components/ui";
 import { requestReviewFocus } from "../../../lib/review-focus-request";

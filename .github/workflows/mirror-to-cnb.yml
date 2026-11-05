@@ -3,7 +3,7 @@
 # source; CNB copies the same tag so Chinese users can pull from
 # https://cnb.cool/aixk/Pi-Desktop.
 #
-# Prerequisite (already configured on vastsa/PI-Desktop):
+# Prerequisite (already configured on xiognws/Pi-Workspace):
 # repository secret CNB_MIRROR_TOKEN, with permission to start builds
 # on aixk/Pi-Desktop. The CNB pipeline listens for event
 # `api_trigger_mirror` and reads `MIRROR_TAGS`.
@@ -30,7 +30,7 @@ concurrency:
 jobs:
   trigger:
     name: Trigger CNB mirror pipeline
-    if: github.repository == 'vastsa/PI-Desktop'
+    if: github.repository == 'xiognws/Pi-Workspace'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:

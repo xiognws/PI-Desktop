@@ -21,13 +21,13 @@
  * upstream isolate its prompt cache.
  */
 
-import { addressesPublishedVendorHost } from "@pi-desktop/shared";
+import { addressesPublishedVendorHost } from "@pi-workspace/shared";
 import type { SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { clampOpenAIPromptCacheKey } from "@earendil-works/pi-ai/api/openai-prompt-cache";
 import { isOpenCodeEndpoint } from "./opencode-session-headers.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
 
-/** Wire APIs where PI-Desktop preserves session identity for custom endpoints. */
+/** Wire APIs where Pi-Workspace preserves session identity for custom endpoints. */
 const SESSION_AFFINITY_APIS: ReadonlySet<string> = new Set([
   "openai-completions",
   "anthropic-messages",
@@ -59,7 +59,7 @@ export type SessionAffinityCompat = {
 export type SessionAffinityProvider = Pick<RuntimeProviderConfig, "apiStyle" | "vendorKey">;
 
 /**
- * Whether PI-Desktop stamps this request itself.
+ * Whether Pi-Workspace stamps this request itself.
  *
  * False for every endpoint that already answers the question: a wire API with
  * no session channel, the OpenCode path (whose own header is applied

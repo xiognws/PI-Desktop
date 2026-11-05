@@ -16,8 +16,8 @@ import {
   type CloseBehavior,
   type KeybindingOverrides,
   type NativeMenuAction,
-} from "@pi-desktop/shared";
-import { catalogs, resolveLocale } from "@pi-desktop/i18n";
+} from "@pi-workspace/shared";
+import { catalogs, resolveLocale } from "@pi-workspace/i18n";
 import { installApplicationMenu } from "../application-menu";
 import { isWindowFullScreen, setWindowFullScreen } from "../window-fullscreen";
 import { createTraySessions } from "../tray-sessions";

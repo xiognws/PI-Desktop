@@ -9,7 +9,7 @@
 
 Plan/Goal removed editing and delegation tools from the provider request while
 retaining earlier tool-call history. A model that repeats one of those names
-can be rejected by a strict gateway before PI-Desktop receives the call. The
+can be rejected by a strict gateway before Pi-Workspace receives the call. The
 application then cannot produce a tool result with that call's identity.
 Preserving a declaration and granting execution are separate responsibilities.
 

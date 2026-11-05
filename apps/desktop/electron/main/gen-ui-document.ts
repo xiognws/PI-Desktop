@@ -10,7 +10,7 @@ import {
   GEN_UI_WHEEL_MESSAGE,
   isGenUiErrorCode,
   type GenUiErrorCode,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   GEN_UI_ASSET_ORIGIN,
   type GenUiKit,

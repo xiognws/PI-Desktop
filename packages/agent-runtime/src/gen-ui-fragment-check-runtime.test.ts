@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEEPSEEK_MODELS } from "@earendil-works/pi-ai/providers/deepseek.models";
-import type { UiMessage } from "@pi-desktop/shared";
+import type { UiMessage } from "@pi-workspace/shared";
 import { modelConfigFromPi } from "./model-capabilities.js";
 import { DesktopAgentRuntime, type RuntimeProviderConfig } from "./runtime.js";
 

@@ -17,7 +17,7 @@ import type {
   SubagentDefinition,
   UserSkillRecord,
   UserSubagentRecord,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import { browserPluginTab, toolWorkPanelTab } from "../lib/work-panel-tabs";
@@ -138,7 +138,7 @@ export function installCaptureRig(): CaptureRig {
         ["user", "分组标题的字号再小一点"],
         [
           "assistant",
-          "已把分组标题从 `--text-sm` 调整为 `--text-2xs`，同时收紧了上下间距，现在与 PI-Desktop 的密度一致。",
+          "已把分组标题从 `--text-sm` 调整为 `--text-2xs`，同时收紧了上下间距，现在与 Pi-Workspace 的密度一致。",
         ],
         ["user", "最后跑一遍检查"],
         [
@@ -390,7 +390,7 @@ export function installCaptureRig(): CaptureRig {
           },
         },
         {
-          command: "pnpm --filter @pi-desktop/desktop build",
+          command: "pnpm --filter @pi-workspace/desktop build",
           status: "running" as const,
           details: undefined,
         },
@@ -1090,7 +1090,7 @@ export function installCaptureRig(): CaptureRig {
         const base = (ws.name || ws.path.split(/[\/]/).filter(Boolean).pop() || "").trim();
         if (base.length > 0 && base.length < 12) {
           useAppStore.setState({
-            workspace: { ...ws, name: "PI-Desktop" },
+            workspace: { ...ws, name: "Pi-Workspace" },
           });
         }
       }

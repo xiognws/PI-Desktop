@@ -9,7 +9,7 @@ import {
   type ProviderPublic,
   type ToolTokenUsage,
   type UiMessage,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 export { contextOccupancyTokens };
 

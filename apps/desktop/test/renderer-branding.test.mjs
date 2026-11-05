@@ -32,11 +32,11 @@ const [
     read("../src/lib/renderer-language.ts"),
   ]);
 
-test("renderer surfaces the PI-Desktop brand instead of the Codex shell brand", () => {
-  assert.match(english, /shellName:\s*"PI-Desktop"/);
-  assert.match(chinese, /shellName:\s*"PI-Desktop"/);
-  assert.match(english, /placeholder:\s*"Ask PI-Desktop to help with anything"/);
-  assert.match(chinese, /placeholder:\s*"让 PI-Desktop 帮你做任何事"/);
+test("renderer surfaces the Pi-Workspace brand instead of the Codex shell brand", () => {
+  assert.match(english, /shellName:\s*"Pi-Workspace"/);
+  assert.match(chinese, /shellName:\s*"Pi-Workspace"/);
+  assert.match(english, /placeholder:\s*"Ask Pi-Workspace to help with anything"/);
+  assert.match(chinese, /placeholder:\s*"让 Pi-Workspace 帮你做任何事"/);
   assert.doesNotMatch(english, /shellName:\s*"Codex"/);
   assert.doesNotMatch(chinese, /shellName:\s*"Codex"/);
   // Codex remains a supported external import source, not the app identity.

@@ -1,5 +1,5 @@
 import { BrowserWindow, Menu } from "electron";
-import { isWindowBackgroundColor, MAX_WINDOW_CORNER_RADIUS } from "@pi-desktop/plugin-sdk";
+import { isWindowBackgroundColor, MAX_WINDOW_CORNER_RADIUS } from "@pi-workspace/plugin-sdk";
 import {
   builtinWindowBackground,
   ErrorCodes,
@@ -13,7 +13,7 @@ import {
   type LifecycleDialogChoice,
   type TraySessionPreferences,
   type WorkPanelTabMenuAction,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   clampWorkPanelTabMenuPointToDip,
   parseWorkPanelTabMenuRequest,

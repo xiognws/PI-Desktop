@@ -92,7 +92,7 @@ function loadBadgeModule({ renderPng } = {}) {
   new Function("require", "exports", "module", outputText)(
     (id) => {
       if (id === "electron") return electron;
-      if (id === "@pi-desktop/shared") return { IPC };
+      if (id === "@pi-workspace/shared") return { IPC };
       if (id === "./taskbar-unread-overlay") return overlay;
       throw new Error(`unexpected dependency: ${id}`);
     },

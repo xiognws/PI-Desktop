@@ -17,7 +17,7 @@ await build({
       export { useAppStore } from "./src/stores/app-store";
       export { api } from "./src/lib/api";
       export { sidebarSessionStatus } from "./src/lib/sidebar-session-status";
-      export { PROTOCOL_VERSION } from "@pi-desktop/shared";
+      export { PROTOCOL_VERSION } from "@pi-workspace/shared";
     `,
     resolveDir: join(root, "apps/desktop"),
     loader: "ts",

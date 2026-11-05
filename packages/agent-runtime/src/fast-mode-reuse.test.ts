@@ -11,7 +11,7 @@ import {
   DesktopAgentRuntime,
   type RuntimeProviderConfig,
 } from "./runtime.js";
-import type { CommandShellOption } from "@pi-desktop/shared";
+import type { CommandShellOption } from "@pi-workspace/shared";
 
 /**
  * The `/fast` switch is resolved per launch, but the sidecar reuses a session's

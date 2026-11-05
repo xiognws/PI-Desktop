@@ -18,8 +18,8 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { catalogs, flattenCatalog } from "@pi-desktop/i18n";
-import { IPC } from "@pi-desktop/shared";
+import { catalogs, flattenCatalog } from "@pi-workspace/i18n";
+import { IPC } from "@pi-workspace/shared";
 import { SidebarMenuPanel } from "../../apps/desktop/src/components/SidebarMenuPanel";
 import { sidebarMenuAction, sidebarMenuSubmenu } from "../../apps/desktop/src/lib/sidebar-menu";
 import { WorktreeBadge, useWorktreeProjectMenuItems, useWorktreeSessionMenuItems } from "../../apps/desktop/src/features/worktree/WorktreeSidebarParts";
@@ -301,8 +301,8 @@ test("sidebar submenu opens on hover, click, and keyboard; worktree actions stil
       // Development React, like `pnpm dev`: StrictMode double-mounts effects.
       define: { "process.env.NODE_ENV": '"development"' },
       alias: {
-        "@pi-desktop/i18n": join(root, "packages/i18n/src"),
-        "@pi-desktop/shared": join(root, "packages/shared/src"),
+        "@pi-workspace/i18n": join(root, "packages/i18n/src"),
+        "@pi-workspace/shared": join(root, "packages/shared/src"),
         react: join(root, "apps/desktop/node_modules/react"),
         "react-dom": join(root, "apps/desktop/node_modules/react-dom"),
         i18next: join(root, "apps/desktop/node_modules/i18next"),

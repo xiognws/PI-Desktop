@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
-import { formatBytes as formatByteSize } from "@pi-desktop/shared";
+import { formatBytes as formatByteSize } from "@pi-workspace/shared";
 import { check } from "./check.js";
 import { pack } from "./pack.js";
 import { publish } from "./publish.js";
 import { TEMPLATE_NAMES, isTemplateName, scaffold } from "./templates.js";
 
-const USAGE = `pi-plugin — PI-Desktop plugin development commands
+const USAGE = `pi-plugin — Pi-Workspace plugin development commands
 
 Usage:
   pi-plugin init <template> <dir> [--id <id>] [--name <name>]

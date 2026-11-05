@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const { scanModelConfigs } = await import("../electron/main/importers/model-config.ts");
-const { publicModelConfigCandidate } = await import("@pi-desktop/shared");
+const { publicModelConfigCandidate } = await import("@pi-workspace/shared");
 
 test("scanModelConfigs reads Claude Code, OpenCode, Codex, and Pi stores", async () => {
   const home = await mkdtemp(join(tmpdir(), "pi-model-import-"));

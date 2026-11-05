@@ -1,5 +1,5 @@
 import type { Message } from "@earendil-works/pi-ai";
-import type { UiMessage } from "@pi-desktop/shared";
+import type { UiMessage } from "@pi-workspace/shared";
 import { describe, expect, it } from "vitest";
 import { omitOversizedImages } from "./image-admission.js";
 import { convertToLlm } from "./pi-runtime-messages.js";

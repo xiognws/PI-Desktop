@@ -1,9 +1,9 @@
 import { realpath, stat } from "node:fs/promises";
 import { basename, isAbsolute } from "node:path";
-import { RacpError } from "@pi-desktop/agent-host";
-import { loadProjectInstructions } from "@pi-desktop/agent-runtime";
-import { collectWorkspaceDiff, getWorkspaceFileIndex, isChatRefOutsideRoots, listDir, readOpenableFile, readOpenableImage, resolveChatFileRef } from "@pi-desktop/host-runtime";
-import type { RacpHostOperations } from "@pi-desktop/racp";
+import { RacpError } from "@pi-workspace/agent-host";
+import { loadProjectInstructions } from "@pi-workspace/agent-runtime";
+import { collectWorkspaceDiff, getWorkspaceFileIndex, isChatRefOutsideRoots, listDir, readOpenableFile, readOpenableImage, resolveChatFileRef } from "@pi-workspace/host-runtime";
+import type { RacpHostOperations } from "@pi-workspace/racp";
 
 /** File views are rooted in the explicit SSH workspace, without Host sessions. */
 export function createWorkspaceFiles(): NonNullable<RacpHostOperations["workspaceFiles"]> {

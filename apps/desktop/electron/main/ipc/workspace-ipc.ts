@@ -13,11 +13,11 @@ import {
   type ProjectGroupRecord,
   type RemoteWorkspace,
   type WorkspaceFilesRequest,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 import {
   loadComposerTemplates,
   type ComposerTemplate,
-} from "@pi-desktop/agent-runtime";
+} from "@pi-workspace/agent-runtime";
 import { remoteWorkspaceForFiles } from "../remote/workspace-file-scope";
 import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
 import { cloneGitRepository } from "../git-clone";
@@ -29,7 +29,7 @@ import {
   consumeComposerPickerSelection,
   rememberComposerPickerSelection,
 } from "../composer-picker";
-import { collectWorkspaceDiff } from "@pi-desktop/host-runtime";
+import { collectWorkspaceDiff } from "@pi-workspace/host-runtime";
 import { parseAllowedExternalUrl } from "../safe-open-external";
 import {
   isAttachmentBlobRef,
@@ -37,7 +37,7 @@ import {
   readOpenableFile,
   readOpenableImage,
   resolveRealOpenablePath,
-} from "@pi-desktop/host-runtime";
+} from "@pi-workspace/host-runtime";
 import { openableMp4Path } from "../open-attachment-video";
 import { isChatRefOutsideRoots, resolveChatFileRef } from "../chat-ref-resolve";
 import { rebaseWorktreeRef, type WorktreeRefContext } from "../worktree-ref";

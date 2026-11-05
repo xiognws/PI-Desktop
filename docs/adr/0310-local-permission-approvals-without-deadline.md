@@ -2,7 +2,7 @@
 
 - Status: Accepted for implementation
 - Date: 2026-09-29
-- Deciders: PI-Desktop maintainers
+- Deciders: Pi-Workspace maintainers
 - Amends: D005 / [ADR 0011](0011-host-rpc-and-storage-defaults.md)
 - Related: D636, issue #1214, E2E-017
 

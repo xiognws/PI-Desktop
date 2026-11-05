@@ -1,6 +1,6 @@
 import { dialog, type BrowserWindow, type WebContents } from "electron";
-import { catalogs, resolveLocale } from "@pi-desktop/i18n";
-import { IPC, type CloseBehavior, type LifecycleDialogChoice, type LifecycleDialogKind } from "@pi-desktop/shared";
+import { catalogs, resolveLocale } from "@pi-workspace/i18n";
+import { IPC, type CloseBehavior, type LifecycleDialogChoice, type LifecycleDialogKind } from "@pi-workspace/shared";
 import type { Logger } from "../logger";
 import {
   readCloseBehavior,

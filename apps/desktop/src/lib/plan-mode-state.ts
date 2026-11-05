@@ -2,7 +2,7 @@ import type {
   GlobalPermissionMode,
   PlanProposal,
   PlanningStateEvent,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 /** Every new approval is an explicit, per-proposal Ask decision. */
 export const PLAN_APPROVAL_DEFAULT_MODE: GlobalPermissionMode = "ask";

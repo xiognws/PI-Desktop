@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "@pi-desktop/plugin-repo-conventions",
+  "name": "@pi-workspace/plugin-repo-conventions",
   "version": "0.1.0",
   "description": "Repository-wide conventions skill (no runtime code).",
   "type": "commonjs"
