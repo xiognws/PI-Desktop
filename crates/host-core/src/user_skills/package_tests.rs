@@ -29,8 +29,8 @@ fn directory_skill_package_accepts_resources_above_the_document_limit() {
     let (mut registry, id, _) = packaged_skill(&app);
     let project = app.path().join("project");
     let project_path = Some(project.to_str().unwrap());
-    // Eight times the document cap, still inside the per-resource cap.
-    let big = vec![b'x'; MAX_SKILL_BYTES * 8];
+    // Comfortably past the old 128 KiB document cap, still inside the per-resource cap.
+    let big = vec![b'x'; 1024 * 1024];
     assert!(big.len() <= MAX_SKILL_RESOURCE_BYTES);
     registry
         .write_package_files(
@@ -76,8 +76,8 @@ fn directory_skill_package_accepts_a_data_shaped_package() {
         .package_files(&id, CapabilityLevel::Project, project_path)
         .unwrap();
     assert!(
-        LARGEST > MAX_SKILL_BYTES && files.len() > 64,
-        "fixture must exceed the document and file-count bounds this replaces"
+        LARGEST > 128 * 1024 && files.len() > 64,
+        "fixture must exceed the old document cap and the file-count bound this replaces"
     );
     assert_eq!(files.len(), SMALLEST_COUNT + 1);
     assert_eq!(
@@ -170,20 +170,35 @@ fn directory_skill_package_rejects_a_package_above_the_total_limit() {
 }
 
 #[test]
-fn skill_document_limit_still_matches_the_prompt_sized_cap() {
+fn a_document_past_the_old_cap_is_accepted_and_stays_visible() {
+    // The 128 KiB cap did two things, and the second was worse than the first: it
+    // rejected an oversized create, and the *scan* skipped an oversized document — so
+    // a skill that grew past the cap silently disappeared from the library. There is
+    // no document cap now: the catalog carries names and descriptions, never bodies.
     let app = tempdir().unwrap();
     let project = app.path().join("project");
     fs::create_dir_all(&project).unwrap();
     let mut registry = UserSkillRegistry::new(app.path());
     let payload = UserSkillInput {
-        name: Some("Too big".into()),
+        name: Some("Huge".into()),
         level: Some("project".into()),
         project_path: Some(project.to_str().unwrap().into()),
-        body: Some("x".repeat(MAX_SKILL_BYTES)),
+        body: Some("x".repeat(512 * 1024)),
         ..UserSkillInput::default()
     };
-    let error = registry.create(payload).unwrap_err().to_string();
-    assert!(error.contains("document exceeds"), "error = {error}");
+
+    let record = registry.create(payload).unwrap();
+    assert!(
+        fs::metadata(&record.path).unwrap().len() > 128 * 1024,
+        "the document really is past the old cap"
+    );
+    let listed = registry
+        .list(CapabilityLevel::Project, Some(project.to_str().unwrap()))
+        .unwrap();
+    assert!(
+        listed.iter().any(|listed| listed.id == record.id),
+        "an oversized document stays in the catalog instead of vanishing"
+    );
 }
 
 #[test]

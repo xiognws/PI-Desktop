@@ -13,10 +13,10 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 const MAX_SKILLS: usize = 128;
-/// Cap on a skill document (`SKILL.md`) and on any document derived from it.
-/// A document can end up in a prompt, so it stays small; sibling package
-/// resources are bounded separately by [`MAX_SKILL_RESOURCE_BYTES`].
-pub const MAX_SKILL_BYTES: usize = 128 * 1024;
+// A skill document has no size cap. The catalog is what reaches a prompt, and the
+// catalog carries names and descriptions, never bodies; an oversized document costs
+// its own bytes and nothing else. The old 128 KiB cap also *hid* skills: the scan
+// skipped a document over it, so a large skill silently vanished from the library.
 /// Cap on one sibling resource inside a directory-shaped skill package.
 /// Resources are data and scripts that are read on demand and never become
 /// prompt content, so a package may carry files well above the document cap.
@@ -806,9 +806,6 @@ impl UserSkillRegistry {
         let source_path = PathBuf::from(&source.path);
         let raw = fs::read_to_string(&source_path)
             .with_context(|| format!("read {}", source_path.display()))?;
-        if raw.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-        }
         let existing = self.list(to.level, to.project_path.as_deref())?;
         if existing.len() >= MAX_SKILLS {
             bail!("SKILL_INVALID: at most {MAX_SKILLS} skills");
@@ -836,9 +833,6 @@ impl UserSkillRegistry {
             move_capability_file(&source_unit, &target_unit)?;
         } else {
             let document = rewrite_document_name(&raw, &placement.name);
-            if document.len() > MAX_SKILL_BYTES {
-                bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-            }
             if shared_directory && target_unit.exists() {
                 // The destination id is unique at this level, so `<stem>/` is a
                 // directory this move creates. Anything already sitting there
@@ -970,7 +964,7 @@ impl UserSkillRegistry {
         let mut seen = HashSet::new();
         for path in paths {
             let raw = match fs::read_to_string(&path) {
-                Ok(raw) if raw.len() <= MAX_SKILL_BYTES => raw,
+                Ok(raw) => raw,
                 _ => continue,
             };
             let (front, body) = parse_front_matter(&raw);
@@ -1129,9 +1123,6 @@ impl UserSkillRegistry {
             .map(|value| clip(value, MAX_DESCRIPTION_CHARS))
             .filter(|value| !value.is_empty());
         let document = render_document(&name, description.as_deref(), &body);
-        if document.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-        }
         fs::create_dir_all(&directory)?;
         let path = if input
             .shape
@@ -1304,9 +1295,6 @@ impl UserSkillRegistry {
         }
         let raw = fs::read_to_string(source_path)
             .with_context(|| format!("read {}", source_path.display()))?;
-        if raw.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-        }
         let (front, body) = parse_front_matter(&raw);
         if body.trim().is_empty() {
             bail!("SKILL_INVALID: document is empty");
@@ -1359,9 +1347,6 @@ impl UserSkillRegistry {
         }
         let raw = fs::read_to_string(&skill_file)
             .with_context(|| format!("read {}", skill_file.display()))?;
-        if raw.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: SKILL.md exceeds {MAX_SKILL_BYTES} bytes");
-        }
         let (front, body) = parse_front_matter(&raw);
         if body.trim().is_empty() {
             bail!("SKILL_INVALID: SKILL.md is empty");
@@ -1453,9 +1438,6 @@ impl UserSkillRegistry {
             bail!("SKILL_INVALID: document is empty");
         }
         let document = render_document(&name, description.as_deref(), &body);
-        if document.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-        }
         fs::write(&record.path, document)?;
         if let Some(enabled) = input.enabled {
             self.state.set_enabled(
@@ -1483,9 +1465,6 @@ impl UserSkillRegistry {
             return Ok(None);
         };
         let raw = fs::read_to_string(&record.path)?;
-        if raw.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-        }
         let (_, body) = parse_front_matter(&raw);
         Ok(Some((record, body)))
     }
