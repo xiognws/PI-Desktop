@@ -1,4 +1,4 @@
 provider: github
 owner: xiognws
-repo: Pi-Workspace
+repo: PI-Desktop
 updaterCacheDirName: '@pi-workspacedesktop-updater'

@@ -463,7 +463,7 @@ test("GitHub releases trigger the CNB mirror pipeline with a JSON payload", () =
   );
   assert.match(
     mirrorToCnbWorkflowSource,
-    /if: github\.repository == 'xiognws\/Pi-Workspace'/,
+    /if: github\.repository == 'xiognws\/PI-Desktop'/,
   );
   assert.match(
     mirrorToCnbWorkflowSource,
