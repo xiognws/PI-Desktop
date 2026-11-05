@@ -3693,7 +3693,7 @@ IPC 请求无法关闭。
   - 退出并外部单击关闭菜单而不创建任何内容。
 
 #### E2E-076：出现启动画面，然后返回主 shell
-- **状态**：部分自动化（`startup-splash-motion.test.mjs` 涵盖启动标记、运动标记、简化运动和目录键；`macos-sidebar-vibrancy.test.mjs` 覆盖 darwin 玻璃启动页与 shell 交叉淡入；全窗口计时仍为草稿）
+- **状态**：部分自动化（`startup-splash-motion.test.mjs` 涵盖启动标记、运动标记、简化运动和目录键；`macos-sidebar-vibrancy.test.mjs` 覆盖 darwin 玻璃启动页与 shell 交叉淡入；`startup-animation.test.mjs` 与 `packages/shared/src/startup-animation.test.ts` 覆盖 D679 动画的边界、状态机、选片、界面与启动界面优先级；`pnpm test:e2e:startup-animation` 用生成的视频启动真实应用，断言 `pi-startup:` 解码、播放推进、渐显，以及不可播放文件仍会交出主界面；全窗口计时仍为草稿）
 - **优先级**：P1
 - **封面**：A，品质/US-UI 外壳抛光
 - **先决条件**：应用程序启动路径可用（开发或打包）。
@@ -3704,14 +3704,21 @@ IPC 请求无法关闭。
   4. 如果可用，请对 OS `prefers-reduced-motion: reduce` 重复此操作。
   5. 在 macOS 上，将启动面与 shell 出现后的侧边栏玻璃态对比。
   6. 在 `bootstrap` 一直被搁置、超过看门狗界限时重复一次，在 30 秒与超过 180 秒时观察启动表面（issue #831）。
+  7. 把一个可播放的短视频放进 `<dataDir>/startup/` 后重新启动（D679）。
+  8. 换成不可播放的文件（例如改名的文本文件）后重新启动。
+  9. 保留该动画，分别在 `prefers-reduced-motion: reduce` 下启动、重载渲染器、以及关闭窗口后从托盘或 Dock 重新打开。
 - **预期**：
 - 准备之前：带有品牌标志、外壳名称、标语和可访问的启动状态 (`data-testid="startup-splash"`) 的全窗口启动画面。
   - 准备好后：启动画面会短暂淡出（或立即减少运动）退出，并且主外壳（或设置页面）在下面是交互式的。
   - 如果初始状态始终没有到达，启动画面不是被一直保留而是被替换：启动表面在 30 秒（`STARTUP_SLOW_HINT_MS`）时加上日志、诊断与退出且不报告失败，在 180 秒（`STARTUP_STALLED_MS`）时变成恢复表面，并额外提供重试（`data-testid="startup-recovery"`）；每个操作都不依赖后端，Windows/Linux 上渲染器绘制的窗口控制按钮保持在该表面之上，退出走 `pi-desktop/app/quit`。
   - macOS 上启动页与侧边栏使用同一套玻璃 tint/sheen，叠在原生 `sidebar` vibrancy 之上；已挂载的 shell 在退出淡出前保持隐藏，再交叉淡入。其他平台仍为不透明的 `--ds-bg-primary`。
+  - `<dataDir>/startup/` 中有视频时（D679）：首个绘制帧里 `data-testid="startup-animation"` 取代启动画面，在不透明黑底上播放，无控件无声音，播完后同一层黑色继续遮住窗口直到引导完成，然后在约一秒内淡出，淡出期间主界面已可点击。启动比视频慢时，黑幕满 3 秒后出现不确定进度条。`Escape` 直接跳到该淡出。
+  - 不可播放的文件绝不会劫持启动：动画在 2 秒内（无首帧）或 `error` 时结束，渐显与正常播完完全一致。
+  - 减少运动、渲染器重载，以及从托盘或 Dock 重新打开的窗口都不播放动画，改用品牌启动画面。设置 → 常规 → 外观 会显示选中的文件、提供打开文件夹的动作，开关改动只在下次启动生效。
+  - 启动被搁置超过看门狗边界时，恢复界面取代动画——绝不会被留在不透明遮罩后面。
   - 没有简单的无品牌“开始...”居中文本作为唯一的启动 UI。
   - Overlay/dialog 输入动作使用共享令牌；减少的运动可以保持状态变化，而无需装饰持续时间。
-- **链接规格**：`04-ux/07-ui-design-system.md` §8、`04-ux/02-i18n-english-first.md`、决策日志 D146 / D304 / D348
+- **链接规格**：`04-ux/07-ui-design-system.md` §8、`04-ux/02-i18n-english-first.md`、`04-ux/09-interaction-patterns.md` 第 1.12 节、ADR 0338、决策日志 D146 / D304 / D348 / D679
 - **验收**：A（应用程序启动），质量
 - **里程碑**：M5
 #### E2E-099：品牌标志遵循活跃主题
@@ -10161,3 +10168,132 @@ PluginPack 产物的解包目录，仅用于开发验证。验收 #1711 前需�
   event/result agreement, batch rejection and delegate restoration.
 - **Status**: Automated offline; native UI clicking and live providers are
   outside this fixture's coverage.
+
+## 电脑操作（ADR 0342、ADR 0344）
+
+原生应用操作仍以 [03-runtime/computer-use](/zh-CN/spec/03-runtime/computer-use)
+为落地闸门。宿主一侧现已有 macOS 真机证据，来自
+`PI_DESKTOP_COMPUTER_USE_DEVICE=1 node scripts/e2e-computer-use-device.mjs`
+（需显式开启：它会读取操作者的屏幕，带 `--act-app` 时还会往其中一个窗口里输入）。
+Electron 一侧——工具自动签发、指示器、"停止"中止轮次、绘制光标、对真实模型的回路——
+仍为 `NOT RUN`，需要屏幕录制权限的部分同样未跑。下述权限申请界面已有隔离 fixture 自动化。
+
+### E2E-COMPUTER-USE-request-accessibility-from-settings
+
+- **前置条件**：隔离 Electron profile；在 IPC 与 Electron 边界模拟系统调用；功能关闭，不调用 Provider 或真实系统权限提示。
+- **步骤**：打开设置，键盘聚焦并连续点击未授权状态；完成申请但保持未授权。在外部开启权限后返回应用。覆盖权限拒绝、申请失败及重试、过期查询、申请中返回焦点、不支持平台与申请中卸载页面。
+- **预期**：打开设置或开启功能不会申请系统权限。只有显式点击才在 Main 申请主应用 TCC 权限，后端 API 保持独立。等待中禁用按钮并显示忙碌，重复点击不重复申请。未授权时仅打开固定的 macOS 辅助功能设置页，并提示用户开启权限。错误可见且可重试。焦点/可见性恢复刷新状态；申请后每秒轮询一次，最多 60 次计时，不再次提示。主应用授权后停止轮询并显示已授权；即使子进程仍未授权，也不会继续要求重复授权，而是单独说明后端权限异常。后端恢复后清除异常。过期结果和卸载后的监听、计时器不得更新界面。已授权或不支持状态仅显示标签。非主窗口来源在系统调用前被拒绝，系统设置打开失败传回；不会交接窗口、截屏或派发输入。
+- **自动化**：`node --test apps/desktop/test/computer-use-permission-user-path.test.mjs apps/desktop/test/computer-use-permission-ipc.test.mjs`；shared 能力筛选测试与 host-core 不支持后端测试覆盖平台门禁。
+- **规格**：[Computer Use](/zh-CN/spec/03-runtime/computer-use) 的设置与 UX 界面。
+- **状态**：fixture 自动化 PASS；真实 macOS TCC 提示/开关 NOT RUN。系统权限仍由用户手动确认。
+
+### E2E-COMPUTER-USE-desktop-grant-is-automatic-and-stoppable
+
+- **前置条件**：隔离的桌面 profile，电脑操作已开启且已绑定模型，被测平台的操作系统
+  权限已授予，两个 fixture 目标应用，最前面是一个 PI-Desktop 窗口，无需 Provider 账号。
+- **步骤**：在没有任何授权时请求 Agent 操作某个应用。观察指示器，执行 `inspect` 与
+  一次 `act`。任务进行中按下"停止"，并让 Agent 立刻再次调用 `Computer`；等冷却结束后
+  再调用一次。在第一个授权仍活动时从另一个会话发起请求。让授权空闲超过过期时间，并
+  耗尽动作预算。随后重启应用。
+- **预期**：不出现挑选器，也从不询问用户选哪个窗口：首次调用即签发桌面授权并绑定到
+  最前面那个非 PI-Desktop 的窗口，不触发操作系统提示，`a11y-only` 下也不截取画面。
+  指示器标明该窗口、剩余预算与截取模式，随每次改绑更新，应用退到后台时仍可见。
+  "停止"撤销授权并中止持有它的轮次，紧随其后的再次调用以
+  `COMPUTER_STOPPED_BY_USER` 失败且不触碰屏幕；冷却结束后可正常签发新授权。第二个
+  会话以 `COMPUTER_GRANT_IN_USE` 被拒。空闲过期与预算耗尽各以自己的错误码关闭授权，
+  且没有授权能活过重启。
+- **规格**：[电脑操作](/zh-CN/spec/03-runtime/computer-use)、
+  [03-tools-and-permissions](/zh-CN/spec/03-runtime/03-tools-and-permissions)。
+- **自动化**：host-core 的 `computer::` 测试、
+  `apps/desktop/test/computer-use-service.test.mjs`；真机用
+  `scripts/e2e-computer-use-device.mjs`。
+- **状态**：PARTIAL —— 真机（macOS 15，台前调度开启）已确认：自动桌面授权绑定最前
+  可用窗口（我们自己的窗口就在它前面且被拒绝）、设置默认值进入授权、真实无障碍树、
+  以及"停止"冷却。指示器、"停止"中止轮次、运行中的预算与空闲关闭、重启场景仍 NOT RUN。
+
+### E2E-COMPUTER-USE-window-switching-stays-inside-the-refusals
+
+- **前置条件**：隔离的桌面 profile 且已有活动桌面授权，两个 fixture 应用，一个
+  PI-Desktop 窗口，一个内置凭据拒绝名单上的窗口，以及一个可按需关闭的 fixture 窗口。
+- **步骤**：让 Agent 读取窗口列表，切换到第二个 fixture 应用并检查、动作。尝试切换到
+  PI-Desktop 窗口、拒绝名单窗口以及一个已不存在的 id。用切换前读到的 `uid` 动作。
+  任务进行中关闭当前绑定窗口再动作。
+- **预期**：观察中列出宿主枚举到的窗口并附带拒绝原因，Renderer 侧没有任何界面能枚举
+  窗口。允许的切换改绑授权、推进 revision、重新框住绘制光标，消耗一个步数但不消耗
+  动作预算。被拒绝的切换分别以 `COMPUTER_SELF_TARGET_REFUSED`、
+  `COMPUTER_TARGET_DENYLISTED` 与 `COMPUTER_SCOPE_VIOLATION` 失败，绑定窗口保持不变，
+  并作为一步回报给模型而不是结束运行。切换前的 `uid` 以 `COMPUTER_STALE_REVISION`
+  失败。绑定窗口被关闭时回落到最前可用窗口，同时在途动作被拒绝；审计日志中每次移动
+  记录一条仅含应用身份的 `computer.grant.rebound`。
+- **规格**：[电脑操作](/zh-CN/spec/03-runtime/computer-use)、
+  [05-security/01-security](/zh-CN/spec/05-security/01-security) §13。
+- **自动化**：host-core 的 `computer::` 改绑测试、`packages/computer-use` 的切换测试；
+  真机用 `scripts/e2e-computer-use-device.mjs`。
+- **状态**：PARTIAL —— 真机上在六个真实应用之间切换成功，每次绑定都推进 revision，
+  切换前的 revision 被拒绝，自我目标／拒绝名单／未知窗口三种绑定均被按码拒绝。真机还
+  发现并修掉两个缺陷：台前调度下无障碍窗口无法与窗口服务器窗口对应（改为按窗口 id
+  对应，D683），以及读取失败时授权会留在读不了的窗口上。关闭绑定窗口的回落、光标重新
+  框住、审计回读仍 NOT RUN。
+
+### E2E-COMPUTER-USE-self-target-and-secure-input-refused
+
+- **前置条件**：隔离的桌面 profile，已有活动授权，一个带待处理审批卡片的
+  PI-Desktop 窗口，以及一个包含密码字段的 fixture 窗口。
+- **步骤**：在包括 `auto` 的每种权限模式下、以及在 `autonomous-in-scope` 授权下，
+  尝试对 PI-Desktop 窗口（含审批卡片与实时语音悬浮件）做检查、截取与动作。让密码
+  字段获得焦点，尝试 `inspect`、`screenshot` 与 `set_value`。尝试一个位于内置凭据
+  拒绝名单上的目标，并尝试移除该条目。
+- **预期**：每次自我目标尝试都以 `COMPUTER_SELF_TARGET_REFUSED` 失败；没有任何
+  合成事件到达任何 PI-Desktop 窗口，也没有审批卡片被关闭。安全输入以
+  `COMPUTER_SECURE_INPUT_REFUSED` 拒绝截取与合成，字段内容不出现在快照、图像、
+  工具结果或日志中。内置拒绝名单条目无法移除。
+- **规格**：[电脑操作](/zh-CN/spec/03-runtime/computer-use)、
+  [05-security/01-security](/zh-CN/spec/05-security/01-security) §13。
+- **状态**：PARTIAL —— 真机上一个 PI-Desktop 窗口位于所有窗口最前，无论作为自动授权
+  的候选还是显式绑定，都以 `COMPUTER_SELF_TARGET_REFUSED` 被拒；拒绝名单窗口以
+  `COMPUTER_TARGET_DENYLISTED` 被拒。审批卡片本身、安全输入与密码字段拒绝仍 NOT RUN。
+
+### E2E-COMPUTER-USE-stale-basis-and-revision-fail-closed
+
+- **前置条件**：隔离的桌面 profile，一个 `a11y-and-pixels` 授权，以及一个可按需
+  移动、改变尺寸与改变层叠顺序的 fixture 窗口。
+- **步骤**：先 `screenshot`，移动目标，再基于过期 `basis` 动作。在对某个 `uid` 的
+  `inspect` 与 `act` 之间改变目标尺寸。用超出测得边界的坐标动作。用另一个授权签发的
+  `basis` 动作。在 `a11y-only` 授权下用坐标动作。
+- **预期**：分别返回 `COMPUTER_STALE_BASIS`、`COMPUTER_STALE_REVISION`、
+  `COMPUTER_SCOPE_VIOLATION` 与 `COMPUTER_CAPTURE_UNAVAILABLE`；其中任何一种都不
+  派发事件，不静默夹取，目标应用观察不到任何输入。
+- **规格**：[电脑操作](/zh-CN/spec/03-runtime/computer-use)、
+  [08-error-codes](/zh-CN/spec/03-runtime/08-error-codes) §3.10。
+- **状态**：NOT RUN —— 需要真机运行。
+
+### E2E-COMPUTER-USE-voice-request-adds-no-authority-of-its-own
+
+- **前置条件**：隔离的桌面 profile，带绑定工作会话的实时语音 fixture 适配器，无真实
+  Provider 账号与麦克风。分别在电脑操作关闭与开启两种状态下各跑一次。
+- **步骤**：在功能关闭与开启状态下，各口述一条要求 Agent 操作某个应用的请求。在会话
+  处于 Plan 与 Goal 时分别重复。在一次语音运行中按下"停止"，并立刻重复该口述请求。
+- **预期**：功能关闭时请求以 `COMPUTER_DISABLED` 失败；语音不能开启该功能，也不发生
+  截取或合成。功能开启时，该请求作为普通 Agent 轮次在会话策略下运行，并拿到与键入
+  路径相同的自动桌面授权（ADR 0344）——语音不带来任何额外权限，也不跳过任何拒绝——
+  进度通过现有工作反馈通道朗读。Plan 与 Goal 在权限评估之前拒绝该工具。冷却期内的
+  语音重试以 `COMPUTER_STOPPED_BY_USER` 失败。
+- **规格**：[电脑操作](/zh-CN/spec/03-runtime/computer-use)、
+  [live-voice](/zh-CN/spec/03-runtime/live-voice)、
+  [live-work-session](/zh-CN/spec/03-runtime/live-work-session)。
+- **状态**：NOT RUN —— 需要真机运行。
+
+### E2E-COMPUTER-USE-platform-support-is-explicit
+
+- **前置条件**：每个受支持平台各跑一次，另加一个 Wayland 会话，以及一台操作系统
+  权限被拒绝的机器。
+- **步骤**：在每个平台上开启该功能并打开体检视图。让 Agent 调用 `Computer` 以签发
+  授权并动作。在 Windows 上绑定由更高完整性级别进程拥有的窗口。在 Wayland 上先尝试输入再尝试截取。在屏幕
+  录制或无障碍被拒绝的平台上尝试检查与截取。
+- **预期**：体检视图区分"未申请"、"已拒绝"与"本平台不支持"。Wayland 上的输入以
+  `COMPUTER_PLATFORM_UNSUPPORTED` 失败而门户截取仍可用；提权的 Windows 目标以
+  `COMPUTER_TARGET_ELEVATED` 失败而不是丢弃事件；被拒绝的操作系统权限以
+  `COMPUTER_OS_PERMISSION_MISSING` 失败。没有路径挂起，也没有路径在未动作的情况下
+  回报成功。
+- **规格**：[电脑操作](/zh-CN/spec/03-runtime/computer-use)。
+- **状态**：NOT RUN —— 需要真机运行。

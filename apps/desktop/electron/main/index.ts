@@ -7,6 +7,11 @@ import {
 } from "electron";
 import { join } from "node:path";
 import {
+  createDefaultLocalAppDeps,
+  createLocalAppCatalog,
+  type LocalAppCatalog,
+} from "./local-apps";
+import {
   applyNetworkProxyFromAppSettings,
   currentNetworkProxy,
   disposeSystemProxyRelay,
@@ -23,6 +28,7 @@ import {
   type AgentEventEnvelope,
   type AppSettings,
   type CloseBehavior,
+  type ComputerGrantView,
   type KeybindingOverrides,
   type PlanExecutionFinishStatus,
 } from "@pi-workspace/shared";
@@ -62,6 +68,7 @@ import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
 import { createSidecarRuntime } from "./runtime/sidecar";
+import { createComputerCursorOverlay } from "./computer-use/cursor-overlay";
 import { createEventPersistence } from "./runtime/event-persistence";
 import { catalogs, resolveLocale } from "@pi-workspace/i18n";
 import { createPlanRuntime } from "./runtime/plans";
@@ -585,6 +592,7 @@ const createdLauncher = createLauncher({
   logger,
   safeOpenExternal,
   toggleMainWindow,
+  dataDir,
 });
 launcherRuntime = createdLauncher;
 const {
@@ -783,6 +791,19 @@ function announceSkillReview(envelope: AgentEventEnvelope): void {
     event.actions.join(" · "),
   );
   sendToRenderer(IPC.event.toast, { message: notice });
+
+ * The agent's drawn cursor and the indicator feed (ADR 0342 §10).
+ *
+ * The overlay is created lazily by its own module on the first draw command,
+ * and it closes with the grant: a window that outlived the authority it was
+ * drawn for would tell the user an action is still possible when it is not.
+ */
+const computerCursorOverlay = createComputerCursorOverlay({
+  log: (message, data) => logger.app("runtime", "warn", message, data),
+});
+function publishComputerGrant(grant: ComputerGrantView | null): void {
+  sendToRenderer(IPC.event.computerGrantChanged, { grant });
+  if (!grant || grant.state !== "active") computerCursorOverlay.close();
 }
 
 const sidecarRuntime = createSidecarRuntime({
@@ -816,6 +837,8 @@ const sidecarRuntime = createSidecarRuntime({
   disabledBuiltinSkills: runtimeDisabledBuiltinSkills,
   pluginActiveInProject,
   currentNetworkProxy,
+  computerCursorOverlay,
+  publishComputerGrant,
 });
 emitAgentEvent = (envelope: AgentEventEnvelope) => {
   announceSkillReview(envelope);
@@ -908,6 +931,30 @@ const liveCallService = createLiveCallService({
   onCallView: (view) => liveVoiceWidget.publish(view),
 });
 
+/**
+ * Installed applications for the plugin launcher.
+ *
+ * The scanning adapter needs real filesystem and Electron access, whose wiring
+ * is asynchronous, while IPC registration is synchronous. This handle awaits
+ * that wiring on first use, warms the first scan in the background so the first
+ * `Alt+Space` already has application tiles, and reports "still scanning" until
+ * it exists (docs/spec/07-plugins/18-plugin-launcher.md §4).
+ */
+let localAppsCatalog: LocalAppCatalog | null = null;
+const localAppsReady = createDefaultLocalAppDeps().then((deps) => {
+  const catalog = createLocalAppCatalog(deps);
+  localAppsCatalog = catalog;
+  void catalog.refresh().catch(() => undefined);
+  return catalog;
+});
+const localApps: LocalAppCatalog = {
+  list: async () => (await localAppsReady).list(),
+  refresh: async () => (await localAppsReady).refresh(),
+  launch: async (appId) => (await localAppsReady).launch(appId),
+  isScanning: () => localAppsCatalog?.isScanning() ?? true,
+  diagnostics: () => localAppsCatalog?.diagnostics() ?? [],
+};
+
 function registerIpc() {
   return registerIpcHandlers({
     restartForStorage: () => {
@@ -920,6 +967,7 @@ function registerIpc() {
     ipcMain,
     getMainWindow,
     getHost,
+    publishComputerGrant,
     getSidecar,
     getAgentHostBridge: () => mainState.agentHostBridge,
     getBackendRouter: () => startupState.backendRouter,
@@ -934,6 +982,9 @@ function registerIpc() {
       pluginServices.composerSuggestion.settle(answer),
     getPluginLauncherWindow: () => mainState.pluginLauncherWindow,
     togglePluginLauncher,
+    /** Same delivery path as the application menu, so readiness and focus are
+     * handled once instead of by the launcher IPC. */
+    openPluginMarket: () => dispatchApplicationMenuCommand("openPluginMarket"),
     safeOpenExternal,
     updater,
     dataDir,
@@ -944,6 +995,7 @@ function registerIpc() {
     persistenceOutbox,
     logger,
     plugins,
+    localApps,
     speech,
     sessionCapabilityContext,
     enrichSession,

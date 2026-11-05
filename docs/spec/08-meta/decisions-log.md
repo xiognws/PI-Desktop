@@ -340,10 +340,10 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D676 | A completed turn the reader followed ends at its prompt | **Amend the stream-completion rule: when a turn completes while the transcript is visible and still following the stream, the renderer scrolls that turn's newest user message to 16px below the titlebar band the transcript reserves at its top (smooth unless reduced motion), releases follow mode, and shows jump-to-latest. Nothing moves when the prompt is already in view, the reply failed or was aborted, the pane is hidden or in a reading window, a disclosure position is held, or a new run starts before the move. Renderer only; no setting, IPC, or persistence change.** | Issue #1889: after a long reply the reader sat at its last line and had to scroll back up to find where it began. |
 | D677 | DeepSeek reasoning replay uses one field per row and never covers real reasoning | **Amend ADR 0256 decision 3: the pi-ai fill pass takes the reasoning field from the newest assistant row that has real reasoning, normalizes every assistant row to that single field (moving real reasoning from another field name, deleting the others), and fills the placeholder only on rows with no reasoning. History rebuild and the thinking panel drop a leading echo of the placeholder (`withoutReasoningReplayPlaceholder`); stored text is not rewritten. No schema, IPC, or setting change.** | Issue #1945: rebuilt rows are stamped `reasoning_content` while a relay streams `reasoning_text`; the fill pass picked `reasoning_content` and wrote the placeholder over the live row's real reasoning, the model echoed it as its own thinking (13.6% of assistant rows in affected sessions), and the echo was persisted and replayed. |
 | D678 | Radial context menu rebuilt and moved to General | **The opt-in transcript radial menu gets at-rest icon-and-label sectors (the hover-only hub label is gone), one filled highlight for the active sector with no focus rectangle, a recessed hub carrying the click-point dot, a 248 px disc with hairline separators and the composer shadow, and shared motion tokens for hover and reveal. A right-press started while the ring is open runs the sector it is released on; releasing in the hub dismisses without running; the release trailing the opening right-click is inert. The settings card moves from the AI tab to General after Sidebar and the settings-search index follows. Action vocabulary, per-direction defaults, `AppSettings.radialMenu`, persistence, and IPC are unchanged.** | The icon-only ring could not be read without hovering every sector, the sector fill and button background painted two highlights over one target, and the ring's switch sat in the AI tab although the surface is a transcript-interaction preference. |
-| D680 | Cloud sync and Remote Hosts leave Settings | **Remove the `sync` and `remoteHosts` destinations from the Settings index: their rail rows, pages, search-keyword indexes, the packaged/development visibility rules they carried, their renderer components and feature modules, their styles, and the tests that pinned them are gone. The host-side configuration-sync service, the remote-host/SSH service, the IPC/RPC contracts, the `configSync.*` / `remoteHosts.*` locale strings, and the Create project dialog's remote source stay. See `04-ux/06-settings-ia.md`, `00-baseline.md`, and `06-delivery/04-e2e-test-plan.md`.** | Both surfaces are unused in this deployment; unreachable pages, Experimental badges, and dead styles only widened the settings directory and kept a maintenance surface alive. |
-| D681 | Bundled tool packages get their own page | **Add a Tools destination below Artifacts in the app-shell rail: the build's `resources/tools/<id>/tool.json` packages, rendered as one card each with name, version, description, declared tools and risk levels, and one enable switch. host-core scans the directory (`crates/host-core/src/tool_packages.rs`) and persists the enabled set in `<data>/tools/state.json`; `toolPackages.list` / `toolPackages.setEnabled` are the only surface, and a package that cannot be read keeps its row with the reason. See `04-ux/01-ui-ia.md` §3.4.1 and `03-runtime/04-data-storage.md` §2.** | Tool packages ship inside the image and need a visible, switchable roster without a plugin install/update/permission model; a separate declarative manifest keeps the marketplace surface out of it. |
-| D682 | The newest prompt stays readable while its answer scrolls | **A single-line strip at the transcript's top edge repeats the newest prompt the user sent once that row's bottom edge has passed the scrollport's top edge, and disappears as soon as any part of the row is visible again. It collapses whitespace, cuts on a word boundary, names the attachment count for an attachment-only prompt, never pins an agent-to-agent delivery, and yields the top edge to an open Find bar. Clicking it scrolls the row back into view. See `04-ux/09-interaction-patterns.md` §2.6.** | The reference client pins its human bubble to the top of the thread; a long answer otherwise pushes the question out of sight and the user has to scroll back to remember what they asked. |
-| D683 | Each session totals its tokens in the status bar | **The status bar gains a session token total, summed over every turn the session has run. The number comes from the host's turn ledger through a new `session.usageTotals` RPC rather than from the rendered transcript, whose window is bounded; the bar polls it on session switch, while a turn streams, and when one ends. The breakdown (input / output / cache read / cache write / reasoning / turns) lives in the item's tooltip, and the item can be hidden from the status bar menu like every other one. See `03-runtime/04-data-storage.md` (usage ledger).** | "How much has this conversation cost me" is a whole-session question; every existing token reading on the bar described one request or one context window. |
+| D686 | Cloud sync and Remote Hosts leave Settings | **Remove the `sync` and `remoteHosts` destinations from the Settings index: their rail rows, pages, search-keyword indexes, the packaged/development visibility rules they carried, their renderer components and feature modules, their styles, and the tests that pinned them are gone. The host-side configuration-sync service, the remote-host/SSH service, the IPC/RPC contracts, the `configSync.*` / `remoteHosts.*` locale strings, and the Create project dialog's remote source stay. See `04-ux/06-settings-ia.md`, `00-baseline.md`, and `06-delivery/04-e2e-test-plan.md`.** | Both surfaces are unused in this deployment; unreachable pages, Experimental badges, and dead styles only widened the settings directory and kept a maintenance surface alive. |
+| D687 | Bundled tool packages get their own page | **Add a Tools destination below Artifacts in the app-shell rail: the build's `resources/tools/<id>/tool.json` packages, rendered as one card each with name, version, description, declared tools and risk levels, and one enable switch. host-core scans the directory (`crates/host-core/src/tool_packages.rs`) and persists the enabled set in `<data>/tools/state.json`; `toolPackages.list` / `toolPackages.setEnabled` are the only surface, and a package that cannot be read keeps its row with the reason. See `04-ux/01-ui-ia.md` §3.4.1 and `03-runtime/04-data-storage.md` §2.** | Tool packages ship inside the image and need a visible, switchable roster without a plugin install/update/permission model; a separate declarative manifest keeps the marketplace surface out of it. |
+| D688 | The newest prompt stays readable while its answer scrolls | **A single-line strip at the transcript's top edge repeats the newest prompt the user sent once that row's bottom edge has passed the scrollport's top edge, and disappears as soon as any part of the row is visible again. It collapses whitespace, cuts on a word boundary, names the attachment count for an attachment-only prompt, never pins an agent-to-agent delivery, and yields the top edge to an open Find bar. Clicking it scrolls the row back into view. See `04-ux/09-interaction-patterns.md` §2.6.** | The reference client pins its human bubble to the top of the thread; a long answer otherwise pushes the question out of sight and the user has to scroll back to remember what they asked. |
+| D689 | Each session totals its tokens in the status bar | **The status bar gains a session token total, summed over every turn the session has run. The number comes from the host's turn ledger through a new `session.usageTotals` RPC rather than from the rendered transcript, whose window is bounded; the bar polls it on session switch, while a turn streams, and when one ends. The breakdown (input / output / cache read / cache write / reasoning / turns) lives in the item's tooltip, and the item can be hidden from the status bar menu like every other one. See `03-runtime/04-data-storage.md` (usage ledger).** | "How much has this conversation cost me" is a whole-session question; every existing token reading on the bar described one request or one context window. |
 
 
 ## M0. Model catalog decisions
@@ -432,6 +432,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D236 | One desktop instance per data directory | **Electron main takes `app.requestSingleInstanceLock()` during module evaluation — after `app.setName`, because the lock lives under the name-derived `userData` path, and before the logger, the persistence outbox, or any other data-directory access. A launch that does not take the lock calls `app.quit()` and boots nothing: the readiness and `before-quit` handlers both return early, so it creates no window, tray, child process, or log line inside the running instance's data directory. The lock holder answers `second-instance` by restoring and focusing its main window through the same path as the tray's Show action, which recreates a window that was closed or hidden into the tray. The lock is requested only when `PI_DESKTOP_DATA_DIR` is unset, so E2E harnesses, the capture rig, and deliberate side-by-side profiles keep the current start-anytime behavior. No IPC channel, host protocol, or storage schema changes.** | A second launch booted a complete second app: another host-core over the single-writer `pi.sqlite` (D002), another outbox and log tree in the same directory, another tray, launcher-chord registration, and updater, leaving two shells divergent over one database. Relaunching the app is a request to see the one already running, and scoping the lock to the installation keeps isolated-data-directory runs launchable (ADR 0094). |
 | D367 | Host-owned plugin session import and ownership API | **`pi.session` gains `import`, `importBatch`, `list`, `get`, `listMessages`, `rename`, and `delete`; `contributes.sessionSources` is required for every source; host-core generates ids and scopes every operation to `(pluginId, source, externalId)` ownership; imports never activate project/provider/model bindings. Schema v14 adds `session_import_origins` and `sessions.deleted_at`; protocol v11 is unchanged. Trash keeps the transcript for owner-only purge.** | External-history plugins need durable import/read/update/delete, and the in-flight `session.getLlmContext` and core `session.import` boundaries are not safe plugin ownership boundaries (ADR 0200, E2E-214 / E2E-215) |
 | D368 | Explicit plugin project ids and host-owned session refresh | **Permission-gated `pi.project.create({ path })` creates or reuses a project and returns its host-generated id without activating the workspace; import items may bind an existing `projectId`, omitted ids stay unbound, and historical origin paths never become tool roots. Electron main emits `pi-desktop/session/event/changed` after successful plugin imports, renames, and deletes; the renderer reuses `refreshSessions()`, skipped imports emit nothing, and closed project tabs are not reopened.** | Exposing `workspace.set` to plugins would change the user's active workspace, and plugin writes need a host-owned renderer refresh path (ADR 0201, E2E-216) |
+| D686 | Plugin session scope: `.all` grants and message-level writes | **`pi.session` gains `session.read.all`, `session.update.all`, and `session.delete.all`, which carry `list`/`get`/`listMessages`, `rename`, and `delete` over every live session instead of only the calling plugin's imports. `.all` is a separate grant, never a widening of `.own`, and it wins when a manifest declares both. Electron main resolves the scope from the grants and sends `scope` to host-core, which enforces exactly that and treats an absent value as `own`; `list` becomes a `LEFT JOIN` on the origin sidecar, `get`/messages report the real `originKind`, `source`, `externalId`, model binding, and `origin` instead of the import projection, and the `trash`/`purge` statements follow the scope instead of an embedded `EXISTS`. Message-level writes arrive as `appendMessage`/`replaceMessages` (`session.update.all`) and `deleteMessage`/`truncateFrom` (`session.delete.all`), delegating to the existing host-core transcript operations, refusing a rewrite with `TURN_RUNNING` while a turn owns the session, and sharing a 60/min budget. `rename` now claims the manual title source. Every session call audits the authorising scope; `sessionsChanged` names the changed session.** | The ADR 0200 ownership filter made a legitimate "read the user's own conversation" capability inexpressible, so ADR 0323 had to invent a narrower title permission and ADR 0333's shipped suggestion flow cannot read the session it runs on; widening `.own` instead would silently expand grants users reviewed as "only the sessions this plugin imported" (ADR 0340) |
 | D370 | Local MCP control plane for desktop operations | *(amended by D372)* **An opt-in Streamable HTTP MCP server inside Electron Main binds to `127.0.0.1`, authenticates with a persistent random bearer token, validates supplied Origins against loopback hostnames, writes a mode-restricted connection manifest, and delegates to the same registered IPC handlers the renderer uses. Named tools cover the project/session/Agent flow; `pi_desktop_invoke` reaches a risk-tagged operation catalog; dangerous operations require `confirm: true`; successful external mutations reuse the renderer session-change event. Local-only and fail-soft at startup.** | An external Agent needs to drive the running desktop without a second permission or persistence implementation and without touching the deferred remote Gateway / WebUI boundary (ADR 0203, E2E-220) |
 | D372 | Tightened local MCP control-plane boundary | **Amend D370 / ADR 0203: the first-version catalog is the project/session/Agent/workspace flow plus reviewed reads; secret-shaped arguments are stripped; `session/configure` is dangerous; listen addresses are asserted loopback; protocol versions are negotiated rather than echoed; results including `structuredContent` are bounded; renderer session refresh is mutation-only.** | The first catalog still exposed native pickers, secret-write provider/OAuth/MCP paths, and unconfirmed `session/configure`, and treated session reads as renderer mutations (E2E-220) |
 | D377 | Plugin desktop control requires native user consent | **A `dangerous` desktop operation invoked through `pi.desktop.invoke` needs the plugin's `confirm: true` and then the user's answer to a host-owned native dialog that shows only the catalog operation id, description, and a bounded argument preview; dismissal, Deny, and a host without a dialog service fail with `PERMISSION_DENIED`. `read`/`write` operations and the MCP contract (D372) are unchanged.** | The controller's `confirm` flag is set by the caller, so a plugin (or a model behind it) could delete sessions or switch a session to `auto` with no human in the loop, and any plugin-drawn confirmation card can be relabeled by a prompt-injected transcript (ADR 0208, E2E-236) |
@@ -8106,9 +8107,256 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `pi-radial-dark`. See `04-ux/09-interaction-patterns.md` §1.11 and
   E2E-CHAT-radial-background-menu.
 
-## 2026-11-03 — Prompt enhancement ships with the application image (D679)
+## 2026-11-03 — User-supplied startup animation (D679)
 
-- D679 tracks the released `pi.prompt-enhancement` plugin (1.3.0, byte-identical
+- D679 lets a user own the boot surface. A video in `<dataDir>/startup/`
+  replaces the brand splash for that launch: it plays to its last frame, holds
+  the window under the same opaque black it played on until the shell has its
+  initial state, then fades that black out over 1000ms
+  (`--motion-startup-reveal`, the one duration outside the motion ramp). The
+  mask stops taking input when the fade starts, so the shell and its window
+  controls are operable for the whole second.
+- Discovery is filesystem-only and creates nothing: entries are confined to
+  the directory by realpath, ranked `webm` > `mp4` > `m4v` > `mov` with file
+  name as the tie-break, and dot-prefixed, non-file, empty, or over-64 MB
+  entries drop out. An installation with no such directory is unchanged — same
+  splash, same dwell, same watchdog bounds.
+- The bytes are served over `pi-startup://animation`, a host-owned scheme with
+  one pathless URL (`standard`, `secure`, `stream`, no CORS) reserved in the
+  single `registerSchemesAsPrivileged` call; `media-src pi-startup:` is the only
+  CSP change. No filesystem path reaches the renderer. The descriptor arrives
+  as a window creation argument, like the display locale, so it is readable
+  before the first paint.
+- Three bounds keep the surface recoverable, each below the next: first frame
+  2s, whole animation 15s, and the watchdog's stalled bound 180s. `Escape`
+  skips. Every end — clean, error, timeout, skip — runs the same reveal.
+- Exactly one boot surface is mounted, ranked recovery > animation > brand
+  splash. The animation plays once per launch for the process's first window
+  (a tray or Dock reopen replays nothing; `sessionStorage` blocks a reload
+  replay), is dropped entirely under `prefers-reduced-motion: reduce`, and is
+  skipped under `PI_DESKTOP_CAPTURE=1`.
+- `AppSettings.startupAnimation` holds the two choices discovery cannot make:
+  `enabled` (absent means on) and `skipWhenReady` (absent plays it out). Both
+  are read before the window is created, so a change lands on the next launch.
+  General → Appearance gains the switch, the gated `skipWhenReady` switch, a
+  status line naming the file the next launch would play, and an action that
+  opens and creates the folder.
+- Not changed: the brand splash, its 420ms dwell and 280ms fade, the watchdog
+  bounds and recovery surface, window creation options, and plugin contracts.
+  Plugin-contributed animations are explicitly out of scope — that hands an
+  untrusted source the first paint and needs its own ADR.
+- Covered by `packages/shared/src/startup-animation.test.ts` and
+  `apps/desktop/test/startup-animation.test.mjs`. See ADR 0338,
+  `04-ux/09-interaction-patterns.md` §1.12 and E2E-076.
+- `pnpm test:e2e:startup-animation` boots the real app against a generated
+  VP9 clip and asserts what no source check can: Chromium decodes bytes served
+  over `pi-startup:` under the page CSP, playback advances, the reveal hands
+  over an interactive shell, and an unplayable file yields the shell in about a
+  second rather than holding the window.
+
+## 2026-10-20 — Plugin session scope: `.all` grants and message-level writes (D680)
+
+- D680 / ADR 0340 opens `pi.session` beyond the ADR 0200 import boundary. Three
+  new permissions — `session.read.all`, `session.update.all`,
+  `session.delete.all` — carry the existing verbs over every live session,
+  including the conversations the user created in this app.
+- `.all` is an addition, not a widening. An installed plugin keeps exactly the
+  reach its user reviewed; a manifest may declare both, and `.all` wins.
+- The ownership predicate stops being a second, implicit permission. Electron
+  main resolves the scope from the granted permissions and sends it; host-core
+  enforces exactly that, treats an absent `scope` as `own`, and rejects an
+  unknown value with `INVALID_PARAMS`.
+- The queries that only worked because the boundary was narrow are fixed:
+  `list` left-joins the origin sidecar, `get` and messages report the real
+  `originKind` / `source` / `externalId` / model binding / `origin` instead of
+  the import projection, and the `trash` and `purge` statements follow the
+  scope instead of an embedded `EXISTS`.
+- Message-level writes exist for the first time: `appendMessage` and
+  `replaceMessages` under `session.update.all`, `deleteMessage` and
+  `truncateFrom` under `session.delete.all`. They delegate to the host-core
+  transcript operations, so revision archiving, inflight checkpoints, and the
+  JSONL rewrite path are unchanged.
+- A rewrite is refused with `TURN_RUNNING` while a turn owns the session.
+  `appendMessage` is exempt, because appending is how a turn's own rows land.
+- `rename` claims the manual title source, so an installed `session.autoTitle`
+  plugin cannot replace a title the user's plugin chose.
+- Every session call now audits the scope that authorised it. Before this
+  change `list`/`get`/`listMessages`/`rename`/`delete` emitted no audit entry.
+- `sessionsChanged` carries the changed `sessionId`, and the shell re-reads an
+  open transcript when that id is active and no turn is running.
+- Not changed: `.own` semantics, the import contract and its limits, the
+  `session.autoTitle` boundary, database schema, and persisted formats. The
+  delete rate limit stays at 20/minute; the four message writes share a
+  60/minute budget.
+- Covered by the `plugin_sessions` and `plugin_session` host-core tests,
+  `apps/desktop/test/plugin-session-access.test.mjs`, and
+  `apps/desktop/test/plugin-session-api.test.mjs`. See ADR 0340, ADR 0200's
+  amendment, ADR 0323's corrected alternative, `03-plugin-api.md` §plugin-owned
+  and host-wide sessions, `13-plugin-permissions-matrix.md` §2, and E2E-268.
+
+## 2026-11-04 — Computer use is a host-owned capability behind a scope grant (D681)
+
+- D681 / ADR 0342 accepts bounded native application control as a design. The
+  agent could already drive the embedded browser guest over allowlisted CDP and
+  nothing else; there is no screen capture, synthetic input, window enumeration,
+  or accessibility client anywhere in the repository. This decision records the
+  contract, not an implementation: no code ships with it.
+- The capability lives in `crates/host-core` as a `computer.*` domain and
+  reaches the agent as one high-risk builtin tool, `Computer`. It is deliberately
+  not a plugin host API, so the most dangerous privilege in the product cannot be
+  requested by a third-party manifest. Electron main stays thin — the picker, the
+  indicator, and the `tools.execute` relay — and the sidecar needs no new
+  `host.proxy` method.
+- Authority is one user-minted scope grant naming one window or application,
+  with a revision, an action budget, an idle expiry, an input policy, and a
+  capture mode. The model cannot name, enumerate, or widen a target; there is at
+  most one active grant per desktop instance; grants are never persisted.
+- Identity is accessibility-first: `inspect` returns roles, names, bounds and
+  per-grant opaque `uid`s, and `act` dispatches platform accessibility actions.
+  Coordinates exist only against a `basis` minted by a capture of the same
+  scope, re-validated immediately before synthesis, so a blind click is
+  unexpressible and a moved window fails closed.
+- Two refusals hold under every mode, setting and grant option: the capability
+  never targets PI-Desktop's own windows, because synthetic input into this app
+  is a permission-broker bypass, and both capture and synthesis refuse under a
+  secure input state or a focused password field. The built-in
+  credential-surface denylist entries cannot be removed.
+- Permission mode governs the grant rather than each keystroke. Minting is
+  always an explicit desktop-UI decision with no deadline; `auto` mints nothing
+  and a spoken request cannot. Within a grant, inspection auto-allows and input
+  follows `confirm-each` (the only policy under `ask`) or an opt-in
+  `autonomous-in-scope`. Plan and Goal hard-deny the tool, and no
+  `allow-session` grant exists for it.
+- Computer use carries **its own model binding** — one `{ providerId, modelId }`
+  the user picks from the existing provider rows, following `imageGeneration`.
+  A bounded perceive-decide-act loop in `packages/computer-use` turns one
+  instruction into validated steps against a strict action schema; the
+  conversation model never drives the machine and there is no silent fallback
+  to it. The agent-facing tool therefore takes an instruction, not a `uid` or a
+  coordinate, and returns a bounded summary rather than the inner transcript.
+- The loop and the capture run in Electron main, not host-core: the loop needs
+  a model provider and the capture needs Chromium, and host-core holds neither.
+  host-core keeps everything that can refuse — targets, accessibility,
+  synthesis, the grant broker, per-action re-validation, audit — and `Computer`
+  follows the `GenerateImages` shape, where `tools.execute` performs the
+  permission evaluation and main executes only after the host authorises.
+- **The agent's cursor is drawn, not stolen.** Actions go through accessibility
+  actions or window-targeted events, so the real pointer never warps and the
+  user keeps their mouse while the agent works; a path that could only act by
+  warping is refused. A frameless, transparent, click-through, always-on-top
+  overlay draws the agent's own cursor, owns no part of the action, cannot
+  receive input, and is never the source of truth for where an action landed.
+- Voice is specified and deliberately unwired in the first release: the agent
+  is the only caller. When stage 3 lands it, a spoken request will reach
+  `Computer` only as a work request on the bound session through the existing
+  delegate/classifier path, as task delegation rather than teleoperation.
+- All three desktop platforms are in scope. Capture is `desktopCapturer`
+  everywhere, so only inspection and input are platform work: macOS
+  (`AXUIElement` actions, `CGEventPostToPid` keys, hand-declared framework FFI
+  with no new crates) is stage 1; Windows (UIA, window-targeted messages,
+  higher-integrity targets refused) and Linux/X11 (AT-SPI, best effort) are
+  stage 2; Wayland refuses input and keeps portal capture. Every unsupported
+  path has its own code, never a hang or a silent no-op, and a partial-fidelity
+  backend declares it instead of returning an empty tree.
+- Non-goal 9 is amended rather than deleted: browser takeover, unattended
+  full-desktop control, and any model-chosen target remain non-goals.
+- Contract pages: `03-runtime/computer-use.md`, `08-error-codes.md` §3.10
+  (`COMPUTER_*`), `05-host-core-rust.md` §2/§5b/§6,
+  `05-security/01-security.md` §13, and `03-tools-and-permissions.md` §0/§2/§6.
+- Stage 1 shipped with the decision: `packages/shared/src/computer-use.ts`,
+  `crates/host-core/src/computer/` with the macOS backend and
+  `rpc/computer_rpc.rs`, `packages/computer-use/`,
+  `apps/desktop/electron/main/computer-use/`, and the picker, indicator,
+  settings card, and drawn cursor in the renderer. Covered by the host-core
+  `computer::` tests, `packages/computer-use` unit tests, the shared
+  validators, and `apps/desktop/test/computer-use-service.test.mjs`. No real
+  application was driven and the five `E2E-COMPUTER-USE-*` gates remain
+  `NOT RUN`; see `docs/implementation/computer-use-evidence.md`.
+
+## 2026-11-05 — Computer use grants the whole desktop automatically (D682)
+
+- D682 / ADR 0344 amends ADR 0342 §4 and §6. The user-picked window grant made
+  a two-application task a sequence of dialogs, so the picker is removed: a
+  `Grant` now carries `scope`, the `Computer` tool handler mints a
+  `desktop`-scope grant itself on a session's first call, and enabling the
+  feature in Settings is the consent. A `window` grant stays expressible and is
+  no longer minted by any UI.
+- A desktop grant binds exactly one window at a time, starting at the frontmost
+  window the host does not refuse. `computer.inspect` takes an optional
+  `targetId`; binding re-runs the self-target, denylist, and elevation checks
+  against a fresh enumeration and always moves the revision, so every `uid` and
+  `basis` from the previous window stops validating. `computer.act` never binds.
+- A closed window does not end a desktop grant: it falls back to the frontmost
+  usable window, and an action aimed at the window that disappeared is refused
+  `COMPUTER_STALE_REVISION` even with no `expectedRevision` supplied. A window
+  grant is revoked instead, as before.
+- The loop sees the host's window list with refusals attached and gains one
+  answer kind, `{"kind":"switch","window":"<id>"}`. A switch spends a loop step
+  and no action budget, a refused switch is reported to the model as a step
+  instead of ending the run, and a switch is never counted as work done.
+- Runs are autonomous by default: `COMPUTER_USE_DEFAULTS.inputPolicy` becomes
+  `autonomous-in-scope` and applies under every permission mode. `confirm-each`
+  stays in the contract but has no approval card behind it, so the Settings row
+  offering it is removed rather than left to imply a control that narrows
+  nothing. Capture stays `a11y-only` by default, and the handler now actually
+  passes the user's capture, budget, and expiry settings to the grant.
+- Stop ends the run: the indicator revokes the grant and aborts the turn that
+  holds it, and host-core refuses an `origin: agent` mint for
+  `AGENT_REGRANT_COOLDOWN` (30s) with the new `COMPUTER_STOPPED_BY_USER`.
+  Without that, the next tool call in the same turn would simply re-grant.
+- The renderer loses the window-enumeration and grant-minting IPC channels
+  entirely; it reads capabilities and the grant, and revokes. Audit records the
+  scope and the minting origin, and appends `computer.grant.rebound` with the
+  application identity on every move.
+- Covered by the new host-core `computer::` tests (frontmost bind, no usable
+  window, rebind refusals, window-grant rebind refusal, closed-window fallback,
+  Stop cooldown), `packages/computer-use` switch tests, the shared defaults
+  test, and `apps/desktop/test/computer-use-service.test.mjs` (automatic mint,
+  Stop refusal, switch call shape). Still device-unverified: the
+  `E2E-COMPUTER-USE-*` gates remain `NOT RUN`.
+
+## 2026-11-05 — The accessibility window is joined by window id, not geometry (D683)
+
+- D683 records a device finding and the private symbol that fixes it. The first
+  real-device run of computer use (macOS 15, Stage Manager active) refused every
+  window except the one on stage: `window_matches` joined the `CGWindowList`
+  entry to its `AXUIElement` by geometry, and the window server reports an
+  off-stage window at its Stage Manager *thumbnail* frame while accessibility
+  reports the real one — measured as `37,607 121x137` against
+  `219,44 1568x1125` for the same window. Geometry is therefore not an identity
+  on this platform, and the capability was unusable in practice.
+- The join is now the window id from `_AXUIElementGetWindow`, which is the same
+  number `CGWindowList` supplies. It is undocumented, has existed since 10.5,
+  and is what every window manager on the platform uses. It is resolved through
+  `dlsym` rather than linked, so a release that drops it degrades to the
+  geometry match instead of failing to launch; a readable id that disagrees is
+  definitive and refuses. No new crate, and the rest of the FFI surface is
+  unchanged.
+- A grant now carries accessibility's window frame rather than the window
+  server's, because element bounds, the coordinate clamp, the `basis`, the drawn
+  cursor, and the capture crop are all in that frame. `measure` keeps taking
+  identity (`appKey`, title) from `CGWindowList` and falls back to its geometry
+  when the window cannot be opened.
+- Two smaller consequences of the same run: the automatic grant now prefers a
+  window whose tree can actually be opened (`Desktop::can_open`, a one-node
+  probe), because the window server lists Stage Manager surfaces in front of
+  the user's windows and binding one wastes a turn; and a failed read no longer
+  leaves the grant on the window it could not read (`policy::inspect_bound`
+  restores the previous binding and keeps the revision bump).
+- The probe itself is `scripts/e2e-computer-use-device.mjs`, opt-in behind
+  `PI_DESKTOP_COMPUTER_USE_DEVICE=1` because it reads the operator's screen and
+  can type into one of their windows. Window titles are withheld unless
+  `--titles` is passed. Re-run it after a macOS upgrade: if `_AXUIElementGetWindow`
+  ever disappears, this is the check that notices.
+- Covered by `computer::tests::an_automatic_grant_skips_a_window_whose_tree_cannot_be_opened`
+  and `a_window_that_cannot_be_read_does_not_become_the_bound_one`; the join
+  itself is platform code and is covered only by the device probe. See
+  `docs/implementation/computer-use-evidence.md` for what the run proved and
+  what it did not.
+
+## 2026-11-03 — Prompt enhancement ships with the application image (D685)
+
+- D685 tracks the released `pi.prompt-enhancement` plugin (1.3.0, byte-identical
   to the marketplace package) in `apps/desktop/resources/plugins` and
   un-ignores that path, so every build this repository produces ships the
   Composer enhancement action as a bundled plugin (ADR 0378).
@@ -8128,9 +8376,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `bundled: 3`, `broken: 0`). See `04-ux/12-prompt-enhancement.md`,
   `04-ux/06-settings-ia.md`, `03-runtime/04-data-storage.md`, and ADR 0378.
 
-## 2026-11-04 — Cloud sync and Remote Hosts leave Settings (D680)
+## 2026-11-04 — Cloud sync and Remote Hosts leave Settings (D686)
 
-- D680 removes the two Settings destinations. `src/lib/settings-search.ts` no
+- D686 removes the two Settings destinations. `src/lib/settings-search.ts` no
   longer declares `sync` or `remoteHosts`, so the rail, the search index, and
   stale-tab fallback drop them together; `SettingsPage.tsx` renders only the
   remaining destinations and no longer imports their pages.
@@ -8154,7 +8402,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   E2E-REMOTE-HOST-settings-compact-inventory is removed with the surface, and
   E2E-REMOTE-HOST-ssh-password-authentication is retired.
 
-## 2026-11-04 — Bundled tool packages get their own page (D681)
+## 2026-11-04 — Bundled tool packages get their own page (D687)
 
 - The Tools destination lists the tool packages this build ships, next to
   Artifacts in the app-shell rail. A package is a directory under
@@ -8180,7 +8428,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   parameter narrowing), and `apps/desktop/test/tools-page.test.mjs` (page union,
   rail order, global search, host-only access, all nine locale catalogs).
 
-## 2026-11-04 — The newest prompt stays readable while its answer scrolls (D682)
+## 2026-11-04 — The newest prompt stays readable while its answer scrolls (D688)
 
 - The reference client keeps the human bubble at the top of the thread while its
   turn is on screen: the bubble is grouped with the turn and sticks. The
@@ -8207,7 +8455,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   boundary, selector escaping, the rendered strip (including the attachment-only
   case), the transcript wiring, and the two new keys in all nine catalogs.
 
-## 2026-11-04 — Each session totals its tokens in the status bar (D683)
+## 2026-11-04 — Each session totals its tokens in the status bar (D689)
 
 - The status bar's token readings described one request: `上下文` is the newest
   turn's context occupancy, `缓存` its cache share. Nothing answered "how much has
@@ -8233,7 +8481,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   session empty) and `apps/desktop/test/session-usage-totals.test.mjs` (bucket
   arithmetic, compaction, the host-ledger wiring, the menu entry, nine catalogs).
 
-## 2026-11-04 — The product is Pi-Workspace, and storage identifiers are frozen separately (D684)
+## 2026-11-04 — The product is Pi-Workspace, and storage identifiers are frozen separately (D690)
 
 - The display name is `Pi-Workspace` (`APP_NAME`), the application ID is
   `net.aiuo.pi-workspace`, the npm scope is `@pi-workspace/*`, and the release

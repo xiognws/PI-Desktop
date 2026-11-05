@@ -343,10 +343,10 @@
 | D676 | 读者跟随的已完成回合停在它的提示处 | **修订流完成规则：转录可见且仍在跟随流时回合完成，渲染层会把该回合最新的用户消息滚动到转录顶部预留的标题栏带下方 16px 处（除非减少动态效果，否则平滑滚动），退出跟随模式并显示“滚动到底部”。提示已在视野内、回复失败或被中止、面板隐藏或处于阅读窗口、披露位置被保持、或在移动前开始了新的运行时，都不移动。仅渲染层；不新增设置，不改变 IPC 或持久化。** | Issue #1889：长回复结束后读者停在最后一行，得自己往上滑才能找到回答的开头。 |
 | D677 | DeepSeek 推理回放每行只用一个字段，且永不覆盖真实推理 | **修订 ADR 0256 第 3 条：pi-ai 的补全过程从最新一条带真实推理的 assistant 行取推理字段，把每条 assistant 行归一到这一个字段（真实推理从其他字段名移过来，并删除其余字段），只在没有任何推理的行上填充占位符。历史重建与思考面板会去掉开头回显的占位符（`withoutReasoningReplayPlaceholder`）；不改写已存储的文本。不改变 schema、IPC 或设置。** | Issue #1945：重建行被标为 `reasoning_content`，而中转流式返回的是 `reasoning_text`；补全过程选了 `reasoning_content`，把占位符写在了 live 行真实推理之上、也就是模型读取的字段里，模型把它当作自己的思考复读（受影响会话中 13.6% 的 assistant 行），回显又被持久化并回放。 |
 | D678 | 环形右键菜单重做并移到「常规」 | **可选的转录背景环形菜单改为：每个扇区静止时就显示图标与动作名（悬停才出现的中心标签删除），当前扇区只有一层填充高亮、不再出现聚焦方框，hub 改为带落点圆点的凹陷圆孔，整环缩到 248px 并用发丝分隔线与输入框级阴影，悬停与展开动效走共享 motion token。菜单打开时按下右键，在哪个扇区松开就执行哪个动作；在中心圆上松开只关闭；打开菜单那次右键尾随的松开不触发任何动作。设置卡片从 AI 页移到常规页侧边栏卡之后，设置搜索索引同步迁移。动作词汇、按方向的默认值、`AppSettings.radialMenu` 结构、持久化与 IPC 均不变。** | 只有图标的环悬停前不可读，扇区填充与按钮底色在同一个目标上画了两层高亮，而且这个开关待在 AI 页里，但环形菜单是转录交互偏好。 |
-| D680 | 云同步与远程主机退出设置 | **从设置索引中移除 `sync` 与 `remoteHosts` 两个目的地：它们的导轨行、页面、搜索关键词索引、它们携带的打包/开发可见性规则、渲染层组件与特性模块、样式，以及锁定它们的测试一并删除。宿主侧配置同步服务、远程主机/SSH 服务、IPC/RPC 契约、`configSync.*` / `remoteHosts.*` 文案，以及创建项目对话框的远程来源保持不变。见 `04-ux/06-settings-ia.md`、`00-baseline.md` 与 `06-delivery/04-e2e-test-plan.md`。** | 本部署完全不用这两个界面；不可达的页面、实验性徽章与死样式只会让设置目录更宽，并让一条维护面继续存在。 |
-| D681 | 随包工具包有自己的页面 | **在应用外壳导轨的产物文件下方新增工具目的地：本构建 `resources/tools/<id>/tool.json` 下的工具包，每个一张卡片，给出名称、版本、说明、声明的工具与风险等级，以及一个启用开关。host-core 扫描该目录（`crates/host-core/src/tool_packages.rs`），并把启用集合持久化到 `<data>/tools/state.json`；`toolPackages.list` / `toolPackages.setEnabled` 是唯一入口，读不出来的工具包保留一行并写明原因。见 `04-ux/01-ui-ia.md` §3.4.1 与 `03-runtime/04-data-storage.md` §2。** | 工具包随镜像发布，需要一个可见、可切换的清单，但不需要插件的安装/更新/权限模型；独立的声明式清单把市场界面挡在外面。 |
-| D682 | 回答滚动时最新提问始终可读 | **在对话区顶边用单行条复述用户发送的最新提问：该行下边缘越过滚动区顶边后出现，行的任何一部分重新可见即消失。它折叠空白、按词边界截断，只带附件的提问显示附件数量，代理间投递永不置顶，并让位给打开的查找栏。点击该条把这一行滚回视野。见 `04-ux/09-interaction-patterns.md` §2.6。** | 参考客户端的做法是把用户气泡钉在对话顶部；否则长回答会把提问顶出视野，用户得往回滚才能想起自己问了什么。 |
-| D683 | 每个会话在状态栏合计自己的 token | **状态栏新增会话 token 合计，覆盖该会话已跑过的所有轮次。数字来自宿主的轮次账本（新增 `session.usageTotals` RPC），而不是渲染出来的对话——后者的窗口是有界的；状态栏在切换会话、轮次流式输出期间与轮次结束时刷新。明细（输入／输出／缓存读／缓存写／推理／轮次）放在该条目的 tooltip 里，并且可以像其他条目一样从状态栏菜单隐藏。见 `03-runtime/04-data-storage.md`（用量账本）。** | 「这段对话到底花了多少」是整个会话层面的问题，而状态栏上原有的 token 读数都只描述单次请求或单个上下文窗口。 |
+| D686 | 云同步与远程主机退出设置 | **从设置索引中移除 `sync` 与 `remoteHosts` 两个目的地：它们的导轨行、页面、搜索关键词索引、它们携带的打包/开发可见性规则、渲染层组件与特性模块、样式，以及锁定它们的测试一并删除。宿主侧配置同步服务、远程主机/SSH 服务、IPC/RPC 契约、`configSync.*` / `remoteHosts.*` 文案，以及创建项目对话框的远程来源保持不变。见 `04-ux/06-settings-ia.md`、`00-baseline.md` 与 `06-delivery/04-e2e-test-plan.md`。** | 本部署完全不用这两个界面；不可达的页面、实验性徽章与死样式只会让设置目录更宽，并让一条维护面继续存在。 |
+| D687 | 随包工具包有自己的页面 | **在应用外壳导轨的产物文件下方新增工具目的地：本构建 `resources/tools/<id>/tool.json` 下的工具包，每个一张卡片，给出名称、版本、说明、声明的工具与风险等级，以及一个启用开关。host-core 扫描该目录（`crates/host-core/src/tool_packages.rs`），并把启用集合持久化到 `<data>/tools/state.json`；`toolPackages.list` / `toolPackages.setEnabled` 是唯一入口，读不出来的工具包保留一行并写明原因。见 `04-ux/01-ui-ia.md` §3.4.1 与 `03-runtime/04-data-storage.md` §2。** | 工具包随镜像发布，需要一个可见、可切换的清单，但不需要插件的安装/更新/权限模型；独立的声明式清单把市场界面挡在外面。 |
+| D688 | 回答滚动时最新提问始终可读 | **在对话区顶边用单行条复述用户发送的最新提问：该行下边缘越过滚动区顶边后出现，行的任何一部分重新可见即消失。它折叠空白、按词边界截断，只带附件的提问显示附件数量，代理间投递永不置顶，并让位给打开的查找栏。点击该条把这一行滚回视野。见 `04-ux/09-interaction-patterns.md` §2.6。** | 参考客户端的做法是把用户气泡钉在对话顶部；否则长回答会把提问顶出视野，用户得往回滚才能想起自己问了什么。 |
+| D689 | 每个会话在状态栏合计自己的 token | **状态栏新增会话 token 合计，覆盖该会话已跑过的所有轮次。数字来自宿主的轮次账本（新增 `session.usageTotals` RPC），而不是渲染出来的对话——后者的窗口是有界的；状态栏在切换会话、轮次流式输出期间与轮次结束时刷新。明细（输入／输出／缓存读／缓存写／推理／轮次）放在该条目的 tooltip 里，并且可以像其他条目一样从状态栏菜单隐藏。见 `03-runtime/04-data-storage.md`（用量账本）。** | 「这段对话到底花了多少」是整个会话层面的问题，而状态栏上原有的 token 读数都只描述单次请求或单个上下文窗口。 |
 
 ## M0. 模型目录决策
 
@@ -432,6 +432,7 @@
 | D236 | 每个数据目录只允许一个桌面实例 | **Electron 主进程在模块求值期间调用 `app.requestSingleInstanceLock()` —— 在 `app.setName` 之后（锁位于由应用名派生的 `userData` 路径下），且在 logger、持久化 outbox 或任何其他数据目录访问之前。没有拿到锁的启动直接调用 `app.quit()` 且不引导任何东西：readiness 与 `before-quit` 处理器都提前返回，因此它不会在运行中实例的数据目录内创建窗口、托盘、子进程或日志行。持有锁的实例通过与托盘“显示”操作相同的路径响应 `second-instance`，恢复并聚焦主窗口，若窗口已关闭或隐藏到托盘则重新创建。只有在未设置 `PI_DESKTOP_DATA_DIR` 时才请求该锁，因此 E2E 测试装置、截图装置和有意并行的 profile 保持原有的随时启动行为。IPC 通道、宿主协议和存储架构均未变化。** | 第二次启动会引导出一个完整的第二份应用：在单写者 `pi.sqlite`（D002）上再开一个 host-core，在同一目录下再建一份 outbox 和日志树，再加一个托盘、一次启动器快捷键注册和一个更新器，导致两个 shell 在同一个数据库上出现分歧。再次启动应用是想看到已经在运行的那一个，把锁的作用域限定在安装本身也让使用独立数据目录的运行仍可启动（ADR 0094）。 |
 | D367 | 宿主拥有的插件会话导入与归属 API | **`pi.session` 增加 `import`、`importBatch`、`list`、`get`、`listMessages`、`rename`、`delete`；每个来源必须声明 `contributes.sessionSources`；host-core 生成 id，并把所有操作限定在 `(pluginId, source, externalId)` 归属内；导入永不激活项目/provider/模型绑定。Schema v14 增加 `session_import_origins` 与 `sessions.deleted_at`；协议 v11 不变。回收站保留转录，仅属主可清除。** | 外部历史插件需要持久的导入/读取/更新/删除，而进行中的 `session.getLlmContext` 与核心 `session.import` 边界不是安全的插件归属边界（ADR 0200，E2E-214 / E2E-215） |
 | D368 | 显式插件项目 id 与宿主拥有的会话刷新 | **受权限门控的 `pi.project.create({ path })` 创建或复用项目并返回宿主生成的 id，不激活工作区；导入项可绑定已有 `projectId`，省略则保持未绑定，历史来源路径永不成为工具根。Electron main 在插件导入、重命名、删除成功后发出 `pi-desktop/session/event/changed`；渲染器复用 `refreshSessions()`，跳过的导入不发事件，已关闭的项目标签不会重新打开。** | 向插件暴露 `workspace.set` 会改变用户的活动工作区，且插件写入需要宿主拥有的渲染器刷新路径（ADR 0201，E2E-216） |
+| D686 | 插件会话作用域：`.all` 权限与消息级写入 | **`pi.session` 增加 `session.read.all`、`session.update.all`、`session.delete.all`，让 `list`/`get`/`listMessages`、`rename`、`delete` 覆盖所有活动会话，而不再只限于本插件导入的会话。`.all` 是与 `.own` 并列的独立授权，不会放宽 `.own`；两者都声明时 `.all` 生效。Electron main 按授权解析作用域并把 `scope` 发给 host-core，host-core 只执行收到的那个值，缺省视为 `own`；`list` 改为对来源边表做 `LEFT JOIN`，`get` 与消息返回真实的 `originKind`、`source`、`externalId`、模型绑定与 `origin`，而不是导入投影，`trash`/`purge` 语句按作用域而不是内嵌 `EXISTS` 执行。消息级写入首次开放：`appendMessage`/`replaceMessages`（`session.update.all`）与 `deleteMessage`/`truncateFrom`（`session.delete.all`），复用既有 host-core 记录操作，回合运行期间以 `TURN_RUNNING` 拒绝改写，并共用每分钟 60 次预算。`rename` 改为占用手动标题来源。每次会话调用都会审计其授权作用域；`sessionsChanged` 会带上变更的会话 id。** | ADR 0200 的归属过滤让「读取用户自己的会话」这一合法能力无法表达，ADR 0323 因此不得不另造一个更窄的标题权限，ADR 0333 已交付的建议流程也读不到它所在的会话；直接放宽 `.own` 则会在用户不知情的情况下放大其审核过的「仅本插件导入的会话」授权（ADR 0340） |
 | D370 | 桌面操作的本地 MCP 控制平面 | *(由 D372 修订)* **Electron Main 内可选启用的 Streamable HTTP MCP 服务器绑定 `127.0.0.1`，用持久随机 bearer token 认证，按回环主机名校验 Origin，写入受模式限制的连接清单，并委托给渲染器使用的同一组已注册 IPC 处理器。命名工具覆盖项目/会话/Agent 流程；`pi_desktop_invoke` 可达带风险标记的操作目录；危险操作需要 `confirm: true`；成功的外部变更复用渲染器会话变更事件。仅本地且启动时失败软着陆。** | 外部 Agent 需要驱动运行中的桌面，又不能有第二套权限或持久化实现，也不能触碰推迟的远程 Gateway / WebUI 边界（ADR 0203，E2E-220） |
 | D372 | 收紧本地 MCP 控制平面边界 | **修订 D370 / ADR 0203：首版目录为项目/会话/Agent/工作区流程加已审阅的读取；剥离秘密形态的参数；`session/configure` 视为危险；监听地址断言为回环；协议版本协商而非回显；包含 `structuredContent` 的结果有界；渲染器会话刷新仅限变更操作。** | 首版目录仍暴露原生选择器、写秘密的 provider/OAuth/MCP 路径与未确认的 `session/configure`，并把会话读取当作渲染器变更（E2E-220） |
 | D377 | 插件桌面控制需要原生用户同意 | **通过 `pi.desktop.invoke` 调用的 `dangerous` 桌面操作，需要插件给出 `confirm: true`，然后由用户在宿主拥有的原生对话框中作答；该对话框只显示目录中的操作 id、描述和有界的参数预览；关闭对话框、拒绝，以及没有对话框服务的宿主都以 `PERMISSION_DENIED` 失败。`read`/`write` 操作与 MCP 契约（D372）不变。** | 控制器的 `confirm` 标志由调用方设置，因此插件（或其背后的模型）可以在没有人参与的情况下删除会话或把会话切到 `auto`，而任何由插件绘制的确认卡片都可能被提示注入的成绩单改换标签（ADR 0208，E2E-236） |
@@ -5658,9 +5659,191 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   `pnpm test:e2e:radial-menu`，以及截图场景 `pi-radial`、`pi-radial-dark` 覆盖。见
   `04-ux/09-interaction-patterns.md` 第 1.11 节与 E2E-CHAT-radial-background-menu。
 
-## 2026-11-03 — 提示词增强随应用镜像发货（D679）
+## 2026-11-03 — 用户自备启动动画（D679）
 
-- D679 将发行版 `pi.prompt-enhancement`（1.3.0，与市场包逐字节一致）纳入
+- D679 把启动界面交给用户。`<dataDir>/startup/` 中的视频会替代该次启动的品牌启动
+  画面：先播到最后一帧，再用播放时那同一层不透明黑色遮住窗口，直到外壳拿到首批状态，
+  然后在 1000ms 内把黑色淡出（`--motion-startup-reveal`，运动梯度之外唯一的时长）。
+  淡出一开始遮罩就不再接收事件，所以主界面与窗口控件在整整一秒里都可操作。
+- 选片只读文件系统且不创建任何目录：条目按 realpath 限制在该目录内，排序为
+  `webm` > `mp4` > `m4v` > `mov`，同类按文件名决定；点号开头、非普通文件、空文件以及
+  超过 64 MB 的条目都会排除。没有该目录的安装行为不变——同样的启动画面、同样的最短
+  停留、同样的看门狗边界。
+- 字节通过 `pi-startup://animation` 提供：host 自有协议，只有一个不带路径的 URL
+  （`standard`、`secure`、`stream`，不开 CORS），在唯一一次
+  `registerSchemesAsPrivileged` 调用中注册；CSP 只新增 `media-src pi-startup:`。没有
+  任何文件系统路径到达渲染器。描述符随窗口创建参数传递（与界面语言同一机制），因此首帧
+  之前就可同步读取。
+- 三个边界让界面始终可恢复，且逐级小于下一级：首帧 2s、整段动画 15s、看门狗的卡死边界
+  180s。`Escape` 可跳过。无论正常结束、出错、超时还是跳过，都走同一套渐显。
+- 任何时刻只挂载一个启动界面，优先级为 恢复界面 > 启动动画 > 品牌启动画面。动画每次
+  启动只播一次，且只给进程的第一个窗口（托盘或 Dock 重新打开不重播；`sessionStorage`
+  阻止重载重播）；`prefers-reduced-motion: reduce` 下完全不播放；
+  `PI_DESKTOP_CAPTURE=1` 下直接跳过。
+- `AppSettings.startupAnimation` 只存选片无法决定的两个选择：`enabled`（缺省为开）和
+  `skipWhenReady`（缺省把视频播完）。两者都在创建窗口之前读取，因此改动在下次启动生效。
+  常规 → 外观 新增该开关、受其管辖的 `skipWhenReady` 开关、一行说明下次启动将播放哪个
+  文件，以及一个打开并创建该文件夹的动作。
+- 未改动：品牌启动画面及其 420ms 停留与 280ms 淡出、看门狗边界与恢复界面、窗口创建
+  选项、插件契约。插件提供启动动画明确不在范围内——那等于把首帧交给不可信来源，需要
+  单独立 ADR。
+- 由 `packages/shared/src/startup-animation.test.ts` 与
+  `apps/desktop/test/startup-animation.test.mjs` 覆盖。见 ADR 0338、
+  `04-ux/09-interaction-patterns.md` 第 1.12 节与 E2E-076。
+- `pnpm test:e2e:startup-animation` 用生成的 VP9 片段启动真实应用，断言源码检查无法
+  覆盖的部分：Chromium 能在页面 CSP 下解码经 `pi-startup:` 提供的字节、播放会推进、
+  渐显会交出可交互的主界面，以及不可播放的文件会在约一秒内交出主界面而不是占住窗口。
+
+## 2026-10-20 —— 插件会话作用域：`.all` 权限与消息级写入（D680）
+
+- D680 / ADR 0340 把 `pi.session` 从 ADR 0200 的导入归属边界扩开。三个新权限
+  `session.read.all`、`session.update.all`、`session.delete.all` 让既有动词覆盖
+  所有活动会话，包括用户在本应用中自己创建的对话。
+- `.all` 是新增而非放宽：已安装插件保留其用户审核过的可达范围；清单可同时声明
+  两者，此时 `.all` 生效。
+- 归属判断不再是隐式的第二权限：Electron main 依据授权解析作用域并下发，
+  host-core 只执行收到的值，缺省按 `own`，未知值以 `INVALID_PARAMS` 拒绝。
+- 修正了只因边界过窄才能工作的查询：`list` 对来源边表做 `LEFT JOIN`，`get` 与
+  消息返回真实的 `originKind`/`source`/`externalId`/模型绑定/`origin`，`trash` 与
+  `purge` 语句按作用域而非内嵌 `EXISTS` 执行。
+- 首次开放消息级写入：`appendMessage`、`replaceMessages`（`session.update.all`）
+  与 `deleteMessage`、`truncateFrom`（`session.delete.all`），复用 host-core 记录
+  操作，因此修订归档、inflight 检查点与 JSONL 重写路径保持不变。
+- 回合运行期间以 `TURN_RUNNING` 拒绝改写；`appendMessage` 例外，因为追加正是
+  回合写入自身行的方式。
+- `rename` 占用手动标题来源，已安装的 `session.autoTitle` 插件之后无法覆盖用户
+  插件选定的标题。
+- 每次会话调用都会审计其授权作用域；此前 `list`/`get`/`listMessages`/`rename`/
+  `delete` 完全没有审计记录。
+- `sessionsChanged` 会带上变更的 `sessionId`，当该会话正是当前打开的会话且没有
+  回合在跑时，外壳会重新读取转录以重绘。
+- 未改动：`.own` 语义、导入契约与其限额、`session.autoTitle` 边界、数据库
+  schema 与持久化格式。删除限流仍为每分钟 20 次；四个消息写入共用每分钟 60 次。
+- 覆盖：host-core 的 `plugin_sessions` 与 `plugin_session` 测试、
+  `apps/desktop/test/plugin-session-access.test.mjs`、
+  `apps/desktop/test/plugin-session-api.test.mjs`。见 ADR 0340、ADR 0200 修订、
+  ADR 0323 更正后的备选方案、`03-plugin-api.md` §插件拥有与全量会话、
+  `13-plugin-permissions-matrix.md` 第 2 节与 E2E-268。
+
+## 2026-11-04 —— 电脑操作是宿主拥有、以作用域授权为门的能力（D681）
+
+- D681 / ADR 0342 以设计形式接受有界的原生应用操作。Agent 此前只能通过白名单
+  CDP 驱动内嵌浏览器宿体，除此之外一无所能；仓库里没有任何屏幕截取、合成输入、
+  窗口枚举或无障碍客户端。本决定记录的是契约而不是实现：没有任何代码随之交付。
+- 该能力住在 `crates/host-core`，作为 `computer.*` 域存在，并以唯一一个高风险
+  内置工具 `Computer` 触达 Agent。它刻意不是插件宿主 API，因此产品中最危险的
+  权限无法被第三方清单申请。Electron Main 保持为薄层——挑选器、指示器和
+  `tools.execute` 转发——sidecar 不需要新的 `host.proxy` 方法。
+- 权限是一份由用户签发、指向一个窗口或一个应用的作用域授权，带 revision、动作
+  预算、空闲过期、输入策略与截取模式。模型不能命名、枚举或扩大目标；每个桌面
+  实例最多一个活动授权；授权从不持久化。
+- 身份以无障碍为先：`inspect` 返回 role、name、bounds 与按授权生成的不透明
+  `uid`，`act` 派发平台无障碍动作。坐标只在配合 `basis`（由同一作用域的截取签发）
+  时存在，并在合成前立即重新校验，因此盲点击无法被表达，移动过的窗口失败关闭。
+- 两条拒绝在任何模式、设置与授权选项下都成立：该能力永不以 PI-Desktop 自身窗口
+  为目标——向本应用合成输入等于绕过权限中介——并且在安全输入状态或焦点落在密码
+  字段时，截取与合成一律拒绝。内置的凭据界面拒绝名单条目不可移除。
+- 权限模式治理授权而非每次按键。签发始终是桌面 UI 的显式决定且无截止期限；
+  `auto` 不签发任何授权，口述请求也不能。在授权内，检查类动作自动允许，输入遵循
+  `confirm-each`（`ask` 下唯一策略）或需显式选择的 `autonomous-in-scope`。
+  Plan 与 Goal 硬拒绝该工具，且它不存在 `allow-session` 授权。
+- 电脑操作有**自己的模型绑定**——用户从已配置的 Provider 行中挑选的一组
+  `{ providerId, modelId }`，沿用 `imageGeneration` 的先例。
+  `packages/computer-use` 中一条有界的"观察—决策—动作"回路把一条指令按严格
+  动作 schema 变成一串已校验的步骤；对话模型绝不驱动机器，也没有静默回退。
+  因此面向 Agent 的工具接受的是一条指令，而不是 `uid` 或坐标，返回的是有界
+  摘要而不是内层记录。
+- 回路与截取跑在 Electron Main 而不是 host-core：回路需要模型 Provider，截取
+  需要 Chromium，host-core 两者都不持有。host-core 保留一切能够拒绝的东西——
+  目标枚举、无障碍、合成、授权中介、每动作重校验、审计——而 `Computer` 沿用
+  `GenerateImages` 的形状：`tools.execute` 做权限评估，Main 在宿主放行后才执行。
+- **Agent 的光标是画出来的，不是抢来的。** 动作走无障碍动作或面向窗口的事件，
+  真实指针永不被挪动，Agent 工作期间用户的鼠标仍归自己；只能靠挪动真实指针来
+  动作的路径会被拒绝。一个无边框、透明、穿透点击、置顶的浮层画出 Agent 自己的
+  光标，它不拥有动作的任何部分，不能接收输入，也绝不是动作落点的事实来源。
+- 语音在首个版本中只定规格、刻意不接通：唯一调用方是 Agent。阶段 3 接通后，
+  一句口述只能经由现有委派/分类器路径成为绑定会话上的工作请求，属于任务委派
+  而不是遥控。
+- 三个桌面平台都在范围内。截取各平台统一用 `desktopCapturer`，因此只有检查与
+  输入是平台工作：macOS（`AXUIElement` 动作、`CGEventPostToPid` 按键、手写
+  framework FFI 且不引入新 crate）属阶段 1；Windows（UIA、面向窗口的消息、
+  提权目标被拒绝）与 Linux/X11（AT-SPI，尽力而为）属阶段 2；Wayland 拒绝输入
+  并保留门户截取。每条不支持路径都有自己的错误码，绝不挂起，也绝不静默空操作，
+  保真度只是部分的后端必须自行声明，而不是返回一棵空树。
+- 非目标第 9 条是修订而非删除：浏览器接管、无人看管的全桌面控制，以及任何由
+  模型自行选择目标，仍然是非目标。
+- 契约页面：`03-runtime/computer-use.md`、`08-error-codes.md` §3.10
+  （`COMPUTER_*`）、`05-host-core-rust.md` §2/§5b/§6、
+  `05-security/01-security.md` §13、`03-tools-and-permissions.md` §0/§2/§6。
+- 阶段 1 随本决定一起交付：`packages/shared/src/computer-use.ts`、
+  `crates/host-core/src/computer/`（含 macOS 后端与 `rpc/computer_rpc.rs`）、
+  `packages/computer-use/`、`apps/desktop/electron/main/computer-use/`，以及
+  Renderer 中的挑选器、指示器、设置卡片与绘制光标。覆盖来自 host-core 的
+  `computer::` 测试、`packages/computer-use` 单测、shared 校验器，以及
+  `apps/desktop/test/computer-use-service.test.mjs`。尚未驱动任何真实应用，
+  五条 `E2E-COMPUTER-USE-*` 闸门仍为 `NOT RUN`，详见
+  `docs/implementation/computer-use-evidence.md`。
+
+## 2026-11-05 —— 电脑操作默认授权整个桌面（D682）
+
+- D682 / ADR 0344 修订 ADR 0342 第 4、6 条。由用户挑选窗口的授权把跨两个应用的
+  任务变成一串对话框，因此移除挑选器：`Grant` 新增 `scope`，`Computer` 工具处理器
+  在会话首次调用时自行签发 `desktop` 作用域授权，在设置中启用该功能即是用户授权。
+  `window` 授权仍然可表达，但已没有任何界面会签发它。
+- 桌面授权每次只绑定一个窗口，初始为宿主不拒绝的最前窗口。`computer.inspect` 接受
+  可选 `targetId`；绑定会对一次全新枚举重跑自我目标、拒绝名单与提权检查，并总是
+  推进 revision，因此上一个窗口的每个 `uid` 与 `basis` 立即失效。`computer.act`
+  永不绑定窗口。
+- 绑定窗口关闭不会结束桌面授权：它回落到最前可用窗口，而瞄准已消失窗口的动作即使
+  没有传 `expectedRevision` 也以 `COMPUTER_STALE_REVISION` 被拒绝。`window` 授权
+  仍按原样被撤销。
+- 回路会看到宿主给出的窗口列表（含拒绝原因），并新增一种回答：
+  `{"kind":"switch","window":"<id>"}`。切换消耗一个回路步数但不消耗动作预算，被拒绝
+  的切换作为一步回报给模型而不是结束运行，并且切换永不计入"已完成的工作"。
+- 运行默认自主：`COMPUTER_USE_DEFAULTS.inputPolicy` 改为 `autonomous-in-scope`，
+  并在所有权限模式下生效。`confirm-each` 仍在契约中，但背后没有审批卡片，因此移除
+  设置里那一行，而不是留下一个什么都没收窄的控件。截取默认仍为 `a11y-only`，并且
+  处理器现在真的会把用户的截取模式、预算与过期设置传给授权。
+- "停止"结束整次运行：指示器撤销授权并中止持有它的轮次，host-core 在
+  `AGENT_REGRANT_COOLDOWN`（30 秒）内以新错误码 `COMPUTER_STOPPED_BY_USER` 拒绝
+  `origin: agent` 的签发。没有这条，同一轮次的下一次工具调用会直接再签一个。
+- Renderer 完全失去枚举窗口与签发授权的 IPC 通道；它只读取能力与授权，并执行撤销。
+  审计记录作用域与签发方，并在每次改绑时追加带应用身份的 `computer.grant.rebound`。
+- 覆盖来自新增的 host-core `computer::` 测试（绑定最前窗口、无可用窗口、改绑拒绝、
+  `window` 授权拒绝改绑、关闭窗口回落、"停止"冷却）、`packages/computer-use` 的切换
+  测试、shared 默认值测试，以及 `apps/desktop/test/computer-use-service.test.mjs`
+  （自动签发、停止拒绝、切换调用形状）。仍未经真机验证：`E2E-COMPUTER-USE-*` 闸门
+  依旧是 `NOT RUN`。
+
+## 2026-11-05 —— 无障碍窗口按窗口 id 对应，而不是按几何（D683）
+
+- D683 记录一次真机发现以及修它所用的私有符号。电脑操作的首次真机运行（macOS 15，
+  台前调度开启）除了台前那个窗口以外，其他窗口全部被拒：`window_matches` 用几何把
+  `CGWindowList` 条目和 `AXUIElement` 对起来，而窗口服务器对不在台前的窗口报的是
+  台前调度的**缩略图**几何，无障碍报的是真实几何——同一个窗口实测为 `37,607 121x137`
+  对 `219,44 1568x1125`。所以在这个平台上几何不构成身份，该能力实际上不可用。
+- 现在的连接键是 `_AXUIElementGetWindow` 返回的窗口 id，与 `CGWindowList` 给出的是
+  同一个数字。它未公开、自 10.5 起存在，平台上所有窗口管理工具都在用。它通过
+  `dlsym` 动态解析而不是链接，所以未来系统移除它只会退化为几何匹配，而不会导致启动
+  失败；能读到但不相等的 id 是确定性的否定，直接拒绝。不引入新 crate，其余 FFI 面不变。
+- 授权现在携带无障碍的窗口框，而不是窗口服务器的，因为元素 bounds、坐标夹取、
+  `basis`、绘制光标与截取裁剪都在这个坐标系里。`measure` 仍从 `CGWindowList` 取身份
+  （`appKey`、标题），窗口打不开时回退到它的几何。
+- 同一次运行带出的两个小结论：自动授权现在优先选择**树确实能打开**的窗口
+  （`Desktop::can_open`，一次单节点探测），因为窗口服务器会把台前调度的表面列在用户
+  窗口之前，绑上去只是白费一轮；读取失败也不再让授权留在读不了的窗口上
+  （`policy::inspect_bound` 回退绑定并保留 revision 推进）。
+- 探针本身是 `scripts/e2e-computer-use-device.mjs`，需 `PI_DESKTOP_COMPUTER_USE_DEVICE=1`
+  显式开启，因为它会读取操作者的屏幕、也可能往其中一个窗口输入；不加 `--titles` 时
+  不打印窗口标题。macOS 升级后重跑它：`_AXUIElementGetWindow` 哪天消失，就靠这个发现。
+- 覆盖：`computer::tests::an_automatic_grant_skips_a_window_whose_tree_cannot_be_opened`
+  与 `a_window_that_cannot_be_read_does_not_become_the_bound_one`；对应逻辑本身是平台
+  代码，只有真机探针覆盖。这次跑到与没跑到的部分见
+  `docs/implementation/computer-use-evidence.md`。
+
+## 2026-11-03 — 提示词增强随应用镜像发货（D685）
+
+- D685 将发行版 `pi.prompt-enhancement`（1.3.0，与市场包逐字节一致）纳入
   `apps/desktop/resources/plugins` 并取消该路径的忽略，使本仓库产出的每个构建都以随包
   插件形式带上输入框增强操作（ADR 0378）。
 - ADR 0324 的宿主契约不变：`contributes.composerTransforms` 与
@@ -5674,9 +5857,9 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   `04-ux/12-prompt-enhancement.md`、`04-ux/06-settings-ia.md`、
   `03-runtime/04-data-storage.md` 与 ADR 0378。
 
-## 2026-11-04 — 云同步与远程主机退出设置（D680）
+## 2026-11-04 — 云同步与远程主机退出设置（D686）
 
-- D680 移除这两个设置目的地。`src/lib/settings-search.ts` 不再声明 `sync` 与
+- D686 移除这两个设置目的地。`src/lib/settings-search.ts` 不再声明 `sync` 与
   `remoteHosts`，因此导轨、搜索索引与陈旧标签回落会一起去掉它们；`SettingsPage.tsx`
   只渲染剩余目的地，不再引入它们的页面。
 - 渲染层界面是删除而不是隐藏：`ConfigSyncPage` 及其连接/范围/保险库/错误组件、
@@ -5693,7 +5876,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   覆盖（远程项目仍通过对话框创建）。E2E 场景 E2E-REMOTE-HOST-settings-compact-inventory 随界面
   一并删除，E2E-REMOTE-HOST-ssh-password-authentication 标记为退役。
 
-## 2026-11-04 — 随包工具包拥有独立页面（D681）
+## 2026-11-04 — 随包工具包拥有独立页面（D687）
 
 - 工具目的地在应用外壳导轨上紧随产物文件：本构建随包发布的工具包，一个包一张卡片。
   工具包是 `resources/tools` 下带 `tool.json` 清单的目录（`schemaVersion`、`id`、
@@ -5712,7 +5895,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   `apps/desktop/test/tools-page.test.mjs`（页面联合类型、导轨顺序、全局搜索、只能经宿主访问、
   九套语言文案）。
 
-## 2026-11-04 — 回答滚动时最新提问始终可读（D682）
+## 2026-11-04 — 回答滚动时最新提问始终可读（D688）
 
 - 参考客户端的做法是把用户气泡与其回合分组，并在回合位于屏幕上期间钉在对话顶部。
   值得照抄的是可观察行为——回答流式输出时提问不离开视野——而不是它的实现机制。
@@ -5732,7 +5915,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   预览折叠与截断、几何边界、选择器转义、渲染出的条含仅附件情形、对话接线，以及九套语言里的
   两个新 key）。
 
-## 2026-11-04 — 每个会话在状态栏合计自己的 token（D683）
+## 2026-11-04 — 每个会话在状态栏合计自己的 token（D689）
 
 - 状态栏原有的 token 读数都只描述单次请求：`上下文` 是最新轮次的上下文占用，`缓存`
   是它的缓存占比。没有一处回答「这段对话一共用了多少」，而那正是整会话层面的问题。

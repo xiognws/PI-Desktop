@@ -38,18 +38,24 @@ import { KeyboardShortcutsSection } from "../../components/settings/KeyboardShor
 import { FontFamilyRow } from "../../components/settings/FontFamilyRow";
 import { ShowThinkingRow } from "../../components/settings/ShowThinkingRow";
 import { TranscriptDisplayModeRow } from "../../components/settings/TranscriptDisplayModeRow";
+import {
+  AutoCollapseSettledGroupsRow,
+  AutoCollapseThinkingRow,
+} from "../../components/settings/TranscriptFoldingRows";
 import { RadialMenuSettings } from "../../components/settings/RadialMenuSettings";
 import { FontSizeRow } from "../../components/settings/FontSizeRow";
 import { LanguageRow } from "../../components/settings/LanguageRow";
 import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 import { ThemeRow } from "../../components/settings/ThemeRow";
 import { MacosWindowTranslucencyRow } from "../../components/settings/MacosWindowTranslucencyRow";
+import { StartupAnimationRows } from "../../components/settings/StartupAnimationRows";
 import { NetworkProxySection } from "../../components/settings/NetworkProxySection";
 import { ProjectsPage } from "../../pages/ProjectsPage";
 import { AgentSkillsPage } from "../../components/settings/AgentSkillsPage";
 import { AgentMcpPage } from "../../components/settings/AgentMcpPage";
 import { AgentSubagentsPage } from "../../components/settings/AgentSubagentsPage";
 import { VoiceSettingsSection } from "./voice/VoiceSettingsSection";
+import { ComputerUseSettings } from "./computer-use/ComputerUseSettings";
 import {
   CommandShellRow,
   ContextUsageDisplayRow,
@@ -416,6 +422,7 @@ export function SettingsPage() {
                 {platform === "darwin" && (
                   <MacosWindowTranslucencyRow settings={settings} saveSettings={saveSettings} />
                 )}
+                <StartupAnimationRows settings={settings} saveSettings={saveSettings} />
               </SettingsCard>
 
               <SettingsCard title={t("settings.sidebar")}>
@@ -565,7 +572,9 @@ export function SettingsPage() {
                 <CommandShellRow settings={settings} saveSettings={saveSettings} />
                 <LinkOpenTargetRow settings={settings} saveSettings={saveSettings} />
                 <ShowThinkingRow settings={settings} saveSettings={saveSettings} />
+                <AutoCollapseThinkingRow settings={settings} saveSettings={saveSettings} />
                 <TranscriptDisplayModeRow settings={settings} saveSettings={saveSettings} />
+                <AutoCollapseSettledGroupsRow settings={settings} saveSettings={saveSettings} />
                 <ContextUsageDisplayRow
                   settings={settings}
                   saveSettings={saveSettings}
@@ -620,6 +629,7 @@ export function SettingsPage() {
                 />
               </SettingsCard>
 
+              <ComputerUseSettings t={t} settings={settings} saveSettings={saveSettings} />
             </div>
           )}
 

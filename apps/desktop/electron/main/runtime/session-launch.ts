@@ -789,6 +789,11 @@ export function createSessionLaunchRuntime({
         // settings stay Main's: they are the user's.
         skillReview: skillReviewPolicyFrom(settings as unknown as Record<string, unknown>),
         ...(jevApiKey ? { jevApiKey } : {}),
+        // A disabled feature is absent from the prompt rather than advertised
+        // and refused on every call (ADR 0342 §13).
+        ...(mode === "agent" && settings.computerUse?.enabled === true
+          ? { computerUseEnabled: true }
+          : {}),
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),
         // Remote-host tools write on that host; Main can only serve local files.

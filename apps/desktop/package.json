@@ -40,6 +40,7 @@
     "@earendil-works/pi-ai": "1.4.0",
     "@earendil-works/pi-mcp": "1.4.0",
     "@pi-workspace/agent-host": "workspace:*",
+    "@pi-workspace/computer-use": "workspace:*",
     "@pi-workspace/agent-runtime": "workspace:*",
     "@pi-workspace/host-runtime": "workspace:*",
     "@pi-workspace/i18n": "workspace:*",

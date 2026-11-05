@@ -6,10 +6,12 @@ import { getModuleDirectory } from "../module-path";
 import {
   APP_NAME,
   builtinWindowBackground,
+  encodeStartupAnimationArgument,
   IPC,
   MAC_TRAFFIC_LIGHT_POSITION,
   type CloseBehavior,
 } from "@pi-workspace/shared";
+import type { ResolvedStartupAnimation } from "../startup-animation";
 import type { BrowserHost } from "../browser-host";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
@@ -52,19 +54,11 @@ import { recoverRendererAfterGone } from "../renderer-recovery";
 function windowsIconPath(): string | undefined {
   if (process.platform !== "win32") return undefined;
 
-  // A PNG first, on purpose. Electron flattens an `.ico` to its single largest
-  // bitmap before handing Windows a window icon, so the taskbar button — which
-  // asks for 24 or 32 logical pixels — has nothing it can use and falls back to
-  // the window class default, i.e. Electron's own atom logo on a branded exe.
-  // Handing it a PNG lets Electron produce the size Windows asked for. The .ico
-  // stays as the fallback for a package that predates this change.
   const resourceRoot = app.isPackaged
     ? process.resourcesPath
     : join(app.getAppPath(), "build");
-  const candidates = app.isPackaged
-    ? [join(resourceRoot, "app-icon.png"), join(resourceRoot, "app-icon.ico")]
-    : [join(resourceRoot, "icon.png"), join(resourceRoot, "icon.ico")];
-  return candidates.find((candidate) => existsSync(candidate));
+  const iconPath = join(resourceRoot, app.isPackaged ? "app-icon.ico" : "icon.ico");
+  return existsSync(iconPath) ? iconPath : undefined;
 }
 
 export type WindowLifecycleState = {
@@ -96,6 +90,20 @@ export type WindowLifecycleState = {
    * `settings.macosWindowTranslucency` is.
    */
   macosWindowTranslucency: boolean;
+  /**
+   * Boot animation this launch resolved from the data directory, or null to
+   * keep the brand splash. Held for the whole process because the
+   * `pi-startup:` handler reads it per request, not once.
+   */
+  startupAnimation: ResolvedStartupAnimation | null;
+  /**
+   * Whether a window has already been created with the animation.
+   *
+   * The animation is a launch moment, so it plays for the first window of the
+   * process only: reopening from the tray or the Dock after the window was
+   * closed replays nothing.
+   */
+  startupAnimationPlayed: boolean;
   pluginLauncherWindow: BrowserWindow | null;
   host: HostProcess | null;
 };
@@ -193,6 +201,13 @@ export async function createWindow({
   const initialWindowBackground = builtinWindowBackground(
     nativeTheme.shouldUseDarkColors ? "dark" : "light",
   );
+  // Only the first window of the process plays the animation (D679). Claiming
+  // it here, before `new BrowserWindow`, is what keeps a reopened window — and
+  // a second window racing this one — on the brand splash instead.
+  const startupAnimation = windowState.startupAnimationPlayed
+    ? null
+    : windowState.startupAnimation;
+  if (startupAnimation) windowState.startupAnimationPlayed = true;
   const windows11NativeCorners = usesWindows11NativeCorners(
     process.platform,
     process.getSystemVersion(),
@@ -249,7 +264,15 @@ export async function createWindow({
       // Preload runs in a sandbox and cannot import Electron's main-only `app`
       // module. Pass the display locale at process creation so it remains
       // available synchronously before the renderer's first paint.
-      additionalArguments: [`--pi-desktop-locale=${app.getLocale()}`],
+      additionalArguments: [
+        `--pi-desktop-locale=${app.getLocale()}`,
+        // The boot animation has to be on screen in the renderer's first
+        // frame, so the descriptor travels as a creation argument like the
+        // locale does; an IPC round-trip would land after the first paint.
+        ...(startupAnimation
+          ? [encodeStartupAnimationArgument(startupAnimation.descriptor)]
+          : []),
+      ],
     },
   });
   const window = windowState.mainWindow;
@@ -1162,23 +1185,6 @@ export async function createWindow({
     }
     if (boundsWatchdog) clearInterval(boundsWatchdog);
   });
-
-  // A launch must always end with a visible window.
-  //
-  // The window is created hidden and shown on `ready-to-show`, but a restored
-  // session or a half-torn-down previous process can leave it shown-and-hidden
-  // again, and then a double-click looks like nothing happened. Unless the
-  // caller asked for a background start (`--hidden`, used by login autostart),
-  // re-assert visibility at every checkpoint the renderer passes.
-  const revealOnLaunch = () => {
-    if (!isLiveWindow() || process.argv.includes("--hidden")) return;
-    if (window.isMinimized()) window.restore();
-    if (!window.isVisible()) window.show();
-  };
-  window.webContents.on("did-finish-load", revealOnLaunch);
-  for (const delayMs of [1200, 3000, 6000]) {
-    setTimeout(revealOnLaunch, delayMs);
-  }
 
   window.once("ready-to-show", () => {
     if (!isLiveWindow()) return;
