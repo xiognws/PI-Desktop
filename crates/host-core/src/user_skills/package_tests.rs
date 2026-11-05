@@ -31,7 +31,6 @@ fn directory_skill_package_accepts_resources_above_the_document_limit() {
     let project_path = Some(project.to_str().unwrap());
     // Comfortably past the old 128 KiB document cap, still inside the per-resource cap.
     let big = vec![b'x'; 1024 * 1024];
-    assert!(big.len() <= MAX_SKILL_RESOURCE_BYTES);
     registry
         .write_package_files(
             &id,
@@ -87,36 +86,36 @@ fn directory_skill_package_accepts_a_data_shaped_package() {
 }
 
 #[test]
-fn directory_skill_package_rejects_a_resource_above_the_resource_limit() {
+fn directory_skill_package_accepts_a_resource_above_the_old_resource_limit() {
+    // Resources have no per-file cap: they are read on demand and never become prompt
+    // content. Only the package total and its file count are bounded.
     let app = tempdir().unwrap();
     let (mut registry, id, root) = packaged_skill(&app);
     let project = app.path().join("project");
     let project_path = Some(project.to_str().unwrap());
-    let error = registry
+    let big = vec![b'x'; 3 * 1024 * 1024];
+
+    registry
         .write_package_files(
             &id,
             CapabilityLevel::Project,
             project_path,
-            &[(
-                "data/huge.json".into(),
-                vec![b'x'; MAX_SKILL_RESOURCE_BYTES + 1],
-            )],
+            &[("data/huge.json".into(), big.clone())],
         )
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("SKILL_LIMIT_EXCEEDED"), "error = {error}");
-    // A resource already on disk is refused on capture at the same bound.
-    fs::create_dir_all(root.join("data")).unwrap();
-    fs::write(
-        root.join("data/huge.json"),
-        vec![b'x'; MAX_SKILL_RESOURCE_BYTES + 1],
-    )
-    .unwrap();
-    let error = registry
+        .unwrap();
+    let captured = registry
         .package_files(&id, CapabilityLevel::Project, project_path)
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("SKILL_LIMIT_EXCEEDED"), "error = {error}");
+        .unwrap();
+    let carried = captured
+        .iter()
+        .find(|(path, _)| path == "data/huge.json")
+        .map(|(_, bytes)| bytes.len());
+    assert_eq!(
+        carried,
+        Some(big.len()),
+        "a resource past the old 2 MiB cap is carried whole"
+    );
+    assert!(root.join("data/huge.json").is_file());
 }
 
 #[test]
@@ -151,16 +150,17 @@ fn directory_skill_package_rejects_a_package_above_the_total_limit() {
     let (mut registry, id, root) = packaged_skill(&app);
     let project = app.path().join("project");
     let project_path = Some(project.to_str().unwrap());
-    let count = MAX_SKILL_PACKAGE_BYTES / MAX_SKILL_RESOURCE_BYTES + 1;
+    const PER_FILE: usize = 6 * 1024 * 1024;
+    let count = MAX_SKILL_PACKAGE_BYTES / PER_FILE + 1;
     assert!(
         count <= MAX_SKILL_PACKAGE_FILES,
         "fixture must fit the file cap"
     );
     fs::create_dir_all(root.join("data")).unwrap();
     for index in 0..count {
-        // Sparse files: the cap is checked against metadata length first.
+        // Sparse files: the total is accumulated as they are read.
         let file = fs::File::create(root.join(format!("data/{index}.bin"))).unwrap();
-        file.set_len(MAX_SKILL_RESOURCE_BYTES as u64).unwrap();
+        file.set_len(PER_FILE as u64).unwrap();
     }
     let error = registry
         .package_files(&id, CapabilityLevel::Project, project_path)

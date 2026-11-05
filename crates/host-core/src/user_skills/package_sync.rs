@@ -13,8 +13,8 @@ fn checked_files(files: &[(String, Vec<u8>)]) -> Result<BTreeMap<&str, &[u8]>> {
         total = total
             .checked_add(bytes.len())
             .ok_or_else(|| anyhow::anyhow!("SKILL_LIMIT_EXCEEDED: skill package is too large"))?;
-        if total > MAX_SKILL_PACKAGE_BYTES || bytes.len() > MAX_SKILL_RESOURCE_BYTES {
-            bail!("SKILL_LIMIT_EXCEEDED: skill package resource or total is too large");
+        if total > MAX_SKILL_PACKAGE_BYTES {
+            bail!("SKILL_LIMIT_EXCEEDED: skill package is too large");
         }
         if result.insert(path.as_str(), bytes.as_slice()).is_some() {
             bail!("SKILL_INVALID: skill package contains duplicate paths");
@@ -31,9 +31,6 @@ fn read_current(root: &Path, target: &Path) -> Result<Option<Vec<u8>>> {
         Ok(metadata) => {
             if !metadata.is_file() || metadata.file_type().is_symlink() {
                 bail!("SKILL_INVALID: skill package destination is unsafe");
-            }
-            if metadata.len() > MAX_SKILL_RESOURCE_BYTES as u64 {
-                bail!("SKILL_LIMIT_EXCEEDED: existing skill resource is too large");
             }
             Ok(Some(fs::read(target)?))
         }

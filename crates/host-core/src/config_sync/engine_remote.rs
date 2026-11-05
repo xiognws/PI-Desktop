@@ -3,7 +3,9 @@ use super::*;
 /// produced by the skill packager, so the receiver must accept exactly what the
 /// packager accepts: a smaller receiver bound would turn an accepted upload
 /// into a failed download.
-const MAX_REMOTE_RESOURCE_BYTES: usize = crate::user_skills::MAX_SKILL_RESOURCE_BYTES;
+/// Config sync keeps its own bound: it moves settings payloads, not skill resources,
+/// and the two stopped sharing a number when the skill cap was removed.
+const MAX_REMOTE_RESOURCE_BYTES: usize = 2 * 1024 * 1024;
 
 pub(super) fn remote_prefix(config: &StoredConfig) -> String {
     format!("vault/{}/", config.vault_id)

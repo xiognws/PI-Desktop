@@ -17,10 +17,9 @@ const MAX_SKILLS: usize = 128;
 // catalog carries names and descriptions, never bodies; an oversized document costs
 // its own bytes and nothing else. The old 128 KiB cap also *hid* skills: the scan
 // skipped a document over it, so a large skill silently vanished from the library.
-/// Cap on one sibling resource inside a directory-shaped skill package.
-/// Resources are data and scripts that are read on demand and never become
-/// prompt content, so a package may carry files well above the document cap.
-pub const MAX_SKILL_RESOURCE_BYTES: usize = 2 * 1024 * 1024;
+// A resource file has no per-file cap either: resources are read on demand and never
+// become prompt content. Only the package total and its file count are bounded, which
+// is about one transfer payload rather than about what a skill may contain.
 pub const MAX_SKILL_PACKAGE_FILES: usize = 256;
 pub const MAX_SKILL_PACKAGE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_NAME_CHARS: usize = 120;
@@ -715,16 +714,7 @@ fn collect_package_files(
             continue;
         }
         let relative = package_relative_path(root, &path)?;
-        // Reject an oversized resource from its metadata before reading it: a
-        // multi-gigabyte file in a skill directory must not be pulled into
-        // memory only to be refused.
-        if metadata.len() > MAX_SKILL_RESOURCE_BYTES as u64 {
-            bail!("SKILL_LIMIT_EXCEEDED: skill package resource is too large");
-        }
         let bytes = fs::read(&path)?;
-        if bytes.len() > MAX_SKILL_RESOURCE_BYTES {
-            bail!("SKILL_LIMIT_EXCEEDED: skill package resource is too large");
-        }
         *total = total.saturating_add(bytes.len());
         if *total > MAX_SKILL_PACKAGE_BYTES {
             bail!("SKILL_LIMIT_EXCEEDED: skill package is too large");
@@ -1173,9 +1163,6 @@ impl UserSkillRegistry {
             bail!("SKILL_INVALID: no skill with id {id}");
         };
         let relative = normalize_resource_path(relative_path)?;
-        if content.len() > MAX_SKILL_RESOURCE_BYTES {
-            bail!("SKILL_INVALID: resource exceeds {MAX_SKILL_RESOURCE_BYTES} bytes");
-        }
         let skills_dir = capability_dir(CapabilityLevel::Global, None, "skills")?;
         let document = PathBuf::from(&record.path);
         let root = match directory_skill_root(&document, &skills_dir) {
