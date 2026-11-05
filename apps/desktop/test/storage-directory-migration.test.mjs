@@ -166,6 +166,25 @@ test("a junction entry is classified as junction and rebuilt as a junction", asy
   }
 });
 
+test("a dangling link is classified from its reparse point, not its target", async (t) => {
+  if (process.platform !== "win32") return t.skip("Windows link classification");
+  const { source } = await fixture();
+  const missing = join(source.data, "gone");
+  await mkdir(source.data, { recursive: true });
+  if (!(await createSymlinkOrSkip(t, missing, join(source.data, "dangling-junction"), "junction"))) return;
+  if (!(await createSymlinkOrSkip(t, missing, join(source.data, "dangling-file"), "file"))) return;
+  assert.deepEqual(
+    await storageLinkTypes([join(source.data, "dangling-junction"), join(source.data, "dangling-file")]),
+    ["junction", "file"],
+    "reading the reparse point keeps a junction a junction even with no target",
+  );
+  // A dangling directory symlink stays `dir`: `dir` reports it as SYMLINKD from
+  // the directory flag the file system keeps on the reparse point, so a link
+  // whose target is missing is still rebuilt as a directory link.
+  if (!(await createSymlinkOrSkip(t, missing, join(source.data, "dangling-dir"), "dir"))) return;
+  assert.equal((await storageLinkTypes([join(source.data, "dangling-dir")]))[0], "dir");
+});
+
 test("a directory symlink survives migration as a symlink, including a UNC target", async (t) => {
   if (process.platform !== "win32") return t.skip("Windows link classification");
   const { source, target } = await fixture();
