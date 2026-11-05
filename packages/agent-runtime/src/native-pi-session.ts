@@ -47,6 +47,7 @@ import {
   type NativePiSnapshot,
 } from "./native-pi-session-lease.js";
 import { NATIVE_PI_SESSION_PREFIX } from "./native-pi-session-id.js";
+import { agentDataHome } from "./pi-home.js";
 
 export { NATIVE_PI_SESSION_PREFIX };
 
@@ -414,7 +415,7 @@ const NATIVE_FORK_ERROR_CODES = new Set([
 const nativeServices = new Map<string, NativePiSessionService>();
 
 export function nativePiService(options: { agentDir?: string; sessionRoot?: string } = {}): NativePiSessionService {
-  const agentDir = resolve(options.agentDir ?? join(homedir(), ".pi", "agent"));
+  const agentDir = resolve(options.agentDir ?? join(agentDataHome(), "agent"));
   const sessionRoot = resolve(options.sessionRoot ?? join(agentDir, "sessions"));
   const key = `${agentDir}\0${sessionRoot}`;
   let service = nativeServices.get(key);
@@ -582,7 +583,7 @@ export class NativePiSessionService {
     sessionRoot?: string;
     modelRuntimeFactory?: () => Promise<ModelRuntime>;
   } = {}) {
-    this.agentDir = resolve(options.agentDir ?? join(homedir(), ".pi", "agent"));
+    this.agentDir = resolve(options.agentDir ?? join(agentDataHome(), "agent"));
     this.root = resolve(options.sessionRoot ?? join(this.agentDir, "sessions"));
     this.modelRuntimeFactory =
       options.modelRuntimeFactory ??

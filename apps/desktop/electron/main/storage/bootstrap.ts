@@ -10,6 +10,7 @@ import { resolveHostBinary } from "../host-process";
 import { clearCaches, migrateFiles, removeBackups } from "./files";
 import { readStoragePreferences, STORAGE_PREFERENCE_FILE, writeStoragePreferences, type StoragePreferences } from "./preferences";
 import { recoverMissingDefaultStorage, sameStorageRoots } from "./startup-recovery";
+import { recordExitReason } from "../run-marker.js";
 
 export type StorageBootstrap = { file: string; anchor: string; managed: boolean; preferences: StoragePreferences };
 class StorageRecoveryCancelled extends Error {}
@@ -49,6 +50,7 @@ export async function prepareStorage(defaultData: string, overridden: boolean): 
     }
   } catch (error) {
     if (error instanceof StorageRecoveryCancelled) {
+      recordExitReason("storage recovery cancelled by the user");
       app.exit(0);
       return new Promise<StorageBootstrap>(() => {});
     }
@@ -56,6 +58,7 @@ export async function prepareStorage(defaultData: string, overridden: boolean): 
     const copy = catalogs[resolveLocale(app.getLocale())].settings.storage;
     await dialog.showMessageBox({ type: "error", title: copy.failedTitle,
       message: copy.unavailableHint, detail: error instanceof Error ? error.message : String(error) });
+    recordExitReason("storage unavailable: " + (error instanceof Error ? error.message : String(error)));
     app.exit(1);
     return new Promise<StorageBootstrap>(() => {});
   }
@@ -121,6 +124,7 @@ export async function prepareStorage(defaultData: string, overridden: boolean): 
     await dialog.showMessageBox(window, { type: "error", title: copy.failedTitle,
       message: copy.failedHint, detail: message, buttons: [copy.continueOriginal] });
   }
+  recordExitReason("storage maintenance finished; relaunching");
   app.relaunch();
   app.exit(0);
   // app.exit terminates the process; do not initialize writers even if a test double returns.

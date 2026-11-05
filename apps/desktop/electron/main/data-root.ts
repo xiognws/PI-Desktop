@@ -2,7 +2,7 @@ import { app } from "electron";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import { DATA_IDENTIFIER } from "@pi-workspace/shared";
+import { DATA_IDENTIFIER, PI_HOME_SUBDIRECTORIES } from "@pi-workspace/shared";
 import {
   adoptDirectory,
   LEGACY_DEVELOPMENT_INSTALLATION_NAME,
@@ -78,6 +78,21 @@ export function applyReleaseDataRoot(development: boolean): string | null {
   } catch (error) {
     console.warn(`[data-root] cannot create ${root}:`, error);
     return null;
+  }
+
+  // Publish the root before anything resolves a path. Skills, agent prompts and
+  // plugin data all hang off it, and a child process can only honour one answer,
+  // so the value is an environment variable rather than a per-caller guess.
+  // `data` and `userdata` are deliberately left to the adoption logic below:
+  // creating them here would make a legacy profile look like a live one.
+  process.env.PI_HOME = root;
+  for (const name of PI_HOME_SUBDIRECTORIES) {
+    if (name === "data" || name === "userdata") continue;
+    try {
+      mkdirSync(join(root, name), { recursive: true });
+    } catch (error) {
+      console.warn(`[data-root] cannot create ${join(root, name)}:`, error);
+    }
   }
 
   const dataDir = join(root, "data");

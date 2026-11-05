@@ -442,7 +442,7 @@ pub(crate) fn capture_instructions(
 }
 
 fn global_instruction_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join(".pi").join("agent").join("AGENTS.md"))
+    crate::pi_home::agent_pi_dir().map(|dir| dir.join("agent").join("AGENTS.md"))
 }
 
 fn read_instruction_file(path: &Path) -> Result<Option<String>> {
