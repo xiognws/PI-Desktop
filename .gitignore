@@ -78,6 +78,13 @@ worktrees
 !/apps/desktop/resources/plugins/pi.browser/
 !/apps/desktop/resources/plugins/pi.file-manager/
 !/apps/desktop/resources/plugins/pi.prompt-enhancement/
+# Intranet distribution: these marketplace plugins ship inside the package and
+# the build machine has no route to the plugin center, so they are tracked here
+# instead of being re-synced by scripts/sync-bundled-plugins.mjs at build time.
+!/apps/desktop/resources/plugins/pi.gitlens/
+!/apps/desktop/resources/plugins/io.github.muzimu217.vision-kit/
+!/apps/desktop/resources/plugins/pi.todo/
+!/apps/desktop/resources/plugins/pi.token-insights/
 # The plugin host writes a `package.json` into a plugin folder that ships none,
 # so Node resolves the plugin's submodules as CommonJS
 # (`plugin-host-process.mjs`, `ensureCommonJsPackage`). The released
