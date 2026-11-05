@@ -429,15 +429,20 @@ fn is_redirect(path: &Path) -> bool {
     if metadata.file_type().is_symlink() {
         return true;
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        // FILE_ATTRIBUTE_REPARSE_POINT: covers junctions, which Rust does not
-        // report as symlinks.
-        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-        return metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
-    }
-    #[cfg(not(windows))]
+    is_reparse_point(&metadata)
+}
+
+/// FILE_ATTRIBUTE_REPARSE_POINT: covers junctions, which Rust does not report as
+/// symlinks.
+#[cfg(windows)]
+fn is_reparse_point(metadata: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+fn is_reparse_point(_metadata: &std::fs::Metadata) -> bool {
     false
 }
 
