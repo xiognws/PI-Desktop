@@ -15,7 +15,7 @@ import {
   SECRET_KEY_RE,
   SECRET_VALUE_RE,
   URL_CREDENTIAL_RE,
-} from "@pi-desktop/shared";
+} from "@pi-workspace/shared";
 
 // NDJSON file logging per docs/spec/03-runtime/09-logging-and-observability.md.
 // Each channel is split into focused category files instead of one crowded

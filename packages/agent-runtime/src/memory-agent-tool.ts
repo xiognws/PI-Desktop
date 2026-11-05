@@ -31,7 +31,7 @@ import {
   type MemoryResult,
   type MemoryTarget,
 } from "./memory-store.js";
-import { scrubSecretsInBatch } from "@pi-desktop/shared";
+import { scrubSecretsInBatch } from "@pi-workspace/shared";
 
 /** Appended to a result whose content had a credential masked out of it. */
 const MEMORY_SCRUB_NOTE =
