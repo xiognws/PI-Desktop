@@ -432,3 +432,29 @@ describe("withoutEchoedReasoningPlaceholderText", () => {
     expect(withoutEchoedReasoningPlaceholderText("real answer")).toBe("real answer");
   });
 });
+
+describe("Changan intranet preset", () => {
+  const changan = NAMED_ENDPOINT_PRESETS.find((preset) => preset.id === "changan");
+
+  it("leads the service list so an intranet install lands on a reachable endpoint", () => {
+    expect(NAMED_ENDPOINT_PRESETS[0]?.id).toBe("changan");
+  });
+
+  it("points at the company gateway using chat completions", () => {
+    expect(changan).toMatchObject({
+      id: "changan",
+      baseUrl: "https://ai.sda.changan.com.cn/api/v1",
+      apiStyle: "chat_completions",
+      labelKey: "settings.presetChangan",
+    });
+  });
+
+  it("carries no credential or model of its own", () => {
+    // The operator supplies both. A baked-in default would either ship a secret
+    // or guess a model the gateway may not serve.
+    const fields = Object.keys(changan ?? {});
+    expect(fields).not.toContain("apiKey");
+    expect(fields).not.toContain("model");
+    expect(fields).not.toContain("models");
+  });
+});

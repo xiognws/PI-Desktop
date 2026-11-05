@@ -1589,6 +1589,7 @@ sklm: {
     presetMistral: "Mistral",
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
+    presetChangan: "Changan",
     presetDeepseek: "DeepSeek",
     apiStyleAutoDetected: "Otomatik algılandı: {{format}}",
     endpointFormatGuidance: "Bu istek URL’si {{format}} biçimini gösteriyor. Eşleşen biçimi ve temel adresi uygulayın; bu, bağlantıyı veya arama yeteneğini test etmez.",

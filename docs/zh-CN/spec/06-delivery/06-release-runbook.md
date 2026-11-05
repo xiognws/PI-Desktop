@@ -543,6 +543,9 @@ electron Pi-Workspace-<version>-linux-<arch>.asar
 
 ## 7. 已知限制
 
+- 内网构建以 `PUBLIC_UPDATE_FEED_REACHABLE = false`
+  （`apps/desktop/electron/main/update-policy.ts`）发布，所有更新模式都解析为
+  `disabled`：该网络无法访问 `github.com`，检查只会留下一个空转的加载状态。恢复更新需要先提供内网更新源，并同时改回该常量、把 `build.publish` / `app-update.yml` 指向它。
 - Linux deb/rpm 和 Windows 便携版 ZIP 仍保持通知和链接更新模式。打包的 macOS、Windows NSIS 和 Linux AppImage 使用应用内 `electron-updater`。
 - Linux x64 和 arm64 包在 Ubuntu 22.04 上构建（本机 `ubuntu-22.04` 和
   `ubuntu-22.04-arm` 运行器），因此 host-core 需要 glibc 2.35 或更高版本

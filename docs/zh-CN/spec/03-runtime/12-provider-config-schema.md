@@ -256,6 +256,11 @@ MiniMax（`anthropic_messages`，`https://api.minimaxi.com/anthropic/v1`）、
 MiniMax (OpenAI)（`chat_completions`，`https://api.minimaxi.com/v1`，别名
 `minimax-openai` / `minimax-compatible`）、Kimi 编程。
 
+内网：Changan（`changan`，`https://ai.sda.changan.com.cn/api/v1`，
+`chat_completions`，别名 `changan-ai` / `changan-ai-gateway`）。它是公司网关，排在
+**服务**下拉框首位，让内网新装直接落在可达端点上。该预设不带 API 密钥、不带模型：
+两者都由使用者填写，不给默认值。
+
 智谱 / Z.AI 的 Completions 请求仍使用 `thinkingFormat: "zai"` 与
 `zaiToolStream: true`。DeepSeek 系 Completions 在 vendor key、URL、模型 ID 或
 目录 family 能识别为 DeepSeek 时设置

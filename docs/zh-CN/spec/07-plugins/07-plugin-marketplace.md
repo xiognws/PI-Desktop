@@ -48,6 +48,14 @@
 无需迁移数据。开发与测试仍可通过 `PI_DESKTOP_PLUGIN_MARKET_URL` 指向本地目录，
 但已发布界面不会因此开放目录配置。
 
+### 内网分发
+
+内网构建在无法访问公共插件中心的环境中使用。当 `plugins/marketplace.rs` 中
+`PUBLIC_MARKET_FEED_REACHABLE = false` 时，目录刷新直接返回随包内置目录
+（`built_in_catalog_at`），不再发起只会超时的请求。因此内置目录就是本分发形态的
+完整目录，插件通过软件内部集成而非远程源进入。显式设置
+`PI_DESKTOP_PLUGIN_MARKET_URL` 仍优先于该短路，测试与开发据此验证远程路径。
+
 市场目录与安装包下载遵循设置 → 常规 → 网络。系统模式会让 host-core 的 `curl`
 通过 Electron 的认证回环 SOCKS 中继，并按当前操作系统代理/PAC 解析目标。直连模式
 强制市场请求直连；自定义模式使用所配置的代理与绕过列表。中继凭据仅在运行期使用，

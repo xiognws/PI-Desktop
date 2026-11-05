@@ -428,6 +428,12 @@ Zen (`opencode` at `https://opencode.ai/zen/v1`, alias `opencode-zen`), Vercel
 AI Gateway (`vercel` at `https://ai-gateway.vercel.sh/v1`, alias
 `vercel-ai-gateway`).
 
+Intranet: Changan (`changan` at `https://ai.sda.changan.com.cn/api/v1`,
+`chat_completions`, aliases `changan-ai` / `changan-ai-gateway`). It is the
+company gateway and leads the Service select, so a fresh intranet install
+starts on a reachable endpoint instead of a public one. The preset carries no
+API key and no model: the operator supplies both, and neither is defaulted.
+
 `builtinProviders()` from pi-ai is the source for this list: every built-in
 provider is either reachable through one of the presets above or is an
 intentional exception with a recorded reason — Amazon Bedrock, Azure OpenAI,

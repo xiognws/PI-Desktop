@@ -28,6 +28,19 @@ export type NamedEndpointPreset = {
 
 export const NAMED_ENDPOINT_PRESETS: readonly NamedEndpointPreset[] = [
   {
+    // The intranet deployment's own gateway: the only endpoint reachable from a
+    // machine that has no public internet. Listed first so a fresh install
+    // configures it without hunting, and it carries no model or key of its own —
+    // the operator fills both in.
+    id: "changan",
+    vendorKey: "changan",
+    name: "Changan",
+    baseUrl: "https://ai.sda.changan.com.cn/api/v1",
+    apiStyle: "chat_completions",
+    labelKey: "settings.presetChangan",
+    aliases: ["changan-ai", "changan-ai-gateway"],
+  },
+  {
     id: "openai",
     vendorKey: "openai",
     name: "OpenAI",

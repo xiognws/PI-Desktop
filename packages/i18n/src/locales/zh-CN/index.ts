@@ -1577,6 +1577,7 @@ sklm: {
     presetMistral: "Mistral",
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
+    presetChangan: "长安 AI",
     presetDeepseek: "DeepSeek",
     apiStyleAutoDetected: "自动识别：{{format}}",
     endpointFormatGuidance: "此请求地址对应 {{format}}。可应用匹配的接口格式和基础地址；这不代表连接或搜索能力已验证。",

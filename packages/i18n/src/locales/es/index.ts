@@ -1576,6 +1576,7 @@ sklm: {
     "presetMistral": "Mistral",
     "presetTogether": "Juntos AI",
     "presetFireworks": "Fuegos artificiales",
+    "presetChangan": "Changan",
     "presetDeepseek": "DeepSeek",
     apiStyleAutoDetected: "Detectado automáticamente: {{format}}",
     endpointFormatGuidance: "Esta URL de solicitud indica {{format}}. Aplica el formato y la dirección base correspondientes; esto no verifica la conexión ni la capacidad de búsqueda.",

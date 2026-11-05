@@ -47,6 +47,17 @@ versions are retained for settings compatibility but ignored; no data migration
 is needed. `PI_DESKTOP_PLUGIN_MARKET_URL` remains available to development and
 test runs without making the catalog configurable in the shipped interface.
 
+### Intranet distribution
+
+The intranet build ships where the public plugin center is unreachable. With
+`PUBLIC_MARKET_FEED_REACHABLE = false` in `plugins/marketplace.rs`, a catalog
+refresh returns the bundled catalog (`built_in_catalog_at`) instead of issuing a
+request that can only time out. The bundled catalog is therefore the whole
+catalog for this distribution, and plugins reach it through in-product
+integration rather than a remote feed. An explicit
+`PI_DESKTOP_PLUGIN_MARKET_URL` still wins over that short-circuit, which is how
+tests and development runs exercise the remote path.
+
 Marketplace catalog and package downloads follow Settings → General → Network.
 System mode sends host-core `curl` through Electron's authenticated loopback
 SOCKS relay, which resolves each destination using the active OS proxy/PAC

@@ -1593,6 +1593,7 @@ sklm: {
     presetMistral: "Mistral",
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
+    presetChangan: "Changan",
     presetDeepseek: "DeepSeek",
     apiStyleAutoDetected: "Auto detected: {{format}}",
     endpointFormatGuidance: "This request URL suggests {{format}}. Apply the matching format and base address; this is not a connection or search capability test.",

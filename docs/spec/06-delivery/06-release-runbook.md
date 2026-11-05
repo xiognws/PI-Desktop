@@ -647,6 +647,12 @@ Shell smoke on each native runner:
 
 ## 7. Known limitations
 
+- Intranet builds ship with `PUBLIC_UPDATE_FEED_REACHABLE = false`
+  (`apps/desktop/electron/main/update-policy.ts`), so every update mode
+  resolves to `disabled`: `github.com` is unreachable on that network and a
+  check could only leave a spinner behind. Restoring the updater means shipping
+  an internal feed and flipping that constant with `build.publish` /
+  `app-update.yml` pointed at it.
 - Linux deb/rpm and the Windows portable ZIP remain notify-and-link update
   modes. Packaged macOS, Windows NSIS, and Linux AppImage use in-app
   `electron-updater`.

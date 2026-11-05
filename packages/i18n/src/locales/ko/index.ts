@@ -1589,6 +1589,7 @@ sklm: {
     presetMistral: "Mistral",
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
+    presetChangan: "Changan",
     presetDeepseek: "DeepSeek",
     apiStyleAutoDetected: "자동 감지: {{format}}",
     endpointFormatGuidance: "이 요청 URL은 {{format}} 형식을 나타냅니다. 해당 형식과 기본 주소를 적용할 수 있지만 연결이나 검색 기능이 검증된 것은 아닙니다.",

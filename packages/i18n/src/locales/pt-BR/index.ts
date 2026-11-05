@@ -1554,6 +1554,7 @@ export const ptBR = {
     presetMistral: "Mistral",
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
+    presetChangan: "Changan",
     presetDeepseek: "DeepSeek",
     apiStyleAutoDetected: "Detectado automaticamente: {{format}}",
     endpointFormatGuidance: "Este URL de solicitação indica {{format}}. Aplique o formato e o endereço base correspondentes; isso não verifica a conexão nem a capacidade de pesquisa.",

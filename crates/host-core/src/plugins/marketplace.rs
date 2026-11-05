@@ -10,6 +10,15 @@ pub(crate) use catalog::{built_in_catalog_at, bundled_package_bytes};
 /// a relative package URL against a git host.
 pub const OFFICIAL_CHANNEL_CATALOG_URL: &str = "https://plugins.aiuo.net/catalog.json";
 
+/// Whether this build can reach the public plugin center.
+///
+/// This distribution ships into the company intranet, which has no route to
+/// `plugins.aiuo.net`. A refresh there can only hold the Extensions surface
+/// behind a network timeout, so the bundled catalog is the whole catalog and no
+/// remote fetch is attempted. Flip this to `true` to reach a real feed again
+/// (`PI_DESKTOP_PLUGIN_MARKET_URL` still overrides the source for tests).
+pub(crate) const PUBLIC_MARKET_FEED_REACHABLE: bool = false;
+
 /// The catalog source used by the plugin manager.
 ///
 /// Application settings are pinned to `Official`.
@@ -225,6 +234,13 @@ impl PluginManager {
     }
 
     fn refresh_catalog_from_remote(&self, force: bool) -> Result<MarketCatalogFile> {
+        // No reachable feed (see PUBLIC_MARKET_FEED_REACHABLE): serve what ships
+        // in the image instead of stalling on a network timeout. An explicit
+        // PI_DESKTOP_PLUGIN_MARKET_URL still wins — that is how the tests and a
+        // dev build point the same code at a mock catalog.
+        if !PUBLIC_MARKET_FEED_REACHABLE && market_source_env_override().is_none() {
+            return Ok(built_in_catalog_at(&self.data_dir));
+        }
         let catalog_url = self.market_source_url();
         let cache_path = self.catalog_path();
         let meta_path = self.market_cache_meta_path();
