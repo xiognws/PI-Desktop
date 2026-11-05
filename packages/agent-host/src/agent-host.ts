@@ -365,6 +365,13 @@ export class AgentHost {
       case "turn_end":
         this.emit(state, "turn.activity", { event }, meta2);
         return;
+      case "skill_review": {
+        // Not a turn item: it summarises the forked review pass, and nothing about
+        // it belongs in the transcript. It rides the activity rail, exactly as it
+        // does in the local RACP mapping.
+        this.emit(state, "turn.activity", { event }, meta2);
+        return;
+      }
       default: {
         const exhaustive: never = event;
         throw new Error(`unhandled agent event ${String((exhaustive as { type?: string }).type)}`);
