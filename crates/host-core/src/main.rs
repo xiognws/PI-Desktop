@@ -9,6 +9,7 @@ mod db;
 mod file_batches;
 mod file_resources;
 mod keyboard;
+mod pi_home;
 mod mcp_servers;
 mod memory;
 mod memory_entries;
@@ -74,13 +75,7 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    let data_dir = std::env::var("PI_DESKTOP_DATA_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .unwrap_or_else(|| std::path::PathBuf::from("."))
-                .join(".pi-desktop")
-        });
+    let data_dir = pi_home::data_dir().unwrap_or_else(|| std::path::PathBuf::from(".pi-desktop"));
 
     std::fs::create_dir_all(&data_dir)?;
     std::fs::create_dir_all(data_dir.join("logs"))?;

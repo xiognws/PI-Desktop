@@ -1,6 +1,7 @@
 import { readFile, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import nodePath, { type PlatformPath, dirname, join, relative, resolve } from "node:path";
+import { agentDataHome } from "./pi-home.js";
 
 const INSTRUCTION_FILE_NAMES = [
   "AGENTS.override.md",
@@ -12,7 +13,7 @@ const INSTRUCTION_FILE_NAMES = [
 // oversized global file can never starve project instructions.
 const MAX_GLOBAL_INSTRUCTION_BYTES = 32 * 1024;
 const MAX_PROJECT_INSTRUCTION_BYTES = 32 * 1024;
-const GLOBAL_INSTRUCTION_PATH = join(homedir(), ".pi", "agent", "AGENTS.md");
+const GLOBAL_INSTRUCTION_PATH = join(agentDataHome(), "agent", "AGENTS.md");
 const GLOBAL_INSTRUCTION_SOURCE = "~/.pi/agent/AGENTS.md";
 
 export type ProjectInstruction = {

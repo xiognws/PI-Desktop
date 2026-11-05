@@ -123,9 +123,7 @@ pub fn workspace_ignore_file(ignore_root: &Path) -> Option<PathBuf> {
 
 /// The user's global ignore file (`<data_dir>/ignore`), when present.
 pub fn user_global_ignore_file() -> Option<PathBuf> {
-    let data_dir = std::env::var_os("PI_DESKTOP_DATA_DIR")
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|home| home.join(".pi-desktop")))?;
+    let data_dir = crate::pi_home::data_dir()?;
     let candidate = data_dir.join("ignore");
     candidate.is_file().then_some(candidate)
 }

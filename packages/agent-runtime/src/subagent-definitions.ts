@@ -30,6 +30,7 @@ import {
 } from "./model-capabilities.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
 import type { ModelConfig, ThinkingCapabilitySet } from "./thinking-level.js";
+import { agentsHome } from "./pi-home.js";
 
 /**
  * What a signed-in vendor account says about one of its models. Resolved by
@@ -46,7 +47,7 @@ export type VendorModelBinding = ThinkingCapabilitySet & {
 
 /** Global directory for user-owned definitions; project roots are not consulted. */
 export function subagentDefinitionDir(_workspaceRoot: string): string {
-  return join(homedir(), ".agents", "subagents");
+  return join(agentsHome(), "subagents");
 }
 
 /**

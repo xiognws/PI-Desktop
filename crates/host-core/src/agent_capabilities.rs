@@ -268,9 +268,7 @@ pub fn global_agents_dir() -> PathBuf {
             return PathBuf::from(trimmed);
         }
     }
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(AGENTS_DIR)
+    crate::pi_home::agents_dir().unwrap_or_else(|| PathBuf::from(".").join(AGENTS_DIR))
 }
 
 pub fn capability_dir(

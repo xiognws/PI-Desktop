@@ -233,7 +233,7 @@ function claudeUserDir(home: string): string {
 function piUserDir(home: string, env: NodeJS.ProcessEnv): string {
   const override = env.PI_DESKTOP_AGENTS_DIR;
   if (override && override.trim()) return path.join(override, "skills");
-  return path.join(home, ".agents", "skills");
+  return path.join(process.env.PI_HOME?.trim() || home, process.env.PI_HOME?.trim() ? "agents" : ".agents", "skills");
 }
 
 export async function scanExternalSkills(opts: SkillScanOptions = {}): Promise<SkillScanResult> {
