@@ -85,6 +85,14 @@ worktrees
 !/apps/desktop/resources/plugins/io.github.muzimu217.vision-kit/
 !/apps/desktop/resources/plugins/pi.todo/
 !/apps/desktop/resources/plugins/pi.token-insights/
+# Startup-resilience fixes ship inside these three plugins: each one broke the
+# plugin restore chain at launch (a host API that does not exist, an
+# undeclared bus permission with a colon-separated topic, a hard-coded data
+# path). The fixes must survive the next marketplace sync, so the folders are
+# tracked here the same way as the intranet plugins above.
+!/apps/desktop/resources/plugins/pi.agents-anywhere/
+!/apps/desktop/resources/plugins/io.github.xideadev.task-dida/
+!/apps/desktop/resources/plugins/io.github.new-beginner.session-usage/
 # The plugin host writes a `package.json` into a plugin folder that ships none,
 # so Node resolves the plugin's submodules as CommonJS
 # (`plugin-host-process.mjs`, `ensureCommonJsPackage`). The released
