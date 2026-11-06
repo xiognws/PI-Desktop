@@ -6,6 +6,7 @@
   "//io.github.xideadev.pi-wechatbot": "Retired 2026-11-04: the WeChat bridge is unused in this deployment.",
   "//local.hindsight.memory": "Retired 2026-11-04: this deployment does not bundle the Hindsight memory bridge.",
   "//local.unipi": "Retired 2026-11-04: the Muse learning adaptation is unused in this deployment.",
+  "//theme-plugins": "Retired 2026-11-06: a declarative theme plugin costs a whole host process (~30 MB) on every launch and needs none of it. Built-in color schemes cover appearance; see ADR 0412.",
   "excluded": [
     "cn.star.jianying-assistant",
     "icedly.moyu-games",
@@ -18,6 +19,11 @@
     "io.github.xinzhihong.group-rooms",
     "io.github.xideadev.pi-wechatbot",
     "local.hindsight.memory",
-    "local.unipi"
+    "local.unipi",
+    "io.github.akshayxkill.nexus-scenic-themes",
+    "io.github.b1eight.pi-desktop-claude-theme",
+    "io.github.eonova.theme-dracula",
+    "io.github.jeasonloop.theme-craftdesk",
+    "pi.theme.opencode"
   ]
 }
