@@ -266,6 +266,32 @@ without asking the user to install anything.
   `PYTHON_RUNTIME_UNAVAILABLE` with the command to run. The tools do not fall
   back to the system Python.
 
+#### Adding a library offline
+
+The shipped stack covers Office work, but an intranet or air-gapped machine
+sometimes needs one more library, and there is no index to fetch it from. The
+user puts the `.whl` files into `<data>/python-site-drop`; at every launch
+`tools/install_libs.py` drains it into `<data>/python-site`, which is first on
+`PYTHONPATH`, so the library is importable by the next tool call with no
+restart.
+
+Dependency resolution is deliberately offline and conservative, because pip
+cannot consult an index that does not exist. The worker reads `Requires-Dist`
+straight out of each wheel's own `METADATA` and compares it with the
+`dist-info` directories already present:
+
+- All dependencies present → the batch installs with
+  `pip install --no-index --no-deps --target`, and the wheels move to `done/`.
+- Anything missing → the whole batch is refused *by name*: the response and a
+  note beside each wheel say `python-docx needs lxml>=3.1.0`, which is the
+  shopping list for the next trip. Refused wheels move to `failed/` so the next
+  scan does not retry them in a loop.
+- Environment markers are honoured for the platform variables that appear in
+  real metadata; `extra`-gated requirements are never installed implicitly.
+
+The scan runs once per launch off the startup path and is never fatal: a broken
+wheel costs a warning in the log, not a failed launch.
+
 ## 3. Common Tool Constraints
 
 Every non-interactive workspace execution tool must have:

@@ -1,6 +1,7 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { getModuleDirectory } from "./module-path.ts";
 
@@ -34,6 +35,23 @@ const MANIFEST_FILE = "MANIFEST.json";
 
 /** Where a customer's own `pip install --target` writes. */
 export const USER_SITE_DIR = "python-site";
+
+/**
+ * Where the user drops `.whl` files they brought from elsewhere.
+ *
+ * The point of a folder rather than a dialog is that an offline user already
+ * has the files on a stick: dragging them into a directory they can open from
+ * the app is the whole interaction. `install_libs.py` drains it at startup and
+ * on demand, moving successes to `done/` and refusals to `failed/` beside a
+ * note naming the libraries still needed.
+ */
+export const LIBRARY_DROP_DIR = "python-site-drop";
+
+/**
+ * Newer than this and the drop folder is drained on the next start anyway; the
+ * check exists so a scan that finds nothing costs no Python process.
+ */
+export const LIBRARY_WORKER = "install_libs.py";
 
 export type PythonRuntime = {
   /** Root of the bundled tree. */
@@ -207,3 +225,87 @@ async function statOf(file: string): Promise<number | null> {
     return null;
   }
 }
+
+export type LibraryDropResult =
+  | { state: "no-runtime"; reason: string }
+  | { state: "idle"; drop: string; site: string }
+  | {
+      state: "installed";
+      drop: string;
+      site: string;
+      installed: string[];
+      blocked: { file: string; reason: string; missing?: string[] }[];
+      /** Libraries still needed, with the requirement text that asked for them. */
+      missing: { name: string; reasons: string[] }[];
+    }
+  | { state: "refused"; drop: string; site: string; code: string; error: string; missing: { name: string; reasons: string[] }[] };
+
+/**
+ * Drain the user's wheel folder.
+ *
+ * Deliberately tolerant: this runs at startup, and a failure here must never
+ * stop the app from opening. The result is reported so the settings page can
+ * show what happened, not thrown.
+ */
+export async function installDroppedLibraries(
+  runtime: PythonRuntime,
+  drop: string,
+  site: string,
+  options: { execFile?: typeof execFile } = {},
+): Promise<LibraryDropResult> {
+  const run = options.execFile ?? execFile;
+  const script = join(runtime.root, "tools", LIBRARY_WORKER);
+  if (!existsSync(script)) {
+    return { state: "no-runtime", reason: `${script} is missing from this build` };
+  }
+  await mkdir(drop, { recursive: true });
+  await mkdir(site, { recursive: true });
+  // Nothing to do and no process to pay for: the common case on every launch
+  // after the first.
+  const pending = (await readdir(drop)).filter((name) => name.toLowerCase().endsWith(".whl"));
+  if (!pending.length) return { state: "idle", drop, site };
+
+  const request = JSON.stringify({ action: "install", drop, site });
+  const output = await new Promise<string>((resolve, reject) => {
+    const child = run(
+      runtime.executable,
+      [script],
+      { env: pythonEnv(runtime, [site]), timeout: 300_000, maxBuffer: 8 * 1024 * 1024 },
+      (error, stdout) => {
+        // A non-zero exit is the worker reporting "refused", which still prints
+        // a JSON answer; only a spawn failure has nothing to read.
+        if (error && !stdout) reject(error);
+        else resolve(String(stdout));
+      },
+    );
+    child.stdin?.end(request);
+  });
+
+  const parsed: unknown = JSON.parse(output);
+  if (typeof parsed !== "object" || parsed === null) {
+    return { state: "refused", drop, site, code: "INSTALL_FAILED", error: "unreadable answer", missing: [] };
+  }
+  const body = parsed as Record<string, unknown>;
+  const missing = Array.isArray(body.missing) ? (body.missing as { name: string; reasons: string[] }[]) : [];
+  if (body.ok === true) {
+    return {
+      state: "installed",
+      drop,
+      site,
+      installed: Array.isArray(body.installed) ? (body.installed as string[]) : [],
+      blocked: Array.isArray(body.blocked)
+        ? (body.blocked as { file: string; reason: string; missing?: string[] }[])
+        : [],
+      missing,
+    };
+  }
+  return {
+    state: "refused",
+    drop,
+    site,
+    code: typeof body.code === "string" ? body.code : "INSTALL_FAILED",
+    error: typeof body.error === "string" ? body.error : "the libraries were not installed",
+    missing,
+  };
+}
+
