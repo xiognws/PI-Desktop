@@ -443,6 +443,9 @@ pub(super) async fn run_setup(
             allow_external_paths: false,
             hashline: None,
             visualization_root: None,
+            // Worktree setup runs Bash and git only; nothing here needs Python.
+            python_executable: None,
+            python_tools_dir: None,
         },
     )
     .await;

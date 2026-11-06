@@ -108,5 +108,14 @@ worktrees
 __pycache__/
 *.pyc
 
+# The Python runtime this build ships: a full CPython tree plus the pinned
+# wheel stack, regenerated on the build machine by
+# scripts/bundle-python-runtime.mjs from scripts/python-runtime.lock.json.
+# Hundreds of megabytes of third-party binaries with their own release cadence,
+# exactly like the marketplace plugins above — versioned as a lock file, never
+# as a tree.
+/apps/desktop/resources/python/
+/.python-staging/
+
 # Local scratch work (audit scripts, throwaway output)
 .scratch/

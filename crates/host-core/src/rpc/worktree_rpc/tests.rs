@@ -35,6 +35,8 @@ fn tool_options(
         allow_external_paths: false,
         hashline: None,
         visualization_root: None,
+        python_executable: None,
+        python_tools_dir: None,
     }
 }
 
