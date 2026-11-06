@@ -2699,6 +2699,11 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(systemPrompt).toContain("Windows PowerShell");
     expect(systemPrompt).toContain("$env:PI_SCRATCH_DIR");
     expect(systemPrompt).not.toContain("Git Bash (POSIX bash on Windows)");
+    // Both surfaces steer the model away from one shell per step: every call
+    // starts a process, and a burst of short-lived interpreters is exactly the
+    // shape endpoint protection scores as malicious.
+    expect(systemPrompt).toContain("combine related steps into one command");
+    expect(bash.description).toContain("combine related steps into one command");
     expect(bash.description).toContain("Windows PowerShell");
     expect((bash.parameters as any).properties.timeout).toMatchObject({
       type: "number",

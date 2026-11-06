@@ -1436,6 +1436,9 @@ export function commandShellGuidance(
     `Shell commands run through ${shell.label} (${shell.id}). The protocol tool remains named Bash for compatibility, even when the active shell is PowerShell or cmd.`,
     shellSyntaxGuidance(shell),
     scratch,
+    // Fewer calls, fewer processes: each call pays a shell start-up and shows
+    // the operating system one more "application spawns an interpreter" step.
+    "Prefer the file tools (Read, Glob, Grep, Write, Edit) when they cover the task, and combine related steps into one command instead of several calls: every call starts a new shell process.",
   ].join(" ");
 }
 
@@ -1452,6 +1455,7 @@ function commandShellToolDescription(
     `An optional timeout from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS} seconds may be supplied; without it, the command defaults to a 60-second timeout.`,
     `Set runInBackground: true for long-lived processes the user needs after the turn ends (dev servers, watchers, builds). A background call returns a backgroundTaskId immediately, survives turn aborts and timeouts, and its output is visible in the composer's running-tasks bar; do not set it for commands whose output the current turn depends on.`,
     "A shell command gate refuses commands that wipe a filesystem or disk, delete recursively outside the workspace, escalate privileges, force-push or rewrite git history, or publish a package. Those calls return a block reason instead of running; choose a scoped, reversible alternative.",
+    "Prefer the file tools (Read, Glob, Grep, Write, Edit) when they cover the task, and combine related steps into one command instead of several calls: every call starts a new shell process.",
     ...(formattedScratch ? [`The session scratch directory is ${formattedScratch}.`] : []),
   ].join(" ");
 }
