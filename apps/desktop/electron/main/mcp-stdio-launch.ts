@@ -1,4 +1,4 @@
-import { realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir as osHomedir } from "node:os";
 import nodePath from "node:path";
 
@@ -59,6 +59,11 @@ const PYTHON_LAUNCHERS: Record<string, true> = { python: true, python3: true };
 export type McpLaunchFs = {
   isFile: (path: string) => boolean;
   realpath: (path: string) => string;
+  /**
+   * Lets a `.cmd` shim resolve to the script it forwards to. Optional so a
+   * caller that only needs discovery keeps working.
+   */
+  readFile?: (path: string) => string;
 };
 
 export type McpStdioLaunch = {
@@ -99,6 +104,7 @@ function defaultFs(): McpLaunchFs {
         return target;
       }
     },
+    readFile: (target) => readFileSync(target, "utf8"),
   };
 }
 
@@ -410,6 +416,51 @@ export function quoteWindowsCmdArg(arg: string): string {
   return `"${arg.replace(/%/g, "%%").replace(/"/g, '""')}"`;
 }
 
+/**
+ * The script an npm `.cmd` shim forwards to. npm writes the `%~dp0` form and
+ * `dp0` already ends with a separator, so the shim spells a doubled one.
+ */
+const SHIM_FORWARD = /%(?:~dp0|dp0)%?\\+(node_modules\\[^"\r\n]+?\.(?:c|m)?js)(?=[\s"])/gi;
+
+/**
+ * Resolve an npm-generated `.cmd` shim to the script it forwards to, so the
+ * child starts as `node <script>` instead of `cmd.exe /d /s /c "<shim>"`.
+ *
+ * A shell layer between this process and the MCP server is pure cost: it
+ * changes nothing the server sees, and endpoint protection that scores process
+ * behaviour counts "unsigned application spawns a command interpreter" as
+ * suspicious. Anything that is not a recognisable npm shim keeps the previous
+ * `cmd.exe` path — a hand-written batch file may do real work, and a shim whose
+ * forwarded script is missing must still reach its own error message.
+ */
+function cmdShimNodeLaunch(
+  file: string,
+  args: string[],
+  hostEnv: NodeJS.ProcessEnv,
+  paths: nodePath.PlatformPath,
+  fs: McpLaunchFs,
+): { command: string; args: string[] } | undefined {
+  if (!fs.readFile) return undefined;
+  let text: string;
+  try {
+    text = fs.readFile(file);
+  } catch {
+    // Unreadable shim: the cmd.exe path still starts it.
+    return undefined;
+  }
+  const dir = paths.dirname(file);
+  const scripts: string[] = [];
+  for (const match of text.matchAll(SHIM_FORWARD)) {
+    const candidate = paths.join(dir, match[1]);
+    if (fs.isFile(candidate)) scripts.push(candidate);
+  }
+  if (scripts.length !== 1) return undefined;
+  const node =
+    firstFile([paths.join(dir, "node.exe")], fs.isFile) ??
+    lookOnPath("node", hostPath(hostEnv, true), paths, pathextList(hostEnv, true), fs.isFile);
+  return node ? { command: node, args: [scripts[0], ...args] } : undefined;
+}
+
 function wrapCmdShim(
   file: string,
   args: string[],
@@ -557,11 +608,18 @@ export function resolveMcpStdioLaunch(options: McpStdioLaunchOptions): McpStdioL
   }
 
   if (win32 && isCmdShim(launchCommand)) {
-    const wrapped = wrapCmdShim(launchCommand, launchArgs, hostEnv, paths);
-    launchCommand = wrapped.command;
-    launchArgs = wrapped.args;
-    windowsHide = wrapped.windowsHide;
-    windowsVerbatimArguments = wrapped.windowsVerbatimArguments;
+    const direct = cmdShimNodeLaunch(launchCommand, launchArgs, hostEnv, paths, fs);
+    if (direct) {
+      launchCommand = direct.command;
+      launchArgs = direct.args;
+      windowsHide = true;
+    } else {
+      const wrapped = wrapCmdShim(launchCommand, launchArgs, hostEnv, paths);
+      launchCommand = wrapped.command;
+      launchArgs = wrapped.args;
+      windowsHide = wrapped.windowsHide;
+      windowsVerbatimArguments = wrapped.windowsVerbatimArguments;
+    }
   } else if (win32) {
     windowsHide = true;
   }
