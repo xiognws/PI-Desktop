@@ -12,9 +12,9 @@ import { skillReviewText } from "./skill-review-text";
  * A pass that wrote something also lists what it wrote; a pass that did not stays
  * one line.
  */
-export function SkillReviewRow({ turnId }: { turnId: string }) {
+export function SkillReviewRow({ sessionId }: { sessionId: string }) {
   const { t } = useTranslation();
-  const notice = useAppStore((state) => state.skillReviewByTurn[turnId]);
+  const notice = useAppStore((state) => state.skillReviewBySession[sessionId]);
   if (!notice) return null;
   const detail = notice.actions.join(" · ");
   return (

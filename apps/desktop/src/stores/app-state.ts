@@ -165,12 +165,13 @@ export type AppState = {
   runningSessions: Record<string, boolean>;
 
   /**
-   * The self-improvement review's verdict for a finished turn, so the transcript can
-   * say whether it looked and what it concluded. A review that wrote nothing is the
-   * common outcome, and without this row it is indistinguishable from one that never
-   * ran. Memory only: the durable record is the skill-review log.
+   * The latest self-improvement review per session, so the transcript can say whether
+   * it looked and what it concluded. A review that wrote nothing is the common
+   * outcome, and without this row it is indistinguishable from one that never ran.
+   * Keyed by session, not turn: the review reports *after* the turn ended, when the
+   * runtime no longer carries a turn id. Memory only — the durable record is the log.
    */
-  skillReviewByTurn: Record<string, SkillReviewNotice>;
+  skillReviewBySession: Record<string, SkillReviewNotice>;
   /** Runtime-owned phase for explaining quiet intervals in active turns. */
   agentStatuses: Record<string, AgentStatus>;
   /** Latest in-memory result for each session, used by the active transcript. */

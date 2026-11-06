@@ -119,10 +119,14 @@ pub struct PermissionManager {
 impl PermissionManager {
     pub fn tool_risk_with_declared(tool_name: &str, declared: Option<&str>) -> Risk {
         match tool_name {
-                // `Remember` writes only the agent's own memory store (ADR 0371):
-                // it never touches user files or runs a process, so it sits with
-                // the other low-risk bookkeeping tools.
-                "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember" => Risk::Low,
+                // The agent's own bookkeeping: reading and writing its memory store
+                // (ADR 0371) and its skill library. Neither touches user files, runs a
+                // process, or reaches the network — they write inside the app's data
+                // root — so they sit with the other low-risk tools and never raise a
+                // card. `Remember` is the historical name for the same write; both are
+                // listed so neither tool name drifts back into the approval path.
+                "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
+                | "memory" | "skill_manage" | "Skill" => Risk::Low,
                 "Write" | "Edit" | "Bash" | "GenerateImages" | "Computer" => Risk::High,
             name if name.starts_with("plugin_") => match declared {
                 Some("low") => Risk::Low,
@@ -461,6 +465,18 @@ mod tests {
     }
 
     #[test]
+    fn memory_and_skill_writes_never_need_a_card() {
+        // The self-improvement path is automatic by requirement: a review that had to
+        // ask the user before saving a lesson would never save one, and the same tools
+        // in the foreground must not interrupt a turn either.
+        for tool in ["memory", "skill_manage", "Skill"] {
+            assert!(
+                matches!(PermissionManager::tool_risk_with_declared(tool, None), Risk::Low),
+                "{tool} must stay low risk"
+            );
+        }
+    }
+
     fn accept_edits_allows_file_tools_only() {
         let pm = PermissionManager::default();
         for tool in ["Write", "Edit"] {

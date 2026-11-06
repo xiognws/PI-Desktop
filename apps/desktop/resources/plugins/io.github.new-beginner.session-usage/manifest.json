@@ -1,0 +1,77 @@
+{
+  "activationEvents": [
+    "onCommand:usage",
+    "onStartup"
+  ],
+  "author": "new-Beginner (fork of LectWolf)",
+  "categories": [
+    "productivity",
+    "developer-tools"
+  ],
+  "changelog": "1.6.4\n- Use the locale fields supported by the official publishing MCP; retain Chinese release history in CHANGELOG.md\n- 适配官方发布字段，中文历史迁移至 CHANGELOG.md，统计功能和权限不变\n1.6.3\n- Restrict release archives to six reviewed runtime files; reject missing files and symlinks\n- Exclude local screenshots, verification records, credentials and session data from the current source tree\n1.6.2\n- Publish Session Usage Plus as an independently maintained GPL fork with its own plugin ID and repository\n- Preserve the original author attribution and all existing usage features\n1.6.1\n- Simplify child labels to Subagent N or Subagent ? without names or IDs; preserve internal identity\n1.6.0\n- Show numbered per-delegation selectors only when subagents exist; merge resume calls by verified identity\n- Hide redundant agent selectors for main-only sessions while retaining unassigned usage\n- Filter model totals independently across all agents; hide single-model controls\n1.5.4\n- Reconcile total requests and tokens with Main + Subagents + Unassigned using exact measured integers\n- Explain unknown ownership instead of hiding the residual; do not invent main/subagent attribution\n- Label request counts separately from user conversation turns and aggregate-only usage\n1.5.3\n- Read completed main-agent inflight checkpoints independently of the full outbox\n- Update each available completed request and deduplicate later queue/SQLite/JSONL records\n- Preserve measured checkpoint metadata across conversation switches and reloads\n- Streaming snapshots are excluded; unpersisted subagents still require a host source\n1.5.2\n- Merge read-only pending usage with SQLite/JSONL and auto-update every available real operation\n- Recover missed file notifications with a lightweight stat fallback\n- Make reply details follow the chart scope and selected bar; remove independent detail controls\n- Remove yellow diagnostics without weakening identity/deduplication safeguards\n- Host 0.18.0 still cannot expose unpersisted usage after its outbox rejects new entries\n1.5.1\n- Merge real SQLite operations with JSONL by verified operation identity, even when assistant messages are missing\n- Watch SQLite/WAL changes; retain known usage on read failures and reject stale session responses\n- Display unknown ownership and aggregate-only coverage without fabricated reply data\n1.5.0\n- Update completed model output usage automatically for main and delegated agents\n- Replace scope dropdowns with themed global and per-section buttons\n- Keep known usage visible while running and distinguish pending usage from read failures\n1.4.0\n- Separate main and delegated agent usage by verified call identity, even with the same model\n- Add global and independent section scope selectors with total as default\n- Deduplicate usage and flag unavailable or incomplete data\n1.3.1\n- Fix uneven chart spacing, stack positioning and clipped selection borders\n- Keep the inspected reply after leaving a bar and through ordinary refresh\n- Return to the final reply and scroll to the end when new replies finish\n1.3.0\n- Add per-reply stacked token history above reply details\n- Hover or focus a bar to inspect that reply; leave to show the latest\n- Preserve history scrolling and reconcile pointer selection after refresh\n1.2.0\n- Follow the actual visible conversation through a minimal renderer extension\n- Add explicit follow/fixed modes and reject stale reports after switching\n- Stop guessing the current conversation from timestamps or running turns\n1.1.0\n- Move Session Usage into the right work panel; /usage no longer opens a window\n1.0.1\n- Follow PI-Desktop UI language",
+  "contributes": {
+    "commands": [
+      {
+        "category": "Session",
+        "id": "sessionUsage.refresh",
+        "keywords": [
+          "usage",
+          "token",
+          "tokens",
+          "cache",
+          "用量",
+          "缓存",
+          "命中"
+        ],
+        "title": "Usage: current session"
+      }
+    ],
+    "views": [
+      {
+        "entry": "renderer/index.html",
+        "icon": "clock",
+        "id": "usage",
+        "order": 50,
+        "title": {
+          "en": "Session Usage",
+          "zh-CN": "会话用量"
+        }
+      }
+    ]
+  },
+  "description": "Session usage in the right work panel, automatically following the visible conversation. /usage refreshes the current conversation without opening a window.",
+  "engines": {
+    "piDesktop": ">=0.17.0"
+  },
+  "homepage": "https://github.com/new-Beginner/pi-session-usage",
+  "i18n": {
+    "en": {
+      "name": "Session Usage Plus",
+      "description": "Session usage in the right work panel, automatically following the visible conversation. /usage refreshes the current conversation without opening a window.",
+      "safetyNotes": "Reads local usage metadata and main-window session identity attributes only. renderer.extension is high risk because it runs in the host document; this extension does not read transcript/draft text, use internal IPC, or send data off-device."
+    },
+    "zh-CN": {
+      "name": "会话用量增强版",
+      "description": "在右侧工作面板自动跟随当前显示的对话，查看输入、输出、缓存和命中率。/usage 刷新当前会话，不再弹窗。",
+      "safetyNotes": "仅读取本机用量元数据和主界面会话身份属性。renderer.extension 因运行在宿主文档中被标为高风险；本扩展不读取消息或输入框正文、不使用内部 IPC、不联网，不注册 Agent 工具。"
+    }
+  },
+  "id": "io.github.new-beginner.session-usage",
+  "license": "GPL-3.0-only",
+  "main": "main.js",
+  "name": "Session Usage Plus",
+  "permissions": [
+    "ui.view",
+    "renderer.extension"
+  ],
+  "renderer": "renderer/session-context.mjs",
+  "rendererActions": [
+    "plugin.call"
+  ],
+  "rendererCallMethods": [
+    "usage.setContext"
+  ],
+  "safetyNotes": "Reads local usage metadata and main-window session identity attributes only. renderer.extension is high risk because it runs in the host document; this extension does not read transcript/draft text, use internal IPC, or send data off-device.",
+  "schemaVersion": 1,
+  "version": "1.6.4"
+}

@@ -70,9 +70,13 @@ describe("contextBudgetFor", () => {
     });
 
     expect(budget).toEqual(fallback);
-    expect(budget.hardLimit).toBe(111_616);
-    expect(budget.requestHeadroom).toBe(16_384);
-    expect(budget.keepRecentTokens).toBe(22_323);
+    // Written as the derivation rather than as literals: this assertion silently went
+    // stale the last time the default output cap moved, and the failure said nothing
+    // about which number had changed.
+    const headroom = Math.floor(DEFAULT_CONTEXT_WINDOW * 0.25);
+    expect(budget.requestHeadroom).toBe(headroom);
+    expect(budget.hardLimit).toBe(DEFAULT_CONTEXT_WINDOW - headroom);
+    expect(budget.keepRecentTokens).toBe(Math.floor(DEFAULT_CONTEXT_WINDOW * 0.15));
   });
 
   it("caps the retained tail on a very large window", () => {

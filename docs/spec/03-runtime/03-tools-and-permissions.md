@@ -132,6 +132,8 @@ Let the agent get things done, but stay under control by default.
 | `SubmitPlan` | low | Preserve exact Markdown bytes in a new `.pi/plan/*.md` artifact and request approval |
 | `EnterGoalMode` | low | Move the same Agent from Agent to Goal after host validation |
 | `SubmitGoal` | low | Preserve exact Markdown bytes in a new `.pi/goal/*.md` artifact and request approval |
+| `OfficeRead` | low | Read `.xlsx`, `.docx`, `.pptx` or `.pdf` through the bundled Python runtime; returns bounded structured content ([2.3](#23-office-documents)) |
+| `OfficeWrite` | high | Create or update those formats through the same runtime; `append` adds to an existing document ([2.3](#23-office-documents)) |
 | `Write` | high | Create/overwrite files; returns the post-write `tag` |
 | `Edit` | high | Modify files through line-anchored ops against a verified `tag` ([18](18-line-anchored-edit-contract.md)) |
 | `Bash` | high | Execute commands |
@@ -227,6 +229,68 @@ or a declaration without also matching a comment or a string literal.
   executed sequentially like every tool outside the read/search batch set. It
   sits in the on-demand catalog with the other ancillary tools, so the model
   activates it once with `ToolSearch` before its first call.
+
+### 2.3 Office documents (`OfficeRead`, `OfficeWrite`)
+
+These two tools give the agent `.xlsx`, `.docx`, `.pptx`, and `.pdf` support
+without asking the user to install anything.
+
+- **Where the libraries come from.** The installation ships its own CPython
+  runtime and a pinned wheel set under `<resources>/python`
+  (`scripts/bundle-python-runtime.mjs`, locked by
+  `scripts/python-runtime.lock.json`). Nothing is downloaded at run time and the
+  customer's own interpreter is never used, so behaviour does not vary with what
+  happens to be on their machine. `PYTHONNOUSERSITE` keeps their per-user
+  `site-packages` out of the import path.
+- **Where the work runs.** One short-lived child process of host-core per call,
+  running `tools/office.py` from that bundle. A malformed document can only kill
+  that process; the host reads a broken response and the session continues. No
+  Office library is ever loaded into the host binary.
+- **How arguments travel.** The request is written to the child's stdin as JSON,
+  never as a command line, so a path containing spaces, quotes, or a leading dash
+  cannot change what runs.
+- **Containment.** The path is resolved by the same workspace/scratch resolver
+  `Read` and `Write` use *before* the child starts; the child receives an already
+  resolved absolute path and does no joining of its own. External paths need the
+  same permission `Write` needs.
+- **Bounds.** `maxRows` (default 200), `maxCols` (60), `maxBlocks` (400),
+  `maxPages` (50), and a 120-second ceiling per call. A bounded result sets
+  `truncated`, so the model says what it did not read rather than implying the
+  document ended.
+- **What it will not do.** `pdf` has no editable document model: its `write` is a
+  merge of `sources` into `path`, and asking for an edit is refused by name.
+  `.docx` tracked changes and comments are not editable, and formulas are not
+  recalculated — `valuesOnly` returns the values the workbook stored.
+- **When the runtime is absent.** A development checkout that never ran
+  `pnpm --filter @pi-workspace/desktop bundle:python` answers
+  `PYTHON_RUNTIME_UNAVAILABLE` with the command to run. The tools do not fall
+  back to the system Python.
+
+#### Adding a library offline
+
+The shipped stack covers Office work, but an intranet or air-gapped machine
+sometimes needs one more library, and there is no index to fetch it from. The
+user puts the `.whl` files into `<data>/python-site-drop`; at every launch
+`tools/install_libs.py` drains it into `<data>/python-site`, which is first on
+`PYTHONPATH`, so the library is importable by the next tool call with no
+restart.
+
+Dependency resolution is deliberately offline and conservative, because pip
+cannot consult an index that does not exist. The worker reads `Requires-Dist`
+straight out of each wheel's own `METADATA` and compares it with the
+`dist-info` directories already present:
+
+- All dependencies present → the batch installs with
+  `pip install --no-index --no-deps --target`, and the wheels move to `done/`.
+- Anything missing → the whole batch is refused *by name*: the response and a
+  note beside each wheel say `python-docx needs lxml>=3.1.0`, which is the
+  shopping list for the next trip. Refused wheels move to `failed/` so the next
+  scan does not retry them in a loop.
+- Environment markers are honoured for the platform variables that appear in
+  real metadata; `extra`-gated requirements are never installed implicitly.
+
+The scan runs once per launch off the startup path and is never fatal: a broken
+wheel costs a warning in the log, not a failed launch.
 
 ## 3. Common Tool Constraints
 

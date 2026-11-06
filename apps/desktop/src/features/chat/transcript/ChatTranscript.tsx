@@ -57,6 +57,7 @@ import {
   resolveRadialMenu,
 } from "../../../lib/radial-menu";
 import { SlotSessionProvider } from "../../../plugins/renderer-slots/use-slots";
+import { SkillReviewRow } from "./SkillReviewRow";
 
 type ChatTranscriptProps = {
   sessionId: string | undefined;
@@ -533,6 +534,10 @@ function TranscriptBody({
             <div className="transcript-hydration-spacer" aria-hidden />
           ) : null}
           <TranscriptHistory entries={historyEntries} isRunning={isRunning} liveDelegations={liveDelegations} liveTurnId={liveTurnId} />
+          {/* The self-improvement review's verdict for this session, one quiet line
+            * under the last turn. It reports after the turn ends, which is why it is
+            * keyed by session rather than hung off a turn. */}
+          <SkillReviewRow sessionId={sessionId ?? ""} />
           {tailEntry ? (
             <TranscriptTail
               entry={tailEntry}

@@ -354,6 +354,10 @@ pub(super) async fn handle(
             store: &hashline,
         }),
         visualization_root: None,
+        // A remote workspace runs its tools on the remote host; the interpreter
+        // shipped with this installation is not there to run.
+        python_executable: None,
+        python_tools_dir: None,
     };
     let mut result = tokio::select! {
         result = tools::execute_tool_with_path_access(Some(&root),None,&p.tool_name,&p.args,options) => result,

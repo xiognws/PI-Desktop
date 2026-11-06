@@ -1,0 +1,119 @@
+{
+  "//": "Pinned Python runtime for the bundled Office/file capabilities. Every entry is an exact wheel and its sha256; scripts/bundle-python-runtime.mjs installs with --require-hashes so a substituted or truncated wheel fails the build instead of shipping. Refresh deliberately: bump a version here, run the bundle script, and commit the regenerated apps/desktop/resources/python/MANIFEST.json in the same change.",
+  "python": {
+    "version": "3.12.13",
+    "implementation": "cpython",
+    "platform": "windows-x86_64",
+    "source": "python-build-standalone (astral-sh)",
+    "note": "Full CPython install, not the embeddable distribution: the user layer installs wheels with `pip install --target`, which needs pip, sysconfig and a normal Lib/ layout."
+  },
+  "wheels": [
+    {
+      "name": "et-xmlfile",
+      "version": "2.0.0",
+      "file": "et_xmlfile-2.0.0-py3-none-any.whl",
+      "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+      "why": "openpyxl runtime dependency"
+    },
+    {
+      "name": "lxml",
+      "version": "6.1.3",
+      "file": "lxml-6.1.3-cp312-cp312-win_amd64.whl",
+      "sha256": "3e9a00d1c2c30936f7add097c41afc5da6556c580909104aafd382cac92a855c",
+      "why": "python-docx / python-pptx XML backend"
+    },
+    {
+      "name": "numpy",
+      "version": "2.5.4",
+      "file": "numpy-2.5.4-cp312-cp312-win_amd64.whl",
+      "sha256": "a7b1b6353e36a7e50de2973a38d705c88ee93adcf120673cee7f45a4a3fa223a",
+      "why": "pandas runtime dependency"
+    },
+    {
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "file": "openpyxl-3.1.5-py2.py3-none-any.whl",
+      "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
+      "why": "read and write .xlsx"
+    },
+    {
+      "name": "pandas",
+      "version": "2.2.3",
+      "file": "pandas-2.2.3-cp312-cp312-win_amd64.whl",
+      "sha256": "59ef3764d0fe818125a5097d2ae867ca3fa64df032331b7e0917cf5d7bf66b13",
+      "why": "tabular analysis over .xlsx/.csv"
+    },
+    {
+      "name": "pillow",
+      "version": "11.3.0",
+      "file": "pillow-11.3.0-cp312-cp312-win_amd64.whl",
+      "sha256": "a6444696fce635783440b7f7a9fc24b3ad10a9ea3f0ab66c5905be1c19ccf17d",
+      "why": "image conversion for Office embedding"
+    },
+    {
+      "name": "pypdf",
+      "version": "6.2.0",
+      "file": "pypdf-6.2.0-py3-none-any.whl",
+      "sha256": "4c0f3e62677217a777ab79abe22bf1285442d70efabf552f61c7a03b6f5c569f",
+      "why": "read, merge, split, generate PDF"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "4.0.0",
+      "file": "python_dateutil-4.0.0-py3-none-any.whl",
+      "sha256": "a5e246f79eb80475e691bf93862cead98decd8a498cf53ba0516fcdc0f50dc1c",
+      "why": "pandas runtime dependency"
+    },
+    {
+      "name": "python-docx",
+      "version": "1.2.0",
+      "file": "python_docx-1.2.0-py3-none-any.whl",
+      "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+      "why": "read and write .docx"
+    },
+    {
+      "name": "python-pptx",
+      "version": "1.0.2",
+      "file": "python_pptx-1.0.2-py3-none-any.whl",
+      "sha256": "160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba",
+      "why": "read and write .pptx"
+    },
+    {
+      "name": "pytz",
+      "version": "2026.6",
+      "file": "pytz-2026.6-py2.py3-none-any.whl",
+      "sha256": "7fed3fee8fd6bd4a2b7b75a8d56021d0624127bf69bd5691f115db929ac570b3",
+      "why": "pandas runtime dependency"
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "file": "typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "why": "python-docx / python-pptx runtime dependency"
+    },
+    {
+      "name": "tzdata",
+      "version": "2026.6",
+      "file": "tzdata-2026.6-py2.py3-none-any.whl",
+      "sha256": "0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec",
+      "why": "pandas timezone database on Windows"
+    },
+    {
+      "name": "xlsxwriter",
+      "version": "3.2.9",
+      "file": "xlsxwriter-3.2.9-py3-none-any.whl",
+      "sha256": "9a5db42bc5dff014806c58a20b9eae7322a134abb6fce3c92c181bfb275ec5b3",
+      "why": "chart- and pivot-bearing .xlsx output"
+    }
+  ],
+  "smokeImports": [
+    "openpyxl",
+    "docx",
+    "pptx",
+    "pandas",
+    "PIL",
+    "pypdf",
+    "xlsxwriter"
+  ]
+}

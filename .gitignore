@@ -85,6 +85,14 @@ worktrees
 !/apps/desktop/resources/plugins/io.github.muzimu217.vision-kit/
 !/apps/desktop/resources/plugins/pi.todo/
 !/apps/desktop/resources/plugins/pi.token-insights/
+# Startup-resilience fixes ship inside these three plugins: each one broke the
+# plugin restore chain at launch (a host API that does not exist, an
+# undeclared bus permission with a colon-separated topic, a hard-coded data
+# path). The fixes must survive the next marketplace sync, so the folders are
+# tracked here the same way as the intranet plugins above.
+!/apps/desktop/resources/plugins/pi.agents-anywhere/
+!/apps/desktop/resources/plugins/io.github.xideadev.task-dida/
+!/apps/desktop/resources/plugins/io.github.new-beginner.session-usage/
 # The plugin host writes a `package.json` into a plugin folder that ships none,
 # so Node resolves the plugin's submodules as CommonJS
 # (`plugin-host-process.mjs`, `ensureCommonJsPackage`). The released
@@ -99,6 +107,15 @@ worktrees
 *.egg-info/
 __pycache__/
 *.pyc
+
+# The Python runtime this build ships: a full CPython tree plus the pinned
+# wheel stack, regenerated on the build machine by
+# scripts/bundle-python-runtime.mjs from scripts/python-runtime.lock.json.
+# Hundreds of megabytes of third-party binaries with their own release cadence,
+# exactly like the marketplace plugins above — versioned as a lock file, never
+# as a tree.
+/apps/desktop/resources/python/
+/.python-staging/
 
 # Local scratch work (audit scripts, throwaway output)
 .scratch/

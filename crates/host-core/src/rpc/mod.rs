@@ -4737,6 +4737,18 @@ async fn handle_request(
                 } else {
                     visualizations::session_dir(&data_dir, &p.session_id)
                 };
+                // The Python runtime belongs to the installation, so Electron
+                // hands it over once at boot rather than per tool call. Absent
+                // means this build ships none, and the Office tools say so.
+                let python_executable = std::env::var_os("PI_DESKTOP_PYTHON")
+                    .map(std::path::PathBuf::from)
+                    .filter(|path| path.is_file());
+                let python_tools_dir = python_executable
+                    .as_ref()
+                    .and_then(|path| path.parent())
+                    .and_then(|root| root.parent())
+                    .map(|root| root.join("tools"))
+                    .filter(|dir| dir.is_dir());
                 let pending_review = if remote_workspace.is_some() {
                     None
                 } else {
@@ -4868,6 +4880,8 @@ async fn handle_request(
                             allow_external_paths: external_path_permission,
                             hashline: Some(hashline_ctx),
                             visualization_root: visualization_path.as_deref(),
+                            python_executable: python_executable.as_deref(),
+                            python_tools_dir: python_tools_dir.as_deref(),
                         },
                         Some(tool_permit.clone()),
                         file_resources.clone(),
@@ -8253,6 +8267,8 @@ mod tests {
                 allow_external_paths: false,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
@@ -8274,6 +8290,8 @@ mod tests {
                 allow_external_paths: false,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
