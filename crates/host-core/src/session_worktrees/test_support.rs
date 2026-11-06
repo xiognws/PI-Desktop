@@ -1,5 +1,12 @@
 //! Real temporary git repositories for worktree tests. Identity is set in the
 //! repository config so tests never depend on the developer's global config.
+//!
+//! Line endings are pinned for the same reason. A developer whose global config
+//! carries `core.autocrlf=true` (Git for Windows' recommended default) would
+//! otherwise get `A\r\n` back from a file committed as `A\n`, and every
+//! merge assertion that compares file contents would fail on that machine while
+//! passing on CI. The temporary repository has no `.gitattributes` of its own,
+//! so the only way to make the checkout stable is to set the repository config.
 
 use std::path::{Path, PathBuf};
 
@@ -27,6 +34,9 @@ pub fn init_repo(path: &Path) -> PathBuf {
     git_cmd(path, &["config", "user.name", "PI Test"]);
     git_cmd(path, &["config", "user.email", "pi-test@example.invalid"]);
     git_cmd(path, &["config", "commit.gpgsign", "false"]);
+    // Keep the bytes a test writes and the bytes it reads back identical.
+    git_cmd(path, &["config", "core.autocrlf", "false"]);
+    git_cmd(path, &["config", "core.eol", "lf"]);
     std::fs::write(path.join("README.md"), "init\n").unwrap();
     git_cmd(path, &["add", "README.md"]);
     git_cmd(path, &["commit", "-q", "-m", "init"]);

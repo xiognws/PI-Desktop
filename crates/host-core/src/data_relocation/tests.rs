@@ -141,7 +141,9 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
     // expectation uses it; the untouched sibling paths in the same record keep
     // whatever spelling the fixture wrote.
     let moved_attachment = crate::db::normalize_project_path(
-        &destination.join("scratch/chat/pasted/input.txt").to_string_lossy(),
+        &destination
+            .join("scratch/chat/pasted/input.txt")
+            .to_string_lossy(),
     )
     .unwrap();
     let new_transcript = fs::read_to_string(destination.join("sessions/chat.jsonl")).unwrap();
@@ -187,7 +189,9 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
     );
     let plugins = read_json(&destination.join("plugins/registry.json"));
     let moved_plugin = crate::db::normalize_project_path(
-        &destination.join("plugins/installed/example").to_string_lossy(),
+        &destination
+            .join("plugins/installed/example")
+            .to_string_lossy(),
     )
     .unwrap();
     assert_eq!(plugins[0]["path"], json!(moved_plugin));
@@ -256,10 +260,10 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
     // rows use, so a moved group and a freshly created one compare equal.
     assert_eq!(
         serde_json::from_str::<Value>(&group).unwrap()["roots"][0]["path"],
-        json!(crate::db::normalize_project_path(
-            &destination.join("project").to_string_lossy()
+        json!(
+            crate::db::normalize_project_path(&destination.join("project").to_string_lossy())
+                .unwrap()
         )
-        .unwrap())
     );
     assert_eq!(
         SecretStore::open(&destination)

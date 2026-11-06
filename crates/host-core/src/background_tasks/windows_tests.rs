@@ -89,11 +89,11 @@ async fn stop_terminates_the_command_the_runner_launched() {
     }
 
     assert!(
-        wait_for_exit(nested_pid),
+        wait_for_exit(nested_pid).await,
         "the command's own child must not survive stopping the task (#1805)"
     );
     assert!(
-        wait_for_exit(command_pid),
+        wait_for_exit(command_pid).await,
         "the launched command must not survive stopping the task (#1805)"
     );
 
@@ -129,13 +129,20 @@ fn process_running(pid: u32) -> bool {
     queried != 0 && exit_code == STILL_ACTIVE as u32
 }
 
+/// Wait for `pid` to disappear, yielding to the runtime while waiting.
+///
+/// The yield is the point. A `std::thread::sleep` here blocks the test's own
+/// task, and `#[tokio::test]` runs on a current-thread runtime: the supervisor
+/// that actually performs the stop would never be polled, so the stop would
+/// appear to do nothing and the assertion would fail on a host that behaves
+/// correctly. Awaiting the sleep lets the supervisor run.
 #[cfg(windows)]
-fn wait_for_exit(pid: u32) -> bool {
+async fn wait_for_exit(pid: u32) -> bool {
     for _ in 0..120 {
         if !process_running(pid) {
             return true;
         }
-        std::thread::sleep(Duration::from_millis(50));
+        tokio::time::sleep(Duration::from_millis(50)).await;
     }
     false
 }

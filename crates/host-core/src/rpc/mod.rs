@@ -9681,7 +9681,12 @@ mod tests {
             .await
         });
         wait_for_bash_registration(&state, &session.id, "abort-during-execution").await;
-        for _ in 0..100 {
+        // The marker is written after the command has already started a child
+        // process, and a loaded machine — a full suite running in parallel —
+        // takes far longer to get there than a test run on its own. Wait for the
+        // event rather than budgeting a second for it: the assertion is about
+        // ordering (started before abort), not about latency.
+        for _ in 0..600 {
             if started_marker.exists() {
                 break;
             }

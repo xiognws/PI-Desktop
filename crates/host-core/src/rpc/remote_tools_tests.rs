@@ -136,7 +136,11 @@ async fn remote_read_dispatch_is_local_approval_then_relay_never_local_runner() 
     let pending_tx = tx.clone();
     let pending_id = id.clone();
     let pending = tokio::spawn(async move {
-        handle_request(pending_state,"tools.execute",json!({"sessionId":pending_id,"toolCallId":"read-a","toolName":"Read","args":{"path":"README.md"},"mode":"agent"}),pending_tx).await
+        // "auto" so the read reaches the relay without a prompt: this test is
+        // about the dispatch path, and the default permission mode ("ask") puts
+        // a permissions.request in front of every tool call. The companion test
+        // below covers the prompting path itself.
+        handle_request(pending_state,"tools.execute",json!({"sessionId":pending_id,"toolCallId":"read-a","toolName":"Read","args":{"path":"README.md"},"mode":"agent","permissionScope":"auto"}),pending_tx).await
     });
     let request: Value = serde_json::from_str(
         &tokio::time::timeout(Duration::from_secs(2), rx.recv())
@@ -184,7 +188,10 @@ async fn denied_remote_write_and_cancelled_read_never_run_locally() {
     let pending_tx = tx.clone();
     let pending_id = id.clone();
     let read = tokio::spawn(async move {
-        handle_request(pending_state,"tools.execute",json!({"sessionId":pending_id,"toolCallId":"read-b","toolName":"Read","args":{"path":"a.txt"},"mode":"agent"}),pending_tx).await
+        // The read leg is about aborting a relayed call, so it runs under
+        // "auto" and reaches the relay directly; the write leg above is the one
+        // that exercises the prompt and the denial.
+        handle_request(pending_state,"tools.execute",json!({"sessionId":pending_id,"toolCallId":"read-b","toolName":"Read","args":{"path":"a.txt"},"mode":"agent","permissionScope":"auto"}),pending_tx).await
     });
     let request: Value = serde_json::from_str(
         &tokio::time::timeout(Duration::from_secs(2), rx.recv())

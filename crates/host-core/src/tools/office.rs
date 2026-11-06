@@ -23,7 +23,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use crate::tools::hashline::ToolError;
-use crate::workspace::{resolve_tool_path_with_external, ContainedRoots, ToolRoot};
+use crate::workspace::{resolve_tool_path_with_external, ContainedRoots};
 
 /// The formats the worker knows how to open. Keeping this list here (rather than
 /// trusting whatever `format` says) means a typo fails with a real message
@@ -62,11 +62,10 @@ fn require_str(args: &Value, key: &str) -> Result<String, ToolError> {
 pub fn parse_request(args: &Value) -> Result<OfficeRequest, ToolError> {
     let format = require_str(args, "format")?.to_lowercase();
     if !FORMATS.contains(&format.as_str()) {
-        return Err(ToolError::new(
-            "INVALID_ARGUMENT",
-            format!("unsupported format: {format}"),
-        )
-        .with_extra(json!({ "supported": FORMATS })));
+        return Err(
+            ToolError::new("INVALID_ARGUMENT", format!("unsupported format: {format}"))
+                .with_extra(json!({ "supported": FORMATS })),
+        );
     }
     let operation = args
         .get("operation")
@@ -163,12 +162,7 @@ pub async fn execute(
 
     // Containment first: the worker gets a resolved path and does no joining of
     // its own, so this is the only place the boundary is decided.
-    let resolved = resolve_argument(
-        workspace_root,
-        roots,
-        &request.path,
-        allow_external_paths,
-    )?;
+    let resolved = resolve_argument(workspace_root, roots, &request.path, allow_external_paths)?;
     if request.operation == "read" && !resolved.is_file() {
         return Err(ToolError::new(
             "FILE_NOT_FOUND",
@@ -193,10 +187,13 @@ pub async fn execute(
                             "sources must be strings",
                         ));
                     };
-                    resolved_sources.push(json!(
-                        resolve_argument(workspace_root, roots, text, allow_external_paths)?
-                            .to_string_lossy()
-                    ));
+                    resolved_sources.push(json!(resolve_argument(
+                        workspace_root,
+                        roots,
+                        text,
+                        allow_external_paths
+                    )?
+                    .to_string_lossy()));
                 }
                 object.insert("sources".into(), Value::Array(resolved_sources));
             }
