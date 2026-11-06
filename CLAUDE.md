@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-11-04.1
+Policy-Sync: 2026-11-06.1
 
 Instructions for Claude Code CLI and Claude Cowork on Pi-Workspace.
 
@@ -83,6 +83,8 @@ Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 ```
 
 Do **not** insert `merge task → local main` between refresh and task-candidate E2E. The task branch itself is the local integration candidate after incorporating latest `origin/main`. Do not open or update a PR that is behind `origin/main`. Run `pnpm check:pr-base` before opening or updating a PR.
+
+Remove a branch and its worktree **as soon as it is used up**: once it is merged into remote `main` (or its commits reached `main` through another lane), absorbed into another request branch, or abandoned. Confirm the commits exist on `origin` before deleting, never delete uncommitted work or a worktree another agent is using, and keep the primary checkout as the only long-lived working copy.
 
 Record E2E evidence:
 

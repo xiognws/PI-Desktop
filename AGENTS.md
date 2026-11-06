@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-11-04.1
+Policy-Sync: 2026-11-06.1
 
 Mandatory rules for AI coding agents working in Pi-Workspace.
 
@@ -330,6 +330,29 @@ the latest `origin/main`. Do not open or update a PR that is behind
 A task-candidate E2E result is valid only when its tested commit and
 base revision are known. The PR integration gate then protects against
 `main` changing between local candidate validation and final merge.
+
+### Remove a branch as soon as it is used up
+
+A request branch and its worktree are working objects, not an archive. Remove
+them as soon as they stop being needed, in the same session that finished the
+work when possible:
+
+* the branch is merged into remote `main` (or its commits already reached
+  `main` through another lane) — remove the worktree and the local branch
+  immediately;
+* its work was absorbed by a rebase or merge into another request branch —
+  remove the absorbed one;
+* the work is abandoned or superseded — record why in the delivery report, then
+  remove it.
+
+Before removing anything, confirm the commits exist on `origin`
+(`git ls-remote --heads origin`) or are explicitly abandoned. Never delete
+uncommitted work, and never remove a worktree another agent is using.
+
+Keep the primary checkout as the only long-lived working copy. Every leftover
+worktree carries its own build output, dependency links and plugin store, so a
+machine that never cleans up accumulates duplicated trees and stale `dist/`
+directories, and "which checkout is current" becomes unanswerable.
 
 ---
 
