@@ -43,7 +43,14 @@ impl Roots {
             .or_else(|_| path.strip_prefix(&self.canonical_source))
             .or_else(|_| path.strip_prefix(&self.project_source))
             .ok()?;
-        Some(self.destination.join(suffix).to_string_lossy().into_owned())
+        // Rewrite into the same spelling every writer stores. Capability records
+        // and project rows key on `db::normalize_project_path` (forward slashes,
+        // no extended-length prefix), so joining with the platform separator
+        // would produce a value that never equals the key the same project
+        // produces on its own — the relocated override would silently stop
+        // matching, and a real collision between the moved key and an existing
+        // one would go undetected.
+        crate::db::normalize_project_path(&self.destination.join(suffix).to_string_lossy())
     }
 
     fn string(&self, value: &mut Value) -> bool {

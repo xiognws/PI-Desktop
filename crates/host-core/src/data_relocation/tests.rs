@@ -137,7 +137,13 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
     let original = fs::read(&transcript).unwrap();
     let key_before = fs::read(source.join("secrets/.machine-key")).unwrap();
     relocate(&source, &destination).unwrap();
-    let moved_attachment = destination.join("scratch/chat/pasted/input.txt");
+    // Rewritten paths take the canonical forward-slash spelling, so the
+    // expectation uses it; the untouched sibling paths in the same record keep
+    // whatever spelling the fixture wrote.
+    let moved_attachment = crate::db::normalize_project_path(
+        &destination.join("scratch/chat/pasted/input.txt").to_string_lossy(),
+    )
+    .unwrap();
     let new_transcript = fs::read_to_string(destination.join("sessions/chat.jsonl")).unwrap();
     let lines: Vec<_> = new_transcript.lines().collect();
     let message: Value = serde_json::from_str(lines[0]).unwrap();
@@ -180,10 +186,11 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
         json!(moved_attachment)
     );
     let plugins = read_json(&destination.join("plugins/registry.json"));
-    assert_eq!(
-        plugins[0]["path"],
-        json!(destination.join("plugins/installed/example"))
-    );
+    let moved_plugin = crate::db::normalize_project_path(
+        &destination.join("plugins/installed/example").to_string_lossy(),
+    )
+    .unwrap();
+    assert_eq!(plugins[0]["path"], json!(moved_plugin));
     assert_eq!(plugins[1]["path"], json!(source.join("dev-source")));
     assert_eq!(plugins[2]["path"], json!(external));
     assert_eq!(
@@ -207,6 +214,9 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
             |row| row.get(0),
         )
         .unwrap();
+    // This row is a path outside the relocation roots, inserted by the fixture
+    // with the platform spelling and never rewritten, so it keeps exactly what
+    // the fixture wrote.
     assert_eq!(outside, external.to_string_lossy());
     let status: String = connection
         .query_row("SELECT status FROM turns WHERE id='live'", [], |row| {
@@ -242,9 +252,14 @@ fn relocates_a_real_copied_profile_without_recovery_or_changing_user_content() {
             |row| row.get(0),
         )
         .unwrap();
+    // Rewritten group roots take the canonical spelling, the same one project
+    // rows use, so a moved group and a freshly created one compare equal.
     assert_eq!(
         serde_json::from_str::<Value>(&group).unwrap()["roots"][0]["path"],
-        json!(destination.join("project"))
+        json!(crate::db::normalize_project_path(
+            &destination.join("project").to_string_lossy()
+        )
+        .unwrap())
     );
     assert_eq!(
         SecretStore::open(&destination)
@@ -280,7 +295,16 @@ fn exact_path_boundaries_preserve_prose_prefix_neighbors_and_traversal() {
     let prose = format!("cat {}", inside.display());
     let mut value = json!({"path":inside, "ref":neighbor, "args":{"command":prose, "path":traversal}, "text":inside, "userCode":{"content":{"path":inside}}});
     assert!(roots.structured(&mut value));
-    assert_eq!(value["path"], json!(roots.destination.join("nested/file")));
+    // Rewritten paths come back in the canonical forward-slash spelling, the
+    // same one `db::normalize_project_path` gives every stored path, so a moved
+    // record keys identically to one the destination created itself.
+    assert_eq!(
+        value["path"],
+        json!(crate::db::normalize_project_path(
+            &roots.destination.join("nested/file").to_string_lossy()
+        )
+        .unwrap())
+    );
     assert_eq!(value["ref"], json!(neighbor));
     assert_eq!(value["args"]["path"], json!(traversal));
     assert_eq!(value["userCode"]["content"]["path"], json!(inside));
@@ -344,7 +368,13 @@ fn handles_legacy_schema_without_upgrading_or_creating_missing_tables() {
     let path: String = database
         .query_row("SELECT path FROM projects", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(path, destination.join("project").to_string_lossy());
+    // The migrated row keeps the canonical spelling rather than the platform
+    // separator, which is what makes a path recorded on Windows compare equal
+    // to the same path after a move.
+    assert_eq!(
+        path,
+        crate::db::canonical_project_path(&destination.join("project").to_string_lossy()).unwrap()
+    );
     let tables: i64 = database
         .query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table'",
@@ -446,10 +476,13 @@ fn encoded_tool_images_remain_lossless_in_all_relocated_file_kinds() {
         .join("scratch/screenshot.png")
         .to_string_lossy()
         .into_owned();
-    let new = destination
-        .join("scratch/screenshot.png")
-        .to_string_lossy()
-        .into_owned();
+    // Rewritten paths take the canonical spelling, so the expectation has to
+    // use it too. The bytes around the path are compared separately below; this
+    // value is only the expected spelling of the moved path.
+    let new = crate::db::normalize_project_path(
+        &destination.join("scratch/screenshot.png").to_string_lossy(),
+    )
+    .unwrap();
     let image = json!({"type":"image","data":"YWJjLw==","mimeType":"image/png"});
     let result =
         json!({"content":[image.clone()],"details":{"content":[image],"path":old},"note":"last"});
