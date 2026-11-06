@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Session Usage</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #181818;
+        --surface: #212121;
+        --fg: #f4f4f5;
+        --muted: color-mix(in oklab, #ffffff 52%, transparent);
+        --faint: color-mix(in oklab, #ffffff 38%, transparent);
+        --border: color-mix(in oklab, #ffffff 10%, transparent);
+        --hit: #86efac;
+        --create: #c4b5fd;
+        --think: #7dd3fc;
+        --warn: #fbbf24;
+        --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      :root[data-base="light"] {
+        color-scheme: light;
+        --bg: #f7f7f8;
+        --surface: #ffffff;
+        --fg: #1a1c1f;
+        --muted: #5d5d5d;
+        --faint: #8a8a8a;
+        --border: color-mix(in oklab, #1a1c1f 10%, transparent);
+        --hit: #15803d;
+        --create: #6d28d9;
+        --think: #0369a1;
+        --warn: #b45309;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      .toolbar {
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 0 0 44px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--border);
+        background: color-mix(in oklab, var(--bg) 88%, transparent);
+      }
+      .toolbar h1 {
+        margin: 0;
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .toolbar .spacer { flex: 1; }
+      .icon-btn {
+        flex: none;
+        appearance: none;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface);
+        color: var(--fg);
+        cursor: pointer;
+        transition: transform 160ms var(--ease-out);
+      }
+      .icon-btn:hover { filter: brightness(1.08); }
+      .icon-btn:active { transform: scale(0.97); }
+      .icon-btn:disabled { opacity: 0.5; cursor: default; }
+      button:focus-visible { outline: 2px solid var(--think); outline-offset: 2px; }
+      .scope-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 16px 0 8px; min-width: 0; }
+      .scope-row h2 { margin: 0; font-size: 12px; color: var(--muted); font-weight: 500; }
+      .scope-global { padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+      .scope-control { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); max-width: 100%; }
+      .scope-control button { appearance: none; border: 1px solid transparent; border-radius: 7px; padding: 4px 9px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; max-width: 100%; min-width: 0; cursor: pointer; }
+      .scope-control button:hover { background: var(--surface); color: var(--fg); }
+      .scope-control button[aria-pressed="true"] { color: var(--think); background: var(--surface); border-color: var(--border); font-weight: 600; }
+      .scope-control button:focus-visible { outline-offset: -1px; }
+      .scope-row > .badges { flex: 0 1 auto; }
+      .totals-badges { margin-bottom: 8px; }
+      .scope-status, .scope-notice { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; margin: 6px 0 12px; }
+      .scope-notice { color: var(--muted); }
+      .icon-btn.spin svg { animation: spin 0.8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .scroller {
+        flex: 1;
+        min-height: 0;
+        min-width: 0;
+        overflow: auto;
+        padding: 16px 16px 28px;
+      }
+      .lede strong, .lede .meta { overflow-wrap: anywhere; }
+      .lede { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+      .lede .meta { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .session-pick { position: relative; min-width: 0; }
+      .session-trigger {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        color: var(--fg);
+        padding: 8px 12px;
+        font: inherit;
+        cursor: pointer;
+        text-align: left;
+        transition: transform 160ms var(--ease-out);
+      }
+      .session-trigger:hover { filter: brightness(1.06); }
+      .session-trigger:active { transform: scale(0.97); }
+      .session-trigger-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .session-trigger svg {
+        flex: none;
+        color: var(--muted);
+        transition: transform 160ms var(--ease-out);
+      }
+      .session-pick.open .session-trigger svg { transform: rotate(180deg); }
+      .session-menu {
+        display: none;
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        top: calc(100% + 6px);
+        max-height: 280px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: 0 12px 32px color-mix(in oklab, #000 28%, transparent);
+        flex-direction: column;
+      }
+      .session-pick.open .session-menu { display: flex; }
+      .session-search {
+        flex: none;
+        padding: 8px 8px 4px;
+      }
+      .session-search input {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+        padding: 7px 10px;
+        font: inherit;
+      }
+      .session-search input:focus { outline: 1px solid color-mix(in oklab, var(--think) 50%, transparent); }
+      .session-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        overflow: auto;
+        padding: 6px 6px 8px;
+        min-height: 0;
+      }
+      .session-option.is-hidden { display: none !important; }
+      .session-empty {
+        color: var(--muted);
+        padding: 12px 10px;
+        font-size: 12px;
+      }
+      .session-option {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--fg);
+        padding: 8px 10px;
+        font: inherit;
+        cursor: pointer;
+        text-align: left;
+      }
+      .session-option:hover { background: color-mix(in oklab, var(--fg) 6%, transparent); }
+      .session-option.selected { background: color-mix(in oklab, var(--hit) 12%, transparent); }
+      .session-option-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .session-option-meta { color: var(--muted); font-size: 11px; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .badges { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+      .badge {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
+        border: 1px solid var(--border);
+      }
+      .badge.hit { color: var(--hit); background: color-mix(in oklab, var(--hit) 14%, transparent); }
+      .badge.create { color: var(--create); background: color-mix(in oklab, var(--create) 14%, transparent); }
+      .badge.think { color: var(--think); background: color-mix(in oklab, var(--think) 14%, transparent); }
+      .hit-hero {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+      .hit-hero .label { color: var(--muted); font-size: 12px; }
+      .hit-hero .value {
+        font-size: 28px;
+        font-weight: 640;
+        letter-spacing: -0.04em;
+        color: var(--hit);
+        font-variant-numeric: tabular-nums;
+      }
+      .hit-hero .sub { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+      .stat {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: var(--surface);
+      }
+      .stat .k { color: var(--muted); font-size: 11px; }
+      .stat .v {
+        margin-top: 4px;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat.hit .v { color: var(--hit); }
+      .stat.create .v { color: var(--create); }
+      .stat .s { margin-top: 3px; color: var(--faint); font-size: 11px; }
+      .stat .s, .last-stat .s, .model-sub { overflow-wrap: anywhere; }
+      h2 {
+        margin: 18px 0 8px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .last-card, .model {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+        background: var(--surface);
+        margin-bottom: 8px;
+      }
+      .last-head, .model-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .last-head > div:first-child { min-width: 0; flex: 1; }
+      .last-head > .badges, .model-top > .badges { flex: none; max-width: 60%; }
+      .last-name, .model-name {
+        font-weight: 600;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .last-meta, .model-sub {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+      .last-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 16px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+      .last-stat .k { color: var(--muted); font-size: 11px; }
+      .last-stat .v {
+        margin-top: 2px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+      }
+      .last-stat.hit .v { color: var(--hit); }
+      .last-stat.create .v { color: var(--create); }
+      .last-stat .s { margin-top: 2px; color: var(--faint); font-size: 11px; }
+      .history-chart {
+        --chart-input: #f59e0b;
+        --chart-cache: #00b9a6;
+        --chart-write: #a78bfa;
+        --chart-output: #3b82f6;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+        min-width: 0;
+      }
+      .history-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 16px; font-size: 11px; color: var(--muted); }
+      .history-legend span { display: inline-flex; align-items: center; gap: 4px; }
+      .history-legend i { width: 8px; height: 8px; border-radius: 2px; background: var(--segment); }
+      .history-layout { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 6px; }
+      .history-axis { position: relative; height: 140px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+      .history-axis span { position: absolute; right: 0; transform: translateY(-50%); }
+      .history-scroll { overflow-x: auto; overflow-y: hidden; min-width: 0; scrollbar-width: thin; padding: 3px 0; margin-top: -3px; }
+      .history-plot { position: relative; height: 164px; }
+      .history-lines { position: absolute; inset: 0 0 24px; pointer-events: none; }
+      .history-lines i { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border); }
+      .history-columns { position: relative; display: flex; gap: 4px; height: 164px; padding: 0 4px; }
+      .history-column { flex: 1 0 12px; width: 12px; min-width: 12px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 140px 24px; text-align: center; }
+      .history-track { display: flex; align-items: flex-end; justify-content: center; min-width: 0; }
+      .history-bar { appearance: none; display: block; width: 100%; max-width: 30px; min-height: 3px; margin: 0; padding: 0; border: 0; border-radius: 2px 2px 0 0; overflow: hidden; background: var(--border); cursor: crosshair; position: relative; }
+      .history-bar > span { position: absolute; left: 0; right: 0; display: block; background: var(--segment); pointer-events: none; }
+      .history-bar.active::after, .history-bar:focus-visible::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--fg); border-radius: inherit; pointer-events: none; z-index: 1; }
+      .history-bar:focus-visible { outline: none; }
+      .history-sequence { padding-top: 5px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+      .history-note { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+      #reply-detail { overflow-anchor: none; }
+      @media (max-width: 380px) {
+        .scroller { padding: 12px 12px 24px; }
+        .stat { padding: 10px 12px; }
+        .last-card, .model { padding: 12px; }
+        .last-head, .model-top { flex-direction: column; }
+        .last-head > div:first-child { flex: auto; max-width: 100%; }
+        .last-head > .badges, .model-top > .badges { max-width: 100%; }
+        .model-name { max-width: 100%; }
+      }
+      .context-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+      #context-status { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+      #follow { flex: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font: inherit; color: var(--fg); background: var(--surface); cursor: pointer; }
+      #follow[hidden] { display: none; }
+      .error { color: var(--muted); }
+      .empty { color: var(--muted); padding: 24px 4px; }
+    </style>
+  </head>
+  <body>
+    <header class="toolbar">
+      <h1 id="heading">会话用量</h1>
+      <div class="spacer"></div>
+      <button type="button" class="icon-btn" id="refresh" aria-label="刷新" title="刷新">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-3-6.7" />
+          <polyline points="21 3 21 9 15 9" />
+        </svg>
+      </button>
+    </header>
+    <div class="context-bar">
+      <span id="context-status" role="status">跟随当前会话</span>
+      <button id="follow" type="button" hidden>跟随当前会话</button>
+    </div>
+    <div class="scroller" id="root">
+      <p class="empty">正在读取…</p>
+    </div>
+    <script>
+      const zh = (locale) => String(locale || "").startsWith("zh");
+      const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      const applyAppearance = (appearance) => {
+        const base = appearance?.base;
+        document.documentElement.dataset.base =
+          base === "light" || base === "dark"
+            ? base
+            : window.matchMedia("(prefers-color-scheme: light)").matches
+              ? "light"
+              : "dark";
+      };
+
+      const esc = (value) =>
+        String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+
+      const compact = (value) => {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num) || num <= 0) return "0";
+        const trim = (n) => n.toFixed(3).replace(/\.?0+$/, "");
+        if (num >= 1_000_000) return `${trim(num / 1_000_000)}M`;
+        if (num >= 1_000) return `${trim(num / 1_000)}k`;
+        return String(Math.round(num));
+      };
+
+      const pct = (rate) => {
+        if (rate == null || !Number.isFinite(rate)) return null;
+        return `${(rate * 100).toFixed(1)}%`;
+      };
+
+      const duration = (ms) => {
+        const num = Number(ms);
+        if (!Number.isFinite(num) || num <= 0) return "";
+        if (num < 1000) return `${Math.round(num)}ms`;
+        return `${(num / 1000).toFixed(num >= 10_000 ? 0 : 1).replace(/\.0$/, "")}s`;
+      };
+
+      const clock = (iso, locale) => {
+        if (!iso) return "";
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleTimeString(zh(locale) ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit" });
+      };
+
+      const copy = (locale) =>
+        zh(locale)
+          ? {
+              title: "会话用量",
+              hit: "命中",
+              prompt: "提示词",
+              input: "输入",
+              cache: "缓存命中",
+              write: "缓存创建",
+              output: "输出",
+              reasoning: "思考",
+              total: "合计",
+              last: "最近一次请求",
+              trend: "Token 用量趋势",
+              chartNote: "每柱一次回复 · 输入 + 缓存 + 输出；思考见明细。移开保留所选，新增回复完成后回到最新。",
+              models: "按模型",
+              times: "次",
+              timesGap: "",
+              busy: "进行中",
+              compact: "压缩",
+              search: "搜索会话",
+              noMatch: "没有匹配的会话",
+              empty: "这个会话还没有带用量的助手回复。",
+              error: "读取失败",
+            }
+          : {
+              title: "Session usage",
+              hit: "Hit",
+              prompt: "Prompt",
+              input: "Input",
+              cache: "Cache hit",
+              write: "Cache create",
+              output: "Output",
+              reasoning: "Reasoning",
+              total: "Total",
+              last: "Last reply",
+              trend: "Token usage trend",
+              chartNote: "One reply per bar · input + cache + output; reasoning in details. Selection stays on leave; new completed replies return to latest.",
+              models: "By model",
+              times: "requests",
+              timesGap: " ",
+              busy: "busy",
+              compact: "compact",
+              search: "Search sessions",
+              noMatch: "No matching sessions",
+              empty: "This session has no assistant replies with usage yet.",
+              error: "Could not read usage",
+            };
+
+      const badge = (kind, text) =>
+        text ? `<span class="badge ${kind}">${esc(text)}</span>` : "";
+
+      const hitBadge = (tokens, t) => {
+        const hit = pct(tokens?.hitRate);
+        return badge("hit", hit ? `${t.hit} ${hit}` : "");
+      };
+
+      const num = (metric, value, kind = "n") =>
+        `<span class="num" data-metric="${metric}" data-kind="${kind}" data-shown="0">${kind === "pct" ? "—" : "0"}</span>`;
+
+      const stat = (k, metric, value, kind = "", sub = "") =>
+        `<div class="stat${kind ? ` ${kind}` : ""}"><div class="k">${k}</div><div class="v">${num(metric, value)}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
+
+      const lastStat = (k, metric, value, kind = "", sub = "") =>
+        `<div class="last-stat${kind ? ` ${kind}` : ""}"><div class="k">${k}</div><div class="v">${num(metric, value)}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
+
+      const timesLabel = (count, t) => `${count}${t.timesGap}${t.times}`;
+
+      const createSub = (tokens) => {
+        const five = Number(tokens?.cacheWrite5m || 0);
+        const hour = Number(tokens?.cacheWrite1h || 0);
+        if (five <= 0 && hour <= 0) return "";
+        return `5m ${compact(five)} · 1h ${compact(hour)}`;
+      };
+      // Scope projections retain parent context; only usage data and running are replaced.
+      const scopeParts = ["totals", "history"];
+      const scopeCopy = (locale) => zh(locale) ? {
+        global: "代理范围", totals: "总量与命中率", history: "历史图范围", detail: "回复明细", models: "模型统计范围",
+        all: "总和", main: "主代理", subagents: "子代理", custom: "自定义", unknown: "未知模型",
+        unavailable: "暂无可显示的用量。", empty: "此范围暂无带用量的回复。", noChildren: "此会话没有子代理。",
+      } : {
+        global: "Agent scope", totals: "Totals & hit rate", history: "History scope", detail: "Reply details", models: "Model stats scope",
+        all: "Total", main: "Main", subagents: "Subagents", custom: "Custom", unknown: "Unknown model",
+        unavailable: "No usage available to display yet.", empty: "No replies with usage in this scope yet.", noChildren: "This session has no subagents.",
+      };
+      function availableScopes(report) {
+        if (Array.isArray(report?.scopes) && report.scopes.length) return report.scopes;
+        return [{ ...report, id: "all", kind: "all", complete: true, running: !!report?.session?.running }];
+      }
+      function agentOptions(report) {
+        const scopes = availableScopes(report), all = scopes.find(s => s.id === "all"), main = scopes.find(s => s.id === "main");
+        const children = scopes.filter(s => s.kind === "agent");
+        if (!main) return [all].filter(Boolean);
+        const unknown = report.reconciliation?.summaryOnly || report.reconciliation?.unknown?.replies ||
+          report.reconciliation?.unknown?.totals?.total || all?.summaryOnly ||
+          all?.history?.some(row => row.agentId === "unknown") ||
+          all?.replies !== main.replies || Object.keys(all?.totals || {}).some(key => all.totals[key] !== main.totals?.[key]);
+        if (!children.length && !unknown) return [main];
+        return [all, main, ...children].filter(Boolean);
+      }
+      function modelOptions(report) {
+        const all = availableScopes(report).find(s => s.id === "all") || report;
+        return [{ id: "all", label: scopeCopy(report.locale).all }, ...(all.byModel || []).map(row => ({
+          id: `model:${encodeURIComponent(row.modelId)}`,
+          label: row.modelId === "unknown" ? scopeCopy(report.locale).unknown : row.modelId, modelId: row.modelId,
+        }))];
+      }
+      function createScopeSelection() {
+        const selected = { global: "all", totals: "all", history: "all", models: "all" };
+        const sessions = new Map();
+        let report = null, sessionKey = null, numbers = new Map(), optionCount = 0;
+        const childKey = scope => scope.delegationId || scope.id;
+        const reconcile = () => {
+          const values = scopeParts.map(part => selected[part]);
+          selected.global = values.every(value => value === values[0]) ? values[0] : "custom";
+        };
+        const label = scope => {
+          if (scope.kind !== "agent") return scopeCopy(report.locale)[scope.id] || scope.id;
+          const ordinal = numbers.get(childKey(scope));
+          return `${zh(report.locale) ? "子代理" : "Subagent "}${ordinal || (zh(report.locale) ? "？" : "?")}`;
+        };
+        return {
+          selected, label,
+          notices: () => [],
+          setReport(next) {
+            if (!next?.ok) { report = next; return; }
+            const key = String(next.session?.id || "");
+            const previous = report;
+            const previousOptionCount = key === sessionKey ? optionCount : 0;
+            if (key !== sessionKey) {
+              if (sessionKey !== null) sessions.set(sessionKey, { selected: { ...selected }, numbers });
+              while (sessions.size > 16) sessions.delete(sessions.keys().next().value);
+              const saved = sessions.get(key);
+              Object.assign(selected, saved?.selected || { global: "all", totals: "all", history: "all", models: "all" });
+              numbers = saved?.numbers || new Map(); sessionKey = key;
+            }
+            report = next;
+            for (const scope of availableScopes(report).filter(s => s.kind === "agent")) {
+              const number = numbers.get(childKey(scope)) || numbers.get(scope.id) ||
+                (scope.callIds || []).map(id => numbers.get(`agent:${id}`)).find(Boolean) || Math.max(0, ...numbers.values()) + 1;
+              numbers.set(childKey(scope), number); numbers.set(scope.id, number);
+              for (const callId of scope.callIds || []) numbers.set(`agent:${callId}`, number);
+            }
+            const options = agentOptions(report);
+            for (const part of scopeParts) {
+              if (previousOptionCount === 1 && options.length > 1) selected[part] = "all";
+              if (options.some(s => s.id === selected[part])) continue;
+              const old = previous?.session?.id === report.session?.id && availableScopes(previous).find(s => s.id === selected[part]);
+              const equivalent = old?.delegationId && options.find(s => s.delegationId === old.delegationId);
+              selected[part] = equivalent?.id || options[0]?.id || "all";
+            }
+            optionCount = options.length;
+            if (modelOptions(report).length <= 2 || !modelOptions(report).some(option => option.id === selected.models)) selected.models = "all";
+            reconcile();
+          },
+          choose(part, id) {
+            if (!(part in selected) || !report?.ok) return;
+            const options = part === "models" ? modelOptions(report) : agentOptions(report);
+            if (!options.some(option => option.id === id)) return;
+            for (const key of part === "global" ? scopeParts : [part]) selected[key] = id;
+            reconcile();
+          },
+          project(part) {
+            if (part === "detail") part = "history";
+            if (!report?.ok) return report;
+            const scope = availableScopes(report).find(s => s.id === (part === "models" ? "all" : selected[part]));
+            const unavailable = !scope || !!scope.unavailable;
+            const history = (scope?.history || []).map(row => {
+              const agent = availableScopes(report).find(s => s.id === row.agentId);
+              return { ...row, agentLabel: agent ? label(agent) : "" };
+            });
+            let byModel = scope?.byModel || [];
+            if (part === "models" && selected.models !== "all") {
+              const model = modelOptions(report).find(option => option.id === selected.models);
+              byModel = byModel.filter(row => row.modelId === model?.modelId);
+            }
+            return { ...report, _scopeId: selected[part], _scope: scope, unavailable,
+              replies: unavailable ? 0 : scope.replies, totals: unavailable ? {} : scope.totals,
+              hasTotals: !unavailable && (scope.hasTotals ?? scope.replies > 0), summaryOnly: !!scope?.summaryOnly,
+              history: unavailable ? [] : history, last: unavailable ? null : history.at(-1) || scope.last,
+              byModel: unavailable ? [] : byModel,
+              turns: selected[part] === "all" ? report.turns : undefined,
+              session: { ...report.session, running: !!scope?.running } };
+          },
+        };
+      }
+      function scopeControl(part, report, state) {
+        const t = scopeCopy(report.locale), selected = state.selected[part];
+        let options = part === "models" ? modelOptions(report) : agentOptions(report).map(scope => ({ id: scope.id, label: state.label(scope) }));
+        if (options.length <= (part === "models" ? 2 : 1)) return "";
+        if (part === "global") options = [...options, { id: "custom", label: t.custom }];
+        return `<div class="scope-control" id="scope-${part}" role="group" aria-label="${esc(t[part])}">${options.map(option =>
+          `<button type="button" data-scope-part="${part}" data-scope-value="${esc(option.id)}" aria-pressed="${option.id === selected}">${esc(option.label)}</button>`
+        ).join("")}</div>`;
+      }
+      function scopeStatus(report) {
+        if (report.replies || report.hasTotals || report._scope?.summaryOnly) return "";
+        const t = scopeCopy(report.locale);
+        const noChildren = report._scope?.complete !== false && report._scopeId === "subagents" &&
+          !availableScopes(report).some(s => s.kind === "agent");
+        const text = report.unavailable ? t.unavailable : noChildren ? t.noChildren : t.empty;
+        return `<p class="scope-status" role="status">${esc(text)}</p>`;
+      }
+      // Session-wide ledger stays independent of the three section selectors.
+      function reconciliationNotice(report) {
+        const ledger = report.reconciliation;
+        if (!ledger || (!ledger.summaryOnly && !ledger.all?.replies)) return "";
+        const chinese = zh(report.locale);
+        if (ledger.summaryOnly) return `<div id="usage-reconciliation" class="scope-notice">${esc(chinese
+          ? "仅有回合汇总：次数及主/子代理归属不可确认，不将汇总虚构成请求。"
+          : "Turn aggregates only: request counts and main/subagent ownership are unavailable; no requests are invented.")}</div>`;
+        const labels = { ...scopeCopy(report.locale), unknown: chinese ? "未归属" : "Unassigned" };
+        const integer = value => Number(value).toLocaleString(chinese ? "zh-CN" : "en-US", { maximumFractionDigits: 0 });
+        const segment = id => `${labels[id]} ${integer(ledger[id].replies)}${chinese ? "次" : " requests"} / ${integer(ledger[id].totals.total)} Token`;
+        const parts = ["main", "subagents", ...(ledger.unknown.replies ? ["unknown"] : [])];
+        const equation = `${segment("all")} = ${parts.map(segment).join(" + ")}`;
+        const note = chinese ? "次数按已记录的模型请求计算，不是用户提问轮数。" : "Counts are recorded model requests, not user conversation turns.";
+        const residual = ledger.unknown.replies ? (chinese
+          ? "未归属用量缺少可验证的代理身份或存在身份冲突，仅计入总和；身份补齐后自动归类，不重复计数。"
+          : "Unassigned usage lacks verified ownership or has conflicting identities. It counts only in Total; later verified identity reclassifies it without double counting.") : "";
+        return `<div id="usage-reconciliation" class="scope-notice"><p>${esc(equation)}</p><p>${esc(note + (residual ? " " + residual : ""))}</p></div>`;
+      }
+
+      let pickerOpen = false;
+      let pickerQuery = "";
+      let pickerScroll = 0;
+      let loadId = 0;
+      let activeLoads = 0;
+      let observedContext = null;
+      let displayedContext = null;
+      let contextCheckId = 0;
+      let contextChecking = false;
+      let lastRenderedReport = null;
+      let stopped = false;
+      const animators = new WeakMap();
+
+      const formatKind = (kind, value) => {
+        if (kind === "pct") return pct(value) || "—";
+        return compact(value);
+      };
+
+      function animateNode(node, target) {
+        if (!node) return;
+        const kind = node.dataset.kind || "n";
+        const next = Number(target);
+        const from = Number(node.dataset.shown || 0);
+        if (!Number.isFinite(next)) {
+          node.dataset.shown = "";
+          node.textContent = "—";
+          return;
+        }
+        if (reduceMotion() || from === next) {
+          node.dataset.shown = String(next);
+          node.textContent = formatKind(kind, next);
+          return;
+        }
+        const prev = animators.get(node);
+        if (prev) cancelAnimationFrame(prev);
+        const start = performance.now();
+        const duration = 620;
+        const step = (now) => {
+          const progress = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const value = from + (next - from) * eased;
+          node.dataset.shown = String(value);
+          node.textContent = formatKind(kind, value);
+          if (progress < 1) animators.set(node, requestAnimationFrame(step));
+          else {
+            node.dataset.shown = String(next);
+            node.textContent = formatKind(kind, next);
+            animators.delete(node);
+          }
+        };
+        animators.set(node, requestAnimationFrame(step));
+      }
+
+      function playNumbers(report, fromZero) {
+        const values = numberMap(report);
+        document.querySelectorAll(".num").forEach((node) => {
+          if (fromZero) node.dataset.shown = "0";
+          const target = values[node.dataset.metric];
+          animateNode(node, target);
+        });
+      }
+
+      function numberMap(report) {
+        const totals = report.totals || {};
+        const last = report.last?.tokens || {};
+        return {
+          "totals.hitRate": totals.hitRate,
+          "totals.prompt": totals.prompt,
+          "totals.input": totals.input,
+          "totals.cacheRead": totals.cacheRead,
+          "totals.cacheWrite": totals.cacheWrite,
+          "totals.output": totals.output,
+          "totals.reasoning": totals.reasoning,
+          "totals.total": totals.total,
+          "last.input": last.input,
+          "last.cacheRead": last.cacheRead,
+          "last.cacheWrite": last.cacheWrite,
+          "last.output": last.output,
+          "last.reasoning": last.reasoning,
+        };
+      }
+
+      function applySessionFilter() {
+        const q = pickerQuery.trim().toLowerCase();
+        const options = [...document.querySelectorAll(".session-option")];
+        let visible = 0;
+        for (const option of options) {
+          const title = (option.querySelector(".session-option-title")?.textContent || "").toLowerCase();
+          const show = !q || title.includes(q);
+          option.classList.toggle("is-hidden", !show);
+          option.hidden = !show;
+          if (show) visible += 1;
+        }
+        const empty = document.getElementById("session-empty");
+        if (empty) {
+          empty.hidden = visible > 0;
+          empty.classList.toggle("is-hidden", visible > 0);
+        }
+      }
+
+      window.__usageOnSearch = (el) => {
+        pickerQuery = el?.value || "";
+        applySessionFilter();
+      };
+
+      const sessionSelect = (report, t) => {
+        const rows = report.recentSessions || [];
+        if (!rows.length) return "";
+        const current = report.session?.id || "";
+        const currentRow = rows.find((row) => row.id === current) || rows[0];
+        const currentTitle = currentRow?.title || currentRow?.shortId || "";
+        return `<div class="session-pick${pickerOpen ? " open" : ""}" id="session-pick">
+          <button type="button" class="session-trigger" id="session-trigger" aria-haspopup="listbox" aria-expanded="${pickerOpen ? "true" : "false"}">
+            <span class="session-trigger-text">${esc(currentTitle)}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="session-menu" role="listbox">
+            <div class="session-search">
+              <input id="session-search" type="text" value="${esc(pickerQuery)}" placeholder="${esc(t.search)}" autocomplete="off" spellcheck="false" oninput="window.__usageOnSearch(this)" onkeyup="window.__usageOnSearch(this)" />
+            </div>
+            <div class="session-list" id="session-list">
+              ${rows
+                .map((row) => {
+                  const selected = row.id === current ? " selected" : "";
+                  const hay = `${row.title || ""} ${row.modelId || ""} ${row.shortId || ""} ${row.id || ""}`;
+                  const meta = row.running ? `<span class="badge think">${esc(t.busy)}</span>` : row.modelId ? `<span class="session-option-meta">${esc(row.modelId)}</span>` : "";
+                  return `<button type="button" class="session-option${selected}" role="option" data-session="${esc(row.id)}" data-hay="${esc(hay)}"><span class="session-option-title">${esc(row.title || row.shortId)}</span>${meta}</button>`;
+                })
+                .join("")}
+              <div class="session-empty" id="session-empty" hidden>${esc(t.noMatch)}</div>
+            </div>
+          </div>
+        </div>`;
+      };
+
+      function restorePicker() {
+        applySessionFilter();
+        const list = document.getElementById("session-list");
+        if (list) list.scrollTop = pickerScroll;
+        const search = document.getElementById("session-search");
+        if (!search) return;
+        if (!search.dataset.bound) {
+          search.dataset.bound = "1";
+          const run = () => window.__usageOnSearch(search);
+          search.addEventListener("input", run);
+          search.addEventListener("keyup", run);
+          search.addEventListener("compositionend", run);
+        }
+        if (pickerOpen) search.focus();
+      }
+
+
+      // HISTORY_HELPERS_START — pure selection and chart helpers are also tested in Node.
+      function createHistorySelection() {
+        let report = null, sessionId = "", selected = null, focused = null;
+        let knownKeys = new Set(), justCompleted = false;
+        const rows = () => Array.isArray(report?.history) ? report.history : [];
+        const find = (key) => key == null ? null : rows().find(row => row.key === key) || null;
+        const select = (key) => { if (find(key)) selected = key; };
+        return {
+          setReport(next) {
+            const nextId = next?.ok && next.replies ? JSON.stringify([String(next.session?.id || ""), next._scopeId || "all"]) : "";
+            const changed = nextId !== sessionId;
+            const latest = Array.isArray(next?.history) ? next.history.at(-1) : next?.last;
+            justCompleted = !changed && !!nextId && !!latest && (next.history || []).some(row => !knownKeys.has(row.key));
+            if (changed || !nextId || justCompleted) { selected = null; focused = null; }
+            report = next; sessionId = nextId;
+            knownKeys = new Set(rows().map(row => row.key));
+            if (!find(selected)) selected = null;
+            if (!find(focused)) focused = null;
+            return changed;
+          },
+          hover(key) { select(key); },
+          focus(key) { focused = find(key)?.key ?? null; select(focused); },
+          selection() {
+            const row = find(selected);
+            return { row: row || rows().at(-1) || report?.last || null, inspecting: !!row };
+          },
+          focusedKey() { return focused; },
+          latestCompleted() { return justCompleted; },
+        };
+      }
+
+      const chartSegments = [
+        ["input", "input"], ["cacheRead", "cache"], ["cacheWrite", "write"], ["output", "output"],
+      ];
+      const chartValue = (value) => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+      const chartTotal = (row) => chartSegments.reduce((sum, [key]) => sum + chartValue(row?.tokens?.[key]), 0);
+      const replyLabel = (sequence, locale) => zh(locale) ? `第 ${sequence} 次回复` : `Reply ${sequence}`;
+
+      function historyChart(report, t) {
+        const rows = Array.isArray(report.history) ? report.history : [];
+        if (!rows.length) return "";
+        const peak = rows.reduce((max, row) => Math.max(max, chartTotal(row)), 0);
+        const magnitude = 10 ** Math.floor(Math.log10(peak || 1));
+        const ceiling = Math.max(1, Math.ceil(peak / magnitude) * magnitude);
+        const tickRows = [0, 1, 2, 3, 4];
+        const width = Math.max(0, rows.length * 16 + 4);
+        const step = Math.max(1, Math.ceil(rows.length / Math.max(2, width / 60)));
+        return `<section class="history-chart" aria-label="${esc(t.trend)}">
+          <div class="history-legend">${chartSegments.map(([key, label]) => `<span><i style="--segment:var(--chart-${key === "cacheRead" ? "cache" : key === "cacheWrite" ? "write" : key})"></i>${esc(t[label])}</span>`).join("")}</div>
+          <div class="history-layout"><div class="history-axis">${tickRows.map(i => `<span style="top:${i * 25}%">${compact(ceiling * (4 - i) / 4)}</span>`).join("")}</div>
+            <div class="history-scroll" id="history-scroll"><div class="history-plot" style="min-width:${width}px">
+              <div class="history-lines">${tickRows.map(i => `<i style="top:${i * 25}%"></i>`).join("")}</div>
+              <div class="history-columns">${rows.map((row, index) => {
+                const total = chartTotal(row);
+                const label = `${replyLabel(row.sequence, report.locale)} · ${row.modelId || ""} · ${compact(total)} tokens`;
+                let bottom = 0;
+                const segments = chartSegments.map(([key]) => {
+                  const value = chartValue(row.tokens?.[key]);
+                  if (!value || !total) return "";
+                  const height = value / total * 100;
+                  const segment = `<span data-segment="${key}" style="bottom:${bottom}%;height:${height}%;--segment:var(--chart-${key === "cacheRead" ? "cache" : key === "cacheWrite" ? "write" : key})"></span>`;
+                  bottom += height;
+                  return segment;
+                }).join("");
+                return `<div class="history-column"><div class="history-track"><button type="button" class="history-bar" data-reply-key="${esc(row.key)}" aria-label="${esc(label)}" style="height:${total / ceiling * 100}%">${segments}</button></div>
+                  <div class="history-sequence">${index === 0 || index === rows.length - 1 || (index + 1) % step === 0 ? esc(row.sequence) : ""}</div></div>`;
+              }).join("")}</div>
+            </div></div>
+          </div><p class="history-note">${esc(t.chartNote)}</p>
+        </section>`;
+      }
+
+      function replyDetail(row, inspecting, locale, t) {
+        if (!row) return "";
+        const tokens = row.tokens || {};
+        const provenance = row.source?.includes("database") ? (zh(locale) ? "数据库 operation" : "Database operation") : "";
+        const ownership = row.agentId === "unknown" ? (zh(locale) ? "归属未知" : "Unknown ownership") : "";
+        const missingTiming = !row.createdAt && row.durationMs == null ? (zh(locale) ? "未记录回复时间/耗时" : "Reply time/duration not recorded") : "";
+        const agent = row.agentLabel || (row.agentId === "main" ? (zh(locale) ? "主代理" : "Main") : row.agentId?.startsWith("agent:") || row.agentOrdinal ? `${zh(locale) ? "子代理" : "Subagent "}${row.agentOrdinal || (zh(locale) ? "？" : "?")}` : "");
+        const meta = [agent, provenance, ownership, duration(row.durationMs), clock(row.createdAt, locale), missingTiming].filter(Boolean).join(" · ");
+        const field = (label, key, kind = "", sub = "") => `<div class="last-stat ${kind}"><div class="k">${esc(label)}</div><div class="v" data-reply-value="${chartValue(tokens[key])}" data-reply-metric="${key}">${compact(tokens[key])}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ""}</div>`;
+        return `<h2 id="reply-heading">${esc(inspecting ? replyLabel(row.sequence, locale) : t.last)}</h2>
+          <div class="last-card" data-reply-sequence="${esc(row.sequence || "")}">
+            <div class="last-head"><div><div class="last-name">${esc(row.modelId || "")}</div>${meta ? `<div class="last-meta">${esc(meta)}</div>` : ""}</div><div class="badges">${hitBadge(tokens, t)}</div></div>
+            <div class="last-grid">${field(t.input, "input")}${field(t.cache, "cacheRead", "hit")}${field(t.write, "cacheWrite", "create", createSub(tokens))}${field(t.output, "output")}${field(t.reasoning, "reasoning")}${field(t.total, "total")}</div>
+          </div>`;
+      }
+      // HISTORY_HELPERS_END
+
+      const historySelection = createHistorySelection();
+      const scopeSelection = createScopeSelection();
+      let scopeReport = null, detailReport = null;
+      function selectHistory(method, key) {
+        historySelection[method](key);
+      }
+      function changeScope(part, value) {
+        if (!scopeReport?.ok || value === "custom") return;
+        const root = document.getElementById("root"), scrollTop = root.scrollTop;
+        scopeSelection.choose(part, value);
+        render(scopeReport, { fromZero: false });
+        root.scrollTop = scrollTop;
+        document.querySelector(`#scope-${part} [data-scope-value="${value}"]`)?.focus?.({ preventScroll: true });
+      }
+      document.addEventListener("click", event => {
+        const button = event.target?.closest?.("button[data-scope-part]");
+        if (button) changeScope(button.dataset.scopePart, button.dataset.scopeValue);
+      });
+      let historyReport = null;
+      let restoringHistoryFocus = false;
+      let detailSignature = "";
+      const historyBar = (target) => target?.closest?.(".history-bar[data-reply-key]") || null;
+
+      function updateReplyDetail() {
+        const target = document.getElementById("reply-detail");
+        if (!target || !historyReport?.ok) return;
+        const source = historyReport;
+        const { row, inspecting } = historySelection.selection();
+        const html = replyDetail(row, inspecting, source.locale, copy(source.locale));
+        if (html !== detailSignature) {
+          target.innerHTML = html;
+          detailSignature = html;
+        }
+        const chartRow = historySelection.selection().row;
+        document.querySelectorAll(".history-bar").forEach(bar => {
+          const active = chartRow && bar.dataset.replyKey === chartRow.key;
+          bar.classList.toggle("active", !!active);
+          bar.setAttribute("aria-current", active ? "true" : "false");
+        });
+      }
+
+      function reconcileHistoryPointer() {
+        // Layout/scroll/refresh must not select a bar under a stationary pointer.
+        updateReplyDetail();
+      }
+
+      function restoreHistory(scrollLeft, focusedKey, changed) {
+        const scroller = document.getElementById("history-scroll");
+        if (!scroller) { updateReplyDetail(); return; }
+        scroller.scrollLeft = scrollLeft == null ? scroller.scrollWidth : scrollLeft;
+        if (focusedKey && !changed) {
+          const bar = [...scroller.querySelectorAll(".history-bar")].find(node => node.dataset.replyKey === focusedKey);
+          restoringHistoryFocus = true;
+          try { bar?.focus({ preventScroll: true }); }
+          finally { restoringHistoryFocus = false; }
+        }
+        updateReplyDetail();
+      }
+
+      document.addEventListener("pointermove", (event) => {
+        selectHistory("hover", historyBar(event.target)?.dataset.replyKey);
+        updateReplyDetail();
+      }, { passive: true });
+      document.documentElement.addEventListener("pointerleave", () => {
+        historySelection.hover(null);
+        updateReplyDetail();
+      });
+      document.addEventListener("pointerdown", () => {
+        historySelection.focus(null);
+        updateReplyDetail();
+      }, { passive: true });
+      document.addEventListener("focusin", (event) => {
+        if (restoringHistoryFocus) return;
+        const bar = historyBar(event.target);
+        selectHistory("focus", bar?.matches(":focus-visible") ? bar.dataset.replyKey : null);
+        updateReplyDetail();
+      });
+      document.addEventListener("focusout", (event) => {
+        if (!historyBar(event.target)) return;
+        historySelection.focus(null);
+        updateReplyDetail();
+      });
+      document.getElementById("root").addEventListener("scroll", reconcileHistoryPointer, { passive: true });
+      window.addEventListener("resize", reconcileHistoryPointer);
+      window.addEventListener("blur", () => {
+        historySelection.hover(null);
+        updateReplyDetail();
+      });
+      function render(report, { fromZero = true } = {}) {
+        const locale = report?.locale || "zh-CN";
+        const t = copy(locale);
+        document.documentElement.lang = locale;
+        const refreshLabel = zh(locale) ? "刷新" : "Refresh";
+        document.getElementById("refresh").title = refreshLabel;
+        document.getElementById("refresh").setAttribute("aria-label", refreshLabel);
+        document.getElementById("heading").textContent = t.title;
+        const root = document.getElementById("root");
+        const focusedScope = document.activeElement?.dataset?.scopePart;
+        const focusedValue = document.activeElement?.dataset?.scopeValue;
+        const oldHistoryScroll = document.getElementById("history-scroll")?.scrollLeft;
+        const focusedKey = historySelection.focusedKey();
+        scopeReport = report;
+        scopeSelection.setReport(report);
+        const totalsReport = scopeSelection.project("totals");
+        const modelsReport = scopeSelection.project("models");
+        historyReport = scopeSelection.project("history");
+        detailReport = historyReport;
+        const historyChanged = historySelection.setReport(historyReport);
+        const latestCompleted = historySelection.latestCompleted();
+        detailSignature = "";
+        const previousValues = new Map();
+        if (!fromZero) {
+          root.querySelectorAll(".num").forEach((node) => {
+            previousValues.set(node.dataset.metric, node.dataset.shown);
+          });
+        }
+        if (!report?.ok) {
+          root.innerHTML = `${sessionSelect(report || {}, t)}<p class="error">${esc(report?.error || t.error)}</p>`;
+          restorePicker();
+          return;
+        }
+        const totals = totalsReport.totals || {};
+        const session = report.session || {};
+        const last = detailReport.last;
+        const models = modelsReport.byModel || [];
+        const think = session.thinkingLevel ? badge("think", session.thinkingLevel) : "";
+        const chart = historyChart(historyReport, t);
+        const st = scopeCopy(locale);
+        root.innerHTML = `
+          <div id="usage-view" data-session="${esc(session.id || "")}" data-has-replies="${report.replies ? "1" : "0"}" data-has-last="${last ? "1" : "0"}">
+          <div class="lede">
+            <strong>${esc(session.title || "")}</strong>
+            ${sessionSelect(report, t)}
+            <div class="meta">
+              <span>${esc(session.modelId || "")}</span>
+              ${think}
+              ${session.running || report.scopes?.[0]?.running ? badge("think", t.busy) : ""}
+              ${report.compactCount ? `<span>${t.compact} ${timesLabel(report.compactCount, t)}</span>` : ""}
+            </div>
+          </div>
+          ${scopeControl("global", report, scopeSelection) ? `<div class="scope-row scope-global"><h2>${esc(st.global)}</h2>${scopeControl("global", report, scopeSelection)}</div>` : ""}
+          ${reconciliationNotice(report)}
+          <section id="scope-totals-panel">
+          <div class="scope-row"><div class="badges">${totalsReport.replies ? badge("", timesLabel(totalsReport.replies, t)) : `<span>${esc(st.totals)}</span>`}</div>${scopeControl("totals", report, scopeSelection)}</div>
+          ${scopeStatus(totalsReport)}
+          ${totalsReport.unavailable || !totalsReport.hasTotals ? "" : `
+          <div class="badges totals-badges">${hitBadge(totals, t)}${totals.cacheWrite ? badge("create", `${t.write} ${compact(totals.cacheWrite)}`) : ""}</div>
+          <div class="hit-hero">
+            <div>
+              <div class="label">${t.hit}</div>
+              <div class="value">${num("totals.hitRate", totals.hitRate, "pct")}</div>
+            </div>
+            <div class="sub">${t.prompt}<br />${num("totals.prompt", totals.prompt)}</div>
+          </div>
+          <div class="grid">
+            ${stat(t.input, "totals.input", totals.input)}
+            ${stat(t.cache, "totals.cacheRead", totals.cacheRead, "hit")}
+            ${stat(t.write, "totals.cacheWrite", totals.cacheWrite, "create", `<span data-sub="totals.cacheWrite">${createSub(totals)}</span>`)}
+            ${stat(t.output, "totals.output", totals.output)}
+            ${stat(t.reasoning, "totals.reasoning", totals.reasoning)}
+            ${stat(t.total, "totals.total", totals.total)}
+          </div>
+          `}</section>
+          <section id="scope-history-panel">
+          <div class="scope-row"><h2>${esc(t.trend)}</h2>${scopeControl("history", report, scopeSelection)}</div>${scopeStatus(historyReport)}${chart}
+          </section>
+          <section id="scope-detail-panel">
+          <div class="scope-row"><h2>${esc(st.detail)}</h2></div>
+          <section id="reply-detail">${replyDetail(last, false, locale, t)}</section>
+          </section>
+          <section id="scope-models-panel">
+          <div class="scope-row"><h2>${esc(t.models)}</h2>${scopeControl("models", report, scopeSelection)}</div>${scopeStatus(modelsReport)}
+          ${
+            models.length
+              ? `${models
+                  .map(
+                    (row) =>
+                      `<div class="model">
+                        <div class="model-top">
+                          <span class="model-name">${esc(row.modelId)}</span>
+                          <span class="badges">${badge("", timesLabel(row.replies, t))}${hitBadge(row.tokens, t)}</span>
+                        </div>
+                        <div class="model-sub">${compact(row.tokens.prompt)}${row.tokens.cacheWrite ? ` · ${t.write} ${compact(row.tokens.cacheWrite)}` : ""}</div>
+                      </div>`,
+                  )
+                  .join("")}`
+              : ""
+          }
+          </section>
+          </div>
+        `;
+        // Removing a focused bar can dispatch focusout while old nodes still exist.
+        // Invalidate their detail cache only after the replacement DOM is installed.
+        detailSignature = "";
+        restorePicker();
+        root.querySelectorAll(".num").forEach((node) => {
+          if (previousValues.has(node.dataset.metric)) {
+            node.dataset.shown = previousValues.get(node.dataset.metric);
+          }
+        });
+        playNumbers(totalsReport, fromZero);
+        restoreHistory(historyChanged || latestCompleted ? null : oldHistoryScroll, latestCompleted ? null : focusedKey, historyChanged || latestCompleted);
+        if (focusedScope && focusedValue) document.querySelector(`#scope-${focusedScope} [data-scope-value="${focusedValue}"]`)?.focus({ preventScroll: true });
+        requestAnimationFrame(() => { if (scopeReport === report) reconcileHistoryPointer(); });
+      }
+
+      const contextKey = (context) => context ? `${context.revision}:${context.mode}:${context.status}:${context.sessionId}` : "";
+
+      function showMode(context = observedContext) {
+        const chinese = zh(document.documentElement.lang);
+        const fixed = context?.mode === "fixed";
+        const pending = pickerOpen && contextKey(displayedContext) !== contextKey(context);
+        document.getElementById("context-status").textContent = pending
+          ? (chinese ? "会话已切换，关闭搜索后更新" : "Session changed; close search to update")
+          : fixed ? (chinese ? "固定查看（不随主界面切换）" : "Fixed session (not following)")
+          : (chinese ? "跟随当前会话" : "Following current session");
+        const follow = document.getElementById("follow");
+        follow.hidden = !fixed;
+        follow.textContent = chinese ? "跟随当前会话" : "Follow current session";
+      }
+
+      function showLoading(context) {
+        const root = document.getElementById("root");
+        root.innerHTML = `<p class="empty">${zh(document.documentElement.lang) ? "正在读取会话用量…" : "Reading session usage…"}</p>`;
+        historySelection.setReport(null);
+        historyReport = null;
+        detailSignature = "";
+        root.scrollTop = 0;
+        root.dataset.contextSession = context?.sessionId || "";
+      }
+
+      function showLoadError(error) {
+        if (stopped || pickerOpen) return;
+        render({ ok: false, locale: document.documentElement.lang, recentSessions: lastRenderedReport?.recentSessions || [], error: String(error?.message || error) });
+      }
+
+      async function syncContext(force = false) {
+        if (stopped || document.hidden || contextChecking) return;
+        const checkId = ++contextCheckId;
+        contextChecking = true;
+        try {
+          const context = await window.pluginBridge.invoke("usage.context");
+          if (stopped || checkId !== contextCheckId) return;
+          const changed = contextKey(context) !== contextKey(observedContext);
+          if (changed) {
+            observedContext = context;
+            loadId += 1; // immediately invalidate a report from an older selection
+          }
+          showMode(context);
+          if (pickerOpen) return;
+          if (changed || force || (!activeLoads && contextKey(displayedContext) !== contextKey(context))) {
+            if (lastRenderedReport?.session?.id !== context.sessionId || context.status !== "active") showLoading(context);
+            void load(false).catch(showLoadError);
+          }
+        } finally { contextChecking = false; }
+      }
+
+      async function load(refresh, sessionId, { automatic = false, follow = false } = {}) {
+        if (stopped || pickerOpen || (automatic && (document.hidden || activeLoads))) return;
+        const requestId = ++loadId;
+        if (!automatic) contextCheckId += 1;
+        activeLoads += 1;
+        if (sessionId || follow) showLoading({ sessionId });
+        try {
+          const report = await window.pluginBridge.invoke(refresh ? "usage.refresh" : "usage.get", {
+            ...(sessionId ? { sessionId } : {}), ...(follow ? { follow: true } : {}),
+          });
+          if (requestId !== loadId || stopped) return;
+          const context = await window.pluginBridge.invoke("usage.context");
+          if (requestId !== loadId || stopped) return;
+          if (report.stale || contextKey(report.context) !== contextKey(context)) {
+            void syncContext(true).catch(showLoadError);
+            return;
+          }
+          observedContext = context;
+          showMode(context);
+          if (pickerOpen || (automatic && document.hidden)) return;
+          const root = document.getElementById("root");
+          const switched = displayedContext?.sessionId !== context.sessionId;
+          const scrollTop = root.scrollTop;
+          const list = document.getElementById("session-list");
+          if (list) pickerScroll = list.scrollTop;
+          render(report, { fromZero: switched || !document.getElementById("usage-view") });
+          displayedContext = context;
+          lastRenderedReport = report;
+          root.scrollTop = switched ? 0 : scrollTop;
+          reconcileHistoryPointer();
+          showMode(context);
+        } catch (error) {
+          if (requestId === loadId && !stopped) throw error;
+        } finally { activeLoads -= 1; }
+      }
+
+      window.pluginBridge?.on("appearance:changed", applyAppearance);
+      window.pluginBridge?.invoke("app.getAppearance").then(applyAppearance).catch(() => applyAppearance(null));
+
+      const closePicker = () => {
+        const list = document.getElementById("session-list");
+        if (list) pickerScroll = list.scrollTop;
+        pickerOpen = false;
+        const pick = document.getElementById("session-pick");
+        const trigger = document.getElementById("session-trigger");
+        pick?.classList.remove("open");
+        trigger?.setAttribute("aria-expanded", "false");
+        void syncContext(true).catch(showLoadError);
+      };
+
+      const togglePicker = () => {
+        pickerOpen = !pickerOpen;
+        const pick = document.getElementById("session-pick");
+        const trigger = document.getElementById("session-trigger");
+        pick?.classList.toggle("open", pickerOpen);
+        trigger?.setAttribute("aria-expanded", pickerOpen ? "true" : "false");
+        if (pickerOpen) {
+          restorePicker();
+          requestAnimationFrame(() => document.getElementById("session-search")?.focus());
+        } else {
+          void syncContext(true).catch(showLoadError);
+        }
+      };
+
+      document.addEventListener("click", (event) => {
+        if (event.target.closest("#session-search") || event.target.closest(".session-search")) return;
+        if (event.target.closest("#session-trigger")) {
+          event.preventDefault();
+          togglePicker();
+          return;
+        }
+        const option = event.target.closest(".session-option[data-session]");
+        if (option?.dataset.session) {
+          pickerOpen = false;
+          closePicker();
+          load(true, option.dataset.session).catch(showLoadError);
+          return;
+        }
+        if (pickerOpen && !event.target.closest("#session-pick")) closePicker();
+      });
+
+      document.addEventListener("input", (event) => {
+        if (event.target?.id !== "session-search") return;
+        pickerQuery = event.target.value;
+        applySessionFilter();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && pickerOpen) {
+          event.preventDefault();
+          closePicker();
+        }
+      });
+
+      const refreshBtn = document.getElementById("refresh");
+      refreshBtn.addEventListener("click", async () => {
+        refreshBtn.disabled = true;
+        refreshBtn.classList.add("spin");
+        try {
+          await load(true);
+        } catch (error) {
+          showLoadError(error);
+        } finally {
+          refreshBtn.disabled = false;
+          refreshBtn.classList.remove("spin");
+        }
+      });
+
+      document.getElementById("follow").addEventListener("click", () => {
+        closePicker();
+        load(true, "", { follow: true }).catch(showLoadError);
+      });
+      window.addEventListener("focus", () => {
+        if (!pickerOpen) load(true).catch(showLoadError);
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && !pickerOpen) load(true).catch(showLoadError);
+      });
+
+      const contextTimer = setInterval(() => { syncContext().catch(showLoadError); }, 1000);
+      // One outstanding wait, released by a backend file event. Idle timeout only
+      // renews the wait; it never refreshes/scans usage on a timer.
+      async function watchUsage() {
+        let after = 0;
+        while (!stopped) {
+          try {
+            const notice = await window.pluginBridge.invoke("usage.watch", { after });
+            if (stopped) return;
+            if (!Number.isSafeInteger(notice?.version) || notice.version < 0) throw new Error("Invalid usage notification");
+            after = notice.version;
+            if (!notice.changed) continue;
+            if (contextKey(notice.context) !== contextKey(observedContext)) {
+              observedContext = notice.context; loadId += 1; showMode();
+              if (!pickerOpen) showLoading(notice.context);
+            }
+            if (!document.hidden && !pickerOpen) await load(false);
+          } catch (error) {
+            if (stopped) return;
+            document.getElementById("context-status").textContent = zh(document.documentElement.lang)
+              ? "自动更新连接中断，正在重连…" : "Usage updates disconnected; reconnecting…";
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      }
+      void watchUsage();
+      window.addEventListener("pagehide", () => {
+        stopped = true;
+        clearInterval(contextTimer);
+        loadId += 1;
+        contextCheckId += 1;
+      });
+      load(true).catch(showLoadError);
+    </script>
+  </body>
+</html>
