@@ -1,7 +1,9 @@
-# ADR 0382: Curate the Bundled Plugin Set
+# ADR 0383: Curate the Bundled Plugin Set
 
 - Status: Accepted
 - Date: 2026-11-06
+- Renumbered from 0382: ADR 0382 is the pinned Python runtime, which landed in
+  the same merge window.
 - Extends: ADR 0241 (the bundled set is whatever sits in `resources/plugins`),
   ADR 0378 (the sync script populates it), ADR 0412 (theme plugins cost a host process)
 
