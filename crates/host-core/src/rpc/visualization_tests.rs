@@ -12,6 +12,8 @@ fn options(visualization_root: Option<&Path>) -> tools::ToolExecutionOptions<'_>
         allow_external_paths: false,
         hashline: None,
         visualization_root,
+        python_executable: None,
+        python_tools_dir: None,
     }
 }
 

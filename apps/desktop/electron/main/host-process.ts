@@ -14,6 +14,7 @@ import { DbSchemaTooNewError, parseSchemaTooNew } from "./host-boot-diagnostics"
 import { redactValue } from "./logger";
 import { getModuleDirectory } from "./module-path";
 import { localTimestamp } from "./log-timestamp.ts";
+import { pythonEnv, resolvePythonRuntime, USER_SITE_DIR } from "./python-runtime.ts";
 
 export type {
   HostNotificationHandler,
@@ -134,6 +135,13 @@ export class HostProcess extends RuntimeHostProcess {
   constructor(dataDir: string, onStderr?: StderrHandler) {
     const builtinPlugins = resolveBuiltinPluginsDir();
     const builtinTools = resolveBuiltinToolsDir();
+    // Every Bash/Core tool command inherits host-core's environment, so the
+    // Python path is set here rather than per call: the runtime is a property of
+    // the installation, not of the session that happens to run a script.
+    const python = resolvePythonRuntime();
+    const pythonPath = python.state === "present" ? pythonEnv(python.runtime, [
+      join(dataDir, USER_SITE_DIR),
+    ]) : null;
     super({
       binaryPath: resolveHostBinary(),
       dataDir,
@@ -146,6 +154,17 @@ export class HostProcess extends RuntimeHostProcess {
         // Same split for the bundled tool packages (D681): the host scans the
         // directory, Electron only says where it is.
         ...(builtinTools ? { PI_DESKTOP_BUILTIN_TOOLS_DIR: builtinTools } : {}),
+        // A build without a pinned runtime (a checkout that never ran
+        // `bundle:python`) simply exports nothing, and the tools that need it
+        // report the absence instead of a half-set PYTHONPATH.
+        ...(pythonPath
+          ? {
+              PYTHONHOME: pythonPath.PYTHONHOME,
+              PYTHONPATH: pythonPath.PYTHONPATH,
+              PYTHONNOUSERSITE: pythonPath.PYTHONNOUSERSITE,
+              PI_DESKTOP_PYTHON: python.state === "present" ? python.runtime.executable : "",
+            }
+          : {}),
       },
       onStderr: onStderr ?? fallbackStderrLogger,
       diagnoseFailure: diagnoseHostFailure,
