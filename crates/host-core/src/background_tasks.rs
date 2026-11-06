@@ -303,6 +303,11 @@ fn resolve_runner_config(
         }),
         env_path: tools::shell::user_login_path().map(str::to_string),
         extra_env: Vec::new(),
+        // Background tasks own their own process for the whole run and must
+        // outlive the turn, so they never join a session shell.
+        persistent: None,
+        session_key: None,
+        shell_dialect: None,
     })
 }
 

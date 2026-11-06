@@ -31,6 +31,9 @@ pub mod ignore_rules;
 mod image_dimensions;
 pub mod office;
 pub mod shell;
+pub mod shell_session;
+#[cfg(test)]
+mod shell_session_tests;
 #[cfg(windows)]
 mod windows_process_tree;
 
@@ -306,6 +309,21 @@ pub(crate) struct ToolRunnerStartConfig {
     /// (ADR 0329). Empty for every other call.
     #[serde(default)]
     pub(crate) extra_env: Vec<(String, String)>,
+    /// Run as a session kernel instead of a one-shot wrapper
+    /// (`docs/notes/persistent-shell-runner.md`). `None`/`false` keeps the
+    /// original behaviour: spawn the interpreter, run once, exit.
+    #[serde(default)]
+    pub(crate) persistent: Option<bool>,
+    /// Name of the host-side session this runner serves. The runner never
+    /// interprets it; it exists so a stale runner is identifiable in logs and
+    /// so a persistent config cannot be produced without naming its owner.
+    #[serde(default)]
+    pub(crate) session_key: Option<String>,
+    /// Shell family of `program` ("posix" | "cmd" | "powershell"), so session
+    /// mode can build its per-command cells without re-resolving the shell on
+    /// a maybe-different PATH.
+    #[serde(default)]
+    pub(crate) shell_dialect: Option<String>,
 }
 
 fn path_has_nul(path: &Path) -> bool {
@@ -335,6 +353,27 @@ fn validate_runner_config(config: &ToolRunnerStartConfig) -> Result<(), String> 
         .is_some_and(|path| path.contains('\0'))
     {
         return Err("runner config contains an environment PATH with an embedded NUL".into());
+    }
+    if config
+        .session_key
+        .as_deref()
+        .is_some_and(|key| key.is_empty() || key.contains('\0'))
+    {
+        return Err("runner config has an invalid session key".into());
+    }
+    if config.persistent == Some(true) {
+        // A session kernel cannot run without knowing whose session it is and
+        // which shell family it is driving; failing here keeps a half-specified
+        // config from starting a shell that can never be fed.
+        if config.session_key.is_none() {
+            return Err("persistent runner config is missing its session key".into());
+        }
+        if !matches!(
+            config.shell_dialect.as_deref(),
+            Some("posix") | Some("cmd") | Some("powershell")
+        ) {
+            return Err("persistent runner config has an unknown shell dialect".into());
+        }
     }
     Ok(())
 }
@@ -475,6 +514,20 @@ pub async fn run_internal_tool_runner() -> Result<i32> {
         .await
         .map_err(|error| anyhow!(error))?;
 
+    // A session config keeps this process alive for as long as the host wants
+    // the shell; the session loop owns the control pipe from here on.
+    if config.persistent == Some(true) {
+        return shell_session::run_persistent_runner(config, control).await;
+    }
+    run_one_shot_runner(config, control).await
+}
+
+async fn run_one_shot_runner(
+    config: ToolRunnerStartConfig,
+    // Only the unix branch below reads the control pipe: there it is how the
+    // host signals that it is gone.
+    #[cfg_attr(not(unix), allow(unused_variables, unused_mut))] mut control: tokio::io::Stdin,
+) -> Result<i32> {
     let mut command = Command::new(&config.program);
     command
         .args(&config.args)
@@ -2998,6 +3051,69 @@ async fn drain_output(
     Ok(())
 }
 
+/// Timeout error shared by the one-shot and session paths so both report the
+/// same budget and the same recovery advice.
+fn bash_timeout_error(timeout_ms: u64) -> (String, String) {
+    (
+        "TOOL_TIMEOUT".into(),
+        format!(
+            "bash timed out after {timeout_ms}ms and was stopped; \
+             the command did not finish within the Bash tool's timeoutMs budget. \
+             Raise timeoutMs for a legitimately long command, or split the work \
+             into shorter commands that each finish inside the budget"
+        ),
+    )
+}
+
+fn bash_aborted_error() -> (String, String) {
+    ("TOOL_ABORTED".into(), "bash aborted".into())
+}
+
+/// Turns a finished command's captured streams into the Bash result.
+///
+/// Shared by the one-shot path and the session path: the runner-error probe,
+/// the two output budgets, and the spill behaviour must not diverge between
+/// them, or the same command would report differently depending on which path
+/// served it.
+fn bash_success_result(
+    stdout: &CapturedOutput,
+    stderr: &CapturedOutput,
+    exit_code: Option<i32>,
+    scratch: Option<&Path>,
+    command_shell_id: &str,
+) -> Result<Value, (String, String)> {
+    let (stdout, stream_trunc_out) = stdout.result();
+    let (stderr, stream_trunc_err) = stderr.result();
+    if let Some(error) = stderr
+        .split_once(INTERNAL_RUNNER_ERROR_PREFIX)
+        .and_then(|(_, value)| value.lines().next())
+    {
+        if let Some((code, message)) = error.split_once('\t') {
+            return Err((code.to_string(), message.to_string()));
+        }
+    }
+    // The streaming capture above bounds what the host holds in memory; these
+    // budgets bound what reaches the model's context, which is far smaller.
+    // stderr keeps its tail because a failing command's actionable message is
+    // the last thing it prints, and the over-budget copy spills to scratch so
+    // the marker can name a real file to Grep instead of just apologizing. The
+    // runner-error probe runs first: the marker must be found before the tail
+    // budget can cut it away.
+    let (stdout, budget_trunc_out) =
+        truncate_with_spill(&stdout, BUDGET_SHELL, scratch, "bash-stdout");
+    let (stderr, budget_trunc_err) =
+        truncate_with_spill(&stderr, BUDGET_SHELL_ERR, scratch, "bash-stderr");
+    let trunc_out = stream_trunc_out || budget_trunc_out;
+    let trunc_err = stream_trunc_err || budget_trunc_err;
+    Ok(json!({
+        "exitCode": exit_code,
+        "stdout": stdout,
+        "stderr": stderr,
+        "truncated": trunc_out || trunc_err,
+        "commandShellId": command_shell_id,
+    }))
+}
+
 enum BashStop {
     Exited(Result<Result<ExitStatus, std::io::Error>, tokio::task::JoinError>),
     TimedOut,
@@ -3064,6 +3180,22 @@ async fn tool_bash(
         (code.into(), message)
     })?;
 
+    // Session fast path: reuse one runner and one interpreter per session
+    // instead of spawning both per call. It declines (NotApplicable) for
+    // background runs, missing session ids, a disabled kill switch, and command
+    // shapes a shell's stdin reader cannot carry, and the one-shot path below
+    // then behaves exactly as it always has.
+    match shell_session::attempt(&invocation.program, root, scratch, command, &options).await {
+        shell_session::PersistentAttempt::NotApplicable => {}
+        shell_session::PersistentAttempt::SessionDied => {
+            // The kernel died before it produced any output, so nothing
+            // observable ran (a command that ran `exit`, or a shell that failed
+            // to start). Replaying it here yields what the user would have got
+            // without sessions at all.
+        }
+        shell_session::PersistentAttempt::Done(result) => return result,
+    }
+
     let config = ToolRunnerStartConfig {
         program: invocation.program,
         args: invocation.args,
@@ -3076,6 +3208,9 @@ async fn tool_bash(
         }),
         env_path: shell::user_login_path().map(str::to_string),
         extra_env: options.extra_env.clone(),
+        persistent: None,
+        session_key: None,
+        shell_dialect: None,
     };
     let SpawnedToolRunner {
         pid,
@@ -3157,16 +3292,8 @@ async fn tool_bash(
     notifier.finish();
 
     match stop {
-        BashStop::TimedOut => Err((
-            "TOOL_TIMEOUT".into(),
-            format!(
-                "bash timed out after {timeout_ms}ms and was stopped; \
-                 the command did not finish within the Bash tool's timeoutMs budget. \
-                 Raise timeoutMs for a legitimately long command, or split the work \
-                 into shorter commands that each finish inside the budget"
-            ),
-        )),
-        BashStop::Aborted => Err(("TOOL_ABORTED".into(), "bash aborted".into())),
+        BashStop::TimedOut => Err(bash_timeout_error(timeout_ms)),
+        BashStop::Aborted => Err(bash_aborted_error()),
         BashStop::LifecycleFailed(error) => Err((
             "TOOL_FAILED".into(),
             format!("bash process lifecycle failed: {error}"),
@@ -3175,37 +3302,13 @@ async fn tool_bash(
             let status = waited
                 .map_err(|error| ("TOOL_FAILED".into(), format!("bash wait failed: {error}")))?
                 .map_err(|error| ("TOOL_FAILED".into(), format!("bash failed: {error}")))?;
-            let (stdout, stream_trunc_out) = stdout.result();
-            let (stderr, stream_trunc_err) = stderr.result();
-            if let Some(error) = stderr
-                .split_once(INTERNAL_RUNNER_ERROR_PREFIX)
-                .and_then(|(_, value)| value.lines().next())
-            {
-                if let Some((code, message)) = error.split_once('\t') {
-                    return Err((code.to_string(), message.to_string()));
-                }
-            }
-            // The streaming capture above bounds what the host holds in memory;
-            // these budgets bound what reaches the model's context, which is far
-            // smaller. stderr keeps its tail because a failing command's
-            // actionable message is the last thing it prints, and the
-            // over-budget copy spills to scratch so the marker can name a real
-            // file to Grep instead of just apologizing. The runner-error probe
-            // runs first: the marker must be found before the tail budget can
-            // cut it away.
-            let (stdout, budget_trunc_out) =
-                truncate_with_spill(&stdout, BUDGET_SHELL, scratch, "bash-stdout");
-            let (stderr, budget_trunc_err) =
-                truncate_with_spill(&stderr, BUDGET_SHELL_ERR, scratch, "bash-stderr");
-            let trunc_out = stream_trunc_out || budget_trunc_out;
-            let trunc_err = stream_trunc_err || budget_trunc_err;
-            Ok(json!({
-                "exitCode": status.code(),
-                "stdout": stdout,
-                "stderr": stderr,
-                "truncated": trunc_out || trunc_err,
-                "commandShellId": options.command_shell_id,
-            }))
+            bash_success_result(
+                &stdout,
+                &stderr,
+                status.code(),
+                scratch,
+                &options.command_shell_id,
+            )
         }
     }
 }
@@ -3541,6 +3644,9 @@ mod tests {
             scratch_dir: None,
             env_path: None,
             extra_env: Vec::new(),
+            persistent: None,
+            session_key: None,
+            shell_dialect: None,
         };
         let frame = encode_runner_config(&config).unwrap();
         assert_eq!(decode_runner_config(&frame).unwrap().args, config.args);
@@ -3560,6 +3666,9 @@ mod tests {
             scratch_dir: None,
             env_path: None,
             extra_env: Vec::new(),
+            persistent: None,
+            session_key: None,
+            shell_dialect: None,
         };
         assert!(encode_runner_config(&nul_config).is_err());
     }
