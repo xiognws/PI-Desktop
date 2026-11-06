@@ -1423,6 +1423,18 @@ export function formatScratchDirForShell(
   return scratchDir;
 }
 
+/**
+ * Shared by the shell system prompt and the Bash tool description.
+ *
+ * Measured over real sessions, an agent turn averaged 12.9 shell calls and most
+ * of them ran commands the in-process file tools already cover. Every call pays
+ * a process start-up and shows the operating system one more "application
+ * spawns an interpreter" step, which is also what behaviour-based endpoint
+ * protection reacts to.
+ */
+const FEWER_SHELL_SPAWNS_GUIDANCE =
+  "Never inspect files through the shell: read with Read, locate with Glob, search with Grep, and write with Write or Edit, instead of running cat, head, tail, ls, dir, find, grep, rg, sed -n or wc. When several shell steps are genuinely needed, send them as one multi-line script in a single call rather than one call per step: every call starts a new shell process.";
+
 export function commandShellGuidance(
   shell: CommandShellOption,
   scratchDir?: string,
@@ -1436,6 +1448,9 @@ export function commandShellGuidance(
     `Shell commands run through ${shell.label} (${shell.id}). The protocol tool remains named Bash for compatibility, even when the active shell is PowerShell or cmd.`,
     shellSyntaxGuidance(shell),
     scratch,
+    // Fewer calls, fewer processes: each call pays a shell start-up and shows
+    // the operating system one more "application spawns an interpreter" step.
+    FEWER_SHELL_SPAWNS_GUIDANCE,
   ].join(" ");
 }
 
@@ -1452,6 +1467,7 @@ function commandShellToolDescription(
     `An optional timeout from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS} seconds may be supplied; without it, the command defaults to a 60-second timeout.`,
     `Set runInBackground: true for long-lived processes the user needs after the turn ends (dev servers, watchers, builds). A background call returns a backgroundTaskId immediately, survives turn aborts and timeouts, and its output is visible in the composer's running-tasks bar; do not set it for commands whose output the current turn depends on.`,
     "A shell command gate refuses commands that wipe a filesystem or disk, delete recursively outside the workspace, escalate privileges, force-push or rewrite git history, or publish a package. Those calls return a block reason instead of running; choose a scoped, reversible alternative.",
+    FEWER_SHELL_SPAWNS_GUIDANCE,
     ...(formattedScratch ? [`The session scratch directory is ${formattedScratch}.`] : []),
   ].join(" ");
 }

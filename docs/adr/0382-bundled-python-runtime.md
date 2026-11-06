@@ -71,15 +71,22 @@ requirement rather than a convenience:
 * The installer grows by roughly 180 MB uncompressed (61.9 MB interpreter,
   ~117 MB libraries). Compression in the NSIS packaging reduces the download; the
   installed size is what it is.
-* `bundle:python` is part of `pack`, `dist`, and the per-platform build chains,
-  and the generated tree is gitignored — the lock file is the reviewed artifact.
-* A CI runner that builds installers needs a Python 3.12 on PATH to run the
-  bundle script, or `--python` pointing at one. The *shipped* interpreter comes
-  from that prefix, so the build is only as reproducible as the machine's CPython,
-  which is why the version is pinned in the lock file and checked at bundle time.
-* Building for a platform the lock file does not cover refuses to run rather than
-  producing a tree with the wrong wheels. Only `windows-x86_64` is pinned today;
-  adding macOS or Linux means adding its wheels to the lock.
+* `bundle:python` runs on the Windows lane only, and the generated tree is
+  gitignored — the lock file is the reviewed artifact. `pack` and `dist` still
+  invoke it so a local build matches a release build on the machine that can do
+  it.
+* The Windows release lane installs a Python 3.12 with `actions/setup-python`
+  (`.github/workflows/release.yml`), because the script needs an interpreter to
+  run `pip install --target`. The *shipped* interpreter is that prefix, so the
+  build is only as reproducible as the machine's CPython — which is why the
+  version is pinned in the lock file and checked at bundle time.
+* Only `windows-x86_64` is pinned today, so only the Windows installer carries
+  the runtime. `dist:mac` and `dist:linux` do not run the step at all, and on any
+  other host the script prints what is missing and exits zero rather than failing
+  a build that has nothing to do with it. On those installers the Office tools
+  answer `PYTHON_RUNTIME_UNAVAILABLE`. Adding a platform means adding its wheels
+  to the lock, putting the step back in that dist script, and adding an
+  interpreter to that lane.
 * `OfficeRead` and `OfficeWrite` are built-in tools, not a plugin. They add no
   process at launch, which keeps this change out of the way of the memory work
   that is reducing plugin host count.

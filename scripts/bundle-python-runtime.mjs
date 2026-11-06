@@ -53,11 +53,18 @@ const PYTHON = flag("python", "");
 const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
 const platform = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux";
 if (!lock.python.platform.startsWith(platform)) {
-  console.error(
-    `this bundle pins Python for ${lock.python.platform}, and this host is ${platform}. ` +
-      "Bundle on the platform you ship, or add that platform to scripts/python-runtime.lock.json.",
+  // Only the platform whose wheels are pinned ships the runtime today. The
+  // release workflow keeps this step on the Windows lane alone, but `pack` and
+  // `dist` are also run by hand on a developer's own machine, where a hard
+  // failure would block an unrelated build. Say what is missing and carry on:
+  // the app already answers PYTHON_RUNTIME_UNAVAILABLE when the tree is absent.
+  console.warn(
+    `skipping: this bundle pins Python for ${lock.python.platform}, and this host is ${platform}. ` +
+      "The installer will ship without a Python runtime, so the Office tools will report " +
+      "PYTHON_RUNTIME_UNAVAILABLE. Add this platform's wheels to " +
+      "scripts/python-runtime.lock.json to bundle it here.",
   );
-  process.exit(1);
+  process.exit(0);
 }
 
 /** A stable relative path inside the bundle, with forward slashes. */
