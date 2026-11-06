@@ -13,14 +13,19 @@ import { mcpStdioLauncherChoice } from "../src/components/extensions/mcp-stdio-l
 
 const win = path.win32;
 
-function winFs(files, links = {}) {
+function winFs(files, links = {}, contents = undefined) {
   const fileSet = new Set(files.map((file) => file.toLowerCase()));
   const linkMap = Object.fromEntries(
     Object.entries(links).map(([from, to]) => [from.toLowerCase(), to]),
   );
+  const textMap = contents
+    ? Object.fromEntries(Object.entries(contents).map(([from, to]) => [from.toLowerCase(), to]))
+    : undefined;
   return {
     isFile: (target) => fileSet.has(target.toLowerCase()),
     realpath: (target) => linkMap[target.toLowerCase()] ?? target,
+    // Only fakes that model a readable file can resolve shims to their script.
+    ...(textMap ? { readFile: (target) => textMap[target.toLowerCase()] ?? "" } : {}),
   };
 }
 
@@ -298,6 +303,78 @@ test("wrapCmdShim outer-quotes survive when .cmd path contains spaces", () => {
   assert.match(inner, /^"[^"]*npx\.cmd"/i, "path is quoted");
   assert.match(inner, /"pkg&whoami"/, "metachar arg stays quoted");
   assert.match(inner, /"say ""hi"""/, "embedded quotes doubled");
+});
+
+test("an npm .cmd shim starts node directly instead of through a shell", () => {
+  const npmDir = win.join("C:", "Users", "zhao", "AppData", "Roaming", "npm");
+  const shim = win.join(npmDir, "pi-mcp.cmd");
+  const node = win.join(npmDir, "node.exe");
+  const entry = win.join(npmDir, "node_modules", "pi-mcp", "dist", "index.js");
+  const shimText = [
+    ":: Created by npm, please don't edit manually.",
+    "@ECHO OFF",
+    "SETLOCAL",
+    'SET "NODE_EXE=%~dp0\\node.exe"',
+    'IF NOT EXIST "%NODE_EXE%" (',
+    '  SET "NODE_EXE=node"',
+    ")",
+    'SET "PI_MCP_JS=%~dp0\\node_modules\\pi-mcp\\dist\\index.js"',
+    '"%NODE_EXE%" "%PI_MCP_JS%" %*',
+  ].join("\r\n");
+  const launch = resolveMcpStdioLaunch({
+    command: shim,
+    args: ["--stdio", "a&b"],
+    env: { PATH: win.join("C:", "Windows", "System32") },
+    platform: "win32",
+    home: winUser,
+    hostEnv: {
+      PATH: npmDir,
+      ComSpec: win.join("C:", "Windows", "System32", "cmd.exe"),
+      PATHEXT: ".EXE;.CMD",
+    },
+    fs: winFs([shim, node, entry], {}, { [shim]: shimText }),
+  });
+  assert.equal(launch.command, node);
+  assert.deepEqual(launch.args, [entry, "--stdio", "a&b"]);
+  assert.equal(launch.windowsHide, true);
+  assert.equal(launch.windowsVerbatimArguments, undefined);
+});
+
+test("a shim whose forwarded script is gone keeps the cmd.exe path", () => {
+  const npmDir = win.join("C:", "Users", "zhao", "AppData", "Roaming", "npm");
+  const shim = win.join(npmDir, "pi-mcp.cmd");
+  const node = win.join(npmDir, "node.exe");
+  const comspec = win.join("C:", "Windows", "System32", "cmd.exe");
+  const shimText = '"%_prog%"  "%dp0%\\node_modules\\pi-mcp\\dist\\index.js" %*';
+  const launch = resolveMcpStdioLaunch({
+    command: shim,
+    args: ["--stdio"],
+    env: { PATH: win.join("C:", "Windows", "System32") },
+    platform: "win32",
+    home: winUser,
+    hostEnv: { PATH: npmDir, ComSpec: comspec, PATHEXT: ".EXE;.CMD" },
+    // The shim is readable, but the script it names does not exist.
+    fs: winFs([shim, node], {}, { [shim]: shimText }),
+  });
+  assert.equal(launch.command, comspec);
+  assert.equal(launch.windowsVerbatimArguments, true);
+});
+
+test("a hand-written .cmd keeps the cmd.exe path", () => {
+  const tools = win.join("C:", "tools");
+  const shim = win.join(tools, "deploy.cmd");
+  const comspec = win.join("C:", "Windows", "System32", "cmd.exe");
+  const launch = resolveMcpStdioLaunch({
+    command: shim,
+    args: [],
+    env: { PATH: win.join("C:", "Windows", "System32") },
+    platform: "win32",
+    home: winUser,
+    hostEnv: { PATH: tools, ComSpec: comspec, PATHEXT: ".EXE;.CMD" },
+    fs: winFs([shim], {}, { [shim]: "@echo off\r\nrobocopy a b /MIR\r\n" }),
+  });
+  assert.equal(launch.command, comspec);
+  assert.equal(launch.windowsVerbatimArguments, true);
 });
 
 // A python.org / winget Python on Windows is `python.exe`; the only
