@@ -194,6 +194,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # Only the Windows lane bundles a Python runtime today: scripts/python-runtime.lock.json
+      # pins windows-x86_64 wheels. `dist:win` runs `bundle:python`, which installs
+      # those pinned wheels with the interpreter on PATH, so the lane needs one.
+      # The other lanes carry no lock section, and their dist scripts do not run
+      # the step at all.
+      - uses: actions/setup-python@v5
+        if: matrix.platform == 'windows'
+        with:
+          python-version: "3.12"
+
       - name: Prepare package inputs
         run: |
           set -euo pipefail

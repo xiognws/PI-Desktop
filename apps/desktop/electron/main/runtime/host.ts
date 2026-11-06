@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { ErrorCodes, IPC, type AgentEventEnvelope, type PlanExecutionFinishStatus, type Risk } from "@pi-workspace/shared";
 import { assertLinuxGlibcSupported } from "../linux-glibc";
 import { HostProcess } from "../host-process";
@@ -10,6 +11,12 @@ import type { FinishTurn } from "./plans";
 import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
 import { createRemoteWorkspaceToolRelay, type RemoteWorkspaceToolRequest } from "../remote/remote-workspace-tools";
 import { reapplyWindowCorners } from "../window-native-corners.ts";
+import {
+  LIBRARY_DROP_DIR,
+  USER_SITE_DIR,
+  installDroppedLibraries,
+  resolvePythonRuntime,
+} from "../python-runtime.ts";
 
 export type HostRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -385,6 +392,42 @@ export function createHostRuntime({
     void superviseRestart("host");
   });
   };
+  /**
+   * Install whatever the user dropped into the library folder.
+   *
+   * Runs once per launch, off the startup path. The user layer is the same
+   * directory `pythonEnv` already puts first on `PYTHONPATH`, so a library that
+   * lands here is importable by the next tool call — no restart needed.
+   */
+  const drainLibraryDropFolder = async (): Promise<void> => {
+    const python = resolvePythonRuntime();
+    if (python.state !== "present") return;
+    const drop = join(dataDir, LIBRARY_DROP_DIR);
+    const site = join(dataDir, USER_SITE_DIR);
+    try {
+      const result = await installDroppedLibraries(python.runtime, drop, site);
+      if (result.state === "idle") return;
+      if (result.state === "installed") {
+        logger.app("runtime", "info", "user Python libraries installed", {
+          data: { installed: result.installed, blocked: result.blocked.map((item) => item.file) },
+        });
+        return;
+      }
+      if (result.state === "refused") {
+        // Expected and actionable: the note beside each refused wheel says what
+        // to fetch, and the settings page repeats it.
+        logger.app("runtime", "warn", "user Python libraries refused", {
+          data: { code: result.code, missing: result.missing.map((item) => item.name) },
+        });
+      }
+    } catch (error) {
+      // Never fatal: a library the user dropped is not worth a failed launch.
+      logger.app("runtime", "warn", "library drop folder could not be drained", {
+        data: String(error),
+      });
+    }
+  };
+
   const startHost = async (): Promise<void> => {
 
   assertLinuxGlibcSupported();
@@ -404,6 +447,10 @@ export function createHostRuntime({
     // for now that a method call will actually be accepted.
     reapplyWindowCorners();
     void importLegacyScheduled();
+    // A user who brought a library on a stick expects it to work the next time
+    // they open the app, so the drop folder is drained once per launch. It is
+    // deliberately not awaited: a slow or broken wheel must not delay a session.
+    void drainLibraryDropFolder();
     // Drain before the renderer can session.get. Assistant/tool rows live in
     // this outbox until host-core appends them; a cold start that raced the
     // flush showed only user prompts (issue #42 / D327). Boot leaves

@@ -7,6 +7,12 @@
   "//local.hindsight.memory": "Retired 2026-11-04: this deployment does not bundle the Hindsight memory bridge.",
   "//local.unipi": "Retired 2026-11-04: the Muse learning adaptation is unused in this deployment.",
   "//theme-plugins": "Retired 2026-11-06: a declarative theme plugin costs a whole host process (~30 MB) on every launch and needs none of it. Built-in color schemes cover appearance; see ADR 0412.",
+  "//theme-plugins-extra": "Retired 2026-11-06: same host-process cost as //theme-plugins. Theme authoring belongs in the app; skins ship as data, not as plugins.",
+  "//native-helper-terminals": "Retired 2026-11-06: both terminals launch an unsigned helper binary (fancy-pty-helper.exe / pi-conpty-helper.exe) from the app's own resource directory. On a host with behaviour-based endpoint protection, an unsigned app spawning unknown executables it shipped itself is indistinguishable from a dropper and gets the whole app flagged. local.terminal covers the same feature in pure JavaScript.",
+  "//development-harness-only": "Retired 2026-11-06: development fixtures. One is an offline-harness manifest, the other an API probe; neither is a user-facing feature.",
+  "//duplicate-usage-views": "Retired 2026-11-06: io.github.new-beginner.session-usage is the tracked pick and covers the same accounting; shipping three more usage panels only adds host processes.",
+  "//duplicate-browser": "Retired 2026-11-06: pi.browser is the tracked browser plugin; a second browser plugin doubles the CDP surface for no extra capability.",
+  "//market-translator": "Retired 2026-11-06: the marketplace feed is not reachable from this deployment, so a catalog translator has nothing to translate.",
   "excluded": [
     "cn.star.jianying-assistant",
     "icedly.moyu-games",
@@ -24,6 +30,19 @@
     "io.github.b1eight.pi-desktop-claude-theme",
     "io.github.eonova.theme-dracula",
     "io.github.jeasonloop.theme-craftdesk",
-    "pi.theme.opencode"
+    "pi.theme.opencode",
+    "adoin.sax-design-theme",
+    "io.github.muzimu217.theme-forge",
+    "local.miku-theme",
+    "pi.theme.studio",
+    "cc.fee.pi-terminal",
+    "io.github.hufangyuan460-blip.windows-terminal",
+    "local.pi-session-filter",
+    "local.project-memory-api-probe",
+    "cc.mcii.session-usage",
+    "io.github.techd81.pi-desktop-usage",
+    "io.github.muzimu217.usage-dashboard",
+    "io.github.ldzhouquan.fast-browser",
+    "io.github.wenziji-hub.market-translator"
   ]
 }
