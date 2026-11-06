@@ -3668,6 +3668,26 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           return (
             "Search the session's code by its syntax tree instead of its text: one ast-grep pattern matches calls, declarations, and member access across TypeScript, Tsx, JavaScript, Html, and Css files. Use it when a Grep regex would also match comments, strings, or unrelated names. Returns `path:line:column` rows and stops at a bounded number of files and matches, reporting what it left out."
           );
+        case "OfficeRead":
+          return (
+            "Read an Office document: `xlsx` (sheet rows), `docx` (paragraphs and tables), " +
+            "`pptx` (slides and shapes), or `pdf` (page text). These formats are read by the Python " +
+            "runtime the app ships, so they work offline and never depend on the user's own Python. " +
+            "Large documents come back bounded (maxRows, maxBlocks, maxPages) with `truncated` set, " +
+            "because the full contents of a workbook rarely fit in one answer. " +
+            "Use Read for plain text and CSV files." +
+            `${scratchPathHint}${externalPathHint}`
+          );
+        case "OfficeWrite":
+          return (
+            "Create or update an Office document: `xlsx` (rows), `docx` (blocks), `pptx` (slides), " +
+            "or `pdf` (merges sources into path). `mode: append` adds to an existing document instead of " +
+            "replacing it. Deliverables belong in the workspace; scratch is for intermediate files. " +
+            "This tool cannot edit tracked changes or comments in a .docx, and it does not recalculate " +
+            "spreadsheet formulas Excel would have stored: reading back with valuesOnly returns the " +
+            "values that were saved." +
+            `${scratchPathHint}${externalPathHint}`
+          );
         case "Bash":
           return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
         case "TodoWrite":
@@ -3789,6 +3809,70 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         ),
         limit: Type.Optional(
           Type.Number({ description: "Maximum reported matches from 1 to 100; defaults to 20." }),
+        ),
+      },
+      OfficeRead: {
+        format: Type.Union(
+          [Type.Literal("xlsx"), Type.Literal("docx"), Type.Literal("pptx"), Type.Literal("pdf")],
+          { description: "Document format, matching the file extension." },
+        ),
+        path: Type.String({
+          description: "The document to open. Workspace-relative, or absolute inside the session scratch directory.",
+        }),
+        sheet: Type.Optional(Type.String({ description: "xlsx: sheet name. Defaults to the first sheet." })),
+        maxRows: Type.Optional(Type.Number({ description: "xlsx: rows to return from 1 to 5000; defaults to 200." })),
+        maxCols: Type.Optional(Type.Number({ description: "xlsx: columns to consider; defaults to 60." })),
+        valuesOnly: Type.Optional(
+          Type.Boolean({
+            description: "xlsx: read cached values instead of formulas. Defaults to true.",
+          }),
+        ),
+        maxBlocks: Type.Optional(Type.Number({ description: "docx: paragraphs and tables to return; defaults to 400." })),
+        maxPages: Type.Optional(Type.Number({ description: "pdf: pages to return; defaults to 50." })),
+      },
+      OfficeWrite: {
+        format: Type.Union(
+          [Type.Literal("xlsx"), Type.Literal("docx"), Type.Literal("pptx"), Type.Literal("pdf")],
+          { description: "Document format, matching the file extension." },
+        ),
+        path: Type.String({
+          description: "The document to create or update. Workspace-relative, or absolute inside the session scratch directory.",
+        }),
+        mode: Type.Optional(
+          Type.Union([Type.Literal("overwrite"), Type.Literal("append")], {
+            description: "overwrite replaces the file; append adds to an existing one. Defaults to overwrite.",
+          }),
+        ),
+        sheet: Type.Optional(Type.String({ description: "xlsx: sheet to write; defaults to Sheet1." })),
+        rows: Type.Optional(
+          Type.Array(Type.Array(Type.Unknown()), {
+            description: 'xlsx: rows of cell values, for example [["name","qty"],["apple",3]].',
+          }),
+        ),
+        blocks: Type.Optional(
+          Type.Array(
+            Type.Object({
+              type: Type.String({ description: "paragraph, heading, or table." }),
+              text: Type.Optional(Type.String()),
+              level: Type.Optional(Type.Number({ description: "heading level from 1 to 6." })),
+              style: Type.Optional(Type.String({ description: "paragraph style name." })),
+              rows: Type.Optional(Type.Array(Type.Array(Type.Unknown()))),
+            }),
+            { description: "docx: content blocks in document order." },
+          ),
+        ),
+        slides: Type.Optional(
+          Type.Array(
+            Type.Object({
+              title: Type.Optional(Type.String()),
+              body: Type.Optional(Type.String()),
+            }),
+            { description: "pptx: one entry per slide." },
+          ),
+        ),
+        layout: Type.Optional(Type.Number({ description: "pptx: slide layout index; defaults to 5 (title only)." })),
+        sources: Type.Optional(
+          Type.Array(Type.String(), { description: "pdf: documents to merge into path." }),
         ),
       },
       Bash: {
@@ -4348,6 +4432,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // the work panel browser), so it ships in every mode. PluginCheck only
     // reads a directory; PluginScaffold and PluginPack write and remain
     // Agent-only. Write/Edit keep guarded declarations in contract modes.
+    // OfficeRead only inspects a document, so it follows Read into every mode;
+    // OfficeWrite replaces a file and follows Write.
     const tools =
       this.mode === "agent"
         ? [
@@ -4361,8 +4447,21 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "BrowserPreview",
             "PluginCheck",
             "TodoWrite",
+            "OfficeRead",
+            "OfficeWrite",
           ]
-        : ["Read", "Glob", "Grep", "AstSearch", "BrowserPreview", "Bash", "Write", "Edit"];
+        : [
+            "Read",
+            "Glob",
+            "Grep",
+            "AstSearch",
+            "BrowserPreview",
+            "Bash",
+            "Write",
+            "Edit",
+            "OfficeRead",
+            "OfficeWrite",
+          ];
     if (this.mode === "agent") {
       tools.push("PluginScaffold", "PluginPack", "GenerateImages", ...Object.keys(scheduledToolParameters));
       if (this.computerUseEnabled) tools.push("Computer");
