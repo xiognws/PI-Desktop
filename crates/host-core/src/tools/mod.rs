@@ -29,6 +29,7 @@ mod grep_rg;
 pub mod hashline;
 pub mod ignore_rules;
 mod image_dimensions;
+pub mod office;
 pub mod shell;
 #[cfg(windows)]
 mod windows_process_tree;
@@ -897,6 +898,12 @@ pub struct ToolExecutionOptions<'a> {
     /// Session visualization directory: a contained root for Read and for
     /// `.html`-only Write/Edit (D671). `None` for remote sessions (contract modes still deny writes).
     pub visualization_root: Option<&'a Path>,
+    /// The interpreter the installer ships, from `PI_DESKTOP_PYTHON`. `None`
+    /// means this build has no runtime, and the Office tools say so instead of
+    /// falling back to whatever Python the customer happens to have.
+    pub python_executable: Option<&'a Path>,
+    /// Directory holding the Office worker script, next to that interpreter.
+    pub python_tools_dir: Option<&'a Path>,
 }
 
 pub fn validate_timeout_ms(timeout_ms: Option<u64>) -> Result<(), (String, String)> {
@@ -1146,6 +1153,8 @@ pub async fn execute_tool_with_options(
             allow_external_paths: false,
             hashline: None,
             visualization_root: None,
+            python_executable: None,
+            python_tools_dir: None,
         },
     )
     .await
@@ -1244,6 +1253,8 @@ pub async fn execute_tool_with_file_lease(
         allow_external_paths,
         hashline,
         visualization_root,
+        python_executable,
+        python_tools_dir,
     } = options;
     let started = Instant::now();
     let timeout_ms = effective_timeout_ms(tool_name, requested_timeout_ms);
@@ -1309,6 +1320,30 @@ pub async fn execute_tool_with_file_lease(
                 .await
                 .map_err(Into::into)
         }
+        name if office::recognizes(name) => match workspace {
+            // The worker is a child process of the host, so nothing it does can
+            // take the host down; the request arrives on stdin, so no path can
+            // become command-line syntax.
+            None => Err(hashline::ToolError::new(
+                "WORKSPACE_REQUIRED",
+                "No workspace is open",
+            )),
+            Some(workspace_root) => {
+                let roots = ContainedRoots::scratch_only(scratch).with(
+                    ToolRoot::Visualization,
+                    visualization_root.map(Path::to_path_buf),
+                );
+                office::execute(
+                    workspace_root,
+                    &roots,
+                    args,
+                    allow_external_paths,
+                    python_executable,
+                    python_tools_dir,
+                )
+                .await
+            }
+        },
         other if is_desktop_dispatched(other) => Err(hashline::ToolError::new(
             "TOOL_NOT_FOUND",
             format!("{other} requires the desktop runner (dispatched via plugins.execute)"),
@@ -4150,6 +4185,8 @@ mod tests {
                 allow_external_paths: true,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
@@ -4310,6 +4347,8 @@ mod tests {
                 allow_external_paths: true,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
@@ -4334,6 +4373,8 @@ mod tests {
                 allow_external_paths: true,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
@@ -4358,6 +4399,8 @@ mod tests {
                 allow_external_paths: true,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
@@ -4386,6 +4429,8 @@ mod tests {
                 allow_external_paths: true,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
@@ -4414,6 +4459,8 @@ mod tests {
                 allow_external_paths: true,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
@@ -4436,6 +4483,8 @@ mod tests {
                 allow_external_paths: true,
                 hashline: None,
                 visualization_root: None,
+                python_executable: None,
+                python_tools_dir: None,
             },
         )
         .await;
