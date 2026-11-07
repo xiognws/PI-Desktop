@@ -13,12 +13,22 @@ const MARKER = "CTX-MARKER";
 it("emits context before every provider request without persisting the replacement", async () => {
   const root = mkdtempSync(join(tmpdir(), "pi-context-event-"));
   const requests: Array<{ messages: unknown[] }> = [];
+  // The turn finishes with every tool failed, so the runtime asks a semantic
+  // judge for a verdict after the turn boundary. That judge is a one-shot
+  // completion of its own — it carries no tools and does not run an extension.
+  const isVerdictJudge = (body: string) => body.includes("You audit one turn of a coding agent");
   // The first request answers with a tool call, so run 1 also has a follow-up
   // request after the tool result; every later request answers with text.
   const replies = [true, false, false];
   const server = createServer(async (request, response) => {
     let body = "";
     for await (const chunk of request) body += chunk;
+    if (isVerdictJudge(body)) {
+      // Answer the judge directly so the turn count stays about the turn.
+      response.writeHead(200, { "content-type": "text/event-stream" });
+      response.end(`data: ${JSON.stringify({ id: "verdict", choices: [{ index: 0, delta: { role: "assistant", content: "HONEST" }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
+      return;
+    }
     requests.push(JSON.parse(body));
     const call = replies.shift() ?? false;
     const delta = call
