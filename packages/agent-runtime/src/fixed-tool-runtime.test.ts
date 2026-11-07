@@ -239,9 +239,14 @@ describe("explicit MCP selection", () => {
       if (!fixed) expect(names).not.toContain(otherTool.name);
       expect(f.rows.some(row => row.toolName === "ToolSearch")).toBe(false);
       expect(f.rows.find(row => row.toolName === otherTool.name)).toMatchObject({ isError: true });
+      // Fix this after the next turn's request:
+      // The turn finishes with a tool_end (the denied `otherTool` probe), so the
+      // semantic turn judge opens its own tools-less completion before the next
+      // prompt reaches the fixture; wire.requests[0] is that judge.
       wire.requests.length = 0;
       await f.runtime.prompt("Continue", "next-user");
-      for (const tool of selectedTools) expect(wire.requests[0].tools.map(t => t.function.name)).toContain(tool.name);
+      const declared = wire.requests.find(request => Array.isArray((request as { tools?: unknown }).tools))!;
+      for (const tool of selectedTools) expect(((declared as unknown as Payload).tools).map(t => t.function.name)).toContain(tool.name);
     } finally { await f.runtime.dispose(); await wire.close(); }
   });
 

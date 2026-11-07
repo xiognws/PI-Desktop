@@ -72,9 +72,9 @@ describe("main-supplied model capabilities", () => {
       name: "unknown-model",
       reasoning: false,
       modalities: { input: ["text"], output: ["text"] },
-      limit: { context: 128_000, input: 128_000, output: 8_192 },
+      limit: { context: 128_000, input: 128_000, output: 32_768 },
       contextWindow: 128_000,
-      maxTokens: 8_192,
+      maxTokens: 32_768,
     });
   });
 

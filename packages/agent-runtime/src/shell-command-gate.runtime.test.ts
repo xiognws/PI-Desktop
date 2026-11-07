@@ -125,6 +125,12 @@ async function runTurn(command: string, options: { gateOff?: boolean } = {}) {
     host: {
       call: async <T>(method: string): Promise<T> => {
         if (method === "session.appendMessage") return undefined as T;
+        // Capability negotiation is not a shell call: the runtime asks every
+        // new host connection about Host-side file batching before the first
+        // request. A host that does not know the method reports it that way.
+        if (method === "tools.fileBatchCapabilities") {
+          return Promise.reject(Object.assign(new Error("missing method"), { code: -32601 })) as Promise<T>;
+        }
         hostCalls.push(method);
         throw new Error("a gated shell command must never reach the host");
       },
@@ -140,7 +146,10 @@ async function runTurn(command: string, options: { gateOff?: boolean } = {}) {
     await runtime.dispose();
     await pending.catch(() => undefined);
   });
-  await received;
+  // Stop waiting when the turn already failed: an aborted turn never sends a
+  // request, and the assertions below report the real reason instead of a
+  // timeout that hides it.
+  await Promise.race([received, pending.then(() => undefined, () => undefined)]);
   await pending;
   const toolOutput = requests[1]?.input.find(
     (item) => item.type === "function_call_output" && item.call_id === "call_fixture",
