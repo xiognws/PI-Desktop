@@ -229,6 +229,23 @@ fn cwd_reset_prefix_matches_each_dialect() {
         !ps.trim_end().contains('\n'),
         "a PowerShell cell must stay on one line"
     );
+    // A string result is written straight out, so a cell whose output had
+    // already arrived reports it without waiting for the pipe to finish; a
+    // non-string object still goes through `Out-String -Stream` one at a time,
+    // because converting it to a string would print a type name and lose the
+    // console's table. Buffering the whole pipe as a single table is what
+    // stalled live notifications, hence the per-object form.
+    assert!(ps.contains("elseif ($_ -is [string])"), "{ps}");
+    assert!(
+        ps.contains("Microsoft.PowerShell.Commands.Internal.Format.*"),
+        "{ps}"
+    );
+    assert!(ps.contains("'FormatEndData'"), "{ps}");
+    assert!(ps.contains("& $script:piRender $_"), "{ps}");
+    // Rendering happens per object, so no raw pipe is ever piped through
+    // `Out-String -Stream | ForEach-Object` as a whole; that form formats the
+    // entire pipeline as one table and holds output back until it completes.
+    assert!(!ps.contains("$_ } | Out-String -Stream"), "{ps}");
 }
 
 #[test]
@@ -299,6 +316,18 @@ fn session_config(program: PathBuf, workspace: &Path, dialect: Dialect) -> ToolR
 /// Runs one session over `cells` and returns `(exit code, per-cell output and
 /// exit code)`. Frames are written up front; the bounded frame channel keeps the
 /// runner reading them one at a time, in order.
+/// A temporary workspace whose path is spelled the way the shell reports it.
+///
+/// `temp_dir()` returns whatever spelling the environment uses, and on a host
+/// whose `TEMP` is an 8.3 short path (`C:\\Users\\ADMINI~1\\...`) that is the short
+/// form, while PowerShell's `Get-Location` reports the long form of the same
+/// directory. Tests that compare a shell-reported directory against the
+/// workspace path need both sides in one spelling, so the fixture keeps the
+/// canonical (long) form.
+fn long_workspace() -> tempfile::TempDir {
+    tempfile::tempdir().expect("temp workspace")
+}
+
 async fn run_shell_session(
     dialect: Dialect,
     program: PathBuf,
@@ -431,11 +460,13 @@ async fn cmd_session_runs_each_command_in_the_workspace() {
     assert_eq!(status, 0, "the session exits cleanly after its last frame");
     assert_eq!(cells.len(), 3);
     assert_eq!(cells[0], ("first\r\n".into(), 0));
-    assert_eq!(
-        cells[1].0.trim_end(),
-        workspace.path().to_string_lossy().trim_end(),
-        "cell starts in the workspace"
-    );
+    // PowerShell resolves the directory and reports its long form, while
+    // `temp_dir()` may hand back the 8.3 short form of the same directory. Compare
+    // canonical paths so the assertion is about the directory, not its spelling.
+    let reported = cells[1].0.trim_end().to_string();
+    let expected = std::fs::canonicalize(workspace.path()).expect("canonical workspace");
+    let reported = std::fs::canonicalize(&reported).unwrap_or_else(|_| reported.into());
+    assert_eq!(reported, expected, "cell starts in the workspace");
     assert_eq!(cells[2].1, 9, "the command's exit code reaches the host");
 }
 
@@ -446,7 +477,7 @@ async fn powershell_session_runs_each_command_in_the_workspace() {
         eprintln!("powershell is not installed; skipping the powershell session test");
         return;
     };
-    let workspace = tempfile::tempdir().expect("temp workspace");
+    let workspace = long_workspace();
     let (status, cells) = run_shell_session(
         Dialect::PowerShell,
         resolved.program,
@@ -461,10 +492,12 @@ async fn powershell_session_runs_each_command_in_the_workspace() {
     assert_eq!(status, 0, "the session exits cleanly after its last frame");
     assert_eq!(cells.len(), 3);
     assert_eq!(cells[0], ("first\r\n".into(), 0));
-    assert_eq!(
-        cells[1].0.trim_end(),
-        workspace.path().to_string_lossy().trim_end(),
-        "cell starts in the workspace"
-    );
+    // `Get-Location` reports the directory the shell resolved to, which is the
+    // long form even when `TEMP` handed the fixture an 8.3 short spelling, so
+    // compare the two paths canonically instead of by the text each side chose.
+    let reported = cells[1].0.trim_end().to_string();
+    let expected = std::fs::canonicalize(workspace.path()).expect("canonical workspace");
+    let reported = std::fs::canonicalize(&reported).unwrap_or_else(|_| reported.into());
+    assert_eq!(reported, expected, "cell starts in the workspace");
     assert_eq!(cells[2].1, 9, "the command's exit code reaches the host");
 }
