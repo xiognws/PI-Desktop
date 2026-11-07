@@ -105,6 +105,8 @@ ToolBudget 一次授予全部资源和容量；等待前驱或资源不占槽位
 | `SubmitPlan` | 低 | 在新的 `.pi/plan/*.md` 工件中保留精确的 Markdown 字节并请求批准 |
 | `EnterGoalMode` | 低 | 主机验证后，将相同的 Agent 从 Agent 移动到 Goal |
 | `SubmitGoal` | 低 | 在新的 `.pi/goal/*.md` 工件中保留精确的 Markdown 字节并请求批准 |
+| `OfficeRead` | 低 | 通过随应用打包的 Python 运行时读取 `.xlsx`、`.docx`、`.pptx` 或 `.pdf`；返回有界结构化内容（[2.3](#23-office-documents)） |
+| `OfficeWrite` | 高 | 通过同一运行时创建或更新这些格式；`append` 追加到既有文档（[2.3](#23-office-documents)） |
 | `Write` | 高 | Create/overwrite 文件；返回写入后的 `tag` |
 | `Edit` | 高 | 通过针对已校验 `tag` 的行锚定操作修改文件（[18](18-line-anchored-edit-contract.md)） |
 | `Bash` | 高 | 执行命令 |

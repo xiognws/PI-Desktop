@@ -71,6 +71,10 @@ class Host {
         ...process.env,
         HOME: home,
         PI_DESKTOP_DATA_DIR: dataDir,
+        // Narrower than HOME: only the global capability root reads it, so the
+        // scenario's market fixtures stay inside the temporary home and never
+        // touch the developer's real ~/.agents.
+        PI_DESKTOP_AGENTS_DIR: join(home, ".agents"),
       },
     });
     this.pending = new Map();
