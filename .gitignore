@@ -84,6 +84,7 @@ worktrees
 !/apps/desktop/resources/plugins/pi.gitlens/
 !/apps/desktop/resources/plugins/io.github.muzimu217.vision-kit/
 !/apps/desktop/resources/plugins/pi.todo/
+!/apps/desktop/resources/plugins/autotest/
 !/apps/desktop/resources/plugins/pi.token-insights/
 # Startup-resilience fixes ship inside these three plugins: each one broke the
 # plugin restore chain at launch (a host API that does not exist, an

@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "id": "pi.autotest",
+  "name": "Autotest",
+  "main": "main.js",
+  "version": "0.1.0",
+  "description": "Soft/hardware integration test rail: requirement decomposition, case generation, a human review gate, script authoring, execution, failure analysis and reporting.",
+  "author": "PI Desktop",
+  "engines": {
+    "piDesktop": ">=0.8.0"
+  },
+  "enabledByDefault": true,
+  "renderer": "renderer/index.mjs",
+  "rendererActions": [
+    "plugin.call"
+  ],
+  "rendererCallMethods": [
+    "meta",
+    "status",
+    "approve",
+    "select",
+    "reveal"
+  ],
+  "permissions": [
+    "agent.tool.register",
+    "agent.complete",
+    "renderer.extension",
+    "agent.prompt.inject"
+  ],
+  "activationEvents": [
+    "onStartup",
+    "onCommand:autotest.open"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "autotest.open",
+        "title": "Autotest: show the active plan",
+        "keywords": [
+          "autotest",
+          "test",
+          "qa",
+          "case",
+          "自动化测试",
+          "用例"
+        ],
+        "category": "Autotest"
+      }
+    ],
+    "agentTools": [
+      {
+        "name": "autotest_requirement",
+        "description": "Decompose a requirement source into features, acceptance criteria and open gaps, and open a test plan for it.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "decompose"
+              ],
+              "description": "decompose the source into features"
+            },
+            "planId": {
+              "type": "string",
+              "description": "existing plan id; omit to create a new plan"
+            },
+            "title": {
+              "type": "string",
+              "description": "plan title"
+            },
+            "source": {
+              "type": "string",
+              "description": "requirement text, PRD excerpt or acceptance criteria"
+            },
+            "gapsConfirmed": {
+              "type": "boolean",
+              "description": "set once a human answered the open gaps"
+            }
+          },
+          "required": [
+            "action",
+            "source"
+          ]
+        }
+      },
+      {
+        "name": "autotest_cases",
+        "description": "Generate the case set for the requirement stage and hand it to the human review gate.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "generate",
+                "regenerate"
+              ],
+              "description": "generate or regenerate the case set"
+            },
+            "planId": {
+              "type": "string",
+              "description": "target plan id"
+            },
+            "focus": {
+              "type": "string",
+              "description": "optional area to emphasise"
+            }
+          },
+          "required": [
+            "action",
+            "planId"
+          ]
+        }
+      },
+      {
+        "name": "autotest_select",
+        "description": "Select or deselect cases before approval, or list them with their current selection.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "select",
+                "deselect"
+              ],
+              "description": "apply the id list as selected or deselected"
+            },
+            "planId": {
+              "type": "string",
+              "description": "target plan id"
+            },
+            "testCaseIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "case ids such as TC-001"
+            }
+          },
+          "required": [
+            "action",
+            "planId",
+            "caseIds"
+          ]
+        }
+      },
+      {
+        "name": "autotest_author",
+        "description": "Author one runnable script per approved case. Refuses while the review gate is closed.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "write"
+              ],
+              "description": "write scripts for the approved case set"
+            },
+            "planId": {
+              "type": "string",
+              "description": "target plan id"
+            },
+            "testCaseIds": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "optional subset of case ids to author in this call; batch at most 3 per call because each script needs its own model call"
+            },
+            "language": {
+              "type": "string",
+              "description": "preferred script language, for example javascript or python"
+            }
+          },
+          "required": [
+            "action",
+            "planId"
+          ]
+        }
+      },
+      {
+        "name": "autotest_run",
+        "description": "Execute the authored scripts and record every result. Refuses while the review gate is closed.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "execute"
+              ],
+              "description": "run the script set"
+            },
+            "planId": {
+              "type": "string",
+              "description": "target plan id"
+            },
+            "testCaseIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "optional subset of case ids"
+            },
+            "timeoutMs": {
+              "type": "number",
+              "description": "per-script timeout in milliseconds"
+            }
+          },
+          "required": [
+            "action",
+            "planId"
+          ]
+        }
+      },
+      {
+        "name": "autotest_diagnose",
+        "description": "Classify every failure of the last run and say whether a script repair is legitimate. Never rewrites a script.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "diagnose"
+              ],
+              "description": "classify the last run"
+            },
+            "planId": {
+              "type": "string",
+              "description": "target plan id"
+            }
+          },
+          "required": [
+            "action",
+            "planId"
+          ]
+        }
+      },
+      {
+        "name": "autotest_report",
+        "description": "Write the run report for the plan as markdown next to its state.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "report"
+              ],
+              "description": "write report.md"
+            },
+            "planId": {
+              "type": "string",
+              "description": "target plan id"
+            }
+          },
+          "required": [
+            "action",
+            "planId"
+          ]
+        }
+      },
+      {
+        "name": "autotest_status",
+        "description": "Show the rail state of one plan, or list every plan when no id is given.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "status"
+              ],
+              "description": "read plan state"
+            },
+            "planId": {
+              "type": "string",
+              "description": "target plan id; omit to list plans"
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      }
+    ],
+    "skills": [
+      "skills/autotest.md"
+    ]
+  },
+  "safetyNotes": "Writes only inside its own plugin data directory. Executes scripts without a shell, passing an argument array, with a per-script timeout and a bounded output buffer. Scripts are written only after a recorded human approval, and failure analysis never rewrites a script or weakens an assertion. Runs no background service and opens no network listener.",
+  "i18n": {
+    "en": {
+      "name": "Autotest",
+      "description": "Soft/hardware integration test rail: requirement decomposition, case generation, a human review gate, script authoring, execution, failure analysis and reporting.",
+      "safetyNotes": "Writes only inside its own plugin data directory. Executes scripts without a shell, passing an argument array, with a per-script timeout and a bounded output buffer. Scripts are written only after a recorded human approval, and failure analysis never rewrites a script or weakens an assertion."
+    },
+    "zh-CN": {
+      "name": "自动化测试",
+      "description": "软硬件集成测试链路：需求分解、用例生成、人工审核门、脚本生成、执行、失败分析与报告。",
+      "safetyNotes": "只写入本插件自己的数据目录。执行脚本不经过 shell，使用参数数组，带单脚本超时与输出上限。只有记录在案的人工批准之后才写脚本，失败分析绝不改写脚本、绝不降低断言强度。不常驻后台服务，不监听网络端口。"
+    }
+  }
+}
