@@ -71,11 +71,17 @@ export type MemoryFailure = {
 
 export type MemoryResult = MemorySuccess | MemoryFailure;
 
-export type MemoryOperation =
+/**
+ * `target` names the store the operation edits. It is unset for the common case
+ * where every operation in a batch belongs to the call's own store; a batch that
+ * mixes stores sets it per operation.
+ */
+export type MemoryOperation = { target?: MemoryTarget } & (
   | { action: "add"; content: string }
   | { action: "replace"; old_text: string; content: string }
   | { action: "patch"; old_text: string; content: string }
-  | { action: "remove"; old_text: string };
+  | { action: "remove"; old_text: string }
+);
 
 function charLimitFor(target: MemoryTarget): number {
   return target === "user" ? USER_CHAR_LIMIT : MEMORY_CHAR_LIMIT;
