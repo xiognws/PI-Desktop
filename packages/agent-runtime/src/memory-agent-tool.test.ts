@@ -259,3 +259,90 @@ describe("the memory tool scrubs what it stores", () => {
     expect(result.details.masked).toBeUndefined();
   });
 });
+
+/** Host that keeps both stores separate, so a misrouted write is visible. */
+function twoStoreHost(initial: { memory?: string[]; user?: string[] } = {}) {
+  const state = { memory: [...(initial.memory ?? [])], user: [...(initial.user ?? [])] };
+  const writes: Array<{ target: string; entries: string[] }> = [];
+  return {
+    state,
+    writes,
+    call: async <T>(method: string, params: unknown): Promise<T> => {
+      const input = params as { target?: "memory" | "user"; entries?: string[] };
+      if (method === "memory.entries") {
+        return { entries: [...(state[input.target ?? "memory"] ?? [])] } as T;
+      }
+      if (method === "memory.writeEntries") {
+        const store = input.target ?? "memory";
+        state[store] = [...(input.entries ?? [])];
+        writes.push({ target: store, entries: [...state[store]] });
+        return { entries: [...state[store]] } as T;
+      }
+      throw new Error(`unexpected method ${method}`);
+    },
+  };
+}
+
+describe("a batch may address both stores", () => {
+  it("routes each operation to the store it names", async () => {
+    const host = twoStoreHost({ memory: ["project uses pnpm"], user: ["prefers short replies"] });
+    const tool = createMemoryTool(host as never);
+    const result = (await (tool.execute as never as (
+      id: string,
+      params: unknown,
+    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>)("call-1", {
+      target: "memory",
+      operations: [
+        { action: "add", content: "release tags are signed" },
+        { action: "add", target: "user", content: "works in UTC+8" },
+      ],
+    }));
+
+    // The pre-fix code dropped the per-operation target and wrote both entries into
+    // `memory`, then reported success, so the user store silently lost its entry.
+    expect(host.state.memory).toEqual(["project uses pnpm", "release tags are signed"]);
+    expect(host.state.user).toEqual(["prefers short replies", "works in UTC+8"]);
+    expect(result.details.targets).toEqual(["memory", "user"]);
+    expect(result.content[0].text).toContain("works in UTC+8");
+  });
+
+  it("writes nothing in either store when one operation is refused", async () => {
+    const host = twoStoreHost({ memory: ["keep me"], user: ["keep me too"] });
+    const tool = createMemoryTool(host as never);
+    const result = (await (tool.execute as never as (
+      id: string,
+      params: unknown,
+    ) => Promise<{ content: Array<{ text: string }> }>)("call-2", {
+      target: "memory",
+      operations: [
+        { action: "add", content: "should not land" },
+        { action: "remove", target: "user", old_text: "not present" },
+      ],
+    }));
+
+    expect(host.state.memory).toEqual(["keep me"]);
+    expect(host.state.user).toEqual(["keep me too"]);
+    expect(host.writes).toHaveLength(0);
+    expect(result.content[0].text).toContain("No entry matched");
+  });
+
+  it("rejects an unknown per-operation target instead of dropping it", () => {
+    const parsed = readMemoryOperations({
+      target: "memory",
+      operations: [{ action: "add", target: "project", content: "x" }],
+    });
+    expect(parsed).toHaveProperty("error");
+    expect((parsed as { error: string }).error).toContain("target must be");
+  });
+
+  it("keeps one store's batch unchanged when the call names only that store", async () => {
+    const host = twoStoreHost({ memory: ["stale"], user: [] });
+    const tool = createMemoryTool(host as never);
+    await (tool.execute as never as (id: string, params: unknown) => Promise<unknown>)("call-3", {
+      target: "memory",
+      operations: [{ action: "remove", old_text: "stale" }, { action: "add", content: "fresh" }],
+    });
+    expect(host.state.memory).toEqual(["fresh"]);
+    expect(host.state.user).toEqual([]);
+  });
+});

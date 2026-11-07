@@ -14486,3 +14486,78 @@ describe("parallel policy tool provenance", () => {
     } finally { internal.extensionRunner = undefined; await runtime.dispose(); }
   });
 });
+
+describe("skill review triggering (Hermes background_review port)", () => {
+  /**
+   * Regression for the dead trigger: `reviewToolsFrom(this.declaredTools())`
+   * could never satisfy `canReview`, because `skill_manage` and `memory` are
+   * ancillary tools that reach the request only after the model spends a
+   * ToolSearch on them. Every turn of every session was skipped with
+   * `no-skill-tools`, so the fork - the only automatic write path into the skill
+   * library - never ran. The trigger now reads the catalog, and the allowlist
+   * still bounds what the fork may call.
+   */
+  const reviewEvents = (events: AgentEventEnvelope[]) =>
+    events.filter((envelope) => envelope.event.type === "skill_review");
+
+  it("has skill_manage in the catalog while the declared request omits it", () => {
+    const runtime = createRuntime({
+      pluginSkills: [{ id: "demo/release-notes", name: "Release notes", description: "d" }],
+    });
+    const internal = runtime as unknown as {
+      toolCatalog: Map<string, AgentTool>;
+      declaredTools(): AgentTool[];
+    };
+    expect(internal.toolCatalog.has("skill_manage")).toBe(true);
+    expect(internal.toolCatalog.has("memory")).toBe(true);
+    // The deferred set is what the model must activate; it is not a statement
+    // about what a background fork may use.
+    expect(internal.declaredTools().map((tool) => tool.name)).not.toContain("skill_manage");
+    return runtime.dispose();
+  });
+
+  it("reaches the fork instead of skipping with no-skill-tools", async () => {
+    const events: AgentEventEnvelope[] = [];
+    const runtime = createRuntime({
+      pluginSkills: [{ id: "demo/release-notes", name: "Release notes", description: "d" }],
+      onEvent: (envelope) => events.push(envelope as AgentEventEnvelope),
+    });
+    const internal = runtime as unknown as {
+      turnToolCalls: number;
+      lastSkillReviewAt: number;
+      skillReviewPolicy: { enabled?: boolean; afterToolCalls?: number; minIntervalSec?: number };
+      runSkillReviewIfDue(): Promise<void>;
+    };
+    internal.skillReviewPolicy = { enabled: true, afterToolCalls: 1, minIntervalSec: 0 };
+    internal.turnToolCalls = 3;
+    internal.lastSkillReviewAt = 0;
+    subagentRuns.calls.length = 0;
+
+    try {
+      await internal.runSkillReviewIfDue();
+
+      // The gate opened: the pre-fix code returned here without spawning anyone.
+      // Two attempts at most - the first answered without reading, so the second
+      // carries the "you never looked" correction.
+      expect(subagentRuns.calls).toHaveLength(2);
+      const fork = subagentRuns.calls[0] as { tools: Array<{ name: string }> };
+      const names = fork.tools.map((tool) => tool.name);
+      expect(names).toContain("skill_manage");
+      expect(names).toContain("Skill");
+      // The allowlist still bounds the fork: nothing outside it is handed over.
+      expect(names).not.toContain("Bash");
+      expect(names).not.toContain("Write");
+      expect(names).not.toContain("Edit");
+      expect(reviewEvents(events).some((envelope) => envelope.event.type === "skill_review")).toBe(true);
+      expect(
+        reviewEvents(events).some(
+          (envelope) =>
+            envelope.event.type === "skill_review" &&
+            (envelope.event as { reason?: string }).reason === "no-skill-tools",
+        ),
+      ).toBe(false);
+    } finally {
+      await runtime.dispose();
+    }
+  });
+});

@@ -2591,7 +2591,15 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       return skipped("cooldown");
     }
 
-    const tools = reviewToolsFrom(this.declaredTools());
+    // The catalog, not `declaredTools()`. `skill_manage` and `memory` are
+    // ancillary: they live in the on-demand catalog and reach the request only
+    // after the model spends a ToolSearch on them. Reading the declared set here
+    // made `canReview` false for every turn of every session, so the review never
+    // ran - the fork is the only automatic write path into the skill library, and
+    // it was unreachable. The fork still receives the session's own tool objects,
+    // and REVIEW_TOOL_ALLOWLIST bounds what it may call, so widening the source
+    // does not widen what a review can do.
+    const tools = reviewToolsFrom([...this.toolCatalog.values()]);
     // A fork without `skill_manage` and `Skill` would pay a full completion and
     // could not land a single change.
     if (!canReview(tools)) return skipped("no-skill-tools");

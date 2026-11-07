@@ -29,6 +29,7 @@ import {
   USER_CHAR_LIMIT,
   type MemoryOperation,
   type MemoryResult,
+  type MemorySuccess,
   type MemoryTarget,
 } from "./memory-store.js";
 import { scrubSecretsInBatch } from "@pi-workspace/shared";
@@ -50,7 +51,7 @@ const MEMORY_TOOL_DESCRIPTION = [
   "- `patch` replaces ONE span inside an entry and keeps the rest verbatim. This is the usual way to correct or extend a note. `old_text` must occur exactly once in the matched entry.",
   "- `replace` swaps a WHOLE entry. Use it when the entry is wrong from the start.",
   "- `remove` deletes a whole entry. Use it to drop stale or superseded notes.",
-  "- `batch` applies several operations atomically against the final size limit, so one call can remove stale entries and add new ones in the same turn.",
+  "- `batch` applies several operations atomically against the final size limit, so one call can remove stale entries and add new ones in the same turn. Put `target` on an operation to edit a store other than the call's own `target`.",
   "",
   "`old_text` only LOCATES an entry; it does not have to be the whole entry, but it must select exactly one. Copy it from the entry as written. If nothing matches, the result lists the closest entries — copy from one of those and retry in this turn.",
   "",
@@ -66,6 +67,12 @@ const operationSchema = Type.Object(
     action: Type.Union(
       [Type.Literal("add"), Type.Literal("replace"), Type.Literal("patch"), Type.Literal("remove")],
       { description: "What to do with the matched entry." },
+    ),
+    target: Type.Optional(
+      Type.Union([Type.Literal("memory"), Type.Literal("user")], {
+        description:
+          "Which store this operation edits. Defaults to the call's `target`; set it to mix both stores in one batch.",
+      }),
     ),
     content: Type.Optional(
       Type.String({
@@ -166,20 +173,32 @@ export function readMemoryOperations(
       const action = entry.action;
       const content = asText(entry.content);
       const oldText = asText(entry.old_text);
+      // An operation may name its own store. Silently dropping the key - which is
+      // what happened before this check - made a batch that meant "this belongs to
+      // the user, that belongs to the project" land wholly in the outer target and
+      // report success, so the model never learned it had written the wrong list.
+      if (entry.target !== undefined && asTarget(entry.target) === undefined) {
+        return {
+          error: `${position}: target must be "memory" or "user", not ${JSON.stringify(entry.target)}.`,
+        };
+      }
+      // Carry the per-operation store through normalisation; dropping it here is
+      // what made the key look accepted while the write went to the outer target.
+      const ownTarget = entry.target === undefined ? {} : { target: asTarget(entry.target) as MemoryTarget };
       if (action === "add") {
         if (!content?.trim()) return { error: `${position}: content is required for add.` };
-        operations.push({ action: "add", content });
+        operations.push({ action: "add", content, ...ownTarget });
         continue;
       }
       if (action === "replace" || action === "patch") {
         if (!oldText?.trim()) return { error: `${position}: old_text is required for ${action}.` };
         if (!content?.trim()) return { error: `${position}: content is required for ${action}.` };
-        operations.push({ action, old_text: oldText, content });
+        operations.push({ action, old_text: oldText, content, ...ownTarget });
         continue;
       }
       if (action === "remove") {
         if (!oldText?.trim()) return { error: `${position}: old_text is required for remove.` };
-        operations.push({ action: "remove", old_text: oldText });
+        operations.push({ action: "remove", old_text: oldText, ...ownTarget });
         continue;
       }
       return {
@@ -287,30 +306,71 @@ export function createMemoryTool(host: MemoryToolHost): AgentTool {
           isError: true,
         };
       }
-      const read = await host.call<{ entries?: string[] }>("memory.entries", { target });
-      const current = Array.isArray(read.entries) ? read.entries : [];
-      const applied =
-        parsed.operations.length === 1
-          ? applyMemoryOperation(target, current, parsed.operations[0])
-          : applyMemoryBatch(target, current, parsed.operations);
-      if (!applied.success) {
-        // A refused edit is the model's to fix, not a tool failure: report it as
-        // text so the model can retry in the same turn.
-        return {
-          content: [{ type: "text", text: renderMemoryResult(target, applied) }],
-          details: { errorCode: `MEMORY_${applied.failureClass.toUpperCase()}` },
-        };
+      const readEntries = async (store: MemoryTarget): Promise<string[]> => {
+        const read = await host.call<{ entries?: string[] }>("memory.entries", { target: store });
+        return Array.isArray(read.entries) ? read.entries : [];
+      };
+      // Group the operations by the store each one addresses. A batch that only
+      // names the outer target is the single-group case and behaves exactly as
+      // before, including the all-or-nothing budget check over the final result.
+      const groups = new Map<MemoryTarget, MemoryOperation[]>();
+      for (const operation of parsed.operations) {
+        const store = operation.target ?? target;
+        const bucket = groups.get(store);
+        if (bucket) bucket.push(operation);
+        else groups.set(store, [operation]);
       }
+      const stores = [...groups.keys()];
+      const currentByStore = new Map<MemoryTarget, string[]>();
+      for (const store of stores) currentByStore.set(store, await readEntries(store));
+
+      // Every store is validated before anything is written, so a batch that
+      // fails on its second store cannot leave the first one half-applied.
+      const staged = new Map<MemoryTarget, MemorySuccess>();
+      for (const store of stores) {
+        const operations = groups.get(store) ?? [];
+        const current = currentByStore.get(store) ?? [];
+        const result =
+          operations.length === 1
+            ? applyMemoryOperation(store, current, operations[0])
+            : applyMemoryBatch(store, current, operations);
+        if (!result.success) {
+          // A refused edit is the model's to fix, not a tool failure: report it as
+          // text so the model can retry in the same turn.
+          return {
+            content: [{ type: "text", text: renderMemoryResult(store, result) }],
+            details: { errorCode: `MEMORY_${result.failureClass.toUpperCase()}` },
+          };
+        }
+        staged.set(store, result);
+      }
+      const entriesByStore = new Map<MemoryTarget, string[]>(
+        stores.map((store) => [store, staged.get(store)?.entries ?? currentByStore.get(store) ?? []]),
+      );
       // Memory becomes prompt content, so it is re-sent to the provider on every later
       // turn. Credential-shaped text is masked on the way in, with the same vocabulary
       // the log redactor uses, in the other direction: what leaves the process rather
       // than what is written to a local file. A token caught anywhere in the batch is
       // masked everywhere in it, because the model often states a key once with its
-      // label and then repeats it bare in the next entry.
-      const safeEntries = scrubSecretsInBatch(applied.entries);
-      const masked = safeEntries.some((entry, index) => entry !== applied.entries[index]);
+      // label and then repeats it bare in the next entry. Masking runs over the whole
+      // batch first so one store cannot keep a token the other one stripped.
+      const scrubbed = new Map<MemoryTarget, { entries: string[]; masked: boolean }>();
+      for (const store of stores) {
+        const entries = entriesByStore.get(store) ?? [];
+        const safe = scrubSecretsInBatch(entries);
+        scrubbed.set(store, {
+          entries: safe,
+          masked: safe.some((entry, index) => entry !== entries[index]),
+        });
+      }
+      const masked = [...scrubbed.values()].some((entry) => entry.masked);
       try {
-        await host.call("memory.writeEntries", { target, entries: safeEntries });
+        for (const store of stores) {
+          await host.call("memory.writeEntries", {
+            target: store,
+            entries: scrubbed.get(store)?.entries ?? [],
+          });
+        }
       } catch (error) {
         return {
           content: [
@@ -323,14 +383,29 @@ export function createMemoryTool(host: MemoryToolHost): AgentTool {
           isError: true,
         };
       }
+      const rendered = stores.map((store) => {
+        const result = staged.get(store);
+        const entries = scrubbed.get(store)?.entries ?? [];
+        return renderMemoryResult(store, result ? { ...result, entries } : {
+          success: true,
+          message: "Entry added.",
+          entries,
+        });
+      });
+      const details: Record<string, unknown> = {
+        entries: (entriesByStore.get(target) ?? []).length,
+        target,
+      };
+      if (stores.length > 1) details.targets = stores;
+      if (masked) details.masked = true;
       return {
         content: [
           {
             type: "text",
-            text: renderMemoryResult(target, applied) + (masked ? MEMORY_SCRUB_NOTE : ""),
+            text: rendered.join("\n\n") + (masked ? MEMORY_SCRUB_NOTE : ""),
           },
         ],
-        details: { entries: applied.entries.length, target, ...(masked ? { masked: true } : {}) },
+        details,
       };
     },
   };
