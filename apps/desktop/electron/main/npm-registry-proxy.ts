@@ -1,6 +1,7 @@
 import { request as httpRequest, createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { connect, type Socket } from "node:net";
+import type { Duplex } from "node:stream";
 
 type ProxyHandler<T> = (proxyUrl: string) => Promise<T>;
 
@@ -59,19 +60,42 @@ function forwardHttpRequest(request: IncomingMessage, response: ServerResponse):
   request.pipe(upstream);
 }
 
-function handleConnect(request: IncomingMessage, client: Socket, head: Buffer): void {
+function handleConnect(
+  request: IncomingMessage,
+  tunnel: Duplex,
+  head: Buffer,
+  sockets: Set<Socket>,
+): void {
+  // The server types a CONNECT socket as a Duplex stream; every peer here is a
+  // net.Socket, which is what pipe/destroy need.
+  const client = tunnel as Socket;
   const authority = parseAuthority(request.url ?? "");
   if (!authority || !allowedAuthority(authority.host, authority.port)) {
     client.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
     return;
   }
   const upstream = connect(Number(authority.port), authority.host);
+  // The server's `connection` listener never sees this socket: it is outbound, so
+  // shutdown has to know about it explicitly or a tunnel still open when the install
+  // finishes keeps the proxy, and the whole operation, alive.
+  sockets.add(upstream);
+  upstream.once("close", () => sockets.delete(upstream));
+  // Tear the pair down from whichever side ends first. Without this a client that
+  // closed half of a CONNECT tunnel left the upstream socket writable, and the
+  // process waited on it.
+  const teardown = () => {
+    client.destroy();
+    upstream.destroy();
+  };
+  client.once("close", teardown);
+  client.once("error", teardown);
+  upstream.once("close", () => client.destroy());
+  upstream.on("error", () => client.destroy());
   upstream.once("connect", () => {
     client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
     if (head.length) upstream.write(head);
     client.pipe(upstream).pipe(client);
   });
-  upstream.on("error", () => client.destroy());
 }
 
 async function closeServer(server: ReturnType<typeof createServer>, sockets: Set<Socket>): Promise<void> {
@@ -84,7 +108,7 @@ async function closeServer(server: ReturnType<typeof createServer>, sockets: Set
 export async function withRegistryOnlyProxy<T>(handler: ProxyHandler<T>): Promise<T> {
   const sockets = new Set<Socket>();
   const server = createServer((request, response) => forwardHttpRequest(request, response));
-  server.on("connect", handleConnect);
+  server.on("connect", (request, socket, head) => handleConnect(request, socket, head, sockets));
   server.on("connection", (socket) => {
     sockets.add(socket);
     socket.once("close", () => sockets.delete(socket));

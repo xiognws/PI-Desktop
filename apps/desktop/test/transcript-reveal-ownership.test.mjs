@@ -58,3 +58,25 @@ test("both transcript hooks route the reveal edge through the shared rule", asyn
     /ownership === "reading-position"[\s\S]*?pinnedRef\.current = false/,
   );
 });
+
+test("an explicit latest replaces a pending restore instead of recording it", async () => {
+  const scrollHook = await read(
+    "../src/features/chat/transcript/hooks/useTranscriptScroll.ts",
+  );
+  // The sampler in the reading-position hook gives up while a restore is
+  // pending, so a jump started during one left the old unpinned bookmark in
+  // place and the next reveal restored it (#1771 keeps that bookmark
+  // authoritative). Explicit latest must write the follow bookmark itself.
+  assert.match(
+    scrollHook,
+    /const recordFollowReadingPosition = useCallback\(\(\) => \{\s*if \(!sessionId\) return;\s*sessionReadingState\(sessionId\)\.position = \{\s*pinned: true/,
+  );
+  assert.match(
+    scrollHook,
+    /const jumpToLatest = useCallback[\s\S]*?recordFollowReadingPosition\(\);/,
+  );
+  assert.doesNotMatch(
+    scrollHook,
+    /const jumpToLatest = useCallback[\s\S]*?rememberReadingPosition\(\);[\s\S]*?latestNavigation\.start/,
+  );
+});

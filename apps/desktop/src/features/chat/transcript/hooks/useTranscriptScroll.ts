@@ -43,6 +43,7 @@ import type { TranscriptSearchTarget } from "../../../../lib/transcript-reading"
 import { useTranscriptSearchFocus } from "../../../../hooks/use-transcript-search-focus";
 import {
   getTranscriptReadingPosition,
+  sessionReadingState,
   transcriptRevealOwnership,
 } from "../../../../lib/transcript-reading-position";
 import { useTranscriptReadingPosition, type RestoreTranscriptReading } from "../../../../hooks/use-transcript-reading-position";
@@ -153,6 +154,16 @@ export function useTranscriptScroll({
     windowSize, contentVersion: messages, onPosition: recordScrollPosition,
     onRestore: onRestoreReading, onMissing: readingPositionMissing,
   });
+
+  // Follow mode's bookmark: bottom, no reading anchor. Recorded directly
+  // rather than sampled, because a hide clamps the scroller to 0 and a pending
+  // restore would make the sampler give up.
+  const recordFollowReadingPosition = useCallback(() => {
+    if (!sessionId) return;
+    sessionReadingState(sessionId).position = {
+      pinned: true, offset: 0, scrollTop: scrollRef.current?.scrollTop ?? 0, windowSize,
+    };
+  }, [scrollRef, sessionId, windowSize]);
 
   // State transition only: completion calls this after starting its own
   // prompt navigation, which must be allowed to finish.
@@ -503,7 +514,9 @@ export function useTranscriptScroll({
     pinnedRef.current = true;
     setShowJump(false);
     scrollToBottom();
-    rememberReadingPosition();
+    // Same hazard as jumpToLatest: a pending restore would swallow the sample
+    // and leave an unpinned bookmark for the next reveal to restore.
+    recordFollowReadingPosition();
     scheduleFollowScroll();
   }, [
     cancelFollowScroll,
@@ -513,8 +526,8 @@ export function useTranscriptScroll({
     latestNavigation,
     readingWindow,
     paneVisible,
+    recordFollowReadingPosition,
     releaseDisclosureAnchor,
-    rememberReadingPosition,
     scheduleFollowScroll,
     scrollToBottom,
   ]);
@@ -771,13 +784,18 @@ export function useTranscriptScroll({
     releaseDisclosureAnchor();
     pinnedRef.current = true;
     setShowJump(false);
-    // A hide/eviction must still retain the accepted follow intent.
-    rememberReadingPosition();
+    // A hide/eviction must still retain the accepted follow intent, and that
+    // intent has to replace any earlier unpinned bookmark: an explicit latest
+    // is the reader declaring they are done with the old position. Recording
+    // it through the reading-position hook gives up when a restore is still
+    // pending (issue #1771 keeps that bookmark authoritative on reveal), so
+    // writing the follow bookmark here is what lets a reveal read "pinned".
+    recordFollowReadingPosition();
     latestNavigation.start(() => {
       arrive?.();
       scrollToBottom();
     });
-  }, [cancelFollowScroll, cancelHistoryPaging, cancelReadingPosition, latestNavigation, releaseDisclosureAnchor, rememberReadingPosition, scrollToBottom]);
+  }, [cancelFollowScroll, cancelHistoryPaging, cancelReadingPosition, latestNavigation, recordFollowReadingPosition, releaseDisclosureAnchor, scrollToBottom]);
 
   // D269: history progression follows the visible top boundary, not only a
   // native scroll event. A tail page can collapse to less than one viewport,
