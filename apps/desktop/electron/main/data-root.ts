@@ -119,18 +119,21 @@ export function applyReleaseDataRoot(development: boolean): string | null {
     );
     process.env.PI_DESKTOP_DATA_DIR = dataDir;
   }
-  adoptDirectory(
-    userData,
-    [
-      join(
-        app.getPath("appData"),
-        development
-          ? LEGACY_DEVELOPMENT_INSTALLATION_NAME
-          : LEGACY_INSTALLATION_NAME,
-      ),
-    ],
-    "user data",
-  );
+  // `appData` is read defensively: it throws before Electron has resolved the
+  // profile paths, and a start-up that cannot name a legacy profile must still
+  // launch with the new one instead of failing outright.
+  let legacyUserData: string | null = null;
+  try {
+    legacyUserData = join(
+      app.getPath("appData"),
+      development
+        ? LEGACY_DEVELOPMENT_INSTALLATION_NAME
+        : LEGACY_INSTALLATION_NAME,
+    );
+  } catch (error) {
+    console.warn("[data-root] cannot resolve appData; no legacy profile is adopted:", error);
+  }
+  adoptDirectory(userData, legacyUserData ? [legacyUserData] : [], "user data");
   const localAppData = process.env.LOCALAPPDATA;
   if (localAppData) {
     adoptDirectory(browsers, [join(localAppData, "ms-playwright")], "browsers");
