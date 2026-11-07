@@ -1168,9 +1168,9 @@ impl UserSkillRegistry {
         let root = match directory_skill_root(&document, &skills_dir) {
             Some(dir) => dir,
             None => {
-                let parent = document
-                    .parent()
-                    .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: skill has no parent directory"))?;
+                let parent = document.parent().ok_or_else(|| {
+                    anyhow::anyhow!("SKILL_INVALID: skill has no parent directory")
+                })?;
                 let target_dir = parent.join(&record.id);
                 fs::create_dir_all(&target_dir)?;
                 fs::rename(&document, target_dir.join("SKILL.md"))
@@ -1593,12 +1593,12 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
     }
 }
 
-pub mod tidy;
 mod package_sync;
 /// Package bounds are asserted in their own module: `tests.rs` is close to the
 /// rust file-size limit, and these tests share one fixture.
 #[cfg(test)]
 mod package_tests;
+pub mod tidy;
 
 #[cfg(test)]
 mod tests;
