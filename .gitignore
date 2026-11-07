@@ -119,3 +119,16 @@ __pycache__/
 
 # Local scratch work (audit scripts, throwaway output)
 .scratch/
+
+# E2E and fixture output that lands in the checkout rather than a scratch dir:
+# the storage suites write .artifacts/ beside the repo root, the transcript
+# history suite falls back to a repository-root temp directory when
+# PI_SCRATCH_DIR is unset, and an Electron fallback-UI build leaves its own
+# profile directory inside the app. None of it is product data.
+/.artifacts/
+/history-loading-*/
+/apps/desktop/.fallback-ui-*/
+
+# The plugin host writes a CommonJS marker package.json into every plugin
+# folder it loads, not just the prompt-enhancement one above.
+/apps/desktop/resources/plugins/*/package.json

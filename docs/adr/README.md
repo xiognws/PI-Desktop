@@ -21,7 +21,6 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
-| bundled-plugin-curation | [Curate the bundled plugin set](bundled-plugin-curation.md) | Accepted |
 | composer-pasted-directory-references | [Composer pasted directory references](composer-pasted-directory-references.md) | Accepted |
 | plugin-projects-list | [Read-only durable project enumeration for plugins](plugin-projects-list.md) | Accepted |
 | append-only-review-state | [Append-only review state](append-only-review-state.md) | Implemented candidate |
@@ -413,3 +412,5 @@ Each ADR includes:
 | 0379 | [Skill authoring is a core tool](0379-skill-authoring-is-a-core-tool.md) | Accepted (amends ADR 0377) |
 | 0380 | [The agent writes its own memory as a flat entry list](0380-agent-writes-its-own-memory.md) | Accepted (amends the memory-store spec §9) |
 | 0381 | [The product is Pi-Workspace, and storage identifiers move with the data](0381-rebrand-to-pi-workspace.md) | Accepted (amends ADR 0278) |
+| 0382 | [Ship a pinned Python runtime for Office and file work](0382-bundled-python-runtime.md) | Accepted |
+| 0383 | [Curate the bundled plugin set](0383-bundled-plugin-curation.md) | Accepted (extends ADR 0241 and ADR 0378) |
