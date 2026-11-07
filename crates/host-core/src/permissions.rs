@@ -119,15 +119,15 @@ pub struct PermissionManager {
 impl PermissionManager {
     pub fn tool_risk_with_declared(tool_name: &str, declared: Option<&str>) -> Risk {
         match tool_name {
-                // The agent's own bookkeeping: reading and writing its memory store
-                // (ADR 0371) and its skill library. Neither touches user files, runs a
-                // process, or reaches the network — they write inside the app's data
-                // root — so they sit with the other low-risk tools and never raise a
-                // card. `Remember` is the historical name for the same write; both are
-                // listed so neither tool name drifts back into the approval path.
-                "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
-                | "memory" | "skill_manage" | "Skill" => Risk::Low,
-                "Write" | "Edit" | "Bash" | "GenerateImages" | "Computer" => Risk::High,
+            // The agent's own bookkeeping: reading and writing its memory store
+            // (ADR 0371) and its skill library. Neither touches user files, runs a
+            // process, or reaches the network — they write inside the app's data
+            // root — so they sit with the other low-risk tools and never raise a
+            // card. `Remember` is the historical name for the same write; both are
+            // listed so neither tool name drifts back into the approval path.
+            "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
+            | "memory" | "skill_manage" | "Skill" => Risk::Low,
+            "Write" | "Edit" | "Bash" | "GenerateImages" | "Computer" => Risk::High,
             name if name.starts_with("plugin_") => match declared {
                 Some("low") => Risk::Low,
                 Some("high") => Risk::High,
@@ -471,12 +471,16 @@ mod tests {
         // in the foreground must not interrupt a turn either.
         for tool in ["memory", "skill_manage", "Skill"] {
             assert!(
-                matches!(PermissionManager::tool_risk_with_declared(tool, None), Risk::Low),
+                matches!(
+                    PermissionManager::tool_risk_with_declared(tool, None),
+                    Risk::Low
+                ),
                 "{tool} must stay low risk"
             );
         }
     }
 
+    #[test]
     fn accept_edits_allows_file_tools_only() {
         let pm = PermissionManager::default();
         for tool in ["Write", "Edit"] {

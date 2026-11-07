@@ -225,9 +225,9 @@ pub struct SessionTotals {
 /// count the whole session. Turns the user deleted are gone with their rows,
 /// which is exactly what the ledger itself says.
 pub fn session_totals(db: &Database, session_id: &str) -> Result<SessionTotals> {
-    let mut statement = db
-        .conn()
-        .prepare("SELECT input_tokens, output_tokens, usage_json FROM turns WHERE session_id = ?1")?;
+    let mut statement = db.conn().prepare(
+        "SELECT input_tokens, output_tokens, usage_json FROM turns WHERE session_id = ?1",
+    )?;
     let mut totals = SessionTotals::default();
     let mut rows = statement.query(params![session_id])?;
     while let Some(row) = rows.next()? {
@@ -248,11 +248,15 @@ pub fn session_totals(db: &Database, session_id: &str) -> Result<SessionTotals> 
             continue;
         };
         let token = |key: &str| parsed.get(key).and_then(Value::as_i64).unwrap_or(0).max(0);
-        totals.cache_read_tokens = totals.cache_read_tokens.saturating_add(token("cacheReadTokens"));
+        totals.cache_read_tokens = totals
+            .cache_read_tokens
+            .saturating_add(token("cacheReadTokens"));
         totals.cache_write_tokens = totals
             .cache_write_tokens
             .saturating_add(token("cacheWriteTokens"));
-        totals.reasoning_tokens = totals.reasoning_tokens.saturating_add(token("reasoningTokens"));
+        totals.reasoning_tokens = totals
+            .reasoning_tokens
+            .saturating_add(token("reasoningTokens"));
     }
     Ok(totals)
 }
@@ -354,7 +358,9 @@ mod tests {
         assert_eq!(session_totals(&db, "missing-session").unwrap().turns, 0);
 
         for (index, (input, output, cached, reasoning)) in
-            [(10_i64, 2_i64, 40_i64, 1_i64), (30, 5, 60, 4)].into_iter().enumerate()
+            [(10_i64, 2_i64, 40_i64, 1_i64), (30, 5, 60, 4)]
+                .into_iter()
+                .enumerate()
         {
             let turn = super::super::begin_turn(&db, &session.id, None, None).unwrap();
             let usage = json!({

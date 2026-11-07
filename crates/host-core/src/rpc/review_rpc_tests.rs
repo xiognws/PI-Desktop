@@ -13,6 +13,28 @@ impl Fixture {
     async fn new() -> Self {
         let data = tempdir().unwrap();
         let root = tempdir().unwrap();
+        // `session.create` is handed `root.path()` and every later target is built
+        // by joining that same base, so the session's workspace root and the
+        // targets are spelled the way `temp_dir()` spells them. The tool
+        // resolver canonicalizes, and on a host whose `TEMP` is an 8.3 short path
+        // that turns `C:\Users\ADMINI~1\...` into `C:\Users\Administrator\...`,
+        // so containment ends up decided by spelling rather than by directory.
+        // Creating the root through its canonical parent gives every later `join`
+        // the long form, which is what the resolver compares against.
+        let root = {
+            let probe = std::fs::canonicalize(root.path()).expect("canonical project root");
+            // `canonicalize` may answer with the `\\?\` verbatim prefix, which the
+            // resolver's lexical normalization strips from only one side of a
+            // comparison. Keep the plain long spelling instead.
+            let plain = probe.to_string_lossy();
+            let plain = plain.strip_prefix("\\\\?\\").unwrap_or(&plain);
+            let plain = std::path::PathBuf::from(plain);
+            if plain == root.path() {
+                root
+            } else {
+                TempDir::new_in(plain.parent().expect("project root parent")).expect("project root")
+            }
+        };
         let mut app = AppState::open(data.path()).unwrap();
         app.handshook = true;
         let state = Arc::new(Mutex::new(app));

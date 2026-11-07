@@ -104,7 +104,10 @@ pub fn tidy_library(root: &Path, policy: &SkillTidyPolicy) -> Result<SkillTidyRe
             .with_context(|| format!("read {}", document.display()))?;
         let chars = body.chars().count();
         if chars > policy.max_document_chars {
-            report.oversized.push(OversizedDocument { id: id.clone(), chars });
+            report.oversized.push(OversizedDocument {
+                id: id.clone(),
+                chars,
+            });
         }
 
         let references_dir = skill.path().join("references");
@@ -169,7 +172,10 @@ pub fn tidy_library(root: &Path, policy: &SkillTidyPolicy) -> Result<SkillTidyRe
 
         for (relative, reason) in &doomed {
             let path = root.join(relative);
-            let bytes = contents.get(relative).map(|text| text.len() as u64).unwrap_or(0);
+            let bytes = contents
+                .get(relative)
+                .map(|text| text.len() as u64)
+                .unwrap_or(0);
             if !policy.dry_run {
                 match fs::remove_file(&path) {
                     Ok(()) => {}
@@ -193,7 +199,9 @@ pub fn tidy_library(root: &Path, policy: &SkillTidyPolicy) -> Result<SkillTidyRe
 
     report.references_removed.sort();
     report.unlinked.sort();
-    report.oversized.sort_by(|left, right| right.chars.cmp(&left.chars));
+    report
+        .oversized
+        .sort_by(|left, right| right.chars.cmp(&left.chars));
     Ok(report)
 }
 
@@ -296,7 +304,10 @@ mod tests {
 
         let report = tidy_library(&root, &SkillTidyPolicy::default()).expect("tidy");
 
-        assert_eq!(report.references_removed, vec!["review/references/scratch.md"]);
+        assert_eq!(
+            report.references_removed,
+            vec!["review/references/scratch.md"]
+        );
         assert!(dir.join("references/pitfalls.md").is_file());
         assert!(!dir.join("references/scratch.md").exists());
     }
@@ -312,7 +323,10 @@ mod tests {
 
         let report = tidy_library(&root, &SkillTidyPolicy::default()).expect("tidy");
 
-        assert_eq!(report.references_removed, vec!["review/references/notes.md"]);
+        assert_eq!(
+            report.references_removed,
+            vec!["review/references/notes.md"]
+        );
         assert!(dir.join("references/pitfalls.md").is_file());
         assert!(!dir.join("references/notes.md").exists());
         assert_eq!(report.bytes_freed, "same lesson\n".len() as u64);
@@ -338,7 +352,10 @@ mod tests {
         let dir = skill(&root, "big", &body);
         reference(&dir, "topic.md", "linked: big\n"); // mentions "big" via body? no
 
-        let policy = SkillTidyPolicy { max_document_chars: 50, ..Default::default() };
+        let policy = SkillTidyPolicy {
+            max_document_chars: 50,
+            ..Default::default()
+        };
         let report = tidy_library(&root, &policy).expect("tidy");
 
         assert_eq!(report.oversized.len(), 1);
@@ -357,11 +374,20 @@ mod tests {
         reference(&dir, "pitfalls.md", "lesson\n");
         reference(&dir, "scratch.md", "");
 
-        let policy = SkillTidyPolicy { dry_run: true, ..Default::default() };
+        let policy = SkillTidyPolicy {
+            dry_run: true,
+            ..Default::default()
+        };
         let report = tidy_library(&root, &policy).expect("tidy");
 
-        assert_eq!(report.references_removed, vec!["review/references/scratch.md"]);
-        assert!(dir.join("references/scratch.md").is_file(), "dry run keeps the file");
+        assert_eq!(
+            report.references_removed,
+            vec!["review/references/scratch.md"]
+        );
+        assert!(
+            dir.join("references/scratch.md").is_file(),
+            "dry run keeps the file"
+        );
     }
 
     #[test]

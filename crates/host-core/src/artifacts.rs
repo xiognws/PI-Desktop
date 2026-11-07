@@ -129,8 +129,9 @@ mod tests {
     fn list_reports_the_project_behind_each_session() {
         let db = test_db();
         let project = "/tmp/pi-desktop-project";
-        let bound = sessions::create_session(&db, None, None, None, None, Some(project.to_string()))
-            .unwrap();
+        let bound =
+            sessions::create_session(&db, None, None, None, None, Some(project.to_string()))
+                .unwrap();
         let loose = sessions::create_session(&db, None, None, None, None, None).unwrap();
         record(&db, &bound.id, "/tmp/inside.ts", "write", None).unwrap();
         record(&db, &loose.id, "/tmp/outside.ts", "write", None).unwrap();
@@ -139,7 +140,10 @@ mod tests {
         let inside = all.iter().find(|x| x.path == "/tmp/inside.ts").unwrap();
         // The project path the session was created with is what the list names.
         assert_eq!(inside.project_path.as_deref(), Some(project));
-        assert!(inside.project_name.as_deref().is_some_and(|name| !name.is_empty()));
+        assert!(inside
+            .project_name
+            .as_deref()
+            .is_some_and(|name| !name.is_empty()));
 
         let outside = all.iter().find(|x| x.path == "/tmp/outside.ts").unwrap();
         assert!(outside.project_path.is_none());
