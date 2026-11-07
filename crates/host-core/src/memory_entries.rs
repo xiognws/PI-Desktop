@@ -210,7 +210,7 @@ mod tests {
         // Between the two limits: refused for `user`, accepted for `memory`.
         let sizeable = "y".repeat(USER_CHAR_LIMIT + 100);
         assert!(db
-            .write_memory_entries(MemoryTarget::User, &[sizeable.clone()])
+            .write_memory_entries(MemoryTarget::User, std::slice::from_ref(&sizeable))
             .is_err());
         assert!(db
             .write_memory_entries(MemoryTarget::Memory, &[sizeable])
