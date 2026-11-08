@@ -56,13 +56,29 @@ export function useTranscriptReadingPosition({
     pendingRef.current = undefined;
     requestRef.current?.abort();
   }, []);
+  // Rotation safety is deliberately limited to unconditional samples. Both
+  // callers that record follow on purpose (an explicit latest, a turn start)
+  // place the scroller before yielding a frame, so a pending restore only
+  // describes a position they are leaving; letting it swallow the sample keeps
+  // an unpinned bookmark that the next reveal restores (#1771).
+  const samplingVisibilityRef = useRef(visible);
+  samplingVisibilityRef.current = visible;
   const remember = useCallback(() => {
     const scroller = scrollRef.current;
     const content = contentRef.current;
-    if (!sessionId || !visible || !scroller || !content || pendingRef.current) return;
+    if (!sessionId || !samplingVisibilityRef.current || !scroller || !content || pendingRef.current) return;
     const position = captureTranscriptReadingPosition(scroller, content, pinnedRef.current, windowSize);
     if (position) sessionReadingState(sessionId).position = position;
-  }, [contentRef, pinnedRef, scrollRef, sessionId, visible, windowSize]);
+  }, [contentRef, pinnedRef, scrollRef, sessionId, windowSize]);
+  // Deliberate follow: the caller already pinned this scroller, so a pending
+  // restore must not decide what the bookmark says.
+  const rememberFollow = useCallback(() => {
+    const scroller = scrollRef.current;
+    const content = contentRef.current;
+    if (!sessionId || !samplingVisibilityRef.current || !scroller || !content) return;
+    const position = captureTranscriptReadingPosition(scroller, content, true, windowSize);
+    if (position) sessionReadingState(sessionId).position = position;
+  }, [contentRef, scrollRef, sessionId, windowSize]);
   const callbacks = useRef({ remember, onMissing });
   callbacks.current = { remember, onMissing };
 
@@ -139,5 +155,5 @@ export function useTranscriptReadingPosition({
     return () => observer?.disconnect();
   }, [contentRef, remember, visible]);
 
-  return { initialPosition, pendingRef, remember, cancel };
+  return { initialPosition, pendingRef, remember, rememberFollow, cancel };
 }

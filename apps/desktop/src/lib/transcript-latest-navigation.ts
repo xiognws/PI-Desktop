@@ -13,20 +13,37 @@ type Navigation = { from: number; startedAt: number; duration: number; lastTop: 
 export function createTranscriptLatestNavigation(port: ScrollPort) {
   let current: Navigation | undefined;
   let frame = 0;
+  // Trip state for the explicit "show me the newest" intent. "done" means
+  // that request was carried out; it stops blocking the follow-up scroll a
+  // pane reveal needs, while starting a new trip still clears it.
+  let phase: "idle" | "moving" | "done" = "idle";
   const cancel = (commit = false) => {
     const previous = current;
     current = undefined;
+    // A reader takeover or an unmount retires the trip; only a new start may
+    // put the viewport back under this owner.
+    phase = commit && previous ? "done" : "idle";
     port.cancel(frame);
     frame = 0;
     if (commit) previous?.arrive();
   };
   const start = (arrive: () => void = () => {}) => {
     cancel();
+    phase = "moving";
     const geometry = port.geometry();
-    if (!geometry || geometry.clientHeight <= 0) { arrive(); return; }
+    if (!geometry || geometry.clientHeight <= 0) {
+      phase = "done";
+      arrive();
+      return;
+    }
     const target = Math.max(0, geometry.scrollHeight - geometry.clientHeight);
     const distance = Math.max(0, target - geometry.scrollTop);
-    if (port.reducedMotion() || distance <= 1) { port.move(target); arrive(); return; }
+    if (port.reducedMotion() || distance <= 1) {
+      port.move(target);
+      phase = "done";
+      arrive();
+      return;
+    }
     const navigation: Navigation = { from: geometry.scrollTop, lastTop: geometry.scrollTop,
       startedAt: port.now(), duration: Math.min(420, Math.max(180, distance / 30)), arrive };
     current = navigation;
@@ -45,10 +62,30 @@ export function createTranscriptLatestNavigation(port: ScrollPort) {
       port.move(top);
       if (progress === 1) {
         current = undefined;
+        phase = "done";
         navigation.arrive();
       } else frame = port.request(advance);
     };
     frame = port.request(advance);
   };
-  return { start, cancel, isActive: () => current !== undefined };
+  // A trip still in flight is parked: it stops owning the viewport, and the
+  // caller that gives up the animation decides where the reader lands. A
+  // reduced-motion or zero-distance trip already reached bottom inside
+  // start(), so it has nothing to park.
+  const landed = () => {
+    if (phase !== "moving") return false;
+    // Stop owning the viewport without claiming the trip ran to completion:
+    // the caller that gives up the animation decides where the reader lands.
+    current = undefined;
+    port.cancel(frame);
+    frame = 0;
+    phase = "idle";
+    return true;
+  };
+  return {
+    start, cancel, landed,
+    // A completed trip must not keep scrollToBottom blocked: the reveal that
+    // follows a pane hide lands on the newest turn instead of a stale offset.
+    phase: () => phase,
+  };
 }

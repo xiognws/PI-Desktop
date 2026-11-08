@@ -25,8 +25,9 @@ function fixture(reduced = false) {
     frames.clear();
     for (const frame of batch) frame(now);
   };
-  const finish = () => { for (let n = 0; navigation.isActive() && n < 60; n++) advance(); };
-  return { box, navigation, positions, frames, advance, finish,
+  const moving = () => navigation.phase() === "moving";
+  const finish = () => { for (let n = 0; moving() && n < 60; n++) advance(); };
+  return { box, navigation, positions, frames, advance, finish, moving,
     start: () => navigation.start(() => arrivals++), arrivals: () => arrivals };
 }
 
@@ -62,7 +63,7 @@ test("reader interruption retires every queued frame without committing latest",
   f.navigation.cancel(); f.advance();
   assert.equal(f.box.scrollTop, top);
   assert.equal(f.arrivals(), 0);
-  assert.equal(f.navigation.isActive(), false);
+  assert.equal(f.moving(), false);
   assert.equal(f.frames.size, 0);
 });
 
@@ -85,4 +86,28 @@ test("reduced motion reaches bottom synchronously", () => {
   assert.equal(f.box.scrollTop, 7400);
   assert.equal(f.arrivals(), 1);
   assert.equal(f.frames.size, 0);
+});
+
+test("a trip still in flight can be landed before a pane reveal bottoms", () => {
+  const f = fixture();
+  f.start(); f.advance();
+  const parked = f.box.scrollTop;
+  assert.equal(f.navigation.landed(), true);
+  // Landing frees the viewport without moving the reader: the pane reveal
+  // that follows is the only thing allowed to choose the position.
+  assert.equal(f.box.scrollTop, parked);
+  assert.equal(f.arrivals(), 0);
+  assert.equal(f.moving(), false);
+  assert.equal(f.frames.size, 0);
+  // Landing twice must not touch an already retired trip.
+  assert.equal(f.navigation.landed(), false);
+  assert.equal(f.arrivals(), 0);
+});
+
+test("a landed trip stops blocking the follow scroll", () => {
+  const f = fixture();
+  f.start(); f.finish();
+  assert.equal(f.navigation.phase(), "done");
+  assert.equal(f.navigation.landed(), false);
+  assert.equal(f.arrivals(), 1);
 });

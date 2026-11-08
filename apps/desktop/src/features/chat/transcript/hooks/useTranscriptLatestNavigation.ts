@@ -23,7 +23,12 @@ export function useTranscriptLatestNavigation({ scrollRef, visible, onPosition }
   }));
   // The explicit latest intent survives an immediate pane hide or eviction.
   // Reader input cancels without committing; it keeps the prepared history view.
-  useLayoutEffect(() => { if (!visible) navigation.cancel(true); }, [navigation, visible]);
+  useLayoutEffect(() => {
+    // Hiding the pane keeps the latest intent alive through an immediate
+    // re-show, but a trip still in flight must stop owning the viewport: its
+    // frames measure a hidden box, and the reveal has to be free to bottom.
+    if (!visible) navigation.landed();
+  }, [navigation, visible]);
   useEffect(() => () => navigation.cancel(true), [navigation]);
   return navigation;
 }

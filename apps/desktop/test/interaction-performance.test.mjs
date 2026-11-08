@@ -191,7 +191,7 @@ test("a revealed pane restores its own scroll position in the layout phase", () 
   // scroller can be clamped while its content grows off screen, and a passive
   // effect would leave one visible frame at the wrong offset (ADR 0137).
   const revealEffect = transcript.match(
-    /useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[\n    cancelFollowScroll,\n    paneVisible,\n    releaseDisclosureAnchor,\n    scrollToBottom,\n    sessionId,\n  \]\);/,
+    /useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[\n    cancelFollowScroll,\n    latestNavigation,\n    paneVisible,\n    releaseDisclosureAnchor,\n    scrollToBottom,\n    sessionId,\n  \]\);/,
   )?.[1];
   assert.ok(revealEffect, "the reveal must restore position in a layout effect");
   assert.match(revealEffect, /retainedScrollTopRef\.current = lastLaidOutScrollTopRef\.current/);
@@ -199,7 +199,9 @@ test("a revealed pane restores its own scroll position in the layout phase", () 
   // bottoms. A stale follow flag must not override the bookmark (#1771).
   assert.match(revealEffect, /transcriptRevealOwnership\(/);
   assert.match(revealEffect, /ownership === "reading-position"/);
-  assert.match(revealEffect, /ownership === "pinned"\) \{\s*scrollToBottom\(\);/);
+  // A trip still in flight when the pane hid must stop owning the viewport
+  // first: it measured a hidden box and would swallow this bottom scroll.
+  assert.match(revealEffect, /ownership === "pinned"\) \{[\s\S]*?latestNavigation\.landed\(\);[\s\S]*?scrollToBottom\(\);/);
   assert.match(revealEffect, /el\.scrollTop = retained/);
   assert.match(revealEffect, /lastScrollTopRef\.current = retained/);
 });

@@ -59,24 +59,48 @@ test("both transcript hooks route the reveal edge through the shared rule", asyn
   );
 });
 
-test("an explicit latest replaces a pending restore instead of recording it", async () => {
-  const scrollHook = await read(
-    "../src/features/chat/transcript/hooks/useTranscriptScroll.ts",
+test("an explicit latest replaces a pending restore with a sampled bottom", async () => {
+  const [scrollHook, readingHook] = await Promise.all([
+    read("../src/features/chat/transcript/hooks/useTranscriptScroll.ts"),
+    read("../src/hooks/use-transcript-reading-position.ts"),
+  ]);
+  // The sampler gives up while a restore is pending, so a jump started during
+  // one left the old unpinned bookmark in place and the next reveal restored
+  // it (#1771 keeps that bookmark authoritative). Deliberate follow therefore
+  // samples through a dedicated path that ignores the pending restore.
+  assert.match(
+    readingHook,
+    /const rememberFollow = useCallback\(\(\) => \{[\s\S]*?if \(position\) sessionReadingState\(sessionId\)\.position = position;/,
   );
-  // The sampler in the reading-position hook gives up while a restore is
-  // pending, so a jump started during one left the old unpinned bookmark in
-  // place and the next reveal restored it (#1771 keeps that bookmark
-  // authoritative). Explicit latest must write the follow bookmark itself.
+  assert.match(
+    readingHook,
+    /captureTranscriptReadingPosition\(scroller, content, true, windowSize\)/,
+  );
   assert.match(
     scrollHook,
-    /const recordFollowReadingPosition = useCallback\(\(\) => \{\s*if \(!sessionId\) return;\s*sessionReadingState\(sessionId\)\.position = \{\s*pinned: true/,
-  );
-  assert.match(
-    scrollHook,
-    /const jumpToLatest = useCallback[\s\S]*?recordFollowReadingPosition\(\);/,
+    /const jumpToLatest = useCallback[\s\S]*?rememberFollowReadingPosition\(\);\s*latestNavigation\.start/,
   );
   assert.doesNotMatch(
     scrollHook,
     /const jumpToLatest = useCallback[\s\S]*?rememberReadingPosition\(\);[\s\S]*?latestNavigation\.start/,
   );
+  // A hide can commit before the trip lands, so the arrival must re-sample the
+  // scroller it actually reached instead of trusting the pre-trip offset.
+  assert.match(
+    scrollHook,
+    /latestNavigation\.start\(\(\) => \{[\s\S]*?scrollToBottom\(\);[\s\S]*?rememberFollowReadingPosition\(\);/,
+  );
+});
+
+
+test("lands an in-flight trip before bottoming a revealed pane", async () => {
+  // A pane that hid mid-trip must not keep the navigation owner active: its
+  // frames measure a hidden box and would swallow the reveal's bottom scroll.
+  const ring = await read("../src/hooks/use-transcript-reading-position.ts");
+  const latestJ = await read("../src/features/chat/transcript/hooks/useTranscriptLatestNavigation.ts");
+  const scrollJ = await read("../src/features/chat/transcript/hooks/useTranscriptScroll.ts");
+  assert.match(latestJ, /if \(!visible\) navigation\.landed\(\);/);
+  assert.match(scrollJ, /if \(ownership === "pinned"\) \{\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*latestNavigation\.landed\(\);\s*scrollToBottom\(\);/);
+  assert.match(scrollJ, /if \(latestNavigation\.phase\(\) === "moving"\) return;/);
+  assert.ok(ring.includes("rememberFollow"));
 });
