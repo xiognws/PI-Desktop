@@ -85,7 +85,10 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
     transcript,
     /history: allHistoryEntries \} = renderedProjection/,
   );
-  assert.match(transcript, /<TranscriptHistory entries=\{historyEntries\}/);
+  // Both the call site and the prop type carry the history array; the type is
+  // what keeps a later rename from quietly widening this array to a fresh one.
+  assert.match(transcript, /<TranscriptHistory\s+entries=\{historyEntries\}/);
+  assert.match(transcript, /type TranscriptHistoryProps = \{\s*entries: TranscriptEntry\[\];/);
   assert.match(transcript, /<TranscriptTail[\s\S]*?entry=\{tailEntry\}/);
   assert.match(transcript, /activityGroupPropsEqual/);
   assert.match(transcript, /assistantTurnPropsEqual/);
