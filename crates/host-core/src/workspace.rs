@@ -96,6 +96,11 @@ pub enum ToolRoot {
     Scratch,
     /// Per-session GenUI fragment directory (D671).
     Visualization,
+    /// The agent's own skill library under the global agents root. It is the
+    /// one directory the agent writes outside a workspace by design; ADR 0377
+    /// keeps skill creation and updates fully automatic, so a file tool that
+    /// targets it is contained rather than external.
+    Skills,
     External,
 }
 
@@ -112,16 +117,21 @@ impl ContainedRoot {
     /// Root identity is rechecked at authorization and execution, not cached
     /// when the session starts. Scratch retains its existing D114 semantics.
     pub fn allows_implicit_access(&self) -> bool {
+        // Scratch, workspace and the agent's own skill library are host-chosen
+        // locations; only the visualization root is revalidated per call.
         self.kind != ToolRoot::Visualization
             || crate::visualizations::validate_session_root(&self.path).is_ok()
     }
 
     fn lexically_contains(&self, input: &str) -> bool {
         if self.kind == ToolRoot::Visualization {
-            crate::visualizations::contains_session_path(&self.path, input)
-        } else {
-            lexically_inside(&self.path, input)
+            return crate::visualizations::contains_session_path(&self.path, input);
         }
+        // The spelling the model passes may already be canonical
+        // (\?\C:\...); compare aliases so a root never misses its own path.
+        let canonical = self.path.to_string_lossy().into_owned();
+        lexically_inside(Path::new(canonical.as_str()), input)
+            || lexically_inside(Path::new(canonical_stripped(&canonical)), input)
     }
 }
 
@@ -140,6 +150,19 @@ impl ContainedRoots {
     /// Roots holding only the session scratch directory (D114), if any.
     pub fn scratch_only(scratch: Option<&Path>) -> Self {
         Self::new().with(ToolRoot::Scratch, scratch.map(Path::to_path_buf))
+    }
+
+    /// The agent's own skill library, if the host resolved one.
+    pub fn with_skills(self, skills: Option<PathBuf>) -> Self {
+        self.with(ToolRoot::Skills, skills)
+    }
+
+    /// The skill-library root, if this host registered one.
+    pub fn skills_root(&self) -> Option<&Path> {
+        self.roots
+            .iter()
+            .find(|root| root.kind == ToolRoot::Skills)
+            .map(|root| root.path.as_path())
     }
 
     /// Append a root; `None` leaves the list unchanged.
@@ -163,7 +186,18 @@ impl ContainedRoots {
     }
 }
 
-/// Lexically resolve `.` / `..` components without touching the filesystem.
+/// Strip the Windows extended-length prefix from a rooted drive path. A
+/// canonicalized root carries it while the model addresses the plain form.
+fn canonical_stripped(path: &str) -> &str {
+    if let Some(rest) = path.strip_prefix(r"\\?\") {
+        if rest.len() >= 3 && rest.as_bytes()[1] == b':' && rest.as_bytes()[2] == b'\\' {
+            return rest;
+        }
+    }
+    path
+}
+
+/// Lexically resolve `./` / `..` components without touching the filesystem.
 /// `..` at the filesystem root clamps (stays at root); the caller's
 /// starts_with check then rejects anything that climbed out of the workspace.
 fn normalize_lexical(path: &Path) -> PathBuf {
@@ -172,7 +206,11 @@ fn normalize_lexical(path: &Path) -> PathBuf {
         match component {
             Component::CurDir => {}
             Component::ParentDir => {
-                out.pop();
+                // Clamp at the root: `C:\` keeps its drive prefix, and an
+                // extended-length `\\?\C:\` keeps `\\?\C:\` as one component.
+                if !matches!(out.components().next_back(), Some(Component::RootDir)) {
+                    out.pop();
+                }
             }
             other => out.push(other.as_os_str()),
         }
@@ -271,24 +309,39 @@ fn resolve_with_existing_ancestor(normalized: PathBuf) -> Result<PathBuf, String
 /// 2. Canonicalization of the deepest existing ancestor, so symlinks inside
 ///    the workspace cannot smuggle a target outside it.
 pub fn resolve_in_workspace(workspace_root: &Path, input: &str) -> Result<PathBuf, String> {
+    // A root that does not exist yet (a fresh session scratch directory, an
+    // empty skill library) still has to bound the paths resolved under it, so
+    // resolve it through its longest existing ancestor instead of failing.
     let root = simple_canonicalize(workspace_root)
+        .or_else(|_| resolve_with_existing_ancestor(normalize_lexical(workspace_root)))
         .map_err(|e| format!("workspace canonicalize failed: {e}"))?;
     let candidate = if Path::new(input).is_absolute() {
         PathBuf::from(input)
     } else {
         root.join(input)
     };
-
     let normalized = normalize_lexical(&candidate);
-    if !path_is_within(&root, &normalized) {
+    // The root is canonical while the caller may address the same directory
+    // through another spelling (Windows 8.3 short names, a symlinked parent).
+    // Both layers compare resolved spellings: a lexical miss retries through
+    // the longest existing ancestor, which also covers targets that do not
+    // exist yet.
+    let canonical = |path: &Path| {
+        path.exists()
+            .then(|| simple_canonicalize(path).ok())
+            .flatten()
+            .or_else(|| resolve_with_existing_ancestor(path.to_path_buf()).ok())
+    };
+    let root_in = canonical(&root).unwrap_or(root.clone());
+    let candidate_in = canonical(&normalized).unwrap_or_else(|| normalized.clone());
+    if !path_is_within(&root_in, &candidate_in) {
         return Err("PATH_OUTSIDE_WORKSPACE".into());
     }
-
     // Canonicalize the deepest existing ancestor (resolves symlinks), then
     // re-append the not-yet-existing tail.
-    let resolved = resolve_with_existing_ancestor(normalized)?;
+    let resolved = resolve_with_existing_ancestor(candidate_in)?;
 
-    if !path_is_within(&root, &resolved) {
+    if !path_is_within(&root_in, &resolved) {
         return Err("PATH_OUTSIDE_WORKSPACE".into());
     }
     Ok(resolved)

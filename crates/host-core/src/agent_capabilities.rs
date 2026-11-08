@@ -271,6 +271,13 @@ pub fn global_agents_dir() -> PathBuf {
     crate::pi_home::agents_dir().unwrap_or_else(|| PathBuf::from(".").join(AGENTS_DIR))
 }
 
+/// The global skill library the agent maintains for itself. File tools treat
+/// this directory as contained (ADR 0377): skill creation and updates stay
+/// fully automatic and never raise a permission card.
+pub fn skills_root() -> PathBuf {
+    global_agents_dir().join("skills")
+}
+
 pub fn capability_dir(
     level: CapabilityLevel,
     project_path: Option<&str>,

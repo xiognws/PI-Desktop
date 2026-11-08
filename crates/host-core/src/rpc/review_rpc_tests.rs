@@ -1,6 +1,16 @@
 use super::*;
+use crate::agent_capabilities::AGENTS_DIR_ENV;
 use crate::review::{finalize_change, prepare_change, ReviewChange};
 use tempfile::{tempdir, TempDir};
+
+/// Put the global skill library inside this fixture. `local_contained_roots`
+/// now registers the real agents root (ADR 0377), so a test temp directory can
+/// land inside it (for example under a per-run `%TEMP%`). Pointing the root at a
+/// path inside the fixture keeps the skill-library root out of every temp dir
+/// that other assertions treat as external.
+fn isolate_agents_dir(data: &Path) {
+    std::env::set_var(AGENTS_DIR_ENV, data.join("no-agents-root"));
+}
 
 struct Fixture {
     data: TempDir,
@@ -12,6 +22,7 @@ struct Fixture {
 impl Fixture {
     async fn new() -> Self {
         let data = tempdir().unwrap();
+        isolate_agents_dir(data.path());
         let root = tempdir().unwrap();
         // `session.create` is handed `root.path()` and every later target is built
         // by joining that same base, so the session's workspace root and the
@@ -635,6 +646,9 @@ async fn review_file_target_is_exact_session_owned_and_rejects_replaced_paths() 
 #[tokio::test]
 async fn review_rpc_records_workspace_scratch_and_approved_external_write_edit() {
     let f = Fixture::new().await;
+    // This fixture also writes outside the workspace through a real temp dir;
+    // keep that dir out of the skill library root the host now registers.
+    isolate_agents_dir(f.root.path());
     f.call(
         "session.configure",
         json!({"id":f.session,"mode":"agent","permissionMode":"auto"}),

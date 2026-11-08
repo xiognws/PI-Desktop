@@ -353,6 +353,7 @@ pub(super) async fn handle(
             session_id: &p.session_id,
             store: &hashline,
         }),
+        skills_root: None,
         visualization_root: None,
         // A remote workspace runs its tools on the remote host; the interpreter
         // shipped with this installation is not there to run.

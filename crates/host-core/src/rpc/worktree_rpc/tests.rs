@@ -34,6 +34,7 @@ fn tool_options(
         bash_options: bash,
         allow_external_paths: false,
         hashline: None,
+        skills_root: None,
         visualization_root: None,
         python_executable: None,
         python_tools_dir: None,

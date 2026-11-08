@@ -12,6 +12,7 @@ fn options(visualization_root: Option<&Path>) -> tools::ToolExecutionOptions<'_>
         allow_external_paths: false,
         hashline: None,
         visualization_root,
+        skills_root: None,
         python_executable: None,
         python_tools_dir: None,
     }
@@ -678,4 +679,72 @@ async fn visualization_alias_spelling_preserves_root_identity_even_inside_the_wo
             workspace::resolve_tool_path(&f.data_dir, &roots, &path.to_string_lossy()).is_err()
         );
     }
+}
+
+// ADR 0377: the agent maintains its own skill library without a card. The
+// library lives outside every workspace, so it is a contained root rather than
+// an external path — and that decision is what keeps skill creation and
+// updates fully automatic.
+#[tokio::test]
+async fn rpc_skill_library_write_and_read_never_raise_a_permission_card() {
+    // The host resolves the library root when it builds the call's contained
+    // roots, so point the global agents directory at a scratch location before
+    // any RPC runs. Unlike the other cases here this test must not share the
+    // process-wide setting with concurrent tests.
+    let library = tempfile::tempdir().unwrap();
+    std::env::set_var(crate::agent_capabilities::AGENTS_DIR_ENV, library.path());
+    let f = fixture();
+    let (state, id) = rpc_session(&f, false, "ask").await;
+    let skills = crate::agent_capabilities::skills_root();
+    let skill = skills.join("review-canary").join("SKILL.md");
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let write = handle_request(
+        state.clone(),
+        "tools.execute",
+        json!({ "sessionId": id, "toolCallId": "skill-write", "toolName": "Write",
+            "args": { "path": skill, "content": "---\nname: review-canary\n---\n" }, "mode": "agent" }),
+        tx.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(write["ok"], true, "{write}");
+    assert_eq!(write["content"]["root"], "skills");
+    let read = handle_request(
+        state.clone(),
+        "tools.execute",
+        json!({ "sessionId": id, "toolCallId": "skill-read", "toolName": "Read",
+            "args": { "path": skill }, "mode": "agent" }),
+        tx.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(read["ok"], true, "{read}");
+    assert_eq!(read["content"]["root"], "skills");
+    while let Ok(note) = rx.try_recv() {
+        let note: Value = serde_json::from_str(&note).unwrap();
+        assert_ne!(note["method"], "permissions.request");
+    }
+    let _ = fs::remove_dir_all(skills.join("review-canary"));
+}
+
+#[test]
+fn skill_library_paths_are_contained_not_external() {
+    let f = fixture();
+    let roots = local_contained_roots(&f.data_dir, "s1", false)
+        .with_skills(Some(crate::agent_capabilities::skills_root()));
+    let args = json!({ "path": crate::agent_capabilities::skills_root().join("SKILL.md") });
+    for tool in ["Read", "Glob", "Grep", "Write", "Edit"] {
+        assert!(
+            !requires_external_path_permission(
+                Some(&f.workspace.to_string_lossy()),
+                &roots,
+                tool,
+                &args
+            ),
+            "{tool} must treat the skill library as contained"
+        );
+    }
+    assert!(contained_write_auto_allowed(
+        false, "agent", &roots, "Write", &args
+    ));
 }

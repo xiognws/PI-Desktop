@@ -951,6 +951,9 @@ pub struct ToolExecutionOptions<'a> {
     /// Session visualization directory: a contained root for Read and for
     /// `.html`-only Write/Edit (D671). `None` for remote sessions (contract modes still deny writes).
     pub visualization_root: Option<&'a Path>,
+    /// The global skill library: a contained root for Read and for the agent's
+    /// own skill writes (ADR 0377). `None` when the host has no agents root.
+    pub skills_root: Option<&'a Path>,
     /// The interpreter the installer ships, from `PI_DESKTOP_PYTHON`. `None`
     /// means this build has no runtime, and the Office tools say so instead of
     /// falling back to whatever Python the customer happens to have.
@@ -1205,6 +1208,7 @@ pub async fn execute_tool_with_options(
             bash_options,
             allow_external_paths: false,
             hashline: None,
+            skills_root: None,
             visualization_root: None,
             python_executable: None,
             python_tools_dir: None,
@@ -1306,6 +1310,7 @@ pub async fn execute_tool_with_file_lease(
         allow_external_paths,
         hashline,
         visualization_root,
+        skills_root,
         python_executable,
         python_tools_dir,
     } = options;
@@ -1349,10 +1354,12 @@ pub async fn execute_tool_with_file_lease(
         "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
             run_file_tool(
                 workspace,
-                ContainedRoots::scratch_only(scratch).with(
-                    ToolRoot::Visualization,
-                    visualization_root.map(Path::to_path_buf),
-                ),
+                ContainedRoots::scratch_only(scratch)
+                    .with_skills(skills_root.map(Path::to_path_buf))
+                    .with(
+                        ToolRoot::Visualization,
+                        visualization_root.map(Path::to_path_buf),
+                    ),
                 tool_name,
                 args,
                 allow_external_paths,
@@ -1479,7 +1486,7 @@ fn require_workspace(workspace: Option<&Path>) -> Result<&Path, (String, String)
 fn display_tool_path(root_kind: ToolRoot, workspace_root: &Path, resolved: &Path) -> String {
     match root_kind {
         ToolRoot::Workspace => relative_display(workspace_root, resolved),
-        ToolRoot::Scratch | ToolRoot::Visualization | ToolRoot::External => {
+        ToolRoot::Scratch | ToolRoot::Skills | ToolRoot::Visualization | ToolRoot::External => {
             resolved.to_string_lossy().to_string()
         }
     }
@@ -1517,6 +1524,7 @@ fn root_label(root_kind: ToolRoot) -> &'static str {
     match root_kind {
         ToolRoot::Workspace => "workspace",
         ToolRoot::Scratch => "scratch",
+        ToolRoot::Skills => "skills",
         ToolRoot::Visualization => "visualization",
         ToolRoot::External => "external",
     }
@@ -2179,7 +2187,7 @@ fn tool_glob(
         .unwrap_or("**/*");
     let set = build_glob_set(pattern)?;
     let (search_dir, root_kind, scoped) = search_root(
-        root,
+        workspace.or(roots.skills_root()).unwrap_or(root),
         roots,
         args,
         allow_external_paths,
@@ -2254,7 +2262,7 @@ fn tool_grep(
         .build()
         .map_err(|e| ("INVALID_ARGUMENT".into(), e.to_string()))?;
     let (search_dir, root_kind, scoped) = search_root(
-        root,
+        workspace.or(roots.skills_root()).unwrap_or(root),
         roots,
         args,
         allow_external_paths,
@@ -4293,6 +4301,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: true,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
@@ -4455,6 +4464,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: true,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
@@ -4481,6 +4491,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: true,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
@@ -4507,6 +4518,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: true,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
@@ -4537,6 +4549,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: true,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
@@ -4567,6 +4580,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: true,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
@@ -4591,6 +4605,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: true,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,

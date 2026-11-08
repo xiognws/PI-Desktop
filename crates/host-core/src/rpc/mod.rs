@@ -1464,8 +1464,9 @@ fn resolve_tool_workspace_for_call(
 /// Read/search tools are low risk inside their normal roots, but an explicit
 /// path outside both roots is a separate capability. The check is deliberately
 /// based on the same resolver used for execution so `..` and symlink escapes
-/// cannot avoid the permission card. Contained roots (scratch, visualization)
-/// are recognized lexically before their lazy directories exist.
+/// cannot avoid the permission card. Contained roots (scratch, visualization,
+/// the skill library) are recognized lexically before their lazy directories
+/// exist.
 fn requires_external_path_permission(
     workspace_path: Option<&str>,
     roots: &ContainedRoots,
@@ -1490,8 +1491,9 @@ fn requires_external_path_permission(
     )
 }
 
-/// Contained roots of a local session: scratch (D114) then visualization
-/// (D671). Remote-workspace sessions get no visualization root.
+/// Contained roots of a local session: scratch (D114), the skill library
+/// (ADR 0377), then visualization (D671). Remote-workspace sessions get no
+/// visualization root.
 fn local_contained_roots(data_dir: &Path, session_id: &str, remote: bool) -> ContainedRoots {
     let visualization = if remote {
         None
@@ -1499,6 +1501,7 @@ fn local_contained_roots(data_dir: &Path, session_id: &str, remote: bool) -> Con
         visualizations::session_dir(data_dir, session_id)
     };
     ContainedRoots::scratch_only(scratch::session_dir(data_dir, session_id).as_deref())
+        .with_skills(Some(crate::agent_capabilities::skills_root()))
         .with(ToolRoot::Visualization, visualization)
 }
 
@@ -4695,20 +4698,25 @@ async fn handle_request(
                 let ws_path = workspace_path.map(PathBuf::from);
                 tracing::debug!(tool = %p.tool_name, admission_wait_ms = tool_permit.wait_ms,
                     initial_wait_reason = tool_permit.initial_wait_reason, "tool admitted");
+                // One root list for authorization, review preparation and
+                // execution: they must agree on where containment ends.
+                let contained_roots = {
+                    let st = state.lock().await;
+                    local_contained_roots(&st.data_dir, &p.session_id, false)
+                };
                 if let Some(resources) = &file_resources {
-                    let roots = {
+                    {
                         let st = state.lock().await;
                         file_batches::verify_root(
                             &st,
                             &p,
                             ws_path.as_deref().and_then(Path::to_str),
                         )?;
-                        local_contained_roots(&st.data_dir, &p.session_id, false)
-                    };
+                    }
                     resources
                         .validate(
                             ws_path.as_deref(),
-                            &roots,
+                            &contained_roots,
                             &p.tool_name,
                             &p.args,
                             external_path_permission,
@@ -4737,6 +4745,10 @@ async fn handle_request(
                 } else {
                     visualizations::session_dir(&data_dir, &p.session_id)
                 };
+                // The skill library is global host state, not per session, so a
+                // remote-workspace session keeps it: the agent still maintains
+                // skills through the same file tools (ADR 0377).
+                let skills_path = Some(crate::agent_capabilities::skills_root());
                 // The Python runtime belongs to the installation, so Electron
                 // hands it over once at boot rather than per tool call. Absent
                 // means this build ships none, and the Office tools say so.
@@ -4757,7 +4769,7 @@ async fn handle_request(
                         &p.session_id,
                         &p.tool_call_id,
                         ws_path.as_deref(),
-                        &local_contained_roots(&data_dir, &p.session_id, false),
+                        &contained_roots,
                         &p.tool_name,
                         &p.args,
                         external_path_permission,
@@ -4879,6 +4891,7 @@ async fn handle_request(
                             bash_options,
                             allow_external_paths: external_path_permission,
                             hashline: Some(hashline_ctx),
+                            skills_root: skills_path.as_deref(),
                             visualization_root: visualization_path.as_deref(),
                             python_executable: python_executable.as_deref(),
                             python_tools_dir: python_tools_dir.as_deref(),
@@ -8266,6 +8279,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: false,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
@@ -8289,6 +8303,7 @@ mod tests {
                 bash_options: None,
                 allow_external_paths: false,
                 hashline: None,
+                skills_root: None,
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
