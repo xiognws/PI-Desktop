@@ -18,6 +18,8 @@ const runner = require('./lib/runner');
 const stages = require('./lib/stages');
 const report = require('./lib/report');
 const llm = require('./lib/llm');
+const jobs = require('./lib/jobs');
+const kb = require('./lib/kb');
 
 const PLAN_ID = {
   type: 'string',
@@ -97,6 +99,10 @@ const TOOLS = [
         testCaseIds: { ...TEST_CASE_IDS, description: 'Run only these cases; omit to run every script.' },
         timeoutMs: { type: 'number', description: 'Per script timeout in milliseconds.' },
         cwd: { type: 'string', description: 'Working directory for the scripts.' },
+        maxOutput: {
+          type: 'number',
+          description: 'Captured output retained per stream, in characters (default 4096).',
+        },
       },
       required: ['action', 'planId'],
     },
@@ -420,6 +426,19 @@ async function onLoad() {
       category: 'Autotest',
       run: revealWorkbench,
     });
+    // The knowledge base lives in the same view, but it is a separate errand:
+    // the palette entry opens the workbench already switched to that tab
+    // (the view reads `tab` from the reveal payload), so a user hunting for a
+    // saved requirement does not have to land on the rail first.
+    await pi.commands.register({
+      id: 'autotest.knowledge',
+      title: 'Autotest: open the knowledge base',
+      keywords: ['autotest', 'knowledge', 'reference', '知识库', '资料'],
+      category: 'Autotest',
+      run: function () {
+        return revealWorkbench({ tab: 'knowledge' });
+      },
+    });
   }
   const registered = registerTools(pi);
   for (const entry of registered) {
@@ -441,6 +460,7 @@ async function onUnload() {
   try {
     if (pi && pi.commands && typeof pi.commands.unregister === 'function') {
       await pi.commands.unregister('autotest.open');
+      await pi.commands.unregister('autotest.knowledge');
     }
   } catch (ignored) {
     // Teardown clears the host-side table by plugin id anyway
@@ -485,13 +505,16 @@ async function onRendererCall(method, payload) {
  * is open answers INVALID_ARGUMENT — that is the host contract, not a bug, and
  * the toast says which way to go instead of failing silently.
  */
-async function revealWorkbench() {
+async function revealWorkbench(options) {
   const ctx = { pi: pi };
   try {
     if (!pi || !pi.ui || typeof pi.ui.revealView !== 'function') {
       throw Object.assign(new Error('this host build has no ui.revealView'), { code: 'UNSUPPORTED' });
     }
-    await pi.ui.revealView({ viewId: 'workbench' });
+    // `tab` is the plugin's own contract with its page, not a host field: an
+    // older host ignores unknown members, and the page falls back to its first
+    // tab when none arrives.
+    await pi.ui.revealView({ viewId: 'workbench', tab: (options && options.tab) || null });
     return { ok: true };
   } catch (error) {
     const code = (error && error.code) || 'REVEAL_FAILED';
@@ -513,6 +536,170 @@ async function revealWorkbench() {
       }
     }
     throw error;
+  }
+}
+
+/* ------------------------------------------------------------ async jobs */
+
+/**
+ * Panel-driven stage work runs as jobs, not as a synchronous handler.
+ *
+ * The host gives a panel invocation 30 seconds (PLUGIN_PANEL_TIMEOUT_MS,
+ * plugin-runtime.ts:698) while a stage that calls a model can take minutes; a
+ * synchronous handler would therefore answer TIMEOUT while the work kept
+ * running invisibly. Every long channel below starts a job, hands the panel a
+ * ticket, and lets the panel poll autotest.job for progress.
+ *
+ * The registry is per plugin process and in memory by design: a job's whole
+ * value is its live progress, and a process restart has already stopped the
+ * work it was describing.
+ */
+let jobRegistry = null;
+
+/**
+ * The shared ctx for work that no conversation started.
+ *
+ * A panel click has no session, no model key and no abort signal, so
+ * toolContext(null) supplies exactly that: the host api, the settings and one
+ * resolved dataDir. `pi` is already bound by the time any channel runs.
+ */
+async function workContext() {
+  return toolContext(null);
+}
+
+/**
+ * Wrap one stage call as a job handler.
+ *
+ * The handler receives the job's own args and reports progress through the
+ * reporter the registry hands it, so a panel sees a live line while a stage
+ * runs instead of a frozen rail.
+ */
+function jobHandler(kind, run) {
+  return async function handler(ctx, args, reporter) {
+    reporter.log('info', kind + ' stage started');
+    const started = Date.now();
+    const result = await run(ctx, args || {}, reporter);
+    reporter.log('info', kind + ' stage finished in ' + (Date.now() - started) + 'ms');
+    return result;
+  };
+}
+
+/**
+ * The six stage handlers a panel may dispatch.
+ *
+ * Each one is the same lib/plan.js function the agent tool calls, so the gate
+ * is enforced once, in one place: a panel cannot reach a stage the agent could
+ * not. `ctx.signal` is absent here -- a panel click carries no abort -- which
+ * is why cancel() is a state change rather than a real interrupt (lib/jobs.js).
+ */
+function stageHandlers() {
+  return {
+    requirement: jobHandler('requirement', function (ctx, args) {
+      return plan.requirement(ctx, args);
+    }),
+    cases: jobHandler('cases', function (ctx, args, reporter) {
+      reporter.progress({ done: 0, total: 0, label: 'generating cases' });
+      return plan.cases(ctx, Object.assign({}, args, { regenerate: args.regenerate === true }));
+    }),
+    author: jobHandler('author', function (ctx, args, reporter) {
+      const ids = Array.isArray(args.testCaseIds) ? args.testCaseIds : [];
+      reporter.progress({ done: 0, total: ids.length, label: 'writing scripts' });
+      return plan.author(ctx, args);
+    }),
+    run: jobHandler('run', function (ctx, args, reporter) {
+      const ids = Array.isArray(args.testCaseIds) ? args.testCaseIds : [];
+      reporter.progress({ done: 0, total: ids.length, label: 'running scripts' });
+      return plan.run(ctx, args);
+    }),
+    diagnose: jobHandler('diagnose', function (ctx, args, reporter) {
+      reporter.progress({ done: 0, total: 1, label: 'classifying failures' });
+      return plan.diagnoseTool(ctx, args);
+    }),
+    report: jobHandler('report', function (ctx, args, reporter) {
+      reporter.progress({ done: 0, total: 1, label: 'rendering report' });
+      return plan.reportTool(ctx, args);
+    }),
+  };
+}
+
+/**
+ * The registry, created on first use with the stage handlers wired in.
+ *
+ * Built lazily rather than at module scope so requiring main.js in a test has
+ * no side effects, and so a host reload cannot leave a registry behind that
+ * outlives the handlers it dispatches into.
+ */
+function jobStore() {
+  if (!jobRegistry) jobRegistry = jobs.createJobs({ handlers: stageHandlers() });
+  return jobRegistry;
+}
+
+/**
+ * Start one job and answer the panel with a ticket.
+ *
+ * A start failure is returned as data, not thrown: JOB_BUSY carries the id of
+ * the job that is already running, and the panel needs that id to attach its
+ * progress line to the right row rather than to show a bare error.
+ */
+async function startJob(kind, payload) {
+  const args = payload || {};
+  const ctx = await workContext();
+  const planId = args.planId || lastPanelPlanId || null;
+  if (!planId) {
+    return { ok: false, code: 'PLAN_ID_REQUIRED', message: 'open or create a plan before starting a stage' };
+  }
+  try {
+    const ticket = jobStore().start(ctx, {
+      planId: planId,
+      kind: kind,
+      args: Object.assign({}, args, { planId: planId }),
+      label: kind,
+    });
+    lastPanelPlanId = planId;
+    return { ok: true, planId: planId, job: ticket };
+  } catch (error) {
+    const answer = {
+      ok: false,
+      code: (error && error.code) || 'JOB_FAILED',
+      message: (error && error.message) || String(error),
+    };
+    // JOB_BUSY names the live job so the panel can poll it instead of guessing.
+    if (error && error.jobId) answer.jobId = error.jobId;
+    if (error && error.job) answer.job = error.job;
+    return answer;
+  }
+}
+
+/**
+ * The requirement stage is the only one that may create a plan.
+ *
+ * Without a planId the stage makes one and reports its id in the result, so the
+ * job is started under a placeholder and re-keyed once the stage answers. A
+ * panel that watched a placeholder would poll a plan that never exists.
+ */
+async function startRequirement(payload) {
+  const args = payload || {};
+  const ctx = await workContext();
+  if (!String(args.source || '').trim()) {
+    return { ok: false, code: 'REQUIREMENT_SOURCE_MISSING', message: 'paste the requirement text before decomposing it' };
+  }
+  const planId = args.planId || lastPanelPlanId || null;
+  try {
+    const ticket = jobStore().start(ctx, {
+      planId: planId || 'new-plan',
+      kind: 'requirement',
+      args: Object.assign({}, args, planId ? { planId: planId } : {}),
+      label: 'decomposing requirement',
+      stage: 'requirements',
+    });
+    if (planId) lastPanelPlanId = planId;
+    return { ok: true, planId: planId, job: ticket };
+  } catch (error) {
+    return {
+      ok: false,
+      code: (error && error.code) || 'JOB_FAILED',
+      message: (error && error.message) || String(error),
+    };
   }
 }
 
@@ -549,6 +736,14 @@ async function panelSnapshot(payload) {
       // reason travels next to the empty detail instead.
       if (error.code !== 'PLAN_NOT_FOUND') throw error;
       projection = null;
+      // A remembered plan the root does not hold must be forgotten. Keeping it
+      // made the panel list an empty root and still answer every stage click
+      // with that stale planId: the job started against a directory that does
+      // not exist here, and the user saw a running bar for work on no plan
+      // (2026-11-08).
+      if (!meta.length || !meta.some(function (entry) { return entry.id === wanted; })) {
+        lastPanelPlanId = (meta[0] && meta[0].id) || null;
+      }
     }
   }
   const appearance = await readAppearance();
@@ -573,6 +768,18 @@ const PANEL_CHANNELS = {
       stages: schema.STAGES.slice(),
       tools: TOOLS.map(function (tool) { return tool.name; }),
       rendererActions: ['status', 'approve', 'select', 'reveal', 'meta'],
+      // The view needs the action surface, not just the stage names: a rail
+      // click maps a stage to a channel, and that map lives here so the page
+      // never invents a channel the plugin does not answer.
+      actions: {
+        requirement: 'autotest.start',
+        cases: 'autotest.cases.generate',
+        author: 'autotest.author',
+        run: 'autotest.execute',
+        diagnose: 'autotest.diagnose',
+        report: 'autotest.report',
+      },
+      jobKinds: jobs.KINDS.slice(),
     };
   },
   'autotest.snapshot': panelSnapshot,
@@ -627,6 +834,98 @@ const PANEL_CHANNELS = {
     const ctx = await toolContext(null);
     const resolved = plan.resolvePlan(ctx, { planId: payload && payload.planId });
     return { ok: true, planId: resolved.state.id, rows: plan.traceRows(resolved.state) };
+  },
+
+  /* -------------------------------------------------------- stage actions */
+
+  // Each long channel answers a job ticket immediately; the panel polls
+  // autotest.job. planId defaults to the plan the panel is already showing, so
+  // a click on the rail needs no argument beyond the stage it names.
+  'autotest.start': async function (payload) {
+    return startRequirement(payload);
+  },
+  'autotest.cases.generate': async function (payload) {
+    return startJob('cases', payload);
+  },
+  'autotest.author': async function (payload) {
+    return startJob('author', payload);
+  },
+  'autotest.execute': async function (payload) {
+    return startJob('run', payload);
+  },
+  'autotest.diagnose': async function (payload) {
+    return startJob('diagnose', payload);
+  },
+  'autotest.report': async function (payload) {
+    return startJob('report', payload);
+  },
+  'autotest.job': async function (payload) {
+    const args = payload || {};
+    const registry = jobStore();
+    if (args.jobId) {
+      const one = registry.get(String(args.jobId));
+      if (!one) return { ok: false, code: 'JOB_NOT_FOUND', message: 'no job ' + String(args.jobId) };
+      return { ok: true, job: one };
+    }
+    const planId = args.planId || lastPanelPlanId || null;
+    if (!planId) return { ok: true, jobs: [], active: null };
+    const all = registry.list(planId);
+    const active = registry.latestFor(planId);
+    return { ok: true, planId: planId, jobs: all, active: active && active.status === 'running' ? active : null };
+  },
+  'autotest.job.cancel': async function (payload) {
+    const args = payload || {};
+    const answer = jobStore().cancel(String(args.jobId || ''), args.reason);
+    if (!answer) return { ok: false, code: 'JOB_NOT_FOUND', message: 'no job ' + String(args.jobId) };
+    return { ok: true, job: answer, cancelled: answer.status === 'cancelled' };
+  },
+
+  /* ----------------------------------------------------------- knowledge */
+
+  // The knowledge base is plain files under the same data root as the plans
+  // (lib/kb.js), so a panel edit and an agent read always see one store.
+  'kb.list': async function (payload) {
+    const ctx = await workContext();
+    return Object.assign({ ok: true }, kb.list(ctx, payload || {}));
+  },
+  'kb.collections': async function () {
+    const ctx = await workContext();
+    return Object.assign({ ok: true }, kb.collections(ctx));
+  },
+  'kb.read': async function (payload) {
+    const ctx = await workContext();
+    return { ok: true, item: kb.read(ctx, payload || {}) };
+  },
+  'kb.write': async function (payload) {
+    const ctx = await workContext();
+    const saved = kb.write(ctx, payload || {});
+    return { ok: true, id: saved.id, item: saved };
+  },
+  'kb.remove': async function (payload) {
+    const ctx = await workContext();
+    return Object.assign({ ok: true }, kb.remove(ctx, payload || {}));
+  },
+  'kb.search': async function (payload) {
+    const ctx = await workContext();
+    return Object.assign({ ok: true }, kb.search(ctx, payload || {}));
+  },
+  'kb.attach': async function (payload) {
+    const args = payload || {};
+    const ctx = await workContext();
+    const planId = args.planId || lastPanelPlanId || null;
+    if (!planId) return { ok: false, code: 'PLAN_ID_REQUIRED', message: 'open a plan before attaching knowledge' };
+    const ids = Array.isArray(args.ids) ? args.ids : [];
+    if (ids.length === 0) return { ok: false, code: 'SELECTION_EMPTY', message: 'select at least one knowledge entry' };
+    return Object.assign({ ok: true }, plan.attachKnowledge(ctx, planId, ids));
+  },
+  'kb.detach': async function (payload) {
+    const args = payload || {};
+    const ctx = await workContext();
+    const planId = args.planId || lastPanelPlanId || null;
+    if (!planId) return { ok: false, code: 'PLAN_ID_REQUIRED', message: 'open a plan before detaching knowledge' };
+    const ids = Array.isArray(args.ids) ? args.ids : [];
+    if (ids.length === 0) return { ok: false, code: 'SELECTION_EMPTY', message: 'select at least one knowledge entry' };
+    return Object.assign({ ok: true }, plan.detachKnowledge(ctx, planId, ids));
   },
 };
 
@@ -697,4 +996,9 @@ module.exports = {
   TOOLS,
   PLAN_SAFE,
   registerTools,
+  // Exposed for tests: the registry is process state, but the handlers and the
+  // stage map are pure values a test can assert on without a host.
+  jobStore,
+  stageHandlers,
+  startJob,
 };

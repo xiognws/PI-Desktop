@@ -491,7 +491,162 @@ textarea.wb-input { resize: vertical; min-height: 44px; line-height: 1.45; font-
 .wb-cell[data-tone="warn"] { background: color-mix(in oklab, var(--warn) 20%, transparent); color: var(--warn); }
 .wb-cell[data-tone="info"] { background: color-mix(in oklab, var(--info) 18%, transparent); color: var(--info); }
 
+/* ── 阶段操作条 ─────────────────────────────────────────────────── */
+
+/* 每个可操作阶段的按钮 + 服务端原因。门禁的规则不在这里：note 显示的是
+   plan.rail.stages[].reason 原文，前端一个字都不改。 */
+.wb-stage-bar {
+  display: grid; gap: 6px; align-items: center;
+  margin-bottom: 10px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+}
+.wb-stage-note { font-size: 11.5px; color: var(--muted); }
+
+/* 阶段节点上的转圈。用例：<span class="wb-spin"></span> 挂在 .wb-node 里。 */
+.wb-spin {
+  width: 9px; height: 9px; flex: none;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: wb-spin 720ms linear infinite;
+}
+@keyframes wb-spin { to { transform: rotate(360deg); } }
+.wb-node-progress { font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--faint); }
+
+/* ── 作业面板 ───────────────────────────────────────────────────── */
+
+/* 日志就地铺开，最多 12 行。等宽字体是为了对齐时间戳。 */
+.wb-log {
+  max-height: 168px;
+  overflow: auto;
+  padding: 7px 9px;
+  border-radius: var(--radius-control);
+  background: var(--mono-bg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--secondary);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 报告 markdown 的淡排版：只做缩进和层级，不做富文本。 */
+.wb-md { max-height: 340px; overflow: auto; }
+.wb-md h1, .wb-md h2, .wb-md h3 { font-size: 12.5px; margin: 10px 0 4px; color: var(--fg); }
+.wb-md h1:first-child, .wb-md h2:first-child { margin-top: 0; }
+
+/* ── 知识库面板 ─────────────────────────────────────────────────── */
+
+/* 三栏：collection / 条目列表 / 详情编辑器。和 .wb-body 一样用 8px 栅格，
+   窄屏退回单栏（见文件末尾的 media query）。 */
+.kb-body {
+  display: grid;
+  grid-template-columns: minmax(132px, 176px) minmax(180px, 260px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.kb-collections, .kb-list, .kb-detail {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+  background: var(--surface);
+  overflow: hidden;
+}
+.kb-collections-head, .kb-list-meta, .kb-detail-head {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.kb-collections-head {
+  padding: 7px 11px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.kb-collections-list { display: grid; gap: 1px; padding: 6px; }
+.kb-collection {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--secondary);
+  text-align: left;
+  transition: background var(--motion), color var(--motion);
+}
+.kb-collection:hover { background: var(--surface-hover); color: var(--fg); }
+.kb-collection[data-active="yes"] { background: var(--surface-active); color: var(--fg); border-color: var(--border-strong); }
+.kb-collection .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kb-collection .count { font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+.kb-list { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.kb-list-head { display: grid; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); }
+.kb-search { padding: 4px 8px; }
+.kb-list-meta { padding: 0 2px; }
+
+/* 条目本体是一个按钮（整块可点），所以要把浏览器默认按钮样式清干净。 */
+.kb-item {
+  display: grid; gap: 3px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--secondary);
+  text-align: left;
+  transition: background var(--motion), border-color var(--motion);
+}
+.kb-item:hover { background: var(--surface-hover); }
+.kb-item[data-active="yes"] { background: var(--surface-active); border-color: var(--border-strong); }
+
+/* 条目标题用粗体，meta 那一行只放机器能读的东西：collection、字节、时间、是否已挂。 */
+.kb-item-title { font-size: 12.5px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kb-item-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 10.5px; color: var(--faint); }
+.kb-item-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.kb-item-excerpt {
+  font-size: 11.5px; color: var(--muted); line-height: 1.45;
+  max-height: 2.9em; overflow: hidden;
+}
+.kb-item-excerpt mark, mark {
+  background: color-mix(in oklab, var(--warn) 34%, transparent);
+  color: var(--fg);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.kb-item-source { font-size: 10.5px; color: var(--faint); font-family: var(--font-mono); }
+
+.kb-detail { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.kb-detail-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+}
+.kb-detail-head .title { font-weight: 600; color: var(--fg); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kb-detail-head .spacer { flex: 1; }
+.kb-detail-body { padding: 10px 11px; }
+
+.kb-form { display: grid; gap: 8px; }
+.kb-field { display: grid; gap: 3px; }
+.kb-field-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.kb-text { min-height: 96px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; user-select: text; -webkit-user-select: text; }
+.kb-form-actions { padding-top: 2px; }
+
+/* 条目列表本身要能滚，列高不能撑破面板。 */
+.kb-list-body { max-height: min(58vh, 560px); overflow: auto; padding: 6px; display: grid; gap: 1px; }
+
+@media (max-width: 980px) {
+  .kb-body { grid-template-columns: minmax(0, 1fr); }
+  .kb-list-body { max-height: none; }
+}
+
 @media (max-width: 720px) {
   .wb-body { grid-template-columns: 1fr; }
   .wb-side { display: none; }
 }
+

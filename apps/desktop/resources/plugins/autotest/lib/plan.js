@@ -45,32 +45,17 @@ function dataRoot(ctx) {
   // dataDir) must not turn into a crash. Local state is addressed by dataDir
   // when the caller already resolved it, which is the normal path for every
   // tool and panel entry point in main.js.
-  if (!ctx || typeof ctx !== 'object') {
-    const bare = new Error('a plan context with dataDir or a host api is required');
-    bare.code = 'DATA_PATH_MISSING';
-    throw bare;
-  }
   // dataDir wins outright: main.js resolved it once, through the same
   // realpath round-trip the host itself uses, so every reader in this process
   // compares identical strings. Deriving a second root from pi.plugin here is
   // what made a plan the panel had just listed answer PLAN_NOT_FOUND
   // (2026-11-08): Windows hands one caller the short ADMINI~1 spelling and
   // another the long Administrator spelling of the same directory.
-  if (ctx.dataDir) return path.resolve(ctx.dataDir);
-  const pi = ctx.pi;
-  // getDataPath() on the host api may answer a promise, and path.join() never
-  // awaits its input: local metadata and local state must therefore be
-  // resolved by the caller that can await, never guessed here.
-  const base = pi && pi.plugin && pi.plugin.getDataPath ? pi.plugin.getDataPath() : null;
-  if (typeof base === 'string') return path.resolve(path.join(base, 'autotest'));
-  if (base && typeof base.then === 'function') {
-    const error = new Error('plugin data path is asynchronous; resolve it before building the plan root');
-    error.code = 'DATA_PATH_ASYNC';
-    throw error;
-  }
-  const missing = new Error('the host api exposes no plugin data path');
-  missing.code = 'DATA_PATH_MISSING';
-  throw missing;
+  //
+  // The rules themselves live in lib/store.js, next to planDir: the knowledge
+  // base needs the same root from the same kind of ctx, and two copies of
+  // "where does plugin data live" is how two readers end up on two directories.
+  return store.dataRootLike(ctx);
 }
 
 function ensureRoot(root) {
@@ -836,6 +821,53 @@ async function reportTool(ctx, args) {
   };
 }
 
+/* ----------------------------------------------------------------- knowledge */
+
+/**
+ * The knowledge refs this plan cites, deduplicated and in a stable order.
+ *
+ * Sorted on every write so a panel that renders the list twice never sees it
+ * reorder, and so two plans citing the same entries compare as strings.
+ */
+function normaliseRefs(value) {
+  const list = Array.isArray(value) ? value : [];
+  return Array.from(
+    new Set(
+      list
+        .map(function (entry) {
+          return String(entry == null ? '' : entry).trim();
+        })
+        .filter(Boolean),
+    ),
+  ).sort();
+}
+
+function writeRefs(dir, state, ids) {
+  state.knowledgeRefs = normaliseRefs(ids);
+  // touchPlan() then writeState(): the same write order every other mutation in
+  // this module uses, so state.json is never partially updated.
+  touchPlan(state);
+  store.writeState(dir, state);
+  return state.knowledgeRefs;
+}
+
+/** Cite knowledge-base entries from a plan. Unknown ids are just refs; no read is attempted. */
+function attachKnowledge(ctx, planId, ids) {
+  const resolved = resolvePlan(ctx, { planId: planId });
+  const merged = resolved.state.knowledgeRefs.concat(Array.isArray(ids) ? ids : []);
+  return { planId: resolved.state.id, knowledgeRefs: writeRefs(resolved.dir, resolved.state, merged), attached: normaliseRefs(ids) };
+}
+
+/** Drop knowledge-base refs from a plan. Refs that were never attached are ignored. */
+function detachKnowledge(ctx, planId, ids) {
+  const resolved = resolvePlan(ctx, { planId: planId });
+  const gone = new Set(normaliseRefs(ids));
+  const kept = resolved.state.knowledgeRefs.filter(function (entry) {
+    return !gone.has(entry);
+  });
+  return { planId: resolved.state.id, knowledgeRefs: writeRefs(resolved.dir, resolved.state, kept), detached: Array.from(gone).sort() };
+}
+
 /* ------------------------------------------------------------ renderer bridge */
 
 /** Actions the renderer may invoke. Anything else is rejected explicitly. */
@@ -946,6 +978,7 @@ function reviewPlan(ctx, planId) {
       verdicts: state.verdicts,
       approvals: state.approvals,
       notes: state.notes,
+      knowledgeRefs: normaliseRefs(state.knowledgeRefs),
     },
     rail: stages.rail(state),
     gate: stages.reviewGate(state),
@@ -1015,6 +1048,9 @@ module.exports = {
   status,
   select,
   approveCaseSet,
+  attachKnowledge,
+  detachKnowledge,
+  normaliseRefs,
   diagnoseTool,
   reportTool,
   callRendererAction,

@@ -30,20 +30,33 @@
   ],
   "activationEvents": [
     "onStartup",
-    "onCommand:autotest.open"
+    "onCommand:autotest.open",
+    "onCommand:autotest.knowledge"
   ],
   "contributes": {
     "commands": [
       {
         "id": "autotest.open",
-        "title": "Autotest: show the active plan",
+        "title": "Autotest: open the workbench",
         "keywords": [
           "autotest",
           "test",
           "qa",
-          "case",
-          "自动化测试",
-          "用例"
+          "workbench",
+          "测试",
+          "工作台"
+        ],
+        "category": "Autotest"
+      },
+      {
+        "id": "autotest.knowledge",
+        "title": "Autotest: open the knowledge base",
+        "keywords": [
+          "autotest",
+          "knowledge",
+          "reference",
+          "知识库",
+          "资料"
         ],
         "category": "Autotest"
       }
@@ -63,7 +76,7 @@
     "agentTools": [
       {
         "name": "autotest_requirement",
-        "description": "Decompose a requirement source into features, acceptance criteria and open gaps, and open a test plan for it.",
+        "description": "Stage 1 of the autotest workbench. Turn requirement text, a file path or a document reference into a feature breakdown with acceptance criteria and an explicit gap list. Creates a plan when planId is omitted.",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -73,34 +86,43 @@
               "enum": [
                 "decompose"
               ],
-              "description": "decompose the source into features"
-            },
-            "planId": {
-              "type": "string",
-              "description": "existing plan id; omit to create a new plan"
+              "description": "Only \"decompose\" is supported."
             },
             "title": {
               "type": "string",
-              "description": "plan title"
+              "description": "Human readable plan title."
             },
             "source": {
               "type": "string",
-              "description": "requirement text, PRD excerpt or acceptance criteria"
+              "description": "Requirement text, or a path or reference to the material."
             },
-            "gapsConfirmed": {
-              "type": "boolean",
-              "description": "set once a human answered the open gaps"
+            "sourceKind": {
+              "type": "string",
+              "enum": [
+                "text",
+                "file",
+                "document",
+                "url"
+              ],
+              "description": "How to read source."
+            },
+            "sourceRef": {
+              "type": "string",
+              "description": "Original location of the material, for traceability."
+            },
+            "planId": {
+              "type": "string",
+              "description": "Reuse an existing plan instead of creating one."
             }
           },
           "required": [
-            "action",
-            "source"
+            "action"
           ]
         }
       },
       {
         "name": "autotest_cases",
-        "description": "Generate the case set for the requirement stage and hand it to the human review gate.",
+        "description": "Stage 2. Generate test cases from the approved feature list. The result is presented for human review and nothing downstream may consume it before approval.",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -111,15 +133,15 @@
                 "generate",
                 "regenerate"
               ],
-              "description": "generate or regenerate the case set"
+              "description": "Regenerate discards the previous case set."
             },
             "planId": {
               "type": "string",
-              "description": "target plan id"
+              "description": "Plan id returned by autotest_requirement."
             },
-            "focus": {
-              "type": "string",
-              "description": "optional area to emphasise"
+            "regenerate": {
+              "type": "boolean",
+              "description": "Allow running even if the stage check would block."
             }
           },
           "required": [
@@ -130,7 +152,7 @@
       },
       {
         "name": "autotest_select",
-        "description": "Select or deselect cases before approval, or list them with their current selection.",
+        "description": "Adjust which reviewed cases take part in the next run. Selection never approves a case; the gate still requires an explicit approval.",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -141,30 +163,34 @@
                 "select",
                 "deselect"
               ],
-              "description": "apply the id list as selected or deselected"
+              "description": "Select or deselect the listed cases."
             },
             "planId": {
               "type": "string",
-              "description": "target plan id"
+              "description": "Plan id returned by autotest_requirement."
             },
             "testCaseIds": {
               "type": "array",
               "items": {
                 "type": "string"
               },
-              "description": "case ids such as TC-001"
+              "description": "Test case ids such as TC-001."
+            },
+            "selected": {
+              "type": "boolean",
+              "description": "Explicit target state; omit to select the listed ids."
             }
           },
           "required": [
             "action",
             "planId",
-            "caseIds"
+            "testCaseIds"
           ]
         }
       },
       {
         "name": "autotest_author",
-        "description": "Author one runnable script per approved case. Refuses while the review gate is closed.",
+        "description": "Stage 3. Write one runnable script per approved test case. Refuses to run while the case set is unapproved, so materialised code always traces back to a reviewed case.",
         "risk": "medium",
         "schema": {
           "type": "object",
@@ -174,20 +200,18 @@
               "enum": [
                 "write"
               ],
-              "description": "write scripts for the approved case set"
+              "description": "Only \"write\" is supported."
             },
             "planId": {
               "type": "string",
-              "description": "target plan id"
+              "description": "Plan id returned by autotest_requirement."
             },
             "testCaseIds": {
               "type": "array",
-              "items": { "type": "string" },
-              "description": "optional subset of case ids to author in this call; batch at most 3 per call because each script needs its own model call"
-            },
-            "language": {
-              "type": "string",
-              "description": "preferred script language, for example javascript or python"
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional subset of case ids to author in this call. Batch at most 3 per call — every script needs its own model call, and one tool call has a bounded budget."
             }
           },
           "required": [
@@ -198,7 +222,7 @@
       },
       {
         "name": "autotest_run",
-        "description": "Execute the authored scripts and record every result. Refuses while the review gate is closed.",
+        "description": "Stage 4. Execute the approved scripts with a bounded timeout and captured output. Never runs before an approved case set exists.",
         "risk": "medium",
         "schema": {
           "type": "object",
@@ -208,22 +232,30 @@
               "enum": [
                 "execute"
               ],
-              "description": "run the script set"
+              "description": "Only \"execute\" is supported."
             },
             "planId": {
               "type": "string",
-              "description": "target plan id"
+              "description": "Plan id returned by autotest_requirement."
             },
             "testCaseIds": {
               "type": "array",
               "items": {
                 "type": "string"
               },
-              "description": "optional subset of case ids"
+              "description": "Run only these cases; omit to run every script."
             },
             "timeoutMs": {
               "type": "number",
-              "description": "per-script timeout in milliseconds"
+              "description": "Per script timeout in milliseconds."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Working directory for the scripts."
+            },
+            "maxOutput": {
+              "type": "number",
+              "description": "Captured output retained per stream, in characters (default 4096)."
             }
           },
           "required": [
@@ -234,7 +266,7 @@
       },
       {
         "name": "autotest_diagnose",
-        "description": "Classify every failure of the last run and say whether a script repair is legitimate. Never rewrites a script.",
+        "description": "Stage 5. Classify the failures of the last run deterministically first (environment, script, assertion, product, flaky, unknown), then ask the model only for narrative. Reports blocking failures that a script rewrite must not paper over.",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -244,11 +276,11 @@
               "enum": [
                 "diagnose"
               ],
-              "description": "classify the last run"
+              "description": "Only \"diagnose\" is supported."
             },
             "planId": {
               "type": "string",
-              "description": "target plan id"
+              "description": "Plan id returned by autotest_requirement."
             }
           },
           "required": [
@@ -259,7 +291,7 @@
       },
       {
         "name": "autotest_report",
-        "description": "Write the run report for the plan as markdown next to its state.",
+        "description": "Stage 6. Render the plan into markdown with the stage rail, coverage, gate state, diagnosis and audit trail, and write report.md next to the plan state.",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -269,11 +301,11 @@
               "enum": [
                 "report"
               ],
-              "description": "write report.md"
+              "description": "Only \"report\" is supported."
             },
             "planId": {
               "type": "string",
-              "description": "target plan id"
+              "description": "Plan id returned by autotest_requirement."
             }
           },
           "required": [
@@ -284,7 +316,7 @@
       },
       {
         "name": "autotest_status",
-        "description": "Show the rail state of one plan, or list every plan when no id is given.",
+        "description": "Read-only. Summarise one plan, or list every plan when planId is omitted: stage rail, coverage, review gate, last run and artifacts.",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -294,11 +326,11 @@
               "enum": [
                 "status"
               ],
-              "description": "read plan state"
+              "description": "Only \"status\" is supported."
             },
             "planId": {
               "type": "string",
-              "description": "target plan id; omit to list plans"
+              "description": "Omit to list all plans."
             }
           },
           "required": [
