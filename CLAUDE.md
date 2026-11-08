@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-11-06.1
+Policy-Sync: 2026-11-08.1
 
 Instructions for Claude Code CLI and Claude Cowork on Pi-Workspace.
 
@@ -75,14 +75,18 @@ Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 7. resolve conflicts in the worktree
 8. task-candidate E2E in the same worktree
 9. push branch
-10. open/update PR
-11. PR integration validation
+10. hand the branch back — no pull request by default
+11. PR integration validation (only when a PR was requested)
 12. merge into remote main through repository gates
 13. synchronize local main
 14. remove your worktree and merged local branch
 ```
 
 Do **not** insert `merge task → local main` between refresh and task-candidate E2E. The task branch itself is the local integration candidate after incorporating latest `origin/main`. Do not open or update a PR that is behind `origin/main`. Run `pnpm check:pr-base` before opening or updating a PR.
+
+### No pull request unless asked
+
+Pushing the request branch ends the default delivery; opening a pull request is a separate decision that belongs to the user. Push and report the branch — do **not** open a PR/MR, convert a draft, or comment on an existing PR merely because delivery finished. Open, update, convert, or close a pull request only when the user asks for that exact action in the current task; "continue", "finish it", "push it", or a checklist that lists `push` alone is not that request. When a PR was requested, the `origin/main` base rule above applies unchanged. Without a PR the PR integration gate is not run — record that in the delivery report.
 
 Remove a branch and its worktree **as soon as it is used up**: once it is merged into remote `main` (or its commits reached `main` through another lane), absorbed into another request branch, or abandoned. Confirm the commits exist on `origin` before deleting, never delete uncommitted work or a worktree another agent is using, and keep the primary checkout as the only long-lived working copy.
 

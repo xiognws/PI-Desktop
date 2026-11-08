@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-11-06.1
+Policy-Sync: 2026-11-08.1
 
 Mandatory rules for AI coding agents working in Pi-Workspace.
 
@@ -315,8 +315,8 @@ behind `origin/main`.
 7. resolve conflicts inside the task worktree
 8. run required task-candidate E2E in the task worktree
 9. push the request branch
-10. open/update the PR/MR
-11. validate the PR integration candidate
+10. hand the branch back — no pull request by default
+11. validate the PR integration candidate (only when a PR was requested)
 12. merge into remote main through repository gates
 13. synchronize local main
 14. remove the worktree and merged local branch
@@ -330,6 +330,23 @@ the latest `origin/main`. Do not open or update a PR that is behind
 A task-candidate E2E result is valid only when its tested commit and
 base revision are known. The PR integration gate then protects against
 `main` changing between local candidate validation and final merge.
+
+### Do not open a pull request unless asked
+
+Pushing the request branch is the end of the default delivery. Opening a
+pull request is a separate, explicit decision that belongs to the user:
+
+* `git push` the request branch and report it — do not open a PR/MR, do
+  not mark a draft ready, and do not comment on an existing PR merely
+  because delivery finished.
+* Open, update, convert, or close a pull request only when the user asks
+  for that exact action in the current task.
+* "Continue", "finish it", "push it", or a delivery checklist that lists
+  `push` alone does not authorize a pull request.
+* When a PR was requested, everything in "Before opening or updating a
+  PR" above applies unchanged.
+* Without a PR, the branch stays available for the user to review, and
+  the PR integration gate is not run. State that in the delivery report.
 
 ### Remove a branch as soon as it is used up
 
