@@ -98,7 +98,7 @@ function writeScript(scriptDir, script) {
  * A configured project command wins. Otherwise the script is run with the
  * current Node binary, or reported as skipped with the reason - never as passed.
  */
-function resolveInvocation(script, file) {
+function resolveInvocation(script, file, options) {
   const configured = splitCommand(script.command);
   if (configured.length > 0) {
     const hasPlaceholder = configured.some(function (part) {
@@ -112,7 +112,14 @@ function resolveInvocation(script, file) {
   }
   const language = String(script.language || '').toLowerCase();
   if (language === 'javascript' || language === 'js' || language === 'mjs') {
-    return { argv: [process.execPath, file], reason: null };
+    // process.execPath is electron.exe inside the host, and running a .cjs with
+    // it as a plain node requires ELECTRON_RUN_AS_NODE plus an extra browser
+    // bootstrap on every start. The scripts the author stage writes are
+    // ordinary CommonJS, so prefer a real node: an explicit
+    // settings.runnerCommand, then PI_NODE_PATH, then `node` on PATH, and only
+    // then this process. When the caller has not run resolveInterpreter(), the
+    // PATH entry is still right on any machine that has node installed.
+    return { argv: [(options && options.nodeCommand) || defaultNodeCommand(), file], reason: null };
   }
   return {
     argv: null,
@@ -141,7 +148,7 @@ function runScript(options) {
       invocation = { argv: opts.argv.slice(), reason: null };
     } else {
       file = writeScript(opts.scriptDir || path.join(os.tmpdir(), 'autotest-scripts'), opts.script);
-      invocation = resolveInvocation(opts.script, file);
+      invocation = resolveInvocation(opts.script, file, { nodeCommand: opts.nodeCommand });
     }
   } catch (error) {
     return Promise.resolve({
@@ -281,31 +288,95 @@ async function runBatch(options) {
  * script is authored. A missing interpreter is an environment failure, and
  * finding it here keeps it out of the failure analysis loop.
  */
+/**
+ * The interpreter a generated script should run under when the author stage did
+ * not pin one. Kept separate from resolveInterpreter() because this path cannot
+ * await: it only names the candidate, the probe is what verifies it.
+ */
+function defaultNodeCommand() {
+  if (process.env.PI_NODE_PATH) return String(process.env.PI_NODE_PATH);
+  return 'node';
+}
+
+/**
+ * Find a Node interpreter that is not this process.
+ *
+ * The plugin host runs inside Electron, so process.execPath is electron.exe.
+ * Asking electron.exe to behave like Node with ELECTRON_RUN_AS_NODE=1 is not
+ * free: the browser binary still initialises enough of itself first, and in a
+ * loaded host that exceeded the 10s probe budget on every call
+ * (2026-11-08: 'probe failed node=v24.20.0 platform=win32 detail=exceeded
+ * 10000ms' twice in a row), which turned an environment check into a hard
+ * ENVIRONMENT_UNAVAILABLE before the plan was even created. A real node
+ * binary answers in ~60ms.
+ *
+ * Order: an explicit setting, then PI_NODE_PATH, then `node` on PATH, then the
+ * electron fallback so a host without any node install still progresses.
+ */
+async function resolveInterpreter(options) {
+  const opts = options || {};
+  const settings = opts.settings || {};
+  const candidates = [];
+  if (settings.runnerCommand) candidates.push({ argv: [String(settings.runnerCommand)], source: 'settings.runnerCommand' });
+  if (process.env.PI_NODE_PATH) candidates.push({ argv: [String(process.env.PI_NODE_PATH)], source: 'PI_NODE_PATH' });
+  candidates.push({ argv: ['node'], source: 'PATH' });
+  candidates.push({
+    argv: [process.execPath],
+    source: 'process.execPath',
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+  });
+  for (let i = 0; i < candidates.length; i += 1) {
+    const entry = candidates[i];
+    // A plain node must not inherit ELECTRON_RUN_AS_NODE from the host: it is
+    // harmless there, but leaving it lets a broken host environment leak into
+    // every script run. Only the electron fallback sets it.
+    const env = Object.assign({}, process.env, entry.env || {});
+    if (!entry.env) delete env.ELECTRON_RUN_AS_NODE;
+    const probe = await runScript({
+      argv: entry.argv.concat(['-e', 'process.stdout.write(process.version)']),
+      cwd: opts.cwd || process.cwd(),
+      timeoutMs: opts.timeoutMs || PROBE_TIMEOUT_MS,
+      maxOutput: 4096,
+      env: env,
+    });
+    if (probe.status === 'passed') {
+      return { ok: true, argv: entry.argv, source: entry.source, version: String(probe.stdout || '').trim(), detail: 'node -e probe passed' };
+    }
+    // Only the last candidate is reported: the earlier misses are expected
+    // (no node on PATH is a normal Windows install), so a failure names the
+    // interpreter that was actually tried last.
+    if (i === candidates.length - 1) {
+      return { ok: false, argv: entry.argv, source: entry.source, version: process.version, detail: probe.reason || 'node -e probe failed' };
+    }
+  }
+  return { ok: false, argv: [process.execPath], source: 'process.execPath', version: process.version, detail: 'no interpreter probed' };
+}
+
+/**
+ * Prove the runtime that will execute a script actually exists before any
+ * script is authored. A missing interpreter is an environment failure, and
+ * finding it here keeps it out of the failure analysis loop.
+ */
 async function selfCheck(options) {
-  const settings = (options && options.settings) || {};
-  const timeoutMs = (options && options.timeoutMs) || PROBE_TIMEOUT_MS;
-  const probe = ['-e', 'process.stdout.write(process.version)'];
-  // Under Electron (the plugin host runs inside it) process.execPath is
-  // electron.exe, and without ELECTRON_RUN_AS_NODE that is the browser binary,
-  // not a Node runner: `electron.exe -e ...` opens a window and never exits, so
-  // the probe can only time out. Ask for the Node behaviour explicitly. A plain
-  // Node host ignores the variable, so this stays correct outside Electron.
-  const env = Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1' });
-  const result = await runScript({
-    argv: [process.execPath].concat(probe),
-    cwd: (options && options.cwd) || process.cwd(),
+  const opts = options || {};
+  const settings = opts.settings || {};
+  const timeoutMs = opts.timeoutMs || PROBE_TIMEOUT_MS;
+  const found = await resolveInterpreter({
+    settings: settings,
+    cwd: opts.cwd,
     timeoutMs: timeoutMs,
-    maxOutput: 4096,
-    env: env,
   });
   const configured = settings && settings.runnerCommand ? String(settings.runnerCommand) : null;
   return {
-    ok: result.status === 'passed',
-    node: process.version,
+    ok: found.ok,
+    node: found.version || process.version,
+    // execPath stays the host binary: the host redacts absolute paths, and the
+    // interesting fact is which interpreter won, not where it lives.
     execPath: process.execPath,
+    interpreter: found.source,
     platform: process.platform,
     configuredRunner: configured,
-    detail: result.status === 'passed' ? 'node -e probe passed' : result.reason || 'node -e probe failed',
+    detail: found.detail,
   };
 }
 
@@ -317,8 +388,10 @@ module.exports = {
   extensionFor,
   writeScript,
   resolveInvocation,
+  defaultNodeCommand,
   runScript,
   runBatch,
+  resolveInterpreter,
   selfCheck,
   tail,
 };

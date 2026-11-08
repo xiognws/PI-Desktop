@@ -13,13 +13,22 @@ test('manifest carries a lowercase dotted id and existing entry points', functio
   assert.ok(fs.existsSync(path.join(dir, manifest.renderer)), 'manifest.renderer must exist');
 });
 
-test('the plugin ships enabled and opens no panel, view or service', function () {
+test('the plugin ships enabled and opens exactly one work-panel view', function () {
   assert.strictEqual(manifest.enabledByDefault, true, 'a bundled plugin the user cannot see is a dead plugin');
   assert.strictEqual(typeof manifest.author, 'string', 'host-core PluginManifest.author is Option<String>; an object silently drops the whole plugin');
   assert.strictEqual(typeof manifest.schemaVersion, 'number');
-  assert.strictEqual(manifest.ui, undefined, 'no panel: every surface is a slot');
-  assert.strictEqual(manifest.contributes.views, undefined);
+  assert.strictEqual(manifest.ui, undefined, 'no status-bar panel: a view is the only full surface');
   assert.strictEqual(manifest.contributes.services, undefined);
+  // A renderer slot rides inside a chat entry; the workbench needs a plan list
+  // beside a case table, which only contributes.views can hold.
+  assert.strictEqual(manifest.contributes.views.length, 1);
+  const view = manifest.contributes.views[0];
+  assert.strictEqual(view.id, 'workbench');
+  assert.strictEqual(view.entry, 'views/workbench.html');
+  // plugin-ui-ipc.ts:323 joins the entry and throws "view entry missing" at open
+  // time, so a stale path would fail in front of the user.
+  assert.ok(fs.existsSync(path.join(dir, view.entry)), 'view entry must exist: ' + view.entry);
+  assert.ok(manifest.permissions.indexOf('ui.view') !== -1, 'revealView needs ui.view (plugin-runtime.ts:4652-4706)');
   assert.ok(manifest.rendererActions.indexOf('plugin.call') !== -1);
   // 'meta' is the renderer's only path out of the plugin: RendererCallRelay
   // refuses any method missing from this list with PLUGIN_CALL_NO_HANDLER
@@ -55,7 +64,13 @@ test('no write, delete or network permission is requested', function () {
   assert.strictEqual(manifest.fs, undefined);
   assert.strictEqual(manifest.net, undefined);
   manifest.permissions.forEach(function (permission) {
-    assert.ok(permission === 'agent.prompt.inject' || HIGH_RISK.indexOf(permission) !== -1);
+    // Only permissions that are actually granted reach this list; ui.view is
+    // not high-risk (plugin-runtime.ts:27-56) but it must still be one of the
+    // allowlisted api permissions, which check.ts verifies.
+    assert.ok(
+      permission === 'agent.prompt.inject' || permission === 'ui.view' || HIGH_RISK.indexOf(permission) !== -1,
+      'unexpected permission: ' + permission
+    );
   });
 });
 

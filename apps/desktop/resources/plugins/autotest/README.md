@@ -4,9 +4,10 @@ A soft/hardware integration test rail that lives inside the conversation.
 
 Six stages: requirement decomposition -> case generation -> **human review gate**
 -> script authoring -> execution -> failure analysis -> report. It ships enabled
-by default, contributes no panel and no background service, and registers eight
-agent tools plus three renderer slots (eight tool cards, one reply-tail strip,
-one fenced-block renderer).
+by default, runs no background service, and exposes three surfaces: eight agent
+tools, three renderer slots (eight tool cards, one reply-tail strip, one
+fenced-block renderer) and **one work-panel view**, the workbench, for browsing
+and reviewing plans without replaying a conversation.
 
 ## Why this shape
 
@@ -55,6 +56,7 @@ lib/stages.js        stage order, block reasons, review gate, coverage
 lib/report.js        summary projection and markdown report
 lib/plan.js          the eight orchestration entry points
 renderer/            review gate, tool cards, stage rail, report block
+views/               the workbench: a sandboxed page served by the host
 skills/autotest.md   how an agent is told to drive the rail
 tests/               node --test units for every module above
 ```
@@ -111,6 +113,54 @@ Two host contracts the renderer depends on, both easy to break silently:
   with `pluginToolName(pluginId, toolName)`. Registering the qualified name is
   refused as `PLUGIN_SLOT_NOT_OWNED`.
 
+## The workbench view
+
+`views/workbench.html` is a real panel page the host loads with
+`win.loadURL(pathToFileURL(...))` in a sandboxed renderer with its own
+persisted partition, so it has no `require`, no `pi` object and no direct file
+access. Everything it shows arrives over one bridge:
+
+- page side: `window.pluginBridge.invoke(channel, payload)`
+- plugin side: `onPanelInvoke(channel, payload)`, exported from `main.js`
+- channels: `autotest.snapshot`, `.appearance`, `.status`, `.approve`,
+  `.select`, `.reveal`, `.report`, `.trace`
+
+The split between the two surfaces is deliberate. The panel may read anything and
+may approve or select cases — the same three powers the renderer bridge has — but
+it cannot author scripts, start a run, diagnose or reach the model. Those stay on
+the agent side, where the approval gate and the 110 s host budget are enforced.
+`tests/panel.test.js` asserts that absence by name.
+
+Facts a view has to respect, each one learned the hard way:
+
+- `contributes.views[].icon` accepts only the tokens in `PLUGIN_VIEW_ICONS`
+  (`branch` is documented but absent; unknown tokens degrade to a letter tile).
+- The page is not docked the same way twice: read
+  `--pi-plugin-titlebar-height` (0 px docked, 46 px standalone) instead of
+  assuming 0. The view also gets no `appearance:changed` push, so it polls
+  `pi.app.getAppearance()` — here through the `autotest.appearance` channel.
+- `pi-plugin check` does **not** verify that `views[].entry` exists. The host
+  does, at startup, with `existsSync`; a missing file shows up as an empty panel
+  and nothing in the plugin log.
+- A view has no build step, so a page-side type error is a runtime death, not a
+  compile error. Two of them shipped and were only caught by clicking through
+  every tab in a live host: `el()` refuses a non-Node child, so `group()` must
+  flatten an array body before appending it; and `panelSnapshot()` already
+  answers the `reviewPlan()` projection, so reaching for a nested `.plan`
+  silently emptied every tab. `tests/panel.test.js` guards both by reading
+  `views/workbench.js`.
+- The panel is a `WebContentsView`, not an iframe, so nothing about it is
+  reachable from the shell's DOM. It is also not openable over IPC — the only
+  routes are the `autotest.open` command (`pi.ui.revealView`) and the work-panel
+  tool list, and both refuse without an active session.
+
+- A plan root resolved from a promise is not a plan root. Every reader in
+  `lib/store.js` compares strings, and Windows answers the same directory as
+  `C:\Users\ADMINI~1\...` to one caller and `C:\Users\Administrator\...`
+  to another — a plan the panel had just listed answered `PLAN_NOT_FOUND` for
+  its own click. `main.js` now realpaths the root once and honours
+  `PI_AUTOTEST_PLAN_ROOT` for callers that cannot await.
+
 ## Tests
 
 ```
@@ -137,5 +187,8 @@ seam, and a smoke that skips it proves nothing.
 ## Enabling
 
 Enabled by default (`enabledByDefault: true`), because a bundled plugin the user
-cannot see is a dead plugin. The command palette still carries
-`Autotest: show the active plan`.
+cannot see is a dead plugin. The command palette carries
+`Autotest: open the workbench`, which calls `pi.ui.revealView({ viewId:
+'workbench' })` (permission `ui.view`). The workbench also always appears in the
+work panel's own tool list, so the command is a shortcut rather than the only
+door.

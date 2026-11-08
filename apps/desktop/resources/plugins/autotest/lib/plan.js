@@ -41,13 +41,28 @@ const PROMPTS = {
 };
 
 function dataRoot(ctx) {
+  // The context is a bag; a caller that hands over only the host api (or only a
+  // dataDir) must not turn into a crash. Local state is addressed by dataDir
+  // when the caller already resolved it, which is the normal path for every
+  // tool and panel entry point in main.js.
+  if (!ctx || typeof ctx !== 'object') {
+    const bare = new Error('a plan context with dataDir or a host api is required');
+    bare.code = 'DATA_PATH_MISSING';
+    throw bare;
+  }
+  // dataDir wins outright: main.js resolved it once, through the same
+  // realpath round-trip the host itself uses, so every reader in this process
+  // compares identical strings. Deriving a second root from pi.plugin here is
+  // what made a plan the panel had just listed answer PLAN_NOT_FOUND
+  // (2026-11-08): Windows hands one caller the short ADMINI~1 spelling and
+  // another the long Administrator spelling of the same directory.
+  if (ctx.dataDir) return path.resolve(ctx.dataDir);
   const pi = ctx.pi;
-  if (ctx.dataDir) return ctx.dataDir;
   // getDataPath() on the host api may answer a promise, and path.join() never
   // awaits its input: local metadata and local state must therefore be
   // resolved by the caller that can await, never guessed here.
   const base = pi && pi.plugin && pi.plugin.getDataPath ? pi.plugin.getDataPath() : null;
-  if (typeof base === 'string') return path.join(base, 'autotest');
+  if (typeof base === 'string') return path.resolve(path.join(base, 'autotest'));
   if (base && typeof base.then === 'function') {
     const error = new Error('plugin data path is asynchronous; resolve it before building the plan root');
     error.code = 'DATA_PATH_ASYNC';
@@ -61,6 +76,25 @@ function dataRoot(ctx) {
 function ensureRoot(root) {
   fs.mkdirSync(path.join(root, 'plans'), { recursive: true });
   return root;
+}
+
+/**
+ * Await the plan root for callers that cannot keep a promise.
+ *
+ * getDataPath() on the host api answers a promise, so every reader that wants
+ * a string path has to await it first. main.js already does that; a caller that
+ * only has {pi} — a test, a renderer action, a future panel channel — would
+ * otherwise walk into DATA_PATH_ASYNC for a directory that exists and is
+ * readable. Resolving here keeps one answer for one question.
+ */
+async function resolveRooted(ctx) {
+  if (ctx && typeof ctx === 'object' && ctx.dataDir) return dataRoot(ctx);
+  const pi = ctx && ctx.pi;
+  const reader = pi && pi.plugin && pi.plugin.getDataPath;
+  if (typeof reader !== 'function') return dataRoot(ctx);
+  const value = await Promise.resolve(reader.call(pi.plugin));
+  if (typeof value !== 'string' || !value) return dataRoot(ctx);
+  return dataRoot({ dataDir: path.join(value, 'autotest') });
 }
 
 function resolvePlan(ctx, args) {
@@ -843,10 +877,135 @@ async function callRendererAction(ctx, method, payload) {
   return handler(ctx, payload || {});
 }
 
+/* --------------------------------------------------------------------- panel */
+
+/**
+ * Everything the work-panel view renders for one plan, in one read.
+ *
+ * The view runs in a sandboxed page with no fs and no require, so every fact it
+ * shows has to be projected here. It also gets a trimmed copy of the case and
+ * script bodies: a plan with 40 cases and 40 scripts is megabytes of source, and
+ * the panel would spend its whole 30s bridge budget on serialisation.
+ */
+function reviewPlan(ctx, planId) {
+  // Callers hand in either the id or a {planId} bag: the panel bridge passes the
+  // id while onRendererCall passes an argument object, and resolvePlan only
+  // takes the bag. Answering PLAN_ID_REQUIRED for a valid id would look like a
+  // deleted plan.
+  const wanted = planId && typeof planId === 'object' ? planId.planId : planId;
+  const resolved = resolvePlan(ctx, { planId: wanted });
+  const state = resolved.state;
+  return {
+    planId: state.id,
+    title: state.title,
+    updatedAt: state.updatedAt,
+    summary: report.summarize(state),
+    state: {
+      id: state.id,
+      title: state.title,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+      activeStage: state.activeStage,
+      status: state.status,
+      source: state.source,
+      stages: state.stages,
+      requirements: state.requirements,
+      features: state.features,
+      cases: state.cases,
+      scripts: (state.scripts || []).map(function (entry) {
+        return {
+          testCaseId: entry.testCaseId,
+          title: entry.title,
+          language: entry.language,
+          command: entry.command,
+          notes: String(entry.notes || '').slice(0, 600),
+          revision: entry.revision,
+          body: String(entry.body || ''),
+        };
+      }),
+      runs: (state.runs || []).map(function (entry) {
+        return {
+          id: entry.id,
+          at: entry.at,
+          results: (entry.results || []).map(function (result) {
+            return {
+              testCaseId: result.testCaseId,
+              title: result.title,
+              status: result.status,
+              exitCode: result.exitCode,
+              durationMs: result.durationMs,
+              reason: result.reason,
+              truncated: result.truncated,
+              file: result.file,
+              stdout: String(result.stdout || '').slice(0, 20000),
+              stderr: String(result.stderr || '').slice(0, 20000),
+            };
+          }),
+        };
+      }),
+      verdicts: state.verdicts,
+      approvals: state.approvals,
+      notes: state.notes,
+    },
+    rail: stages.rail(state),
+    gate: stages.reviewGate(state),
+    coverage: stages.coverage(state),
+    artifacts: store.listArtifacts(resolved.dir),
+    next: stages.nextStages(state),
+  };
+}
+
+/** The markdown report of one plan, rendered on demand (never cached to disk). */
+function reportMarkdown(ctx, planId) {
+  const wanted = planId && typeof planId === 'object' ? planId.planId : planId;
+  const resolved = resolvePlan(ctx, { planId: wanted });
+  return {
+    planId: resolved.state.id,
+    markdown: report.renderMarkdown(resolved.state),
+  };
+}
+
+/**
+ * One row of the traceability matrix. Kept here rather than in the view so the
+ * join between feature, case, script and run is testable without a browser.
+ */
+function traceRows(state) {
+  const latest = (state.runs || []).slice(-1)[0] || null;
+  const results = {};
+  if (latest && Array.isArray(latest.results)) {
+    latest.results.forEach(function (entry) {
+      results[entry.testCaseId] = entry;
+    });
+  }
+  const scriptByCase = {};
+  (state.scripts || []).forEach(function (entry) {
+    scriptByCase[entry.testCaseId] = entry;
+  });
+  return (state.cases || []).map(function (entry) {
+    const result = results[entry.id] || null;
+    return {
+      testCaseId: entry.id,
+      title: entry.title,
+      priority: entry.priority,
+      featureId: entry.featureId,
+      selected: entry.selected !== false,
+      approvedRevision: typeof entry.approvedRevision === 'number' ? entry.approvedRevision : null,
+      revision: entry.revision,
+      hasScript: Boolean(scriptByCase[entry.id]),
+      status: result ? result.status : null,
+      durationMs: result ? result.durationMs : null,
+    };
+  });
+}
+
 module.exports = {
   PROMPTS,
   RENDERER_ACTIONS,
   dataRoot,
+  resolveRooted,
+  reviewPlan,
+  reportMarkdown,
+  traceRows,
   ensureRoot,
   resolvePlan,
   requirement,

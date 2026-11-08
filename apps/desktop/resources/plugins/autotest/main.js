@@ -12,6 +12,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const plan = require('./lib/plan');
+const schema = require('./lib/schema');
+const store = require('./lib/store');
 const runner = require('./lib/runner');
 const stages = require('./lib/stages');
 const report = require('./lib/report');
@@ -214,6 +216,27 @@ function log(message) {
  * then `undefined`, so mock mode, the case budget and a configured runner were
  * silently ignored. Await it, and never overwrite it with an unresolved value.
  */
+/**
+ * A plan root a synchronous caller can name.
+ *
+ * Every store reader needs a string root, but the host api only answers one
+ * through an async call. A renderer action or a panel click that arrives before
+ * the plugin finished loading, or in a context where nothing may await, then has
+ * no root at all. PI_AUTOTEST_PLAN_ROOT pins it for those callers; unset, the
+ * async path in pluginPlanRoot() stays the only answer.
+ */
+function syncPlanRoot() {
+  const pinned = process.env.PI_AUTOTEST_PLAN_ROOT;
+  if (pinned) {
+    try {
+      return fs.realpathSync.native(pinned);
+    } catch (error) {
+      return pinned;
+    }
+  }
+  return null;
+}
+
 async function pluginSettings(pi) {
   const reader = pi && pi.plugin && pi.plugin.getSettings;
   if (typeof reader !== 'function') return {};
@@ -230,11 +253,30 @@ async function pluginSettings(pi) {
  * implements it like getSettings, as a parent call), and path.join never
  * awaits: resolving it here is the only place that can.
  */
-async function pluginDataDir(pi) {
+async function pluginPlanRoot(pi) {
   const reader = pi && pi.plugin && pi.plugin.getDataPath;
   if (typeof reader !== 'function') return null;
-  const value = await reader.call(pi.plugin);
-  return typeof value === 'string' && value ? path.join(value, 'autotest') : null;
+  // Bind the receiver explicitly: the host api is a proxy whose methods are not
+  // guaranteed to be pure functions of their arguments, and an unbound call
+  // inside a promise chain answers a different directory than the same call
+  // outside it. Resolving once per call keeps every reader on one root.
+  const value = await Promise.resolve(reader.call(pi.plugin));
+  if (typeof value !== 'string' || !value) return null;
+  // Resolve to one spelling. Windows reports the same directory as
+  // C:\Users\ADMINI~1\... to mkdtemp and C:\Users\Administrator\... to the
+  // host join, and every plan lookup in lib/store.js compares strings — a plan
+  // written under one spelling is invisible to a reader holding the other, so
+  // the panel listed a plan and then answered PLAN_NOT_FOUND for its own click
+  // (2026-11-08). One realpath here covers every reader downstream.
+  const root = path.join(value, 'autotest');
+  try {
+    return fs.realpathSync.native(root);
+  } catch (error) {
+    // The directory does not exist yet: the first write creates it, and a
+    // resolved path is not available before that. Fall through rather than
+    // failing a read that is only asking for an empty list.
+    return root;
+  }
 }
 
 async function toolContext(toolCtx, extra) {
@@ -249,7 +291,9 @@ async function toolContext(toolCtx, extra) {
       toolCallId: toolCtx && toolCtx.toolCallId,
       workspacePath: toolCtx && toolCtx.workspacePath,
       settings: await pluginSettings(currentPi),
-      dataDir: await pluginDataDir(currentPi),
+      // A pinned root wins so a caller that cannot await still lands on one
+      // directory; otherwise resolve through the host api as usual.
+      dataDir: syncPlanRoot() || (await pluginPlanRoot(currentPi)),
       log: activeLog || undefined,
       runtimes: {
         // The probe must run in the workspace, not in the host process cwd, and
@@ -363,6 +407,20 @@ function registerTools(pi) {
 async function onLoad() {
   pi = globalThis.pi || pi;
   currentPi = pi;
+  // The host resolves activationEvents to commands.register calls
+  // (plugin-host-process.mjs:628-637 looks the id up in a Map filled only by
+  // api.commands.register), so the toolbar command has to be registered here;
+  // naming it in the manifest alone would leave a palette entry that runs
+  // nothing.
+  if (pi && pi.commands && typeof pi.commands.register === 'function') {
+    await pi.commands.register({
+      id: 'autotest.open',
+      title: 'Autotest: open the workbench',
+      keywords: ['autotest', 'test', 'qa', 'workbench', '测试', '工作台'],
+      category: 'Autotest',
+      run: revealWorkbench,
+    });
+  }
   const registered = registerTools(pi);
   for (const entry of registered) {
     await pi.agent.registerTool({
@@ -379,6 +437,15 @@ async function onLoad() {
 async function onUnload() {
   for (const definition of TOOLS) {
     await pi.agent.unregisterTool(definition.name);
+  }
+  try {
+    if (pi && pi.commands && typeof pi.commands.unregister === 'function') {
+      await pi.commands.unregister('autotest.open');
+    }
+  } catch (ignored) {
+    // Teardown clears the host-side table by plugin id anyway
+    // (plugin-runtime.ts:3669-3671); a stale entry here would only outlive
+    // the process if unload failed, and then the whole plugin is gone.
   }
 }
 
@@ -407,4 +474,227 @@ async function onRendererCall(method, payload) {
   }
 }
 
-module.exports = { onLoad, onUnload, onRendererCall, TOOLS, PLAN_SAFE, registerTools };
+/* ------------------------------------------------------------------ views */
+
+/**
+ * Open the workbench in a work-panel tab.
+ *
+ * pi.ui.revealView is the only way in (packages/plugin-sdk/src/index.ts:1373,
+ * needs the ui.view permission, implemented at plugin-runtime.ts:4652-4706).
+ * It targets the *active session*, so a plugin command fired while no session
+ * is open answers INVALID_ARGUMENT — that is the host contract, not a bug, and
+ * the toast says which way to go instead of failing silently.
+ */
+async function revealWorkbench() {
+  const ctx = { pi: pi };
+  try {
+    if (!pi || !pi.ui || typeof pi.ui.revealView !== 'function') {
+      throw Object.assign(new Error('this host build has no ui.revealView'), { code: 'UNSUPPORTED' });
+    }
+    await pi.ui.revealView({ viewId: 'workbench' });
+    return { ok: true };
+  } catch (error) {
+    const code = (error && error.code) || 'REVEAL_FAILED';
+    log('info', 'reveal workbench failed: ' + code + ' ' + ((error && error.message) || ''));
+    if (pi && pi.ui && typeof pi.ui.showToast === 'function') {
+      // showToast takes (message, level) positionally — packages/plugin-sdk/src/index.ts:1366.
+      // Handing it an object stringifies as "[object Object]" in the host
+      // (plugin-runtime.ts:2500 does String(payload?.message)) and, when the
+      // object reaches the renderer unbranded, React #31 tears the window down.
+      try {
+        await pi.ui.showToast(
+          code === 'INVALID_ARGUMENT'
+            ? 'Open a chat session first, then run Autotest: open the workbench.'
+            : 'Autotest: the workbench could not be opened (' + code + ').',
+          'warn',
+        );
+      } catch (ignored) {
+        /* a toast is best effort */
+      }
+    }
+    throw error;
+  }
+}
+
+/* ------------------------------------------------------------ panel bridge */
+
+/**
+ * Work-panel channels.
+ *
+ * The host answers a thrown error with PLUGIN_CALL_FAILED and nothing else
+ * (plugin-host-process.mjs:804-818), so failures come back as data carrying
+ * their own code: the view has to say *what* went wrong, and the bridge has a
+ * 30s budget that a swallowed rejection would burn for nothing.
+ *
+ * The set of actions the view may take is deliberately identical to the
+ * renderer bridge — status/approve/select. Starting a run or editing a script
+ * stays on the agent tool side, where the approval gate is enforced.
+ */
+let lastPanelPlanId = null;
+
+async function panelSnapshot(payload) {
+  const ctx = await toolContext(null);
+  // The panel names no workspace: a view opened from the work panel has no
+  // session behind it, so listPlans() must not be gated on one. It reads the
+  // plan root directly and the projection reuses the same ctx.
+  const meta = store.listPlans(ctx.dataDir);
+  const wanted = payload && payload.planId ? String(payload.planId) : lastPanelPlanId || (meta[0] && meta[0].id) || null;
+  let projection = null;
+  if (wanted) {
+    try {
+      projection = plan.reviewPlan(ctx, wanted);
+      lastPanelPlanId = wanted;
+    } catch (error) {
+      // A plan deleted behind the panel must not blank the whole list; the
+      // reason travels next to the empty detail instead.
+      if (error.code !== 'PLAN_NOT_FOUND') throw error;
+      projection = null;
+    }
+  }
+  const appearance = await readAppearance();
+  return {
+    ok: true,
+    plans: meta,
+    planId: projection ? projection.planId : null,
+    plan: projection,
+    base: appearanceBase(appearance),
+    locale: (await hostLocale()).toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en',
+  };
+}
+
+const PANEL_CHANNELS = {
+  // The view calls this on boot to learn the stage rail and tool list before it
+  // asks for a plan. Without it every workbench open logged an UNSUPPORTED
+  // error and the page kept a stale rail until the first snapshot landed.
+  'autotest.meta': async function () {
+    return {
+      ok: true,
+      pluginId: 'pi.autotest',
+      stages: schema.STAGES.slice(),
+      tools: TOOLS.map(function (tool) { return tool.name; }),
+      rendererActions: ['status', 'approve', 'select', 'reveal', 'meta'],
+    };
+  },
+  'autotest.snapshot': panelSnapshot,
+  'autotest.appearance': async function () {
+    const appearance = await readAppearance();
+    return { ok: true, appearance: appearance, base: appearanceBase(appearance) };
+  },
+  'autotest.status': async function (payload) {
+    const ctx = await toolContext(null);
+    return { ok: true, result: await plan.status(ctx, { planId: payload && payload.planId }) };
+  },
+  'autotest.approve': async function (payload) {
+    const ctx = await toolContext(null);
+    const args = payload || {};
+    const cases = Array.isArray(args.cases) ? args.cases : [];
+    if (cases.length === 0) {
+      const error = new Error('approve needs the reviewed case rows; an empty list would approve nothing');
+      error.code = 'CASES_EMPTY';
+      throw error;
+    }
+    const answer = await plan.approveCaseSet(ctx, {
+      planId: args.planId,
+      cases: cases,
+      decision: args.decision === 'rejected' ? 'rejected' : 'approved',
+      actor: args.actor || 'workbench',
+      note: args.note,
+    });
+    lastPanelPlanId = answer.planId || lastPanelPlanId;
+    return { ok: true, result: answer };
+  },
+  'autotest.select': async function (payload) {
+    const ctx = await toolContext(null);
+    const args = payload || {};
+    return {
+      ok: true,
+      result: await plan.select(ctx, {
+        planId: args.planId,
+        testCaseIds: args.testCaseIds,
+        selected: typeof args.selected === 'boolean' ? args.selected : undefined,
+      }),
+    };
+  },
+  'autotest.reveal': async function (payload) {
+    const ctx = await toolContext(null);
+    return { ok: true, result: await plan.callRendererAction(ctx, 'reveal', payload || {}) };
+  },
+  'autotest.report': async function (payload) {
+    const ctx = await toolContext(null);
+    return Object.assign({ ok: true }, plan.reportMarkdown(ctx, payload && payload.planId));
+  },
+  'autotest.trace': async function (payload) {
+    const ctx = await toolContext(null);
+    const resolved = plan.resolvePlan(ctx, { planId: payload && payload.planId });
+    return { ok: true, planId: resolved.state.id, rows: plan.traceRows(resolved.state) };
+  },
+};
+
+async function onPanelInvoke(channel, payload) {
+  const handler = PANEL_CHANNELS[channel];
+  if (!handler) {
+    return { ok: false, code: 'UNSUPPORTED', message: 'unknown panel channel: ' + String(channel) };
+  }
+  // A panel can be reopened while the plugin is still loading; onLoad has not
+  // necessarily run yet, so bind the host api here too.
+  pi = pi || globalThis.pi;
+  currentPi = currentPi || pi;
+  try {
+    return await handler(payload || {});
+  } catch (error) {
+    return {
+      ok: false,
+      code: (error && error.code) || 'PANEL_FAILED',
+      message: (error && error.message) || String(error),
+    };
+  }
+}
+
+/**
+ * Host locale and appearance, mirroring pi.gitlens/main.js:67-119.
+ *
+ * A docked view has no appearance:changed push channel, so the page polls these
+ * through the bridge instead. Both host APIs are optional: an older host
+ * answers nothing and the view keeps its last palette.
+ */
+async function hostLocale() {
+  try {
+    if (pi && pi.app && typeof pi.app.getLocale === 'function') {
+      const value = await pi.app.getLocale();
+      if (typeof value === 'string' && value) return value;
+    }
+  } catch (ignored) {
+    /* older host */
+  }
+  return 'en';
+}
+
+function appearanceBase(appearance) {
+  if (!appearance || typeof appearance !== 'object') return 'system';
+  if (appearance.base === 'light' || appearance.base === 'dark') return appearance.base;
+  if (appearance.theme === 'light' || appearance.theme === 'dark') return appearance.theme;
+  return 'system';
+}
+
+async function readAppearance() {
+  try {
+    if (pi && pi.app && typeof pi.app.getAppearance === 'function') {
+      const value = await pi.app.getAppearance();
+      if (value && typeof value === 'object') return value;
+    }
+  } catch (ignored) {
+    /* older host: the page falls back to prefers-color-scheme */
+  }
+  return null;
+}
+
+module.exports = {
+  onLoad,
+  onUnload,
+  onRendererCall,
+  onPanelInvoke,
+  PANEL_CHANNELS,
+  TOOLS,
+  PLAN_SAFE,
+  registerTools,
+};

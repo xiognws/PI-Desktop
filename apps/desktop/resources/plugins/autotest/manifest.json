@@ -25,7 +25,8 @@
     "agent.tool.register",
     "agent.complete",
     "renderer.extension",
-    "agent.prompt.inject"
+    "agent.prompt.inject",
+    "ui.view"
   ],
   "activationEvents": [
     "onStartup",
@@ -45,6 +46,18 @@
           "用例"
         ],
         "category": "Autotest"
+      }
+    ],
+    "views": [
+      {
+        "id": "workbench",
+        "title": {
+          "en": "Autotest Workbench",
+          "zh-CN": "测试工作台"
+        },
+        "icon": "workflow",
+        "entry": "views/workbench.html",
+        "order": 30
       }
     ],
     "agentTools": [

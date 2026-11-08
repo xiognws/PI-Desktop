@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN" data-booting="true">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="pi-plugin-chrome" content="v3" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file: data:; font-src 'self' file:; connect-src 'none';"
+    />
+    <title>测试工作台</title>
+    <link rel="stylesheet" href="./workbench.css" />
+    <script src="./workbench.js" defer></script>
+  </head>
+  <body>
+    <header class="wb-top">
+      <div class="wb-brand">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-brand-text">测试工作台</span>
+      </div>
+      <div class="wb-rail" id="rail" role="tablist" aria-label="阶段"></div>
+      <div class="wb-top-actions">
+        <span class="wb-chip" id="gate-chip" hidden></span>
+        <button class="wb-icon-btn" id="refresh" type="button" title="重新读取计划 (R)">↻</button>
+      </div>
+    </header>
+    <div class="wb-banner" id="banner" hidden></div>
+    <div class="wb-body">
+      <nav class="wb-side" aria-label="测试计划">
+        <div class="wb-side-head">
+          <input class="wb-search" id="search" type="search" placeholder="搜索计划…" autocomplete="off" />
+        </div>
+        <div class="wb-plan-list" id="plan-list"></div>
+        <div class="wb-side-foot" id="side-foot"></div>
+      </nav>
+      <main class="wb-main">
+        <section class="wb-hero" id="hero"></section>
+        <nav class="wb-tabs" id="tabs" role="tablist"></nav>
+        <div class="wb-view" id="view"></div>
+      </main>
+    </div>
+    <div class="wb-drawer" id="drawer" hidden>
+      <div class="wb-drawer-head">
+        <span class="wb-drawer-title" id="drawer-title"></span>
+        <div class="wb-drawer-actions">
+          <button class="wb-icon-btn" id="drawer-copy" type="button" title="复制">⧉</button>
+          <button class="wb-icon-btn" id="drawer-close" type="button" title="关闭 (Esc)">✕</button>
+        </div>
+      </div>
+      <pre class="wb-drawer-body" id="drawer-body"></pre>
+    </div>
+    <div class="wb-toast" id="toast" hidden></div>
+  </body>
+</html>

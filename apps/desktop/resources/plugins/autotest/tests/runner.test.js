@@ -51,9 +51,14 @@ test('resolveInvocation honours an explicit script placeholder', function () {
 });
 
 test('resolveInvocation falls back to the node binary only for javascript', function () {
+  // Not process.execPath: inside the plugin host that is electron.exe, and
+  // starting it as a plain node costs an extra browser bootstrap on every
+  // script (2026-11-08: the environment probe alone exceeded 10s there).
   const js = runner.resolveInvocation({ language: 'javascript' }, 'x.mjs');
-  assert.strictEqual(js.argv[0], process.execPath);
+  assert.strictEqual(js.argv[0], 'node');
   assert.strictEqual(js.argv[1], 'x.mjs');
+  const pinned = runner.resolveInvocation({ language: 'javascript' }, 'x.mjs', { nodeCommand: 'C:/node/node.exe' });
+  assert.strictEqual(pinned.argv[0], 'C:/node/node.exe', 'a caller-supplied interpreter wins');
   const py = runner.resolveInvocation({ language: 'python' }, 'x.py');
   assert.strictEqual(py.argv, null);
   assert.match(py.reason, /no runner command configured/);
@@ -133,4 +138,17 @@ test('runBatch keeps order and records a cancellation before start', async funct
   assert.match(results[1].reason, /cancelled/);
   // The cancelled item never starts, so it does not emit a progress tick.
   assert.strictEqual(seen.length, 1);
+});
+
+test('the interpreter probe prefers a real node over the host binary', async function () {
+  // The probe decides whether a plan may start at all, so a probe that can only
+  // time out is worse than no probe: it reported the host as a dead runtime.
+  const found = await runner.resolveInterpreter({ timeoutMs: 8000 });
+  assert.ok(found.argv.length >= 1);
+  if (found.ok) {
+    assert.match(found.version, /^v\d+\./);
+    assert.ok(['settings.runnerCommand', 'PI_NODE_PATH', 'PATH', 'process.execPath'].indexOf(found.source) !== -1);
+  } else {
+    assert.strictEqual(found.source, 'process.execPath', 'only the last resort is reported as the failure');
+  }
 });
