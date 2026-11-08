@@ -601,6 +601,7 @@ export const en = {
     usageCompaction: "Compacted {{times}}× · summary",
     compactionRow: "Context compacted · #{{times}}",
     skillReviewApplied: "Skill review · {{count}} update",
+    skillReviewAppliedDetail: "Self-improvement review: {{detail}}",
     skillReviewNothing: "Skill review · looked, nothing new",
     skillReviewNoLook: "Skill review · did not read the library",
     skillReviewFailed: "Skill review · failed",

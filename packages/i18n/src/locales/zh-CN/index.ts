@@ -591,6 +591,7 @@ export const zhCN = {
     usageCompaction: "已压缩 {{times}} 次 · 摘要",
     compactionRow: "上下文已压缩 · 第 {{times}} 次",
     skillReviewApplied: "技能回顾 · 已更新 {{count}} 项",
+    skillReviewAppliedDetail: "💾 自我改进回顾：{{detail}}",
     skillReviewNothing: "技能回顾 · 已查看技能库，无新内容",
     skillReviewNoLook: "技能回顾 · 未读取技能库",
     skillReviewFailed: "技能回顾 · 失败",

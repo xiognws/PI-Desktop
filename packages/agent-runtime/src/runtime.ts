@@ -39,6 +39,7 @@ import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
 import { createMemoryTool } from "./memory-agent-tool.js";
 import { createSkillManageTool } from "./skill-manage-tool.js";
 import {
+  accrueReviewToolCalls,
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
   REVIEW_DEFAULT_MIN_TOOL_CALLS,
   SKILL_REVIEW_DEFINITION,
@@ -54,7 +55,7 @@ import { createJevClassifierTool } from "./jev-classifier-tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
 import { remoteMutationIdentity } from "./remote-workspace.js";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import {
   settledDelegationMessage,
@@ -1916,6 +1917,12 @@ export class DesktopAgentRuntime {
    * hold the review off forever, which is how its row stopped appearing at all.
    */
   private turnToolCallsSinceReview = 0;
+  /**
+   * Fingerprint of the last turn a review was dispatched for. A turn that only
+   * replays the same tool calls with the same result is not material, and asking
+   * for skills from it manufactures work instead of finding lessons.
+   */
+  private lastReviewedMaterial = "";
   private skillReviewRunning = false;
   /** Aborts an in-flight review when a new turn arrives (foreground priority). */
   private skillReviewAbort?: AbortController;
@@ -2577,75 +2584,87 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // there is no work in them to learn from (the host's `is_contract_mode`).
     if (this.mode !== "agent") return skipped("mode");
     if (this.skillReviewRunning) return emit({ outcome: "skipped", reason: "already-running" });
-    const minToolCalls = policy.afterToolCalls ?? REVIEW_DEFAULT_MIN_TOOL_CALLS;
-    // Measured over the turns since the last review was dispatched or the cooldown
-    // was last taken, not over the turn that just ended. Counting only the current
-    // turn lets a chain of short turns hold the review off forever.
-    if (this.turnToolCallsSinceReview < minToolCalls) {
-      this.turnToolCallsSinceReview += this.turnToolCalls;
-      return skipped("too-few-tools");
-    }
-    const minIntervalSec = policy.minIntervalSec ?? REVIEW_DEFAULT_MIN_INTERVAL_SEC;
-    if (Date.now() - this.lastSkillReviewAt < minIntervalSec * 1000) {
-      this.turnToolCallsSinceReview += this.turnToolCalls;
-      return skipped("cooldown");
-    }
+    // Both readings describe the turn that just ended, so they are taken before the
+    // first `emit`: the notice's own listener must not observe a half-updated gate.
+    // Whatever the gate decides, the turn is spent afterwards — an aborted turn and
+    // a skipped turn were both paid for in tool calls, and carrying them into a later
+    // turn would let one long turn qualify an unrelated short one.
+    const gate = this.consumeTurnForReview(policy);
+    if (gate.material) return skipped("nothing-new");
+    if (gate.tooFewTools) return skipped("too-few-tools");
+    if (gate.cooled) return skipped("cooldown");
 
-    // The catalog, not `declaredTools()`. `skill_manage` and `memory` are
-    // ancillary: they live in the on-demand catalog and reach the request only
-    // after the model spends a ToolSearch on them. Reading the declared set here
-    // made `canReview` false for every turn of every session, so the review never
-    // ran - the fork is the only automatic write path into the skill library, and
-    // it was unreachable. The fork still receives the session's own tool objects,
-    // and REVIEW_TOOL_ALLOWLIST bounds what it may call, so widening the source
-    // does not widen what a review can do.
-    const tools = reviewToolsFrom([...this.toolCatalog.values()]);
+    // The review's write path is built for the fork, not borrowed from the turn's
+    // declaration list. `Skill` only exists when the session has a skill catalog
+    // and plugin tools travel by launch policy, so a session whose library is
+    // empty — exactly the one that needs its first skills — had no writer and the
+    // pass was skipped forever. The fork is `reviewToolsFrom` still: whatever the
+    // allowlist admits from the session, plus the two tools the review owns.
+    const declared = this.declaredTools();
+    const tools = reviewToolsFrom([
+      ...declared,
+      ...(declared.some((tool) => tool.name === SKILL_TOOL_NAME)
+        ? []
+        : [this.buildSkillTool()]),
+      ...(declared.some((tool) => tool.name === "skill_manage")
+        ? []
+        : [createSkillManageTool(this.host)]),
+    ]);
     // A fork without `skill_manage` and `Skill` would pay a full completion and
     // could not land a single change.
-    if (!canReview(tools)) return skipped("no-skill-tools");
+    if (!canReview(tools)) {
+      // Name the tools the fork would actually carry. "no-skill-tools" alone cannot
+      // be acted on: a reader needs to see which half is missing.
+      const names = tools.map((tool) => tool.name).sort();
+      this.emit({
+        type: "skill_review",
+        outcome: "skipped",
+        reason: `no-skill-tools:${names.join(",") || "none"}`,
+      });
+      return;
+    }
 
     const controller = new AbortController();
     this.skillReviewAbort = controller;
     this.skillReviewRunning = true;
+    this.lastReviewedMaterial = gate.materialKey;
     try {
       // Two attempts at most: the first may answer without reading, the second is
       // the same pass with the correction appended. Nothing loops past that, so a
       // model that will not look costs one extra completion and then stops.
+      // Only a completed fork can report: one that was aborted, stopped, or failed
+      // never looked, and "skipped (aborted)" sounds like a verdict on the session
+      // rather than a gate on the scheduler. Those stay in the log.
       for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const collector = new ReviewActionCollector();
-      const run = new SubagentRun({
-        definition: SKILL_REVIEW_DEFINITION,
-        sessionId: this.sessionId,
-        parentToolCallId: "skill-review",
-        task: SKILL_REVIEW_PROMPT + (attempt === 1 ? "" : `\n\n${SKILL_REVIEW_NO_LOOK_RETRY}`),
-        systemPrompt: SKILL_REVIEW_TOOL_NOTE,
-        tools,
-        provider: this.provider,
-        thinkingLevel: "off",
-        initialMessages: [...this.agent.state.messages],
-        onEvent: (envelope) => collector.record(envelope.event),
-        signal: controller.signal,
-      });
-      const result = await run.run();
-      const summary = collector.actions().map(describeReviewAction);
-      if (summary.length > 0) {
-        emit({ outcome: "applied", actions: summary });
-      } else if (result.status === "completed" && collector.toolCallCount() === 0 && attempt < 2) {
-        // A completion that never touched a tool read nothing: the model answered from
-        // the prompt alone. One correction is worth spending on, because "nothing to
-        // save" and "never looked" are indistinguishable downstream.
-        continue;
-      } else {
-        emit({
-          outcome: "skipped",
-          reason:
-            result.status !== "completed"
-              ? result.status
-              : collector.toolCallCount() === 0
-                ? "no-tool-calls"
-                : "nothing-to-save",
+        const collector = new ReviewActionCollector();
+        const run = new SubagentRun({
+          definition: SKILL_REVIEW_DEFINITION,
+          sessionId: this.sessionId,
+          parentToolCallId: "skill-review",
+          task: SKILL_REVIEW_PROMPT + (attempt === 1 ? "" : `\n\n${SKILL_REVIEW_NO_LOOK_RETRY}`),
+          systemPrompt: SKILL_REVIEW_TOOL_NOTE,
+          tools,
+          provider: this.provider,
+          thinkingLevel: "off",
+          initialMessages: [...this.agent.state.messages],
+          onEvent: (envelope) => collector.record(envelope.event),
+          signal: controller.signal,
         });
-      }
+        const result = await run.run();
+        const summary = collector.actions().map(describeReviewAction);
+        if (summary.length > 0) {
+          emit({ outcome: "applied", actions: summary });
+        } else if (result.status === "completed" && collector.toolCallCount() === 0 && attempt < 2) {
+          // A completion that never touched a tool read nothing: the model answered from
+          // the prompt alone. One correction is worth spending on, because "nothing to
+          // save" and "never looked" are indistinguishable downstream.
+          continue;
+        } else if (result.status === "completed") {
+          emit({
+            outcome: "skipped",
+            reason: collector.toolCallCount() === 0 ? "no-tool-calls" : "nothing-to-save",
+          });
+        }
       }
     } catch (error) {
       emit({
@@ -2658,8 +2677,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       // The cooldown starts whether or not the fork wrote anything: the completion
       // was spent, and a skip must not invite a retry loop.
       this.lastSkillReviewAt = Date.now();
-      this.turnToolCalls = 0;
-      this.turnToolCallsSinceReview = 0;
     }
   }
 
@@ -4691,6 +4708,97 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
 
   private declaredTools(): AgentTool[] {
     return this.declarationPolicy?.tools ?? this.activeTools();
+  }
+
+  /**
+   * The `Skill` read tool, built on demand.
+   *
+   * `activeTools` only publishes it when the session has a skill catalog, which
+   * makes a library with no skills unreachable — including from the background
+   * review, whose whole job is to create the first ones. The tool's contract is
+   * unchanged: it loads a document main serves, and a session with nothing to
+   * list simply returns nothing.
+   */
+  private buildSkillTool(): AgentTool {
+    const tool: AgentTool = {
+      name: SKILL_TOOL_NAME,
+      label: "Skill",
+      description:
+        "Load the full instructions of one skill listed in the Skills section of your system prompt. Pass its exact id (for example \"demo.hello/release-notes\"). Returns the skill document; follow it for the current task.",
+      parameters: Type.Object({
+        id: Type.String({
+          description: "Skill id exactly as listed in the Skills section.",
+        }),
+      }),
+      execute: async (toolCallId) =>
+        this.subagentToolError(toolCallId, "No skill library is available in this session."),
+    };
+    return tool;
+  }
+
+  /**
+   * Read the turn that just ended against the review gates, once.
+   *
+   * The turn's counters are reset here rather than at the start of the next turn:
+   * a gate that declines, a fork that fails, and an interrupted turn all still
+   * spent their tool calls, and the next turn must be measured on its own work.
+   * Taking the reading before the reset is what keeps a single long turn from
+   * qualifying an unrelated short one that follows it.
+   */
+  private consumeTurnForReview(policy: SkillReviewPolicy): {
+    material: boolean;
+    materialKey: string;
+    tooFewTools: boolean;
+    cooled: boolean;
+  } {
+    const minToolCalls = policy.afterToolCalls ?? REVIEW_DEFAULT_MIN_TOOL_CALLS;
+    const minIntervalSec = policy.minIntervalSec ?? REVIEW_DEFAULT_MIN_INTERVAL_SEC;
+    const accrual = accrueReviewToolCalls(
+      this.turnToolCallsSinceReview,
+      this.turnToolCalls,
+      minToolCalls,
+    );
+    const material = this.reviewMaterialKey();
+    const repeated = material === this.lastReviewedMaterial;
+    const cooled = Date.now() - this.lastSkillReviewAt < minIntervalSec * 1000;
+    const due = accrual.due && !cooled;
+    this.turnToolCalls = 0;
+    // Only a dispatched review starts the count over. A turn that was merely too
+    // small is still work the next review has to account for.
+    this.turnToolCallsSinceReview = due ? 0 : accrual.sinceLastReview;
+    return { material: repeated, materialKey: material, tooFewTools: !accrual.due, cooled };
+  }
+
+  /**
+   * What the turn that just ended actually did: the user's own request plus an
+   * order-independent digest of its tool calls and their results.
+   *
+   * The user's message is in the key on purpose. "List this directory twice" is a
+   * repeat; "list it, then explain what you found" reuses the same tool call for a
+   * new job, and only the request tells the two apart.
+   */
+  private reviewMaterialKey(): string {
+    const messages = this.agent.state.messages as unknown as Array<Record<string, unknown>>;
+    const turnId = this.turnId;
+    const parts: string[] = [];
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message?.role === "user") {
+        parts.push(`user:${String(message.content ?? "")}`);
+        break;
+      }
+    }
+    const calls: string[] = [];
+    for (const message of messages) {
+      if (message?.role !== "tool") continue;
+      if (turnId && message.turnId !== turnId) continue;
+      calls.push(
+        `${String(message.toolName ?? "")}${JSON.stringify(message.content ?? "")}`,
+      );
+    }
+    calls.sort();
+    parts.push(`calls:${calls.join("|")}`);
+    return createHash("sha256").update(parts.join("\n")).digest("hex");
   }
 
   private isPlanSafePluginTool(name: string): boolean {

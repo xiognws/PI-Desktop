@@ -591,6 +591,7 @@ export const zhTW = {
     usageCompaction: "已壓縮 {{times}} 次 · 摘要",
     compactionRow: "上下文已壓縮 · 第 {{times}} 次",
     skillReviewApplied: "技能回顧 · 已更新 {{count}} 項",
+    skillReviewAppliedDetail: "💾 自我改進回顧：{{detail}}",
     skillReviewNothing: "技能回顧 · 已查看技能庫，無新內容",
     skillReviewNoLook: "技能回顧 · 未讀取技能庫",
     skillReviewFailed: "技能回顧 · 失敗",

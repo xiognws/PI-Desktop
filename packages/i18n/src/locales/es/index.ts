@@ -586,6 +586,7 @@ export const es = {
     "usageCompaction": "Compactado {{times}}× · resumen",
     "compactionRow": "Contexto compactado · #{{times}}",
     "skillReviewApplied": "Revisión de habilidades · {{count}} actualización",
+    "skillReviewAppliedDetail": "Revisión de auto-mejora: {{detail}}",
     "skillReviewNothing": "Revisión de habilidades · revisado, nada nuevo",
     "skillReviewNoLook": "Revisión de habilidades · no leyó la biblioteca",
     "skillReviewFailed": "Revisión de habilidades · falló",

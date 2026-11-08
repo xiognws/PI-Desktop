@@ -211,17 +211,9 @@ function TranscriptBody({
     onRestoreReading,
   });
   const returnToLatest = useCallback(() => {
-    // The prepared history view is released by the trip's arrival, or at once
-    // when the pane is already hidden: no frame can run inside a hidden box, so
-    // waiting for one would leave the view behind and land the reveal on a
-    // layout the reader never chose.
-    if (paneVisible) {
-      jumpToLatest(onPrepareReturnToLatest?.() ?? onReturnToLatest);
-      return;
-    }
-    onReturnToLatest?.();
-    jumpToLatest();
-  }, [jumpToLatest, onPrepareReturnToLatest, onReturnToLatest, paneVisible]);
+    const arrive = onPrepareReturnToLatest?.() ?? onReturnToLatest;
+    jumpToLatest(arrive);
+  }, [jumpToLatest, onPrepareReturnToLatest, onReturnToLatest]);
 
   // Find runs over the rendered rows, so it needs the same content element the
   // transcript already measures for the minimap and search focus.
@@ -280,17 +272,6 @@ function TranscriptBody({
     () => (transcriptRunning ? liveHistoryTurnId(historyEntries, tailEntry) : undefined),
     [historyEntries, tailEntry, transcriptRunning],
   );
-  // The turn the review will report on: the live turn while one runs, otherwise the
-  // last assistant turn the list holds. The row is anchored to it so it stays under
-  // the turn it describes even as the tail above it changes.
-  const lastSettledTurnId = useMemo(() => {
-    for (let index = historyEntries.length - 1; index >= 0; index -= 1) {
-      const entry = historyEntries[index];
-      if (entry.kind === "assistant-turn") return entry.id;
-    }
-    return tailEntry?.kind === "assistant-turn" ? tailEntry.id : undefined;
-  }, [historyEntries, tailEntry]);
-  const reviewTurnId = liveTurnId ?? lastSettledTurnId;
   const hasSpecializedActivity = specializedActivity !== undefined;
   // Existing output does not mean the turn has finished: a text stream can
   // pause, and completed tool rows can outlive their activity. Keep one tail
@@ -557,7 +538,7 @@ function TranscriptBody({
             isRunning={isRunning}
             liveDelegations={liveDelegations}
             liveTurnId={liveTurnId}
-            trailingSlot={<SkillReviewRow sessionId={sessionId ?? ""} turnId={reviewTurnId} />}
+            trailingSlot={<SkillReviewRow sessionId={sessionId ?? ""} />}
           />
           {tailEntry ? (
             <TranscriptTail

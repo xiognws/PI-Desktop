@@ -586,6 +586,7 @@ export const de = {
     "usageCompaction": "Verdichtet {{times}}× · Zusammenfassung",
     "compactionRow": "Kontext komprimiert · #{{times}}",
     "skillReviewApplied": "Skill-Review · {{count}} Aktualisierung",
+    "skillReviewAppliedDetail": "Selbstverbesserung: {{detail}}",
     "skillReviewNothing": "Skill-Review · geprüft, nichts Neues",
     "skillReviewNoLook": "Skill-Review · Bibliothek nicht gelesen",
     "skillReviewFailed": "Skill-Review · fehlgeschlagen",

@@ -235,9 +235,10 @@ export function createEventsSlice({
       }
       const event = envelope.event;
       if (event.type === "skill_review") {
-        // Keyed by session for the row's lifetime, and stamped with the turn it
-        // reviews so the transcript can hold it under that turn. In memory only — the
-        // durable record is the skill-review log.
+        // Keyed by session for the row's lifetime. The envelope's turn id is the
+        // runtime's, which the transcript's rows never compare against, so it is not
+        // kept: the row is placed by the history list, under the turn just finished.
+        // In memory only — the durable record is the skill-review log.
         set((state) => ({
           skillReviewBySession: {
             ...state.skillReviewBySession,
@@ -245,7 +246,6 @@ export function createEventsSlice({
               outcome: event.outcome,
               ...(event.reason ? { reason: event.reason } : {}),
               actions: event.actions ?? [],
-              ...(envelope.turnId ? { turnId: envelope.turnId } : {}),
             },
           },
         }));

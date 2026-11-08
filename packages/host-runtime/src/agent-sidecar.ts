@@ -77,6 +77,18 @@ const HOST_PROXY_ALLOWED = new Set([
   "memory.entries",
   "memory.writeEntries",
   "memory.recall",
+  // The agent's own skill library (ADR 0377). `skill_manage` is the write path
+  // for the same documents the `Skill` tool reads, and every action is a
+  // `skills.*` RPC: without these the background review can see the library but
+  // never land a lesson, which is exactly the deadlock it exists to prevent.
+  // Reads and writes only — import, builtin toggles and listing stay host-UI
+  // concerns the sidecar has no reason to reach.
+  "skills.create",
+  "skills.read",
+  "skills.update",
+  "skills.writeFile",
+  "skills.removeFile",
+  "skills.remove",
   // Trusted extensions (D387): answered by the embedding host, plus the
   // session methods the ExtensionAPI reaches (spec 16 §10.1).
   "extensions.commands.publish",

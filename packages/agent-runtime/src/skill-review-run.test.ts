@@ -10,6 +10,7 @@ import {
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
   REVIEW_DEFAULT_MIN_TOOL_CALLS,
   ReviewActionCollector,
+  accrueReviewToolCalls,
   canReview,
   describeReviewAction,
   skillReviewPolicyFrom,
@@ -230,16 +231,19 @@ describe("skillReviewPolicyFrom", () => {
       enabled: true,
       afterToolCalls: REVIEW_DEFAULT_MIN_TOOL_CALLS,
       minIntervalSec: REVIEW_DEFAULT_MIN_INTERVAL_SEC,
-      showQuietPasses: true,
+      showQuietPasses: false,
     });
   });
 
   it("reports the quiet passes only when the reader asks for them", () => {
-    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: false }).showQuietPasses).toBe(false);
+    // A pass that found nothing is the normal answer, so it is off unless the
+    // reader turned that one key on — the same silence Hermes keeps.
+    expect(skillReviewPolicyFrom().showQuietPasses).toBe(false);
     expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: true }).showQuietPasses).toBe(true);
-    // Only an explicit boolean false silences the row; anything else keeps it.
-    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: "false" }).showQuietPasses).toBe(true);
-    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: null }).showQuietPasses).toBe(true);
+    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: false }).showQuietPasses).toBe(false);
+    // Only an explicit boolean true turns them on; anything else stays silent.
+    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: "true" }).showQuietPasses).toBe(false);
+    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: null }).showQuietPasses).toBe(false);
   });
 
   it("turns off only on an explicit false", () => {
@@ -252,12 +256,32 @@ describe("skillReviewPolicyFrom", () => {
       enabled: true,
       afterToolCalls: 7,
       minIntervalSec: 30,
-      showQuietPasses: true,
+      showQuietPasses: false,
     });
     for (const bad of [0, -5, Number.NaN, "10", null]) {
       const policy = skillReviewPolicyFrom({ skillReviewAfterToolCalls: bad });
       expect(policy.afterToolCalls).toBe(REVIEW_DEFAULT_MIN_TOOL_CALLS);
     }
+  });
+});
+
+describe("accrueReviewToolCalls", () => {
+  it("opens the gate on the turn that reaches the threshold", () => {
+    // The first turn that meets the minimum must count itself; judging before
+    // counting is what kept the review from ever firing.
+    expect(accrueReviewToolCalls(0, 3, 3)).toEqual({ sinceLastReview: 3, due: true });
+    expect(accrueReviewToolCalls(0, 1, 3)).toEqual({ sinceLastReview: 1, due: false });
+  });
+
+  it("carries short turns forward until they add up", () => {
+    let total = 0;
+    for (const turn of [1, 1, 1]) total = accrueReviewToolCalls(total, turn, 3).sinceLastReview;
+    expect(total).toBe(3);
+    expect(accrueReviewToolCalls(total, 0, 3).due).toBe(true);
+  });
+
+  it("counts a turn with no tool calls as nothing added", () => {
+    expect(accrueReviewToolCalls(5, 0, 3)).toEqual({ sinceLastReview: 5, due: true });
   });
 });
 

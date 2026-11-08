@@ -55,7 +55,9 @@ export const REVIEW_DEFAULT_MIN_INTERVAL_SEC = 120;
  *
  * The keys are not in the typed `AppSettings` (they predate it), so they come in as
  * a record and are read with the defaults the review has always used: on, after
- * three tool calls, at most once every two minutes, and reporting a quiet pass.
+ * three tool calls, and at most once every two minutes. Quiet passes are off by
+ * default: Hermes only ever announces a review that wrote something, and a reader
+ * who wants the empty passes as well has to ask for that one key.
  */
 export function skillReviewPolicyFrom(settings: Record<string, unknown> = {}): {
   enabled: boolean;
@@ -71,8 +73,26 @@ export function skillReviewPolicyFrom(settings: Record<string, unknown> = {}): {
     enabled: settings.skillReviewAfterTurn !== false,
     afterToolCalls: positive("skillReviewAfterToolCalls", REVIEW_DEFAULT_MIN_TOOL_CALLS),
     minIntervalSec: positive("skillReviewMinIntervalSec", REVIEW_DEFAULT_MIN_INTERVAL_SEC),
-    showQuietPasses: settings.skillReviewShowQuietPasses !== false,
+    showQuietPasses: settings.skillReviewShowQuietPasses === true,
   };
+}
+
+/**
+ * Advance the "tool calls since the last review" counter by the turn that just
+ * ended, then say whether the gate opens.
+ *
+ * The order is the whole function. Counting after the comparison means the first
+ * turn that qualifies is measured against zero and thrown away, so a machine that
+ * only ever runs one qualifying turn at a time never opens the gate — the row
+ * never appears and the log blames `too-few-tools` forever.
+ */
+export function accrueReviewToolCalls(
+  sinceLastReview: number,
+  thisTurn: number,
+  minToolCalls: number,
+): { sinceLastReview: number; due: boolean } {
+  const total = sinceLastReview + thisTurn;
+  return { sinceLastReview: total, due: total >= minToolCalls };
 }
 
 /**
