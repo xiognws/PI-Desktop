@@ -28,7 +28,8 @@ function fixture(reduced = false) {
   const moving = () => navigation.phase() === "moving";
   const finish = () => { for (let n = 0; moving() && n < 60; n++) advance(); };
   return { box, navigation, positions, frames, advance, finish, moving,
-    start: () => navigation.start(() => arrivals++), arrivals: () => arrivals };
+    start: () => navigation.start(() => arrivals++), arrivals: () => arrivals,
+    reveal: () => navigation.start(), resumed: () => arrivals };
 }
 
 test("latest moves continuously to bottom before committing the new view", () => {
@@ -88,20 +89,82 @@ test("reduced motion reaches bottom synchronously", () => {
   assert.equal(f.frames.size, 0);
 });
 
-test("a trip still in flight can be landed before a pane reveal bottoms", () => {
+test("a hide while in flight carries the accepted latest in one step", () => {
   const f = fixture();
   f.start(); f.advance();
-  const parked = f.box.scrollTop;
   assert.equal(f.navigation.landed(), true);
-  // Landing frees the viewport without moving the reader: the pane reveal
-  // that follows is the only thing allowed to choose the position.
-  assert.equal(f.box.scrollTop, parked);
-  assert.equal(f.arrivals(), 0);
-  assert.equal(f.moving(), false);
+  // No frame runs inside a hidden box, so the intent is carried out where the
+  // trip was travelling: the reader lands on the newest turn, not on the
+  // offset the animation happened to stop at.
+  assert.equal(f.box.scrollTop, 7400);
+  assert.equal(f.arrivals(), 1);
   assert.equal(f.frames.size, 0);
-  // Landing twice must not touch an already retired trip.
+  assert.equal(f.navigation.phase(), "done");
+  // The committed intent is retired, so a second hide carries nothing.
+  f.navigation.landed();
+  f.navigation.cancel(true);
+  assert.equal(f.arrivals(), 1);
+});
+
+test("a trip that already reached bottom still commits when the pane hides", () => {
+  const f = fixture();
+  f.start(); f.finish();
+  // The hide lands one layout after the final frame, so nothing is in flight,
+  // yet the accepted latest intent must still be carried out.
+  f.navigation.cancel(true); f.navigation.cancel(true); f.advance();
+  assert.equal(f.arrivals(), 1);
+  assert.equal(f.box.scrollTop, 7400);
+  assert.equal(f.frames.size, 0);
+  // A committed trip is retired, not left claiming the viewport.
+  assert.equal(f.navigation.phase(), "idle");
+});
+
+test("a landed done trip parks without moving or committing again", () => {
+  const f = fixture();
+  f.start(); f.finish();
+  const settled = f.box.scrollTop;
   assert.equal(f.navigation.landed(), false);
-  assert.equal(f.arrivals(), 0);
+  assert.equal(f.box.scrollTop, settled);
+  assert.equal(f.arrivals(), 1);
+  assert.equal(f.frames.size, 0);
+});
+
+test("a reveal after a hidden trip needs no second trip", () => {
+  const f = fixture();
+  f.start(); f.advance();
+  assert.equal(f.navigation.landed(), true);
+  // The hide already committed, so the reveal has nothing to revive: it must
+  // not start a trip of its own, and the viewport stays on the newest turn.
+  f.reveal(); f.finish();
+  assert.equal(f.resumed(), 1);
+  assert.equal(f.box.scrollTop, 7400);
+  assert.equal(f.navigation.phase(), "done");
+});
+
+test("an explicit latest after a committed hide commits once for itself", () => {
+  const f = fixture();
+  f.start(); f.advance();
+  f.navigation.landed();
+  let explicit = 0;
+  f.navigation.start(() => { explicit++; });
+  f.finish();
+  // The hide already committed, so this trip owes its own arrival and must not
+  // revive the retired one.
+  assert.equal(explicit, 1);
+  assert.equal(f.arrivals(), 1);
+  assert.equal(f.navigation.phase(), "done");
+});
+
+test("a reader takeover after a hide starts a clean trip", () => {
+  const f = fixture();
+  f.start(); f.advance();
+  f.navigation.landed();
+  f.navigation.cancel();
+  f.reveal(); f.finish();
+  // The hide committed once; the takeover retires everything else, so the
+  // reveal's own trip carries no arrival of its own.
+  assert.equal(f.resumed(), 1);
+  assert.equal(f.box.scrollTop, 7400);
 });
 
 test("a landed trip stops blocking the follow scroll", () => {

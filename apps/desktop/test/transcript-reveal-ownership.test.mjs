@@ -78,7 +78,7 @@ test("an explicit latest replaces a pending restore with a sampled bottom", asyn
   );
   assert.match(
     scrollHook,
-    /const jumpToLatest = useCallback[\s\S]*?rememberFollowReadingPosition\(\);\s*latestNavigation\.start/,
+    /const jumpToLatest = useCallback[\s\S]*?rememberFollowReadingPosition\(\);\s*\/\/ The prepared history view[\s\S]*?latestNavigation\.start/,
   );
   assert.doesNotMatch(
     scrollHook,

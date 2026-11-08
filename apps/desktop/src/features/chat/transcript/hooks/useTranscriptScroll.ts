@@ -773,7 +773,7 @@ export function useTranscriptScroll({
     });
   }, [reachTop, releaseDisclosureAnchor, releaseFollow, retryHistoryPaging]);
 
-  const jumpToLatest = useCallback((arrive?: () => void) => {
+  const jumpToLatest = useCallback((arrive: () => void = () => {}) => {
     // Retire the gesture and all competing owners before yielding any frames.
     lastScrollGestureAtRef.current = -Infinity;
     cancelReadingPosition();
@@ -786,8 +786,17 @@ export function useTranscriptScroll({
     // intent has to replace any earlier unpinned bookmark: an explicit latest
     // is the reader declaring they are done with the old position.
     rememberFollowReadingPosition();
+    // The prepared history view is released when the trip lands, or at once
+    // when it has nowhere to travel. Parking it here would strand the reader in
+    // history if the pane hid before a single frame ran.
     latestNavigation.start(() => {
-      arrive?.();
+      // A parked trip already owns an arrival; this fresh one replaces it, so
+      // never pass through the no-arrival default that would revive the old
+      // intent instead.
+      arrive();
+      // Move the viewport in the same call: the arrival releases the prepared
+      // history view, and a hide one layout later must not find the reader
+      // stranded where the animation started.
       scrollToBottom();
       // The trip reached the newest turn, so the follow bookmark belongs at
       // the bottom it actually landed on, not at the offset it started from.

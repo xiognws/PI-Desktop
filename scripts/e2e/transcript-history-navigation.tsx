@@ -182,7 +182,7 @@ globalThis.transcriptHistoryNavigationProbe = async (reducedOnly = false) => {
     }
     if (reducedOnly) {
       assert(matchMedia("(prefers-reduced-motion: reduce)").matches, "reduced motion emulation missing");
-      assert(failures.length === 0 && unexpected.length === 0, failures.join("\n"));
+      assert(failures.length === 0 && unexpected.length === 0, "reduced motion failures: " + failures.join("\n"));
       return { ok: true, reducedMotion: true, cases: results };
     }
     for (const action of ["interrupt", "press", "growth", "complete", "hide", "unmount", "new-search", "failed-search"] as const) {
@@ -243,16 +243,28 @@ globalThis.transcriptHistoryNavigationProbe = async (reducedOnly = false) => {
             useAppStore.setState({ isRunning: false, runningSessions: {},
               messages: useAppStore.getState().messages.map(message => ({ ...message, status: "complete" })) });
           } else if (action === "hide") {
+            // The click already carries the intent out, so the hide has to be
+            // judged on what actually survives it: no prepared history view may
+            // be left behind, the viewport may not be pinned mid-history, and
+            // coming back must land on the newest turn.
             render(false);
-            await until(() => !useAppStore.getState().transcriptViews[id], "hide did not commit accepted latest intent");
+            await until(() => !useAppStore.getState().transcriptViews[id], "hide left a prepared history view behind");
             render();
+            // The reveal repaints a taller transcript, so landing on bottom is
+            // a frame-late layout step rather than a viewport assertion.
+            await frame();
+            await until(() => bottom(), "reveal did not land on the newest turn");
           } else if (action === "unmount") {
             flushSync(() => root.render(null));
             assert(!useAppStore.getState().transcriptViews[id], "unmount did not commit accepted latest intent");
             render();
           }
-          await until(() => !useAppStore.getState().transcriptViews[id] && bottom(), `${action} lost latest`);
-          for (let n = 0; n < 15; n++) { await frame(); assert(bottom(), `${action} reversed accepted latest`); }
+          await until(() => !useAppStore.getState().transcriptViews[id], `${action} lost latest`);
+          await until(() => bottom(), `${action} reversed accepted latest`);
+
+          // The settled viewport has to stay put: a repaint must not drift the
+          // reader off the newest turn once the trip is done.
+          for (let n = 0; n < 15; n++) { await frame(); assert(bottom(), `${action} drifted off latest`); }
         }
         results.push({ lifecycle: action, ok: true });
         console.log("LATEST_LIFECYCLE " + JSON.stringify({ action, ok: true }));
@@ -401,7 +413,7 @@ globalThis.transcriptHistoryNavigationProbe = async (reducedOnly = false) => {
       } finally { anchor.stop(); }
     }
     assert(unexpected.length === 0, `unexpected IPC: ${unexpected.join(",")}`);
-    assert(failures.length === 0, failures.join("\n"));
+    assert(failures.length === 0, "failures: " + failures.join(" || "));
     return { ok: true, cases: results, reads };
   } finally {
     for (const item of pending.splice(0)) item.resolve(item.response);

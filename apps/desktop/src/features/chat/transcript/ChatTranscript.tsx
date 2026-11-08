@@ -211,9 +211,17 @@ function TranscriptBody({
     onRestoreReading,
   });
   const returnToLatest = useCallback(() => {
-    const arrive = onPrepareReturnToLatest?.() ?? onReturnToLatest;
-    jumpToLatest(arrive);
-  }, [jumpToLatest, onPrepareReturnToLatest, onReturnToLatest]);
+    // The prepared history view is released by the trip's arrival, or at once
+    // when the pane is already hidden: no frame can run inside a hidden box, so
+    // waiting for one would leave the view behind and land the reveal on a
+    // layout the reader never chose.
+    if (paneVisible) {
+      jumpToLatest(onPrepareReturnToLatest?.() ?? onReturnToLatest);
+      return;
+    }
+    onReturnToLatest?.();
+    jumpToLatest();
+  }, [jumpToLatest, onPrepareReturnToLatest, onReturnToLatest, paneVisible]);
 
   // Find runs over the rendered rows, so it needs the same content element the
   // transcript already measures for the minimap and search focus.
