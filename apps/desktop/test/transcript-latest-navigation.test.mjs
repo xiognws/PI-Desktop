@@ -123,6 +123,8 @@ test("a landed done trip parks without moving or committing again", () => {
   const f = fixture();
   f.start(); f.finish();
   const settled = f.box.scrollTop;
+  // A trip that already arrived owns no intent, so a hide must not run its
+  // arrival a second time. The pane keeps the page the reader can still read.
   assert.equal(f.navigation.landed(), false);
   assert.equal(f.box.scrollTop, settled);
   assert.equal(f.arrivals(), 1);

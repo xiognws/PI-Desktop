@@ -114,7 +114,7 @@ export function createTranscriptLatestNavigation(port: ScrollPort) {
     // sees, so the accepted intent is carried out here in one step: the trip
     // lands on the newest turn it was already travelling to, instead of
     // reversing when the pane comes back.
-    if (parkedArrive && flight) {
+    if (phase === "parked" && parkedArrive && flight) {
       const arrival = parkedArrive;
       const bottom = port.geometry();
       parkedArrive = undefined;
