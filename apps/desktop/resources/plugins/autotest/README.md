@@ -6,8 +6,9 @@ Six stages: requirement decomposition -> case generation -> **human review gate*
 -> script authoring -> execution -> failure analysis -> report. It ships enabled
 by default, runs no background service, and exposes three surfaces: eight agent
 tools, three renderer slots (eight tool cards, one reply-tail strip, one
-fenced-block renderer) and **one work-panel view**, the workbench, for browsing
-and reviewing plans without replaying a conversation.
+fenced-block renderer) and **one work-panel view**, the workbench, which drives
+the whole rail - every stage, the review gate and the knowledge base - without
+replaying a conversation.
 
 ## Why this shape
 
@@ -54,10 +55,13 @@ lib/runner.js        shell-free script execution with timeout and output cap
 lib/diagnose.js      deterministic failure classification
 lib/stages.js        stage order, block reasons, review gate, coverage
 lib/report.js        summary projection and markdown report
-lib/plan.js          the eight orchestration entry points
+lib/jobs.js          the async job registry the panel starts stages through
+lib/kb.js            the knowledge base: file-backed entries, BM25 search
+lib/plan.js          the eight orchestration entry points, plus knowledge refs
 renderer/            review gate, tool cards, stage rail, report block
 views/               the workbench: a sandboxed page served by the host
 skills/autotest.md   how an agent is told to drive the rail
+scripts/             smoke walk and the manifest drift check
 tests/               node --test units for every module above
 ```
 
@@ -123,13 +127,42 @@ access. Everything it shows arrives over one bridge:
 - page side: `window.pluginBridge.invoke(channel, payload)`
 - plugin side: `onPanelInvoke(channel, payload)`, exported from `main.js`
 - channels: `autotest.snapshot`, `.appearance`, `.status`, `.approve`,
-  `.select`, `.reveal`, `.report`, `.trace`
+  `.select`, `.reveal`, `.report`, `.trace`, `.start`, `.cases.generate`,
+  `.author`, `.execute`, `.diagnose`, `.job`, `.job.cancel`, plus eight `kb.*`
+  channels
 
-The split between the two surfaces is deliberate. The panel may read anything and
-may approve or select cases — the same three powers the renderer bridge has — but
-it cannot author scripts, start a run, diagnose or reach the model. Those stay on
-the agent side, where the approval gate and the 110 s host budget are enforced.
-`tests/panel.test.js` asserts that absence by name.
+The panel drives the whole rail, and the reason it can is the job registry.
+A panel invocation is killed at `PLUGIN_PANEL_TIMEOUT_MS` (30 s,
+`plugin-runtime.ts:698`), which no model call or test run fits inside. So every
+stage channel is a **dispatch**, not a call: it starts a job and answers with a
+ticket in milliseconds, and the page polls `autotest.job` while it runs.
+
+```
+page  --autotest.execute-->  main.js  --jobs.start-->  lib/jobs.js
+                                  |                        |
+                                  +--> {ok, job:{id, status:'running'}}   |
+page  --autotest.job------>  main.js  ------------------>  job snapshot
+```
+
+Consequences worth knowing before touching it:
+
+- `autotest.report` used to answer `{ok, markdown}` inline. It now answers a
+  ticket like every other stage and the markdown arrives as `job.result.markdown`.
+- The gate is not re-implemented in the page. `stageBar()` reads
+  `plan.rail.stages[].state` and shows `entry.reason` verbatim; the two
+  `revision <= approvedRevision` comparisons that used to live in
+  `views/workbench.js` are gone. One implementation, in `lib/plan.js`.
+- `autotest.job` takes either `{jobId}` (one job) or `{planId}` (`{jobs, active}`).
+  `active` is the running one and is what the page adopts on reload.
+- A stage channel with no plan answers `PLAN_ID_REQUIRED`; only
+  `autotest.start` may run without one, because that is how the first plan is
+  created. `tests/panel.test.js` covers both.
+
+The knowledge base is the one tab that works without a plan. Entries live in
+`<data>/kb/<collection>/<id>.json` next to a `<id>.md` body, are scored by
+BM25 with a relative-length penalty, and are attached to a plan by id
+(`plan.attachKnowledge`), so a plan records *which* reference it was written
+against and a later edit to that reference is visible as a change.
 
 Facts a view has to respect, each one learned the hard way:
 
@@ -170,6 +203,11 @@ node --test "tests/*.test.js"
 Pass the glob as a quoted string; `node --test tests` treats the directory as a
 single test file and fails.
 
+`scripts/check-manifest-drift.cjs` parses `main.js` with a regex (it never
+requires it) and compares the eight tool schemas and the two commands against
+`manifest.json`, so a schema that drifts from the implementation fails the build
+instead of failing at call time.
+
 `scripts/smoke.cjs` walks all six stages through the same `toolContext` the host
 builds, in mock mode and in a temp data dir, and is wrapped by
 `tests/smoke.test.js` so the suite covers it. Run it by hand while wiring the
@@ -188,7 +226,7 @@ seam, and a smoke that skips it proves nothing.
 
 Enabled by default (`enabledByDefault: true`), because a bundled plugin the user
 cannot see is a dead plugin. The command palette carries
-`Autotest: open the workbench`, which calls `pi.ui.revealView({ viewId:
-'workbench' })` (permission `ui.view`). The workbench also always appears in the
-work panel's own tool list, so the command is a shortcut rather than the only
-door.
+`Autotest: open the workbench` and `Autotest: open the knowledge base`, which
+call `pi.ui.revealView({ viewId: 'workbench', tab })` (permission `ui.view`).
+The workbench also always appears in the work panel's own tool list, so the
+commands are shortcuts rather than the only door.

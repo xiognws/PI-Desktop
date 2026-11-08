@@ -30,6 +30,24 @@ function resolveRoot(dir) {
   return fs.realpathSync.native(dir);
 }
 
+// 工作台把频道名写成字面量再交给桥，没有构建步骤，拼错一个字母只有运行时才炸。
+// 页面通过四个入口发频道：invoke(读)、mutate(写)、startJob(长任务)、kbCall(知识库)，
+// 所以四个都要扫。频道名允许两级点号（autotest.job.cancel、autotest.cases.generate）。
+function collectChannels(source) {
+  const called = new Set();
+  const patterns = [
+    /invoke\('([a-z][a-zA-Z.]*)'/g,
+    /mutate\('([a-z][a-zA-Z.]*)'/g,
+    /startJob\(\s*'([a-z][a-zA-Z.]*)'/g,
+    /kbCall\(\s*'([a-z][a-zA-Z.]*)'/g,
+  ];
+  patterns.forEach(function (pattern) {
+    let match;
+    while ((match = pattern.exec(source)) !== null) called.add(match[1]);
+  });
+  return called;
+}
+
 function makeCtx(dir) {
   return { dataDir: dir, settings: { mockMode: true }, runtimes: {} };
 }
@@ -166,14 +184,82 @@ test('a pinned plan root is what a renderer action reads', async function () {
   }
 });
 
-test('the panel cannot run scripts, author scripts or reach the model', function () {
+test('the panel dispatches stages as jobs instead of running them inline', function () {
+  // 2026-11-08 (m08671): the user asked for a page that can *drive* the whole
+  // pipeline, not a read-only board. The trust boundary moved by exactly one
+  // step: a panel may now start a stage, but only through the job registry, so
+  // the 30s panel budget is never spent on a model call, and never through its
+  // own re-implementation of the gate.
   const channels = Object.keys(main.PANEL_CHANNELS);
-  assert.ok(channels.indexOf('autotest.author') === -1, 'script authoring stays on the tool side');
-  assert.ok(channels.indexOf('autotest.run') === -1, 'running stays on the tool side, behind the gate');
-  assert.ok(channels.indexOf('autotest.diagnose') === -1);
-  channels.forEach(function (channel) {
-    assert.match(channel, /^autotest\.[a-z]+$/);
+  // Starting a stage is allowed; the gate itself still lives in lib/plan.js.
+  ['autotest.start', 'autotest.cases.generate', 'autotest.author', 'autotest.execute', 'autotest.diagnose', 'autotest.report'].forEach(function (channel) {
+    assert.ok(channels.indexOf(channel) !== -1, channel + ' must be served so the page can drive the pipeline');
   });
+  // The stage channels are asynchronous tickets, not results: a synchronous
+  // handler would answer TIMEOUT on the host's 30s panel budget.
+  assert.ok(channels.indexOf('autotest.job') !== -1, 'the page needs a progress channel to poll');
+  assert.ok(channels.indexOf('autotest.job.cancel') !== -1);
+  channels.forEach(function (channel) {
+    // Two namespaces live on one bridge: the pipeline (autotest.*) and the
+    // knowledge base (kb.*). Both are dotted lowercase verbs; autotest.job.cancel
+    // is the one compound.
+    assert.match(channel, /^(autotest\.[a-z]+(\.[a-z]+)?|kb\.[a-z]+)$/);
+  });
+});
+
+test('every stage channel hands back a job ticket rather than a stage result', async function () {
+  const dataPath = resolveRoot(fs.mkdtempSync(path.join(os.tmpdir(), 'autotest-panel-jobs-')));
+  const root = resolveRoot(path.join(dataPath, 'autotest'));
+  const seeded = seedPlan(root);
+  const previousPi = globalThis.pi;
+  const previousRoot = process.env.PI_AUTOTEST_PLAN_ROOT;
+  globalThis.pi = stubPi(dataPath);
+  process.env.PI_AUTOTEST_PLAN_ROOT = root;
+  try {
+    // mockMode makes the model call a local stub, so the job finishes without
+    // a network; the point of the assertion is the *shape* of the answer.
+    const answer = await main.onPanelInvoke('autotest.cases.generate', { planId: seeded.id });
+    assert.strictEqual(answer.ok, true, JSON.stringify(answer));
+    assert.ok(answer.job && answer.job.id, 'a stage channel answers a job ticket');
+    assert.strictEqual(answer.job.kind, 'cases');
+    assert.strictEqual(answer.job.status, 'running');
+    assert.strictEqual(answer.job.planId, seeded.id);
+    const polled = await main.onPanelInvoke('autotest.job', { jobId: answer.job.id });
+    assert.strictEqual(polled.ok, true, JSON.stringify(polled));
+    assert.strictEqual(polled.job.id, answer.job.id);
+    const byPlan = await main.onPanelInvoke('autotest.job', { planId: seeded.id });
+    assert.strictEqual(byPlan.ok, true, JSON.stringify(byPlan));
+    assert.ok(byPlan.jobs.length >= 1, 'a plan-scoped poll lists its jobs');
+  } finally {
+    globalThis.pi = previousPi;
+    if (previousRoot === undefined) delete process.env.PI_AUTOTEST_PLAN_ROOT;
+    else process.env.PI_AUTOTEST_PLAN_ROOT = previousRoot;
+  }
+});
+
+test('a stage channel refuses to start without a plan', async function () {
+  // A click on the rail before any plan exists must name what is missing, not
+  // start a job against a directory that cannot be addressed. lastPanelPlanId
+  // is process state that another test may have filled, so clear it the way a
+  // fresh plugin process would arrive: by pointing the panel at an empty root
+  // and naming no plan.
+  const dataPath = resolveRoot(fs.mkdtempSync(path.join(os.tmpdir(), 'autotest-panel-noplan-')));
+  const previousPi = globalThis.pi;
+  const previousRoot = process.env.PI_AUTOTEST_PLAN_ROOT;
+  globalThis.pi = stubPi(dataPath);
+  process.env.PI_AUTOTEST_PLAN_ROOT = resolveRoot(path.join(dataPath, 'autotest'));
+  try {
+    // A snapshot against an empty root leaves lastPanelPlanId null: no plan is
+    // listed, so nothing is remembered.
+    await main.onPanelInvoke('autotest.snapshot', {});
+    const answer = await main.onPanelInvoke('autotest.execute', { planId: null });
+    assert.strictEqual(answer.ok, false, JSON.stringify(answer));
+    assert.strictEqual(answer.code, 'PLAN_ID_REQUIRED');
+  } finally {
+    globalThis.pi = previousPi;
+    if (previousRoot === undefined) delete process.env.PI_AUTOTEST_PLAN_ROOT;
+    else process.env.PI_AUTOTEST_PLAN_ROOT = previousRoot;
+  }
 });
 
 test('approving through the panel opens the gate under the workbench actor', async function () {
@@ -236,14 +322,7 @@ test('every channel the workbench calls is served by a panel handler', function 
   // channel: autotest.meta" and the rail stayed empty until a snapshot landed.
   // The view has no build step, so a missing channel only shows up at runtime.
   const source = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
-  const called = new Set();
-  const pattern = /invoke\('([a-z]+\.[a-zA-Z]+)'/g;
-  let match;
-  while ((match = pattern.exec(source)) !== null) called.add(match[1]);
-  // The view reaches the bridge through helpers: invoke('literal') for reads and
-  // mutate('literal', ...) for writes, so both call shapes count as "called".
-  const viaMutate = /mutate\('([a-z]+\.[a-zA-Z]+)'/g;
-  while ((match = viaMutate.exec(source)) !== null) called.add(match[1]);
+  const called = collectChannels(source);
   assert.ok(called.size >= 4, 'the view should call several channels, found ' + Array.from(called).join(', '));
   Array.from(called).forEach(function (channel) {
     assert.ok(
@@ -255,6 +334,70 @@ test('every channel the workbench calls is served by a panel handler', function 
   // build reads the rail from the snapshot: the handler must stay served so an
   // older page bundle cannot hit UNSUPPORTED.
   assert.ok(Object.prototype.hasOwnProperty.call(main.PANEL_CHANNELS, 'autotest.meta'), 'the boot channel must stay wired');
+});
+test('the workbench dispatches all six stage channels from the page', function () {
+  // The whole point of the rebuild: the page itself starts stages instead of
+  // asking the agent to. A typo in a channel literal is invisible without a
+  // build step, so the literals are pinned here.
+  const source = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  const called = collectChannels(source);
+  [
+    'autotest.start',
+    'autotest.cases.generate',
+    'autotest.author',
+    'autotest.execute',
+    'autotest.diagnose',
+    'autotest.report',
+    'autotest.job',
+    'autotest.job.cancel',
+  ].forEach(function (channel) {
+    assert.ok(called.has(channel), 'the workbench never calls ' + channel);
+  });
+  // The knowledge base panel is part of the same view and reaches the same bridge.
+  ['kb.list', 'kb.read', 'kb.write', 'kb.remove', 'kb.search', 'kb.collections', 'kb.attach', 'kb.detach'].forEach(
+    function (channel) {
+      assert.ok(called.has(channel), 'the workbench never calls ' + channel);
+    },
+  );
+});
+test('the workbench shows the gate verdict instead of recomputing it', function () {
+  // lib/stages.js reviewGate() is the only authority on whether the gate is
+  // open: it knows about the approved record, the awaiting_review stage, the
+  // deselected rows and the stale revision. The page used to re-derive the
+  // stale-revision rule itself (entry.revision <= entry.approvedRevision) in two
+  // views, which drifted from the server the moment the rule changed. The page
+  // may only read gate.ok / gate.reason and the per-case approvedRevision field
+  // for display.
+  const source = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  assert.strictEqual(
+    /revision\s*[<>]=?\s*[a-zA-Z_.]*approvedRevision/.test(source),
+    false,
+    'the page must not compare revisions to decide whether the gate is open',
+  );
+  assert.strictEqual(
+    /approvedRevision\s*[<>]=?\s*[a-zA-Z_.]*revision/.test(source),
+    false,
+    'the page must not compare revisions to decide whether the gate is open',
+  );
+  // The verdict itself has to be on screen, verbatim from the server.
+  assert.ok(source.indexOf('gate.reason') !== -1, 'the page must render the server supplied gate reason');
+  assert.ok(source.indexOf('gate.ok') !== -1, 'the page must render the server supplied gate verdict');
+});
+test('the workbench page loads no inline script and reaches no network', function () {
+  // CSP is default-src 'none'; connect-src 'none'; script-src 'self' file:.
+  // An inline <script> block or a fetch() would be blocked at runtime and the
+  // page would die silently, so both are pinned at the source level.
+  const html = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.html'), 'utf8');
+  const inline = /<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/script>/i;
+  assert.strictEqual(inline.test(html), false, 'the page must not carry an inline script block');
+  const scripts = html.match(/<script\b[^>]*>/gi) || [];
+  assert.strictEqual(scripts.length, 1, 'the page loads exactly one script, found ' + scripts.join(' '));
+  assert.ok(/<script[^>]*\bsrc="\.\/workbench\.js"/.test(html), 'the one script must be the local workbench.js');
+  const js = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  assert.strictEqual(/\bfetch\s*\(/.test(js), false, 'connect-src is none, so the page must not call fetch()');
+  assert.strictEqual(/XMLHttpRequest|new\s+WebSocket\b|EventSource/.test(js), false, 'the page must not open its own transport');
+  // The bridge is the only way out of the sandbox.
+  assert.ok(js.indexOf('window.pluginBridge') !== -1, 'the page must talk through window.pluginBridge');
 });
 test('the meta channel answers the stage list the rail draws', async function () {
   const answer = await main.onPanelInvoke('autotest.meta', {});

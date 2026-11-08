@@ -73,6 +73,9 @@ function createPlan(root, input) {
     verdicts: [],
     approvals: [],
     notes: [],
+    // Knowledge-base entries this plan cites. Empty on every plan that predates
+    // the knowledge base; lib/plan.js owns the attach/detach writes.
+    knowledgeRefs: [],
   };
   writeState(dir, state);
   return { dir: dir, state: state };
@@ -87,6 +90,35 @@ function planDir(root, planId) {
   return path.join(root, 'plans', String(planId));
 }
 
+/**
+ * The plugin data root behind a context bag.
+ *
+ * The plan store only ever gets a string root, but a sibling store (the
+ * knowledge base) needs the same answer from the same kind of ctx, and a second
+ * implementation of "where does plugin data live" is how two readers end up on
+ * two different directories. Keep it beside planDir, with the same contract:
+ * dataDir when the caller already resolved it, otherwise the host api.
+ */
+function dataRootLike(ctx) {
+  if (!ctx || typeof ctx !== 'object') {
+    const bare = new Error('a data context with dataDir or a host api is required');
+    bare.code = 'DATA_PATH_MISSING';
+    throw bare;
+  }
+  if (ctx.dataDir) return path.resolve(ctx.dataDir);
+  const pi = ctx.pi;
+  const base = pi && pi.plugin && pi.plugin.getDataPath ? pi.plugin.getDataPath() : null;
+  if (typeof base === 'string') return path.resolve(path.join(base, 'autotest'));
+  if (base && typeof base.then === 'function') {
+    const error = new Error('plugin data path is asynchronous; resolve it before building a root');
+    error.code = 'DATA_PATH_ASYNC';
+    throw error;
+  }
+  const missing = new Error('the host api exposes no plugin data path');
+  missing.code = 'DATA_PATH_MISSING';
+  throw missing;
+}
+
 function readState(dir) {
   const file = path.join(dir, STATE_FILE);
   if (!fs.existsSync(file)) {
@@ -99,7 +131,7 @@ function readState(dir) {
   schema.STAGES.forEach(function (stage) {
     parsed.stages[stage] = parsed.stages[stage] || { status: 'idle', updatedAt: null, artifactId: null, note: null };
   });
-  ['requirements', 'features', 'cases', 'scripts', 'runs', 'verdicts', 'approvals', 'notes'].forEach(function (key) {
+  ['requirements', 'features', 'cases', 'scripts', 'runs', 'verdicts', 'approvals', 'notes', 'knowledgeRefs'].forEach(function (key) {
     parsed[key] = Array.isArray(parsed[key]) ? parsed[key] : [];
   });
   return parsed;
@@ -198,6 +230,7 @@ module.exports = {
   newPlanId,
   createPlan,
   planDir,
+  dataRootLike,
   readState,
   writeState,
   saveArtifact,
