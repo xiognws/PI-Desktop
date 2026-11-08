@@ -238,7 +238,15 @@ export function createHostRuntime({
             const normalizedMode = typeof q.mode === "string" ? q.mode : undefined;
             if (normalizedMode === "agent" || normalizedMode === "plan" || normalizedMode === "goal") {
               sessionMode = normalizedMode;
-            } else if (q.sessionId && runtimeState.host) {
+            }
+            // The executor identity is read whenever a session is named, not
+            // only when the mode is missing. The runtime always stamps `mode`
+            // (packages/agent-runtime/src/runtime.ts:4060), so gating this read
+            // on an absent mode meant `modelKey` was never populated in
+            // practice: every plugin that needs the session model (agent.complete
+            // requires `providerId/modelId`) got undefined. Keeping the mode
+            // short-circuit above only avoids a second source of truth for it.
+            if (q.sessionId && runtimeState.host) {
               try {
                 const detail = await runtimeState.host.call<{
                   session?: {
@@ -249,7 +257,10 @@ export function createHostRuntime({
                   };
                 }>("session.get", { id: q.sessionId });
                 const session = detail?.session;
-                if (session?.mode === "agent" || session?.mode === "plan" || session?.mode === "goal") {
+                if (
+                  !sessionMode &&
+                  (session?.mode === "agent" || session?.mode === "plan" || session?.mode === "goal")
+                ) {
                   sessionMode = session.mode;
                 }
                 if (session?.providerId && session?.modelId) {

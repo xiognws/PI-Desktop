@@ -827,6 +827,14 @@ export function createSessionLaunchRuntime({
           supportedThinkingLevels: [...thinkingCapabilities.supportedThinkingLevels],
           ...(modelConfig ? { modelConfig } : {}),
         },
+        // Plugin agent tools are the whole point of the plugin host surface,
+        // so they travel with every launch the same way plugin skills do:
+        // re-read per launch (a reload, an enable or a scope change takes
+        // effect on the next prompt) and filtered by the plugin's project
+        // scope. Without this the manifest's `contributes.agentTools` reached
+        // the renderer and the plugin registry but never the model: the
+        // runtime catalog had no plugin entries, so no tool was declared and
+        // `ToolSearch` could not find a name that was never registered.
         pluginTools: [
           ...plugins
             .getTools()
