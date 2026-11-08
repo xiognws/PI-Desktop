@@ -100,6 +100,16 @@ worktrees
 # `pi.prompt-enhancement` folder has no such file; the tracked copy stays
 # exactly the released file set.
 /apps/desktop/resources/plugins/pi.prompt-enhancement/package.json
+# The plugin host writes a `package.json` into any tracked plugin folder that
+# ships none, so Node resolves the plugin's submodules as CommonJS
+# (`plugin-host-process.mjs`, `ensureCommonJsPackage`). Same generated file as
+# `pi.prompt-enhancement` above, for the plugins tracked after that rule was
+# written -- listed per folder because gitignore cannot express "untracked
+# files under a tracked directory".
+/apps/desktop/resources/plugins/pi.gitlens/package.json
+/apps/desktop/resources/plugins/io.github.muzimu217.vision-kit/package.json
+/apps/desktop/resources/plugins/pi.todo/package.json
+/apps/desktop/resources/plugins/pi.token-insights/package.json
 # The plugin host also writes one into any example plugin folder it loads.
 /examples/plugins/*/package.json
 /.plugin-packages/
