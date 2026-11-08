@@ -64,17 +64,50 @@ function splitTopLevel(body) {
   return parts.map((part) => part.trim()).filter(Boolean);
 }
 
-/** Read the balanced {...} or [...] block that starts at 'open' in source. */
+/**
+ * Read the balanced {...} or [...] block that starts at 'open' in source.
+ *
+ * Comments are skipped along with strings. They have to be: a `//` line that
+ * mentions an unbalanced quote — an apostrophe in prose is enough — otherwise
+ * opens a string the scanner never closes, and the error surfaces as
+ * "unbalanced { starting at <a perfectly balanced object>" pointing at code
+ * that is fine. This checker parses source with a scanner, so it owes the same
+ * respect to comments that it already pays to strings.
+ */
 function readBalanced(source, open) {
   const opener = source[open];
   const closer = opener === '{' ? '}' : ']';
   let depth = 0;
   let quote = null;
+  let lineComment = false;
+  let blockComment = false;
   for (let i = open; i < source.length; i += 1) {
     const ch = source[i];
+    const next = source[i + 1];
+    if (lineComment) {
+      if (ch === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (ch === '*' && next === '/') {
+        blockComment = false;
+        i += 1;
+      }
+      continue;
+    }
     if (quote) {
       if (ch === '\\') i += 1;
       else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      lineComment = true;
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      blockComment = true;
+      i += 1;
       continue;
     }
     if (ch === "'" || ch === '"' || ch === '`') {

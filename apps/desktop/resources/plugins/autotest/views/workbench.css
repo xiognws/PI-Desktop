@@ -184,6 +184,70 @@ button { cursor: pointer; }
   min-height: 0;
 }
 
+/* ── 实验台：左计划树 + 中工作区(+底部日志) + 右证据栏 ──────────────── */
+.wb-bench {
+  display: grid;
+  grid-template-columns: minmax(190px, 232px) minmax(0, 1fr) minmax(240px, 320px);
+  min-height: 0;
+}
+
+/* 证据栏收起来时不占位：窄屏、以及用户手动折叠时都走这条规则。 */
+.wb-bench[data-evidence="off"] { grid-template-columns: minmax(190px, 232px) minmax(0, 1fr); }
+.wb-bench[data-evidence="off"] .wb-evidence { display: none; }
+
+.wb-evidence {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  min-height: 0;
+}
+.wb-evidence-head {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.wb-evidence-body { overflow-y: auto; padding: 10px 12px; min-height: 0; }
+
+/* 一条证据 = 标题 + 出处 + 摘要。引用条目高亮，未引用条目压暗，
+   这样「这次生成到底看了什么」一眼能扫出来。 */
+.wb-ev {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.wb-ev:last-child { border-bottom: 0; }
+.wb-ev[data-cited="no"] { opacity: 0.62; }
+.wb-ev-head { display: flex; gap: 6px; align-items: baseline; }
+.wb-ev-title { color: var(--fg); flex: 1; min-width: 0; }
+.wb-ev-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--faint);
+  white-space: nowrap;
+}
+.wb-ev-badge[data-layer="global"] { border-color: color-mix(in oklab, var(--info) 45%, transparent); color: var(--info); }
+.wb-ev-badge[data-layer="project"] { border-color: color-mix(in oklab, var(--ok) 45%, transparent); color: var(--ok); }
+.wb-ev-id {
+  font-size: 10.5px;
+  color: var(--faint);
+  word-break: break-all;
+}
+.wb-ev-body {
+  margin-top: 4px;
+  color: var(--secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wb-ev-empty { color: var(--faint); font-size: 12px; }
+
 .wb-side {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -237,7 +301,50 @@ button { cursor: pointer; }
   color: var(--faint);
 }
 
-.wb-main { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+/* 中栏四行：标题 / tab / 内容 / 底部日志。日志行给固定上限，
+   让内容区始终能拿到剩余高度，而不是被日志顶掉。 */
+.wb-main {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ── 底部事件日志 ───────────────────────────────────────────────────── */
+.wb-console { border-top: 1px solid var(--border); background: var(--bg); }
+.wb-console-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 12px;
+  font-size: 11px;
+  color: var(--faint);
+}
+.wb-console-title { letter-spacing: 0.04em; text-transform: uppercase; }
+.wb-console-hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-console-body {
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 0 12px 8px;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+/* 折叠时只留标题条：日志是参考，不该在不需要时占掉内容高度。 */
+.wb-console[data-collapsed="yes"] .wb-console-body { display: none; }
+.wb-console[data-collapsed="yes"] #console-toggle { transform: rotate(-90deg); }
+.wb-log { display: flex; gap: 8px; }
+.wb-log-time { color: var(--faint); white-space: nowrap; }
+.wb-log-tag {
+  white-space: nowrap;
+  color: var(--faint);
+}
+.wb-log[data-tone="info"] .wb-log-tag { color: var(--info); }
+.wb-log[data-tone="warn"] .wb-log-tag { color: var(--warn); }
+.wb-log[data-tone="bad"] .wb-log-tag { color: var(--bad); }
+.wb-log[data-tone="ok"] .wb-log-tag { color: var(--ok); }
+.wb-log-text { color: var(--secondary); min-width: 0; word-break: break-word; }
+.wb-console-empty { color: var(--faint); }
 
 .wb-hero { padding: 10px 14px 6px; }
 .wb-hero h1 {
@@ -645,8 +752,15 @@ textarea.wb-input { resize: vertical; min-height: 44px; line-height: 1.45; font-
   .kb-list-body { max-height: none; }
 }
 
+@media (max-width: 1100px) {
+  /* 证据栏先让位：它承载的是可追溯性，不是操作入口，
+     窄屏下比计划树和内容更容易临时藏起来。 */
+  .wb-bench { grid-template-columns: minmax(190px, 232px) minmax(0, 1fr); }
+  .wb-evidence { display: none; }
+}
+
 @media (max-width: 720px) {
-  .wb-body { grid-template-columns: 1fr; }
+  .wb-bench { grid-template-columns: 1fr; }
   .wb-side { display: none; }
 }
 

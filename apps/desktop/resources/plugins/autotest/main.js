@@ -909,6 +909,14 @@ const PANEL_CHANNELS = {
     const ctx = await workContext();
     return Object.assign({ ok: true }, kb.search(ctx, payload || {}));
   },
+  // What the case/script stages were actually shown, and what a hypothetical
+  // query would retrieve now. The panel needs both: the first to explain a
+  // generated row's citation, the second to answer "what would change if I
+  // edited this entry" without running a model.
+  'kb.retrieve': async function (payload) {
+    const ctx = await workContext();
+    return Object.assign({ ok: true }, kb.retrieve(ctx, payload || {}));
+  },
   'kb.attach': async function (payload) {
     const args = payload || {};
     const ctx = await workContext();

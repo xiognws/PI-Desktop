@@ -25,7 +25,13 @@
       </div>
     </header>
     <div class="wb-banner" id="banner" hidden></div>
-    <div class="wb-body">
+    <!--
+      实验台布局（左树 / 中执行 / 右证据 / 下日志）。
+      四块区域都是常驻的，切换 tab 只换中栏内容，不换页面结构 ——
+      「执行」「报告」以前是各自独立的 tab，切走就看不到结果，
+      而排查一次失败恰恰需要同时看用例、输出和知识库引用。
+    -->
+    <div class="wb-bench">
       <nav class="wb-side" aria-label="测试计划">
         <div class="wb-side-head">
           <input class="wb-search" id="search" type="search" placeholder="搜索计划…" autocomplete="off" />
@@ -37,7 +43,21 @@
         <section class="wb-hero" id="hero"></section>
         <nav class="wb-tabs" id="tabs" role="tablist"></nav>
         <div class="wb-view" id="view"></div>
+        <section class="wb-console" id="console" aria-label="事件日志">
+          <header class="wb-console-head">
+            <span class="wb-console-title">事件日志</span>
+            <span class="wb-console-hint" id="console-hint"></span>
+            <button class="wb-icon-btn" id="console-toggle" type="button" title="折叠/展开">⌄</button>
+          </header>
+          <div class="wb-console-body" id="console-body"></div>
+        </section>
       </main>
+      <aside class="wb-evidence" id="evidence" aria-label="证据与引用">
+        <header class="wb-evidence-head">
+          <span id="evidence-title">证据</span>
+        </header>
+        <div class="wb-evidence-body" id="evidence-body"></div>
+      </aside>
     </div>
     <div class="wb-drawer" id="drawer" hidden>
       <div class="wb-drawer-head">

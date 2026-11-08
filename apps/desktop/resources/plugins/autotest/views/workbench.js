@@ -2653,6 +2653,207 @@
 
   /* ── 渲染总入口 ─────────────────────────────────────────────────── */
 
+  /* ── 证据栏：这次生成看了什么 ─────────────────────────────────────── */
+
+  /**
+   * 当前 tab 对应的检索记录。
+   *
+   * 计划把每次生成都写进 state.retrievals（含 query、命中的 id 与分数），
+   * scripts 阶段的记录按用例分开（scripts:TC-001）。这里挑出与当前 tab
+   * 相关的那几条，最新的在前 —— 重跑过一次阶段时，用户要看的是刚跑那次。
+   */
+  function retrievalsFor(tab) {
+    // 检索记录挂在 projection.state 下（lib/plan.js reviewPlan），不是 projection
+    // 顶层 —— 顶层只有 planId/title/summary/rail/gate/coverage。写成顶层读到的
+    // 永远是 []，右栏就永远显示「还没生成过」，功能等于不存在。
+    var state0 = planState();
+    if (!state0 || !Array.isArray(state0.retrievals)) return [];
+    var wanted = null;
+    if (tab === 'cases') wanted = 'cases';
+    else if (tab === 'scripts') wanted = 'scripts';
+    else if (tab === 'requirement') wanted = 'requirement';
+    var rows = state0.retrievals.filter(function (row) {
+      if (!wanted) return true;
+      if (wanted === 'scripts') return String(row.stage || '').indexOf('scripts') === 0;
+      return row.stage === wanted;
+    });
+    return rows.slice().reverse();
+  }
+
+  /** 这一次生成引用了哪些 id：用例行与脚本行各自带的 referenceIds。 */
+  function citedIds(tab) {
+    var state0 = planState();
+    var ids = {};
+    if (!state0) return ids;
+    var rows = tab === 'scripts' ? state0.scripts || [] : state0.cases || [];
+    rows.forEach(function (row) {
+      (row.referenceIds || []).forEach(function (id) {
+        ids[String(id)] = true;
+      });
+    });
+    return ids;
+  }
+
+  function evidenceRow(hit, cited) {
+    return el('div', { className: 'wb-ev', 'data-cited': cited ? 'yes' : 'no' }, [
+      el('div', { className: 'wb-ev-head' }, [
+        el('span', { className: 'wb-ev-title', text: hit.title || hit.id || '-' }),
+        el('span', {
+          className: 'wb-ev-badge',
+          'data-layer': hit.layer || 'project',
+          text: hit.layer === 'global' ? '随包' : '项目'
+        })
+      ]),
+      el('div', { className: 'wb-ev-id', text: hit.id || '' }),
+      hit.excerpt ? el('div', { className: 'wb-ev-body', text: hit.excerpt }) : null
+    ]);
+  }
+
+  /**
+   * 右栏。三种状态，必须互相区分：
+   *   还没有计划 / 这个阶段还没跑过 / 跑过但知识库没命中。
+   * 三者都显示成空栏的话，用户分不清「没参考」和「功能没生效」。
+   */
+  function renderEvidence() {
+    var host = clear(document.getElementById('evidence-body'));
+    var title = document.getElementById('evidence-title');
+    var LABELS = {
+      overview: '生成依据总览',
+      requirement: '需求拆解的生成依据',
+      cases: '用例的生成依据',
+      scripts: '脚本的生成依据',
+      runs: '本次执行的证据',
+      diagnosis: '诊断引用的知识',
+      report: '报告引用的知识',
+      knowledge: '知识库分层',
+      matrix: '追溯引用的知识'
+    };
+    if (title) title.textContent = LABELS[state.tab] || '证据';
+    var plan = snapshotPlan();
+    if (!plan) {
+      host.appendChild(el('div', { className: 'wb-ev-empty', text: '选中一个计划后，这里显示它的生成依据。' }));
+      return;
+    }
+    var runs = retrievalsFor(state.tab);
+    if (!runs.length) {
+      host.appendChild(
+        el('div', {
+          className: 'wb-ev-empty',
+          text: '这个阶段还没生成过。跑一次之后，这里会列出当时的检索记录。'
+        })
+      );
+      return;
+    }
+    var cited = citedIds(state.tab);
+    var latest = runs[0];
+    if (latest.error) {
+      host.appendChild(el('div', { className: 'wb-ev-empty', text: '检索失败：' + latest.error }));
+      return;
+    }
+    host.appendChild(
+      el('div', { className: 'wb-ev-id', text: '查询：' + (latest.query || '(空)') })
+    );
+    if (!latest.hits || !latest.hits.length) {
+      host.appendChild(
+        el('div', {
+          className: 'wb-ev-empty',
+          text: '这一轮没有命中任何条目（语料 ' + (latest.corpus || 0) + ' 条）—— 生成只用需求文本。'
+        })
+      );
+      return;
+    }
+    latest.hits.forEach(function (hit) {
+      host.appendChild(evidenceRow(hit, !!cited[String(hit.id)]));
+    });
+    // 多条记录（重跑、或多用例各一条）时在末尾列出更早的查询，便于回溯。
+    if (runs.length > 1) {
+      var older = runs.slice(1).map(function (row) {
+        return el('div', { className: 'wb-ev-id', text: shortTime(row.at) + ' · ' + (row.query || '(空)') });
+      });
+      host.appendChild(
+        el('div', { className: 'wb-ev', 'data-cited': 'no' }, [
+          el('div', { className: 'wb-ev-head', text: '更早的检索（' + (runs.length - 1) + '）' })
+        ].concat(older))
+      );
+    }
+  }
+
+  /* ── 底部事件日志 ─────────────────────────────────────────────────── */
+
+  /**
+   * 一个常驻的日志条，把「计划本身的事件」与「本次作业的进度」合在一起。
+   *
+   * 以前这两样分散在各 tab 里，切走就看不到；排查一次失败恰恰需要一边看
+   * 用例一边看日志。这里只读已有状态，不新增请求。
+   */
+  function consoleLines() {
+    var lines = [];
+    var job = state.job;
+    if (job && Array.isArray(job.log)) {
+      job.log.slice(-40).forEach(function (entry) {
+        lines.push({
+          at: entry.at,
+          tag: job.kind || 'job',
+          tone: 'info',
+          text: entry.message
+        });
+      });
+    }
+    if (job && job.error) {
+      lines.push({
+        at: job.updatedAt || job.finishedAt,
+        tag: 'error',
+        tone: 'bad',
+        text: (job.error.code ? job.error.code + ': ' : '') + (job.error.message || '')
+      });
+    }
+    var state0 = planState();
+    if (state0) {
+      // 计划的阶段状态本身就是一条时间线：谁在什么时刻变成了什么。
+      Object.keys(state0.stages || {}).forEach(function (stage) {
+        var entry = state0.stages[stage] || {};
+        if (!entry.updatedAt) return;
+        var tone = entry.status === 'failed' ? 'bad'
+          : entry.status === 'done' ? 'ok'
+          : entry.status === 'awaiting_review' ? 'warn'
+          : 'info';
+        lines.push({
+          at: entry.updatedAt,
+          tag: stage,
+          tone: tone,
+          text: (entry.note || entry.status || '')
+        });
+      });
+    }
+    lines.sort(function (a, b) {
+      return String(a.at || '').localeCompare(String(b.at || ''));
+    });
+    return lines;
+  }
+
+  function renderConsole() {
+    var lines = consoleLines();
+    var body = clear(document.getElementById('console-body'));
+    var hint = document.getElementById('console-hint');
+    if (!lines.length) {
+      body.appendChild(el('div', { className: 'wb-console-empty', text: '暂无事件。' }));
+      if (hint) hint.textContent = '';
+      return;
+    }
+    lines.slice(-60).forEach(function (line) {
+      body.appendChild(
+        el('div', { className: 'wb-log', 'data-tone': line.tone }, [
+          el('span', { className: 'wb-log-time', text: shortTime(line.at) }),
+          el('span', { className: 'wb-log-tag', text: line.tag }),
+          el('span', { className: 'wb-log-text', text: line.text })
+        ])
+      );
+    });
+    if (hint) hint.textContent = lines.length + ' 条';
+    // 新日志滚到底：用户关心的是刚发生的那条。
+    body.scrollTop = body.scrollHeight;
+  }
+
   function render() {
     renderRail();
     renderBanner();
@@ -2660,6 +2861,8 @@
     renderHero();
     renderTabs();
     renderView();
+    renderEvidence();
+    renderConsole();
     renderDrawer();
     document.documentElement.removeAttribute('data-booting');
   }
@@ -2669,6 +2872,12 @@
   function bindChrome() {
     document.getElementById('refresh').addEventListener('click', function () {
       reload(state.planId).catch(function () {});
+    });
+    // 日志条折叠状态只活在这个页面生命周期里：它是「现在要不要看」，
+    // 不是用户偏好，写进持久层反而会让下次打开时莫名其妙地少一块。
+    document.getElementById('console-toggle').addEventListener('click', function () {
+      var box = document.getElementById('console');
+      box.setAttribute('data-collapsed', box.getAttribute('data-collapsed') === 'yes' ? 'no' : 'yes');
     });
     document.getElementById('search').addEventListener('input', function (event) {
       state.search = event.target.value || '';

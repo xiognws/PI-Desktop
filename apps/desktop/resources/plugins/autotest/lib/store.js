@@ -131,7 +131,7 @@ function readState(dir) {
   schema.STAGES.forEach(function (stage) {
     parsed.stages[stage] = parsed.stages[stage] || { status: 'idle', updatedAt: null, artifactId: null, note: null };
   });
-  ['requirements', 'features', 'cases', 'scripts', 'runs', 'verdicts', 'approvals', 'notes', 'knowledgeRefs'].forEach(function (key) {
+  ['requirements', 'features', 'cases', 'scripts', 'runs', 'verdicts', 'approvals', 'notes', 'knowledgeRefs', 'retrievals'].forEach(function (key) {
     parsed[key] = Array.isArray(parsed[key]) ? parsed[key] : [];
   });
   return parsed;

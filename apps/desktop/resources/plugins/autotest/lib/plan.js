@@ -15,10 +15,90 @@ const path = require('node:path');
 const schema = require('./schema');
 const store = require('./store');
 const llm = require('./llm');
+const kb = require('./kb');
 const runner = require('./runner');
 const diagnose = require('./diagnose');
 const stages = require('./stages');
 const report = require('./report');
+
+/**
+ * The retrieval query for a stage, built from the plan's own material.
+ *
+ * The features are one line each and the whole point of the feature list is to
+ * name the behaviours under test, so joining their titles is a better query
+ * than the raw requirement text: it is shorter, it is already in the domain's
+ * vocabulary, and it does not drag in boilerplate headings from a document the
+ * user pasted whole. Requirement ids are appended because a base entry keyed to
+ * `R-03` should still be reachable.
+ */
+function featureQuery(state) {
+  const parts = [];
+  (state.features || []).forEach(function (feature) {
+    if (feature.title) parts.push(String(feature.title));
+    if (Array.isArray(feature.requirementRefs)) parts.push(feature.requirementRefs.join(' '));
+  });
+  if (!parts.length && state.source && state.source.text) {
+    parts.push(String(state.source.text).slice(0, 400));
+  }
+  return Array.from(new Set(parts.join(' ').split(/\s+/))).join(' ');
+}
+
+/** The query for one case, used when authoring its script. */
+function caseQuery(testCase) {
+  return [
+    testCase.title,
+    Array.isArray(testCase.steps) ? testCase.steps.join(' ') : '',
+    Array.isArray(testCase.expected) ? testCase.expected.join(' ') : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * Retrieve the knowledge a stage is allowed to see, and record what was found.
+ *
+ * Recording is the part that makes the result auditable: `state.retrievals`
+ * keeps the query, the ids and the scores for each stage, so a generated case
+ * that cites an entry can be checked against what the model was actually shown,
+ * and a later edit to that entry is visible as a change to a record the plan
+ * already holds. Retrieval never throws into the stage: a corpus that cannot be
+ * read degrades to "no reference", with the reason stored beside it.
+ */
+function retrieveKnowledge(ctx, state, stageName, query) {
+  const record = { stage: stageName, query: String(query || ''), at: new Date().toISOString() };
+  let result;
+  try {
+    result = kb.retrieve(ctx, { query: query, k: 8 });
+  } catch (error) {
+    record.error = String((error && error.message) || error);
+    record.hits = [];
+    record.total = 0;
+    pushRetrieval(state, record);
+    return { query: record.query, hits: [], total: 0, terms: [], corpus: 0, usedChars: 0 };
+  }
+  record.hits = result.hits.map(function (hit) {
+    return { id: hit.id, title: hit.title, layer: hit.layer, collection: hit.collection, score: hit.score };
+  });
+  record.total = result.total;
+  record.corpus = result.corpus;
+  record.tookMs = result.tookMs;
+  pushRetrieval(state, record);
+  return result;
+}
+
+/**
+ * Keep the last retrieval per stage.
+ *
+ * A list, not a map keyed by stage: re-running the case stage after editing the
+ * knowledge base must leave both records behind, because the second run's cases
+ * were written against different references and the first set is still sitting
+ * in the approval history.
+ */
+function pushRetrieval(state, record) {
+  if (!Array.isArray(state.retrievals)) state.retrievals = [];
+  state.retrievals.push(record);
+  if (state.retrievals.length > 24) state.retrievals = state.retrievals.slice(-24);
+}
 
 const PROMPTS = {
   requirement: [
@@ -28,11 +108,13 @@ const PROMPTS = {
   cases: [
     'You are a test designer. Turn an approved feature list into test cases.',
     'Rules: one case tests one behaviour; prefer behaviour-level cases over implementation steps; mark priority P0 only for data-loss, safety or security paths; state preconditions explicitly; expected results must be observable; do not restate the same check twice.',
+    'The knowledge base section carries project and company references retrieved for this feature set. Treat each entry as a source of truth about the product, the interface under test, and the test practice this team follows. Where an entry states a concrete value, message, timing or identifier, use it verbatim instead of inventing one. Where an entry and the feature list disagree, follow the entry and record the conflict in the case notes. Cite the [id] of every entry a case relies on in referenceIds; return an empty array for a case that used none. Never cite an id that is not in the knowledge base section.',
   ].join('\n'),
   author: [
     'You are a test automation engineer. Write one runnable script per approved test case.',
     'Rules: no network access assumptions beyond what the case states; assert the expected result explicitly so a wrong product fails the script; never weaken an assertion to make a run pass; keep the script self-contained and print diagnostics on failure; no interactive input.',
     'For JavaScript, write CommonJS: use require() and module.exports, never import/export — the runner stores scripts as .cjs and executes them with plain Node.',
+    'The knowledge base section carries references retrieved for this case: the interface it exercises, the protocol or tooling this project uses, and the conventions this team writes tests in. When an entry gives a concrete invocation, endpoint, selector, DID, frame layout or runner command, follow it rather than inventing a plausible one. When an entry shows the project already has a helper or runner for this kind of check, use that path. Cite the [id] of every entry you relied on in referenceIds; return an empty array when you used none. Never cite an id that is not in the knowledge base section.',
   ].join('\n'),
   diagnose: [
     'You are a test failure analyst. You receive deterministic classifications and run logs.',
@@ -309,20 +391,31 @@ async function cases(ctx, args) {
   const budget = stages.caseBudget(state.features.length, ctx.settings);
   updateStage(dir, state, 'cases', { status: 'running' });
   store.writeState(dir, state);
+  // Retrieval is automatic and recorded: the feature titles are the query, the
+  // hits go into the prompt, and the ids land in the retrieval record so a case
+  // that cites [kb-...] can be traced back to the entry that produced it. A
+  // failed retrieval is not a stage failure — a plan must still be able to run
+  // with an empty knowledge base — but it is reported, never swallowed.
+  const retrieval = retrieveKnowledge(ctx, state, 'cases', featureQuery(state));
   let answer;
   try {
     answer = await modelCall('cases', function () {
     return llm.completeJson(ctx.pi, {
     system: PROMPTS.cases,
-    context: JSON.stringify({ features: state.features, budget: budget }, null, 2),
+    context: [
+      JSON.stringify({ features: state.features, budget: budget }, null, 2),
+      kb.renderRetrieval(retrieval),
+    ].filter(Boolean).join('\n\n'),
     instruction:
       'Produce between ' +
       Math.max(1, budget - 4) +
       ' and ' +
       budget +
-      ' test cases covering every feature. Return cases: an array of objects with title, featureId, priority (P0-P3), preconditions, steps and expected (arrays of strings), and type.',
+      (retrieval.hits.length
+        ? ' test cases covering every feature, using the knowledge base entries above as the reference for concrete values and expected behaviour. Return cases: an array of objects with title, featureId, priority (P0-P3), preconditions, steps, expected (arrays of strings), type, and referenceIds (array of the [id]s you relied on).'
+        : ' test cases covering every feature. No knowledge base entry matched this feature set, so derive expectations from the feature text alone. Return cases: an array of objects with title, featureId, priority (P0-P3), preconditions, steps, expected (arrays of strings), type, and referenceIds (an empty array).'),
     jsonSchemaHint:
-      '{"cases":[{"title":"","featureId":"F-01","priority":"P1","preconditions":[""],"steps":[""],"expected":[""],"type":"functional"}]}',
+      '{"cases":[{"title":"","featureId":"F-01","priority":"P1","preconditions":[""],"steps":[""],"expected":[""],"type":"functional","referenceIds":[]}]}',
     ...modelOptions(ctx, 'cases'),
     });
   });
@@ -373,6 +466,13 @@ function normaliseCases(input, state) {
       steps: Array.isArray(entry && entry.steps) ? entry.steps.map(String) : [],
       expected: Array.isArray(entry && entry.expected) ? entry.expected.map(String) : [],
       type: String((entry && entry.type) || 'functional'),
+      // Which knowledge-base entries this case was written against. Kept as
+      // reported, not filtered against the corpus: an entry that has since been
+      // deleted is exactly the kind of drift a reviewer needs to see, and a
+      // silent filter would hide it.
+      referenceIds: Array.isArray(entry && entry.referenceIds)
+        ? entry.referenceIds.map(String).filter(Boolean)
+        : [],
     };
   });
 }
@@ -425,13 +525,25 @@ async function author(ctx, args) {
     const previous = state.scripts.find(function (entry) {
       return entry.testCaseId === testCase.id;
     });
+    // The case's own referenced entries come first in the query, so the script
+    // is grounded in what the case was written against, and the case body adds
+    // the rest of the subject matter.
+    const retrieval = retrieveKnowledge(
+      ctx,
+      state,
+      'scripts:' + testCase.id,
+      caseQuery(testCase),
+    );
     const answer = await modelCall('scripts', function () {
       return llm.completeJson(ctx.pi, {
       system: PROMPTS.author,
-      context: JSON.stringify(testCase, null, 2),
+      context: [
+        JSON.stringify(testCase, null, 2),
+        kb.renderRetrieval(retrieval),
+      ].filter(Boolean).join('\n\n'),
       instruction:
-        'Write one script that executes the steps and asserts every expected result. Return language, script, command (or null when the case needs no project runner) and notes.',
-      jsonSchemaHint: '{"language":"javascript","script":"","command":null,"notes":""}',
+        'Write one script that executes the steps and asserts every expected result. Return language, script, command (or null when the case needs no project runner), notes and referenceIds (the [id]s you relied on).',
+      jsonSchemaHint: '{"language":"javascript","script":"","command":null,"notes":"","referenceIds":[]}',
       ...modelOptions(ctx, 'author'),
       });
     });
@@ -443,6 +555,9 @@ async function author(ctx, args) {
       command: answer.data.command ? String(answer.data.command) : null,
       notes: answer.data.notes ? String(answer.data.notes) : null,
       revision: previous ? previous.revision + 1 : 1,
+      referenceIds: Array.isArray(answer.data.referenceIds)
+        ? answer.data.referenceIds.map(String).filter(Boolean)
+        : [],
     });
   }
   } catch (error) {
@@ -979,6 +1094,11 @@ function reviewPlan(ctx, planId) {
       approvals: state.approvals,
       notes: state.notes,
       knowledgeRefs: normaliseRefs(state.knowledgeRefs),
+      // What each generation stage was actually shown, newest last. The cases
+      // and scripts carry referenceIds; this is the other half of that pair —
+      // without it a citation cannot be checked against the retrieval it came
+      // from, and "why did it say this?" has no answer in the plan.
+      retrievals: Array.isArray(state.retrievals) ? state.retrievals : [],
     },
     rail: stages.rail(state),
     gate: stages.reviewGate(state),

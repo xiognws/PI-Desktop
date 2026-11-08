@@ -399,6 +399,84 @@ test('the workbench page loads no inline script and reaches no network', functio
   // The bridge is the only way out of the sandbox.
   assert.ok(js.indexOf('window.pluginBridge') !== -1, 'the page must talk through window.pluginBridge');
 });
+test('the bench keeps its four regions in the page, not in a tab', function () {
+  // 实验台布局的意义就是这四块同时在场：左树、中执行、右证据、下日志。
+  // 任意一块退回成「某个 tab 里才有」，排查失败时就得来回切换，功能也就
+  // 退化回改动前的样子了。
+  const html = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.html'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  ['wb-bench', 'wb-side', 'wb-main', 'wb-evidence', 'wb-console'].forEach(function (name) {
+    assert.match(html, new RegExp('class="[^"]*' + name), 'missing region: ' + name);
+  });
+  // 三个入口都要有各自的渲染函数，否则区域是死的空壳。
+  ['renderEvidence', 'renderConsole', 'renderPlans'].forEach(function (fn) {
+    assert.ok(page.indexOf('function ' + fn) !== -1, 'missing renderer: ' + fn);
+    assert.ok(page.indexOf(fn + '();') !== -1, 'renderer never called: ' + fn);
+  });
+});
+
+test('the evidence rail distinguishes "not generated yet" from "no match"', function () {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  // 两种空栏必须给不同的话：前者是还没跑，后者是跑了但语料没命中。
+  // 都写「暂无」的话，用户分不清功能没生效和知识库为空。
+  assert.match(page, /这个阶段还没生成过/);
+  assert.match(page, /没有命中任何条目/);
+  assert.match(page, /检索失败/);
+});
+
+test('the console merges job progress with plan stage history', function () {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  const body = page.slice(page.indexOf('function consoleLines'), page.indexOf('function renderConsole'));
+  assert.match(body, /job\.log/, 'job progress must appear in the console');
+  // 阶段历史住在 projection.state 里，顶层没有 stages（见 lib/plan.js reviewPlan）。
+  // 早先这里断言的是 plan.stages，于是测试守着一个页面永远读不到的形状。
+  assert.match(body, /state0\.stages/, 'plan stage history must appear in the console');
+  // 排序是按时间，不是按来源：两路混排才有「一条时间线」的意义。
+  assert.match(body, /lines\.sort/);
+});
+
+test('the rail and console read the projection through its state, never the flat shell', function () {
+  // 生成依据（retrievals）和用例、脚本都挂在 projection.state 下，projection 顶层
+  // 只有 planId/title/summary/rail/gate/coverage。页面对着顶层读只会恒空，右栏就
+  // 永远显示「还没生成过」——功能在线却看不出在线（2026-11-08）。
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autotest-panel-flat-'));
+  const seeded = seedPlan(dir);
+  const state = store.readState(seeded.dir);
+  state.retrievals = [{
+    stage: 'cases',
+    query: 'thermal cycling',
+    at: new Date().toISOString(),
+    total: 1,
+    corpus: 2,
+    hits: [{ id: 'kb-thermal-0001', title: 'thermal cycling practice', layer: 'global', excerpt: 'cycle before measuring' }],
+  }];
+  store.writeState(seeded.dir, state);
+  const projection = plan.reviewPlan(makeCtx(dir), seeded.id);
+  assert.strictEqual(projection.state.retrievals.length, 1);
+  ['cases', 'stages', 'scripts', 'retrievals'].forEach(function (key) {
+    assert.strictEqual(projection[key], undefined, key + ' must not sit on the projection top level');
+  });
+
+  const page = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  const region = page.slice(page.indexOf('function retrievalsFor'), page.indexOf('function render()'));
+  ['retrievals', 'cases', 'scripts', 'stages'].forEach(function (key) {
+    assert.doesNotMatch(region, new RegExp('plan\\.' + key + '\\b'), 'the rail read plan.' + key + ' off the flat shell');
+  });
+  assert.match(region, /planState\(\)/, 'the rail must read the nested projection state');
+});
+
+test('every tab labels its own evidence rail', function () {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'views', 'workbench.js'), 'utf8');
+  const tabs = page.slice(page.indexOf('var TABS = ['), page.indexOf('var FAILURE_LABELS'));
+  const labels = page.slice(page.indexOf('var LABELS = {'), page.indexOf('if (title) title.textContent'));
+  const ids = (tabs.match(/'[a-z]+'/g) || []).map(function (s) { return s.slice(1, -1); });
+  ids.forEach(function (id) {
+    // 每换一个 tab 都写「证据」时，用户不知道右栏为什么换了内容。
+    assert.ok(labels.indexOf(id + ':') !== -1, 'tab without an evidence title: ' + id);
+  });
+});
+
+
 test('the meta channel answers the stage list the rail draws', async function () {
   const answer = await main.onPanelInvoke('autotest.meta', {});
   assert.strictEqual(answer.ok, true, JSON.stringify(answer));

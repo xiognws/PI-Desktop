@@ -7,9 +7,19 @@ const path = require('node:path');
 
 const kb = require('../lib/kb');
 
-/** The same ctx shape every tool and panel entry point builds in main.js. */
+/**
+ * The same ctx shape every tool and panel entry point builds in main.js.
+ *
+ * The global root is pinned to an empty directory. Left unset, `kb.globalRoot`
+ * walks up from `__dirname` into the plugin's shipped `knowledge/` seed, and
+ * every corpus assertion here would be counting the package's entries as well
+ * as the test's own.
+ */
 function ctx() {
-  return { dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'autotest-kb-')) };
+  return {
+    dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'autotest-kb-')),
+    globalKbRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'autotest-kb-global-')),
+  };
 }
 
 function seed(context, entries) {
@@ -27,7 +37,7 @@ test('write then read round trips every field and writes both files', function (
     source: { kind: 'file', ref: 'docs/brake.md' },
     text: 'The brake unit must warm up within 4 seconds.',
   });
-  assert.match(written.id, /^kb-brake-warmup-\d{14}$/);
+  assert.match(written.id, /^kb-specs-brake-warmup-\d{14}$/);
   assert.ok(fs.existsSync(path.join(c.dataDir, 'kb', 'specs', written.id + '.json')));
   assert.ok(fs.existsSync(path.join(c.dataDir, 'kb', 'specs', written.id + '.md')));
 
@@ -150,7 +160,7 @@ test('remove deletes both files and read then answers KB_NOT_FOUND', function ()
   const c = ctx();
   const written = kb.write(c, { collection: 'specs', title: 'Throwaway', text: 'gone soon' });
   const removed = kb.remove(c, { id: written.id });
-  assert.deepStrictEqual(removed, { id: written.id, collection: 'specs', removed: true });
+  assert.deepStrictEqual(removed, { id: written.id, collection: 'specs', layer: 'project', removed: true });
   assert.strictEqual(fs.existsSync(path.join(c.dataDir, 'kb', 'specs', written.id + '.json')), false);
   assert.strictEqual(fs.existsSync(path.join(c.dataDir, 'kb', 'specs', written.id + '.md')), false);
   assert.throws(
