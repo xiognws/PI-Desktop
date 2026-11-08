@@ -1208,6 +1208,8 @@ export const ptBR = {
     builtinSkills: "Habilidades integradas",
     builtin: "Integrada",
     skillsProjectPath: "Caminho de habilidades do projeto",
+    skillReviewUiTitle: "Revisão de autoaperfeiçoamento",
+    skillReviewUiDesc: "Revisa a biblioteca de habilidades após cada turno e grava nela as lições duradouras. Desativado oculta a linha de revisão.",
     mcp: "Servidores MCP",
     mcpGlobalPath: "Caminho MCP global",
     mcpProjectPath: "Caminho MCP do projeto",

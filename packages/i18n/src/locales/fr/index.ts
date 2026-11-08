@@ -1224,6 +1224,8 @@ sklm: {
     "builtinSkills": "Compétences intégrées",
     "builtin": "Intégrée",
     "skillsProjectPath": "Parcours de compétences projet",
+    "skillReviewUiTitle": "Révision auto-amélioration",
+    "skillReviewUiDesc": "Examine la bibliothèque de compétences après chaque tour et y consigne les leçons durables. Désactivé masque la ligne de révision.",
     "mcp": "Serveurs MCP",
     "mcpGlobalPath": "Chemin MCP global",
     "mcpProjectPath": "Chemin MCP du projet",

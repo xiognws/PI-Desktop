@@ -1224,6 +1224,8 @@ sklm: {
     "builtinSkills": "Integrierte Skills",
     "builtin": "Integriert",
     "skillsProjectPath": "Projektkompetenzpfad",
+    "skillReviewUiTitle": "Selbstverbesserung",
+    "skillReviewUiDesc": "Prüft nach jedem Turn die Skill-Bibliothek und schreibt dauerhafte Lektionen hinein. Ausgeblendet verbirgt die Skill-Review-Zeile.",
     "mcp": "MCP-Server",
     "mcpGlobalPath": "Globaler MCP-Pfad",
     "mcpProjectPath": "Projekt-MCP-Pfad",

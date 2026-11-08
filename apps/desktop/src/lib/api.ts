@@ -540,6 +540,7 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     infiniteProviderRetry?: unknown;
     jevEnabled?: unknown;
     smoothStreaming?: unknown;
+    skillReviewVisible?: unknown;
     sidebarRunningIndicators?: unknown;
     sidebarRunningBadge?: unknown;
     sidebarRunningRail?: unknown;
@@ -611,6 +612,14 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     typeof value.smoothStreaming !== "boolean"
   ) {
     throw Object.assign(new Error("smoothStreaming is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "skillReviewVisible") &&
+    typeof value.skillReviewVisible !== "boolean"
+  ) {
+    throw Object.assign(new Error("skillReviewVisible is invalid"), {
       errorCode: "INVALID_PARAMS",
     });
   }

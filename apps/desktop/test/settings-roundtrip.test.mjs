@@ -215,3 +215,26 @@ test("settings write round-trips command folding through the preload boundary", 
     else globalThis.window = previousWindow;
   }
 });
+
+test("the skill review row switch defaults on and crosses both boundaries as a boolean", () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { piDesktop: { platform: "win32" } };
+  try {
+    for (const validate of [renderer.validateSettingsWrite, main.validateSettingsWrite]) {
+      // Absent means the row shows: the review runs either way, and hiding the
+      // only sign of it by default would be indistinguishable from it not running.
+      assert.equal(validate({ defaultMode: "agent" }).skillReviewVisible, undefined);
+      assert.equal(validate({ skillReviewVisible: false }).skillReviewVisible, false);
+      assert.equal(validate({ skillReviewVisible: true }).skillReviewVisible, true);
+      for (const value of ["off", 0, null, {}]) {
+        assert.throws(
+          () => validate({ skillReviewVisible: value }),
+          /skillReviewVisible is invalid/,
+        );
+      }
+    }
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});

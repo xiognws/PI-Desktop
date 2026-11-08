@@ -1234,6 +1234,8 @@ sklm: {
     builtinSkills: "Built-in skills",
     builtin: "Built-in",
     skillsProjectPath: "Project skills path",
+    skillReviewUiTitle: "Self-improvement review",
+    skillReviewUiDesc: "Review the skill library after each turn and write durable lessons into it. Off hides the skill review row.",
     mcp: "MCP servers",
     mcpGlobalPath: "Global MCP path",
     mcpProjectPath: "Project MCP path",

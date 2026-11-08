@@ -50,7 +50,8 @@ import { SkillMarketPanel } from "./SkillMarketPanel";
 import { AgentSkillImportPanel } from "../../features/settings/imports/AgentSkillImportPanel";
 import { ImportToggleButton } from "../../features/settings/import-workbench";
 
-import { TooltipButton } from "../ui";
+import { SettingsRow, SettingsCard } from "../../features/settings/primitives";
+import { SettingsToggle, TooltipButton } from "../ui";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
 
 function projectSkillsPath(projectPath: string | null): string {
@@ -80,6 +81,19 @@ const EMPTY_SKILL_COLLECTION: SkillCollection = {
 
 export function AgentSkillsPage() {
   const { t } = useTranslation();
+  const settings = useAppStore((state) => state.settings);
+  const showReview = settings?.skillReviewVisible !== false;
+  const saveSkillReviewVisible = (visible: boolean): void => {
+    const current = useAppStore.getState().settings;
+    if (!current) return;
+    const next = { ...current, skillReviewVisible: visible };
+    // Optimistic: the switch must move with the finger, and a failed write
+    // rolls the stored value back rather than leaving the row disagreeing.
+    useAppStore.setState({ settings: next });
+    void api.setSettings(next).catch(() => {
+      useAppStore.setState({ settings: current });
+    });
+  };
   const showToast = useAppStore((state) => state.showToast);
   const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const fetchSkills = useCallback(async (): Promise<SkillCollection> => {
@@ -714,6 +728,19 @@ export function AgentSkillsPage() {
           />
         </div>
       </section>
+
+      <SettingsCard title={t("settings.skillReviewUiTitle")}>
+        <SettingsRow
+          title={t("settings.skillReviewUiTitle")}
+          description={t("settings.skillReviewUiDesc")}
+        >
+          <SettingsToggle
+            checked={showReview}
+            label={t("settings.skillReviewUiTitle")}
+            onChange={() => saveSkillReviewVisible(!showReview)}
+          />
+        </SettingsRow>
+      </SettingsCard>
 
       <CapabilityPanel
         loading={loading}

@@ -3924,7 +3924,7 @@
   margin: 4px auto 10px;
   font-size: var(--text-xs, 11px);
   color: var(--muted-foreground);
-  line-height: 1.4;
+  line-height: var(--leading-normal);
   text-align: center;
 }
 

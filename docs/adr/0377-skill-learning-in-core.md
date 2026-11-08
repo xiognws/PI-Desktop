@@ -75,6 +75,17 @@ diagnosable from the log. Every applied review ends in a toast naming the skills
 it changed — a background pass the user cannot see is indistinguishable from one
 that never ran.
 
+The tool-call gate counts the turns since the last review was dispatched, not the
+turn that just ended: counting only the current turn lets a chain of short turns
+hold the review off forever, which is how the feature silently never fired.
+
+The transcript shows one quiet centered line under the finished turn it belongs
+to, not a message in the conversation. The notice is keyed by turn id, so a newer
+turn never inherits an older verdict. `skillReviewVisible: false` hides that row
+and leaves the review running — the row is a report about the review, not the
+review's switch; `skillReviewAfterTurn: false` is the switch. Passes that found
+nothing stay out of the transcript by default (`skillReviewShowQuietPasses`).
+
 ## Consequences
 
 - The capability ships with the app and cannot be removed by disabling a plugin,

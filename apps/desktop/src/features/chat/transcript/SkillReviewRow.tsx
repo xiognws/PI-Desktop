@@ -27,6 +27,10 @@ export function SkillReviewRow({
 }) {
   const { t } = useTranslation();
   const notice = useAppStore((state) => state.skillReviewBySession[sessionId]);
+  // The switch hides the row, never the review: a user who turned the report off
+  // still gets the skill library updated, they just do not want the line.
+  const visible = useAppStore((state) => state.settings?.skillReviewVisible !== false);
+  if (!visible) return null;
   if (!notice) return null;
   if (notice.turnId && turnId && notice.turnId !== turnId) return null;
   const detail = notice.actions.join(" · ");

@@ -241,6 +241,12 @@ export type AppSettings = {
    */
   smoothStreaming?: boolean;
   /**
+   * Show the background skill review in the transcript after a turn (ADR 0377).
+   * Absent turns it on: the review runs either way, so its result is the only
+   * sign it exists. Off keeps the review running and only hides its row.
+   */
+  skillReviewVisible?: boolean;
+  /**
    * Render inline interactive visualizations in the transcript (ADR
    * `gen-ui-inline-visualization`). Absent and false keep the feature off: the
    * system prompt carries no visualization directory, the

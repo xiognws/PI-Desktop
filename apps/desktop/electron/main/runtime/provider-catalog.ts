@@ -214,6 +214,7 @@ export function createProviderCatalogRuntime({
       radialMenu?: unknown;
       autoCollapseSettledGroups?: unknown;
       autoCollapseThinking?: unknown;
+      skillReviewVisible?: unknown;
     };
     if (
       Object.prototype.hasOwnProperty.call(value, "defaultCommandShell") &&
@@ -236,6 +237,14 @@ export function createProviderCatalogRuntime({
       typeof value.keepAwakeWhileRunning !== "boolean"
     ) {
       throw Object.assign(new Error("keepAwakeWhileRunning is invalid"), {
+        errorCode: ErrorCodes.INVALID_PARAMS,
+      });
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "skillReviewVisible") &&
+      typeof value.skillReviewVisible !== "boolean"
+    ) {
+      throw Object.assign(new Error("skillReviewVisible is invalid"), {
         errorCode: ErrorCodes.INVALID_PARAMS,
       });
     }

@@ -220,6 +220,8 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     keywordKeys: [
       "settings.skillsGlobalPath",
       "settings.skillsProjectPath",
+      "settings.skillReviewUiTitle",
+      "settings.skillReviewUiDesc",
       "settings.globalScopeDescription",
       "settings.projectScopeDescription",
       "settings.importSkill",

@@ -1221,6 +1221,8 @@ sklm: {
     builtinSkills: "內建技能",
     builtin: "內建",
     skillsProjectPath: "專案技能路徑",
+    skillReviewUiTitle: "自我改進回顧",
+    skillReviewUiDesc: "每個回合結束後審查技能庫，把值得沉澱的經驗寫進技能；關閉後不再顯示「技能回顧」列。",
     mcp: "MCP 伺服器",
     mcpGlobalPath: "全域性 MCP 路徑",
     mcpProjectPath: "專案 MCP 路徑",

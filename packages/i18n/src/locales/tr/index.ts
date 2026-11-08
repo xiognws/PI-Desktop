@@ -1230,6 +1230,8 @@ sklm: {
     builtinSkills: "Yerleşik beceriler",
     builtin: "Yerleşik",
     skillsProjectPath: "Proje becerileri yolu",
+    skillReviewUiTitle: "Kendini geliştirme incelemesi",
+    skillReviewUiDesc: "Her turdan sonra beceri kitaplığını inceleyip kalıcı dersleri yazar. Kapalıyken beceri inceleme satırı görünmez.",
     mcp: "MCP sunucuları",
     mcpGlobalPath: "Genel MCP yolu",
     mcpProjectPath: "Proje MCP yolu",
