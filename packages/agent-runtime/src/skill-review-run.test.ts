@@ -230,7 +230,16 @@ describe("skillReviewPolicyFrom", () => {
       enabled: true,
       afterToolCalls: REVIEW_DEFAULT_MIN_TOOL_CALLS,
       minIntervalSec: REVIEW_DEFAULT_MIN_INTERVAL_SEC,
+      showQuietPasses: true,
     });
+  });
+
+  it("reports the quiet passes only when the reader asks for them", () => {
+    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: false }).showQuietPasses).toBe(false);
+    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: true }).showQuietPasses).toBe(true);
+    // Only an explicit boolean false silences the row; anything else keeps it.
+    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: "false" }).showQuietPasses).toBe(true);
+    expect(skillReviewPolicyFrom({ skillReviewShowQuietPasses: null }).showQuietPasses).toBe(true);
   });
 
   it("turns off only on an explicit false", () => {
@@ -243,6 +252,7 @@ describe("skillReviewPolicyFrom", () => {
       enabled: true,
       afterToolCalls: 7,
       minIntervalSec: 30,
+      showQuietPasses: true,
     });
     for (const bad of [0, -5, Number.NaN, "10", null]) {
       const policy = skillReviewPolicyFrom({ skillReviewAfterToolCalls: bad });

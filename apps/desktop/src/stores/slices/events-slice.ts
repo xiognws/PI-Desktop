@@ -235,9 +235,9 @@ export function createEventsSlice({
       }
       const event = envelope.event;
       if (event.type === "skill_review") {
-        // Keyed by session: the review reports after its turn has ended, and the row
-        // sits at the end of that session's transcript. In memory only — the durable
-        // record is the skill-review log.
+        // Keyed by session for the row's lifetime, and stamped with the turn it
+        // reviews so the transcript can hold it under that turn. In memory only — the
+        // durable record is the skill-review log.
         set((state) => ({
           skillReviewBySession: {
             ...state.skillReviewBySession,
@@ -245,6 +245,7 @@ export function createEventsSlice({
               outcome: event.outcome,
               ...(event.reason ? { reason: event.reason } : {}),
               actions: event.actions ?? [],
+              ...(envelope.turnId ? { turnId: envelope.turnId } : {}),
             },
           },
         }));

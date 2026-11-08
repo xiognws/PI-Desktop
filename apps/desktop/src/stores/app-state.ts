@@ -124,6 +124,13 @@ export type SkillReviewNotice = {
   reason?: string;
   /** One short description per write the review made. */
   actions: string[];
+  /**
+   * Durable turn the reviewed turn belonged to, when the runtime knew it. The
+   * notice reports after that turn ended, so the turn id is the only thing that can
+   * carry it from the head of the transcript (where it is received) to the end of
+   * the turn it describes (where it is shown).
+   */
+  turnId?: string;
 };
 
 export type AppState = {

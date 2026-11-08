@@ -272,6 +272,17 @@ function TranscriptBody({
     () => (transcriptRunning ? liveHistoryTurnId(historyEntries, tailEntry) : undefined),
     [historyEntries, tailEntry, transcriptRunning],
   );
+  // The turn the review will report on: the live turn while one runs, otherwise the
+  // last assistant turn the list holds. The row is anchored to it so it stays under
+  // the turn it describes even as the tail above it changes.
+  const lastSettledTurnId = useMemo(() => {
+    for (let index = historyEntries.length - 1; index >= 0; index -= 1) {
+      const entry = historyEntries[index];
+      if (entry.kind === "assistant-turn") return entry.id;
+    }
+    return tailEntry?.kind === "assistant-turn" ? tailEntry.id : undefined;
+  }, [historyEntries, tailEntry]);
+  const reviewTurnId = liveTurnId ?? lastSettledTurnId;
   const hasSpecializedActivity = specializedActivity !== undefined;
   // Existing output does not mean the turn has finished: a text stream can
   // pause, and completed tool rows can outlive their activity. Keep one tail
@@ -533,11 +544,13 @@ function TranscriptBody({
             // view, which is exactly the jitter this avoids.
             <div className="transcript-hydration-spacer" aria-hidden />
           ) : null}
-          <TranscriptHistory entries={historyEntries} isRunning={isRunning} liveDelegations={liveDelegations} liveTurnId={liveTurnId} />
-          {/* The self-improvement review's verdict for this session, one quiet line
-            * under the last turn. It reports after the turn ends, which is why it is
-            * keyed by session rather than hung off a turn. */}
-          <SkillReviewRow sessionId={sessionId ?? ""} />
+          <TranscriptHistory
+            entries={historyEntries}
+            isRunning={isRunning}
+            liveDelegations={liveDelegations}
+            liveTurnId={liveTurnId}
+            trailingSlot={<SkillReviewRow sessionId={sessionId ?? ""} turnId={reviewTurnId} />}
+          />
           {tailEntry ? (
             <TranscriptTail
               entry={tailEntry}

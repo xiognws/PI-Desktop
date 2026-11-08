@@ -53,14 +53,15 @@ export const REVIEW_DEFAULT_MIN_INTERVAL_SEC = 120;
 /**
  * The review policy a session launches with, read off the app settings.
  *
- * The three keys are not in the typed `AppSettings` (they predate it), so they come
- * in as a record and are read with the defaults the review has always used: on,
- * after three tool calls, at most once every two minutes.
+ * The keys are not in the typed `AppSettings` (they predate it), so they come in as
+ * a record and are read with the defaults the review has always used: on, after
+ * three tool calls, at most once every two minutes, and reporting a quiet pass.
  */
 export function skillReviewPolicyFrom(settings: Record<string, unknown> = {}): {
   enabled: boolean;
   afterToolCalls: number;
   minIntervalSec: number;
+  showQuietPasses: boolean;
 } {
   const positive = (key: string, fallback: number): number => {
     const value = settings[key];
@@ -70,6 +71,7 @@ export function skillReviewPolicyFrom(settings: Record<string, unknown> = {}): {
     enabled: settings.skillReviewAfterTurn !== false,
     afterToolCalls: positive("skillReviewAfterToolCalls", REVIEW_DEFAULT_MIN_TOOL_CALLS),
     minIntervalSec: positive("skillReviewMinIntervalSec", REVIEW_DEFAULT_MIN_INTERVAL_SEC),
+    showQuietPasses: settings.skillReviewShowQuietPasses !== false,
   };
 }
 

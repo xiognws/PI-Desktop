@@ -3911,18 +3911,21 @@
 .turn-changes-row[data-rolled-back] .review-file-type { color: var(--ds-text-faint); }
 
 /* The self-improvement review's verdict under a finished turn. Deliberately the
-   quietest row in the transcript: it is a report, not a message, and a silent
-   review is the normal case. */
+   quietest row in the transcript: it is a report, not a message. Centered on the
+   turn boundary the way Hermes reports its background review — the row belongs to
+   the turn, not to the assistant's prose, so it does not hang off the message
+   gutter. */
 .skill-review-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: center;
   gap: 6px;
-  margin: 2px 0 6px;
-  padding-left: 2px;
+  margin: 4px auto 10px;
   font-size: var(--text-xs, 11px);
   color: var(--muted-foreground);
   line-height: 1.4;
+  text-align: center;
 }
 
 .skill-review-row[data-outcome="applied"] .skill-review-text {

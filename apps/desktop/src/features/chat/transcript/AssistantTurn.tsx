@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -177,6 +178,13 @@ type TranscriptHistoryProps = {
   liveDelegations?: ReadonlyMap<string, true>;
   /** The running session's live turn, when it renders inside the history list (#1949). */
   liveTurnId?: string;
+  /**
+   * Rendered under the last settled row, inside the list the user reads. A row that
+   * belongs to the turn boundary (the skill review's verdict) has to follow the
+   * transcript instead of being pinned to the live tail, or it disappears the
+   * moment anything else lands after it.
+   */
+  trailingSlot?: ReactNode;
 };
 
 /**
@@ -192,6 +200,7 @@ export const TranscriptHistory = memo(function TranscriptHistory({
   isRunning,
   liveDelegations,
   liveTurnId,
+  trailingSlot,
 }: TranscriptHistoryProps) {
   return (
     <>
@@ -204,6 +213,7 @@ export const TranscriptHistory = memo(function TranscriptHistory({
           delegationsLive={entry.kind === "assistant-turn" && liveDelegations?.has(entry.id)}
         />
       ))}
+      {trailingSlot}
     </>
   );
 }, (previous, next) => {
@@ -211,6 +221,7 @@ export const TranscriptHistory = memo(function TranscriptHistory({
     previous.isRunning !== next.isRunning ||
     previous.liveDelegations !== next.liveDelegations ||
     previous.liveTurnId !== next.liveTurnId ||
+    previous.trailingSlot !== next.trailingSlot ||
     previous.entries.length !== next.entries.length
   ) {
     return false;

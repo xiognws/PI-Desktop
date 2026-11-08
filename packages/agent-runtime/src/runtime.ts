@@ -1047,6 +1047,12 @@ export type SkillReviewPolicy = {
   enabled?: boolean;
   afterToolCalls?: number;
   minIntervalSec?: number;
+  /**
+   * Whether a review that looked and found nothing is reported. Defaults to on so a
+   * quiet library stays distinguishable from a review that never ran; off leaves only
+   * reviews that wrote something or broke.
+   */
+  showQuietPasses?: boolean;
 };
 
 export type AgentRuntimeOptions = {
@@ -1904,6 +1910,12 @@ export class DesktopAgentRuntime {
   /** Tool calls seen in the turn now running; the review's size gate reads it. */
   private turnToolCalls = 0;
   private lastSkillReviewAt = 0;
+  /**
+   * Tool calls in the turns since the last review was dispatched or the cooldown
+   * consumed one. Measuring only the current turn would let a chain of short turns
+   * hold the review off forever, which is how its row stopped appearing at all.
+   */
+  private turnToolCallsSinceReview = 0;
   private skillReviewRunning = false;
   /** Aborts an in-flight review when a new turn arrives (foreground priority). */
   private skillReviewAbort?: AbortController;
@@ -2542,18 +2554,42 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
    */
   private async runSkillReviewIfDue(): Promise<void> {
     const policy = this.skillReviewPolicy;
-    const skipped = (reason: string): void => {
-      this.emit({ type: "skill_review", outcome: "skipped", reason });
+    const emit = (notice: {
+      outcome: "applied" | "skipped" | "failed";
+      reason?: string;
+      actions?: string[];
+    }): void => {
+      // A pass that looked and found nothing is the normal answer, and reporting it
+      // on every qualifying turn is noise. It stays available, but only for someone
+      // who asked for it; a write and a failure always report.
+      if (
+        notice.outcome === "skipped" &&
+        policy.showQuietPasses === false &&
+        notice.reason === "nothing-to-save"
+      ) {
+        return;
+      }
+      this.emit({ type: "skill_review", ...notice });
     };
+    const skipped = (reason: string): void => emit({ outcome: "skipped", reason });
     if (policy.enabled === false) return skipped("disabled");
     // Plan and Goal negotiate a contract first and share a denial-only tool set;
     // there is no work in them to learn from (the host's `is_contract_mode`).
     if (this.mode !== "agent") return skipped("mode");
-    if (this.skillReviewRunning) return skipped("already-running");
+    if (this.skillReviewRunning) return emit({ outcome: "skipped", reason: "already-running" });
     const minToolCalls = policy.afterToolCalls ?? REVIEW_DEFAULT_MIN_TOOL_CALLS;
-    if (this.turnToolCalls < minToolCalls) return skipped("too-few-tools");
+    // Measured over the turns since the last review was dispatched or the cooldown
+    // was last taken, not over the turn that just ended. Counting only the current
+    // turn lets a chain of short turns hold the review off forever.
+    if (this.turnToolCallsSinceReview < minToolCalls) {
+      this.turnToolCallsSinceReview += this.turnToolCalls;
+      return skipped("too-few-tools");
+    }
     const minIntervalSec = policy.minIntervalSec ?? REVIEW_DEFAULT_MIN_INTERVAL_SEC;
-    if (Date.now() - this.lastSkillReviewAt < minIntervalSec * 1000) return skipped("cooldown");
+    if (Date.now() - this.lastSkillReviewAt < minIntervalSec * 1000) {
+      this.turnToolCallsSinceReview += this.turnToolCalls;
+      return skipped("cooldown");
+    }
 
     const tools = reviewToolsFrom(this.declaredTools());
     // A fork without `skill_manage` and `Skill` would pay a full completion and
@@ -2585,15 +2621,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       const result = await run.run();
       const summary = collector.actions().map(describeReviewAction);
       if (summary.length > 0) {
-        this.emit({ type: "skill_review", outcome: "applied", actions: summary });
+        emit({ outcome: "applied", actions: summary });
       } else if (result.status === "completed" && collector.toolCallCount() === 0 && attempt < 2) {
         // A completion that never touched a tool read nothing: the model answered from
         // the prompt alone. One correction is worth spending on, because "nothing to
         // save" and "never looked" are indistinguishable downstream.
         continue;
       } else {
-        this.emit({
-          type: "skill_review",
+        emit({
           outcome: "skipped",
           reason:
             result.status !== "completed"
@@ -2605,8 +2640,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       }
       }
     } catch (error) {
-      this.emit({
-        type: "skill_review",
+      emit({
         outcome: "failed",
         reason: error instanceof Error ? error.message : String(error),
       });
@@ -2617,6 +2651,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       // was spent, and a skip must not invite a retry loop.
       this.lastSkillReviewAt = Date.now();
       this.turnToolCalls = 0;
+      this.turnToolCallsSinceReview = 0;
     }
   }
 
