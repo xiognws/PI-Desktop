@@ -140,6 +140,7 @@ Let the agent get things done, but stay under control by default.
 | `Computer` | high | Inspect and operate the one native window or application the user granted; disabled without an active scope grant ([computer-use](computer-use.md), ADR 0342) |
 | `asktool` | low | Ask one or more user questions and return the submitted answers as tool output |
 | `TodoWrite` | low | Replace the current Agent session checklist; host validates and persists the full ordered snapshot |
+| `Skill` | low | Load one skill document, its path, and the `references/*.md` it owns; called with no `id` it lists the live library ([2.4](#24-skill-catalog-and-loading)) |
 
 > Names may be fine-tuned during implementation, but semantics stay consistent.
 
@@ -291,6 +292,26 @@ straight out of each wheel's own `METADATA` and compares it with the
 
 The scan runs once per launch off the startup path and is never fatal: a broken
 wheel costs a warning in the log, not a failed launch.
+
+### 2.4 Skill catalog and loading
+
+The catalog is a system-prompt section (`# Skills`, one line per skill: id, name,
+description) assembled at session launch from built-ins, plugin skills and the
+user's own library, filtered by activation scope. A body never enters the prompt;
+it costs tokens only when it is loaded.
+
+`Skill` is the read tool over that catalog:
+
+| call | result |
+| --- | --- |
+| no `id` | the live library as it stands now. The prompt section is a snapshot frozen at session start, so a skill created mid-session — by `skill_manage`, or by the background review's fork — appears only here |
+| an `id` | that document, its `SKILL.md` path, and every `references/*.md` beside it, so a reference is read without guessing a filename or globbing the directory |
+
+Both calls are read-only and `low` risk. A listing is answered by the runtime from
+the catalog it already holds; a load is served by Electron main, which resolves
+built-in, then user, then plugin documents. A session with an empty library still
+carries the tool during a review pass, and answers a listing with "the library is
+empty" rather than failing a call the review prompt tells the model to make.
 
 ## 3. Common Tool Constraints
 

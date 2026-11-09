@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatSkillLibrary,
   pluginSkillsPrompt,
   pluginSkillsPromptSections,
   SKILL_TOOL_NAME,
@@ -53,4 +54,32 @@ it("gives skill IDs collision-free section names and stable catalog ordering", (
   expect(sections["skill:skill:a"]).toContain("Colon");
   expect(sections["skill:a"]).toContain("A");
   expect(pluginSkillsPromptSections([])).toEqual({});
+});
+
+describe("formatSkillLibrary", () => {
+  it("lists the live library in id order, one line per skill", () => {
+    const text = formatSkillLibrary([
+      { id: "zeta/one", name: "Zeta", description: "Last in order." },
+      { id: "alpha/two", name: "Alpha" },
+    ]);
+    expect(text.startsWith("# Skill library (2 skills)")).toBe(true);
+    const lines = text.split("\n").filter((line) => line.startsWith("- "));
+    expect(lines).toEqual([
+      "- `alpha/two` — Alpha",
+      "- `zeta/one` — Zeta: Last in order.",
+    ]);
+    // A snapshot is not a listing: the text has to say which one this is.
+    expect(text).toContain("snapshot taken at session start");
+    expect(text).not.toContain("# Skills\n");
+  });
+
+  it("says the library is empty instead of returning nothing", () => {
+    const text = formatSkillLibrary([]);
+    expect(text).toContain("library is empty");
+    expect(text).toContain("skill_manage");
+  });
+
+  it("counts a single skill in the singular", () => {
+    expect(formatSkillLibrary([{ id: "a", name: "A" }]).startsWith("# Skill library (1 skill)")).toBe(true);
+  });
 });

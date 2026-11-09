@@ -26,6 +26,28 @@ function skillEntry(skill: PluginSkillDef): string {
   return `- \`${skill.id}\` — ${skill.name}${description ? `: ${description}` : ""}`;
 }
 
+/**
+ * The library as the model can read it *now*.
+ *
+ * The Skills section of the system prompt is a snapshot frozen at session start,
+ * so a skill created mid-session (by `skill_manage` or by the review fork) is not
+ * in it. `Skill` with no id answers from the live catalog instead, which is what
+ * the review prompt asks for when it says "list what exists" before deciding.
+ */
+export function formatSkillLibrary(skills: readonly PluginSkillDef[]): string {
+  if (!skills.length) {
+    return "The skill library is empty: no skill documents exist yet. Create the first one with `skill_manage` action `create`.";
+  }
+  const ordered = [...skills].sort((a, b) => a.id.localeCompare(b.id));
+  return [
+    `# Skill library (${ordered.length} skill${ordered.length === 1 ? "" : "s"})`,
+    "",
+    "This is the live library. The Skills section of your system prompt is a snapshot taken at session start, so a skill created since then appears only here.",
+    "",
+    ...ordered.map(skillEntry),
+  ].join("\n");
+}
+
 /** Stable entry identities let Pi append only the changed or revoked skill. */
 export function pluginSkillsPromptSections(skills: readonly PluginSkillDef[]): Record<string, string> {
   if (!skills.length) return {};

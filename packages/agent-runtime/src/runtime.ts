@@ -38,6 +38,7 @@ import { imageGenerationDescription, imageGenerationParameters } from "./image-g
 import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
 import { createMemoryTool } from "./memory-agent-tool.js";
 import { createSkillManageTool } from "./skill-manage-tool.js";
+import { createSkillTool } from "./skill-tool.js";
 import {
   accrueReviewToolCalls,
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
@@ -4582,18 +4583,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     const skillTools: AgentTool[] =
       this.mode === "agent" && this.pluginSkills.length
       ? [
-          {
-            name: SKILL_TOOL_NAME,
-            label: "Skill",
-            description:
-              "Load the full instructions of one skill listed in the Skills section of your system prompt. Pass its exact id (for example \"demo.hello/release-notes\"). Returns the skill document; follow it for the current task.",
-            parameters: Type.Object({
-              id: Type.String({
-                description: "Skill id exactly as listed in the Skills section.",
-              }),
-            }),
-            execute: exec(SKILL_TOOL_NAME).execute,
-          },
+          createSkillTool({
+            skills: this.pluginSkills,
+            load: exec(SKILL_TOOL_NAME).execute,
+          }),
         ]
       : [];
     const modeTools =
@@ -4715,25 +4708,16 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
    *
    * `activeTools` only publishes it when the session has a skill catalog, which
    * makes a library with no skills unreachable — including from the background
-   * review, whose whole job is to create the first ones. The tool's contract is
-   * unchanged: it loads a document main serves, and a session with nothing to
-   * list simply returns nothing.
+   * review, whose whole job is to create the first ones. Here the catalog is
+   * empty, so a listing says the library is empty and an id lookup fails with
+   * that reason instead of a bare schema rejection.
    */
   private buildSkillTool(): AgentTool {
-    const tool: AgentTool = {
-      name: SKILL_TOOL_NAME,
-      label: "Skill",
-      description:
-        "Load the full instructions of one skill listed in the Skills section of your system prompt. Pass its exact id (for example \"demo.hello/release-notes\"). Returns the skill document; follow it for the current task.",
-      parameters: Type.Object({
-        id: Type.String({
-          description: "Skill id exactly as listed in the Skills section.",
-        }),
-      }),
-      execute: async (toolCallId) =>
+    return createSkillTool({
+      skills: [],
+      load: async (toolCallId) =>
         this.subagentToolError(toolCallId, "No skill library is available in this session."),
-    };
-    return tool;
+    });
   }
 
   /**

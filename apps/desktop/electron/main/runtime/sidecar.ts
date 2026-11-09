@@ -31,7 +31,7 @@ import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import type { FinishTurn } from "./plans";
-import { formatSkillToolContent, type LoadedSkillDocument } from "../skill-document";
+import { formatSkillToolContent, listSkillReferences, type LoadedSkillDocument } from "../skill-document";
 import { currentSystemProxyRelayUrl } from "../network-proxy";
 
 export type SidecarRuntimeDependencies = {
@@ -670,10 +670,13 @@ export function createSidecarRuntime({
   s.setLocalTool("Skill", async ({ args, sessionId }) => {
     const id = String((args as { id?: unknown })?.id ?? "").trim();
     if (!id) {
+      // The runtime answers a listing from the catalog it holds, so main is only
+      // reached with an id. Kept as a refusal rather than an empty success: a
+      // caller that asked for a document must not read "no document" as one.
       return {
         ok: false,
         isError: true,
-        content: "Skill: `id` is required. Use an id from the Skills section.",
+        content: "Skill: `id` is required to load a document. Call Skill with no arguments to list the library.",
       };
     }
     const projectPath = sessionProjects.get(sessionId) ?? null;
@@ -688,7 +691,7 @@ export function createSidecarRuntime({
         plugins.loadSkillBody(id);
       return {
         ok: true,
-        content: formatSkillToolContent(skill),
+        content: formatSkillToolContent(skill, listSkillReferences(skill.location)),
       };
     } catch (error) {
       const userIds = (await activeUserSkills(projectPath ?? undefined)).map(

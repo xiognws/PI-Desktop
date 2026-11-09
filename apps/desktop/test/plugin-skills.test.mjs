@@ -123,7 +123,7 @@ test("the built-in skill body loads through the same Skill tool", () => {
     /loadBuiltinSkillBody\(id\) \?\?\s*\(await loadUserSkillBody\(id, projectPath\)\) \?\?\s*plugins\.loadSkillBody\(id\)/,
   );
   assert.match(mainSrc, /const userIds = \(await activeUserSkills/);
-  assert.match(desktopSidecarSrc, /formatSkillToolContent\(skill\)/);
+  assert.match(desktopSidecarSrc, /formatSkillToolContent\(\s*skill,\s*listSkillReferences\(skill\.location\)/);
   assert.match(desktopSidecarSrc, /await assertBuiltinSkillEnabled\(id, disabledBuiltinSkills\)/);
   assert.match(builtinSrc, /location: raw\.path/);
   assert.match(runtimeSrc, /location: skill\.path/);
