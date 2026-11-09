@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   GLOBAL_SCOPE,
   type AgentCapabilityLevel,
   type BuiltinSkillRecord,
+  type SkillCurationReport,
   type UserSkillRecord,
 } from "@pi-workspace/shared";
 import { api } from "../../lib/api";
@@ -143,6 +144,44 @@ export function AgentSkillsPage() {
   const [view, setView] = useState<"skills" | "market">("skills");
   const [saving, setSaving] = useState(false);
   const { armed, setArmed } = useArmedDelete();
+  /**
+   * Maintenance is advisory until somebody clicks: the page reads a dry run on
+   * load, and only the archive button sends `dryRun: false`. A failed report
+   * leaves the card out rather than failing the page — it is a hint, not state.
+   */
+  const [curation, setCuration] = useState<SkillCurationReport | null>(null);
+  const [curating, setCurating] = useState(false);
+  const refreshCuration = useCallback(async () => {
+    try {
+      const { report } = await api.curateUserSkills({
+        ...(selectedProjectPath ? { projectPath: selectedProjectPath } : {}),
+      });
+      setCuration(report);
+    } catch {
+      setCuration(null);
+    }
+  }, [selectedProjectPath]);
+  useEffect(() => {
+    void refreshCuration();
+  }, [refreshCuration]);
+  const archiveIdle = async () => {
+    setCurating(true);
+    try {
+      const { report } = await api.curateUserSkills({
+        ...(selectedProjectPath ? { projectPath: selectedProjectPath } : {}),
+        dryRun: false,
+      });
+      setCuration(report);
+      await load();
+      showToast(t("settings.skillCurateArchived", { count: report.archived.length }), {
+        variant: "success",
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      setCurating(false);
+    }
+  };
 
   const rowKey = (level: AgentCapabilityLevel, id: string) => `${level}:${id}`;
   const builtinRowKey = (id: string) => `builtin:${id}`;
@@ -411,6 +450,14 @@ export function AgentSkillsPage() {
     global: tallySkillUsage(visible.global),
     project: tallySkillUsage(visible.project),
   };
+
+  // "Idle" is what the maintenance card is about: stale plus archivable.
+  const idleCount = curation
+    ? curation.entries.filter((entry) => entry.state !== "keep").length
+    : 0;
+  const archivableCount = curation
+    ? curation.entries.filter((entry) => entry.state === "archive").length
+    : 0;
 
   /** A row's usage state, as a badge beside its level. */
   const usageBadge = (skill: UserSkillRecord) => {
@@ -763,6 +810,33 @@ export function AgentSkillsPage() {
           />
         </div>
       </section>
+
+      {curation && curation.policy ? (
+        <SettingsCard title={t("settings.skillCurateTitle")}>
+          <SettingsRow
+            title={t("settings.skillCurateTitle")}
+            description={
+              idleCount === 0
+                ? t("settings.skillCurateNone")
+                : t("settings.skillCurateDesc", {
+                    count: idleCount,
+                    days: curation.policy.archiveAfterDays,
+                  })
+            }
+          >
+            <CapabilityButton
+              variant="secondary"
+              busy={curating}
+              disabled={archivableCount === 0 || curating}
+              onClick={() => void archiveIdle()}
+            >
+              {archivableCount === 0
+                ? t("settings.skillCurateNothing")
+                : t("settings.skillCurateAction", { count: archivableCount })}
+            </CapabilityButton>
+          </SettingsRow>
+        </SettingsCard>
+      ) : null}
 
       <SettingsCard title={t("settings.skillReviewUiTitle")}>
         <SettingsRow

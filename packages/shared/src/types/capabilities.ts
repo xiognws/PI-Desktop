@@ -155,6 +155,27 @@ export type UserSkillRecord = {
   useCount?: number;
 };
 
+/** How idle one skill is, as the maintenance pass sees it. */
+export type SkillCurationEntry = {
+  id: string;
+  name: string;
+  level: AgentCapabilityLevel;
+  projectPath?: string;
+  useCount: number;
+  /** Last load, or the document's own timestamp when nothing ever loaded it. */
+  lastActivityAt: number;
+  idleDays: number;
+  state: "keep" | "stale" | "archive";
+};
+
+/** What `skills.curate` found, and what it turned off when it was not a dry run. */
+export type SkillCurationReport = {
+  entries: SkillCurationEntry[];
+  archived: string[];
+  dryRun: boolean;
+  policy?: { staleAfterDays: number; archiveAfterDays: number };
+};
+
 /** A skill bundled with Pi-Workspace and enabled globally by default. */
 export type BuiltinSkillRecord = {
   id: string;

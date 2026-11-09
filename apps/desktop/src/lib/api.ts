@@ -118,6 +118,7 @@ import type {
   TraySessionPreferences,
   ToolPermissionResolution,
   BuiltinSkillRecord,
+  SkillCurationReport,
   UserSkillInput,
   UserSkillRecord,
   UserSubagentInput,
@@ -1527,6 +1528,16 @@ export const api = {
     invoke<{ id: string; enabled: boolean }>(IPC.invoke.skillBuiltinSetEnabled, { id, enabled }),
   listUserSkills: (query?: AgentCapabilityQuery) =>
     invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList, query),
+  /**
+   * Report the idle skills, or archive them when `dryRun` is explicitly false.
+   * The host treats a missing `dryRun` as true, so the page asks first.
+   */
+  curateUserSkills: (request?: {
+    projectPath?: string;
+    dryRun?: boolean;
+    staleAfterDays?: number;
+    archiveAfterDays?: number;
+  }) => invoke<{ report: SkillCurationReport }>(IPC.invoke.skillCurate, request ?? {}),
   createUserSkill: (skill: UserSkillInput) =>
     invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillCreate, skill),
   /**

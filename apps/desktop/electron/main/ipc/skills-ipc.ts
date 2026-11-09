@@ -1,6 +1,6 @@
 import { app, dialog, shell } from "electron";
 import { importSkillFolders, readLastSkillImportDirectory, writeLastSkillImportDirectory } from "../skill-folder-import";
-import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type UserSkillRecord, type UserSubagentRecord } from "@pi-workspace/shared";
+import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type SkillCurationReport, type UserSkillRecord, type UserSubagentRecord } from "@pi-workspace/shared";
 import { loadSubagentDefinitions, type UserSubagentDocument } from "@pi-workspace/agent-runtime";
 import { builtinSkillCatalog } from "../builtin-skills";
 import type { HostProcess } from "../host-process";
@@ -153,6 +153,43 @@ export function registerSkillsIpc({
     if (!host) throw new Error("host unavailable");
     return host.call("skills.list", query);
   });
+
+  /**
+   * Skill maintenance. `dryRun` defaults to true in the host too, so a stray call
+   * cannot switch a library off: the page reads the report first and only the
+   * user's own click sends `dryRun: false`.
+   */
+  handle(
+    IPC.invoke.skillCurate,
+    async (request: {
+      projectPath?: unknown;
+      dryRun?: unknown;
+      staleAfterDays?: unknown;
+      archiveAfterDays?: unknown;
+    } = {}) => {
+      if (!host) throw new Error("host unavailable");
+      const payload: Record<string, unknown> = {};
+      if (typeof request.projectPath === "string" && request.projectPath) {
+        payload.projectPath = request.projectPath;
+      }
+      if (typeof request.dryRun === "boolean") payload.dryRun = request.dryRun;
+      if (typeof request.staleAfterDays === "number") {
+        payload.staleAfterDays = request.staleAfterDays;
+      }
+      if (typeof request.archiveAfterDays === "number") {
+        payload.archiveAfterDays = request.archiveAfterDays;
+      }
+      const result = await host.call<{ report: SkillCurationReport }>(
+        "skills.curate",
+        payload,
+      );
+      // Archiving flips activation, which the list the page renders is built from.
+      if (payload.dryRun === false && result?.report?.archived?.length) {
+        sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      }
+      return result;
+    },
+  );
 
   handle(IPC.invoke.skillBuiltinList, async () => {
     if (!host) throw new Error("host unavailable");
