@@ -153,7 +153,7 @@ const wheelsDir = join(STAGING, "wheels");
 const siteDir = join(STAGING, "site-packages");
 const runtimeDir = join(STAGING, "runtime");
 
-if (wheelSource !== wheelsDir) {
+if (wheelSource && wheelSource !== wheelsDir) {
   await mkdir(wheelsDir, { recursive: true });
   for (const wheel of lock.wheels) {
     const source = join(wheelSource, wheel.file);
