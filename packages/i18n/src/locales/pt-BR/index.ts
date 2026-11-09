@@ -366,6 +366,10 @@ export const ptBR = {
     viewOptions: "Visualização",
   },
   sessionCollaboration: {
+    worklineTitle: "Linhas de trabalho",
+    worklineActiveCount: "{{count}} ativas",
+    worklineAria: "Linhas de trabalho em andamento",
+    worklineDelegatedBy: "por {{name}}",
     statusIdle: "Ocioso",
     statusQueued: "Na fila",
     statusRunning: "Trabalhando",

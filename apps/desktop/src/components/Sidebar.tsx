@@ -79,6 +79,7 @@ import {
   ProjectRunCount,
   ProjectRunRail,
 } from "./ProjectRunIndicator";
+import { WorklineStrip } from "./WorklineStrip";
 import { ErrorCodes, formatSessionLink } from "@pi-workspace/shared";
 import type { SessionSummary } from "@pi-workspace/shared";
 import type {
@@ -2665,6 +2666,16 @@ export function Sidebar({
             </div>
           </section>
         ) : null}
+
+        <WorklineStrip
+          sessions={sessions}
+          runningSessions={runningSessions}
+          pendingPermissions={pendingPermissions}
+          activeSessionId={activeSessionId}
+          onOpenSession={(sessionId) => {
+            void openSessionFromHover(sessionId);
+          }}
+        />
 
         <section
           className="sidebar-standalone-sessions"

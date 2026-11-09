@@ -376,6 +376,10 @@ export const ko = {
     viewOptions: "보기",
   },
   sessionCollaboration: {
+    worklineTitle: "작업 라인",
+    worklineActiveCount: "{{count}}개 진행 중",
+    worklineAria: "진행 중인 작업 라인",
+    worklineDelegatedBy: "{{name}} 배포",
     statusIdle: "대기",
     statusQueued: "대기열에 있음",
     statusRunning: "진행 중",

@@ -367,6 +367,10 @@ export const de = {
     "viewOptions": "Ansicht",
   },
   "sessionCollaboration": {
+    "worklineTitle": "Arbeitslinien",
+    "worklineActiveCount": "{{count}} aktiv",
+    "worklineAria": "Laufende Arbeitslinien",
+    "worklineDelegatedBy": "von {{name}}",
     "statusIdle": "Inaktiv",
     "statusQueued": "In Warteschlange",
     "statusRunning": "In Bearbeitung",

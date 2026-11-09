@@ -369,6 +369,10 @@ export const zhCN = {
     viewOptions: "显示",
   },
   sessionCollaboration: {
+    worklineTitle: "工作线",
+    worklineActiveCount: "{{count}} 条在跑",
+    worklineAria: "正在进行的工作线",
+    worklineDelegatedBy: "由 {{name}} 派发",
     statusIdle: "空闲",
     statusQueued: "排队中",
     statusRunning: "进行中",

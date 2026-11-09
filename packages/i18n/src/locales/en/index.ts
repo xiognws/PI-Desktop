@@ -374,6 +374,10 @@ export const en = {
     viewOptions: "View",
   },
   sessionCollaboration: {
+    worklineTitle: "Worklines",
+    worklineActiveCount: "{{count}} active",
+    worklineAria: "Worklines in progress",
+    worklineDelegatedBy: "by {{name}}",
     statusIdle: "Idle",
     statusQueued: "Queued",
     statusRunning: "Working",
