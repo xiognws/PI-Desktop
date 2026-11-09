@@ -44,12 +44,26 @@ export async function runSessionListProbe({
     throw new Error("session-list probe requires an unconfigured boot profile");
   }
   await catalog.ensureLoaded();
-  const models = catalog.modelsForProvider({
+  const catalogModels = catalog.modelsForProvider({
     vendorKey: "openai",
     providerId: "session-list-probe",
   }).slice(0, 13);
-  const modelIds = models.map((model) => model.modelId);
-  if (modelIds.length < 2) throw new Error("bundled catalog lacks probe model fixtures");
+  // The product ships no bundled model catalog: providers are added by hand, so
+  // a fresh boot profile legitimately has no model fixtures. The probe measures
+  // the session list, which only needs two distinct model ids.
+  const models =
+    catalogModels.length >= 2
+      ? catalogModels.map((model) => ({
+          id: model.modelId,
+          contextWindow: model.contextWindow ?? 128_000,
+          maxTokens: model.maxTokens ?? 8_192,
+          thinkingLevels: model.supportedThinkingLevels ?? [],
+        }))
+      : [
+          { id: "probe-model-a", contextWindow: 128_000, maxTokens: 8_192, thinkingLevels: [] },
+          { id: "probe-model-b", contextWindow: 128_000, maxTokens: 8_192, thinkingLevels: [] },
+        ];
+  const modelIds = models.map((model) => model.id);
   const { provider } = await host.call<{ provider: { id: string } }>("providers.create", {
     name: "Session list responsiveness fixture",
     vendorKey: "openai",
@@ -58,12 +72,7 @@ export async function runSessionListProbe({
     authKind: "none",
     baseUrl: "http://127.0.0.1:9/session-list-probe",
     defaultModelId: modelIds[0],
-    models: models.map((model) => ({
-      id: model.modelId,
-      contextWindow: model.contextWindow ?? 128_000,
-      maxTokens: model.maxTokens ?? 8_192,
-      thinkingLevels: model.supportedThinkingLevels ?? [],
-    })),
+    models,
   });
   const fixtures: FixtureSession[] = [];
   // Seed through the authoritative Host API without warming Main's lookup cache.
