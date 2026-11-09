@@ -1,4 +1,5 @@
 use self::curator::{CurationReport, CurationState, CuratorPolicy};
+use self::pins::SkillPinStore;
 use self::usage::{SkillUsage, SkillUsageStore};
 use crate::activation::ActivationScope;
 use crate::agent_capabilities::{
@@ -60,6 +61,9 @@ pub struct UserSkillRecord {
     /// used" from "this release did not report usage".
     #[serde(default)]
     pub use_count: u32,
+    /// Exempt from the maintenance pass (ADR 0387's escape hatch).
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -126,6 +130,8 @@ pub struct UserSkillRegistry {
     /// Loads, not edits: what a maintenance pass needs to tell a skill somebody
     /// uses from one nobody has ever opened.
     usage: SkillUsageStore,
+    /// Skills the user asked the maintenance pass to leave alone.
+    pins: SkillPinStore,
 }
 
 /// Place a single skill file at `target`, either as a copy or a symlink.
@@ -938,6 +944,7 @@ impl UserSkillRegistry {
             state: CapabilityState::new(data_dir, SKILL_KIND),
             builtins: CapabilityState::new(data_dir, BUILTIN_SKILL_KIND),
             usage: SkillUsageStore::new(data_dir),
+            pins: SkillPinStore::new(data_dir),
         }
     }
 
@@ -1023,6 +1030,9 @@ impl UserSkillRegistry {
                 .filter(|value| !value.is_empty());
             let updated_at = file_timestamp(&path);
             let usage = self.usage.get(level, &id, owner_project_path.as_deref());
+            let pinned = self
+                .pins
+                .is_pinned(level, &id, owner_project_path.as_deref());
             records.push(UserSkillRecord {
                 id,
                 name,
@@ -1038,6 +1048,7 @@ impl UserSkillRegistry {
                 updated_at,
                 last_used_at: usage.map(|usage| usage.last_used_at),
                 use_count: usage.map(|usage| usage.use_count).unwrap_or(0),
+                pinned,
             });
         }
         let ids: HashSet<String> = records.iter().map(|record| record.id.clone()).collect();
@@ -1045,6 +1056,8 @@ impl UserSkillRegistry {
         // Same sweep for the counters: a document that no longer exists must not
         // hand its "used twice" badge to whatever is created next under that name.
         self.usage
+            .retain(level, owner_project_path.as_deref(), &ids)?;
+        self.pins
             .retain(level, owner_project_path.as_deref(), &ids)?;
         records.sort_by(|a, b| {
             a.name
@@ -1653,6 +1666,39 @@ impl UserSkillRegistry {
         Ok(Some((record, usage)))
     }
 
+    /// Pin or unpin one skill, so the maintenance pass leaves it alone.
+    ///
+    /// A pin is stored apart from activation: it says "keep this ready for me",
+    /// not "this one is off", and the two must not overwrite each other.
+    pub fn set_pinned(
+        &mut self,
+        id: &str,
+        pinned: bool,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+    ) -> Result<Option<UserSkillRecord>> {
+        let Some(record) = self.find(id, level, project_path)? else {
+            return Ok(None);
+        };
+        let record_level = record
+            .level
+            .as_deref()
+            .map(|value| CapabilityLevel::parse(Some(value)))
+            .transpose()?
+            .unwrap_or(CapabilityLevel::Global);
+        self.pins.set(
+            record_level,
+            &record.id,
+            record.project_path.as_deref().or(project_path),
+            pinned,
+        )?;
+        self.find(
+            &record.id,
+            Some(record_level),
+            record.project_path.as_deref(),
+        )
+    }
+
     /// Decide which skills stopped earning their place, and — when asked to act —
     /// switch the archivable ones off.
     ///
@@ -1722,6 +1768,7 @@ mod package_sync;
 /// rust file-size limit, and these tests share one fixture.
 #[cfg(test)]
 mod package_tests;
+pub mod pins;
 pub mod tidy;
 mod usage;
 

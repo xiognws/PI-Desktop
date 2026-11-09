@@ -526,3 +526,16 @@ test("a skill row says whether the model ever loaded it, and the group says how 
   assert.match(layout, /note\?: string/);
   assert.match(styles, /\.agent-capability-group-note\b/);
 });
+
+test("a skill can be pinned against the maintenance pass", () => {
+  // The pin is the escape hatch from curation, so it has to reach the host and
+  // be visible on the row without hovering: a protected skill that looks
+  // unprotected invites somebody to archive it.
+  assert.match(skills, /api\.setUserSkillPinned\(/);
+  assert.match(skills, /settings\.skillPinned/);
+  assert.match(skills, /aria-pressed=\{skill\.pinned === true\}/);
+  assert.match(skills, /const togglePin = async \(skill: UserSkillRecord/);
+  // Archiving must not take a pinned row with it; the host decides from the same
+  // report this page reads.
+  assert.match(skills, /skillIdleBadge\(curationRows\.get\(skill\.id\)\)/);
+});

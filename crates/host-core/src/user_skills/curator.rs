@@ -85,6 +85,9 @@ pub struct CurationEntry {
     pub last_activity_at: i64,
     pub idle_days: i64,
     pub state: CurationState,
+    /// Pinned skills are always `keep`; the flag is reported so a reader can see
+    /// why a skill with no load history is not on the list.
+    pub pinned: bool,
 }
 
 /// Classify a skill. Pure, so the thresholds are testable without a filesystem.
@@ -160,12 +163,18 @@ pub fn plan(
             .and_then(|value| CapabilityLevel::parse(Some(value)).ok())
             .unwrap_or(CapabilityLevel::Global);
         let usage_entry = usage.get(level, &record.id, record.project_path.as_deref());
-        let (idle_days, state) = classify(
+        let (idle_days, classified) = classify(
             usage_entry.map(|entry| (entry.use_count, Some(entry.last_used_at))),
             document_timestamp_ms(record),
             now,
             policy,
         );
+        // A pin is the user's answer to the rule: report the skill, never act on it.
+        let state = if record.pinned {
+            CurationState::Keep
+        } else {
+            classified
+        };
         report.entries.push(CurationEntry {
             id: record.id.clone(),
             name: record.name.clone(),
@@ -177,6 +186,7 @@ pub fn plan(
                 .unwrap_or_else(|| document_timestamp_ms(record)),
             idle_days,
             state,
+            pinned: record.pinned,
         });
     }
     // Most idle first: the report is read top-down when somebody decides.

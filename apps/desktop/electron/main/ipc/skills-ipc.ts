@@ -191,6 +191,36 @@ export function registerSkillsIpc({
     },
   );
 
+  /**
+   * Pin or unpin one skill. A pin is what protects a skill from the maintenance
+   * pass, so it reloads the list the same way a delete does.
+   */
+  handle(
+    IPC.invoke.skillSetPinned,
+    async (payload: {
+      id?: unknown;
+      pinned?: unknown;
+      level?: unknown;
+      projectPath?: unknown;
+    } = {}) => {
+      if (!host) throw new Error("host unavailable");
+      if (typeof payload.id !== "string" || !payload.id) {
+        throw new Error("invalid skill pin request");
+      }
+      const result = await host.call<{ skill: UserSkillRecord | null }>(
+        "skills.setPinned",
+        {
+          id: payload.id,
+          pinned: payload.pinned === true,
+          ...(typeof payload.level === "string" ? { level: payload.level } : {}),
+          ...(typeof payload.projectPath === "string" ? { projectPath: payload.projectPath } : {}),
+        },
+      );
+      if (result?.skill) sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return result;
+    },
+  );
+
   handle(IPC.invoke.skillBuiltinList, async () => {
     if (!host) throw new Error("host unavailable");
     const disabled = await disabledBuiltinSkills();

@@ -140,3 +140,75 @@ fn the_report_lists_the_most_idle_document_first() {
         assert!(ancient_at < recent_at, "the worst offender reads first");
     });
 }
+
+#[test]
+fn a_pin_keeps_an_idle_document_out_of_the_list() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let created = registry.create(input("Pinned", "global", None)).unwrap();
+        backdate(Path::new(&created.path), 400);
+
+        // Without a pin it is the worst offender in the library.
+        let before = registry
+            .curate(None, CuratorPolicy::default(), true)
+            .unwrap();
+        assert_eq!(
+            before
+                .entries
+                .iter()
+                .find(|entry| entry.id == created.id)
+                .unwrap()
+                .state,
+            crate::user_skills::curator::CurationState::Archive
+        );
+
+        let pinned = registry
+            .set_pinned(&created.id, true, None, None)
+            .unwrap()
+            .expect("the skill exists");
+        assert!(pinned.pinned);
+
+        let after = registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        let entry = after
+            .entries
+            .iter()
+            .find(|entry| entry.id == created.id)
+            .unwrap();
+        assert_eq!(
+            entry.state,
+            crate::user_skills::curator::CurationState::Keep
+        );
+        assert!(entry.pinned, "the report says why it was left alone");
+        assert!(after.archived.is_empty());
+        assert!(
+            row(&mut registry, &created.id).enabled,
+            "nothing was switched off"
+        );
+    });
+}
+
+#[test]
+fn unpinning_returns_a_skill_to_the_pass() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let created = registry.create(input("Unpinned", "global", None)).unwrap();
+        backdate(Path::new(&created.path), 400);
+        registry.set_pinned(&created.id, true, None, None).unwrap();
+        let unpinned = registry
+            .set_pinned(&created.id, false, None, None)
+            .unwrap()
+            .unwrap();
+        assert!(!unpinned.pinned);
+
+        let report = registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        assert_eq!(report.archived, vec![created.id.clone()]);
+    });
+}

@@ -5735,6 +5735,29 @@ async fn handle_request(
                 None => Ok(json!({ "recorded": false })),
             }
         }
+        "skills.setPinned" => {
+            let id = require_id(&params)?;
+            let pinned = params
+                .get("pinned")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let level = params
+                .get("level")
+                .and_then(Value::as_str)
+                .map(|value| CapabilityLevel::parse(Some(value)))
+                .transpose()
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            match st
+                .user_skills
+                .set_pinned(&id, pinned, level, project_path)
+                .map_err(skill_err)?
+            {
+                Some(skill) => Ok(json!({ "skill": skill })),
+                None => Ok(json!({ "skill": null })),
+            }
+        }
         "skills.curate" => {
             // Maintenance, not deletion: a dry run reports what it would retire,
             // and the acting call only flips the same activation flag the row's
@@ -6370,6 +6393,70 @@ mod tests {
             .unwrap()
             .contains("pnpm and never runs npm install"));
         assert!(memory_hit["score"].as_f64().unwrap() > 0.0);
+    }
+
+    #[tokio::test]
+    async fn skill_pin_rpc_round_trips_and_shows_on_the_list() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project_dir = tempfile::tempdir().unwrap();
+        let project = project_dir.path().to_string_lossy().to_string();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        let query = json!({ "level": "project", "projectPath": project });
+        let created = handle_request(
+            state.clone(),
+            "skills.create",
+            json!({ "skill": {
+                "name": "Pin probe",
+                "description": "d",
+                "body": "# Probe
+",
+                "level": "project",
+                "projectPath": project,
+            } }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let id = created["skill"]["id"].as_str().unwrap().to_string();
+        assert_eq!(created["skill"]["pinned"], json!(false));
+
+        let pinned = handle_request(
+            state.clone(),
+            "skills.setPinned",
+            json!({ "id": id, "pinned": true, "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(pinned["skill"]["pinned"], json!(true));
+
+        // The list is the reader the UI uses.
+        let listed = handle_request(state.clone(), "skills.list", query, tx.clone())
+            .await
+            .unwrap();
+        let row = listed["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == json!(id))
+            .unwrap();
+        assert_eq!(row["pinned"], json!(true));
+
+        // An unknown id is a miss, not an error: the page may be looking at a row
+        // that was deleted in another window.
+        let missing = handle_request(
+            state,
+            "skills.setPinned",
+            json!({ "id": "no-such-skill", "pinned": true }),
+            tx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(missing["skill"], json!(null));
     }
 
     #[tokio::test]

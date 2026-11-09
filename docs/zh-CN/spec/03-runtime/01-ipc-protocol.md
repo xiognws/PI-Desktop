@@ -1292,7 +1292,11 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
   因此项目级文档记在它自己的项目上；本库不拥有的 id（内置技能、插件文档）返回
   `{ recorded: false }`，属正常未命中而非错误。计数落在
   `<data>/agent-capabilities/skill-usage.json`，每次扫描同步清理，避免被删除的文档
-  把计数留给同名后继；并通过 `UserSkillRecord` 的 `useCount` / `lastUsedAt` 暴露。
+  把计数留给同名后继；并通过 `UserSkillRecord` 的 `useCount` / `lastUsedAt` / `pinned` 暴露。
+- `skills.setPinned({ id, pinned, level?, projectPath? })` → `{ skill }` —— 固定或取消固定
+  一个技能。固定状态与激活状态分开存储（它表示"给我留着"，不是"这个关掉了"），并且是
+  维护流程唯一的豁免：被固定的技能无论多闲置都归为 `keep`，报告里会带 `pinned` 说明原因。
+  未知 id 返回 `skill: null` —— 页面可能正在操作另一个窗口已删掉的行。
 - `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
   → `{ report }` —— 技能库维护（ADR 0387）。`report.entries` 按闲置天数把每个技能
   分类为 `keep` / `stale` / `archive`（从上次加载算起；从未加载过则算文档自身时间戳），

@@ -1555,6 +1555,17 @@ export const api = {
    * Report the idle skills, or archive them when `dryRun` is explicitly false.
    * The host treats a missing `dryRun` as true, so the page asks first.
    */
+  /** Pin or unpin one skill: the user's "keep this one" against curation. */
+  setUserSkillPinned: (
+    id: string,
+    pinned: boolean,
+    query?: AgentCapabilityQuery,
+  ) =>
+    invoke<{ skill: UserSkillRecord | null }>(IPC.invoke.skillSetPinned, {
+      id,
+      pinned,
+      ...(query ?? {}),
+    }),
   curateUserSkills: (request?: {
     projectPath?: string;
     dryRun?: boolean;

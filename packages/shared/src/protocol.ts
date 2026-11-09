@@ -460,6 +460,7 @@ export const IPC = {
     skillRemove: "pi-desktop/skill/remove",
     skillSetEnabled: "pi-desktop/skill/setEnabled",
     skillCurate: "pi-desktop/skill/curate",
+    skillSetPinned: "pi-desktop/skill/setPinned",
     skillSetScope: "pi-desktop/skill/setScope",
     skillTransfer: "pi-desktop/skill/transfer",
     skillRead: "pi-desktop/skill/read",

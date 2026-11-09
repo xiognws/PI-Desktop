@@ -1689,7 +1689,13 @@ one-liner.
   not an error. Counters live in `<data>/agent-capabilities/skill-usage.json`,
   are swept on every scan so a deleted document cannot hand its count to a
   same-named successor, and surface on `UserSkillRecord` as
-  `useCount` / `lastUsedAt`.
+  `useCount` / `lastUsedAt` / `pinned`.
+- `skills.setPinned({ id, pinned, level?, projectPath? })` → `{ skill }` — pin or
+  unpin one skill. A pin is stored apart from activation (it says "keep this
+  ready", not "this is off") and is the maintenance pass's only exemption: a
+  pinned skill is classified `keep` however idle it is, and the report says so.
+  `skill: null` for an unknown id — the page may be acting on a row another
+  window already deleted.
 - `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
   → `{ report }` — maintenance over the user library (ADR 0387). `report.entries`
   classifies every skill `keep` / `stale` / `archive` by idle days, counted from

@@ -43,6 +43,7 @@ import {
   IconFileText,
   IconFolderOpen,
   IconPencil,
+  IconPin,
   IconPlus,
   IconRefresh,
   IconTrash,
@@ -216,6 +217,27 @@ export function AgentSkillsPage() {
    * The switch flips locally first and only reverts if the host refuses, so one
    * row's request never blanks the list or freezes the others.
    */
+  /**
+   * Pin or unpin one skill. A pin is what keeps the maintenance pass away from a
+   * skill the user wants left alone, so it writes through the host like every
+   * other row action and the list decides the rest.
+   */
+  const togglePin = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
+    const key = rowKey(level, skill.id);
+    rowBusy.begin(key);
+    patchRow(level, skill.id, { pinned: !(skill.pinned === true) });
+    try {
+      await api.setUserSkillPinned(skill.id, !(skill.pinned === true), levelQuery(level));
+      await load();
+      await refreshCuration();
+    } catch (error) {
+      patchRow(level, skill.id, { pinned: skill.pinned === true });
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      rowBusy.end(key);
+    }
+  };
+
   const toggle = async (skill: UserSkillRecord, level: AgentCapabilityLevel) => {
     const key = rowKey(level, skill.id);
     if (!rowBusy.begin(key)) return;
@@ -646,12 +668,26 @@ export function AgentSkillsPage() {
             {skill.source === "imported" ? (
               <span className="agent-capability-badge">{t("settings.imported")}</span>
             ) : null}
+            {skill.pinned ? (
+              <span className="agent-capability-badge">{t("settings.skillPinned")}</span>
+            ) : null}
             {usageBadge(skill)}
           </>
         }
         description={skill.description || t("settings.noCapabilityDescription")}
         actions={
           <>
+            <TooltipButton
+              type="button"
+              className="settings-icon-button"
+              ariaLabel={skill.pinned ? t("settings.skillUnpin") : t("settings.skillPin")}
+              tooltip={skill.pinned ? t("settings.skillUnpin") : t("settings.skillPin")}
+              aria-pressed={skill.pinned === true}
+              disabled={busy}
+              onClick={() => void togglePin(skill, level)}
+            >
+              <IconPin size={15} />
+            </TooltipButton>
             <TooltipButton
               type="button"
               className="settings-icon-button"

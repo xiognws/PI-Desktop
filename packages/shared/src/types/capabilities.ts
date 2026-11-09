@@ -153,6 +153,8 @@ export type UserSkillRecord = {
   lastUsedAt?: number;
   /** Number of loads. `skills.recordUse` is the only writer. */
   useCount?: number;
+  /** Exempt from the maintenance pass; the user's own "keep this" (ADR 0387). */
+  pinned?: boolean;
 };
 
 /** How idle one skill is, as the maintenance pass sees it. */
