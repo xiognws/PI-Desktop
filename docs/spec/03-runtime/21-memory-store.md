@@ -153,7 +153,7 @@ turns a 0.1 ms "recent 20" query into 130 ms.
 | Method | Params | Returns |
 |---|---|---|
 | `memory.remember` | `scope`, `kind`, `title`, `body`, `projectPath?`, `sessionId?`, `tags?`, `source?`, `confidence?`, `pinned?` | `{ memory, deduped }` |
-| `memory.recall` | `query`, `scope?`, `projectPath?`, `sessionId?`, `limit?` (≤ 50) | `{ memories: [{ memory, score }] }` |
+| `memory.recall` | `query`, `scope?`, `projectPath?`, `sessionId?`, `limit?` (≤ 50), `entriesLimit?` (≤ 20) | `{ memories: [{ memory, score }], entries: [{ target, index, text, score }] }` — see §9.3 |
 | `memory.list` | `scope?`, `kind?`, `pinned?`, `projectPath?`, `sessionId?`, `includeSuperseded?`, `limit?`, `offset?` | `{ memories, total }` |
 | `memory.update` | `id` + any of `title`, `body`, `tags`, `confidence`, `pinned` | `{ memory }` |
 | `memory.forget` | `id` **or** `sessionId` | `{ removed }` |
@@ -268,8 +268,16 @@ lists instead of the scored store above:
 - **Risk class**: `low`; Agent mode only (Plan and Goal turns declare a
   denial-only tool set before any host action).
 
-**Known gap**: recall (§9.1) still queries the scored store above, which nothing
-writes any more, so a note written by the tool reaches the next session through
-the snapshot but **not** through recall. Pointing recall at the entry lists — or
-retiring the scored store — is a separate change with its own compatibility
-question (project-scoped memory, ADR 0234).
+**Recall reads both stores** (amended): `memory.recall` searches the entry lists
+as well and returns its hits under `entries` — `{ target, index, text, score }`,
+ranked by how many of the query's terms the entry contains, then by entry length.
+Terms use the index's own normalisation (§5), so a two-character CJK query is two
+terms and matches inside a sentence. The scored table above still answers under
+`memories` for databases that hold rows from an older build; nothing writes it,
+and retiring it is a separate change with its own compatibility question
+(project-scoped memory, ADR 0234).
+
+**Remaining gap**: the desktop host does not implement the runtime's optional
+`memoryRecall` member (§9.1), so the per-turn `<memory_context>` block is still
+inert in a normal session. The host-side query is ready; wiring the member is the
+next step, and it is the only reason that block has never appeared.

@@ -167,18 +167,36 @@ async fn remember(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, J
 async fn recall(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
     let query = required_str(&params, "query")?.to_string();
     let limit = optional_usize(&params, "limit")?;
+    let entry_limit = optional_usize(&params, "entriesLimit")?
+        .unwrap_or(5)
+        .min(20);
     let st = state.lock().await;
     let hits = st
         .db
         .recall(RecallQuery {
-            query,
+            query: query.clone(),
             scope: scope_param(&params)?,
             project_path: optional_str(&params, "projectPath")?,
             session_id: optional_str(&params, "sessionId")?,
             limit,
         })
         .map_err(internal)?;
-    Ok(json!({ "memories": hits }))
+    // The entry lists are what the agent actually writes (ADR 0378); recall used
+    // to search only the scored table, which nothing writes, so a note the agent
+    // kept was reachable through the prompt snapshot and invisible to a query.
+    // Both lists are searched here, best effort: a failure to read them costs the
+    // extra hits, never the call.
+    let memory_entries = st
+        .db
+        .memory_entries(crate::memory_entries::MemoryTarget::Memory)
+        .unwrap_or_default();
+    let user_entries = st
+        .db
+        .memory_entries(crate::memory_entries::MemoryTarget::User)
+        .unwrap_or_default();
+    let entries =
+        crate::memory_entries::search_entries(&memory_entries, &user_entries, &query, entry_limit);
+    Ok(json!({ "memories": hits, "entries": entries }))
 }
 
 fn memory_target(params: &Value) -> Result<crate::memory_entries::MemoryTarget, JsonRpcError> {

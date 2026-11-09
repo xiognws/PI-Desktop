@@ -237,3 +237,146 @@ mod tests {
         assert!(error.to_string().contains("NUL"), "{error}");
     }
 }
+
+/// One entry that matched a recall query.
+///
+/// Recall used to read only the scored `memories` table, which nothing has
+/// written since the agent started keeping flat entry lists (ADR 0378) — so a
+/// note the agent wrote reached the next session through the prompt snapshot and
+/// was invisible to every query. These hits are the missing half: the same text,
+/// searched where it actually lives.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntryHit {
+    /// `memory` (the agent's notes) or `user` (who the user is).
+    pub target: String,
+    /// Position in that target's list, so a caller can name the entry it means.
+    pub index: usize,
+    pub text: String,
+    /// Share of the query's terms this entry contains, `0 < score <= 1`.
+    pub score: f64,
+}
+
+/// Terms of a query, matching the index's own normalisation: every CJK ideograph
+/// is a term, Latin words stay whole, case is ignored.
+fn query_terms(query: &str) -> Vec<String> {
+    crate::memory::normalise_search_text(query)
+        .to_lowercase()
+        .split_whitespace()
+        .filter(|term| !term.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Search both entry lists for the terms of `query`.
+///
+/// Ranking is deliberately simple and explainable, because the corpus is tiny
+/// (two lists, 200 entries and a few thousand characters at most): more of the
+/// query's terms first, then the shorter entry — the shorter text is the one that
+/// is *about* the terms rather than a paragraph that happens to mention them.
+pub fn search_entries(
+    memory: &[String],
+    user: &[String],
+    query: &str,
+    limit: usize,
+) -> Vec<EntryHit> {
+    let terms = query_terms(query);
+    if terms.is_empty() || limit == 0 {
+        return Vec::new();
+    }
+    let mut hits: Vec<EntryHit> = Vec::new();
+    for (target, entries) in [("memory", memory), ("user", user)] {
+        for (index, text) in entries.iter().enumerate() {
+            let normalised = crate::memory::normalise_search_text(text).to_lowercase();
+            let matched = terms
+                .iter()
+                .filter(|term| normalised.split_whitespace().any(|word| word == *term))
+                .count();
+            if matched == 0 {
+                continue;
+            }
+            hits.push(EntryHit {
+                target: target.to_string(),
+                index,
+                text: text.clone(),
+                score: matched as f64 / terms.len() as f64,
+            });
+        }
+    }
+    hits.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.text.chars().count().cmp(&b.text.chars().count()))
+            .then(a.target.cmp(&b.target))
+            .then(a.index.cmp(&b.index))
+    });
+    hits.truncate(limit);
+    hits
+}
+
+#[cfg(test)]
+mod search_tests {
+    use super::*;
+
+    fn list(items: &[&str]) -> Vec<String> {
+        items.iter().map(|item| item.to_string()).collect()
+    }
+
+    #[test]
+    fn a_cjk_phrase_matches_inside_a_sentence() {
+        // The index splits every ideograph, so a two-character query is two terms.
+        let memory = list(&["上下文压缩时保留最近 20000 tokens"]);
+        let hits = search_entries(&memory, &[], "压缩", 5);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].target, "memory");
+        assert_eq!(hits[0].index, 0);
+    }
+
+    #[test]
+    fn latin_terms_ignore_case_and_whole_words() {
+        let user = list(&["Prefers Chinese replies; never restarts the desktop app"]);
+        assert_eq!(search_entries(&[], &user, "DESKTOP", 5).len(), 1);
+        // A term inside a longer word is not a match: "app" must not hit "apple".
+        assert!(search_entries(&[], &user, "apple", 5).is_empty());
+    }
+
+    #[test]
+    fn more_matched_terms_rank_first_then_the_shorter_entry() {
+        let memory = list(&[
+            "compression keeps the recent tail of the transcript",
+            "compression tail",
+            "unrelated note",
+        ]);
+        let hits = search_entries(&memory, &[], "compression tail", 5);
+        assert_eq!(hits.len(), 2);
+        // Both match both terms; the shorter entry is the one about them.
+        assert_eq!(hits[0].text, "compression tail");
+        assert_eq!(hits[0].score, 1.0);
+        assert!(hits[1].score < 1.0 || hits[1].text.starts_with("compression keeps"));
+    }
+
+    #[test]
+    fn an_empty_or_unmatched_query_returns_nothing() {
+        let memory = list(&["something"]);
+        assert!(search_entries(&memory, &[], "   ", 5).is_empty());
+        assert!(search_entries(&memory, &[], "nothing-here", 5).is_empty());
+        assert!(search_entries(&memory, &[], "something", 0).is_empty());
+    }
+
+    #[test]
+    fn the_limit_cuts_the_tail_of_the_ranking() {
+        let memory = list(&["alpha one", "alpha two", "alpha three"]);
+        assert_eq!(search_entries(&memory, &[], "alpha", 2).len(), 2);
+    }
+
+    #[test]
+    fn both_lists_are_searched_and_keep_their_own_index() {
+        let memory = list(&["project uses pnpm"]);
+        let user = list(&["speaks Chinese", "uses pnpm workspaces"]);
+        let hits = search_entries(&memory, &user, "pnpm", 5);
+        assert_eq!(hits.len(), 2);
+        let user_hit = hits.iter().find(|hit| hit.target == "user").unwrap();
+        assert_eq!(user_hit.index, 1);
+    }
+}

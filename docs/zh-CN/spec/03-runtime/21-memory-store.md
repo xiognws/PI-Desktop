@@ -138,7 +138,7 @@ SELECT m.*, bm25(memories_fts) AS score
 | 方法 | 参数 | 返回 |
 |---|---|---|
 | `memory.remember` | `scope`、`kind`、`title`、`body`、`projectPath?`、`sessionId?`、`tags?`、`source?`、`confidence?`、`pinned?` | `{ memory, deduped }` |
-| `memory.recall` | `query`、`scope?`、`projectPath?`、`sessionId?`、`limit?`（≤ 50） | `{ memories: [{ memory, score }] }` |
+| `memory.recall` | `query`、`scope?`、`projectPath?`、`sessionId?`、`limit?`（≤ 50）、`entriesLimit?`（≤ 20） | `{ memories: [{ memory, score }], entries: [{ target, index, text, score }] }` —— 见 §9.3 |
 | `memory.list` | `scope?`、`kind?`、`pinned?`、`projectPath?`、`sessionId?`、`includeSuperseded?`、`limit?`、`offset?` | `{ memories, total }` |
 | `memory.update` | `id` 加上 `title`、`body`、`tags`、`confidence`、`pinned` 中的任意项 | `{ memory }` |
 | `memory.forget` | `id` **或** `sessionId` | `{ removed }` |
@@ -238,7 +238,12 @@ FTS 表，用的就是全新 schema 的同一份 DDL，因此全新库与升级�
 - **风险等级**：`low`；仅 Agent 模式（Plan 与 Goal 轮在任何宿主动作前就声明了
   只含拒绝的工具集）。
 
-**已知缺口**：召回（§9.1）仍在查询上面的计分存储，而它已经没有任何写入方，
-因此工具写下的一条笔记会通过快照进入下一次会话，却**无法**通过召回进入。
-把召回指向条目列表 —— 或者让计分存储退役 —— 是另一项改动，有它自己的兼容性
-问题（项目级记忆，ADR 0234）。
+**召回同时读两个存储**（已修订）：`memory.recall` 现在也检索条目列表，命中放在
+`entries` 键下 —— `{ target, index, text, score }`，先按命中的查询词数量排序，再按
+条目长度；分词沿用索引自身的归一化（§5），所以两个汉字的查询就是两个词，能命中
+句子中间。上面的计分表仍以 `memories` 回答旧版本数据库里的行；它已无写入方，
+让它退役是另一项改动（项目级记忆，ADR 0234）。
+
+**剩余缺口**：桌面宿主没有实现运行时那个可选的 `memoryRecall` 成员（§9.1），
+所以正常会话里每回合的 `<memory_context>` 仍是空转。宿主的查询侧已就绪，
+把该成员接上就是下一步——这也是它至今从未出现过的唯一原因。

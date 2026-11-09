@@ -6253,6 +6253,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn memory_recall_rpc_finds_what_the_agent_wrote() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        handle_request(
+            state.clone(),
+            "memory.writeEntries",
+            json!({ "target": "memory", "entries": [
+                "This project builds with pnpm and never runs npm install.",
+                "Unrelated note about the weather.",
+            ] }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        handle_request(
+            state.clone(),
+            "memory.writeEntries",
+            json!({ "target": "user", "entries": ["Prefers pnpm workspaces."] }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+
+        let recalled = handle_request(state, "memory.recall", json!({ "query": "pnpm" }), tx)
+            .await
+            .unwrap();
+        // The scored table still answers under its own key (nothing writes it any
+        // more, but a database upgraded from an older build may still hold rows).
+        assert!(recalled["memories"].is_array());
+        let entries = recalled["entries"].as_array().unwrap();
+        assert_eq!(entries.len(), 2, "both lists are searched");
+        let memory_hit = entries
+            .iter()
+            .find(|hit| hit["target"] == json!("memory"))
+            .expect("the agent's own note is found");
+        assert_eq!(memory_hit["index"], json!(0));
+        assert!(memory_hit["text"]
+            .as_str()
+            .unwrap()
+            .contains("pnpm and never runs npm install"));
+        assert!(memory_hit["score"].as_f64().unwrap() > 0.0);
+    }
+
+    #[tokio::test]
     async fn skill_curate_rpc_defaults_to_reporting_only() {
         let data_dir = tempfile::tempdir().unwrap();
         let project_dir = tempfile::tempdir().unwrap();
