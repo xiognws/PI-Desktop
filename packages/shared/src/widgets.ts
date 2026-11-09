@@ -1,8 +1,8 @@
 /**
- * Capability packages (D691).
+ * Widget packages (D691).
  *
- * A capability package is a directory under `<userData>/capabilities/<id>/`
- * holding a `capability.json` manifest and one entry module. Unlike a plugin or
+ * A widget package is a directory under `<userData>/widgets/<id>/`
+ * holding a `widget.json` manifest and one entry module. Unlike a plugin or
  * a trusted extension, a package is not compiled into the application image and
  * is not declared by some other package: the user drops a folder in, the host
  * scans it at start-up, and the agent sidecar loads it.
@@ -18,12 +18,12 @@
 /**
  * What a package is allowed to touch. Declared in the manifest and narrowed by
  * the host: a package that asks for nothing gets nothing, and `host` is never
- * granted without the user saying so in the capability page.
+ * granted without the user saying so in the widget page.
  */
-export type CapabilityPermission = "read" | "write" | "net" | "agent" | "host";
+export type WidgetPermission = "read" | "write" | "net" | "agent" | "host";
 
 /** Every permission this build understands, in escalating order. */
-export const CAPABILITY_PERMISSIONS: readonly CapabilityPermission[] = [
+export const WIDGET_PERMISSIONS: readonly WidgetPermission[] = [
   "read",
   "write",
   "net",
@@ -32,11 +32,11 @@ export const CAPABILITY_PERMISSIONS: readonly CapabilityPermission[] = [
 ];
 
 /** Permissions that grant nothing outside the package's own directory. */
-export const CAPABILITY_SANDBOX_PERMISSIONS: readonly CapabilityPermission[] = ["read", "write"];
+export const WIDGET_SANDBOX_PERMISSIONS: readonly WidgetPermission[] = ["read", "write"];
 
 /** Which process a package may reach through the `host` permission. */
-export type CapabilityAction = {
-  /** Method name the caller passes to `capability.invoke`. */
+export type WidgetAction = {
+  /** Method name the caller passes to `widget.invoke`. */
   name: string;
   description: string;
   /** Argument names, for the UI and for the agent tool schema. */
@@ -50,28 +50,28 @@ export type CapabilityAction = {
  * still loads, but with its permissions cut to the sandbox floor until the user
  * acknowledges the new digest.
  */
-export type CapabilityTrust = "untrusted" | "trusted" | "modified";
+export type WidgetTrust = "untrusted" | "trusted" | "modified";
 
 /** One package as the host reports it to the renderer. */
-export type CapabilitySummary = {
+export type WidgetSummary = {
   /** Manifest id; falls back to the directory name when the manifest is broken. */
   id: string;
   name: string;
   version: string;
   description: string;
   author?: string;
-  /** Directory name under `capabilities/` the package was read from. */
+  /** Directory name under `widgets/` the package was read from. */
   dirName: string;
   /** Absolute package directory, shown so the user can find and edit it. */
   path: string;
   /** Permissions the manifest asks for. */
-  requestedPermissions: CapabilityPermission[];
+  requestedPermissions: WidgetPermission[];
   /** Permissions actually in force after trust and duplicates were applied. */
-  grantedPermissions: CapabilityPermission[];
-  actions: CapabilityAction[];
+  grantedPermissions: WidgetPermission[];
+  actions: WidgetAction[];
   /** Enabled set, owned by the user; a disabled package is never loaded. */
   enabled: boolean;
-  trust: CapabilityTrust;
+  trust: WidgetTrust;
   /** SHA-256 of the package directory contents, hex. */
   digest: string;
   /** Why the manifest could not be read, when it could not. The row still renders. */
@@ -79,7 +79,7 @@ export type CapabilitySummary = {
 };
 
 /** Live state of a loaded package inside the agent sidecar. */
-export type CapabilityRuntimeState = {
+export type WidgetRuntimeState = {
   id: string;
   /** `loaded` means the entry module evaluated and registered its actions. */
   state: "loaded" | "error" | "skipped";
@@ -88,8 +88,8 @@ export type CapabilityRuntimeState = {
   error?: string;
 };
 
-/** One entry in a `capability.invoke` reply. */
-export type CapabilityInvokeResult = {
+/** One entry in a `widget.invoke` reply. */
+export type WidgetInvokeResult = {
   id: string;
   action: string;
   /** Whatever the action returned, JSON-serialised. */
@@ -99,47 +99,47 @@ export type CapabilityInvokeResult = {
 };
 
 /** Manifest schema this build understands. */
-export const CAPABILITY_SCHEMA_VERSION = 1;
+export const WIDGET_SCHEMA_VERSION = 1;
 /** Runtime API a package entry is compiled against. */
-export const CAPABILITY_API_VERSION = 1;
+export const WIDGET_API_VERSION = 1;
 /** Manifest file name inside each package directory. */
-export const CAPABILITY_MANIFEST_FILE = "capability.json";
-/** Longest `capability.invoke` the sidecar will wait before failing the call. */
-export const CAPABILITY_INVOKE_TIMEOUT_MS = 30_000;
+export const WIDGET_MANIFEST_FILE = "widget.json";
+/** Longest `widget.invoke` the sidecar will wait before failing the call. */
+export const WIDGET_INVOKE_TIMEOUT_MS = 30_000;
 /** Most packages the host will load from one data directory. */
-export const MAX_CAPABILITY_PACKAGES = 64;
+export const MAX_WIDGET_PACKAGES = 64;
 
 /**
  * Narrow a raw permission list to the ones this build implements, preserving
  * the manifest's order and dropping duplicates.
  */
-export function normalizeCapabilityPermissions(
+export function normalizeWidgetPermissions(
   raw: readonly string[] | undefined,
-): CapabilityPermission[] {
-  const seen = new Set<CapabilityPermission>();
+): WidgetPermission[] {
+  const seen = new Set<WidgetPermission>();
   for (const entry of raw ?? []) {
     if (typeof entry !== "string") continue;
     const value = entry.trim().toLowerCase();
-    if ((CAPABILITY_PERMISSIONS as readonly string[]).includes(value)) {
-      seen.add(value as CapabilityPermission);
+    if ((WIDGET_PERMISSIONS as readonly string[]).includes(value)) {
+      seen.add(value as WidgetPermission);
     }
   }
-  return CAPABILITY_PERMISSIONS.filter((permission) => seen.has(permission));
+  return WIDGET_PERMISSIONS.filter((permission) => seen.has(permission));
 }
 
 /** The permissions a package keeps when the user has not trusted its digest. */
-export function sandboxCapabilityPermissions(
-  requested: readonly CapabilityPermission[],
-): CapabilityPermission[] {
+export function sandboxWidgetPermissions(
+  requested: readonly WidgetPermission[],
+): WidgetPermission[] {
   return requested.filter((permission) =>
-    (CAPABILITY_SANDBOX_PERMISSIONS as readonly string[]).includes(permission),
+    (WIDGET_SANDBOX_PERMISSIONS as readonly string[]).includes(permission),
   );
 }
 
 /** True when `permission` is in force for `summary`. */
-export function hasCapabilityPermission(
-  summary: Pick<CapabilitySummary, "grantedPermissions" | "enabled" | "trust">,
-  permission: CapabilityPermission,
+export function hasWidgetPermission(
+  summary: Pick<WidgetSummary, "grantedPermissions" | "enabled" | "trust">,
+  permission: WidgetPermission,
 ): boolean {
   if (!summary.enabled || summary.trust === "modified") return false;
   return summary.grantedPermissions.includes(permission);

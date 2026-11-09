@@ -7,7 +7,7 @@ import { parseMcpServerIds, parseMcpToolNames } from "./mcp-tool-selection.js";
 import { randomUUID } from "node:crypto";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
-import { CapabilityRegistry } from "./capabilities/index.js";
+import { WidgetRegistry } from "./widgets/index.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
 import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
@@ -40,7 +40,7 @@ import {
 } from "@pi-workspace/shared";
 import type {
   AgentEventEnvelope,
-  CapabilitySummary,
+  WidgetSummary,
   AskToolResolution,
   SubagentDefinition,
   ContextCompactionRecord,
@@ -73,7 +73,7 @@ const runtimes: RuntimeMap = new Map();
 const hostProxy = new ParentHostProxy();
 
 /**
- * Capability packages (D691). Deliberately process-scoped rather than
+ * Widget packages (D691). Deliberately process-scoped rather than
  * session-scoped: a package is code the user installed, and loading it twice
  * because two windows opened would double every side effect it has.
  *
@@ -81,7 +81,7 @@ const hostProxy = new ParentHostProxy();
  * main still sees one host-core client and the `permissions.request` filter
  * still applies.
  */
-const capabilityRegistry = new CapabilityRegistry({
+const widgetRegistry = new WidgetRegistry({
   call: (method, params) => hostProxy.call(method, params ?? {}),
 });
 const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
@@ -331,7 +331,7 @@ async function runtimeFor(
   const runtime = new DesktopAgentRuntime({
     // The registry outlives the runtime, so hand it a resolver: a session built
     // before the packages finished loading still sees them once they are there.
-    capabilityTools: () => [capabilityRegistry.agentTool()],
+    widgetTools: () => [widgetRegistry.agentTool()],
     host: hostProxy,
     sessionId,
     mode,
@@ -640,31 +640,31 @@ async function handle(method: string, params: any): Promise<unknown> {
         String(params.args ?? ""),
       );
     }
-    // Capability packages (D691). The host discovers and trusts; this process
+    // Widget packages (D691). The host discovers and trusts; this process
     // only loads and runs. Main forwards the host's summary list, so the sidecar
     // never decides on its own that a package may run.
-    case "capability.sync": {
+    case "widget.sync": {
       const summaries = Array.isArray(params?.packages)
-        ? (params.packages as CapabilitySummary[])
+        ? (params.packages as WidgetSummary[])
         : [];
-      const states = await capabilityRegistry.sync(summaries);
+      const states = await widgetRegistry.sync(summaries);
       return { states };
     }
-    case "capability.list":
-      return { packages: capabilityRegistry.list(), states: capabilityRegistry.states() };
-    case "capability.invoke": {
+    case "widget.list":
+      return { packages: widgetRegistry.list(), states: widgetRegistry.states() };
+    case "widget.invoke": {
       const id = String(params?.id ?? "").trim();
       const action = String(params?.action ?? "").trim();
-      if (!id) throw Object.assign(new Error("capability.invoke needs an id"), { rpcCode: -32602 });
+      if (!id) throw Object.assign(new Error("widget.invoke needs an id"), { rpcCode: -32602 });
       if (!action) {
-        throw Object.assign(new Error("capability.invoke needs an action"), { rpcCode: -32602 });
+        throw Object.assign(new Error("widget.invoke needs an action"), { rpcCode: -32602 });
       }
-      return capabilityRegistry.invoke(id, action, params?.args);
+      return widgetRegistry.invoke(id, action, params?.args);
     }
-    case "capability.logs":
-      return { logs: capabilityRegistry.logsFor(String(params?.id ?? "").trim()) };
-    case "capability.clear":
-      capabilityRegistry.clear();
+    case "widget.logs":
+      return { logs: widgetRegistry.logsFor(String(params?.id ?? "").trim()) };
+    case "widget.clear":
+      widgetRegistry.clear();
       return { ok: true };
     case "agent.getStatus": {
       const sessionId = String(params.sessionId);

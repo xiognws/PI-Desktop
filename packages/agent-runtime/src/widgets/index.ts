@@ -1,26 +1,33 @@
 /**
- * Sidecar-side capability registry (D691).
+ * Sidecar-side widget registry (D691).
  *
  * One instance per sidecar process. It loads packages once, answers
- * `capability.*` RPCs, and relays a package's host wishes through the existing
+ * `widget.*` RPCs, and relays a package's host wishes through the existing
  * parent-host proxy. Keeping this in one object means the RPC handlers stay a
  * thin translation layer and the "who may call what" rules live in one place.
  */
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type {
-  CapabilityInvokeResult,
-  CapabilityRuntimeState,
-  CapabilitySummary,
+  WidgetInvokeResult,
+  WidgetRuntimeState,
+  WidgetSummary,
 } from "@pi-workspace/shared";
 import { Type } from "typebox";
 
-import { CapabilityRunner, type CapabilityRunnerHost } from "./runner.js";
+import { WidgetRunner, type WidgetRunnerHost } from "./runner.js";
 
 /** Agent tool the model uses to reach installed packages. */
-export const CAPABILITY_TOOL_NAME = "Capability";
+export const WIDGET_TOOL_NAME = "Widget";
 
-/** RPC name the sidecar answers for a package's host calls. */
-export const CAPABILITY_HOST_METHODS = new Set([
+/**
+ * Host RPCs a package may reach when it was granted the `host` permission.
+ *
+ * Read-only on purpose: a widget is user code the client did not write, so
+ * the default host surface lets it look, not touch. Every name here must also
+ * appear in the sidecar's HOST_PROXY_ALLOWED set, or the call dies at the
+ * parent boundary with "host method not allowed from sidecar".
+ */
+export const WIDGET_HOST_METHODS = new Set([
   "memory.recall",
   "memory.list",
   "memory.stats",
@@ -28,13 +35,13 @@ export const CAPABILITY_HOST_METHODS = new Set([
   "app.health",
 ]);
 
-export class CapabilityRegistry {
-  private runner: CapabilityRunner;
+export class WidgetRegistry {
+  private runner: WidgetRunner;
   /** Packages the host reported but the runner refused, for status queries. */
   private rejected = new Map<string, string>();
 
-  constructor(host: CapabilityRunnerHost) {
-    this.runner = new CapabilityRunner(host);
+  constructor(host: WidgetRunnerHost) {
+    this.runner = new WidgetRunner(host);
   }
 
   /**
@@ -43,8 +50,8 @@ export class CapabilityRegistry {
    * The reply is the sidecar's view of *every* package the host reported, so the
    * page can show why a row is skipped without asking twice.
    */
-  async sync(summaries: CapabilitySummary[]): Promise<CapabilityRuntimeState[]> {
-    const usable: CapabilitySummary[] = [];
+  async sync(summaries: WidgetSummary[]): Promise<WidgetRuntimeState[]> {
+    const usable: WidgetSummary[] = [];
     this.rejected = new Map();
     for (const summary of summaries) {
       if (!summary.enabled) continue;
@@ -64,10 +71,10 @@ export class CapabilityRegistry {
     return this.states();
   }
 
-  states(): CapabilityRuntimeState[] {
+  states(): WidgetRuntimeState[] {
     const loaded = this.runner.states();
     const known = new Set(loaded.map((state) => state.id));
-    const skipped: CapabilityRuntimeState[] = [...this.rejected.entries()]
+    const skipped: WidgetRuntimeState[] = [...this.rejected.entries()]
       .filter(([id]) => !known.has(id))
       .map(([id, error]) => ({ id, state: "skipped", actionNames: [], error }));
     return [...loaded, ...skipped];
@@ -79,7 +86,7 @@ export class CapabilityRegistry {
   }
 
   /** Run one action; the caller has already resolved the package. */
-  async invoke(id: string, action: string, args: unknown): Promise<CapabilityInvokeResult> {
+  async invoke(id: string, action: string, args: unknown): Promise<WidgetInvokeResult> {
     const result = await this.runner.invoke(id, action, args);
     return { id, action, value: result.value, durationMs: result.durationMs };
   }
@@ -89,7 +96,7 @@ export class CapabilityRegistry {
   }
 
   /**
-   * The `Capability` agent tool (D691 §agent side).
+   * The `Widget` agent tool (D691 §agent side).
    *
    * Packages are listed and driven from the same surface the user sees, so the
    * model can reach a package the user installed without the client having to
@@ -99,13 +106,13 @@ export class CapabilityRegistry {
    */
   agentTool(): AgentTool {
     return {
-      name: CAPABILITY_TOOL_NAME,
-      label: "Capability",
+      name: WIDGET_TOOL_NAME,
+      label: "Widget",
       description:
-        "Use the capability packages the user installed in this client. \"list\" shows the loaded packages and the actions each exposes; \"invoke\" runs one action and returns its result. Packages are user code with their own permissions, so invoke only an action that is listed.",
+        "Use the widget packages the user installed in this client. \"list\" shows the loaded packages and the actions each exposes; \"invoke\" runs one action and returns its result. Packages are user code with their own permissions, so invoke only an action that is listed.",
       parameters: Type.Object({
         action: Type.String({ description: "list or invoke." }),
-        capabilityId: Type.Optional(
+        widgetId: Type.Optional(
           Type.String({ description: "Package id, from a list result. Required for invoke." }),
         ),
         actionName: Type.Optional(
@@ -139,21 +146,21 @@ export class CapabilityRegistry {
                 type: "text",
                 text: packages.length
                   ? JSON.stringify({ packages, states })
-                  : "No capability package is installed and enabled.",
+                  : "No widget package is installed and enabled.",
               },
             ],
             details: { packages: packages.length, states: states.length },
           };
         }
         if (action !== "invoke") {
-          throw new Error(`unknown capability tool action ${action || "(empty)"}`);
+          throw new Error(`unknown widget tool action ${action || "(empty)"}`);
         }
-        const capabilityId = typeof params.capabilityId === "string" ? params.capabilityId.trim() : "";
+        const widgetId = typeof params.widgetId === "string" ? params.widgetId.trim() : "";
         const actionName = typeof params.actionName === "string" ? params.actionName.trim() : "";
-        if (!capabilityId || !actionName) {
-          throw new Error("capabilityId and actionName are required for invoke");
+        if (!widgetId || !actionName) {
+          throw new Error("widgetId and actionName are required for invoke");
         }
-        const result = await this.invoke(capabilityId, actionName, params.args);
+        const result = await this.invoke(widgetId, actionName, params.args);
         return {
           content: [{ type: "text", text: JSON.stringify(result) }],
           details: { id: result.id, action: result.action, durationMs: result.durationMs },
@@ -163,7 +170,7 @@ export class CapabilityRegistry {
   }
 
   /** Packages currently loaded, for the agent tool's own listing. */
-  list(): CapabilitySummary[] {
+  list(): WidgetSummary[] {
     return [...this.runner.summaries().values()];
   }
 

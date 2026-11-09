@@ -815,7 +815,7 @@ const AGENT_CORE_TOOL_NAMES = new Set([
   "Bash",
   ASK_TOOL_NAME,
   // The slash menu answers a user-invoked `/skill:<skill-id>` with an instruction to
-  // call `Skill { id }` on the first turn (ADR 0219), and a capability the
+  // call `Skill { id }` on the first turn (ADR 0219), and a widget the
   // model has to go looking for is one it will not use. Registration keeps its
   // own gate: the tool only exists when the catalog is non-empty.
   SKILL_TOOL_NAME,
@@ -1122,12 +1122,12 @@ export type AgentRuntimeOptions = {
    * `loadTrustedExtensions()` before the first prompt. */
   trustedExtensions?: TrustedExtensionSpec[];
   /**
-   * Exposes the `Capability` tool (D691) so the model can list and invoke the
-   * capability packages the user installed. The sidecar passes a resolver rather
+   * Exposes the `Widget` tool (D691) so the model can list and invoke the
+   * widget packages the user installed. The sidecar passes a resolver rather
    * than the tool itself: packages load after the runtime is built, and the tool
    * has to see whatever the registry holds at call time.
    */
-  capabilityTools?: () => AgentTool[];
+  widgetTools?: () => AgentTool[];
   /** Effective command shell selected by host-core for this session. */
   commandShell: CommandShellOption;
   /** Absolute per-session scratch directory for temporary files (D114).
@@ -1945,8 +1945,8 @@ export class DesktopAgentRuntime {
   private pluginTools: PluginToolDef[];
   private pluginSkills: PluginSkillDef[];
   private trustedExtensionSpecs: TrustedExtensionSpec[];
-  /** Resolves the capability tools at call time (D691); empty when none. */
-  private capabilityTools: () => AgentTool[];
+  /** Resolves the widget tools at call time (D691); empty when none. */
+  private widgetTools: () => AgentTool[];
   private extensionRunner?: TrustedExtensionRunner;
   private trustedExtensionLoad?: Promise<void>;
   private extensionSessionName?: string;
@@ -2201,7 +2201,7 @@ export class DesktopAgentRuntime {
     this.pluginTools = opts.pluginTools ?? [];
     this.pluginSkills = [...(opts.pluginSkills ?? [])].sort((left, right) => left.id.localeCompare(right.id));
     this.trustedExtensionSpecs = opts.trustedExtensions ?? [];
-    this.capabilityTools = opts.capabilityTools ?? (() => []);
+    this.widgetTools = opts.widgetTools ?? (() => []);
     this.subagents = opts.subagents ?? [];
     this.subagentProviders = opts.subagentProviders ?? {};
     this.subagentModelKeys = new Set(opts.subagentModelKeys ?? []);
@@ -4629,10 +4629,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // Trusted extension tools are non-core: the per-mode allowlist and
     // ToolSearch deferral treat them like plugin tools (spec 16 §7).
     const extensionTools = this.extensionRunner?.getAgentTools() ?? [];
-    // Capability packages (D691) contribute one stable tool, so a package the
+    // Widget packages (D691) contribute one stable tool, so a package the
     // user installed is reachable by the model without a per-action schema that
     // would change every time the package is edited.
-    const capabilityTools = this.mode === "agent" ? this.capabilityTools() : [];
+    const widgetTools = this.mode === "agent" ? this.widgetTools() : [];
     return [
       ...builtins,
       ...jevTools,
@@ -4645,7 +4645,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       ...subagentTools,
       ...contextTools,
       ...extensionTools,
-      ...capabilityTools,
+      ...widgetTools,
     ];
   }
 
@@ -4850,7 +4850,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       retainModeToolDeclaration(name) ||
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
       // The whole delegation lifecycle stays in the core set rather than the
-      // on-demand catalog: a capability the model has to go looking for is one
+      // on-demand catalog: a widget the model has to go looking for is one
       // it will not use, and delegation is worth the extra schemas per request.
       name === SUBAGENT_TOOL_NAME ||
       name === SUBAGENT_WAIT_TOOL_NAME ||
@@ -4898,12 +4898,12 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     );
     if (entries.length > visibleEntries.length) {
       lines.push(
-        `- ... ${entries.length - visibleEntries.length} more; search by exact name or capability`,
+        `- ... ${entries.length - visibleEntries.length} more; search by exact name or widget`,
       );
     }
     return [
       "# On-demand tools",
-      `The following capabilities are available on demand. Call ${TOOL_SEARCH_NAME} with an exact tool name or a short capability description before using an on-demand tool that has not been activated. A visible schema is not activation; the tool_activation section, when present, records active names.`,
+      `The following widgets are available on demand. Call ${TOOL_SEARCH_NAME} with an exact tool name or a short widget description before using an on-demand tool that has not been activated. A visible schema is not activation; the tool_activation section, when present, records active names.`,
       ...lines,
     ].join("\n");
   }
@@ -4933,11 +4933,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       name: TOOL_SEARCH_NAME,
       label: "Tool Search",
       description:
-        "Find and activate an on-demand tool by exact name or capability. Use this before calling an inactive tool listed under On-demand tools, even when its schema is already visible. Activation does not bypass approval or mode restrictions.",
+        "Find and activate an on-demand tool by exact name or widget. Use this before calling an inactive tool listed under On-demand tools, even when its schema is already visible. Activation does not bypass approval or mode restrictions.",
       parameters: Type.Object({
         query: Type.String({
           description:
-            "Exact tool name or a short capability description, for example `BrowserPreview` or `validate plugin`.",
+            "Exact tool name or a short widget description, for example `BrowserPreview` or `validate plugin`.",
         }),
       }),
       execute: async (_toolCallId, params) => {
@@ -9670,7 +9670,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     execution: PlanExecution,
     durableTurnId: string,
   ): Promise<{ turnId: string }> {
-    // Keep every new user turn small. A capability loaded for the preceding
+    // Keep every new user turn small. A widget loaded for the preceding
     // turn can be searched again when the new task actually needs it.
     this.subagentOverrideProviders = {};
     this.resetDeferredToolsForPrompt();
@@ -9816,7 +9816,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.gracefulStopRequested = false;
     this.runCancelled = false;
     this.turnSubagentUsage = undefined;
-    // Capabilities and path-scoped instruction claims belong to one prompt.
+    // Widgets and path-scoped instruction claims belong to one prompt.
     this.subagentOverrideProviders = {};
     this.pathInstructionClaims.clear();
     this.pendingUserMessageId = userMessageId;
@@ -9836,9 +9836,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.setAgentActivity({ phase: "starting", since: Date.now() });
     try {
       // Publish turn ownership before the first await. Status polling and Stop
-      // must include capability negotiation, not observe a falsely idle turn.
+      // must include widget negotiation, not observe a falsely idle turn.
       await this.batchPlanner.negotiate(Boolean(this.remoteWorkspace));
-      if (this.runCancelled || this.disposed) throw turnAbortedError("Turn aborted during Host capability negotiation");
+      if (this.runCancelled || this.disposed) throw turnAbortedError("Turn aborted during Host widget negotiation");
       this.rebuildToolCatalog();
       this.resetDeferredToolsForPrompt();
       if (selectedTools.length) this.activateDeferredTools(selectedTools);

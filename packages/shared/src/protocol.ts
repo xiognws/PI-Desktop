@@ -369,18 +369,18 @@ export const IPC = {
     /** Plugin-contributed agent extensions (D387/D388, ADR 0214). */
     pluginImportExtension: "pi-desktop/plugin/importExtension",
     /**
-     * Capability packages (D691): scanned from the user data directory, loaded
+     * Widget packages (D691): scanned from the user data directory, loaded
      * inside the agent sidecar. The host owns discovery and trust, the sidecar
      * owns execution, and this page never reads the filesystem itself.
      */
-    capabilitiesList: "pi-desktop/capabilities/list",
-    capabilitiesSetEnabled: "pi-desktop/capabilities/setEnabled",
-    capabilitiesTrust: "pi-desktop/capabilities/trust",
-    capabilitiesReveal: "pi-desktop/capabilities/reveal",
+    widgetsList: "pi-desktop/widgets/list",
+    widgetsSetEnabled: "pi-desktop/widgets/setEnabled",
+    widgetsTrust: "pi-desktop/widgets/trust",
+    widgetsReveal: "pi-desktop/widgets/reveal",
     /** The scan root itself, so an empty section can still open the folder. */
-    capabilitiesRoot: "pi-desktop/capabilities/root",
-    capabilitiesRuntime: "pi-desktop/capabilities/runtime",
-    capabilitiesInvoke: "pi-desktop/capabilities/invoke",
+    widgetsRoot: "pi-desktop/widgets/root",
+    widgetsRuntime: "pi-desktop/widgets/runtime",
+    widgetsInvoke: "pi-desktop/widgets/invoke",
     extensionsCommandRun: "pi-desktop/extensions/commands/run",
     extensionsUiRespond: "pi-desktop/extensions/ui/respond",
     pluginLoadDev: "pi-desktop/plugin/loadDev",
@@ -546,8 +546,8 @@ export const IPC = {
     configSyncProgress: "pi-desktop/configSync/event/progress",
     extensionsUiPrompt: "pi-desktop/extensions/event/uiPrompt",
     extensionsStatus: "pi-desktop/extensions/event/status",
-    /** A capability package finished loading, failed, or was reloaded. */
-    capabilitiesChanged: "pi-desktop/capabilities/event/changed",
+    /** An widget finished loading, failed, or was reloaded. */
+    widgetsChanged: "pi-desktop/widgets/event/changed",
     pluginLauncherShown: "pi-desktop/pluginLauncher/event/shown",
     agentMessage: "pi-desktop/agent/event/message",
     agentQueueChanged: "pi-desktop/agent/event/queueChanged",

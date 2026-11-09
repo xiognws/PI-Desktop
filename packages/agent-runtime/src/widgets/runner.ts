@@ -1,5 +1,5 @@
 /**
- * Capability package runner (D691).
+ * Widget package runner (D691).
  *
  * Loads one entry module per enabled, readable package and keeps the
  * implementations its `register` calls produced. Loading is per process, not per
@@ -9,28 +9,28 @@
  * Failure containment is the whole point of this file. A package that throws at
  * import, registers an action nobody declared, or hangs past the invoke budget
  * must leave the client working — the failure belongs to that package's row in
- * the capability page, never to the sidecar.
+ * the widget page, never to the sidecar.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
-  CAPABILITY_API_VERSION,
-  CAPABILITY_INVOKE_TIMEOUT_MS,
-  CAPABILITY_MANIFEST_FILE,
-  CAPABILITY_SCHEMA_VERSION,
-  normalizeCapabilityPermissions,
-  type CapabilityAction,
-  type CapabilityPermission,
-  type CapabilityRuntimeState,
-  type CapabilitySummary,
+  WIDGET_API_VERSION,
+  WIDGET_INVOKE_TIMEOUT_MS,
+  WIDGET_MANIFEST_FILE,
+  WIDGET_SCHEMA_VERSION,
+  normalizeWidgetPermissions,
+  type WidgetAction,
+  type WidgetPermission,
+  type WidgetRuntimeState,
+  type WidgetSummary,
 } from "@pi-workspace/shared";
 
 import type {
-  CapabilityActionHandler,
-  CapabilityActionInput,
-  CapabilityApi,
-  LoadedCapability,
+  WidgetActionHandler,
+  WidgetActionInput,
+  WidgetApi,
+  LoadedWidget,
 } from "./types.js";
 
 /** Most characters one package may keep in its log ring. */
@@ -38,14 +38,14 @@ const LOG_LIMIT = 200;
 /** Entry module candidates, in resolution order. */
 const ENTRY_CANDIDATES = ["index.js", "index.mjs", "index.cjs"];
 
-export type CapabilityRunnerHost = {
+export type WidgetRunnerHost = {
   /** Ask host-core for something; the caller has already checked `host`. */
   call(method: string, params: unknown): Promise<unknown>;
   /** Where the packages live, for the "open folder" affordance and errors. */
   packagesDir?: string;
 };
 
-export type CapabilityManifestIssue = { id: string; message: string };
+export type WidgetManifestIssue = { id: string; message: string };
 
 type ManifestShape = {
   schemaVersion?: number;
@@ -60,11 +60,11 @@ type ManifestShape = {
 };
 
 /** Narrow an unknown value to a manifest we are willing to execute. */
-export function readCapabilityManifest(dir: string): {
+export function readWidgetManifest(dir: string): {
   manifest?: ManifestShape;
   error?: string;
 } {
-  const file = path.join(dir, CAPABILITY_MANIFEST_FILE);
+  const file = path.join(dir, WIDGET_MANIFEST_FILE);
   let text: string;
   try {
     text = readFileSync(file, "utf8");
@@ -75,20 +75,20 @@ export function readCapabilityManifest(dir: string): {
   try {
     parsed = JSON.parse(text);
   } catch (cause) {
-    return { error: `${CAPABILITY_MANIFEST_FILE}: ${cause instanceof Error ? cause.message : String(cause)}` };
+    return { error: `${WIDGET_MANIFEST_FILE}: ${cause instanceof Error ? cause.message : String(cause)}` };
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { error: `${CAPABILITY_MANIFEST_FILE}: expected an object` };
+    return { error: `${WIDGET_MANIFEST_FILE}: expected an object` };
   }
   const manifest = parsed as ManifestShape;
-  if (manifest.schemaVersion !== CAPABILITY_SCHEMA_VERSION) {
+  if (manifest.schemaVersion !== WIDGET_SCHEMA_VERSION) {
     return {
-      error: `${CAPABILITY_MANIFEST_FILE}: unsupported schemaVersion ${String(manifest.schemaVersion)}`,
+      error: `${WIDGET_MANIFEST_FILE}: unsupported schemaVersion ${String(manifest.schemaVersion)}`,
     };
   }
-  if (manifest.apiVersion !== CAPABILITY_API_VERSION) {
+  if (manifest.apiVersion !== WIDGET_API_VERSION) {
     return {
-      error: `${CAPABILITY_MANIFEST_FILE}: unsupported apiVersion ${String(manifest.apiVersion)}`,
+      error: `${WIDGET_MANIFEST_FILE}: unsupported apiVersion ${String(manifest.apiVersion)}`,
     };
   }
   return { manifest };
@@ -103,7 +103,7 @@ export function resolveEntry(dir: string): string | undefined {
   return undefined;
 }
 
-function declaredActions(manifest: ManifestShape): CapabilityAction[] {
+function declaredActions(manifest: ManifestShape): WidgetAction[] {
   return (manifest.actions ?? [])
     .filter((action): action is { name: string; description?: string; params?: string[] } =>
       typeof action?.name === "string" && action.name.trim().length > 0,
@@ -118,9 +118,9 @@ function declaredActions(manifest: ManifestShape): CapabilityAction[] {
 }
 
 function summarize(
-  summary: CapabilitySummary,
+  summary: WidgetSummary,
   manifest: ManifestShape,
-): CapabilitySummary {
+): WidgetSummary {
   return {
     ...summary,
     name: typeof manifest.name === "string" && manifest.name.trim() ? manifest.name.trim() : summary.id,
@@ -131,23 +131,23 @@ function summarize(
   };
 }
 
-export class CapabilityRunner {
-  private loaded = new Map<string, LoadedCapability>();
-  private host: CapabilityRunnerHost;
+export class WidgetRunner {
+  private loaded = new Map<string, LoadedWidget>();
+  private host: WidgetRunnerHost;
 
-  constructor(host: CapabilityRunnerHost) {
+  constructor(host: WidgetRunnerHost) {
     this.host = host;
   }
 
   /** Packages currently held, by id. */
-  summaries(): Map<string, CapabilitySummary> {
+  summaries(): Map<string, WidgetSummary> {
     return new Map(
       [...this.loaded.entries()].map(([id, entry]) => [id, entry.summary]),
     );
   }
 
   /** Runtime state of every package, for the page's status panel. */
-  states(): CapabilityRuntimeState[] {
+  states(): WidgetRuntimeState[] {
     return [...this.loaded.values()].map((entry) => ({
       id: entry.summary.id,
       state: entry.state,
@@ -163,8 +163,8 @@ export class CapabilityRunner {
    * the granted permissions and the digest trust verdict, so the sidecar never
    * re-derives trust from the filesystem on its own.
    */
-  async load(summaries: CapabilitySummary[]): Promise<CapabilityRuntimeState[]> {
-    const next = new Map<string, LoadedCapability>();
+  async load(summaries: WidgetSummary[]): Promise<WidgetRuntimeState[]> {
+    const next = new Map<string, LoadedWidget>();
     for (const summary of summaries) {
       if (!summary.enabled) continue;
       if (summary.error) continue;
@@ -181,9 +181,9 @@ export class CapabilityRunner {
     this.loaded.clear();
   }
 
-  private async loadOne(summary: CapabilitySummary): Promise<LoadedCapability | undefined> {
+  private async loadOne(summary: WidgetSummary): Promise<LoadedWidget | undefined> {
     const dir = summary.path;
-    const { manifest, error } = readCapabilityManifest(dir);
+    const { manifest, error } = readWidgetManifest(dir);
     if (!manifest) {
       return {
         summary,
@@ -205,13 +205,13 @@ export class CapabilityRunner {
         logs: [],
       };
     }
-    const permissions = normalizeCapabilityPermissions(summary.grantedPermissions);
-    const actions = new Map<string, CapabilityActionHandler>();
+    const permissions = normalizeWidgetPermissions(summary.grantedPermissions);
+    const actions = new Map<string, WidgetActionHandler>();
     const logs: string[] = [];
     const api = this.createApi(summary, dir, permissions, actions, logs);
     try {
-      const { loadCapabilityEntry } = await import("./loader.js");
-      const factory = await loadCapabilityEntry(entry);
+      const { loadWidgetEntry } = await import("./loader.js");
+      const factory = await loadWidgetEntry(entry);
       if (typeof factory !== "function") {
         return {
           summary,
@@ -250,14 +250,14 @@ export class CapabilityRunner {
   }
 
   private createApi(
-    summary: CapabilitySummary,
+    summary: WidgetSummary,
     dir: string,
-    permissions: readonly CapabilityPermission[],
-    actions: Map<string, CapabilityActionHandler>,
+    permissions: readonly WidgetPermission[],
+    actions: Map<string, WidgetActionHandler>,
     logs: string[],
-  ): CapabilityApi {
+  ): WidgetApi {
     const runner = this;
-    const can = (permission: CapabilityPermission) => permissions.includes(permission);
+    const can = (permission: WidgetPermission) => permissions.includes(permission);
     const log = (message: string) => {
       const line = String(message);
       logs.push(line);
@@ -265,7 +265,7 @@ export class CapabilityRunner {
     };
     const call = async (method: string, params?: unknown) => {
       if (!can("host")) {
-        throw new Error(`capability ${summary.id} has no host permission`);
+        throw new Error(`widget ${summary.id} has no host permission`);
       }
       return runner.host.call(method, params);
     };
@@ -279,10 +279,10 @@ export class CapabilityRunner {
       call,
       action(name, handler) {
         if (typeof name !== "string" || !name.trim()) {
-          throw new Error("capability action name is required");
+          throw new Error("widget action name is required");
         }
         if (typeof handler !== "function") {
-          throw new Error(`capability action ${name} needs a function`);
+          throw new Error(`widget action ${name} needs a function`);
         }
         actions.set(name.trim(), handler);
       },
@@ -309,11 +309,11 @@ export class CapabilityRunner {
     logs: string[];
   }> {
     const entry = this.loaded.get(id);
-    if (!entry) throw new Error(`capability ${id} is not loaded`);
+    if (!entry) throw new Error(`widget ${id} is not loaded`);
     const handler = entry.actions.get(action);
-    if (!handler) throw new Error(`capability ${id} has no action ${action}`);
+    if (!handler) throw new Error(`widget ${id} has no action ${action}`);
     const logs: string[] = [];
-    const input: CapabilityActionInput = {
+    const input: WidgetActionInput = {
       args,
       dir: entry.summary.path,
       log: (message: string) => {
@@ -324,7 +324,7 @@ export class CapabilityRunner {
       },
       call: async (method: string, params?: unknown) => {
         if (!entry.summary.grantedPermissions.includes("host")) {
-          throw new Error(`capability ${id} has no host permission`);
+          throw new Error(`widget ${id} has no host permission`);
         }
         return this.host.call(method, params);
       },
@@ -332,8 +332,8 @@ export class CapabilityRunner {
     const startedAt = Date.now();
     const result = await withDeadline(
       Promise.resolve().then(() => handler(input)),
-      CAPABILITY_INVOKE_TIMEOUT_MS,
-      `capability ${id} action ${action} exceeded ${CAPABILITY_INVOKE_TIMEOUT_MS}ms`,
+      WIDGET_INVOKE_TIMEOUT_MS,
+      `widget ${id} action ${action} exceeded ${WIDGET_INVOKE_TIMEOUT_MS}ms`,
     );
     return { value: result, durationMs: Date.now() - startedAt, logs };
   }

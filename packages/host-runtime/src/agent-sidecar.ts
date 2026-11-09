@@ -77,6 +77,12 @@ const HOST_PROXY_ALLOWED = new Set([
   "memory.entries",
   "memory.writeEntries",
   "memory.recall",
+  // Capability packages (D691) reach the host through the same proxy, so the
+  // read-only memory surface they advertise has to be reachable: a package that
+  // calls memory.list with the host permission otherwise fails with
+  // "host method not allowed from sidecar" and looks broken in the UI.
+  "memory.list",
+  "memory.stats",
   // The agent's own skill library (ADR 0377). `skill_manage` is the write path
   // for the same documents the `Skill` tool reads, and every action is a
   // `skills.*` RPC: without these the background review can see the library but

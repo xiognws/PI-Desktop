@@ -1,8 +1,8 @@
 /**
- * Example capability package (D691).
+ * Example widget package (D691).
  *
- * Copy this folder into `<userData>/capabilities/`, accept its digest on the
- * Capabilities page, then invoke `now` from the agent's `Capability` tool
+ * Copy this folder into `<userData>/widgets/`, accept its digest on the
+ * Widgets page, then invoke `now` from the agent's `Widget` tool
  * (`remember` needs the `host` permission, which is requested here on purpose).
  *
  * The entry module is loaded with jiti and must **default-export a function**:
@@ -18,9 +18,13 @@ export default async function activate(api) {
   api.action("remember", async ({ args, call }) => {
     // "host" is what lets an action reach the host at all; without it the call
     // rejects and the action fails loudly instead of pretending.
-    const listed = await call("memory.list", {});
-    const entries = Array.isArray(listed?.entries) ? listed.entries : [];
+    const listed = await call("memory.list", { limit: 50 });
+    const memories = Array.isArray(listed?.memories) ? listed.memories : [];
     const note = args && typeof args === "object" ? args.note : undefined;
-    return { requested: typeof note === "string" && note.length > 0, entries: entries.length };
+    return {
+      requested: typeof note === "string" && note.length > 0,
+      total: typeof listed?.total === "number" ? listed.total : memories.length,
+      titles: memories.slice(0, 3).map((entry) => entry?.title ?? ""),
+    };
   });
 }

@@ -1,5 +1,5 @@
 /**
- * Capability packages, sidecar half (D691).
+ * Widget packages, sidecar half (D691).
  *
  * The host discovers packages and owns trust; this process is the only place
  * package code ever runs. Everything here therefore assumes the code is
@@ -10,14 +10,14 @@
  * the sidecar needs to hold a loaded package in memory.
  */
 import type {
-  CapabilityAction,
-  CapabilityPermission,
-  CapabilityRuntimeState,
-  CapabilitySummary,
+  WidgetAction,
+  WidgetPermission,
+  WidgetRuntimeState,
+  WidgetSummary,
 } from "@pi-workspace/shared";
 
 /** What a package may ask the host to do (D691 §host bridge). */
-export type CapabilityHostCall = {
+export type WidgetHostCall = {
   /** Host-core RPC method, e.g. `memory.recall`. Refused without `host`. */
   method: string;
   params?: unknown;
@@ -26,17 +26,17 @@ export type CapabilityHostCall = {
 };
 
 /** The API object handed to each package entry as its only argument. */
-export type CapabilityApi = {
+export type WidgetApi = {
   /** Manifest identity, read-only. */
   readonly id: string;
   readonly version: string;
   /** Permissions actually in force; a package may narrow its own behaviour. */
-  readonly permissions: readonly CapabilityPermission[];
+  readonly permissions: readonly WidgetPermission[];
   /** True when this run was granted `permission`. */
-  can(permission: CapabilityPermission): boolean;
+  can(permission: WidgetPermission): boolean;
   /** Register the implementation of one manifest action. */
-  action(name: string, handler: CapabilityActionHandler): void;
-  /** Log a line the user can find in the capability page's runtime panel. */
+  action(name: string, handler: WidgetActionHandler): void;
+  /** Log a line the user can find in the widget page's runtime panel. */
   log(message: string): void;
   /** Ask the host to run an RPC method. Requires `host`. */
   call(method: string, params?: unknown): Promise<unknown>;
@@ -45,10 +45,10 @@ export type CapabilityApi = {
 };
 
 /** One registered action implementation. */
-export type CapabilityActionHandler = (input: CapabilityActionInput) => unknown | Promise<unknown>;
+export type WidgetActionHandler = (input: WidgetActionInput) => unknown | Promise<unknown>;
 
-export type CapabilityActionInput = {
-  /** Whatever the caller passed to `capability.invoke`. */
+export type WidgetActionInput = {
+  /** Whatever the caller passed to `widget.invoke`. */
   args: unknown;
   /** Absolute package directory, so an action need not re-derive it. */
   dir: string;
@@ -58,12 +58,12 @@ export type CapabilityActionInput = {
 };
 
 /** A package as the runner holds it. */
-export type LoadedCapability = {
-  summary: CapabilitySummary;
-  actions: Map<string, CapabilityActionHandler>;
+export type LoadedWidget = {
+  summary: WidgetSummary;
+  actions: Map<string, WidgetActionHandler>;
   /** Manifest actions, for reporting an action the entry never implemented. */
-  declared: CapabilityAction[];
-  state: CapabilityRuntimeState["state"];
+  declared: WidgetAction[];
+  state: WidgetRuntimeState["state"];
   error?: string;
   logs: string[];
 };

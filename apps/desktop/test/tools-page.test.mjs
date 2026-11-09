@@ -101,14 +101,14 @@ test("the packaged image ships resources/tools", () => {
   assert.ok(existsSync(new URL("../resources/tools/README.md", import.meta.url)));
 });
 
-test("an empty tool list never hides the capability section", () => {
+test("an empty tool list never hides the widget section", () => {
   // A source checkout ships no tool packages, so the empty state is the normal
   // first screen. Capabilities render above that branch, which is what keeps
   // them visible when there is nothing else on the page.
-  assert.match(page, /data-capability-section="true"/);
-  const sectionAt = page.indexOf("<CapabilitySection");
+  assert.match(page, /data-widget-section="true"/);
+  const sectionAt = page.indexOf("<WidgetSection");
   const emptyAt = page.indexOf('className="tools-empty"');
-  assert.ok(sectionAt > 0 && emptyAt > sectionAt, "the capability section renders before the empty state");
+  assert.ok(sectionAt > 0 && emptyAt > sectionAt, "the widget section renders before the empty state");
 });
 
 test("every locale speaks the tools page", () => {
@@ -123,8 +123,8 @@ test("every locale speaks the tools page", () => {
       "broken",
       "risk",
       // The header entry that opens the capability packages (D691).
-      "capabilityEntry",
-      "capabilityEntryHint",
+      "widgetEntry",
+      "widgetEntryHint",
     ]) {
       const entryKey = locale === "de" || locale === "es" || locale === "fr" ? `"${entry}"` : entry;
       assert.ok(catalog.includes(`${entryKey}:`), `${locale} defines tools.${entry}`);

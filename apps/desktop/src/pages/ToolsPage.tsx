@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
-  CapabilityRuntimeState,
-  CapabilitySummary,
-  CapabilityTrust,
+  WidgetRuntimeState,
+  WidgetSummary,
+  WidgetTrust,
   ToolPackageSummary,
   ToolPackageTool,
 } from "@pi-workspace/shared";
 
-import { IconRefresh, IconSparkles, IconWrench } from "../components/icons";
+import { IconChevronDown, IconChevronRight, IconRefresh, IconSparkles, IconWrench } from "../components/icons";
 import { Badge, Button, SettingsToggle, TooltipButton } from "../components/ui";
 import { api } from "../lib/api";
 import "../features/tools/tools.css";
@@ -18,9 +18,9 @@ import "../features/tools/tools.css";
  * Tools: one page for both kinds of package this build can run (D681, D691).
  *
  * Tool packages are directories under `resources/tools` with a `tool.json`
- * manifest; capability packages are directories the *user* drops into
- * `<userData>/capabilities`. They are listed together — capabilities first,
- * because a scanned capability folder is the only thing on this page the user
+ * manifest; widget packages are directories the *user* drops into
+ * `<userData>/widgets`. They are listed together — widgets first,
+ * because a scanned widget folder is the only thing on this page the user
  * personally put there. Each section only renders packages that were actually
  * found, so an empty scan produces no heading and no empty card.
  */
@@ -30,11 +30,11 @@ export function ToolsPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [capabilities, setCapabilities] = useState<CapabilitySummary[]>([]);
-  const [capabilityStates, setCapabilityStates] = useState<CapabilityRuntimeState[]>([]);
-  const [capabilityStatus, setCapabilityStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [capabilityError, setCapabilityError] = useState("");
-  const [capabilityBusyId, setCapabilityBusyId] = useState<string | null>(null);
+  const [widgets, setCapabilities] = useState<WidgetSummary[]>([]);
+  const [widgetStates, setWidgetStates] = useState<WidgetRuntimeState[]>([]);
+  const [widgetStatus, setWidgetStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [widgetError, setWidgetError] = useState("");
+  const [widgetBusyId, setWidgetBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setStatus((current) => (current === "ready" ? current : "loading"));
@@ -50,19 +50,19 @@ export function ToolsPage() {
   }, []);
 
   const loadCapabilities = useCallback(async () => {
-    setCapabilityStatus((current) => (current === "ready" ? current : "loading"));
+    setWidgetStatus((current) => (current === "ready" ? current : "loading"));
     try {
-      const result = await api.listCapabilities();
+      const result = await api.listWidgets();
       setCapabilities(result.packages);
-      setCapabilityError("");
-      setCapabilityStatus("ready");
+      setWidgetError("");
+      setWidgetStatus("ready");
       // Runtime state is advisory: the sidecar is not necessarily up, and that
       // must not blank out a list the host just answered.
-      const runtime = await api.capabilityRuntime().catch(() => ({ states: [] }));
-      setCapabilityStates(runtime.states);
+      const runtime = await api.widgetRuntime().catch(() => ({ states: [] }));
+      setWidgetStates(runtime.states);
     } catch (cause) {
-      setCapabilityError(cause instanceof Error ? cause.message : String(cause));
-      setCapabilityStatus("error");
+      setWidgetError(cause instanceof Error ? cause.message : String(cause));
+      setWidgetStatus("error");
     }
   }, []);
 
@@ -87,25 +87,25 @@ export function ToolsPage() {
     }
   };
 
-  /** Settle the capability section after any write, and mirror the runtime. */
-  const settleCapabilities = async (next: CapabilitySummary[]) => {
+  /** Settle the widget section after any write, and mirror the runtime. */
+  const settleCapabilities = async (next: WidgetSummary[]) => {
     setCapabilities(next);
-    setCapabilityError("");
-    setCapabilityStatus("ready");
-    const runtime = await api.capabilityRuntime().catch(() => ({ states: [] }));
-    setCapabilityStates(runtime.states);
+    setWidgetError("");
+    setWidgetStatus("ready");
+    const runtime = await api.widgetRuntime().catch(() => ({ states: [] }));
+    setWidgetStates(runtime.states);
   };
 
-  const toggleCapability = async (id: string, enabled: boolean) => {
-    setCapabilityBusyId(id);
+  const toggleWidget = async (id: string, enabled: boolean) => {
+    setWidgetBusyId(id);
     try {
-      const result = await api.setCapabilityEnabled(id, enabled);
+      const result = await api.setWidgetEnabled(id, enabled);
       await settleCapabilities(result.packages);
     } catch (cause) {
-      setCapabilityError(cause instanceof Error ? cause.message : String(cause));
-      setCapabilityStatus("error");
+      setWidgetError(cause instanceof Error ? cause.message : String(cause));
+      setWidgetStatus("error");
     } finally {
-      setCapabilityBusyId(null);
+      setWidgetBusyId(null);
     }
   };
 
@@ -114,34 +114,34 @@ export function ToolsPage() {
    * rejected by the host instead of being trusted silently, and that failure is
    * shown here so the user can reload and look again.
    */
-  const setCapabilityTrust = async (pkg: CapabilitySummary, trusted: boolean) => {
-    setCapabilityBusyId(pkg.id);
+  const setWidgetTrust = async (pkg: WidgetSummary, trusted: boolean) => {
+    setWidgetBusyId(pkg.id);
     try {
-      const result = await api.setCapabilityTrust(pkg.id, pkg.digest, trusted);
+      const result = await api.setWidgetTrust(pkg.id, pkg.digest, trusted);
       await settleCapabilities(result.packages);
     } catch (cause) {
-      setCapabilityError(cause instanceof Error ? cause.message : String(cause));
-      setCapabilityStatus("error");
+      setWidgetError(cause instanceof Error ? cause.message : String(cause));
+      setWidgetStatus("error");
     } finally {
-      setCapabilityBusyId(null);
+      setWidgetBusyId(null);
     }
   };
 
-  const revealCapability = async (id: string) => {
+  const revealWidget = async (id: string) => {
     try {
-      await api.revealCapability(id);
+      await api.revealWidget(id);
     } catch (cause) {
-      setCapabilityError(cause instanceof Error ? cause.message : String(cause));
-      setCapabilityStatus("error");
+      setWidgetError(cause instanceof Error ? cause.message : String(cause));
+      setWidgetStatus("error");
     }
   };
 
   const revealCapabilitiesDir = async () => {
     try {
-      await api.revealCapabilitiesDir();
+      await api.revealWidgetsDir();
     } catch (cause) {
-      setCapabilityError(cause instanceof Error ? cause.message : String(cause));
-      setCapabilityStatus("error");
+      setWidgetError(cause instanceof Error ? cause.message : String(cause));
+      setWidgetStatus("error");
     }
   };
 
@@ -170,16 +170,16 @@ export function ToolsPage() {
       </header>
 
       <div className="tools-sections">
-        <CapabilitySection
-          packages={capabilities}
-          states={capabilityStates}
-          status={capabilityStatus}
-          error={capabilityError}
-          busyId={capabilityBusyId}
+        <WidgetSection
+          packages={widgets}
+          states={widgetStates}
+          status={widgetStatus}
+          error={widgetError}
+          busyId={widgetBusyId}
           onReload={() => void loadCapabilities()}
-          onToggle={(id, enabled) => void toggleCapability(id, enabled)}
-          onTrust={(pkg, trusted) => void setCapabilityTrust(pkg, trusted)}
-          onReveal={(id) => void revealCapability(id)}
+          onToggle={(id, enabled) => void toggleWidget(id, enabled)}
+          onTrust={(pkg, trusted) => void setWidgetTrust(pkg, trusted)}
+          onReveal={(id) => void revealWidget(id)}
           onRevealDir={() => void revealCapabilitiesDir()}
         />
 
@@ -252,14 +252,14 @@ export function ToolsPage() {
 }
 
 /**
- * Capability packages found under `<userData>/capabilities` (D691).
+ * Widget packages found under `<userData>/widgets` (D691).
  *
  * Nothing is rendered when the scan found nothing: this section exists because
  * the user put those folders there, not because the build promises a feature.
  * Each action can be run from here, which is the client side of the two-way
- * contract — the agent reaches the same actions through its `Capability` tool.
+ * contract — the agent reaches the same actions through its `Widget` tool.
  */
-function CapabilitySection({
+function WidgetSection({
   packages,
   states,
   status,
@@ -271,14 +271,14 @@ function CapabilitySection({
   onReveal,
   onRevealDir,
 }: {
-  packages: CapabilitySummary[];
-  states: CapabilityRuntimeState[];
+  packages: WidgetSummary[];
+  states: WidgetRuntimeState[];
   status: "loading" | "ready" | "error";
   error: string;
   busyId: string | null;
   onReload: () => void;
   onToggle: (id: string, enabled: boolean) => void;
-  onTrust: (pkg: CapabilitySummary, trusted: boolean) => void;
+  onTrust: (pkg: WidgetSummary, trusted: boolean) => void;
   onReveal: (id: string) => void;
   onRevealDir: () => void;
 }) {
@@ -286,20 +286,20 @@ function CapabilitySection({
   const stateOf = (id: string) => states.find((state) => state.id === id);
 
   if (status === "loading" && packages.length === 0) {
-    return <p className="tools-placeholder">{t("capabilities.loading")}</p>;
+    return <p className="tools-placeholder">{t("widgets.loading")}</p>;
   }
   if (status === "error" && packages.length === 0) {
     return (
-      <div className="tools-capability-section">
+      <div className="tools-widget-section">
         <p className="tools-placeholder is-error">
-          {t("capabilities.loadFailed", { message: error })}
+          {t("widgets.loadFailed", { message: error })}
         </p>
-        <div className="tools-capability-section-actions">
+        <div className="tools-widget-section-actions">
           <Button variant="ghost" size="sm" onClick={onReload}>
-            {t("capabilities.refresh")}
+            {t("widgets.refresh")}
           </Button>
           <Button variant="ghost" size="sm" onClick={onRevealDir}>
-            {t("capabilities.revealDir")}
+            {t("widgets.revealDir")}
           </Button>
         </div>
       </div>
@@ -308,30 +308,30 @@ function CapabilitySection({
   if (packages.length === 0) return null;
 
   return (
-    <div className="tools-capability-section" data-capability-section="true">
-      <div className="tools-capability-section-head">
-        <div className="tools-capability-section-title">
+    <div className="tools-widget-section" data-widget-section="true">
+      <div className="tools-widget-section-head">
+        <div className="tools-widget-section-title">
           <IconSparkles size={14} aria-hidden />
-          <h3>{t("capabilities.title")}</h3>
+          <h3>{t("widgets.title")}</h3>
           <span className="tools-count">
-            {t("capabilities.count", { count: packages.length })}
+            {t("widgets.count", { count: packages.length })}
           </span>
         </div>
         <Button variant="ghost" size="sm" onClick={onRevealDir}>
-          {t("capabilities.revealDir")}
+          {t("widgets.revealDir")}
         </Button>
       </div>
       {status === "error" ? (
         <p className="tools-placeholder is-error">
-          {t("capabilities.loadFailed", { message: error })}
+          {t("widgets.loadFailed", { message: error })}
         </p>
       ) : null}
       <div className="tools-list">
         {packages.map((pkg) => (
           <article
             key={pkg.id}
-            className={`tools-card capabilities-card${pkg.enabled ? "" : " is-disabled"}`}
-            data-capability={pkg.id}
+            className={`tools-card widgets-card${pkg.enabled ? "" : " is-disabled"}`}
+            data-widget={pkg.id}
             data-trust={pkg.trust}
           >
             <div className="tools-card-head">
@@ -339,14 +339,14 @@ function CapabilitySection({
                 <span className="tools-card-name">{pkg.name}</span>
                 {pkg.version ? (
                   <Badge tone="neutral" className="tools-card-version">
-                    {t("capabilities.version", { version: pkg.version })}
+                    {t("widgets.version", { version: pkg.version })}
                   </Badge>
                 ) : null}
                 <TrustBadge trust={pkg.trust} />
               </div>
               <SettingsToggle
                 checked={pkg.enabled}
-                label={t("capabilities.enableLabel", { name: pkg.name })}
+                label={t("widgets.enableLabel", { name: pkg.name })}
                 busy={busyId === pkg.id}
                 disabled={busyId === pkg.id || pkg.trust === "untrusted"}
                 onChange={() => onToggle(pkg.id, !pkg.enabled)}
@@ -355,7 +355,7 @@ function CapabilitySection({
 
             {pkg.error ? (
               <p className="tools-card-error" role="alert">
-                {t("capabilities.broken", { message: pkg.error })}
+                {t("widgets.broken", { message: pkg.error })}
               </p>
             ) : (
               <>
@@ -363,26 +363,26 @@ function CapabilitySection({
                   <p className="tools-card-description">{pkg.description}</p>
                 ) : null}
 
-                <dl className="capabilities-facts">
-                  <dt>{t("capabilities.factPermissions")}</dt>
+                <dl className="widgets-facts">
+                  <dt>{t("widgets.factPermissions")}</dt>
                   <dd>
                     <PermissionBadges
                       requested={pkg.requestedPermissions}
                       granted={pkg.grantedPermissions}
                     />
                   </dd>
-                  <dt>{t("capabilities.factRuntime")}</dt>
+                  <dt>{t("widgets.factRuntime")}</dt>
                   <dd>
                     <RuntimeLabel state={stateOf(pkg.id)} />
                   </dd>
                 </dl>
 
                 {pkg.actions.length === 0 ? (
-                  <p className="tools-card-note">{t("capabilities.noActions")}</p>
+                  <p className="tools-card-note">{t("widgets.noActions")}</p>
                 ) : (
-                  <ul className="capabilities-action-list">
+                  <ul className="widgets-action-list">
                     {pkg.actions.map((action) => (
-                      <CapabilityActionRow
+                      <WidgetActionRow
                         key={action.name}
                         pkg={pkg}
                         actionName={action.name}
@@ -392,7 +392,7 @@ function CapabilitySection({
                   </ul>
                 )}
 
-                <div className="capabilities-card-actions">
+                <div className="widgets-card-actions">
                   {pkg.trust === "trusted" ? (
                     <Button
                       variant="secondary"
@@ -400,7 +400,7 @@ function CapabilitySection({
                       disabled={busyId === pkg.id}
                       onClick={() => onTrust(pkg, false)}
                     >
-                      {t("capabilities.revokeTrust")}
+                      {t("widgets.revokeTrust")}
                     </Button>
                   ) : (
                     <Button
@@ -410,14 +410,14 @@ function CapabilitySection({
                       onClick={() => onTrust(pkg, true)}
                     >
                       {pkg.trust === "modified"
-                        ? t("capabilities.trustAgain")
-                        : t("capabilities.trustLabel")}
+                        ? t("widgets.trustAgain")
+                        : t("widgets.trustLabel")}
                     </Button>
                   )}
                   <Button variant="ghost" size="sm" onClick={() => onReveal(pkg.id)}>
-                    {t("capabilities.reveal")}
+                    {t("widgets.reveal")}
                   </Button>
-                  <span className="capabilities-digest" title={pkg.digest}>
+                  <span className="widgets-digest" title={pkg.digest}>
                     {pkg.digest.slice(0, 12)}
                   </span>
                 </div>
@@ -432,15 +432,20 @@ function CapabilitySection({
 
 /**
  * One action plus a run control. The result is kept next to the action that
- * produced it: a capability package is arbitrary user code, so seeing what it
+ * produced it: a widget package is arbitrary user code, so seeing what it
  * returned — or why it failed — is the only honest feedback available.
+ *
+ * The result starts collapsed to a single status line. A package can return
+ * pages of JSON and a card holds several actions, so an always-open block turns
+ * one card into a wall of text. The status line still says whether it worked and
+ * how long it took; the payload is one click away.
  */
-function CapabilityActionRow({
+function WidgetActionRow({
   pkg,
   actionName,
   description,
 }: {
-  pkg: CapabilitySummary;
+  pkg: WidgetSummary;
   actionName: string;
   description: string;
 }) {
@@ -448,46 +453,79 @@ function CapabilityActionRow({
   const [result, setResult] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [running, setRunning] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [durationMs, setDurationMs] = useState(0);
 
   const run = async () => {
     setRunning(true);
     setFailed(false);
+    // Collapse the previous answer: the old payload must not sit above the new
+    // one while the call is in flight.
+    setExpanded(false);
+    const startedAt = Date.now();
     try {
-      const answer = await api.invokeCapability(pkg.id, actionName, {});
+      const answer = await api.invokeWidget(pkg.id, actionName, {});
       setResult(formatValue(answer.value));
+      setDurationMs(typeof answer.durationMs === "number" ? answer.durationMs : Date.now() - startedAt);
     } catch (cause) {
       setFailed(true);
       setResult(cause instanceof Error ? cause.message : String(cause));
+      setDurationMs(Date.now() - startedAt);
     } finally {
       setRunning(false);
     }
   };
 
+  const status = failed ? t("widgets.resultFailed") : t("widgets.resultOk");
+
   return (
-    <li className="capabilities-action-row">
-      <div className="capabilities-action">
-        <code className="capabilities-action-name">{actionName}</code>
-        <span className="capabilities-action-description">{description}</span>
+    <li className="widgets-action-row">
+      <div className="widgets-action">
+        <code className="widgets-action-name">{actionName}</code>
+        <span className="widgets-action-description">{description}</span>
         <Button
           variant="ghost"
           size="sm"
-          className="capabilities-action-run"
+          className="widgets-action-run"
           disabled={!pkg.enabled || pkg.trust !== "trusted" || running}
           onClick={() => void run()}
         >
-          {running ? t("capabilities.running") : t("capabilities.run")}
+          {running ? t("widgets.running") : t("widgets.run")}
         </Button>
       </div>
       {result !== null ? (
-        <pre
-          className={`capabilities-action-result${failed ? " is-error" : ""}`}
-          data-capability-result={actionName}
-        >
-          {result}
-        </pre>
+        <div className="widgets-result" data-widget-result={actionName}>
+          <button
+            type="button"
+            className={`widgets-result-toggle${failed ? " is-error" : ""}`}
+            aria-expanded={expanded}
+            data-widget-expanded={expanded ? "true" : "false"}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? (
+              <IconChevronDown size={12} aria-hidden />
+            ) : (
+              <IconChevronRight size={12} aria-hidden />
+            )}
+            <span className="widgets-result-status">{status}</span>
+            <span className="widgets-result-duration">{formatDuration(durationMs)}</span>
+            <span className="widgets-result-hint">
+              {expanded ? t("widgets.hideResult") : t("widgets.showResult")}
+            </span>
+          </button>
+          {expanded ? (
+            <pre className={`widgets-action-result${failed ? " is-error" : ""}`}>{result}</pre>
+          ) : null}
+        </div>
       ) : null}
     </li>
   );
+}
+
+/** Milliseconds once, seconds above 1000 — the two scales a user can feel. */
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
 }
 
 /** JSON when it is an object, a bare string when the action returned one. */
@@ -501,22 +539,22 @@ function formatValue(value: unknown): string {
   }
 }
 
-function TrustBadge({ trust }: { trust: CapabilityTrust }) {
+function TrustBadge({ trust }: { trust: WidgetTrust }) {
   const { t } = useTranslation();
   const tone = trust === "trusted" ? "success" : trust === "modified" ? "warning" : "neutral";
   return (
-    <Badge tone={tone} className="capabilities-trust">
-      {t(`capabilities.trust.${trust}`)}
+    <Badge tone={tone} className="widgets-trust">
+      {t(`widgets.trust.${trust}`)}
     </Badge>
   );
 }
 
-function RuntimeLabel({ state }: { state?: CapabilityRuntimeState }) {
+function RuntimeLabel({ state }: { state?: WidgetRuntimeState }) {
   const { t } = useTranslation();
-  if (!state) return <span className="capabilities-muted">{t("capabilities.runtimeAbsent")}</span>;
+  if (!state) return <span className="widgets-muted">{t("widgets.runtimeAbsent")}</span>;
   return (
-    <span className={`capabilities-runtime is-${state.state}`}>
-      {t(`capabilities.runtime.${state.state}`)}
+    <span className={`widgets-runtime is-${state.state}`}>
+      {t(`widgets.runtime.${state.state}`)}
     </span>
   );
 }
@@ -525,19 +563,19 @@ function PermissionBadges({
   requested,
   granted,
 }: {
-  requested: CapabilitySummary["requestedPermissions"];
-  granted: CapabilitySummary["grantedPermissions"];
+  requested: WidgetSummary["requestedPermissions"];
+  granted: WidgetSummary["grantedPermissions"];
 }) {
   if (requested.length === 0) return null;
   return (
-    <span className="capabilities-permissions">
+    <span className="widgets-permissions">
       {requested.map((permission) => {
         const held = granted.includes(permission);
         return (
           <Badge
             key={permission}
             tone={held ? "neutral" : "warning"}
-            className={`capabilities-permission${held ? "" : " is-denied"}`}
+            className={`widgets-permission${held ? "" : " is-denied"}`}
           >
             {permission}
           </Badge>
