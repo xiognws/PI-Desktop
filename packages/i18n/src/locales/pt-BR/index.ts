@@ -1322,6 +1322,7 @@ export const ptBR = {
     skillBatchFailed: "Falha ao importar {{count}} pastas. Primeiro erro: {{first}}",
     skillsEmpty: "Nenhuma habilidade nesta pasta",
     skillUsageNever: "Nunca usada",
+    skillUsageIdle: "{{days}} d sem uso",
     skillUsageUsed: "Usada {{count}}×",
     skillUsageUnusedOf: "{{unused}} de {{total}} nunca usadas",
     skillCurateTitle: "Manutenção de habilidades",

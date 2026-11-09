@@ -1342,6 +1342,7 @@ sklm: {
     "skillBatchFailed": "No se pudieron importar {{count}} carpetas. Primer error: {{first}}",
     "skillsEmpty": "No hay habilidades en esta carpeta",
     "skillUsageNever": "Nunca usada",
+    "skillUsageIdle": "{{days}} d sin uso",
     "skillUsageUsed": "Usada {{count}}×",
     "skillUsageUnusedOf": "{{unused}} de {{total}} nunca usadas",
     "skillCurateTitle": "Mantenimiento de habilidades",

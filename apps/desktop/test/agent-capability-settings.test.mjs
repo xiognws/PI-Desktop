@@ -512,7 +512,10 @@ test("MCP OAuth error events use localized recovery copy when available", () => 
 test("a skill row says whether the model ever loaded it, and the group says how many", () => {
   // The count comes from the host (`skills.recordUse`), so the page must read the
   // record field rather than guess from timestamps or file dates.
-  assert.match(skills, /import \{ skillUsageBadge, tallySkillUsage \} from "\.\.\/\.\.\/lib\/skill-usage"/);
+  assert.match(skills, /from "\.\.\/\.\.\/lib\/skill-usage"/);
+  assert.match(skills, /skillUsageBadge/);
+  assert.match(skills, /skillIdleBadge\(curationRows\.get\(skill\.id\)\)/);
+  assert.match(skills, /settings\.skillUsageIdle/);
   assert.match(skills, /\{usageBadge\(skill\)\}/);
   assert.match(skills, /settings\.skillUsageNever/);
   assert.match(skills, /settings\.skillUsageUsed/);

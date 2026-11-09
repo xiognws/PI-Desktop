@@ -39,3 +39,31 @@ export function skillUsageBadge(
   if (skill.useCount === undefined) return undefined;
   return skill.useCount === 0 ? { kind: "never" } : { kind: "used", count: skill.useCount };
 }
+
+/** The maintenance state of one skill, as the curation report describes it. */
+export type SkillCurationRow = { id: string; idleDays: number; state: "keep" | "stale" | "archive" };
+
+/**
+ * The row a curation report is about, by id.
+ *
+ * The report and the skill list are two reads of the same library; keying by id
+ * keeps a row's badge correct when one of them refreshes before the other.
+ */
+export function curationById(
+  entries: readonly SkillCurationRow[] | undefined,
+): Map<string, SkillCurationRow> {
+  return new Map((entries ?? []).map((entry) => [entry.id, entry]));
+}
+
+/**
+ * The idle badge a row shows, or `undefined`.
+ *
+ * Only a skill the pass would actually touch carries one: "idle 12 days" on a
+ * skill nobody is about to archive is noise next to the used/never badge.
+ */
+export function skillIdleBadge(
+  entry: SkillCurationRow | undefined,
+): { days: number; archivable: boolean } | undefined {
+  if (!entry || entry.state === "keep") return undefined;
+  return { days: entry.idleDays, archivable: entry.state === "archive" };
+}

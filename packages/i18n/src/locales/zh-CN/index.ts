@@ -1339,6 +1339,7 @@ sklm: {
     skillBatchFailed: "{{count}} 个文件夹导入失败。首个错误：{{first}}",
     skillsEmpty: "此目录中没有技能",
     skillUsageNever: "从未使用",
+    skillUsageIdle: "{{days}} 天未使用",
     skillUsageUsed: "已用 {{count}} 次",
     skillUsageUnusedOf: "{{total}} 个中 {{unused}} 个从未使用",
     skillCurateTitle: "技能维护",

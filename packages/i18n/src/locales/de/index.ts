@@ -1342,6 +1342,7 @@ sklm: {
     "skillBatchFailed": "{{count}} Ordner konnten nicht importiert werden. Erster Fehler: {{first}}",
     "skillsEmpty": "Keine Fähigkeiten in diesem Ordner",
     "skillUsageNever": "Nie verwendet",
+    "skillUsageIdle": "{{days}} T. ungenutzt",
     "skillUsageUsed": "{{count}}× verwendet",
     "skillUsageUnusedOf": "{{unused}} von {{total}} nie verwendet",
     "skillCurateTitle": "Fähigkeiten pflegen",

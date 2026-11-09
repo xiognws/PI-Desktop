@@ -1352,6 +1352,7 @@ sklm: {
     skillBatchFailed: "Failed to import {{count}} folders. First: {{first}}",
     skillsEmpty: "No skills in this folder",
     skillUsageNever: "Never used",
+    skillUsageIdle: "{{days}}d idle",
     skillUsageUsed: "Used {{count}}×",
     skillUsageUnusedOf: "{{unused}} of {{total}} never used",
     skillCurateTitle: "Skill maintenance",

@@ -53,7 +53,12 @@ import { ImportToggleButton } from "../../features/settings/import-workbench";
 
 import { SettingsRow, SettingsCard } from "../../features/settings/primitives";
 import { SettingsToggle, TooltipButton } from "../ui";
-import { skillUsageBadge, tallySkillUsage } from "../../lib/skill-usage";
+import {
+  curationById,
+  skillIdleBadge,
+  skillUsageBadge,
+  tallySkillUsage,
+} from "../../lib/skill-usage";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
 
 function projectSkillsPath(projectPath: string | null): string {
@@ -459,16 +464,29 @@ export function AgentSkillsPage() {
     ? curation.entries.filter((entry) => entry.state === "archive").length
     : 0;
 
-  /** A row's usage state, as a badge beside its level. */
+  /** Curation entries by skill id, so a row can say how idle it is. */
+  const curationRows = useMemo(() => curationById(curation?.entries), [curation]);
+
+  /** A row's usage state, as badges beside its level. */
   const usageBadge = (skill: UserSkillRecord) => {
     const badge = skillUsageBadge(skill);
-    if (!badge) return null;
+    const idle = skillIdleBadge(curationRows.get(skill.id));
     return (
-      <span className="agent-capability-badge">
-        {badge.kind === "never"
-          ? t("settings.skillUsageNever")
-          : t("settings.skillUsageUsed", { count: badge.count })}
-      </span>
+      <>
+        {badge ? (
+          <span className="agent-capability-badge">
+            {badge.kind === "never"
+              ? t("settings.skillUsageNever")
+              : t("settings.skillUsageUsed", { count: badge.count })}
+          </span>
+        ) : null}
+        {idle ? (
+          // The archive button says how many it would turn off; this says which.
+          <span className="agent-capability-badge">
+            {t("settings.skillUsageIdle", { days: idle.days })}
+          </span>
+        ) : null}
+      </>
     );
   };
 

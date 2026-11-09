@@ -1348,6 +1348,7 @@ sklm: {
     skillBatchFailed: "폴더 {{count}}개를 가져오지 못했습니다. 첫 번째 오류: {{first}}",
     skillsEmpty: "이 폴더에 스킬 없음",
     skillUsageNever: "사용된 적 없음",
+    skillUsageIdle: "{{days}}일 미사용",
     skillUsageUsed: "{{count}}회 사용",
     skillUsageUnusedOf: "{{total}}개 중 {{unused}}개 사용된 적 없음",
     skillCurateTitle: "스킬 유지 관리",

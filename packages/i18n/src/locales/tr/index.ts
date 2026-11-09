@@ -1348,6 +1348,7 @@ sklm: {
     skillBatchFailed: "{{count}} klasör içe aktarılamadı. İlk hata: {{first}}",
     skillsEmpty: "Bu klasörde beceri yok",
     skillUsageNever: "Hiç kullanılmadı",
+    skillUsageIdle: "{{days}} gündür boşta",
     skillUsageUsed: "{{count}}× kullanıldı",
     skillUsageUnusedOf: "{{total}} tanesinden {{unused}} tanesi hiç kullanılmadı",
     skillCurateTitle: "Beceri bakımı",

@@ -1342,6 +1342,7 @@ sklm: {
     "skillBatchFailed": "Échec de l'import de {{count}} dossiers. Premier échec : {{first}}",
     "skillsEmpty": "Aucune compétence dans ce dossier",
     "skillUsageNever": "Jamais utilisée",
+    "skillUsageIdle": "{{days}} j inactif",
     "skillUsageUsed": "Utilisée {{count}}×",
     "skillUsageUnusedOf": "{{unused}} sur {{total}} jamais utilisées",
     "skillCurateTitle": "Maintenance des compétences",
