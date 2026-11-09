@@ -324,12 +324,15 @@ export function CapabilityGroupHeader({
   label,
   path,
   count,
+  note,
   action,
 }: {
   label: string;
   /** Resolved `.agents` path; omit for shipped sources that have no file. */
   path?: string;
   count: number;
+  /** Optional short state beside the number ("5 of 12 never used"). */
+  note?: string;
   action?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -349,6 +352,7 @@ export function CapabilityGroupHeader({
       >
         {count}
       </span>
+      {note ? <span className="agent-capability-group-note">{note}</span> : null}
       {action ? <span className="agent-capability-group-action">{action}</span> : null}
     </div>
   );

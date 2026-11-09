@@ -149,6 +149,10 @@ export type UserSkillRecord = {
   sizeBytes: number;
   createdAt: string;
   updatedAt: string;
+  /** Last load through the `Skill` tool, epoch ms. Absent means never loaded. */
+  lastUsedAt?: number;
+  /** Number of loads. `skills.recordUse` is the only writer. */
+  useCount?: number;
 };
 
 /** A skill bundled with Pi-Workspace and enabled globally by default. */

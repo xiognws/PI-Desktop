@@ -1892,6 +1892,16 @@
   line-height: var(--leading-normal);
 }
 
+/* A short state beside the count ("5 of 12 never used"): same weight as the
+   count, without the pill, so it reads as a note rather than a second number. */
+.agent-capability-group-note {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-normal);
+}
+
 /* Natural-height list of row tiles; the gap is the divider (D297). */
 .agent-capability-list {
   display: flex;

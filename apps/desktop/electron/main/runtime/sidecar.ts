@@ -689,6 +689,23 @@ export function createSidecarRuntime({
         loadBuiltinSkillBody(id) ??
         (await loadUserSkillBody(id, projectPath)) ??
         plugins.loadSkillBody(id);
+      // Count the load before answering, but never fail it: a bookkeeping write
+      // that loses a race with a host restart costs a badge, not the document.
+      // Built-in and plugin skills are not in the user library, and the host
+      // answers `recorded: false` for them without an error.
+      if (runtimeState.host) {
+        await runtimeState.host
+          .call("skills.recordUse", {
+            id,
+            ...(projectPath ? { projectPath } : {}),
+          })
+          .catch((error: unknown) => {
+            logger.app("runtime", "warn", "skill usage was not recorded", {
+              event: "skill.recordUseFailed",
+              data: { error: error instanceof Error ? error.message : String(error) },
+            });
+          });
+      }
       return {
         ok: true,
         content: formatSkillToolContent(skill, listSkillReferences(skill.location)),

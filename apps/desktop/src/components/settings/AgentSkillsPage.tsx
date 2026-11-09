@@ -52,6 +52,7 @@ import { ImportToggleButton } from "../../features/settings/import-workbench";
 
 import { SettingsRow, SettingsCard } from "../../features/settings/primitives";
 import { SettingsToggle, TooltipButton } from "../ui";
+import { skillUsageBadge, tallySkillUsage } from "../../lib/skill-usage";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
 
 function projectSkillsPath(projectPath: string | null): string {
@@ -397,6 +398,39 @@ export function AgentSkillsPage() {
     project: visible.project.length,
   };
 
+  /**
+   * What the model has actually loaded, per level.
+   *
+   * `useCount` is written by `skills.recordUse` whenever the `Skill` tool loads a
+   * document, so "never used" means "no session has opened this", not "this
+   * release forgot to count" — an older host omits the field and no badge shows.
+   */
+  const usage = {
+    // Tallied over the rows the group header is counting, so a search cannot show
+    // "2" beside a note about twelve skills.
+    global: tallySkillUsage(visible.global),
+    project: tallySkillUsage(visible.project),
+  };
+
+  /** A row's usage state, as a badge beside its level. */
+  const usageBadge = (skill: UserSkillRecord) => {
+    const badge = skillUsageBadge(skill);
+    if (!badge) return null;
+    return (
+      <span className="agent-capability-badge">
+        {badge.kind === "never"
+          ? t("settings.skillUsageNever")
+          : t("settings.skillUsageUsed", { count: badge.count })}
+      </span>
+    );
+  };
+
+  const usageNote = (level: "global" | "project") => {
+    const { unused, total } = usage[level];
+    if (total === 0 || unused === 0) return undefined;
+    return t("settings.skillUsageUnusedOf", { unused, total });
+  };
+
   const projectName = useMemo(
     () =>
       options.find((project) => project.path === selectedProjectPath)?.name ??
@@ -547,6 +581,7 @@ export function AgentSkillsPage() {
             {skill.source === "imported" ? (
               <span className="agent-capability-badge">{t("settings.imported")}</span>
             ) : null}
+            {usageBadge(skill)}
           </>
         }
         description={skill.description || t("settings.noCapabilityDescription")}
@@ -765,6 +800,7 @@ export function AgentSkillsPage() {
                   label={t("settings.globalLevel")}
                   path={GLOBAL_SKILLS_PATH}
                   count={visible.global.length}
+                  note={usageNote("global")}
                   action={importButton("global")}
                 />
                 {visible.global.length === 0 ? (
@@ -789,6 +825,7 @@ export function AgentSkillsPage() {
                   label={t("settings.projectLevel")}
                   path={projectSkillsPath(selectedProjectPath)}
                   count={visible.project.length}
+                  note={usageNote("project")}
                   action={selectedProjectPath ? importButton("project") : undefined}
                 />
                 {!selectedProjectPath ? (

@@ -1679,6 +1679,15 @@ one-liner.
 - `skills.setEnabled({ id, enabled, level, projectPath? })`
 - `skills.disabledBuiltins()` → `{ disabled: string[] }`
 - `skills.setBuiltinEnabled({ id, enabled })` → `{ id, enabled }`
+- `skills.recordUse({ id, projectPath? })` → `{ recorded, skill?, useCount?, lastUsedAt? }`
+  — one load of a user skill, counted by the `Skill` tool right after the
+  document is served. The lookup is the same one `read` uses, so a project
+  document is counted against its own project. An id this library does not own
+  (a built-in, a plugin document) answers `{ recorded: false }` — a normal miss,
+  not an error. Counters live in `<data>/agent-capabilities/skill-usage.json`,
+  are swept on every scan so a deleted document cannot hand its count to a
+  same-named successor, and surface on `UserSkillRecord` as
+  `useCount` / `lastUsedAt`.
 
 Built-in skill activation is global and defaults to enabled. Host stores only
 disabled IDs in `<data>/agent-capabilities/skill-builtins.json`, separately

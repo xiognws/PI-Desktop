@@ -5642,6 +5642,27 @@ async fn handle_request(
                 crate::user_skills::tidy::tidy_library(&root, &policy).map_err(skill_err)?;
             Ok(json!({ "report": report, "root": root.to_string_lossy() }))
         }
+        "skills.recordUse" => {
+            // The model loaded a document; the library counts it. A built-in or
+            // plugin skill is not in this library, so `recorded: false` is a
+            // normal answer, not a failure — the load itself already succeeded.
+            let id = require_id(&params)?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            match st
+                .user_skills
+                .record_use(&id, project_path)
+                .map_err(skill_err)?
+            {
+                Some((skill, usage)) => Ok(json!({
+                    "recorded": true,
+                    "skill": skill,
+                    "useCount": usage.use_count,
+                    "lastUsedAt": usage.last_used_at,
+                })),
+                None => Ok(json!({ "recorded": false })),
+            }
+        }
         "skills.read" => {
             let id = require_id(&params)?;
             let level = params
@@ -6110,6 +6131,101 @@ mod tests {
         assert!(result["root"]
             .as_str()
             .is_some_and(|root| root.ends_with("skills")));
+    }
+
+    #[tokio::test]
+    async fn skill_usage_rpc_counts_loads_and_a_delete_drops_them() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project_dir = tempfile::tempdir().unwrap();
+        let project = project_dir.path().to_string_lossy().to_string();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        // Project level on purpose: the global library resolves through the
+        // user's home directory, which other tests in this binary redirect.
+        let query = json!({ "level": "project", "projectPath": project });
+        let created = handle_request(
+            state.clone(),
+            "skills.create",
+            json!({ "skill": {
+                "name": "Usage probe",
+                "description": "d",
+                "body": "# Probe
+",
+                "level": "project",
+                "projectPath": project,
+            } }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let id = created["skill"]["id"].as_str().unwrap().to_string();
+
+        // A fresh document: listed, and nothing has loaded it yet.
+        let listed = handle_request(state.clone(), "skills.list", query.clone(), tx.clone())
+            .await
+            .unwrap();
+        let row = listed["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == json!(id))
+            .expect("the created skill is listed");
+        assert_eq!(row["useCount"], json!(0));
+        assert!(
+            row.get("lastUsedAt").is_none(),
+            "never loaded has no timestamp"
+        );
+
+        let record = json!({ "id": id, "projectPath": project });
+        let first = handle_request(
+            state.clone(),
+            "skills.recordUse",
+            record.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(first["recorded"], json!(true));
+        assert_eq!(first["useCount"], json!(1));
+        let second = handle_request(
+            state.clone(),
+            "skills.recordUse",
+            record.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(second["useCount"], json!(2));
+
+        // The list is the reader the UI uses; it has to carry the counter.
+        let listed = handle_request(state.clone(), "skills.list", query.clone(), tx.clone())
+            .await
+            .unwrap();
+        let row = listed["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == json!(id))
+            .unwrap();
+        assert_eq!(row["useCount"], json!(2));
+        assert!(row["lastUsedAt"].is_number());
+
+        // Deleting the document drops its counters with it.
+        handle_request(
+            state.clone(),
+            "skills.remove",
+            json!({ "id": id, "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let after = handle_request(state, "skills.recordUse", record, tx)
+            .await
+            .unwrap();
+        assert_eq!(after["recorded"], json!(false));
     }
 
     #[tokio::test]

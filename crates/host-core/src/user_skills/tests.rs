@@ -6,6 +6,9 @@ use tempfile::tempdir;
 #[path = "tests_lifecycle.rs"]
 mod lifecycle;
 
+#[path = "tests_usage.rs"]
+mod usage;
+
 fn input(name: &str, level: &str, project_path: Option<&str>) -> UserSkillInput {
     UserSkillInput {
         name: Some(name.into()),
@@ -84,6 +87,8 @@ fn disabled_project_skill_shadows_global_skill() {
         size_bytes: 1,
         created_at: String::new(),
         updated_at: String::new(),
+        last_used_at: None,
+        use_count: 0,
     };
     let mut project = global.clone();
     project.level = Some("project".into());
@@ -256,6 +261,8 @@ fn record(id: &str, name: &str) -> UserSkillRecord {
         size_bytes: 0,
         created_at: String::new(),
         updated_at: String::new(),
+        last_used_at: None,
+        use_count: 0,
     }
 }
 

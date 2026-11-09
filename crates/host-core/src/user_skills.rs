@@ -1,3 +1,4 @@
+use self::usage::{SkillUsage, SkillUsageStore};
 use crate::activation::ActivationScope;
 use crate::agent_capabilities::{
     capability_dir, capability_id, copy_directory_tree, display_name_candidate, file_timestamp,
@@ -50,6 +51,14 @@ pub struct UserSkillRecord {
     pub size_bytes: u64,
     pub created_at: String,
     pub updated_at: String,
+    /// Last time this document was loaded through the `Skill` tool, epoch ms.
+    /// Absent means never loaded — the one signal a maintenance pass has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_used_at: Option<i64>,
+    /// Number of loads. Serialized even when zero, so a reader can tell "never
+    /// used" from "this release did not report usage".
+    #[serde(default)]
+    pub use_count: u32,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -113,6 +122,9 @@ impl ImportShape {
 pub struct UserSkillRegistry {
     state: CapabilityState,
     builtins: CapabilityState,
+    /// Loads, not edits: what a maintenance pass needs to tell a skill somebody
+    /// uses from one nobody has ever opened.
+    usage: SkillUsageStore,
 }
 
 /// Place a single skill file at `target`, either as a copy or a symlink.
@@ -903,6 +915,7 @@ impl UserSkillRegistry {
         Self {
             state: CapabilityState::new(data_dir, SKILL_KIND),
             builtins: CapabilityState::new(data_dir, BUILTIN_SKILL_KIND),
+            usage: SkillUsageStore::new(data_dir),
         }
     }
 
@@ -987,6 +1000,7 @@ impl UserSkillRegistry {
                 .map(|value| clip(value, MAX_DESCRIPTION_CHARS))
                 .filter(|value| !value.is_empty());
             let updated_at = file_timestamp(&path);
+            let usage = self.usage.get(level, &id, owner_project_path.as_deref());
             records.push(UserSkillRecord {
                 id,
                 name,
@@ -1000,10 +1014,16 @@ impl UserSkillRegistry {
                 size_bytes: raw.len() as u64,
                 created_at: updated_at.clone(),
                 updated_at,
+                last_used_at: usage.map(|usage| usage.last_used_at),
+                use_count: usage.map(|usage| usage.use_count).unwrap_or(0),
             });
         }
-        let ids = records.iter().map(|record| record.id.clone()).collect();
+        let ids: HashSet<String> = records.iter().map(|record| record.id.clone()).collect();
         self.state.prune(SKILL_KIND, level, project_path, &ids)?;
+        // Same sweep for the counters: a document that no longer exists must not
+        // hand its "used twice" badge to whatever is created next under that name.
+        self.usage
+            .retain(level, owner_project_path.as_deref(), &ids)?;
         records.sort_by(|a, b| {
             a.name
                 .to_lowercase()
@@ -1537,6 +1557,19 @@ impl UserSkillRegistry {
         }
         delete_skill_files(&PathBuf::from(&record.path), &roots)?;
         let level = record_level;
+        // The counters belonged to that document. Dropping them here is the
+        // *intentional* delete; the scan's sweep covers files removed on disk.
+        self.usage.forget(
+            level,
+            &record.id,
+            Some(
+                record
+                    .project_path
+                    .as_deref()
+                    .unwrap_or_else(|| project_path.unwrap_or("")),
+            )
+            .filter(|path| !path.is_empty()),
+        );
         let _ = self.find(id, Some(level), record.project_path.as_deref())?;
         Ok(true)
     }
@@ -1571,6 +1604,32 @@ impl UserSkillRegistry {
         )
     }
 
+    /// Record one load of a user skill.
+    ///
+    /// The id alone is enough to mean "the document the model would load": the
+    /// lookup is the same one `read` uses, so a project document is recorded
+    /// against its own project. A built-in or plugin skill is not in this
+    /// library and returns `None` — the caller records what it can, and a load
+    /// the library cannot identify costs nothing.
+    pub fn record_use(
+        &mut self,
+        id: &str,
+        project_path: Option<&str>,
+    ) -> Result<Option<(UserSkillRecord, SkillUsage)>> {
+        let Some(record) = self.find(id, None, project_path)? else {
+            return Ok(None);
+        };
+        let level = record
+            .level
+            .as_deref()
+            .map(|value| CapabilityLevel::parse(Some(value)))
+            .transpose()?
+            .unwrap_or(CapabilityLevel::Global);
+        let owner_project = record.project_path.as_deref().or(project_path);
+        let usage = self.usage.record(level, &record.id, owner_project)?;
+        Ok(Some((record, usage)))
+    }
+
     pub fn set_scope(
         &mut self,
         id: &str,
@@ -1599,6 +1658,7 @@ mod package_sync;
 #[cfg(test)]
 mod package_tests;
 pub mod tidy;
+mod usage;
 
 #[cfg(test)]
 mod tests;

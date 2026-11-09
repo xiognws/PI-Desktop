@@ -1287,6 +1287,12 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 - `skills.read({ id, level?, projectPath? })` → `{ skill, body }`
 - `skills.remove({ id, level?, projectPath? })`
 - `skills.setEnabled({ id, enabled, level, projectPath? })`
+- `skills.recordUse({ id, projectPath? })` → `{ recorded, skill?, useCount?, lastUsedAt? }`
+  —— 由 `Skill` 工具在文档交付后立即记一次「被加载」。查找与 `read` 同一条路径，
+  因此项目级文档记在它自己的项目上；本库不拥有的 id（内置技能、插件文档）返回
+  `{ recorded: false }`，属正常未命中而非错误。计数落在
+  `<data>/agent-capabilities/skill-usage.json`，每次扫描同步清理，避免被删除的文档
+  把计数留给同名后继；并通过 `UserSkillRecord` 的 `useCount` / `lastUsedAt` 暴露。
 
 列表包含由 frontmatter 得出的 `name` 和 `description`，不包含正文。只有描述
 进入提示，模型调用 `Skill` 时才读取正文 (D174)。缺失文件会在下一次扫描时

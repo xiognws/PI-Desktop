@@ -508,3 +508,18 @@ test("MCP OAuth error events use localized recovery copy when available", () => 
   assert.match(mcp, /mcpOAuthErrorTranslationKey\(event\.errorCode\)/);
   assert.match(mcp, /\(errorKey && t\(errorKey\)\) \|\| event\.message/);
 });
+
+test("a skill row says whether the model ever loaded it, and the group says how many", () => {
+  // The count comes from the host (`skills.recordUse`), so the page must read the
+  // record field rather than guess from timestamps or file dates.
+  assert.match(skills, /import \{ skillUsageBadge, tallySkillUsage \} from "\.\.\/\.\.\/lib\/skill-usage"/);
+  assert.match(skills, /\{usageBadge\(skill\)\}/);
+  assert.match(skills, /settings\.skillUsageNever/);
+  assert.match(skills, /settings\.skillUsageUsed/);
+  assert.match(skills, /settings\.skillUsageUnusedOf/);
+  // The tally rides the existing group header instead of a second toolbar.
+  assert.match(skills, /note=\{usageNote\("global"\)\}/);
+  assert.match(skills, /note=\{usageNote\("project"\)\}/);
+  assert.match(layout, /note\?: string/);
+  assert.match(styles, /\.agent-capability-group-note\b/);
+});
