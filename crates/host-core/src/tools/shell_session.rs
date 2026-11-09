@@ -734,8 +734,10 @@ impl LiveSession {
         // buffer is only ever seen by the tool result — a live renderer would
         // never receive `tools.output` at all.
         if emit {
-            run.notifications.push(OutputStream::Stdout, run.stdout.finish());
-            run.notifications.push(OutputStream::Stderr, run.stderr.finish());
+            run.notifications
+                .push(OutputStream::Stdout, run.stdout.finish());
+            run.notifications
+                .push(OutputStream::Stderr, run.stderr.finish());
             run.notifications.finish();
         }
         run
