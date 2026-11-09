@@ -1436,6 +1436,14 @@ does not automatically trigger another callback. This path does not restore
 the withdrawn `A2A` or `Peer` tools and does not change `Task`, `TaskWait`,
 `TaskList`, or `TaskStop` semantics.
 
+In the bundled build (ADR 0384) the vendored plugin sends
+`notifyOnCompletion: true` for `spawn` and for a `send` that is not
+`kind: "message"`, so a supervising session receives the worker's completion
+and continues on its own; the host queues it through the existing durable turn
+queue when that session is busy. A `kind: "message"` send and an explicit
+`notifyOnCompletion: false` keep the pull behavior, where `result` is the only
+read and no callback is generated.
+
 ## 6. Providers & models
 
 > Full policy: `11-provider-model-system.md`, `12-provider-config-schema.md`, `13-model-catalog-and-selection.md`.
