@@ -14,6 +14,9 @@ function fakeHost(
     createError?: string;
     writeError?: string;
     deleteOk?: boolean;
+    absorbError?: string;
+    absorbCopied?: string[];
+    absorbSkipped?: string[];
   } = {},
 ) {
   const calls: Call[] = [];
@@ -39,6 +42,13 @@ function fakeHost(
             throw new Error(options.writeError);
           }
           return { path: input.path } as T;
+        case "skills.absorb":
+          if (options.absorbError) throw new Error(options.absorbError);
+          return {
+            copied: options.absorbCopied ?? ["references/b.md"],
+            skipped: options.absorbSkipped ?? [],
+            absorbed: { id: input.id, name: input.id, absorbedInto: input.into },
+          } as T;
         case "skills.remove":
           return { ok: options.deleteOk ?? true } as T;
         default:
@@ -48,8 +58,12 @@ function fakeHost(
   };
 }
 
-async function run(host: ReturnType<typeof fakeHost>, params: Record<string, unknown>) {
-  const tool = createSkillManageTool(host as never);
+async function run(
+  host: ReturnType<typeof fakeHost>,
+  params: Record<string, unknown>,
+  options: { projectPath?: string } = {},
+) {
+  const tool = createSkillManageTool(host as never, options);
   const result = (await tool.execute("call-1", params as never, undefined as never)) as {
     content: { text: string }[];
     isError?: boolean;
@@ -246,5 +260,82 @@ describe("skill_manage: arguments", () => {
     const { result } = await run(host, { action: "create", name: "x" });
     expect(result.isError).toBe(true);
     expect(result.details).toMatchObject({ errorCode: "SKILL_CREATE_FAILED" });
+  });
+});
+
+describe("skill_manage absorb", () => {
+  it("merges into the umbrella and reports what moved", async () => {
+    const host = fakeHost({ absorbSkipped: ["references/shared.md"] });
+    const { text: message, result } = await run(host, {
+      action: "absorb",
+      name: "old-one",
+      into: "umbrella",
+    });
+    expect(host.calls.at(-1)).toEqual({
+      method: "skills.absorb",
+      params: { id: "old-one", into: "umbrella" },
+    });
+    expect(message).toContain("Merged `old-one` into `umbrella`.");
+    expect(message).toContain("Moved 1 file(s): references/b.md.");
+    expect(message).toContain("Kept the umbrella's own copy of: references/shared.md.");
+    expect(result.isError).toBeUndefined();
+  });
+
+  it("requires an umbrella, and refuses to absorb itself", async () => {
+    const host = fakeHost();
+    const missing = await run(host, { action: "absorb", name: "old-one" });
+    expect(missing.text).toContain("`into` is required");
+    expect(host.calls).toHaveLength(0);
+
+    const self = await run(host, { action: "absorb", name: "same", into: "same" });
+    expect(self.text).toContain("cannot absorb itself");
+    expect(host.calls).toHaveLength(0);
+  });
+
+  it("reports a host refusal as text the model can act on", async () => {
+    const host = fakeHost({ absorbError: "SKILL_INVALID: merging across scopes is a transfer" });
+    const { text: message, result } = await run(host, {
+      action: "absorb",
+      name: "a",
+      into: "b",
+    });
+    expect(message).toContain("across scopes");
+    // A refusal is ordinary text, not a tool failure: the model can pick a
+    // different umbrella in the same turn.
+    expect(result.isError).toBeUndefined();
+    expect(result.details?.errorCode).toBe("SKILL_INVALID_PATH");
+  });
+});
+
+describe("skill_manage resource scope", () => {
+  it("sends the session's project so a project skill can be written to", async () => {
+    const host = fakeHost();
+    await run(
+      host,
+      { action: "write_file", name: "scoped", file_path: "references/a.md", content: "# a" },
+      { projectPath: "D:/work/one" },
+    );
+    expect(host.calls.at(-1)?.params).toMatchObject({
+      id: "scoped",
+      path: "references/a.md",
+      level: "project",
+      projectPath: "D:/work/one",
+    });
+
+    await run(host, { action: "remove_file", name: "scoped", file_path: "references/a.md" }, {
+      projectPath: "D:/work/one",
+    });
+    expect(host.calls.at(-1)?.params).toMatchObject({ level: "project", projectPath: "D:/work/one" });
+  });
+
+  it("omits the scope when the session has no project", async () => {
+    const host = fakeHost();
+    await run(host, {
+      action: "write_file",
+      name: "global-one",
+      file_path: "references/a.md",
+      content: "# a",
+    });
+    expect(host.calls.at(-1)?.params).not.toHaveProperty("level");
   });
 });

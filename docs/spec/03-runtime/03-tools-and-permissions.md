@@ -304,6 +304,12 @@ it costs tokens only when it is loaded.
 
 | call | result |
 | --- | --- |
+`skill_manage` accepts `create`, `patch`, `write_file`, `remove_file`, `delete`, and
+`absorb`. `absorb` merges the named skill into the skill in `into`: its resource
+files move under the umbrella, collisions keep the umbrella's copy, and the source
+document is switched off rather than deleted (ADR 0389). Resource writes carry the
+session's `projectPath`, so a project-level skill can be addressed by id alone.
+
 | no `id` | the live library as it stands now. The prompt section is a snapshot frozen at session start, so a skill created mid-session — by `skill_manage`, or by the background review's fork — appears only here |
 | an `id` | that document, its `SKILL.md` path, and every `references/*.md` beside it, so a reference is read without guessing a filename or globbing the directory |
 

@@ -539,3 +539,14 @@ test("a skill can be pinned against the maintenance pass", () => {
   // report this page reads.
   assert.match(skills, /skillIdleBadge\(curationRows\.get\(skill\.id\)\)/);
 });
+
+test("merging is offered as a menu action with an explicit target picker", () => {
+  // A merge changes what the library means, so it opens a picker instead of
+  // acting on one click; the card names the source and lists only other rows at
+  // the same level.
+  assert.match(skills, /key: "merge"/);
+  assert.match(skills, /setMergeSource\(\{ skill, level \}\)/);
+  assert.match(skills, /api\.absorbUserSkill\(skill\.id, target\.id, levelQuery\(level\)\)/);
+  assert.match(skills, /row\.id !== mergeSource\.skill\.id/);
+  assert.match(skills, /settings\.skillMergeDone/);
+});

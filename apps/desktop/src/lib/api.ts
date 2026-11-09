@@ -1555,6 +1555,18 @@ export const api = {
    * Report the idle skills, or archive them when `dryRun` is explicitly false.
    * The host treats a missing `dryRun` as true, so the page asks first.
    */
+  /** Merge one skill into another: move its files, take it out of the catalog. */
+  absorbUserSkill: (
+    id: string,
+    into: string,
+    query?: AgentCapabilityQuery,
+  ) =>
+    invoke<{
+      absorbed: UserSkillRecord | null;
+      into: UserSkillRecord | null;
+      copied: string[];
+      skipped: string[];
+    }>(IPC.invoke.skillAbsorb, { id, into, ...(query ?? {}) }),
   /** Pin or unpin one skill: the user's "keep this one" against curation. */
   setUserSkillPinned: (
     id: string,

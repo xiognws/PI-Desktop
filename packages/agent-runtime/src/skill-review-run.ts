@@ -177,7 +177,7 @@ Read-before-write: before you patch an existing skill's SKILL.md, load it with \
 
 User-preference embedding (important): when the user expressed a style/format/workflow preference, the update belongs in the SKILL.md body, not just in memory. Memory captures 'who the user is and what the current situation and state of your operations are'; skills capture 'how to do this class of task for this user'. When they complain about how you handled a task, the skill that governs that task needs to carry the lesson.
 
-If you notice two existing skills that overlap, note it in your reply — consolidation at scale is a separate pass. Never delete a skill here.
+If you notice two existing skills that overlap, you may merge them — but only when the merge is obvious from what \`Skill\` returned in THIS review. Patch the umbrella's SKILL.md so it describes what it now covers, then call \`skill_manage\` with action \`absorb\`, \`name\` set to the redundant skill and \`into\` set to the umbrella. Its resource files move under the umbrella and its document leaves the catalog while staying on disk; nothing is deleted. Say in your reply which skills you merged and why. If the overlap is partial — two documents that each carry something the other lacks — do not absorb: note it in your reply and let a person decide. Never delete a skill here.
 
 Do NOT capture as skills${DO_NOT_CAPTURE_BLOCK}
 'Nothing to save.' is a real option but should NOT be the default. If the session ran smoothly with no corrections and produced no new technique, just say 'Nothing to save.' and stop. Otherwise, act.`;

@@ -41,6 +41,7 @@ const SKILL_MANAGE_DESCRIPTION = [
   "- `write_file` adds one file beside the skill's SKILL.md. `references/<topic>.md` is the usual choice (prose the model reads); `templates/`, `scripts/` and `assets/` hold what a procedure needs to run — a fill-in file, a program, a data file. Prefer this over a whole-document rewrite: it is a small write and cannot damage the document.",
   "- `remove_file` deletes one such file that is wrong or superseded.",
   "- `delete` removes a whole skill. Only when its content now lives somewhere better.",
+  "- `absorb` merges one skill into another: its resource files move under the umbrella (existing files are kept as the umbrella's) and it leaves the catalog. Nothing is deleted, so this is the right move when two skills turned out to be one topic — pass the redundant skill as `name` and the umbrella as `into`. Patch the umbrella first so its body describes what it now covers.",
   "",
   "Never create a near-duplicate of a skill you already have: patch it, or add a reference to it.",
   "",
@@ -56,6 +57,7 @@ const SKILL_MANAGE_PARAMETERS = Type.Object(
         Type.Literal("write_file"),
         Type.Literal("remove_file"),
         Type.Literal("delete"),
+        Type.Literal("absorb"),
       ],
       { description: "What to do with the library." },
     ),
@@ -89,6 +91,11 @@ const SKILL_MANAGE_PARAMETERS = Type.Object(
     content: Type.Optional(
       Type.String({ description: "write_file only. Markdown for the reference file." }),
     ),
+    into: Type.Optional(
+      Type.String({
+        description: "absorb only. Skill id of the umbrella that keeps the content.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -102,6 +109,7 @@ type RawParams = {
   new_string?: string;
   file_path?: string;
   content?: string;
+  into?: string;
 };
 
 function text(
@@ -185,7 +193,17 @@ async function patchSkill(host: SkillManageHost, params: RawParams) {
   }
 }
 
-async function writeResource(host: SkillManageHost, params: RawParams) {
+/** The scope fields a resource RPC needs to reach a project skill. */
+function scopeOf(options: SkillManageOptions): { level?: string; projectPath?: string } {
+  const projectPath = options.projectPath?.trim();
+  return projectPath ? { level: "project", projectPath } : {};
+}
+
+async function writeResource(
+  host: SkillManageHost,
+  params: RawParams,
+  options: SkillManageOptions,
+) {
   const id = params.name?.trim();
   const path = params.file_path?.trim();
   if (!id) return refused("`name` is required to write a reference file.", "SKILL_MISSING_NAME");
@@ -203,6 +221,7 @@ async function writeResource(host: SkillManageHost, params: RawParams) {
       id,
       path,
       content: params.content,
+      ...scopeOf(options),
     });
     return text(`Wrote \`${result?.path ?? path}\` into skill \`${id}\`.`, {
       id,
@@ -216,7 +235,11 @@ async function writeResource(host: SkillManageHost, params: RawParams) {
   }
 }
 
-async function removeResource(host: SkillManageHost, params: RawParams) {
+async function removeResource(
+  host: SkillManageHost,
+  params: RawParams,
+  options: SkillManageOptions,
+) {
   const id = params.name?.trim();
   const path = params.file_path?.trim();
   if (!id) return refused("`name` is required to remove a reference file.", "SKILL_MISSING_NAME");
@@ -227,12 +250,53 @@ async function removeResource(host: SkillManageHost, params: RawParams) {
     );
   }
   try {
-    await host.call("skills.removeFile", { id, path });
+    await host.call("skills.removeFile", { id, path, ...scopeOf(options) });
     return text(`Removed \`${path}\` from skill \`${id}\`.`, { id, action: "remove_file" });
   } catch (error) {
     const detail = String((error as { message?: string })?.message ?? error);
     if (/SKILL_INVALID/.test(detail)) return refused(detail, "SKILL_INVALID_PATH");
     return text(`The reference file was not removed: ${detail}`, { errorCode: "SKILL_REMOVE_FAILED" }, true);
+  }
+}
+
+async function absorbSkill(
+  host: SkillManageHost,
+  params: RawParams,
+  options: SkillManageOptions,
+) {
+  const id = params.name?.trim();
+  const into = params.into?.trim();
+  if (!id) return refused("`name` is required: the skill that should be absorbed.", "SKILL_MISSING_NAME");
+  if (!into) {
+    return refused(
+      "`into` is required: the umbrella skill that keeps the content.",
+      "SKILL_MISSING_INTO",
+    );
+  }
+  if (id === into) {
+    return refused("A skill cannot absorb itself.", "SKILL_INVALID_ACTION");
+  }
+  try {
+    const result = await host.call<{
+      copied?: string[];
+      skipped?: string[];
+      absorbed?: { name?: string; absorbedInto?: string };
+    }>("skills.absorb", { id, into, ...scopeOf(options) });
+    const copied = result?.copied ?? [];
+    const skipped = result?.skipped ?? [];
+    const parts = [
+      `Merged \`${id}\` into \`${into}\`.`,
+      copied.length ? `Moved ${copied.length} file(s): ${copied.join(", ")}.` : "No files needed moving.",
+      skipped.length
+        ? `Kept the umbrella's own copy of: ${skipped.join(", ")}.`
+        : "",
+      "The absorbed skill is out of the catalog; its document is still on disk, so a person can re-enable it.",
+    ].filter(Boolean);
+    return text(parts.join(" "), { id, into, action: "absorb", copied, skipped });
+  } catch (error) {
+    const detail = String((error as { message?: string })?.message ?? error);
+    if (/SKILL_INVALID/.test(detail)) return refused(detail, "SKILL_INVALID_PATH");
+    return text(`The merge did not happen: ${detail}`, { errorCode: "SKILL_ABSORB_FAILED" }, true);
   }
 }
 
@@ -256,7 +320,13 @@ async function deleteSkill(host: SkillManageHost, params: RawParams) {
  * with `create` and refine it with `patch`, never to re-send a whole document
  * it could not see (the Skills section is a snapshot, like memory).
  */
-export function createSkillManageTool(host: SkillManageHost): AgentTool {
+/** Where the session is scoped, so a project skill can be addressed by id. */
+export type SkillManageOptions = { projectPath?: string };
+
+export function createSkillManageTool(
+  host: SkillManageHost,
+  options: SkillManageOptions = {},
+): AgentTool {
   return {
     name: "skill_manage",
     label: "Skill",
@@ -271,14 +341,16 @@ export function createSkillManageTool(host: SkillManageHost): AgentTool {
         case "patch":
           return patchSkill(host, params);
         case "write_file":
-          return writeResource(host, params);
+          return writeResource(host, params, options);
         case "remove_file":
-          return removeResource(host, params);
+          return removeResource(host, params, options);
         case "delete":
           return deleteSkill(host, params);
+        case "absorb":
+          return absorbSkill(host, params, options);
         default:
           return refused(
-            "`action` must be one of create, patch, write_file, remove_file, delete.",
+            "`action` must be one of create, patch, write_file, remove_file, delete, absorb.",
             "SKILL_INVALID_ACTION",
           );
       }

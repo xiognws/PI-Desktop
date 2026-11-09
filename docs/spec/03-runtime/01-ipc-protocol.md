@@ -1690,6 +1690,12 @@ one-liner.
   are swept on every scan so a deleted document cannot hand its count to a
   same-named successor, and surface on `UserSkillRecord` as
   `useCount` / `lastUsedAt` / `pinned`.
+- `skills.absorb({ id, into, level?, projectPath? })` → `{ absorbed, into, copied, skipped }` —
+  merge one skill into another (ADR 0389). The source's resource files move under
+  the umbrella; a file the umbrella already has is kept as the umbrella's and
+  reported in `skipped`. The source document stays on disk and is only switched
+  off, so the merge is reversible, and its `absorbedInto` records where it went.
+  Both skills must live in the same scope; an unknown id is `SKILL_INVALID`.
 - `skills.setPinned({ id, pinned, level?, projectPath? })` → `{ skill }` — pin or
   unpin one skill. A pin is stored apart from activation (it says "keep this
   ready", not "this is off") and is the maintenance pass's only exemption: a

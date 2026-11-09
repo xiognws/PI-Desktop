@@ -417,3 +417,4 @@ Each ADR includes:
 | 0384 | [Capability packages run in the agent sidecar](0384-capability-packages-run-in-the-agent-sidecar.md) | Implemented candidate |
 | 0387 | [Skill curation by idle days](0387-skill-curation-by-idle-days.md) | Accepted (extends ADR 0377 and ADR 0379) |
 | 0388 | [A skill owns four resource containers](0388-skill-resource-containers.md) | Accepted (extends ADR 0379 and ADR 0303) |
+| 0389 | [Consolidating skills by absorbing one into another](0389-skill-consolidation-by-absorb.md) | Accepted (extends ADR 0387) |

@@ -5647,6 +5647,15 @@ async fn handle_request(
         }
         "skills.writeFile" => {
             let id = require_id(&params)?;
+            // A bare id only reaches the global library: a project skill lives
+            // under that project, so the caller that knows the scope says it.
+            let level = params
+                .get("level")
+                .and_then(Value::as_str)
+                .map(|value| CapabilityLevel::parse(Some(value)))
+                .transpose()
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
             let path = params
                 .get("path")
                 .and_then(Value::as_str)
@@ -5658,19 +5667,26 @@ async fn handle_request(
             let mut st = state.lock().await;
             let written = st
                 .user_skills
-                .write_resource(&id, None, None, path, content)
+                .write_resource(&id, level, project_path, path, content)
                 .map_err(skill_err)?;
             Ok(json!({ "path": written }))
         }
         "skills.removeFile" => {
             let id = require_id(&params)?;
+            let level = params
+                .get("level")
+                .and_then(Value::as_str)
+                .map(|value| CapabilityLevel::parse(Some(value)))
+                .transpose()
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
             let path = params
                 .get("path")
                 .and_then(Value::as_str)
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let mut st = state.lock().await;
             st.user_skills
-                .remove_resource(&id, None, None, path)
+                .remove_resource(&id, level, project_path, path)
                 .map_err(skill_err)?;
             Ok(json!({ "path": path }))
         }
@@ -5734,6 +5750,28 @@ async fn handle_request(
                 })),
                 None => Ok(json!({ "recorded": false })),
             }
+        }
+        "skills.absorb" => {
+            let id = require_id(&params)?;
+            let into = params
+                .get("into")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, String::from("into is required"), "INVALID_PARAMS"))?;
+            let level = params
+                .get("level")
+                .and_then(Value::as_str)
+                .map(|value| CapabilityLevel::parse(Some(value)))
+                .transpose()
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            let outcome = st
+                .user_skills
+                .absorb(&id, into, level, project_path)
+                .map_err(skill_err)?;
+            Ok(json!(outcome))
         }
         "skills.setPinned" => {
             let id = require_id(&params)?;
@@ -6393,6 +6431,124 @@ mod tests {
             .unwrap()
             .contains("pnpm and never runs npm install"));
         assert!(memory_hit["score"].as_f64().unwrap() > 0.0);
+    }
+
+    #[tokio::test]
+    async fn skill_absorb_rpc_moves_resources_and_records_where_they_went() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project_dir = tempfile::tempdir().unwrap();
+        let project = project_dir.path().to_string_lossy().to_string();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+        let query = json!({ "level": "project", "projectPath": project });
+
+        let create = |name: &str| {
+            json!({ "skill": {
+                "name": name,
+                "description": "d",
+                "body": format!("# {name}
+"),
+                "level": "project",
+                "projectPath": project,
+            } })
+        };
+        let umbrella = handle_request(
+            state.clone(),
+            "skills.create",
+            create("Umbrella"),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let umbrella_id = umbrella["skill"]["id"].as_str().unwrap().to_string();
+        let leaf = handle_request(state.clone(), "skills.create", create("Leaf"), tx.clone())
+            .await
+            .unwrap();
+        let leaf_id = leaf["skill"]["id"].as_str().unwrap().to_string();
+
+        for (id, path, body) in [
+            (
+                &umbrella_id,
+                "references/shared.md",
+                "# umbrella copy
+",
+            ),
+            (
+                &leaf_id,
+                "references/shared.md",
+                "# leaf copy
+",
+            ),
+            (
+                &leaf_id,
+                "references/only-leaf.md",
+                "# leaf only
+",
+            ),
+        ] {
+            handle_request(
+                state.clone(),
+                "skills.writeFile",
+                json!({ "id": id, "path": path, "content": body, "projectPath": project }),
+                tx.clone(),
+            )
+            .await
+            .unwrap();
+        }
+
+        let outcome = handle_request(
+            state.clone(),
+            "skills.absorb",
+            json!({ "id": leaf_id, "into": umbrella_id, "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(outcome["copied"], json!(["references/only-leaf.md"]));
+        assert_eq!(outcome["skipped"], json!(["references/shared.md"]));
+        assert_eq!(outcome["absorbed"]["enabled"], json!(false));
+        assert_eq!(outcome["absorbed"]["absorbedInto"], json!(umbrella_id));
+
+        // Running it again is a no-op that reports every path as skipped: the
+        // umbrella already had the one file and now has the other, so a second
+        // merge cannot overwrite the umbrella with the leaf's copy.
+        let again = handle_request(
+            state.clone(),
+            "skills.absorb",
+            json!({ "id": leaf_id, "into": umbrella_id, "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(again["copied"], json!([]));
+        assert_eq!(
+            again["skipped"],
+            json!(["references/only-leaf.md", "references/shared.md"])
+        );
+
+        // The absorbed document survives on disk, so this is reversible.
+        let listed = handle_request(state.clone(), "skills.list", query, tx.clone())
+            .await
+            .unwrap();
+        let leaf_row = listed["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == json!(leaf_id))
+            .unwrap();
+        assert_eq!(leaf_row["absorbedInto"], json!(umbrella_id));
+
+        // An unknown target is a plain error, not a silent no-op.
+        let failure = handle_request(
+            state,
+            "skills.absorb",
+            json!({ "id": leaf_id, "into": "no-such-skill", "level": "project", "projectPath": project }),
+            tx,
+        )
+        .await;
+        assert!(failure.is_err());
     }
 
     #[tokio::test]

@@ -41,6 +41,7 @@ import {
   IconBookOpen,
   IconDownload,
   IconFileText,
+  IconBranch,
   IconFolderOpen,
   IconPencil,
   IconPin,
@@ -156,6 +157,12 @@ export function AgentSkillsPage() {
    * leaves the card out rather than failing the page — it is a hint, not state.
    */
   const [curation, setCuration] = useState<SkillCurationReport | null>(null);
+  /** The row waiting for a merge target, set by the row menu. */
+  const [mergeSource, setMergeSource] = useState<{
+    skill: UserSkillRecord;
+    level: AgentCapabilityLevel;
+  } | null>(null);
+  const [merging, setMerging] = useState(false);
   const [curating, setCurating] = useState(false);
   const refreshCuration = useCallback(async () => {
     try {
@@ -217,6 +224,30 @@ export function AgentSkillsPage() {
    * The switch flips locally first and only reverts if the host refuses, so one
    * row's request never blanks the list or freezes the others.
    */
+  /** Merge the pending row into the chosen umbrella. */
+  const mergeInto = async (target: UserSkillRecord) => {
+    if (!mergeSource) return;
+    const { skill, level } = mergeSource;
+    setMerging(true);
+    try {
+      const result = await api.absorbUserSkill(skill.id, target.id, levelQuery(level));
+      setMergeSource(null);
+      showToast(
+        t("settings.skillMergeDone", {
+          name: skill.name || skill.id,
+          into: target.name || target.id,
+        }),
+      );
+      void result;
+      await load();
+      await refreshCuration();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      setMerging(false);
+    }
+  };
+
   /**
    * Pin or unpin one skill. A pin is what keeps the maintenance pass away from a
    * skill the user wants left alone, so it writes through the host like every
@@ -584,6 +615,18 @@ export function AgentSkillsPage() {
     const isArmed = armed === key;
     const items: CapabilityMenuItem[] = [
       {
+        // A merge is the only action here that changes what the library means, so
+        // it opens a picker instead of acting on one click.
+        key: "merge",
+        label: t("settings.skillMerge"),
+        icon: <IconBranch size={14} />,
+        disabled: busy,
+        onSelect: () => {
+          setMenuFor(null);
+          setMergeSource({ skill, level });
+        },
+      },
+      {
         key: "reveal",
         label: t("extensions.skills.reveal"),
         icon: <IconFolderOpen size={14} />,
@@ -889,6 +932,40 @@ export function AgentSkillsPage() {
                 : t("settings.skillCurateAction", { count: archivableCount })}
             </CapabilityButton>
           </SettingsRow>
+        </SettingsCard>
+      ) : null}
+
+      {mergeSource ? (
+        <SettingsCard title={t("settings.skillMergeTitle", { name: mergeSource.skill.name || mergeSource.skill.id })}>
+          <SettingsRow
+            title={t("settings.skillMergeTitle", {
+              name: mergeSource.skill.name || mergeSource.skill.id,
+            })}
+            description={t("settings.skillMergeHint")}
+          >
+            <CapabilityButton
+              variant="secondary"
+              disabled={merging}
+              onClick={() => setMergeSource(null)}
+            >
+              {t("settings.skillMergeCancel")}
+            </CapabilityButton>
+          </SettingsRow>
+          <div className="agent-capability-merge-targets">
+            {(visible[mergeSource.level] ?? [])
+              .filter((row) => row.id !== mergeSource.skill.id)
+              .map((row) => (
+                <CapabilityButton
+                  key={row.id}
+                  variant="secondary"
+                  busy={merging}
+                  disabled={merging}
+                  onClick={() => void mergeInto(row)}
+                >
+                  {row.name || row.id}
+                </CapabilityButton>
+              ))}
+          </div>
         </SettingsCard>
       ) : null}
 

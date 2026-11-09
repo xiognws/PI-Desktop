@@ -485,3 +485,83 @@ fn write_resource_refuses_a_root_a_skill_does_not_own() {
         )
         .is_ok());
 }
+
+#[test]
+fn absorb_moves_resources_and_takes_the_source_out_of_the_catalog() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let umbrella = registry.create(input("Umbrella", "global", None)).unwrap();
+        let leaf = registry.create(input("Leaf", "global", None)).unwrap();
+        registry
+            .write_resource(
+                &umbrella.id,
+                None,
+                None,
+                "references/a.md",
+                "# from umbrella\n",
+            )
+            .unwrap();
+        registry
+            .write_resource(&leaf.id, None, None, "references/a.md", "# from leaf\n")
+            .unwrap();
+        registry
+            .write_resource(&leaf.id, None, None, "references/b.md", "# only leaf\n")
+            .unwrap();
+
+        let outcome = registry.absorb(&leaf.id, &umbrella.id, None, None).unwrap();
+        assert_eq!(outcome.copied, vec!["references/b.md".to_string()]);
+        assert_eq!(outcome.skipped, vec!["references/a.md".to_string()]);
+        let absorbed = outcome.absorbed.expect("the source still exists");
+        assert!(!absorbed.enabled, "an absorbed skill leaves the catalog");
+        assert_eq!(
+            absorbed.absorbed_into.as_deref(),
+            Some(umbrella.id.as_str())
+        );
+
+        // The umbrella keeps its own copy, and gains the one it did not have.
+        let resources = registry
+            .package_files(&umbrella.id, CapabilityLevel::Global, None)
+            .unwrap();
+        let names: Vec<&str> = resources.iter().map(|(path, _)| path.as_str()).collect();
+        assert!(names.contains(&"references/a.md"));
+        assert!(names.contains(&"references/b.md"));
+        let a = resources
+            .iter()
+            .find(|(path, _)| path == "references/a.md")
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&a.1), "# from umbrella\n");
+
+        // The leaf document is still on disk: an absorb is reversible.
+        let (leaf_record, _) = registry.read(&leaf.id, None, None).unwrap().unwrap();
+        assert!(Path::new(&leaf_record.path).exists());
+    });
+}
+
+#[test]
+fn absorb_refuses_itself_and_cross_scope_merges() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    let project_dir = tempdir().unwrap();
+    let project = project_dir.path().to_string_lossy().to_string();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let global = registry.create(input("Global", "global", None)).unwrap();
+        let scoped = registry
+            .create(input("Scoped", "project", Some(&project)))
+            .unwrap();
+
+        let self_error = registry
+            .absorb(&global.id, &global.id, None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(self_error.contains("absorb itself"), "{self_error}");
+
+        let cross = registry
+            .absorb(&scoped.id, &global.id, None, Some(&project))
+            .unwrap_err()
+            .to_string();
+        assert!(cross.contains("across scopes"), "{cross}");
+    });
+}

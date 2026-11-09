@@ -192,6 +192,42 @@ export function registerSkillsIpc({
   );
 
   /**
+   * Merge one skill into another. Two writes happen host-side (the resource
+   * copy and the activation change), so the renderer reloads both the list and
+   * the maintenance report rather than patching a row.
+   */
+  handle(
+    IPC.invoke.skillAbsorb,
+    async (payload: {
+      id?: unknown;
+      into?: unknown;
+      level?: unknown;
+      projectPath?: unknown;
+    } = {}) => {
+      if (!host) throw new Error("host unavailable");
+      if (typeof payload.id !== "string" || !payload.id) {
+        throw new Error("invalid skill merge request");
+      }
+      if (typeof payload.into !== "string" || !payload.into) {
+        throw new Error("invalid skill merge request");
+      }
+      const result = await host.call<{
+        absorbed: UserSkillRecord | null;
+        into: UserSkillRecord | null;
+        copied: string[];
+        skipped: string[];
+      }>("skills.absorb", {
+        id: payload.id,
+        into: payload.into,
+        ...(typeof payload.level === "string" ? { level: payload.level } : {}),
+        ...(typeof payload.projectPath === "string" ? { projectPath: payload.projectPath } : {}),
+      });
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return result;
+    },
+  );
+
+  /**
    * Pin or unpin one skill. A pin is what protects a skill from the maintenance
    * pass, so it reloads the list the same way a delete does.
    */

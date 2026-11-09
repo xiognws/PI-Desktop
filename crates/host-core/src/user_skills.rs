@@ -1,4 +1,5 @@
 use self::curator::{CurationReport, CurationState, CuratorPolicy};
+use self::links::{SkillLink, SkillLinkStore};
 use self::pins::SkillPinStore;
 use self::usage::{SkillUsage, SkillUsageStore};
 use crate::activation::ActivationScope;
@@ -33,6 +34,20 @@ const SKILL_KIND: &str = "skills";
 /// documents and must not erase a built-in preference.
 const BUILTIN_SKILL_KIND: &str = "skill-builtins";
 
+/// What one consolidation moved, so a caller can report it instead of guessing.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AbsorbOutcome {
+    /// The document taken out of the catalog.
+    pub absorbed: Option<UserSkillRecord>,
+    /// The umbrella that received its resources.
+    pub into: Option<UserSkillRecord>,
+    /// Resource paths moved under the umbrella.
+    pub copied: Vec<String>,
+    /// Resource paths the umbrella already had; its copy was kept.
+    pub skipped: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UserSkillRecord {
@@ -64,6 +79,9 @@ pub struct UserSkillRecord {
     /// Exempt from the maintenance pass (ADR 0387's escape hatch).
     #[serde(default)]
     pub pinned: bool,
+    /// The umbrella this document was merged into, when it was (ADR 0389).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub absorbed_into: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -132,6 +150,8 @@ pub struct UserSkillRegistry {
     usage: SkillUsageStore,
     /// Skills the user asked the maintenance pass to leave alone.
     pins: SkillPinStore,
+    /// Where an absorbed skill went, so a quiet document can explain itself.
+    links: SkillLinkStore,
 }
 
 /// Place a single skill file at `target`, either as a copy or a symlink.
@@ -723,6 +743,22 @@ fn package_relative_path(root: &Path, path: &Path) -> Result<String> {
     Ok(components.join("/"))
 }
 
+/// Write `relative` under `root`, creating parents. Refuses a symlinked
+/// destination so a resource write can never escape the skill directory.
+fn write_bytes(root: &Path, relative: &str, bytes: &[u8]) -> Result<()> {
+    let destination = root.join(relative);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    if let Ok(metadata) = fs::symlink_metadata(&destination) {
+        if metadata.file_type().is_symlink() {
+            bail!("SKILL_INVALID: skill resources cannot be symbolic links");
+        }
+    }
+    fs::write(&destination, bytes)?;
+    Ok(())
+}
+
 fn collect_package_files(
     root: &Path,
     current: &Path,
@@ -945,6 +981,7 @@ impl UserSkillRegistry {
             builtins: CapabilityState::new(data_dir, BUILTIN_SKILL_KIND),
             usage: SkillUsageStore::new(data_dir),
             pins: SkillPinStore::new(data_dir),
+            links: SkillLinkStore::new(data_dir),
         }
     }
 
@@ -1033,6 +1070,10 @@ impl UserSkillRegistry {
             let pinned = self
                 .pins
                 .is_pinned(level, &id, owner_project_path.as_deref());
+            let absorbed_into = self
+                .links
+                .get(level, &id, owner_project_path.as_deref())
+                .map(|link| link.into);
             records.push(UserSkillRecord {
                 id,
                 name,
@@ -1049,6 +1090,7 @@ impl UserSkillRegistry {
                 last_used_at: usage.map(|usage| usage.last_used_at),
                 use_count: usage.map(|usage| usage.use_count).unwrap_or(0),
                 pinned,
+                absorbed_into,
             });
         }
         let ids: HashSet<String> = records.iter().map(|record| record.id.clone()).collect();
@@ -1058,6 +1100,8 @@ impl UserSkillRegistry {
         self.usage
             .retain(level, owner_project_path.as_deref(), &ids)?;
         self.pins
+            .retain(level, owner_project_path.as_deref(), &ids)?;
+        self.links
             .retain(level, owner_project_path.as_deref(), &ids)?;
         records.sort_by(|a, b| {
             a.name
@@ -1234,12 +1278,45 @@ impl UserSkillRegistry {
                 target_dir
             }
         };
-        let destination = root.join(&relative);
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&destination, content)
-            .with_context(|| format!("write {}", destination.display()))?;
+        write_bytes(&root, &relative, content.as_bytes())
+            .with_context(|| format!("write {} resource {relative}", record.id))?;
+        Ok(relative)
+    }
+
+    /// Write one sibling resource from raw bytes.
+    ///
+    /// The merge path moves whatever the source skill shipped, and an asset is
+    /// not text; sharing this with `write_resource` keeps one path rule and one
+    /// symlink-free write for both callers.
+    pub fn write_resource_bytes(
+        &mut self,
+        id: &str,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+        relative_path: &str,
+        bytes: &[u8],
+    ) -> Result<String> {
+        let Some(record) = self.find(id, level, project_path)? else {
+            bail!("SKILL_INVALID: no skill with id {id}");
+        };
+        let relative = normalize_resource_path(relative_path)?;
+        let skills_dir = capability_dir(CapabilityLevel::Global, None, "skills")?;
+        let document = PathBuf::from(&record.path);
+        let root = match directory_skill_root(&document, &skills_dir) {
+            Some(dir) => dir,
+            None => {
+                let parent = document.parent().ok_or_else(|| {
+                    anyhow::anyhow!("SKILL_INVALID: skill has no parent directory")
+                })?;
+                let target_dir = parent.join(&record.id);
+                fs::create_dir_all(&target_dir)?;
+                fs::rename(&document, target_dir.join("SKILL.md"))
+                    .with_context(|| format!("promote {}", document.display()))?;
+                target_dir
+            }
+        };
+        write_bytes(&root, &relative, bytes)
+            .with_context(|| format!("write {} resource {relative}", record.id))?;
         Ok(relative)
     }
 
@@ -1666,6 +1743,80 @@ impl UserSkillRegistry {
         Ok(Some((record, usage)))
     }
 
+    /// Merge one skill into another: move its resources under the umbrella, take
+    /// it out of the catalog, and record where it went.
+    ///
+    /// Nothing is deleted. The absorbed document stays on disk with its own body,
+    /// so an absorb the user regrets is one toggle away from being undone — which
+    /// is the only reason this may act on a library without asking twice.
+    /// Resources the umbrella already has are kept as the umbrella's and reported
+    /// as skipped: a merge must never silently overwrite the document it merges
+    /// *into*.
+    pub fn absorb(
+        &mut self,
+        id: &str,
+        into: &str,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+    ) -> Result<AbsorbOutcome> {
+        let Some(source) = self.find(id, level, project_path)? else {
+            bail!("SKILL_INVALID: no skill with id {id}");
+        };
+        let Some(target) = self.find(into, level, project_path)? else {
+            bail!("SKILL_INVALID: no skill with id {into}");
+        };
+        if source.id == target.id {
+            bail!("SKILL_INVALID: a skill cannot absorb itself");
+        }
+        if source.level != target.level || source.project_path != target.project_path {
+            bail!("SKILL_INVALID: merging across scopes is a transfer, not an absorb");
+        }
+        let scope = source
+            .level
+            .as_deref()
+            .map(|value| CapabilityLevel::parse(Some(value)))
+            .transpose()?
+            .unwrap_or(CapabilityLevel::Global);
+        let source_project = source.project_path.as_deref();
+
+        let existing: std::collections::HashSet<String> = self
+            .package_files(&target.id, scope, target.project_path.as_deref())?
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        let mut copied = Vec::new();
+        let mut skipped = Vec::new();
+        for (path, bytes) in self.package_files(&source.id, scope, source_project)? {
+            if path.eq_ignore_ascii_case("SKILL.md") {
+                continue;
+            }
+            if existing.contains(&path) {
+                skipped.push(path);
+                continue;
+            }
+            self.write_resource_bytes(&target.id, Some(scope), source_project, &path, &bytes)?;
+            copied.push(path);
+        }
+
+        self.set_enabled(&source.id, false, Some(scope), source_project)?;
+        self.links.set(
+            scope,
+            &source.id,
+            source_project,
+            SkillLink {
+                into: target.id.clone(),
+                at: chrono::Utc::now().timestamp_millis(),
+            },
+        )?;
+
+        Ok(AbsorbOutcome {
+            absorbed: self.find(&source.id, Some(scope), source_project)?,
+            into: self.find(&target.id, Some(scope), target.project_path.as_deref())?,
+            copied,
+            skipped,
+        })
+    }
+
     /// Pin or unpin one skill, so the maintenance pass leaves it alone.
     ///
     /// A pin is stored apart from activation: it says "keep this ready for me",
@@ -1763,6 +1914,7 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
 }
 
 pub mod curator;
+pub mod links;
 mod package_sync;
 /// Package bounds are asserted in their own module: `tests.rs` is close to the
 /// rust file-size limit, and these tests share one fixture.

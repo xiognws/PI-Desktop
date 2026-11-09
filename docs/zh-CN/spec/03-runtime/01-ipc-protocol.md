@@ -1293,6 +1293,10 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
   `{ recorded: false }`，属正常未命中而非错误。计数落在
   `<data>/agent-capabilities/skill-usage.json`，每次扫描同步清理，避免被删除的文档
   把计数留给同名后继；并通过 `UserSkillRecord` 的 `useCount` / `lastUsedAt` / `pinned` 暴露。
+- `skills.absorb({ id, into, level?, projectPath? })` → `{ absorbed, into, copied, skipped }` ——
+  把一个技能合并进另一个（ADR 0389）。源技能的资源文件移到总技能下；总技能已有的同名文件保留总技能
+  的版本并在 `skipped` 里报告。源文档仍留在磁盘上，只是被关闭，因此合并可逆，并由 `absorbedInto`
+  记录去向。两个技能必须处于同一作用域；未知 id 返回 `SKILL_INVALID`。
 - `skills.setPinned({ id, pinned, level?, projectPath? })` → `{ skill }` —— 固定或取消固定
   一个技能。固定状态与激活状态分开存储（它表示"给我留着"，不是"这个关掉了"），并且是
   维护流程唯一的豁免：被固定的技能无论多闲置都归为 `keep`，报告里会带 `pinned` 说明原因。

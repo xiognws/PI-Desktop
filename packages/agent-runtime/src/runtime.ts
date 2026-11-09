@@ -2620,7 +2620,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         : [this.buildSkillTool()]),
       ...(declared.some((tool) => tool.name === "skill_manage")
         ? []
-        : [createSkillManageTool(this.host)]),
+        : [createSkillManageTool(this.host, { projectPath: this.projectPath })]),
       // The same gap one layer down: `memory` is deferred, so the fork only had it
       // when the turn happened to activate it. A pass that learns a preference —
       // the case the review prompt calls a first-class signal — could not write it
@@ -4567,7 +4567,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // documents; without this tool the library could only grow in the
     // background review, never while the turn that learned it is still running.
     const skillAuthoringTools: AgentTool[] =
-      this.mode === "agent" ? [createSkillManageTool(this.host)] : [];
+      this.mode === "agent" ? [createSkillManageTool(this.host, { projectPath: this.projectPath })] : [];
 
     // Plugins contribute Agent tools by default. Plan/Goal modes only
     // expose plugins that declare plan-safe actions (ADR 0211); the

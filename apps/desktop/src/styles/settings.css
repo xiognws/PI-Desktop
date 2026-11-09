@@ -1894,6 +1894,14 @@
 
 /* A short state beside the count ("5 of 12 never used"): same weight as the
    count, without the pill, so it reads as a note rather than a second number. */
+/* Merge targets: a row of umbrella candidates under the merge card. */
+.agent-capability-merge-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+
 .agent-capability-group-note {
   flex: 0 0 auto;
   color: var(--ds-text-muted);

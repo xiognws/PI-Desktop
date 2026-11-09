@@ -93,6 +93,7 @@ fn disabled_project_skill_shadows_global_skill() {
         last_used_at: None,
         use_count: 0,
         pinned: false,
+        absorbed_into: None,
     };
     let mut project = global.clone();
     project.level = Some("project".into());
@@ -268,6 +269,7 @@ fn record(id: &str, name: &str) -> UserSkillRecord {
         last_used_at: None,
         use_count: 0,
         pinned: false,
+        absorbed_into: None,
     }
 }
 
