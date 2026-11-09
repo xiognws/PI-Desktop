@@ -1,3 +1,4 @@
+use self::curator::{CurationReport, CurationState, CuratorPolicy};
 use self::usage::{SkillUsage, SkillUsageStore};
 use crate::activation::ActivationScope;
 use crate::agent_capabilities::{
@@ -1630,6 +1631,47 @@ impl UserSkillRegistry {
         Ok(Some((record, usage)))
     }
 
+    /// Decide which skills stopped earning their place, and — when asked to act —
+    /// switch the archivable ones off.
+    ///
+    /// Nothing is deleted and nothing is moved: "archived" is the same
+    /// activation flag the row's toggle writes, so the user can bring a skill
+    /// back from the settings page in one click. `dry_run` is the default at the
+    /// RPC boundary and the only mode the daily pass uses.
+    pub fn curate(
+        &mut self,
+        project_path: Option<&str>,
+        policy: CuratorPolicy,
+        dry_run: bool,
+    ) -> Result<CurationReport> {
+        let records = self.active_for(project_path)?;
+        let mut report = crate::user_skills::curator::plan(&records, &self.usage, policy)?;
+        report.dry_run = dry_run;
+        if !dry_run {
+            let archivable: Vec<(CapabilityLevel, String, Option<String>)> = report
+                .entries
+                .iter()
+                .filter(|entry| entry.state == CurationState::Archive)
+                .map(|entry| {
+                    let level = CapabilityLevel::parse(Some(&entry.level))
+                        .unwrap_or(CapabilityLevel::Global);
+                    (level, entry.id.clone(), entry.project_path.clone())
+                })
+                .collect();
+            for (level, id, owner) in archivable {
+                self.state.set_enabled(
+                    SKILL_KIND,
+                    level,
+                    &id,
+                    owner.as_deref().or(project_path),
+                    false,
+                )?;
+                report.archived.push(id);
+            }
+        }
+        Ok(report)
+    }
+
     pub fn set_scope(
         &mut self,
         id: &str,
@@ -1652,6 +1694,7 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
     }
 }
 
+pub mod curator;
 mod package_sync;
 /// Package bounds are asserted in their own module: `tests.rs` is close to the
 /// rust file-size limit, and these tests share one fixture.

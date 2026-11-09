@@ -6,6 +6,9 @@ use tempfile::tempdir;
 #[path = "tests_lifecycle.rs"]
 mod lifecycle;
 
+#[path = "tests_curator.rs"]
+mod curator;
+
 #[path = "tests_usage.rs"]
 mod usage;
 

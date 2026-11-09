@@ -5663,6 +5663,30 @@ async fn handle_request(
                 None => Ok(json!({ "recorded": false })),
             }
         }
+        "skills.curate" => {
+            // Maintenance, not deletion: a dry run reports what it would retire,
+            // and the acting call only flips the same activation flag the row's
+            // toggle writes. Defaults are dry-run so an accidental call cannot
+            // switch a library off.
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let dry_run = params
+                .get("dryRun")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            let mut policy = crate::user_skills::curator::CuratorPolicy::default();
+            if let Some(value) = params.get("staleAfterDays").and_then(Value::as_i64) {
+                policy.stale_after_days = value;
+            }
+            if let Some(value) = params.get("archiveAfterDays").and_then(Value::as_i64) {
+                policy.archive_after_days = value;
+            }
+            let mut st = state.lock().await;
+            let report = st
+                .user_skills
+                .curate(project_path, policy, dry_run)
+                .map_err(skill_err)?;
+            Ok(json!({ "report": report }))
+        }
         "skills.read" => {
             let id = require_id(&params)?;
             let level = params
@@ -6226,6 +6250,78 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(after["recorded"], json!(false));
+    }
+
+    #[tokio::test]
+    async fn skill_curate_rpc_defaults_to_reporting_only() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project_dir = tempfile::tempdir().unwrap();
+        let project = project_dir.path().to_string_lossy().to_string();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        let query = json!({ "level": "project", "projectPath": project });
+        let created = handle_request(
+            state.clone(),
+            "skills.create",
+            json!({ "skill": {
+                "name": "Curate probe",
+                "description": "d",
+                "body": "# Probe
+",
+                "level": "project",
+                "projectPath": project,
+            } }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let id = created["skill"]["id"].as_str().unwrap().to_string();
+
+        // No `dryRun` in the payload: maintenance must not act by accident.
+        let report = handle_request(
+            state.clone(),
+            "skills.curate",
+            json!({ "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let report = &report["report"];
+        assert_eq!(report["dryRun"], json!(true));
+        assert_eq!(report["archived"], json!([]));
+        let entry = report["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["id"] == json!(id))
+            .expect("the skill is in the report");
+        assert_eq!(entry["state"], json!("keep"));
+        assert_eq!(entry["useCount"], json!(0));
+
+        // Acting on a fresh document still archives nothing: it has just been
+        // written, which is the most recent evidence of use there is.
+        let applied = handle_request(
+            state.clone(),
+            "skills.curate",
+            json!({ "projectPath": project, "dryRun": false }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(applied["report"]["archived"], json!([]));
+        let listed = handle_request(state, "skills.list", query, tx)
+            .await
+            .unwrap();
+        let row = listed["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == json!(id))
+            .unwrap();
+        assert_eq!(row["enabled"], json!(true));
     }
 
     #[tokio::test]

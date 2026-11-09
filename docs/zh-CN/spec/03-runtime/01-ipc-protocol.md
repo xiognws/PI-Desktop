@@ -1293,6 +1293,11 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
   `{ recorded: false }`，属正常未命中而非错误。计数落在
   `<data>/agent-capabilities/skill-usage.json`，每次扫描同步清理，避免被删除的文档
   把计数留给同名后继；并通过 `UserSkillRecord` 的 `useCount` / `lastUsedAt` 暴露。
+- `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
+  → `{ report }` —— 技能库维护（ADR 0384）。`report.entries` 按闲置天数把每个技能
+  分类为 `keep` / `stale` / `archive`（从上次加载算起；从未加载过则算文档自身时间戳），
+  `archived` 列出本次真正关掉的技能。**`dryRun` 默认 true**，误调只报告不改动。
+  归档写的是与 `skills.setEnabled` 同一个激活标记——绝不删除文档，一行开关即可恢复。
 
 列表包含由 frontmatter 得出的 `name` 和 `description`，不包含正文。只有描述
 进入提示，模型调用 `Skill` 时才读取正文 (D174)。缺失文件会在下一次扫描时

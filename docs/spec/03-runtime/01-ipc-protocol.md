@@ -1688,6 +1688,14 @@ one-liner.
   are swept on every scan so a deleted document cannot hand its count to a
   same-named successor, and surface on `UserSkillRecord` as
   `useCount` / `lastUsedAt`.
+- `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
+  → `{ report }` — maintenance over the user library (ADR 0384). `report.entries`
+  classifies every skill `keep` / `stale` / `archive` by idle days, counted from
+  the last load or from the document's own timestamp when nothing ever loaded
+  it; `archived` names what the pass switched off. **`dryRun` defaults to true**,
+  so a stray call reports and changes nothing. Archiving writes the same
+  activation flag as `skills.setEnabled` — it never deletes a document, and one
+  toggle brings the skill back.
 
 Built-in skill activation is global and defaults to enabled. Host stores only
 disabled IDs in `<data>/agent-capabilities/skill-builtins.json`, separately
