@@ -72,12 +72,16 @@ let probe = null;
 let out = "";
 const pendingLines = new Map();
 
+// A cold first boot of a freshly packaged app has to unpack, register every
+// bundled plugin and start the scheduled runner before it emits BOOT_PROBE, so
+// the budget is configurable for slow or first-run machines.
+const probeBudgetMs = Number(process.env.PI_BOOT_PROBE_TIMEOUT_MS ?? "45000");
 const timeout = setTimeout(() => {
-  console.error("FAIL boot-probe — timeout after 45s");
+  console.error(`FAIL boot-probe — timeout after ${probeBudgetMs}ms`);
   console.error(out.slice(-2000));
   child.kill("SIGKILL");
   cleanup(1);
-}, 45_000);
+}, probeBudgetMs);
 
 function cleanup(code) {
   clearTimeout(timeout);
