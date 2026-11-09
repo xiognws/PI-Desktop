@@ -1351,6 +1351,7 @@ sklm: {
     "skillMergeHint": "Die Dateien wandern unter das Dachthema und der Skill verlässt den Katalog; nichts wird gelöscht.",
     "skillMergeCancel": "Abbrechen",
     "skillMergeDone": "„{{name}}“ in „{{into}}“ überführt.",
+    "skillAbsorbed": "Überführt → {{into}}",
     "skillUsageUsed": "{{count}}× verwendet",
     "skillUsageUnusedOf": "{{unused}} von {{total}} nie verwendet",
     "skillCurateTitle": "Fähigkeiten pflegen",

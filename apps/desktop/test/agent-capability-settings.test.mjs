@@ -550,3 +550,11 @@ test("merging is offered as a menu action with an explicit target picker", () =>
   assert.match(skills, /row\.id !== mergeSource\.skill\.id/);
   assert.match(skills, /settings\.skillMergeDone/);
 });
+
+test("a merged row says where it went", () => {
+  // The row is off because it became part of another skill; without the badge it
+  // reads as a skill somebody disabled for no reason.
+  assert.match(skills, /skill\.absorbedInto/);
+  assert.match(skills, /settings\.skillAbsorbed/);
+  assert.match(skills, /into: skill\.absorbedInto/);
+});

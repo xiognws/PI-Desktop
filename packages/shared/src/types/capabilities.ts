@@ -155,6 +155,8 @@ export type UserSkillRecord = {
   useCount?: number;
   /** Exempt from the maintenance pass; the user's own "keep this" (ADR 0387). */
   pinned?: boolean;
+  /** Umbrella this document was merged into, when it was (ADR 0389). */
+  absorbedInto?: string;
 };
 
 /** How idle one skill is, as the maintenance pass sees it. */

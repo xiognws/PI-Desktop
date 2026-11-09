@@ -714,6 +714,13 @@ export function AgentSkillsPage() {
             {skill.pinned ? (
               <span className="agent-capability-badge">{t("settings.skillPinned")}</span>
             ) : null}
+            {skill.absorbedInto ? (
+              // A merged skill is off because it became part of another one; saying
+              // so is the difference between history and a mystery.
+              <span className="agent-capability-badge">
+                {t("settings.skillAbsorbed", { into: skill.absorbedInto })}
+              </span>
+            ) : null}
             {usageBadge(skill)}
           </>
         }

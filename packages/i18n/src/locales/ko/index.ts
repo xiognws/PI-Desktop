@@ -1357,6 +1357,7 @@ sklm: {
     skillMergeHint: "파일은 우산 스킬 아래로 옮겨지고 이 스킬은 카탈로그에서 빠집니다. 삭제되는 것은 없습니다.",
     skillMergeCancel: "취소",
     skillMergeDone: "“{{name}}”을(를) “{{into}}”에 병합했습니다.",
+    skillAbsorbed: "병합됨 → {{into}}",
     skillUsageUsed: "{{count}}회 사용",
     skillUsageUnusedOf: "{{total}}개 중 {{unused}}개 사용된 적 없음",
     skillCurateTitle: "스킬 유지 관리",

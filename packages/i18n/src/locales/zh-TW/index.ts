@@ -1348,6 +1348,7 @@ sklm: {
     skillMergeHint: "它的檔案會移到總技能下，本身退出目錄；不會刪除任何東西。",
     skillMergeCancel: "取消",
     skillMergeDone: "已把「{{name}}」合併到「{{into}}」。",
+    skillAbsorbed: "已合併 → {{into}}",
     skillUsageUsed: "已用 {{count}} 次",
     skillUsageUnusedOf: "{{total}} 個中 {{unused}} 個從未使用",
     skillCurateTitle: "技能維護",

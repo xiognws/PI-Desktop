@@ -1331,6 +1331,7 @@ export const ptBR = {
     skillMergeHint: "Os arquivos passam para o guarda-chuva e ele sai do catálogo; nada é excluído.",
     skillMergeCancel: "Cancelar",
     skillMergeDone: "“{{name}}” mesclada em “{{into}}”.",
+    skillAbsorbed: "Mesclada → {{into}}",
     skillUsageUsed: "Usada {{count}}×",
     skillUsageUnusedOf: "{{unused}} de {{total}} nunca usadas",
     skillCurateTitle: "Manutenção de habilidades",

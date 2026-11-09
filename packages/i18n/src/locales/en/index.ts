@@ -1361,6 +1361,7 @@ sklm: {
     skillMergeHint: "Its files move under the umbrella and it leaves the catalog; nothing is deleted.",
     skillMergeCancel: "Cancel",
     skillMergeDone: "Merged “{{name}}” into “{{into}}”.",
+    skillAbsorbed: "Merged → {{into}}",
     skillUsageUsed: "Used {{count}}×",
     skillUsageUnusedOf: "{{unused}} of {{total}} never used",
     skillCurateTitle: "Skill maintenance",

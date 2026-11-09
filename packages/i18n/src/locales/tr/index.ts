@@ -1357,6 +1357,7 @@ sklm: {
     skillMergeHint: "Dosyaları şemsiyeye taşınır ve katalogdan çıkar; hiçbir şey silinmez.",
     skillMergeCancel: "İptal",
     skillMergeDone: "“{{name}}” → “{{into}}” birleştirildi.",
+    skillAbsorbed: "Birleşti → {{into}}",
     skillUsageUsed: "{{count}}× kullanıldı",
     skillUsageUnusedOf: "{{total}} tanesinden {{unused}} tanesi hiç kullanılmadı",
     skillCurateTitle: "Beceri bakımı",

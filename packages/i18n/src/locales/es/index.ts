@@ -1351,6 +1351,7 @@ sklm: {
     "skillMergeHint": "Sus archivos pasan al paraguas y sale del catálogo; no se elimina nada.",
     "skillMergeCancel": "Cancelar",
     "skillMergeDone": "«{{name}}» fusionada en «{{into}}».",
+    "skillAbsorbed": "Fusionada → {{into}}",
     "skillUsageUsed": "Usada {{count}}×",
     "skillUsageUnusedOf": "{{unused}} de {{total}} nunca usadas",
     "skillCurateTitle": "Mantenimiento de habilidades",
