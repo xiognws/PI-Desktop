@@ -21,6 +21,7 @@ import { resolveLocalFile } from "../browser-view";
 import { catalogModelConfigFor } from "../models-dev-catalog";
 import { AgentSidecar } from "../agent-sidecar";
 import { relaxedNetworkPolicyEnabled } from "../endpoint-policy";
+import { shellCommandShape, type ShellCommandShape } from "./tool-log-shape";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { BrowserHost } from "../browser-host";
@@ -131,6 +132,7 @@ export function createSidecarRuntime({
       parentToolCallId?: string;
       nestedParentToolCallId?: string;
       agentName?: string;
+      commandShape?: ShellCommandShape;
     }
   >();
   const toolKey = (sessionId: string, toolCallId: string) => `${sessionId}:${toolCallId}`;
@@ -216,6 +218,7 @@ export function createSidecarRuntime({
           parentToolCallId: envelope.parentToolCallId,
           nestedParentToolCallId: envelope.nestedParentToolCallId,
           agentName: envelope.agentName,
+          commandShape: shellCommandShape(event.toolName, event.args),
         });
       } else if (event.type === "tool_end") {
         const key = toolKey(envelope.sessionId, event.toolCallId);
@@ -246,6 +249,7 @@ export function createSidecarRuntime({
               durationMs: started
                 ? Math.max(0, envelope.ts - started.startedAt)
                 : undefined,
+              ...(started?.commandShape ? { commandShape: started.commandShape } : {}),
               result,
             },
           },
