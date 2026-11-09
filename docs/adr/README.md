@@ -416,3 +416,4 @@ Each ADR includes:
 | 0383 | [Curate the bundled plugin set](0383-bundled-plugin-curation.md) | Accepted (extends ADR 0241 and ADR 0378) |
 | 0384 | [Capability packages run in the agent sidecar](0384-capability-packages-run-in-the-agent-sidecar.md) | Implemented candidate |
 | 0387 | [Skill curation by idle days](0387-skill-curation-by-idle-days.md) | Accepted (extends ADR 0377 and ADR 0379) |
+| 0388 | [A skill owns four resource containers](0388-skill-resource-containers.md) | Accepted (extends ADR 0379 and ADR 0303) |

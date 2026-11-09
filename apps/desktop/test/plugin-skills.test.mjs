@@ -123,7 +123,7 @@ test("the built-in skill body loads through the same Skill tool", () => {
     /loadBuiltinSkillBody\(id\) \?\?\s*\(await loadUserSkillBody\(id, projectPath\)\) \?\?\s*plugins\.loadSkillBody\(id\)/,
   );
   assert.match(mainSrc, /const userIds = \(await activeUserSkills/);
-  assert.match(desktopSidecarSrc, /formatSkillToolContent\(\s*skill,\s*listSkillReferences\(skill\.location\)/);
+  assert.match(desktopSidecarSrc, /formatSkillToolContent\(\s*skill,\s*listSkillResources\(skill\.location\)/);
   // A load is counted the moment it lands, or "never used" stops meaning anything.
   assert.match(desktopSidecarSrc, /"skills\.recordUse"/);
   assert.match(desktopSidecarSrc, /await assertBuiltinSkillEnabled\(id, disabledBuiltinSkills\)/);

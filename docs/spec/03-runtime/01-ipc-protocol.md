@@ -1661,9 +1661,11 @@ one-liner.
   on the next scan; `SKILL_INVALID` if the OS or file system refuses a symlink).
 - `skills.update({ id, ...skill })`
 - `skills.writeFile({ id, path, content })` → `{ path }` — writes one resource
-  beside the document (`references/<topic>.md`, one level deep, no traversal).
-  A flat `<id>.md` skill is promoted to `<id>/SKILL.md` first, so the id keeps
-  naming the skill.
+  beside the document. The path is `<root>/<name>`, one level deep, no `.`/`..`
+  segment and no absolute path, where `root` is `references` (markdown only),
+  `templates`, `scripts` or `assets` ([ADR 0388](../../adr/0388-skill-resource-containers.md)).
+  The host stores bytes and never executes them. A flat `<id>.md` skill is
+  promoted to `<id>/SKILL.md` first, so the id keeps naming the skill.
 - `skills.removeFile({ id, path })` → `{ path }` — the exact mirror: only that
   resource goes, the document and every sibling stay.
 - `skills.tidy({ level?, projectPath?, policy? })` → `{ report, root }` — library

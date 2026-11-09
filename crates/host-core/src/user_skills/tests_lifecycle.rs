@@ -409,3 +409,79 @@ fn remove_refuses_a_skill_directory_that_redirects() {
         let _ = fs::remove_file(outside.join("precious.txt"));
     });
 }
+
+/// The four containers a skill owns (ADR 0388). `references/` stays markdown,
+/// the rest carry whatever the skill needs; nothing outside them is writable.
+#[test]
+fn write_resource_accepts_the_four_skill_containers() {
+    // Project level on purpose: the global root is a process-wide env setting
+    // other tests repoint, and a test about path rules must not join that race.
+    let app = tempdir().unwrap();
+    let project = tempdir().unwrap();
+    let project_path = project.path().to_string_lossy().to_string();
+    let mut registry = UserSkillRegistry::new(app.path());
+    let record = registry
+        .create(input("Containers", "project", Some(&project_path)))
+        .unwrap();
+    let skill_dir = Path::new(&record.path).parent().unwrap().join(&record.id);
+
+    for (path, body) in [
+        ("references/api.md", "# api\n"),
+        ("templates/report.md", "Report for {{date}}\n"),
+        ("scripts/collect.ps1", "Get-ChildItem\n"),
+        ("assets/schema.json", "{\"a\":1}\n"),
+    ] {
+        registry
+            .write_resource(&record.id, None, Some(&project_path), path, body)
+            .unwrap_or_else(|error| panic!("{path}: {error}"));
+        assert_eq!(
+            fs::read_to_string(skill_dir.join(path)).unwrap(),
+            body,
+            "{path}"
+        );
+    }
+}
+
+#[test]
+fn write_resource_refuses_a_root_a_skill_does_not_own() {
+    let app = tempdir().unwrap();
+    let project = tempdir().unwrap();
+    let project_path = project.path().to_string_lossy().to_string();
+    let mut registry = UserSkillRegistry::new(app.path());
+    let record = registry
+        .create(input("Roots", "project", Some(&project_path)))
+        .unwrap();
+
+    for path in [
+        "SKILL.md",
+        "notes/api.md",
+        "references/../escape.md",
+        "../references/x.md",
+    ] {
+        let error = registry
+            .write_resource(&record.id, None, Some(&project_path), path, "x")
+            .expect_err(path)
+            .to_string();
+        assert!(error.contains("SKILL_INVALID"), "{path}: {error}");
+    }
+    // A reference is prose the model reads, so it stays markdown.
+    assert!(registry
+        .write_resource(
+            &record.id,
+            None,
+            Some(&project_path),
+            "references/api.txt",
+            "x"
+        )
+        .is_err());
+    // The other containers are not restricted that way.
+    assert!(registry
+        .write_resource(
+            &record.id,
+            None,
+            Some(&project_path),
+            "templates/api.txt",
+            "x"
+        )
+        .is_ok());
+}

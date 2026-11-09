@@ -14,9 +14,8 @@
  *
  * What is deliberately NOT ported yet, and why:
  *
- * - `templates/` and `scripts/` support files. The host's `skills.writeFile` only
- *   accepts `references/<topic>.md` today, so the prompt must not promise the other
- *   two kinds. Add them to the host first, then to this text.
+ * - Nothing here: the host now accepts `templates/`, `scripts/` and `assets/`
+ *   beside `references/` (ADR 0388), and the prompt below names them.
  * - The read-before-write refusal. The text asks the model to re-read before it
  *   patches (which is what makes a patch land on real spans), but it does not claim
  *   the write is *refused* otherwise: that guard is the next slice of work.

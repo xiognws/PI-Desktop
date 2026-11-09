@@ -525,11 +525,21 @@ fn delete_skill_files(document: &Path, roots: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
-/// Accept only `references/<name>.md`-style resource paths.
+/// The containers a skill may own beside its `SKILL.md` (ADR 0388).
+///
+/// Modelled on the shape a skill is expected to have: notes it reads
+/// (`references/`), files it fills in (`templates/`), programs it runs
+/// (`scripts/`), and anything else it needs (`assets/`).
+const RESOURCE_ROOTS: [&str; 4] = ["references", "templates", "scripts", "assets"];
+
+/// Accept `<root>/<name>` resource paths under one of the four known roots.
 ///
 /// The review loop writes model-produced paths, so this is a security boundary,
-/// not a convenience: `..`, absolute paths and anything outside `references/`
-/// are rejected rather than normalised into something surprising.
+/// not a convenience: `..`, absolute paths and anything outside those roots are
+/// rejected rather than normalised into something surprising. `references/` keeps
+/// its markdown-only rule — it is prose the model reads into context — while the
+/// other three carry whatever the skill needs (a template, a script, a data
+/// file). The host never executes anything it stores here.
 fn normalize_resource_path(raw: &str) -> Result<String> {
     let trimmed = raw.trim().replace('\\', "/");
     let trimmed = trimmed.trim_start_matches('/');
@@ -540,14 +550,25 @@ fn normalize_resource_path(raw: &str) -> Result<String> {
     if parts.iter().any(|part| *part == "." || *part == "..") {
         bail!("SKILL_INVALID: resource path may not traverse");
     }
-    if parts.len() < 2 || parts[0] != "references" {
-        bail!("SKILL_INVALID: resource path must be references/<name>.md");
+    let allowed = parts
+        .first()
+        .is_some_and(|root| RESOURCE_ROOTS.contains(root));
+    if parts.len() < 2 || !allowed {
+        bail!(
+            "SKILL_INVALID: resource path must be one of {}",
+            RESOURCE_ROOTS
+                .iter()
+                .map(|root| format!("{root}/<name>"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
     }
-    if !parts
-        .last()
-        .is_some_and(|part| part.to_ascii_lowercase().ends_with(".md"))
+    if parts[0] == "references"
+        && !parts
+            .last()
+            .is_some_and(|part| part.to_ascii_lowercase().ends_with(".md"))
     {
-        bail!("SKILL_INVALID: resource path must end with .md");
+        bail!("SKILL_INVALID: a reference must end with .md");
     }
     Ok(parts.join("/"))
 }
@@ -1163,7 +1184,8 @@ impl UserSkillRegistry {
     /// Write one sibling resource inside a skill's own directory.
     ///
     /// A skill document may ship resources next to its `SKILL.md`
-    /// (`references/<topic>.md`). That is how the background review appends what
+    /// (`references/<topic>.md`, `templates/<name>`, `scripts/<name>`,
+    /// `assets/<name>`). That is how the background review appends what
     /// a session taught without rewriting the whole document — the same shape
     /// the imported Anthropic packages use, and the reason a review can be
     /// incremental instead of all-or-nothing.
@@ -1210,8 +1232,8 @@ impl UserSkillRegistry {
 
     /// Delete one sibling resource from a directory-shaped skill.
     ///
-    /// The exact mirror of `write_resource`: same `references/<name>.md` path
-    /// rule and the same promotion-free lookup, so a model-produced path can
+    /// The exact mirror of `write_resource`: same `<root>/<name>` path rule and
+    /// the same promotion-free lookup, so a model-produced path can
     /// never reach outside the skill's own resource directory. Only the
     /// resource goes; the skill document and every other resource stay.
     pub fn remove_resource(

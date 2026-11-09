@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { formatSkillToolContent, listSkillReferences } from "../electron/main/skill-document.ts";
+import { formatSkillToolContent, listSkillResources } from "../electron/main/skill-document.ts";
 
 test("Skill tool content identifies the document and its reference directory", () => {
   const content = formatSkillToolContent({
@@ -24,12 +24,12 @@ test("a skill with no references directory lists nothing and still returns its b
   const location = join(dir, "SKILL.md");
   writeFileSync(location, "# Skill\n");
 
-  assert.deepEqual(listSkillReferences(location), []);
+  assert.deepEqual(listSkillResources(location), []);
   const content = formatSkillToolContent({ id: "a", name: "A", location, body: "Body." });
   assert.equal(content.includes("Reference files in this skill"), false);
 });
 
-test("the loaded document names every references/ file, so no filename has to be guessed", () => {
+test("the loaded document names every file the skill ships, so no filename has to be guessed", () => {
   const dir = mkdtempSync(join(tmpdir(), "skill-refs-some-"));
   const location = join(dir, "SKILL.md");
   writeFileSync(location, "# Skill\n");
@@ -39,13 +39,13 @@ test("the loaded document names every references/ file, so no filename has to be
   // Not a reference: the host only ever writes markdown into this directory.
   writeFileSync(join(dir, "references", "notes.txt"), "ignore me\n");
 
-  assert.deepEqual(listSkillReferences(location), [
+  assert.deepEqual(listSkillResources(location), [
     "references/api-quirks.md",
     "references/verticals.md",
   ]);
   const content = formatSkillToolContent(
     { id: "a", name: "A", location, body: "Body." },
-    listSkillReferences(location),
+    listSkillResources(location),
   );
   assert.match(content, /- references\/api-quirks\.md/);
   assert.match(content, /- references\/verticals\.md/);
@@ -55,5 +55,35 @@ test("the loaded document names every references/ file, so no filename has to be
 });
 
 test("an unreadable location is treated as no references rather than failing the load", () => {
-  assert.deepEqual(listSkillReferences(join(tmpdir(), "does-not-exist", "SKILL.md")), []);
+  assert.deepEqual(listSkillResources(join(tmpdir(), "does-not-exist", "SKILL.md")), []);
+});
+
+test("a skill that ships a template, a script or an asset lists them too", () => {
+  const dir = mkdtempSync(join(tmpdir(), "skill-res-roots-"));
+  const location = join(dir, "SKILL.md");
+  writeFileSync(location, "# Skill\n");
+  for (const [container, name] of [
+    ["references", "api.md"],
+    ["templates", "report.md"],
+    ["scripts", "collect.ps1"],
+    ["assets", "schema.json"],
+  ]) {
+    mkdirSync(join(dir, container));
+    writeFileSync(join(dir, container, name), "x\n");
+  }
+
+  // References first, then what a procedure needs to run: the order the model
+  // should look at them.
+  assert.deepEqual(listSkillResources(location), [
+    "references/api.md",
+    "templates/report.md",
+    "scripts/collect.ps1",
+    "assets/schema.json",
+  ]);
+  const content = formatSkillToolContent(
+    { id: "a", name: "A", location, body: "Body." },
+    listSkillResources(location),
+  );
+  assert.match(content, /- scripts\/collect\.ps1/);
+  assert.match(content, /never something the host runs/);
 });

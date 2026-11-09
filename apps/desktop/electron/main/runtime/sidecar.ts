@@ -31,7 +31,7 @@ import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import type { FinishTurn } from "./plans";
-import { formatSkillToolContent, listSkillReferences, type LoadedSkillDocument } from "../skill-document";
+import { formatSkillToolContent, listSkillResources, type LoadedSkillDocument } from "../skill-document";
 import { currentSystemProxyRelayUrl } from "../network-proxy";
 
 export type SidecarRuntimeDependencies = {
@@ -708,7 +708,7 @@ export function createSidecarRuntime({
       }
       return {
         ok: true,
-        content: formatSkillToolContent(skill, listSkillReferences(skill.location)),
+        content: formatSkillToolContent(skill, listSkillResources(skill.location)),
       };
     } catch (error) {
       const userIds = (await activeUserSkills(projectPath ?? undefined)).map(

@@ -5,7 +5,8 @@
  * and the text to act on; the app's skill store performs it. Nothing here
  * touches the filesystem — every action is a `skills.*` RPC, so the runtime, the
  * UI and the background review all write through one implementation and one path
- * rule (`references/<name>.md`, validated host-side).
+ * rule (`<root>/<name>` under references/, templates/, scripts/ or assets/,
+ * validated host-side).
  *
  * `patch` reads the document here and applies the replacement locally rather
  * than asking the host to match on a string: "which occurrence did the model
@@ -37,8 +38,8 @@ const SKILL_MANAGE_DESCRIPTION = [
   "Actions:",
   "- `create` starts a new skill. Give `name` (lowercase-hyphenated) and `description` (one sentence: when to use it); `body` is the document. A name that already exists is refused — patch that skill instead.",
   "- `patch` replaces ONE span inside an existing skill's document. `old_string` must occur exactly once; copy it verbatim. This is the usual way to extend a skill you already have.",
-  "- `write_file` adds `references/<topic>.md` beside the skill's SKILL.md. Prefer this for a self-contained lesson: it is a small write and cannot damage the document. Path must be `references/<name>.md`.",
-  "- `remove_file` deletes one `references/<name>.md` that is wrong or superseded.",
+  "- `write_file` adds one file beside the skill's SKILL.md. `references/<topic>.md` is the usual choice (prose the model reads); `templates/`, `scripts/` and `assets/` hold what a procedure needs to run — a fill-in file, a program, a data file. Prefer this over a whole-document rewrite: it is a small write and cannot damage the document.",
+  "- `remove_file` deletes one such file that is wrong or superseded.",
   "- `delete` removes a whole skill. Only when its content now lives somewhere better.",
   "",
   "Never create a near-duplicate of a skill you already have: patch it, or add a reference to it.",
@@ -81,7 +82,8 @@ const SKILL_MANAGE_PARAMETERS = Type.Object(
     ),
     file_path: Type.Optional(
       Type.String({
-        description: "write_file / remove_file. Must be `references/<name>.md`.",
+        description:
+          "write_file / remove_file. `<root>/<name>` with root `references` (markdown only), `templates`, `scripts` or `assets`.",
       }),
     ),
     content: Type.Optional(
@@ -188,7 +190,10 @@ async function writeResource(host: SkillManageHost, params: RawParams) {
   const path = params.file_path?.trim();
   if (!id) return refused("`name` is required to write a reference file.", "SKILL_MISSING_NAME");
   if (!path) {
-    return refused("`file_path` is required; it must look like `references/<topic>.md`.", "SKILL_MISSING_PATH");
+    return refused(
+      "`file_path` is required; it must look like `references/<topic>.md`, `templates/<name>`, `scripts/<name>` or `assets/<name>`.",
+      "SKILL_MISSING_PATH",
+    );
   }
   if (params.content === undefined) {
     return refused("`content` is required to write a reference file.", "SKILL_MISSING_CONTENT");
@@ -216,7 +221,10 @@ async function removeResource(host: SkillManageHost, params: RawParams) {
   const path = params.file_path?.trim();
   if (!id) return refused("`name` is required to remove a reference file.", "SKILL_MISSING_NAME");
   if (!path) {
-    return refused("`file_path` is required; it must look like `references/<topic>.md`.", "SKILL_MISSING_PATH");
+    return refused(
+      "`file_path` is required; it must look like `references/<topic>.md`, `templates/<name>`, `scripts/<name>` or `assets/<name>`.",
+      "SKILL_MISSING_PATH",
+    );
   }
   try {
     await host.call("skills.removeFile", { id, path });
