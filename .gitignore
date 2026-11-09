@@ -119,6 +119,13 @@ worktrees
 __pycache__/
 *.pyc
 
+# Local venvs and dependency trees created to build or test a Python-bearing
+# plugin (the Autotest platform). The plugin's own package `.gitignore` covers
+# its venv; the UI dependency tree is ignored here because it is a 39k-file
+# pnpm store that also breaks `pi-plugin pack`'s 2000-file package limit when a
+# developer has built the panel locally.
+plugins/autotest/platform/ui/node_modules/
+
 # The Python runtime this build ships: a full CPython tree plus the pinned
 # wheel stack, regenerated on the build machine by
 # scripts/bundle-python-runtime.mjs from scripts/python-runtime.lock.json.

@@ -21,6 +21,7 @@
     "monaco-languageclient": "^11.0.2",
     "reka-ui": "^2.11.0",
     "tailwind-merge": "^3.7.0",
+    "vscode": "npm:@codingame/monaco-vscode-extension-api@^37.6.0",
     "vscode-languageclient": "^10.1.2",
     "vue": "^3.5.42",
     "vue-router": "^4.6.4"

@@ -83,8 +83,15 @@ The transcript shows one quiet centered line under the finished turn it belongs
 to, not a message in the conversation. The notice is keyed by turn id, so a newer
 turn never inherits an older verdict. `skillReviewVisible: false` hides that row
 and leaves the review running — the row is a report about the review, not the
-review's switch; `skillReviewAfterTurn: false` is the switch. Passes that found
-nothing stay out of the transcript by default (`skillReviewShowQuietPasses`).
+review's switch; `skillReviewAfterTurn: false` is the switch.
+
+Only a review that landed something, or broke, earns that line — the same scope
+the reference implementation publishes. A gate that declined the turn and a pass
+that looked and found nothing are scheduler answers, not news: they stay in the
+skill-review log, where a session that never learns is still diagnosable, and
+out of the conversation, where they read as noise on every qualifying turn.
+`skillReviewShowQuietPasses: true` is the opt-in that puts the quiet answers
+back, and it is off unless explicitly set.
 
 ## Consequences
 

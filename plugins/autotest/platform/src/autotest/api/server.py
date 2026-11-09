@@ -22,6 +22,7 @@ import threading
 import uuid
 import sqlite3
 import subprocess
+import sys
 from datetime import datetime
 
 from autotest.executors import execute_script, read_events
@@ -57,6 +58,57 @@ app.add_middleware(
 DIST = Path("ui/dist")
 # 项目数据目录：插件跑起来时由宿主指向 userData，避免写进插件包内部
 WORKSPACE = Path(os.getenv("AUTOTEST_WORKSPACE", "workspace/projects"))
+
+# 平台自己的配置文件：workspace 只用环境变量传的话，用户在设置页改了就无处安放。
+# 放在 DATA_DIR（默认 cwd）而不是 WORKSPACE 里 —— 后者正是这个文件要指向的
+# 东西，把它放进自己管辖的目录里会在切换 workspace 时被一起搬走。
+SETTINGS_FILE = Path(os.getenv("AUTOTEST_SETTINGS_FILE", "platform-settings.json"))
+# 已保存但尚未生效的 workspace：下次启动读它，而不是立刻改运行中的 WORKSPACE
+PENDING_WORKSPACE: str = ""
+# _current_port 需要知道实际监听端口；uvicorn 由插件以 --port 拉起
+PORT = int(os.getenv("AUTOTEST_PORT", os.getenv("PORT", "4000")))
+# 阶段名与流水线一致（pipelines/service.py 的 stage 顺序）。
+# 平台自己不做推理，这些是流水线里由桌面端 Agent 驱动的那几段。
+_PLATFORM_STAGES = [
+    {"id": "analyze", "name": "需求分析"},
+    {"id": "design", "name": "用例设计"},
+    {"id": "author", "name": "脚本工程"},
+]
+# 硬件适配 MCP（CAN / HMI / 日志）：平台只登记它们的存在与地址，
+# 启用与授权在桌面端的 MCP 设置里。这里不探活 —— 设置页不该因为
+# 一台没接的台架而显示整页报错。
+MCP_HARDWARE_SERVERS = [
+    ("mcp_can", "CAN 总线适配", "http://127.0.0.1:9100/mcp"),
+    ("mcp_hmi", "座舱 HMI 适配", "http://127.0.0.1:9101/mcp"),
+    ("mcp_logger", "日志采集适配", "http://127.0.0.1:9102/mcp"),
+]
+
+
+def _current_port() -> int:
+    return PORT
+
+
+def load_platform_settings() -> None:
+    """启动时读平台配置。环境变量优先于文件：插件宿主显式传的 AUTOTEST_WORKSPACE
+    是权威，文件只是用户在设置页留下的选择。"""
+    global PENDING_WORKSPACE, WORKSPACE
+    if not SETTINGS_FILE.is_file():
+        return
+    try:
+        data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    saved = str(data.get("workspace", "")).strip()
+    if saved and not os.getenv("AUTOTEST_WORKSPACE"):
+        WORKSPACE = Path(saved)
+    PENDING_WORKSPACE = saved
+
+
+def _write_platform_settings() -> None:
+    SETTINGS_FILE.write_text(
+        json.dumps({"workspace": PENDING_WORKSPACE}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 # 每个项目的数据库表结构
@@ -256,6 +308,7 @@ def init_project_db(project_id: str):
 
 @app.on_event("startup")
 async def startup():
+    load_platform_settings()
     init_db()
     WORKSPACE.mkdir(parents=True, exist_ok=True)
     stray = 0
@@ -345,6 +398,31 @@ async def list_cases(project_id: str):
         cases.append(c)
 
     return {"cases": cases, "total": len(cases)}
+
+
+@app.get("/api/projects/{project_id}/case-stats")
+async def case_stats(project_id: str):
+    """用例/执行计数。
+
+    项目列表以前读 project.json 里的 case_count / execution_count，但这两个
+    字段只在创建项目时写成 0，之后没有任何代码回写，所以首页永远显示
+    「0 用例 / 0 次执行」。计数改成按需从项目库现算，不引入第二个真相源。
+    """
+    require_project(project_id)
+    db_path = get_project_db(project_id)
+    if not db_path.exists():
+        return {"case_count": 0, "execution_count": 0}
+    conn = sqlite3.connect(db_path)
+    try:
+        case_count = conn.execute("SELECT COUNT(*) FROM test_cases").fetchone()[0]
+    except sqlite3.OperationalError:
+        case_count = 0
+    try:
+        execution_count = conn.execute("SELECT COUNT(*) FROM executions").fetchone()[0]
+    except sqlite3.OperationalError:
+        execution_count = 0
+    conn.close()
+    return {"case_count": case_count, "execution_count": execution_count}
 
 
 @app.post("/api/projects/{project_id}/cases")
@@ -444,6 +522,10 @@ async def delete_case(project_id: str, case_id: str):
 
     conn = sqlite3.connect(db_path)
     conn.execute("DELETE FROM test_cases WHERE id = ?", (case_id,))
+    # 用例删了，指向它的脚本会变成孤儿：脚本页仍能列出，但 case_id 指向一个
+    # 不存在的用例，用例页的「执行」永远找不到它。解除关联而不是删脚本，
+    # 脚本文件属于用户资产。
+    conn.execute("UPDATE scripts SET case_id = '' WHERE case_id = ?", (case_id,))
     conn.commit()
     conn.close()
 
@@ -907,6 +989,68 @@ async def set_case_status(project_id: str, case_id: str, body: dict = Body(...))
     return {"id": case_id, "status": status}
 
 
+@app.post("/api/projects/{project_id}/cases/{case_id}/run")
+async def run_case(project_id: str, case_id: str, background: bool = False):
+    """按用例跑它的脚本。
+
+    用例本身没有可执行内容：执行单位一直是 scripts 行（scripts.case_id 指回
+    用例）。面板上的「执行」按钮以前没有后端，只能去脚本页逐个跑；这里把
+    「用例 → 脚本」的查找放到后端，并复用 execute_script 的同一套事件流与
+    结果回写，所以用例状态、执行记录、报告的口径和脚本页完全一致。
+
+    一个用例挂多个脚本时全部按顺序执行，任一失败即整体失败。
+    ``background=true`` 立即返回（面板/Agent 用），随后轮询 /executions。
+    """
+    db_path = get_project_db(project_id)
+    if not db_path.exists():
+        raise HTTPException(status_code=404, detail="项目数据库不存在")
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    if not conn.execute("SELECT 1 FROM test_cases WHERE id = ?", (case_id,)).fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="用例不存在")
+    rows = conn.execute(
+        "SELECT * FROM scripts WHERE case_id = ? ORDER BY created_at ASC", (case_id,)
+    ).fetchall()
+    conn.close()
+
+    if not rows:
+        raise HTTPException(status_code=409, detail="该用例还没有关联脚本")
+
+    scripts = [dict(row) for row in rows]
+    project_dir = safe_project_dir(project_id)
+
+    def run_all() -> dict:
+        results = []
+        for script in scripts:
+            results.append(
+                execute_script(
+                    db_path,
+                    project_id,
+                    script,
+                    project_dir=project_dir,
+                    timeout_s=300.0,
+                )
+            )
+        failed = [r for r in results if str(r.get("status", "")) not in ("pass", "passed")]
+        return {
+            "case_id": case_id,
+            "status": "pass" if not failed else "fail",
+            "runs": results,
+        }
+
+    if background:
+        threading.Thread(
+            target=run_all,
+            daemon=True,
+            name=f"run-case-{case_id}",
+        ).start()
+        return {"status": "started", "case_id": case_id, "scripts": len(scripts)}
+
+    return await asyncio.to_thread(run_all)
+
+
 @app.get("/api/projects/{project_id}/pipelines/{pipeline_id}")
 async def get_pipeline_run(project_id: str, pipeline_id: str):
     db_path = get_project_db(project_id)
@@ -1299,6 +1443,50 @@ async def runtime_status(projectId: str = ""):
         payload["schedules"] = 0
         payload["nextRun"] = None
     return payload
+
+
+@app.get("/api/platform")
+async def platform_info():
+    """平台自身的运行参数。
+
+    与 ``/api/runtime`` 分开：那个是「某个项目当前跑到哪」的状态栏投影（默认
+    不带 projectId 就只回版本），这个是「平台安装成什么样」，与项目无关，
+    设置页读的就是它。
+    """
+    return {
+        "version": APP_VERSION,
+        "healthy": True,
+        "workspace": str(WORKSPACE),
+        "python": sys.executable,
+        "backend_port": _current_port(),
+        "agents": _PLATFORM_STAGES,
+        "mcp_servers": [
+            {"id": name, "name": label, "url": url, "enabled": False}
+            for name, label, url in MCP_HARDWARE_SERVERS
+        ],
+    }
+
+
+class SettingsUpdate(BaseModel):
+    workspace: str | None = None
+
+
+@app.put("/api/settings")
+async def update_settings(body: SettingsUpdate):
+    """平台级配置的写入入口。
+
+    目前只有 workspace（项目数据根目录）。它必须在**下一次启动后端**时生效，
+    不能就地改：``WORKSPACE`` 在启动时被各服务持有，运行中改会让正在跑的
+    执行与新建的项目指向两个不同的目录。
+    """
+    global PENDING_WORKSPACE
+    if body.workspace is not None:
+        target = Path(body.workspace).expanduser()
+        if not str(target).strip():
+            raise HTTPException(status_code=400, detail="workspace 不能为空")
+        PENDING_WORKSPACE = str(target)
+    _write_platform_settings()
+    return {"workspace": str(WORKSPACE), "pendingWorkspace": PENDING_WORKSPACE}
 
 
 @app.get("/api/projects/{project_id}/env-status")

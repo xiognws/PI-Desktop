@@ -48,13 +48,72 @@ async function toggleFavorite(id: string) {
 }
 
 // 复制用例
-function copyCase(id: string) {
+async function copyCase(id: string) {
   const c = cases.value.find(c => c.id === id)
-  if (c) {
-    const newCase = { ...c, id: Date.now().toString(), name: c.name + ' (副本)' }
-    cases.value.push(newCase)
+  if (!c) return
+  try {
+    const res = await fetch(`/api/projects/${projectId}/cases`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `${c.name} (副本)`,
+        module: c.module || '',
+        precondition: c.precondition || '',
+        steps: c.steps || '',
+        expected: c.expected || '',
+        type: c.type || '正向',
+        priority: c.priority || '中',
+        tags: c.tags || [],
+      }),
+    })
+    if (!res.ok) throw new Error(`${res.status}`)
+    const created = await res.json()
+    cases.value.unshift(created)
+  } catch (e) {
+    console.error('复制用例失败', e)
+    alert('复制失败')
   }
 }
+
+// 执行用例：走 /cases/{id}/run，后端跑它关联的脚本并把结果回写到用例状态。
+// 以前这个按钮没有后端，用户只能去脚本页逐个跑。
+const runningIds = ref<string[]>([])
+
+async function runCase(id: string) {
+  if (runningIds.value.includes(id)) return
+  runningIds.value.push(id)
+  try {
+    const res = await fetch(`/api/projects/${projectId}/cases/${id}/run`, {
+      method: 'POST',
+    })
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}))
+      throw new Error(detail.detail || `${res.status} ${res.statusText}`)
+    }
+    await loadCases()
+  } catch (e) {
+    console.error('执行用例失败', e)
+    alert(`执行失败：${(e as Error).message}`)
+  } finally {
+    runningIds.value = runningIds.value.filter(x => x !== id)
+  }
+}
+
+async function runSelected() {
+  for (const id of [...selectedIds.value]) {
+    await runCase(String(id))
+  }
+  selectedIds.value = []
+}
+
+async function deleteSelected() {
+  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 条用例？`)) return
+  for (const id of [...selectedIds.value]) {
+    await deleteCase(String(id))
+  }
+  selectedIds.value = []
+}
+
 
 // 删除用例
 async function deleteCase(id: string) {
@@ -92,14 +151,88 @@ function exportSelected() {
     return
   }
   const selected = cases.value.filter(c => selectedIds.value.includes(c.id))
-  const data = JSON.stringify(selected, null, 2)
+  downloadJson(selected, '测试用例导出.json')
+}
+
+// 导出全部
+function exportAll() {
+  if (cases.value.length === 0) {
+    alert('当前项目还没有用例')
+    return
+  }
+  downloadJson(cases.value, '测试用例全部.json')
+}
+
+function downloadJson(payload: unknown, filename: string) {
+  const data = JSON.stringify(payload, null, 2)
   const blob = new Blob([data], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = '测试用例导出.json'
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// 导入：接受上面导出的 JSON 数组，逐条 POST /cases。
+// 同名用例跳过而不是覆盖 —— 导入整批时覆盖会让已有用例内容被静默替换。
+const importOpen = ref(false)
+const importFile = ref<HTMLInputElement>()
+const importing = ref(false)
+const importResult = ref('')
+
+async function onImportPick(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  importing.value = true
+  importResult.value = ''
+  let created = 0
+  let skipped = 0
+  let failed = 0
+  try {
+    const rows = JSON.parse(await file.text())
+    if (!Array.isArray(rows)) throw new Error('文件内容不是用例数组')
+    const existing = new Set(cases.value.map(c => c.name))
+    for (const row of rows) {
+      const name = String(row?.name ?? row?.title ?? '').trim()
+      if (!name) {
+        failed += 1
+        continue
+      }
+      if (existing.has(name)) {
+        skipped += 1
+        continue
+      }
+      const res = await fetch(`/api/projects/${projectId}/cases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          module: row.module ?? row.module_id ?? '',
+          precondition: row.precondition ?? '',
+          steps: row.steps ?? '',
+          expected: row.expected ?? '',
+          type: row.type ?? row.case_type ?? '正向',
+          priority: row.priority ?? '中',
+          tags: Array.isArray(row.tags) ? row.tags : [],
+        }),
+      })
+      if (res.ok) {
+        created += 1
+        existing.add(name)
+      } else {
+        failed += 1
+      }
+    }
+    await loadCases()
+    importResult.value = `新增 ${created} 条，跳过重名 ${skipped} 条，失败 ${failed} 条`
+  } catch (e) {
+    importResult.value = `导入失败：${(e as Error).message}`
+  } finally {
+    importing.value = false
+    if (importFile.value) importFile.value.value = ''
+  }
 }
 
 // 快捷键
@@ -200,67 +333,38 @@ const typeMap: Record<string, string> = {
   '异常': 'bg-red-50 text-red-600',
 }
 
-// 初始化脑图
-function initMindMap() {
-  if (jm) return
-
-  const mindData = {
-    meta: {
-      name: '测试用例脑图',
-      author: 'AI Test Platform',
-      version: '1.0',
-    },
+// 脑图：用真实用例按 module 分组渲染。
+// 旧版是一棵写死的发动机样例树（冷启动/燃油/点火/诊断），和 cases 无关，
+// 切到脑图看到的是与当前项目毫无关系的假数据。现在树根是项目，第二层是
+// cases 里真实出现过的 module，叶子是用例标题。
+function buildMindMap() {
+  const byModule = new Map<string, { id: string; topic: string }[]>()
+  for (const c of cases.value) {
+    const module = (c.module || '').trim() || '未分组'
+    if (!byModule.has(module)) byModule.set(module, [])
+    byModule.get(module)!.push({ id: String(c.id), topic: c.name || '(未命名用例)' })
+  }
+  return {
+    meta: { name: '测试用例脑图', author: 'Pi-Workspace', version: '1.0' },
     format: 'node_tree',
     data: {
       id: 'root',
-      topic: '发动机控制',
+      topic: `用例 (${cases.value.length})`,
       'background-color': '#8b5cf6',
       'foreground-color': '#ffffff',
-      children: [
-        {
-          id: 'start',
-          topic: '启动系统',
-          'background-color': '#ef4444',
-          'foreground-color': '#ffffff',
-          children: [
-            { id: '1', topic: '冷启动转速稳定性' },
-            { id: '2', topic: '怠速波动测试' },
-            { id: '3', topic: '空调怠速补偿' },
-          ],
-        },
-        {
-          id: 'fuel',
-          topic: '燃油系统',
-          'background-color': '#f97316',
-          'foreground-color': '#ffffff',
-          children: [
-            { id: '4', topic: '喷射量精确控制' },
-            { id: '5', topic: '急加速加浓补偿' },
-          ],
-        },
-        {
-          id: 'ignition',
-          topic: '点火系统',
-          'background-color': '#3b82f6',
-          'foreground-color': '#ffffff',
-          children: [
-            { id: '6', topic: '点火提前角控制' },
-            { id: '7', topic: '爆震传感器调整' },
-          ],
-        },
-        {
-          id: 'diag',
-          topic: '诊断系统',
-          'background-color': '#10b981',
-          'foreground-color': '#ffffff',
-          children: [
-            { id: '8', topic: 'DTC 故障码读取' },
-            { id: '9', topic: 'OBD 接口测试' },
-          ],
-        },
-      ],
+      children: [...byModule.entries()].map(([module, leaves]) => ({
+        id: `mod-${module}`,
+        topic: `${module} (${leaves.length})`,
+        children: leaves,
+      })),
     },
   }
+}
+
+// 初始化脑图
+function initMindMap() {
+  if (jm) return
+  const mindData = buildMindMap()
 
   const options = {
     container: 'jsmind_container',
@@ -322,7 +426,7 @@ watch(viewMode, (val) => {
 
           <!-- 批量操作 -->
           <template v-if="selectedIds.length > 0">
-            <button class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-200 text-green-600 rounded-lg hover:bg-green-50">
+            <button @click="runSelected" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-200 text-green-600 rounded-lg hover:bg-green-50">
               <Play class="w-4 h-4" />
               批量执行
             </button>
@@ -330,16 +434,16 @@ watch(viewMode, (val) => {
               <Download class="w-4 h-4" />
               导出选中
             </button>
-            <button class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50">
+            <button @click="deleteSelected" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50">
               <Trash2 class="w-4 h-4" />
               批量删除
             </button>
           </template>
-          <button class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+          <button @click="importOpen = true" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
             <Upload class="w-4 h-4" />
             导入
           </button>
-          <button class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+          <button @click="exportAll" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
             <Download class="w-4 h-4" />
             导出
           </button>
@@ -454,6 +558,12 @@ watch(viewMode, (val) => {
               </td>
               <td class="px-4 py-3 text-sm">
                 <button class="text-blue-600 hover:underline mr-2" @click="openDetail(c)">详情</button>
+                <button
+                  class="text-green-600 hover:underline mr-2 disabled:opacity-50"
+                  :disabled="runningIds.includes(c.id)"
+                  @click="runCase(c.id)">
+                  {{ runningIds.includes(c.id) ? '执行中…' : '执行' }}
+                </button>
                 <button class="text-gray-500 hover:text-blue-600 mr-2" @click="copyCase(c.id)">复制</button>
                 <button class="text-gray-500 hover:text-red-600" @click="deleteCase(c.id)">删除</button>
               </td>
@@ -526,8 +636,13 @@ watch(viewMode, (val) => {
         </div>
 
         <div class="border-t border-gray-200 p-4 flex gap-2">
-          <button class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">编辑</button>
-          <button class="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">执行</button>
+          <button @click="drawerOpen = false" class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">关闭</button>
+          <button
+            :disabled="runningIds.includes(selectedCase.id)"
+            @click="runCase(String(selectedCase.id))"
+            class="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {{ runningIds.includes(selectedCase.id) ? '执行中…' : '执行' }}
+          </button>
         </div>
       </div>
     </Transition>
@@ -570,6 +685,32 @@ watch(viewMode, (val) => {
         <div class="flex gap-3 mt-6">
           <button @click="createDialogOpen = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">取消</button>
           <button @click="createCase" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导入用例对话框 -->
+    <div v-if="importOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-96">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">导入测试用例</h3>
+        <p class="text-xs text-gray-500 mb-4">
+          选择「导出」生成的 JSON 数组。同名用例会被跳过，不会覆盖已有内容。
+        </p>
+        <input
+          ref="importFile"
+          type="file"
+          accept="application/json,.json"
+          :disabled="importing"
+          class="w-full text-sm"
+          @change="onImportPick"
+        />
+        <p v-if="importResult" class="text-xs text-gray-600 mt-3">{{ importResult }}</p>
+        <div class="flex gap-3 mt-6">
+          <button
+            @click="importOpen = false; importResult = ''"
+            class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+            关闭
+          </button>
         </div>
       </div>
     </div>

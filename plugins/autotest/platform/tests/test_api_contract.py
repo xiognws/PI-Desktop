@@ -150,6 +150,148 @@ def test_get_nonexistent_case_returns_404(client):
     assert client.get(f"/api/projects/{pid}/cases/case_00000000").status_code == 404
 
 
+# ---------- 用例执行（用例 → 脚本） ----------
+
+def _make_case(client, pid: str, name: str = "TC-100 用例执行") -> str:
+    r = client.post(f"/api/projects/{pid}/cases", json={"name": name})
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
+def test_run_case_without_script_is_409(client):
+    pid = _make_project(client)
+    cid = _make_case(client, pid)
+    r = client.post(f"/api/projects/{pid}/cases/{cid}/run")
+    assert r.status_code == 409
+    assert "脚本" in r.json()["detail"]
+
+
+def test_run_case_unknown_case_is_404(client):
+    pid = _make_project(client)
+    r = client.post(f"/api/projects/{pid}/cases/case_00000000/run")
+    assert r.status_code == 404
+
+
+def test_run_case_executes_its_scripts_and_writes_case_status(client):
+    """用例「执行」按钮的后端：跑关联脚本，并把结果回写到用例状态。
+
+    脚本用 python 语言、内容只打印一行，走真实执行器（不 mock），
+    这样事件流、executions 行和 test_cases.status 的回写都被覆盖。
+    """
+    pid = _make_project(client)
+    cid = _make_case(client, pid)
+    r = client.post(
+        f"/api/projects/{pid}/scripts",
+        json={
+            "name": "case_run.py",
+            "language": "python",
+            "case_id": cid,
+            "content": "print('case run ok')\n",
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    run = client.post(f"/api/projects/{pid}/cases/{cid}/run")
+    assert run.status_code == 200, run.text
+    body = run.json()
+    assert body["case_id"] == cid
+    assert len(body["runs"]) == 1
+
+    cases = client.get(f"/api/projects/{pid}/cases").json()["cases"]
+    assert cases[0]["status"] in ("通过", "失败", "异常", "已取消")
+
+    executions = client.get(f"/api/projects/{pid}/executions").json()["executions"]
+    assert len(executions) == 1
+
+
+def test_deleting_a_case_unlinks_its_scripts(client):
+    pid = _make_project(client)
+    cid = _make_case(client, pid)
+    client.post(
+        f"/api/projects/{pid}/scripts",
+        json={"name": "orphan.py", "language": "python", "case_id": cid, "content": ""},
+    )
+    assert client.delete(f"/api/projects/{pid}/cases/{cid}").status_code == 200
+
+    scripts = client.get(f"/api/projects/{pid}/scripts").json()["scripts"]
+    assert len(scripts) == 1, "脚本是用户资产，删用例不能删脚本"
+    assert scripts[0]["case_id"] == ""
+
+
+def test_case_stats_counts_live_rows_not_stale_project_json(client):
+    """首页统计读的是项目库现算值，不是 project.json 里那个永远为 0 的字段。"""
+    pid = _make_project(client)
+    assert client.get(f"/api/projects/{pid}/case-stats").json() == {
+        "case_count": 0,
+        "execution_count": 0,
+    }
+
+    _make_case(client, pid)
+    _make_case(client, pid)
+    stats = client.get(f"/api/projects/{pid}/case-stats").json()
+    assert stats["case_count"] == 2
+    assert client.get(f"/api/projects/{pid}/case-stats").status_code == 200
+
+
+# ---------- 平台信息 / 设置 ----------
+
+def test_platform_info_reports_runtime_facts(client):
+    """设置页读的就是这个：解释器、workspace、端口、MCP 登记。"""
+    body = client.get("/api/platform").json()
+    assert body["healthy"] is True
+    assert body["version"]
+    assert body["workspace"]
+    assert body["python"]
+    assert isinstance(body["backend_port"], int)
+    assert [s["id"] for s in body["mcp_servers"]] == ["mcp_can", "mcp_hmi", "mcp_logger"]
+    assert [a["id"] for a in body["agents"]] == ["analyze", "design", "author"]
+
+
+def test_settings_update_persists_workspace_for_next_start(client, tmp_path, monkeypatch):
+    """保存不是就地生效：写进配置文件，由下次启动读取。
+
+    就地改运行中的 WORKSPACE 会让正在跑的执行与新项目指向两个目录。
+    """
+    settings_file = tmp_path / "platform-settings.json"
+    monkeypatch.setattr(server, "SETTINGS_FILE", settings_file)
+
+    target = tmp_path / "elsewhere" / "projects"
+    r = client.put("/api/settings", json={"workspace": str(target)})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["pendingWorkspace"] == str(target)
+    # 运行中的 WORKSPACE 不变
+    assert body["workspace"] == str(server.WORKSPACE)
+
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved["workspace"] == str(target)
+
+
+def test_settings_rejects_empty_workspace(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "SETTINGS_FILE", tmp_path / "s.json")
+    r = client.put("/api/settings", json={"workspace": "   "})
+    assert r.status_code == 400
+
+
+def test_load_platform_settings_never_overrides_the_host_env(monkeypatch, tmp_path):
+    """插件宿主传的 AUTOTEST_WORKSPACE 是权威，配置文件不能覆盖它。"""
+    settings_file = tmp_path / "platform-settings.json"
+    settings_file.write_text(json.dumps({"workspace": str(tmp_path / "from-file")}), encoding="utf-8")
+    monkeypatch.setattr(server, "SETTINGS_FILE", settings_file)
+    monkeypatch.setenv("AUTOTEST_WORKSPACE", str(tmp_path / "from-env"))
+
+    original = server.WORKSPACE
+    server.load_platform_settings()
+    try:
+        assert server.WORKSPACE == original
+        assert server.PENDING_WORKSPACE == str(tmp_path / "from-file")
+    finally:
+        server.WORKSPACE = original
+        server.PENDING_WORKSPACE = ""
+
+
+
+
 # ---------- backend restart ----------
 
 def test_backend_restart_spawns_run_backend_bat(client, monkeypatch):

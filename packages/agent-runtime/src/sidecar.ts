@@ -104,6 +104,8 @@ function testRuntimeIdentity(sessionId: string) {
   };
 }
 
+// TEMP-DIAGNOSTIC: dump the launch params shape (no secrets) so the review's
+// gate can be traced from the sidecar's own view of what it was handed.
 type RuntimeParams = {
   sessionId: string;
   mode?: Mode;

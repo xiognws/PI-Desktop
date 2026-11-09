@@ -161,7 +161,6 @@ function backToHome() {
             { path: 'requirements', name: '需求' },
             { path: 'pipeline', name: '流水线' },
             { path: 'cases', name: '用例' },
-            { path: 'trace', name: '追踪' },
             { path: 'scripts', name: '脚本' },
             { path: 'plans', name: '计划' },
             { path: 'executions', name: '执行' },

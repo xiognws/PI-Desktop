@@ -727,6 +727,17 @@ impl LiveSession {
             run.stop = CellStop::Ended;
             run.code = end.code;
         }
+        // The one-shot path flushes the trailing capture and the truncation
+        // notice before it returns; a cell must do the same. A fast command
+        // (which is most of them) finishes before the notification interval
+        // elapses, so without this the chunk still sitting in the pending
+        // buffer is only ever seen by the tool result — a live renderer would
+        // never receive `tools.output` at all.
+        if emit {
+            run.notifications.push(OutputStream::Stdout, run.stdout.finish());
+            run.notifications.push(OutputStream::Stderr, run.stderr.finish());
+            run.notifications.finish();
+        }
         run
     }
 

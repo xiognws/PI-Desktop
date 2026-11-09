@@ -16,6 +16,10 @@ type RunEvent = {
   path?: string
   kind?: string
   counts?: { pass: number; fail: number; skip: number }
+  // run.end 携带的执行归因：replay 命中数与模型调用数（本平台恒为 0，
+  // 推理在桌面端 Agent 侧，这里只为把执行器回填的字段如实显示出来）
+  replayHits?: number
+  modelCalls?: number
 }
 
 const route = useRoute()

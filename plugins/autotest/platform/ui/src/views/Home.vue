@@ -4,54 +4,23 @@ import { useRouter } from 'vue-router'
 import {
   Cpu,
   Plus,
-  Search,
   FileText,
   ListChecks,
   PlayCircle,
-  TrendingUp,
-  Clock,
-  Moon,
-  Sun,
-  Bell,
 } from 'lucide-vue-next'
 
 const router = useRouter()
 
-// 全局搜索
-const globalSearch = ref('')
-const searchOpen = ref(false)
-function onSearchBlur() {
-  setTimeout(() => searchOpen.value = false, 200)
-}
-const searchResults = ref([
-  { id: 1, title: '发动机启动后转速应稳定在 800±50rpm', type: '测试用例', project: '长安深蓝 S7 ECU 测试' },
-  { id: 2, title: '冷启动脚本_发动机.py', type: '测试脚本', project: '长安深蓝 S7 ECU 测试' },
-  { id: 3, title: '发动机模块回归测试报告', type: '测试报告', project: '长安深蓝 S7 ECU 测试' },
-])
-
-// 深色模式
-const darkMode = ref(false)
-function toggleDarkMode() {
-  darkMode.value = !darkMode.value
-  document.documentElement.classList.toggle('dark', darkMode.value)
-}
-
-// 通知中心
-const notificationsOpen = ref(false)
-const notifications = ref([
-  { id: 1, title: '发动机模块回归测试完成', desc: '通过率 83.3%，1 条失败', time: '10 分钟前', read: false },
-  { id: 2, title: 'AI 已生成 5 条新用例', desc: '来自需求文档：怠速稳定性要求', time: '1 小时前', read: false },
-  { id: 3, title: '测试计划执行完成', desc: '座舱蓝牙周回归测试已完成', time: '昨天', read: true },
-])
-
-// 统计数据（全部来自 /api/projects 的真实字段）
+// 统计与项目列表：全部来自后端真实数据。
+// 计数不再读 project.json 的 case_count / execution_count —— 那两个字段只在
+// 建项目时写成 0，之后没有任何回写，首页因此永远显示「0 用例 / 0 次执行」。
+// 现在按项目逐个问 /case-stats，由后端从项目库现算。
 const stats = ref({
   totalProjects: 0,
   totalCases: 0,
   totalExecutions: 0,
 })
 
-// 项目列表
 const projects = ref<any[]>([])
 
 // 新建项目对话框
@@ -62,15 +31,36 @@ const newProject = ref({
   type: 'ECU',
 })
 
+type Stats = { case_count: number; execution_count: number }
+
 async function loadProjects() {
   try {
     const res = await fetch('/api/projects')
     const data = await res.json()
     projects.value = data.projects || []
-    // 更新统计
     stats.value.totalProjects = projects.value.length
-    stats.value.totalCases = projects.value.reduce((sum: number, p: any) => sum + (p.case_count || 0), 0)
-    stats.value.totalExecutions = projects.value.reduce((sum: number, p: any) => sum + (p.execution_count || 0), 0)
+
+    const counts = await Promise.all(
+      projects.value.map(async (p: any) => {
+        try {
+          const r = await fetch(`/api/projects/${p.id}/case-stats`)
+          if (!r.ok) return { case_count: 0, execution_count: 0 }
+          return (await r.json()) as Stats
+        } catch {
+          return { case_count: 0, execution_count: 0 }
+        }
+      }),
+    )
+    stats.value.totalCases = counts.reduce((sum, c) => sum + (c.case_count || 0), 0)
+    stats.value.totalExecutions = counts.reduce(
+      (sum, c) => sum + (c.execution_count || 0),
+      0,
+    )
+    projects.value = projects.value.map((p: any, i: number) => ({
+      ...p,
+      case_count: counts[i].case_count,
+      execution_count: counts[i].execution_count,
+    }))
   } catch (e) {
     console.error('加载项目失败', e)
   }
@@ -112,64 +102,8 @@ function enterProject(id: string) {
         <span class="font-semibold text-gray-900">AI 测试平台</span>
       </div>
       <div class="flex items-center gap-4">
-        <!-- 全局搜索 -->
-        <div class="relative">
-          <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            v-model="globalSearch"
-            type="text"
-            placeholder="搜索用例、脚本、报告..."
-            class="w-64 pl-9 pr-4 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-            @focus="searchOpen = true"
-            @blur="onSearchBlur"
-          />
-          <!-- 搜索结果下拉 -->
-          <div v-if="searchOpen && globalSearch" class="absolute top-full mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-auto">
-            <div class="px-4 py-2 text-xs text-gray-500 border-b">搜索结果</div>
-            <div v-for="item in searchResults" :key="item.id" class="px-4 py-2 hover:bg-gray-50 cursor-pointer">
-              <div class="text-sm text-gray-900">{{ item.title }}</div>
-              <div class="text-xs text-gray-500">{{ item.type }} · {{ item.project }}</div>
-            </div>
-          </div>
-        </div>
-        <router-link to="/tasks" class="text-sm text-gray-500 hover:text-gray-700">任务</router-link>
         <router-link to="/knowledge" class="text-sm text-gray-500 hover:text-gray-700">知识库</router-link>
-        <router-link to="/environments" class="text-sm text-gray-500 hover:text-gray-700">环境</router-link>
-        <router-link to="/logs" class="text-sm text-gray-500 hover:text-gray-700">日志</router-link>
-        <router-link to="/mcp" class="text-sm text-gray-500 hover:text-gray-700">插件</router-link>
         <router-link to="/settings" class="text-sm text-gray-500 hover:text-gray-700">设置</router-link>
-
-        <!-- 深色模式切换 -->
-        <button @click="toggleDarkMode" class="p-2 rounded-lg hover:bg-gray-100">
-          <Moon v-if="!darkMode" class="w-5 h-5 text-gray-500" />
-          <Sun v-else class="w-5 h-5 text-yellow-500" />
-        </button>
-
-        <!-- 通知中心 -->
-        <div class="relative">
-          <button @click="notificationsOpen = !notificationsOpen" class="p-2 rounded-lg hover:bg-gray-100 relative">
-            <Bell class="w-5 h-5 text-gray-500" />
-            <span v-if="notifications.some(n => !n.read)" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-          <Transition name="fade">
-            <div v-if="notificationsOpen" class="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-20">
-              <div class="p-3 border-b border-gray-100 flex items-center justify-between">
-                <h3 class="font-medium text-gray-900 text-sm">通知</h3>
-                <span class="text-xs text-blue-600 cursor-pointer hover:underline">全部已读</span>
-              </div>
-              <div class="max-h-80 overflow-auto">
-                <div v-for="n in notifications" :key="n.id" class="p-3 border-b border-gray-50 hover:bg-gray-50" :class="{ 'bg-blue-50/50': !n.read }">
-                  <div class="flex items-center gap-2">
-                    <span v-if="!n.read" class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                    <span class="text-sm font-medium text-gray-900">{{ n.title }}</span>
-                  </div>
-                  <p class="text-xs text-gray-500 mt-1 ml-3.5">{{ n.desc }}</p>
-                  <p class="text-xs text-gray-400 mt-1 ml-3.5">{{ n.time }}</p>
-                </div>
-              </div>
-            </div>
-          </Transition>
-        </div>
 
         <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm">测</div>
       </div>

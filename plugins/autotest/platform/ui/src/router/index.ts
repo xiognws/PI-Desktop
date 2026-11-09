@@ -16,29 +16,9 @@ const router = createRouter({
       component: () => import('@/views/Home.vue'),
     },
     {
-      path: '/tasks',
-      name: 'Tasks',
-      component: () => import('@/views/Tasks.vue'),
-    },
-    {
       path: '/knowledge',
       name: 'Knowledge',
       component: () => import('@/views/Knowledge.vue'),
-    },
-    {
-      path: '/logs',
-      name: 'Logs',
-      component: () => import('@/views/Logs.vue'),
-    },
-    {
-      path: '/mcp',
-      name: 'McpPlugins',
-      component: () => import('@/views/McpPlugins.vue'),
-    },
-    {
-      path: '/environments',
-      name: 'Environments',
-      component: () => import('@/views/Environments.vue'),
     },
     {
       path: '/settings',
@@ -69,11 +49,6 @@ const router = createRouter({
           path: 'cases',
           name: 'Cases',
           component: () => import('@/views/Cases.vue'),
-        },
-        {
-          path: 'trace',
-          name: 'TraceMatrix',
-          component: () => import('@/views/TraceMatrix.vue'),
         },
         {
           path: 'scripts',
