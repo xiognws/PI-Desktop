@@ -369,10 +369,6 @@ export const zhTW = {
     viewOptions: "顯示",
   },
   sessionCollaboration: {
-    worklineTitle: "工作線",
-    worklineActiveCount: "{{count}} 條進行中",
-    worklineAria: "進行中的工作線",
-    worklineDelegatedBy: "由 {{name}} 派發",
     statusIdle: "閒置",
     statusQueued: "排隊中",
     statusRunning: "進行中",

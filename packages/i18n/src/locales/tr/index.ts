@@ -376,10 +376,6 @@ export const tr = {
     viewOptions: "Görünüm",
   },
   sessionCollaboration: {
-    worklineTitle: "Çalışma hatları",
-    worklineActiveCount: "{{count}} etkin",
-    worklineAria: "Sürmekte olan çalışma hatları",
-    worklineDelegatedBy: "{{name}} tarafından",
     statusIdle: "Boşta",
     statusQueued: "Sırada",
     statusRunning: "Çalışıyor",

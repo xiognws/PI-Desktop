@@ -1,7 +1,8 @@
 # ADR 0385: Show cross-session worklines in the sidebar
 
-- Status: Accepted for implementation
+- Status: **Withdrawn** — superseded by ADR 0386
 - Date: 2026-11-09
+- Withdrawn: 2026-11-09 (a separate sidebar strip was the wrong place)
 - Related: ADR 0384 (push-first work deliveries), ADR 0213 (host turn queue),
   ADR 0239 (collaboration ledger), ADR 0107 (task notifications),
   `lib/sidebar-project-runs.ts` (per-project run counts)

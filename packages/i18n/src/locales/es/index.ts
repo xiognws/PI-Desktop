@@ -367,10 +367,6 @@ export const es = {
     "viewOptions": "Vista",
   },
   "sessionCollaboration": {
-    "worklineTitle": "Líneas de trabajo",
-    "worklineActiveCount": "{{count}} activas",
-    "worklineAria": "Líneas de trabajo en curso",
-    "worklineDelegatedBy": "por {{name}}",
     "statusIdle": "Inactivo",
     "statusQueued": "En cola",
     "statusRunning": "En curso",

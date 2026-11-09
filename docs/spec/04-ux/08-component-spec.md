@@ -103,15 +103,6 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   painted thick-frame rim;
   they never resize or reserve the work panel. Responsive layout follows
   [07-ui-design-system.md](07-ui-design-system.md) §10.1
-- Sidebar worklines (ADR 0385): a bounded strip above the session list shows one
-  row per session that is busy right now — title, state badge, the session that
-  created it, and the first line of its current task. Rows order `waiting` (a
-  pending permission) before `running` before `queued`; a session that is idle
-  after completing is not listed. The strip renders nothing when no session is
-  busy, so an idle sidebar keeps the layout above unchanged. Rows are buttons
-  that open the session and expose `aria-current="page"` for the active one; the
-  strip carries its own `aria-label` and does not add a landmark role. Strings
-  come from the `sessionCollaboration.workline*` keys in every shipped locale.
 
 ### 1.5 Accessibility
 
