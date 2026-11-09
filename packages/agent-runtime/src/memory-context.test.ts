@@ -112,6 +112,45 @@ describe("memoryContextPrefix", () => {
   });
 });
 
+describe("entry-list recall (ADR 0378)", () => {
+  it("renders what the agent wrote, labelled by target", async () => {
+    const { host } = hostWithRecall(async () => ({
+      memories: [],
+      entries: [
+        { target: "memory", index: 0, text: "this repo builds with pnpm", score: 1 },
+        { target: "user", index: 1, text: "prefers Chinese replies", score: 0.5 },
+      ],
+    }));
+    const prefix = await memoryContextPrefix(host, "how do I build", {});
+    expect(prefix).toContain("- [memory] this repo builds with pnpm");
+    expect(prefix).toContain("- [user] prefers Chinese replies");
+  });
+
+  it("does not need the scored table to say anything", async () => {
+    const { host } = hostWithRecall(async () => ({
+      entries: [{ target: "memory", text: "deploy host is sda-build-02" }],
+    }));
+    expect(await memoryContextPrefix(host, "deploy", {})).toContain("sda-build-02");
+  });
+
+  it("still renders scored hits, after the entries", async () => {
+    const { host } = hostWithRecall(async () => ({
+      memories: [hit()],
+      entries: [{ target: "memory", text: "fresh note" }],
+    }));
+    const prefix = (await memoryContextPrefix(host, "deploy", {})) ?? "";
+    expect(prefix.indexOf("fresh note")).toBeGreaterThan(-1);
+    expect(prefix.indexOf("deploy target")).toBeGreaterThan(prefix.indexOf("fresh note"));
+  });
+
+  it("skips an entry with no text and returns nothing when both halves are empty", async () => {
+    const { host } = hostWithRecall(async () => ({
+      entries: [{ target: "memory", text: "   " }],
+    }));
+    expect(await memoryContextPrefix(host, "deploy", {})).toBeUndefined();
+  });
+});
+
 describe("prependMemoryContext", () => {
   it("prefixes a plain string with a separating blank line", () => {
     expect(prependMemoryContext("hello", "<memory>")).toBe("<memory>\n\nhello");

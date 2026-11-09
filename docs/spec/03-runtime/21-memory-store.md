@@ -277,7 +277,9 @@ terms and matches inside a sentence. The scored table above still answers under
 and retiring it is a separate change with its own compatibility question
 (project-scoped memory, ADR 0234).
 
-**Remaining gap**: the desktop host does not implement the runtime's optional
-`memoryRecall` member (§9.1), so the per-turn `<memory_context>` block is still
-inert in a normal session. The host-side query is ready; wiring the member is the
-next step, and it is the only reason that block has never appeared.
+**The per-turn block reaches these lists** (§9.1): the runtime asks the optional
+`memoryRecall` member, the sidecar's parent-host proxy forwards it as
+`memory.recall` through `host.proxy`, and that method is on the
+`HOST_PROXY_ALLOWED` list — so a normal Agent-mode session has both halves: the
+frozen prompt snapshot (always) and a query over the entry lists (per turn, five
+hits, 3 000 chars, best effort).
