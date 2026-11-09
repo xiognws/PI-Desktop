@@ -29,6 +29,7 @@
 | [16-trusted-extensions.md](/zh-CN/spec/07-plugins/16-trusted-extensions) | 受信任扩展（sidecar 内扩展面） |
 | [17-plugin-glossary.md](17-plugin-glossary.md) | 插件中英术语与使用边界 |
 | [18-plugin-launcher.md](18-plugin-launcher.md) | 插件启动器（`Alt+Space`）、触发器与本机应用 |
+| [19-capability-packages.md](19-capability-packages.md) | 能力包：用户目录扫描、在 agent sidecar 内运行、双向调用与摘要信任 |
 
 ## 从契约回查代码
 

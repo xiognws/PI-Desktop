@@ -102,6 +102,7 @@
 - [16-trusted-extensions.md](07-plugins/16-trusted-extensions.md)
 - [17-plugin-glossary.md](07-plugins/17-plugin-glossary.md)
 - [18-plugin-launcher.md](07-plugins/18-plugin-launcher.md)
+- [19-capability-packages.md](07-plugins/19-capability-packages.md)
 
 ## 8. Meta
 - [README.md](08-meta/README.md)

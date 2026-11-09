@@ -414,3 +414,4 @@ Each ADR includes:
 | 0381 | [The product is Pi-Workspace, and storage identifiers move with the data](0381-rebrand-to-pi-workspace.md) | Accepted (amends ADR 0278) |
 | 0382 | [Ship a pinned Python runtime for Office and file work](0382-bundled-python-runtime.md) | Accepted |
 | 0383 | [Curate the bundled plugin set](0383-bundled-plugin-curation.md) | Accepted (extends ADR 0241 and ADR 0378) |
+| 0384 | [Capability packages run in the agent sidecar](0384-capability-packages-run-in-the-agent-sidecar.md) | Implemented candidate |
