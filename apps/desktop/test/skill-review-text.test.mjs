@@ -7,10 +7,12 @@ const { skillReviewText } = await import("../src/features/chat/transcript/skill-
 /** Echo the key and its options, so the test is about which branch ran. */
 const t = (key, options) => `${key}${options ? ` ${JSON.stringify(options)}` : ""}`;
 
-test("an applied review says how many updates it made", () => {
+test("an applied review names the updates it made", () => {
   const text = skillReviewText({ outcome: "applied", actions: ["a", "b"] }, t);
-  assert.match(text, /skillReviewApplied/);
-  assert.match(text, /"count":2/);
+  // The row prints what the review wrote, not a bare count: the actions are the
+  // part a reader acts on, and the label is a sentence around them.
+  assert.match(text, /skillReviewAppliedDetail/);
+  assert.match(text, /"detail":"a · b"/);
 });
 
 test("a review that looked and found nothing is not the same as one that never looked", () => {
