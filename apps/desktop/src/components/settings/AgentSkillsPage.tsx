@@ -55,6 +55,8 @@ import { ImportToggleButton } from "../../features/settings/import-workbench";
 
 import { SettingsRow, SettingsCard } from "../../features/settings/primitives";
 import { SettingsToggle, TooltipButton } from "../ui";
+import { buildLearningMap } from "../../lib/learning-map";
+import { LearningMapCanvas } from "./LearningMapCanvas";
 import {
   curationById,
   skillIdleBadge,
@@ -163,6 +165,10 @@ export function AgentSkillsPage() {
     level: AgentCapabilityLevel;
   } | null>(null);
   const [merging, setMerging] = useState(false);
+  /** The agent's own memory entries, drawn on the learning map beside the skills. */
+  const [memoryEntries, setMemoryEntries] = useState<
+    { id: string; text: string; target: "memory" | "user" }[]
+  >([]);
   const [curating, setCurating] = useState(false);
   const refreshCuration = useCallback(async () => {
     try {
@@ -510,6 +516,38 @@ export function AgentSkillsPage() {
   };
 
   // "Idle" is what the maintenance card is about: stale plus archivable.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [memory, user] = await Promise.all([
+          api.memoryEntries("memory"),
+          api.memoryEntries("user"),
+        ]);
+        if (cancelled) return;
+        setMemoryEntries([
+          ...(memory?.entries ?? []).map((text, index) => ({
+            id: `memory-${index}`,
+            text,
+            target: "memory" as const,
+          })),
+          ...(user?.entries ?? []).map((text, index) => ({
+            id: `user-${index}`,
+            text,
+            target: "user" as const,
+          })),
+        ]);
+      } catch {
+        // A map of the skills alone is still worth showing; the entries are a
+        // second store and failing to read them is not a page error.
+        if (!cancelled) setMemoryEntries([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading]);
+
   const idleCount = curation
     ? curation.entries.filter((entry) => entry.state !== "keep").length
     : 0;
@@ -518,6 +556,24 @@ export function AgentSkillsPage() {
     : 0;
 
   /** Curation entries by skill id, so a row can say how idle it is. */
+  /** The map the card draws: skills that are on, plus every memory entry. */
+  const learningMap = useMemo(
+    () =>
+      buildLearningMap(
+        [...visible.global, ...visible.project]
+          .filter((row) => row.enabled !== false)
+          .map((row) => ({
+            id: row.id,
+            name: row.name,
+            description: row.description,
+            enabled: row.enabled,
+            useCount: row.useCount,
+          })),
+        memoryEntries,
+      ),
+    [visible.global, visible.project, memoryEntries],
+  );
+
   const curationRows = useMemo(() => curationById(curation?.entries), [curation]);
 
   /** A row's usage state, as badges beside its level. */
@@ -914,6 +970,48 @@ export function AgentSkillsPage() {
           />
         </div>
       </section>
+
+      <SettingsCard title={t("settings.learningMapTitle")}>
+        <SettingsRow
+          title={t("settings.learningMapTitle")}
+          description={
+            learningMap.nodes.length === 0
+              ? t("settings.learningMapEmpty")
+              : t("settings.learningMapDesc", {
+                  skills: learningMap.counts.skills,
+                  memories: learningMap.counts.memories,
+                  edges: learningMap.edges.length,
+                })
+          }
+        >
+          <div className="learning-map-legend">
+            <span className="learning-map-legend-item">
+              <span className="learning-map-swatch is-skill" />
+              {t("settings.learningMapSkills")}
+            </span>
+            <span className="learning-map-legend-item">
+              <span className="learning-map-swatch is-memory" />
+              {t("settings.learningMapMemory")}
+            </span>
+            <span className="learning-map-legend-item">
+              <span className="learning-map-swatch is-user" />
+              {t("settings.learningMapUser")}
+            </span>
+          </div>
+        </SettingsRow>
+        {learningMap.nodes.length > 0 ? (
+          <div className="learning-map-body">
+            <LearningMapCanvas
+              map={learningMap}
+              labels={{
+                skills: t("settings.learningMapSkills"),
+                memories: t("settings.learningMapMemory"),
+                edge: (weight) => t("settings.learningMapEdge", { weight }),
+              }}
+            />
+          </div>
+        ) : null}
+      </SettingsCard>
 
       {curation && curation.policy ? (
         <SettingsCard title={t("settings.skillCurateTitle")}>

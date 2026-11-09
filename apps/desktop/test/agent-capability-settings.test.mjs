@@ -558,3 +558,13 @@ test("a merged row says where it went", () => {
   assert.match(skills, /settings\.skillAbsorbed/);
   assert.match(skills, /into: skill\.absorbedInto/);
 });
+
+test("the learning map draws skills and memory entries together", () => {
+  assert.match(skills, /buildLearningMap\(/);
+  assert.match(skills, /api\.memoryEntries\("memory"\)/);
+  assert.match(skills, /api\.memoryEntries\("user"\)/);
+  assert.match(skills, /<LearningMapCanvas/);
+  // A skill that is switched off is not part of what the agent can currently use,
+  // so it is not drawn as an active node.
+  assert.match(skills, /\.filter\(\(row\) => row\.enabled !== false\)/);
+});

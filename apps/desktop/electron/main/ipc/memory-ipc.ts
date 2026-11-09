@@ -132,6 +132,17 @@ export function registerMemoryIpc({
   registrar.handle(IPC.invoke.memoryList, async (input?: unknown) =>
     forward("memory.list", listParams(input)),
   );
+  /**
+   * The flat entry list the `memory` tool writes — a different store from
+   * `memory.list` (the scored table), and the one the learning map draws.
+   */
+  registrar.handle(IPC.invoke.memoryEntries, async (input?: unknown) => {
+    const target = (input as { target?: unknown } | undefined)?.target;
+    if (target !== "memory" && target !== "user") {
+      throw new Error("invalid memory target");
+    }
+    return forward("memory.entries", { target });
+  });
   registrar.handle(IPC.invoke.memoryStats, async () => forward("memory.stats", {}));
   registrar.handle(IPC.invoke.memoryUpdate, async (input?: unknown) =>
     forward("memory.update", updateParams(input)),

@@ -1293,6 +1293,9 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
   `{ recorded: false }`，属正常未命中而非错误。计数落在
   `<data>/agent-capabilities/skill-usage.json`，每次扫描同步清理，避免被删除的文档
   把计数留给同名后继；并通过 `UserSkillRecord` 的 `useCount` / `lastUsedAt` / `pinned` 暴露。
+- `memory.entries({ target })` → `{ target, entries: string[] }` —— 只读地读取 `memory` 工具写入的
+  扁平条目表，转发给渲染层，使学习图谱能把技能与记忆条目画在一起（ADR 0390）。它与 `memory.list`
+  是**不同的存储**。
 - `skills.absorb({ id, into, level?, projectPath? })` → `{ absorbed, into, copied, skipped }` ——
   把一个技能合并进另一个（ADR 0389）。源技能的资源文件移到总技能下；总技能已有的同名文件保留总技能
   的版本并在 `skipped` 里报告。源文档仍留在磁盘上，只是被关闭，因此合并可逆，并由 `absorbedInto`

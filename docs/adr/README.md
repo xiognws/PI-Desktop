@@ -418,3 +418,4 @@ Each ADR includes:
 | 0387 | [Skill curation by idle days](0387-skill-curation-by-idle-days.md) | Accepted (extends ADR 0377 and ADR 0379) |
 | 0388 | [A skill owns four resource containers](0388-skill-resource-containers.md) | Accepted (extends ADR 0379 and ADR 0303) |
 | 0389 | [Consolidating skills by absorbing one into another](0389-skill-consolidation-by-absorb.md) | Accepted (extends ADR 0387) |
+| 0390 | [A learning map drawn from the two stores](0390-learning-map-from-two-stores.md) | Accepted |

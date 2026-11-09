@@ -1190,6 +1190,9 @@ export const api = {
     }),
   listMemories: (filter?: MemoryListFilter) =>
     invoke<{ memories: MemoryRecord[]; total: number }>(IPC.invoke.memoryList, filter),
+  /** The agent-written entry list for one store (`memory` / `user`). */
+  memoryEntries: (target: "memory" | "user") =>
+    invoke<{ target: string; entries: string[] }>(IPC.invoke.memoryEntries, { target }),
   memoryStats: () => invoke<{ stats: MemoryStats }>(IPC.invoke.memoryStats),
   updateMemory: (input: MemoryUpdateInput) =>
     invoke<{ memory: MemoryRecord }>(IPC.invoke.memoryUpdate, input),
