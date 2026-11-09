@@ -14544,6 +14544,9 @@ describe("skill review triggering (Hermes background_review port)", () => {
       const names = fork.tools.map((tool) => tool.name);
       expect(names).toContain("skill_manage");
       expect(names).toContain("Skill");
+      // The memory half of the loop: `memory` is deferred too, so without this
+      // the fork could learn a preference and have nowhere to write it.
+      expect(names).toContain("memory");
       // The allowlist still bounds the fork: nothing outside it is handed over.
       expect(names).not.toContain("Bash");
       expect(names).not.toContain("Write");

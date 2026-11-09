@@ -2596,11 +2596,12 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     if (gate.cooled) return skipped("cooldown");
 
     // The review's write path is built for the fork, not borrowed from the turn's
-    // declaration list. `Skill` only exists when the session has a skill catalog
-    // and plugin tools travel by launch policy, so a session whose library is
-    // empty — exactly the one that needs its first skills — had no writer and the
-    // pass was skipped forever. The fork is `reviewToolsFrom` still: whatever the
-    // allowlist admits from the session, plus the two tools the review owns.
+    // declaration list. Every writer here is ancillary (`memory`, `skill_manage`)
+    // or conditional (`Skill` exists only when the session has a catalog), so a
+    // fork built from `declaredTools()` alone had no pen at all — and a session
+    // whose library is empty, exactly the one that needs its first skill, was
+    // skipped forever. The fork is `reviewToolsFrom` still: whatever the
+    // allowlist admits from the session, plus one copy of each writer it lacks.
     const declared = this.declaredTools();
     const tools = reviewToolsFrom([
       ...declared,
@@ -2610,6 +2611,18 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       ...(declared.some((tool) => tool.name === "skill_manage")
         ? []
         : [createSkillManageTool(this.host)]),
+      // The same gap one layer down: `memory` is deferred, so the fork only had it
+      // when the turn happened to activate it. A pass that learns a preference —
+      // the case the review prompt calls a first-class signal — could not write it
+      // anywhere, which is the memory half of the loop going quiet.
+      ...(declared.some((tool) => tool.name === "memory")
+        ? []
+        : [createMemoryTool(this.host)]),
+      // The same gap one layer down: `memory` is deferred, so the fork only had it
+      // when the turn happened to activate it. A pass that learns a preference —
+      // the case the review prompt calls a first-class signal — could not write it
+      // anywhere, which is the memory half of the loop going quiet.
+
     ]);
     // A fork without `skill_manage` and `Skill` would pay a full completion and
     // could not land a single change.
