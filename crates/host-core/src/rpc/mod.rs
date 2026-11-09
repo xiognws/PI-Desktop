@@ -627,6 +627,15 @@ where
     }
 }
 
+/// One required, non-empty string parameter (D691 capability RPCs).
+fn capability_id_param(params: &Value) -> Result<String, JsonRpcError> {
+    let id = params.get("id").and_then(|value| value.as_str()).unwrap_or("").trim();
+    if id.is_empty() {
+        return Err(rpc_err(1000, "id is required", "INVALID_ARGUMENT"));
+    }
+    Ok(id.to_string())
+}
+
 fn rpc_err(code: i64, message: impl Into<String>, error_code: &str) -> JsonRpcError {
     JsonRpcError {
         code,
@@ -3800,6 +3809,65 @@ async fn handle_request(
             let packages = crate::tool_packages::set_enabled(&st.data_dir, &id, enabled)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "packages": packages }))
+        }
+
+        // Capability packages (D691): the user drops a folder under
+        // <data>/capabilities and the host owns discovery, trust and the enabled
+        // set. Execution happens in the agent sidecar, never here.
+        "capabilities.list" => {
+            let st = state.lock().await;
+            let packages = crate::capabilities::list(&st.data_dir)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "packages": packages }))
+        }
+
+        "capabilities.setEnabled" => {
+            let id = capability_id_param(&params)?;
+            let enabled = params
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .ok_or_else(|| rpc_err(1000, "enabled is required", "INVALID_ARGUMENT"))?;
+            let st = state.lock().await;
+            let packages = crate::capabilities::set_enabled(&st.data_dir, &id, enabled)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "packages": packages }))
+        }
+
+        "capabilities.setTrusted" => {
+            let id = capability_id_param(&params)?;
+            let digest = params
+                .get("digest")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let trusted = params
+                .get("trusted")
+                .and_then(|v| v.as_bool())
+                .ok_or_else(|| rpc_err(1000, "trusted is required", "INVALID_ARGUMENT"))?;
+            let st = state.lock().await;
+            let packages = crate::capabilities::set_trusted(&st.data_dir, &id, &digest, trusted)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "packages": packages }))
+        }
+
+        "capabilities.dir" => {
+            let id = capability_id_param(&params)?;
+            let st = state.lock().await;
+            let dir = crate::capabilities::package_dir(&st.data_dir, &id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "path": dir.to_string_lossy() }))
+        }
+
+        // The scan root itself: the folder the user drops packages into. It
+        // exists even with no package inside, which is what lets an empty page
+        // still offer "open this folder" instead of a dead end.
+        "capabilities.root" => {
+            let st = state.lock().await;
+            let root = crate::capabilities::packages_dir(&st.data_dir);
+            if let Err(error) = std::fs::create_dir_all(&root) {
+                return Err(rpc_err(1000, error.to_string(), "INTERNAL"));
+            }
+            Ok(json!({ "path": root.to_string_lossy() }))
         }
 
         "plans.pending" => {

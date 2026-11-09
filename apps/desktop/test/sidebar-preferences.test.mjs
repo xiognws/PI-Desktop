@@ -501,7 +501,7 @@ test("home switcher lists retained sidebar projects and the active workspace", (
 
   assert.deepEqual(
     projects.map((project) => project.name),
-    ["other", "Pi-Workspace", "pi-desktop-plugins"],
+    ["other", "pi-desktop-plugins", "Pi-Workspace"],
   );
 });
 

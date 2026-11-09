@@ -1689,7 +1689,7 @@ one-liner.
   same-named successor, and surface on `UserSkillRecord` as
   `useCount` / `lastUsedAt`.
 - `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
-  → `{ report }` — maintenance over the user library (ADR 0384). `report.entries`
+  → `{ report }` — maintenance over the user library (ADR 0387). `report.entries`
   classifies every skill `keep` / `stale` / `archive` by idle days, counted from
   the last load or from the document's own timestamp when nothing ever loaded
   it; `archived` names what the pass switched off. **`dryRun` defaults to true**,

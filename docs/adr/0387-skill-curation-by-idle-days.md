@@ -1,4 +1,4 @@
-# ADR 0384: Skill curation by idle days
+# ADR 0387: Skill curation by idle days
 
 - Status: Accepted
 - Date: 2026-11-09
@@ -12,7 +12,7 @@ document has stopped earning its place. Hermes answers this with a curator that
 moves unused skills to an archive on an inactivity schedule; until now the
 library here had no usage signal at all, so "unused" could not even be defined.
 
-Skill usage is now counted (`skills.recordUse`, ADR 0384's prerequisite): every
+Skill usage is now counted (`skills.recordUse`, ADR 0387's prerequisite): every
 `Skill` load bumps a per-skill count and timestamp, and `skills.list` carries
 them. That makes an idle-day rule expressible for the first time.
 

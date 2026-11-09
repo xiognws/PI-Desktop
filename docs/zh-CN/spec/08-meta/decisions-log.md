@@ -5933,3 +5933,40 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - 覆盖：`crates/host-core/src/sessions/usage.rs`（两轮求和、别的会话不串号、没有用量文档
   的轮次仍然计入、未知会话为空）与 `apps/desktop/test/session-usage-totals.test.mjs`
   （桶运算、压缩格式、宿主账本接线、菜单条目、九套语言）。
+## 2026-11-09 —— 能力包是放在用户目录、跑在 agent sidecar 里的文件夹（D691）
+
+- 「工具」页保留内置工具包清单（D687），并新增一个入口按钮通往能力页。*能力包* 是
+  `<userData>/capabilities/` 下的一个文件夹，含 `capability.json`（`schemaVersion`、
+  `apiVersion`、`id`、`name`、`version`、`description`、`permissions[]`、`actions[]`）
+  和一个默认导出激活函数的入口模块。既不捆绑也不安装：宿主启动时扫描该目录，读不到
+  清单的文件夹保留可见的报错行，而不是凭空消失。
+- 执行发生在 **agent sidecar**，不在 Electron 主进程，也不在渲染层。
+  `capabilities/index.ts` 维护进程级注册表（不是每会话），所以两个窗口不会把同一个包
+  加载两次；每个动作 30 秒上限；激活钩子抛错只让该包自己失败。
+- 双向都是打开的，这正是它不做成插件的原因。渲染层 → `pi-desktop/capabilities/invoke`
+  → sidecar `capability.invoke`；动作内部 `call(method, params)` → `ParentHostProxy`
+  → 主进程正常 RPC，范围限定在 `CAPABILITY_HOST_METHODS`。agent 自己通过 `Capability`
+  工具（`list` / `invoke`）触达能力包，只在 agent 模式挂载，模型可以在回合中途调用。
+- 权限分 `read`、`write`、`net`、`agent`、`host`。未信任的包被沙箱限制为
+  `read` + `write`；`host` 默认永不授予，没有授权的动作在 sidecar 内就被拒掉，
+  宿主根本看不到这次调用。
+- 不做签名，改为由 host-core 冻结包内相对路径与字节的 SHA-256 摘要：首次出现是
+  `untrusted`，确认即钉住那份摘要，之后文件改动撤回授权并把行标记为 `modified`，
+  用不再匹配的摘要重新确认会被回以 `changed on disk since it was reviewed`。签名最终
+  要喂的也是这个判断——*这是不是我审过的那份代码*——这样就不必先发明一个产品还没有的
+  发布者身份。
+- 为什么不做成插件：插件注册表带来安装、版本、市场与签名语义；手工拷贝的文件夹不是安装
+  过的产品，走插件反而会让用户代码的实际权限看起来比它小。为什么不做成工具包：工具包是
+  声明式的，不执行任何东西。
+- 测试覆盖：`crates/host-core/src/capabilities.rs` 单测（扫描、沙箱授予、确认、磁盘上
+  摘要变化、禁用、未知 schema 版本、重复 id）、
+  `packages/agent-runtime/src/capabilities/index.test.ts`（加载与调用、跳过/未信任、
+  一个坏清单不拖累其它包、入口抛错、未注册动作、host 权限闸门且宿主零调用、超时、
+  `clear`、agent 工具的 list/invoke/空态）、
+  `packages/agent-runtime/src/capabilities/example.test.ts`（随仓库的示例包能加载并应答）、
+  `apps/desktop/test/capabilities-ipc.test.mjs`（通道注册、参数收窄、每次变更后同步
+  sidecar、invoke 只走 sidecar）、`apps/desktop/test/capabilities-page.test.mjs`
+  （页面联合、路由、入口按钮、信任与摘要接线、九个语言目录），以及
+  `apps/desktop/test/tools-page.test.mjs`（各语言目录里的入口文案键）。见 ADR 0384 与
+  规格 07-plugins/19。
+

@@ -8508,3 +8508,51 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   spellings), `apps/desktop/test/development-profile.test.mjs` (profile names and
   the order identity is established in), and
   `apps/desktop/test/frozen-identifiers.test.mjs` (the frozen set above).
+
+## 2026-11-09 — Capability packages are user folders that run in the agent sidecar (D691)
+
+- The Tools page keeps its list of bundled tool packages (D687) and gains one
+  entry button that opens a capability page. A *capability package* is a folder
+  under `<userData>/capabilities/` with `capability.json`
+  (`schemaVersion`, `apiVersion`, `id`, `name`, `version`, `description`,
+  `permissions[]`, `actions[]`) plus an entry module that default-exports an
+  activate function. Nothing is bundled and nothing is installed: the host scans
+  the directory at launch, and a folder without a readable manifest keeps a
+  visible error row instead of vanishing.
+- Execution lives in the **agent sidecar**, not Electron main and not the
+  renderer. `capabilities/index.ts` keeps a process-level registry (not
+  per-session, so two windows cannot load one package twice), each action runs
+  under a 30 s deadline, and a throwing activate hook fails that package only.
+- Both directions are open, which is the reason this is not a plugin.
+  Renderer → `pi-desktop/capabilities/invoke` → sidecar `capability.invoke`;
+  and inside an action, `call(method, params)` → `ParentHostProxy` → main's normal
+  RPC path, limited to `CAPABILITY_HOST_METHODS`. The agent itself reaches
+  packages through a `Capability` tool (`list` / `invoke`) registered in agent
+  mode only, so the model can call a capability mid-turn.
+- Permissions are `read`, `write`, `net`, `agent`, `host`. An untrusted package
+  is sandboxed to `read` + `write`; `host` is never granted by default, and an
+  action that reaches for it without the grant is refused inside the sidecar, so
+  the host never sees the call.
+- Nothing is signed. Instead host-core freezes a SHA-256 digest of the package's
+  relative paths and bytes: first sight is `untrusted`, accepting pins that exact
+  digest, a later change withdraws the grant and marks the row `modified`, and
+  re-accepting a digest that no longer matches answers `changed on disk since it
+  was reviewed`. That is the check a signature would feed anyway — *is this the
+  code I reviewed* — without inventing a publisher identity the product lacks.
+- Why not a plugin: the plugin registry brings install, versioning, marketplace
+  and signing semantics; a hand-copied folder is not an installed product, and
+  routing capabilities through it would make the reach of user code look smaller
+  than it is. Why not a tool package: tool packages are declarative and never run.
+- Covered by `crates/host-core/src/capabilities.rs` unit tests (scan, sandbox
+  grant, acceptance, digest change on disk, disabling, unknown schema version,
+  duplicate ids), `packages/agent-runtime/src/capabilities/index.test.ts` (load
+  and invoke, skipped/untrusted, a broken manifest that does not drag others
+  down, a throwing entry, an unregistered action, the host-permission gate with
+  zero host calls, the deadline, `clear`, and the agent tool's list/invoke/empty
+  paths), `packages/agent-runtime/src/capabilities/example.test.ts` (the shipped
+  example package loads and answers), `apps/desktop/test/capabilities-ipc.test.mjs`
+  (channel registration, parameter narrowing, sidecar sync after every mutation,
+  invoke going only to the sidecar), `apps/desktop/test/capabilities-page.test.mjs`
+  (page union, route, entry button, trust and digest wiring, all nine locales),
+  and `apps/desktop/test/tools-page.test.mjs` (entry button keys in every
+  catalog). See ADR 0384 and spec 07-plugins/19.

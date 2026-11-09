@@ -1122,6 +1122,13 @@ export type AgentRuntimeOptions = {
   /** Trusted extensions enabled for this session (D387); loaded by
    * `loadTrustedExtensions()` before the first prompt. */
   trustedExtensions?: TrustedExtensionSpec[];
+  /**
+   * Exposes the `Capability` tool (D691) so the model can list and invoke the
+   * capability packages the user installed. The sidecar passes a resolver rather
+   * than the tool itself: packages load after the runtime is built, and the tool
+   * has to see whatever the registry holds at call time.
+   */
+  capabilityTools?: () => AgentTool[];
   /** Effective command shell selected by host-core for this session. */
   commandShell: CommandShellOption;
   /** Absolute per-session scratch directory for temporary files (D114).
@@ -1939,6 +1946,8 @@ export class DesktopAgentRuntime {
   private pluginTools: PluginToolDef[];
   private pluginSkills: PluginSkillDef[];
   private trustedExtensionSpecs: TrustedExtensionSpec[];
+  /** Resolves the capability tools at call time (D691); empty when none. */
+  private capabilityTools: () => AgentTool[];
   private extensionRunner?: TrustedExtensionRunner;
   private trustedExtensionLoad?: Promise<void>;
   private extensionSessionName?: string;
@@ -2193,6 +2202,7 @@ export class DesktopAgentRuntime {
     this.pluginTools = opts.pluginTools ?? [];
     this.pluginSkills = [...(opts.pluginSkills ?? [])].sort((left, right) => left.id.localeCompare(right.id));
     this.trustedExtensionSpecs = opts.trustedExtensions ?? [];
+    this.capabilityTools = opts.capabilityTools ?? (() => []);
     this.subagents = opts.subagents ?? [];
     this.subagentProviders = opts.subagentProviders ?? {};
     this.subagentModelKeys = new Set(opts.subagentModelKeys ?? []);
@@ -4625,6 +4635,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // Trusted extension tools are non-core: the per-mode allowlist and
     // ToolSearch deferral treat them like plugin tools (spec 16 §7).
     const extensionTools = this.extensionRunner?.getAgentTools() ?? [];
+    // Capability packages (D691) contribute one stable tool, so a package the
+    // user installed is reachable by the model without a per-action schema that
+    // would change every time the package is edited.
+    const capabilityTools = this.mode === "agent" ? this.capabilityTools() : [];
     return [
       ...builtins,
       ...jevTools,
@@ -4637,6 +4651,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       ...subagentTools,
       ...contextTools,
       ...extensionTools,
+      ...capabilityTools,
     ];
   }
 

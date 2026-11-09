@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "example.tide-probe",
+  "name": "Tide probe",
+  "version": "0.1.0",
+  "description": "Reports the local time and remembers one note, to show a package talking back to the host.",
+  "author": "Pi-Workspace",
+  "permissions": ["read", "host"],
+  "actions": [
+    {
+      "name": "now",
+      "description": "Return the current local time as ISO-8601.",
+      "params": {}
+    },
+    {
+      "name": "remember",
+      "description": "Count the entries the host memory already holds.",
+      "params": {
+        "note": { "type": "string", "description": "Text to remember." }
+      }
+    }
+  ]
+}

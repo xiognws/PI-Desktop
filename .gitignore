@@ -78,6 +78,12 @@ worktrees
 !/apps/desktop/resources/plugins/pi.browser/
 !/apps/desktop/resources/plugins/pi.file-manager/
 !/apps/desktop/resources/plugins/pi.prompt-enhancement/
+# Session Orchestrator is tracked so this build can carry its push-first
+# delivery patch (ADR 0384): a supervising session receives the worker's
+# completion instead of polling for it. Tracking the directory also makes
+# scripts/sync-bundled-plugins.mjs skip it, so the marketplace copy cannot
+# overwrite the patch. UPSTREAM.md records the release it came from.
+!/apps/desktop/resources/plugins/pi.session-orchestrator/
 # Intranet distribution: these marketplace plugins ship inside the package and
 # the build machine has no route to the plugin center, so they are tracked here
 # instead of being re-synced by scripts/sync-bundled-plugins.mjs at build time.

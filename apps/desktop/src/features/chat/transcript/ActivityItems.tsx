@@ -7,6 +7,8 @@ import { thinkingRowStartsOpen } from "../../../lib/activity-group-folding";
 import { ThinkingRow } from "./shared";
 import { HostedSearchRow } from "./HostedSearchRow";
 import { SubagentTopology } from "./SubagentDetail";
+import { SpawnedSessionCard } from "./SpawnedSessionCard";
+import { spawnedSessionFrom } from "../../../lib/session-task-card";
 import { ToolRow } from "./ToolRow";
 import { useRenderBlocks, type RenderBlock } from "./render-blocks";
 
@@ -54,6 +56,12 @@ const ActivityItemBlock = memo(function ActivityItemBlock({
         delegationTimings={delegationTimings}
         onUserInteraction={onUserInteraction}
       />;
+    }
+    // A spawn starts a real durable session, so the row shows what was started
+    // and opens it; every other action of the same tool keeps the generic row.
+    if (item.kind === "tool") {
+      const spawned = spawnedSessionFrom(item.message);
+      if (spawned) return <SpawnedSessionCard key={item.message.id} session={spawned} />;
     }
     // A tool or hosted-search row always starts collapsed: only the user opens
     // a payload, never the row's position in the turn. A review-backed edit is

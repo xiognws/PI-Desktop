@@ -1,6 +1,8 @@
 /**
  * The Tools page (D681): a sidebar destination under 产物文件/Artifacts that
- * lists the tool packages this build ships, with one enable switch each.
+ * lists the tool packages this build ships, with one enable switch each. The
+ * same page also carries the capability packages scanned from the user's data
+ * folder (D691), above the tool packages.
  *
  * Source contracts only. The scan and the enabled set live in host-core
  * (`crates/host-core/src/tool_packages.rs`, covered by Rust tests) and the IPC
@@ -30,7 +32,9 @@ const packageJson = JSON.parse(read("../package.json"));
 const LOCALES = ["en", "de", "es", "fr", "ko", "pt-BR", "tr", "zh-CN", "zh-TW"];
 
 test("tools is an app-shell page next to artifacts", () => {
-  assert.match(appState, /page: "chat" \| "scheduled" \| "plugins" \| "artifacts" \| "tools" \| "settings"/);
+  assert.match(appState, /\| "tools"/);
+  // Capability packages share this page (D691); there is no second route.
+  assert.doesNotMatch(appState, /\| "capabilities"/);
   assert.match(appShell, /pages\/ToolsPage/);
   assert.match(appShell, /page === "tools" \? \([\s\S]{0,90}<ToolsPage \/>/);
   // A full page has to hide the work panel and refuse to open it, or the route
@@ -97,12 +101,31 @@ test("the packaged image ships resources/tools", () => {
   assert.ok(existsSync(new URL("../resources/tools/README.md", import.meta.url)));
 });
 
+test("an empty tool list never hides the capability section", () => {
+  // A source checkout ships no tool packages, so the empty state is the normal
+  // first screen. Capabilities render above that branch, which is what keeps
+  // them visible when there is nothing else on the page.
+  assert.match(page, /data-capability-section="true"/);
+  const sectionAt = page.indexOf("<CapabilitySection");
+  const emptyAt = page.indexOf('className="tools-empty"');
+  assert.ok(sectionAt > 0 && emptyAt > sectionAt, "the capability section renders before the empty state");
+});
+
 test("every locale speaks the tools page", () => {
   for (const locale of LOCALES) {
     const catalog = read(`../../../packages/i18n/src/locales/${locale}/index.ts`);
     const key = locale === "de" || locale === "es" || locale === "fr" ? '"tools"' : "tools";
     assert.ok(catalog.includes(`${key}: {`), `${locale} defines the tools block`);
-    for (const entry of ["title", "loadFailed", "empty", "broken", "risk"]) {
+    for (const entry of [
+      "title",
+      "loadFailed",
+      "empty",
+      "broken",
+      "risk",
+      // The header entry that opens the capability packages (D691).
+      "capabilityEntry",
+      "capabilityEntryHint",
+    ]) {
       const entryKey = locale === "de" || locale === "es" || locale === "fr" ? `"${entry}"` : entry;
       assert.ok(catalog.includes(`${entryKey}:`), `${locale} defines tools.${entry}`);
     }
