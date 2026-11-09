@@ -62,6 +62,16 @@ test("startup plugin restore notifies the renderer after every enabled plugin lo
       schemaTooNewOf: () => null,
     },
     "../plugin-display-locale": { syncPluginDisplayLocale: async () => {} },
+    // A run marker records an unclean exit and is read on the next start; the
+    // lifecycle imports it, so the restore scenario needs it stubbed even
+    // though nothing here reads a previous run back.
+    "../run-marker.js": {
+      setRunMarkerDirectory: () => {},
+      writeRunMarker: () => {},
+      readRunMarker: () => null,
+      describeUnfinishedRun: () => null,
+      readLastExitReason: () => null,
+    },
     "@pi-workspace/host-runtime": {
       RuntimeSupervisor: class {
         superviseRestart() {
