@@ -39,16 +39,17 @@ Three properties are deliberate:
 2. **Archiving is deactivation, never deletion.** The pass writes the same
    activation flag the row's toggle writes, so one click in the settings page
    brings the skill back. Nothing on disk is touched.
-3. **The scheduled pass only reports.** A daily maintenance tick logs what it
-   would retire; it does not turn anything off. A skill that vanishes from the
-   catalog because a timer fired is indistinguishable, from the user's side,
-   from a bug or a lost file — and this app has no "why did this turn off"
-   surface to explain it.
+3. **Nothing runs on a timer.** Curation happens when somebody opens the skills
+   page (a dry run) and clicks the archive button. A skill that vanishes from the
+   catalog because a background timer fired is indistinguishable, from the user's
+   side, from a bug or a lost file, and this app has no "why did this turn off"
+   surface to explain it — so the pass has one caller: the page in front of the
+   person making the decision.
 
 ## Consequences
 
 - The library can be tidied without a model call, so the pass is cheap enough to
-  run at boot and testable as pure functions (`classify`, `plan`).
+  run on every page load and testable as pure functions (`classify`, `plan`).
 - A skill the user turned off by hand is indistinguishable from an archived one.
   That is acceptable: both mean "not in the catalog right now", and both are one
   toggle away.

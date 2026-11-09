@@ -2,12 +2,12 @@
 //!
 //! Hermes retires skills with a curator that reads per-skill activity and moves
 //! stale ones to an archive. This is the same idea with one deliberate
-//! difference: **the scheduled pass never disables anything**. A skill that
-//! disappears from the catalog because a timer fired is indistinguishable, from
-//! the user's side, from a bug or a lost file — there is no "why did this turn
-//! off" surface here yet. So the daily pass only *reports* what it would retire,
-//! and the one-click archive in the settings page is the thing that acts, with
-//! the list in front of the person doing it.
+//! difference: **nothing here runs on a timer**. A skill that disappears from the
+//! catalog because a background job fired is indistinguishable, from the user's
+//! side, from a bug or a lost file — there is no "why did this turn off" surface
+//! yet. So the pass reports unless the caller asks it to act, and the one-click
+//! archive in the settings page is the only thing that acts, with the list in
+//! front of the person doing it.
 //!
 //! The rule itself is small and explainable:
 //!
