@@ -629,7 +629,11 @@ where
 
 /// One required, non-empty string parameter (D691 capability RPCs).
 fn capability_id_param(params: &Value) -> Result<String, JsonRpcError> {
-    let id = params.get("id").and_then(|value| value.as_str()).unwrap_or("").trim();
+    let id = params
+        .get("id")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .trim();
     if id.is_empty() {
         return Err(rpc_err(1000, "id is required", "INVALID_ARGUMENT"));
     }
