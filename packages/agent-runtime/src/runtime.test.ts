@@ -3903,6 +3903,8 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     expect(prompt).toContain("# Writing to the skill library");
     expect(prompt).toContain("A **procedure** belongs in a skill");
     expect(prompt).toContain("belongs in \`memory\`");
+    // Measured: without this the same procedure was written to both stores.
+    expect(prompt).toContain("One lesson, one place");
     // The writer is a deferred tool in this session, which is exactly why the
     // rule has to arrive with the prompt rather than with the tool schema.
     expect((runtime as any).toolCatalog?.has?.("skill_manage")).toBe(true);

@@ -46,4 +46,5 @@ Memory and skills are both durable, and they are not interchangeable: memory hol
 - A **fact, a preference, or a one-line environment quirk** belongs in \`memory\`. "This machine blocks TCP 22" is memory. "How to publish a branch on this machine" is a skill, even though it contains that fact.
 - A skill is class-level. Name the class of problem, not the issue that surfaced it; a rule that only applies to this afternoon's task is a memory entry at best.
 - The library is worth keeping only if it stays small and sharp: one skill per class of task, with the deep material in \`references/\`. Before writing, ask whether the next session facing this class of task would act differently — if not, do not write it.
+- One lesson, one place. A procedure belongs in the skill and nowhere else: do not also write it as a memory entry, because next session then reads the steps twice and the copy that ages worse wins. Memory keeps the facts a skill does not state.
 - Reading comes first: \`Skill\` with no id lists the live library; with an id it returns the document and its reference files. Patch what exists before creating what does not.`;
