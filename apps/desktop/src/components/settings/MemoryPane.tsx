@@ -101,14 +101,15 @@ function useAgentEntries() {
       cancelled = true;
     };
   }, []);
-  return entries;
+  return { entries, setEntries };
 }
 
 export function MemoryPane() {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<ScopeFilter>("all");
   const { records, setRecords, stats, loading, error, load } = useMemoryData(scope);
-  const agentEntries = useAgentEntries();
+  const { entries: agentEntries, setEntries: setAgentEntries } = useAgentEntries();
+  const [savingEntries, setSavingEntries] = useState(false);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -174,6 +175,28 @@ export function MemoryPane() {
       value === "all" ? t("settings.memoryFilterAll") : t(SCOPE_LABEL_KEY[value]),
   }));
 
+  /**
+   * Drop one entry from a store.
+   *
+   * The list is the model's context, so this is the one edit a person can make
+   * that changes what the next turn reads. It uses the same whole-list write the
+   * `memory` tool uses, which means the host's budget check applies here too.
+   */
+  const removeAgentEntry = async (target: "memory" | "user", index: number) => {
+    const next = agentEntries[target].filter((_, position) => position !== index);
+    const previous = agentEntries;
+    setAgentEntries({ ...agentEntries, [target]: next });
+    setSavingEntries(true);
+    try {
+      await api.writeMemoryEntries(target, next);
+    } catch (cause) {
+      setAgentEntries(previous);
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSavingEntries(false);
+    }
+  };
+
   return (
     <SettingsCard
       title={t("settings.memory")}
@@ -226,6 +249,15 @@ export function MemoryPane() {
                       : "settings.memoryAgentMemory",
                   )}</Badge>
                   <span className="min-w-0 flex-1 break-words">{entry.text}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={savingEntries}
+                    aria-label={t("settings.memoryAgentRemove", { text: entry.text.slice(0, 40) })}
+                    onClick={() => void removeAgentEntry(entry.target, entry.index)}
+                  >
+                    ×
+                  </Button>
                 </li>
               ))}
             </ul>

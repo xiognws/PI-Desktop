@@ -1366,6 +1366,7 @@ sklm: {
     memoryAgentMemory: "记忆",
     memoryAgentUser: "用户画像",
     memoryAgentHint: "这里才是模型在上下文里读到的内容；下方列表是旧的打分记忆库。",
+    memoryAgentRemove: "删除「{{text}}」",
     skillUsageUsed: "已用 {{count}} 次",
     skillUsageUnusedOf: "{{total}} 个中 {{unused}} 个从未使用",
     skillCurateTitle: "技能维护",

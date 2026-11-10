@@ -1193,6 +1193,12 @@ export const api = {
   /** The agent-written entry list for one store (`memory` / `user`). */
   memoryEntries: (target: "memory" | "user") =>
     invoke<{ target: string; entries: string[] }>(IPC.invoke.memoryEntries, { target }),
+  /** Replace one store's whole entry list; the host validates the budget. */
+  writeMemoryEntries: (target: "memory" | "user", entries: string[]) =>
+    invoke<{ target: string; entries: string[] }>(IPC.invoke.memoryWriteEntries, {
+      target,
+      entries,
+    }),
   memoryStats: () => invoke<{ stats: MemoryStats }>(IPC.invoke.memoryStats),
   updateMemory: (input: MemoryUpdateInput) =>
     invoke<{ memory: MemoryRecord }>(IPC.invoke.memoryUpdate, input),

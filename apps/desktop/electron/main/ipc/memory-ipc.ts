@@ -143,6 +143,22 @@ export function registerMemoryIpc({
     }
     return forward("memory.entries", { target });
   });
+  /**
+   * Replace one store's whole entry list — the same contract the `memory` tool
+   * uses, so a person editing the list here cannot produce a state the model
+   * could not have produced itself. The host validates the budget.
+   */
+  registrar.handle(IPC.invoke.memoryWriteEntries, async (input?: unknown) => {
+    const payload = (input ?? {}) as { target?: unknown; entries?: unknown };
+    if (payload.target !== "memory" && payload.target !== "user") {
+      throw new Error("invalid memory target");
+    }
+    if (!Array.isArray(payload.entries) || payload.entries.some((e) => typeof e !== "string")) {
+      throw new Error("entries must be an array of strings");
+    }
+    return forward("memory.writeEntries", { target: payload.target, entries: payload.entries });
+  });
+
   registrar.handle(IPC.invoke.memoryStats, async () => forward("memory.stats", {}));
   registrar.handle(IPC.invoke.memoryUpdate, async (input?: unknown) =>
     forward("memory.update", updateParams(input)),

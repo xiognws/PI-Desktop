@@ -1379,6 +1379,7 @@ sklm: {
     memoryAgentMemory: "Memory",
     memoryAgentUser: "Profile",
     memoryAgentHint: "These are the entries the model reads in context. The list below is the older scored store.",
+    memoryAgentRemove: "Remove “{{text}}”",
     skillUsageUsed: "Used {{count}}×",
     skillUsageUnusedOf: "{{unused}} of {{total}} never used",
     skillCurateTitle: "Skill maintenance",

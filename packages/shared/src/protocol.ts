@@ -252,6 +252,7 @@ export const IPC = {
     projectMemorySave: "pi-desktop/project/memory/save",
     memoryList: "pi-desktop/memory/list",
     memoryEntries: "pi-desktop/memory/entries",
+    memoryWriteEntries: "pi-desktop/memory/writeEntries",
     memoryStats: "pi-desktop/memory/stats",
     memoryUpdate: "pi-desktop/memory/update",
     memoryForget: "pi-desktop/memory/forget",

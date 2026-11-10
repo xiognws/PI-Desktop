@@ -1375,6 +1375,7 @@ sklm: {
     memoryAgentMemory: "Anı",
     memoryAgentUser: "Profil",
     memoryAgentHint: "Modelin bağlamda okuduğu kayıtlar bunlar. Aşağıdaki liste eski puanlı depo.",
+    memoryAgentRemove: "“{{text}}” kaydını sil",
     skillUsageUsed: "{{count}}× kullanıldı",
     skillUsageUnusedOf: "{{total}} tanesinden {{unused}} tanesi hiç kullanılmadı",
     skillCurateTitle: "Beceri bakımı",

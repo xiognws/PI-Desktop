@@ -1375,6 +1375,7 @@ sklm: {
     memoryAgentMemory: "기억",
     memoryAgentUser: "프로필",
     memoryAgentHint: "모델이 컨텍스트에서 읽는 항목입니다. 아래 목록은 이전 점수 기반 저장소입니다.",
+    memoryAgentRemove: "“{{text}}” 삭제",
     skillUsageUsed: "{{count}}회 사용",
     skillUsageUnusedOf: "{{total}}개 중 {{unused}}개 사용된 적 없음",
     skillCurateTitle: "스킬 유지 관리",

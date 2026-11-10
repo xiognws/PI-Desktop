@@ -1349,6 +1349,7 @@ export const ptBR = {
     memoryAgentMemory: "Memória",
     memoryAgentUser: "Perfil",
     memoryAgentHint: "Estas são as entradas que o modelo lê no contexto. A lista abaixo é o armazenamento pontuado antigo.",
+    memoryAgentRemove: "Remover “{{text}}”",
     skillUsageUsed: "Usada {{count}}×",
     skillUsageUnusedOf: "{{unused}} de {{total}} nunca usadas",
     skillCurateTitle: "Manutenção de habilidades",

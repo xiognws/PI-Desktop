@@ -1369,6 +1369,7 @@ sklm: {
     "memoryAgentMemory": "Recuerdo",
     "memoryAgentUser": "Perfil",
     "memoryAgentHint": "Estas son las entradas que el modelo lee en contexto. La lista de abajo es el almacén puntuado anterior.",
+    "memoryAgentRemove": "Quitar «{{text}}»",
     "skillUsageUsed": "Usada {{count}}×",
     "skillUsageUnusedOf": "{{unused}} de {{total}} nunca usadas",
     "skillCurateTitle": "Mantenimiento de habilidades",

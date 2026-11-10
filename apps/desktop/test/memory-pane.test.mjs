@@ -93,3 +93,12 @@ test("the memory page shows what the agent wrote, not only the scored store", ()
   assert.match(pane, /settings\.memoryAgentTitle/);
   assert.match(pane, /settings\.memoryAgentHint/);
 });
+
+test("a person can drop one agent-written memory entry", () => {
+  // The entry list is the model's context; until now only the model could
+  // change it. The write goes through the same whole-list contract the tool
+  // uses, so the host's budget check still applies.
+  assert.match(pane, /api\.writeMemoryEntries\(target, next\)/);
+  assert.match(pane, /setAgentEntries\(previous\)/);
+  assert.match(pane, /settings\.memoryAgentRemove/);
+});

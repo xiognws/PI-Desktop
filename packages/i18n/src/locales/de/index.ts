@@ -1369,6 +1369,7 @@ sklm: {
     "memoryAgentMemory": "Erinnerung",
     "memoryAgentUser": "Profil",
     "memoryAgentHint": "Das sind die Einträge, die das Modell im Kontext liest. Die Liste darunter ist der ältere bewertete Speicher.",
+    "memoryAgentRemove": "„{{text}}“ entfernen",
     "skillUsageUsed": "{{count}}× verwendet",
     "skillUsageUnusedOf": "{{unused}} von {{total}} nie verwendet",
     "skillCurateTitle": "Fähigkeiten pflegen",
