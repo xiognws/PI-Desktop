@@ -44,8 +44,16 @@ export const REVIEW_TOOL_ALLOWLIST: readonly string[] = [
 /** Iteration ceiling for one review fork (Hermes uses the same number). */
 export const REVIEW_MAX_ITERATIONS = 16;
 
-/** A turn that used fewer tools than this taught nothing worth a completion. */
-export const REVIEW_DEFAULT_MIN_TOOL_CALLS = 3;
+/**
+ * A turn that used fewer tools than this taught nothing worth a completion.
+ *
+ * One, not three: measured on a live session, the turns that carried the lessons
+ * worth keeping were the short ones (a preference, a pitfall, one procedure) and
+ * every one of them was skipped as `too-few-tools`. The cooldown, not the tool
+ * count, is what keeps the review from running on every turn — a review that
+ * reads one exchange costs one small completion.
+ */
+export const REVIEW_DEFAULT_MIN_TOOL_CALLS = 1;
 /** Floor between two reviews of the same session, in seconds. */
 export const REVIEW_DEFAULT_MIN_INTERVAL_SEC = 120;
 
