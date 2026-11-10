@@ -14,6 +14,7 @@
     "preview": "pnpm --filter @pi-workspace/desktop run preview",
     "pack": "pnpm --filter @pi-workspace/desktop run pack",
     "dist": "pnpm --filter @pi-workspace/desktop run dist",
+    "stage:manual": "node scripts/stage-desktop-manual.mjs",
     "pi-plugin": "pi-plugin",
     "build": "pnpm -r --if-present build && cargo build --release -p host-core",
     "build:js": "pnpm -r --if-present build",

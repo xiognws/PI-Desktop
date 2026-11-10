@@ -1799,6 +1799,8 @@ export const api = {
   executeCommand: (commandId: string) =>
     invoke(IPC.invoke.commandPaletteExecute, commandId),
   openLogs: () => invoke(IPC.invoke.logOpenFolder),
+  /** Open the handbook this build shipped with (About panel). */
+  openManual: () => invoke<{ ok: boolean; path: string }>(IPC.invoke.manualOpen),
   /** What the next launch would play as its boot animation (D679). */
   startupAnimationStatus: () =>
     invoke<StartupAnimationStatus>(IPC.invoke.startupAnimationStatus),

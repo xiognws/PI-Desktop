@@ -25,11 +25,12 @@
     "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "bundle:python": "node ../../scripts/bundle-python-runtime.mjs",
-    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && electron-vite build && electron-builder --dir",
-    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && electron-vite build && node ../../scripts/build-desktop-release.mjs",
-    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
-    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
+    "stage:manual": "node ../../scripts/stage-desktop-manual.mjs",
+    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run stage:manual && electron-vite build && electron-builder --dir",
+    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
+    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --mac --publish never",
+    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
+    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
     "@ast-grep/napi": "0.51.0",
@@ -154,6 +155,10 @@
       {
         "from": "resources/python",
         "to": "python"
+      },
+      {
+        "from": "resources/manual",
+        "to": "manual"
       }
     ],
     "mac": {
