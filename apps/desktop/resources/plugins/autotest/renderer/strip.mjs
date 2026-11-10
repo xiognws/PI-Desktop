@@ -6,7 +6,7 @@
 // (apps/desktop/src/lib/transcript-display-mode.ts falls back to 'fully-folded'),
 // so a review gate rendered only as a tool card can be missed. When the plan
 // still needs a decision the same gate is rendered here, at the reply tail.
-import { h, useEffect, useState, useCallback } from 'react';
+import { createElement as h, useEffect, useState, useCallback } from 'react';
 import { call, callError } from './bridge.mjs';
 import { Button, Chip, Empty } from './ui.mjs';
 import { StageRailView, ReviewGate } from './cards.mjs';

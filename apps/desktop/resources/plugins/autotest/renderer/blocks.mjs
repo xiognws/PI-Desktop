@@ -1,7 +1,7 @@
 // Fenced block renderer for the report markdown the tool emits, plus the
 // diagnose narrative. Renders in a scrollable pre so a long report never
 // stretches the message column.
-import { h, useState } from 'react';
+import { createElement as h, useState } from 'react';
 import { Pre, Button, Chip } from './ui.mjs';
 
 const MAX_PREVIEW = 6000;
