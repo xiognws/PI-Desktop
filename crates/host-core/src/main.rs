@@ -3,7 +3,6 @@ mod agent_capabilities;
 mod artifacts;
 mod audit;
 mod background_tasks;
-mod widgets;
 mod computer;
 mod config_sync;
 mod data_relocation;
@@ -43,6 +42,7 @@ mod turn_queue;
 mod user_skills;
 mod user_subagents;
 mod visualizations;
+mod widgets;
 mod workspace;
 
 use std::sync::Arc;
