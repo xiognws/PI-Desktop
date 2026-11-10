@@ -13,6 +13,7 @@ import { registerArtifactsIpc } from "./artifacts-ipc";
 import { registerToolPackagesIpc } from "./tool-packages-ipc";
 import { registerWidgetsIpc } from "./widgets-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
+import { registerManualIpc } from "./manual-ipc";
 import { registerStartupAnimationIpc } from "./startup-animation-ipc";
 import { registerMarketIpc } from "./market-ipc";
 import { registerMcpIpc } from "./mcp-ipc";
@@ -575,6 +576,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     isDeveloperMode,
     getMainWindow,
   });
+
+  registerManualIpc({ registrar, stripWinLongPrefix });
 
   registerStartupAnimationIpc({ registrar, dataDir, stripWinLongPrefix });
 

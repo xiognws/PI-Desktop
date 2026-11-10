@@ -690,6 +690,17 @@ export function SettingsPage() {
                   </Button>
                 </SettingsRow>
                 <SettingsRow
+                  title={t("settings.manual")}
+                  description={t("settings.manualDesc")}
+                >
+                  <Button
+                    variant="secondary"
+                    onClick={() => void api.openManual().catch(() => undefined)}
+                  >
+                    {t("settings.openManual")}
+                  </Button>
+                </SettingsRow>
+                <SettingsRow
                   title={t("settings.feedback")}
                   description={t("settings.feedbackDesc")}
                 >
