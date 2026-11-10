@@ -17,6 +17,7 @@ import {
   type MemoryStats,
 } from "../../lib/api";
 import { SettingsCard } from "../../features/settings/primitives";
+import { mergeLegacyInto, type MemoryTarget } from "../../lib/memory-merge";
 import { Badge, Button, cx, Input, SegmentedControl } from "../ui";
 
 const PAGE_SIZE = 200;
@@ -110,6 +111,7 @@ export function MemoryPane() {
   const { records, setRecords, stats, loading, error, load } = useMemoryData(scope);
   const { entries: agentEntries, setEntries: setAgentEntries } = useAgentEntries();
   const [savingEntries, setSavingEntries] = useState(false);
+  const [mergingLegacy, setMergingLegacy] = useState(false);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -176,6 +178,44 @@ export function MemoryPane() {
   }));
 
   /**
+   * Copy the older scored store into the entry list the model actually reads.
+   *
+   * Copy, not move: the legacy rows stay where they are, so a bad merge is undone
+   * by deleting the entries it added, and nothing a past session recorded can be
+   * lost by a bug here.
+   */
+  const mergeLegacy = async () => {
+    setMergingLegacy(true);
+    try {
+      const [listed] = await Promise.all([api.listMemories({ limit: PAGE_SIZE })]);
+      let addedTotal = 0;
+      let overflowTotal = 0;
+      for (const target of ["user", "memory"] as MemoryTarget[]) {
+        const current = target === "user" ? agentEntries.user : agentEntries.memory;
+        const result = mergeLegacyInto(current, listed.memories, target);
+        if (result.added.length === 0) {
+          overflowTotal += result.overflow.length;
+          continue;
+        }
+        await api.writeMemoryEntries(target, result.next);
+        addedTotal += result.added.length;
+        overflowTotal += result.overflow.length;
+        setAgentEntries((previous) => ({ ...previous, [target]: result.next }));
+      }
+      setNotice(
+        t("settings.memoryMergeDone", {
+          added: addedTotal,
+          skipped: overflowTotal,
+        }),
+      );
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setMergingLegacy(false);
+    }
+  };
+
+  /**
    * Drop one entry from a store.
    *
    * The list is the model's context, so this is the one edit a person can make
@@ -202,9 +242,19 @@ export function MemoryPane() {
       title={t("settings.memory")}
       description={t("settings.memoryIntro")}
       action={
-        <Button variant="secondary" size="sm" onClick={() => void tidy()} disabled={tidying}>
-          {tidying ? t("settings.memoryTidying") : t("settings.memoryTidy")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void mergeLegacy()}
+            disabled={mergingLegacy || records.length === 0}
+          >
+            {mergingLegacy ? t("settings.memoryMergeRunning") : t("settings.memoryMergeAction")}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => void tidy()} disabled={tidying}>
+            {tidying ? t("settings.memoryTidying") : t("settings.memoryTidy")}
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-3">

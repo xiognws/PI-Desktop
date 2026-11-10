@@ -102,3 +102,11 @@ test("a person can drop one agent-written memory entry", () => {
   assert.match(pane, /setAgentEntries\(previous\)/);
   assert.match(pane, /settings\.memoryAgentRemove/);
 });
+
+test("the memory page can pull the old store into the list the model reads", () => {
+  // Copy, not move: the legacy rows stay put, so a bad merge is undone by
+  // deleting the entries it added.
+  assert.match(pane, /mergeLegacyInto\(current, listed\.memories, target\)/);
+  assert.match(pane, /api\.writeMemoryEntries\(target, result\.next\)/);
+  assert.match(pane, /settings\.memoryMergeAction/);
+});
