@@ -1,5 +1,5 @@
 /**
- * `capabilities.*` IPC bridge (D691).
+ * `widgets.*` IPC bridge (D691).
  *
  * Two back ends, deliberately split by ownership: the host-core side scans
  * the data directory and owns trust/enabled state, while loading and running
@@ -10,7 +10,7 @@
  * renderer invented; both back ends validate again.
  */
 import { shell } from "electron";
-import { IPC, type CapabilitySummary } from "@pi-workspace/shared";
+import { IPC, type WidgetSummary } from "@pi-workspace/shared";
 
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
@@ -32,34 +32,34 @@ function requireId(input: unknown, what: string): string {
 }
 
 function toggleParams(input: unknown): { id: string; enabled: boolean } {
-  const id = requireId(input, "capabilities.setEnabled");
+  const id = requireId(input, "widgets.setEnabled");
   const enabled = (input as Record<string, unknown>).enabled;
   if (typeof enabled !== "boolean") {
-    throw new Error("capabilities.setEnabled expects a boolean enabled");
+    throw new Error("widgets.setEnabled expects a boolean enabled");
   }
   return { id, enabled };
 }
 
 function trustParams(input: unknown): { id: string; digest: string; trusted: boolean } {
-  const id = requireId(input, "capabilities.trust");
+  const id = requireId(input, "widgets.trust");
   const raw = input as Record<string, unknown>;
   const digest = typeof raw.digest === "string" ? raw.digest.trim().slice(0, MAX_DIGEST_CHARS) : "";
-  if (!digest) throw new Error("capabilities.trust expects a non-empty digest");
+  if (!digest) throw new Error("widgets.trust expects a non-empty digest");
   if (typeof raw.trusted !== "boolean") {
-    throw new Error("capabilities.trust expects a boolean trusted");
+    throw new Error("widgets.trust expects a boolean trusted");
   }
   return { id, digest, trusted: raw.trusted };
 }
 
 function invokeParams(input: unknown): { id: string; action: string; args: unknown } {
-  const id = requireId(input, "capabilities.invoke");
+  const id = requireId(input, "widgets.invoke");
   const raw = input as Record<string, unknown>;
   const action = typeof raw.action === "string" ? raw.action.trim().slice(0, MAX_ACTION_CHARS) : "";
-  if (!action) throw new Error("capabilities.invoke expects a non-empty action");
+  if (!action) throw new Error("widgets.invoke expects a non-empty action");
   return { id, action, args: raw.args };
 }
 
-export function registerCapabilitiesIpc({
+export function registerWidgetsIpc({
   registrar,
   getHost,
   getSidecar,
@@ -75,16 +75,16 @@ export function registerCapabilitiesIpc({
    */
   async function syncSidecar(
     sidecar: AgentSidecar,
-    packages: CapabilitySummary[],
+    packages: WidgetSummary[],
   ): Promise<void> {
-    await sidecar.call("capability.sync", { packages }).catch(() => undefined);
+    await sidecar.call("widget.sync", { packages }).catch(() => undefined);
   }
 
-  registrar.handle(IPC.invoke.capabilitiesList, async () => {
+  registrar.handle(IPC.invoke.widgetsList, async () => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    const listed = (await host.call("capabilities.list", {})) as {
-      packages?: CapabilitySummary[];
+    const listed = (await host.call("widgets.list", {})) as {
+      packages?: WidgetSummary[];
     };
     const packages = listed.packages ?? [];
     const sidecar = getSidecar();
@@ -92,39 +92,39 @@ export function registerCapabilitiesIpc({
     return { packages };
   });
 
-  registrar.handle(IPC.invoke.capabilitiesRuntime, async () => {
+  registrar.handle(IPC.invoke.widgetsRuntime, async () => {
     const sidecar = getSidecar();
     if (!sidecar) return { states: [] };
-    return sidecar.call("capability.list", {});
+    return sidecar.call("widget.list", {});
   });
 
-  registrar.handle(IPC.invoke.capabilitiesSetEnabled, async (input?: unknown) => {
+  registrar.handle(IPC.invoke.widgetsSetEnabled, async (input?: unknown) => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    const result = await host.call("capabilities.setEnabled", toggleParams(input));
-    const packages = ((result as { packages?: CapabilitySummary[] }).packages ?? []);
+    const result = await host.call("widgets.setEnabled", toggleParams(input));
+    const packages = ((result as { packages?: WidgetSummary[] }).packages ?? []);
     const sidecar = getSidecar();
     if (sidecar) await syncSidecar(sidecar, packages);
     return { packages };
   });
 
-  registrar.handle(IPC.invoke.capabilitiesTrust, async (input?: unknown) => {
+  registrar.handle(IPC.invoke.widgetsTrust, async (input?: unknown) => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    const result = await host.call("capabilities.setTrusted", trustParams(input));
-    const packages = ((result as { packages?: CapabilitySummary[] }).packages ?? []);
+    const result = await host.call("widgets.setTrusted", trustParams(input));
+    const packages = ((result as { packages?: WidgetSummary[] }).packages ?? []);
     const sidecar = getSidecar();
     if (sidecar) await syncSidecar(sidecar, packages);
     return { packages };
   });
 
-  registrar.handle(IPC.invoke.capabilitiesReveal, async (input?: unknown) => {
+  registrar.handle(IPC.invoke.widgetsReveal, async (input?: unknown) => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    const { path } = (await host.call("capabilities.dir", {
-      id: requireId(input, "capabilities.reveal"),
+    const { path } = (await host.call("widgets.dir", {
+      id: requireId(input, "widgets.reveal"),
     })) as { path?: string };
-    if (!path) throw new Error("capability directory not found");
+    if (!path) throw new Error("widget directory not found");
     shell.showItemInFolder(stripWinLongPrefix(path));
     return { path };
   });
@@ -133,18 +133,18 @@ export function registerCapabilitiesIpc({
    * The scan root, created on demand. Opening the folder is how a user adds a
    * package at all, so this has to work on a machine that has never had one.
    */
-  registrar.handle(IPC.invoke.capabilitiesRoot, async () => {
+  registrar.handle(IPC.invoke.widgetsRoot, async () => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    const { path } = (await host.call("capabilities.root", {})) as { path?: string };
-    if (!path) throw new Error("capability directory unavailable");
+    const { path } = (await host.call("widgets.root", {})) as { path?: string };
+    if (!path) throw new Error("widget directory unavailable");
     shell.showItemInFolder(stripWinLongPrefix(path));
     return { path };
   });
 
-  registrar.handle(IPC.invoke.capabilitiesInvoke, async (input?: unknown) => {
+  registrar.handle(IPC.invoke.widgetsInvoke, async (input?: unknown) => {
     const sidecar = getSidecar();
     if (!sidecar) throw new Error("agent runtime unavailable");
-    return sidecar.call("capability.invoke", invokeParams(input));
+    return sidecar.call("widget.invoke", invokeParams(input));
   });
 }

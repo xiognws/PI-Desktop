@@ -8509,25 +8509,25 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   the order identity is established in), and
   `apps/desktop/test/frozen-identifiers.test.mjs` (the frozen set above).
 
-## 2026-11-09 — Capability packages are user folders that run in the agent sidecar (D691)
+## 2026-11-09 — Widget packages are user folders that run in the agent sidecar (D691)
 
-- The Tools page keeps its list of bundled tool packages (D687) and gains one
-  entry button that opens a capability page. A *capability package* is a folder
-  under `<userData>/capabilities/` with `capability.json`
+- The Tools page keeps its list of bundled tool packages (D687) and gains an
+  entry button that opens the widget section. An *widget package* is a folder
+  under `<userData>/widgets/` with `widget.json`
   (`schemaVersion`, `apiVersion`, `id`, `name`, `version`, `description`,
   `permissions[]`, `actions[]`) plus an entry module that default-exports an
   activate function. Nothing is bundled and nothing is installed: the host scans
   the directory at launch, and a folder without a readable manifest keeps a
   visible error row instead of vanishing.
 - Execution lives in the **agent sidecar**, not Electron main and not the
-  renderer. `capabilities/index.ts` keeps a process-level registry (not
+  renderer. `packages/agent-runtime/src/widgets/index.ts` keeps a process-level registry (not
   per-session, so two windows cannot load one package twice), each action runs
   under a 30 s deadline, and a throwing activate hook fails that package only.
 - Both directions are open, which is the reason this is not a plugin.
-  Renderer → `pi-desktop/capabilities/invoke` → sidecar `capability.invoke`;
+  Renderer → `pi-desktop/widgets/invoke` → sidecar `widget.invoke`;
   and inside an action, `call(method, params)` → `ParentHostProxy` → main's normal
-  RPC path, limited to `CAPABILITY_HOST_METHODS`. The agent itself reaches
-  packages through a `Capability` tool (`list` / `invoke`) registered in agent
+  RPC path, limited to `WIDGET_HOST_METHODS`. The agent itself reaches
+  packages through an `Widget` tool (`list` / `invoke`) registered in agent
   mode only, so the model can call a capability mid-turn.
 - Permissions are `read`, `write`, `net`, `agent`, `host`. An untrusted package
   is sandboxed to `read` + `write`; `host` is never granted by default, and an
@@ -8545,11 +8545,11 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   than it is. Why not a tool package: tool packages are declarative and never run.
 - Covered by `crates/host-core/src/capabilities.rs` unit tests (scan, sandbox
   grant, acceptance, digest change on disk, disabling, unknown schema version,
-  duplicate ids), `packages/agent-runtime/src/capabilities/index.test.ts` (load
+  duplicate ids), `packages/agent-runtime/src/widgets/index.test.ts` (load
   and invoke, skipped/untrusted, a broken manifest that does not drag others
   down, a throwing entry, an unregistered action, the host-permission gate with
   zero host calls, the deadline, `clear`, and the agent tool's list/invoke/empty
-  paths), `packages/agent-runtime/src/capabilities/example.test.ts` (the shipped
+  paths), `packages/agent-runtime/src/widgets/example.test.ts` (the shipped
   example package loads and answers), `apps/desktop/test/capabilities-ipc.test.mjs`
   (channel registration, parameter narrowing, sidecar sync after every mutation,
   invoke going only to the sidecar), `apps/desktop/test/capabilities-page.test.mjs`

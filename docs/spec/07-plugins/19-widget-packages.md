@@ -1,28 +1,28 @@
-# 19-capability-packages.md
+# 19-widget-packages.md
 
-Capability packages are runnable code the user drops in, not code the build ships.
+Widget packages are runnable code the user drops in, not code the build ships.
 A tool package (`07-plugins/01`…): metadata plus assets, listed and switched on
 the Tools page, no runtime. A plugin (`07-plugins/01`): installed, versioned,
-permission-gated by the plugin registry. A capability package sits in between: a
+permission-gated by the plugin registry. An widget package sits in between: a
 folder the user copies into their data directory, scanned at launch, loaded in the
 agent sidecar, invoked over RPC. It gets *more* reach than a plugin — a plugin
-extension is a hook inside the agent, a capability is a program the agent calls and
+extension is a hook inside the agent, an widget is a program the agent calls and
 that can call back into the host.
 
 ## 1. Where packages live
 
-`<userData>/capabilities/<folder>/` — one folder per package, one manifest per
+`<userData>/widgets/<folder>/` — one folder per package, one manifest per
 folder. Nothing is bundled: an empty directory is an empty Tools entry. The host
-scans one level deep at launch and on every `capabilities.list`; a folder without
+scans one level deep at launch and on every `widgets.list`; a folder without
 a readable manifest keeps its row and says why (same rule as tool packages,
 `host-core/src/tool_packages.rs`).
 
-Paths are resolved by host-core (`capabilities_packages_dir`), never by the
+Paths are resolved by host-core (`widgets_packages_dir`), never by the
 renderer. The renderer only ever sees summaries over IPC.
 
 ## 2. Manifest
 
-`capability.json`, schema version 1:
+`widget.json`, schema version 1:
 
 ```json
 {
@@ -53,7 +53,7 @@ Limits: 64 packages, 512 files and 8 MB per package.
 ## 3. Entry module
 
 `index.js` / `index.mjs` / `index.cjs`, resolved in that order. The module
-**default-exports a function** — the activate hook. It receives the capability
+**default-exports a function** — the activate hook. It receives the widget
 API and registers actions:
 
 ```js
@@ -83,10 +83,10 @@ In the **agent sidecar** (`packages/agent-runtime`), in the sidecar's own proces
 
 ## 5. Two directions
 
-**Client → package.** Renderer → IPC `pi-desktop/capabilities/invoke` → sidecar
-`capability.invoke` `{ capabilityId, action, args }` → runner → action handler.
+**Client → package.** Renderer → IPC `pi-desktop/widgets/invoke` → sidecar
+`widget.invoke` `{ widgetId, action, args }` → runner → action handler.
 The result is `{ value, durationMs, logs }`, bounded by
-`CAPABILITY_INVOKE_TIMEOUT_MS` (30 s). An unknown capability or action is an
+`WIDGET_INVOKE_TIMEOUT_MS` (30 s). An unknown widget or action is an
 error, not an empty result.
 
 **Package → host.** Inside an action, `call(method, params)` reaches back through
@@ -98,7 +98,7 @@ with the `host` permission granted; everything else is refused before leaving th
 sidecar.
 
 **The agent → package.** The `Capability` agent tool (`action: list | invoke`,
-plus `capabilityId` / `actionName` / `args`) lets the model enumerate installed
+plus `widgetId` / `actionName` / `args`) lets the model enumerate installed
 packages and call their actions in a turn. It is registered only in agent mode,
 like the extension tool set it sits next to (`runtime.ts` `activeTools()`).
 
@@ -117,20 +117,20 @@ host-core decides what is granted:
 
 An untrusted package is sandboxed to `read` + `write`. An action that calls a
 host method without `host` fails with
-`capability <id> has no host permission` and the host side sees no call at all —
-that is asserted in `packages/agent-runtime/src/capabilities/index.test.ts`.
+`widget <id> has no host permission` and the host side sees no call at all —
+that is asserted in `packages/agent-runtime/src/widgets/index.test.ts`.
 
 ## 7. Trust, and why the digest exists
 
-Nothing signs a capability package and nothing verifies a signature in v1. The
+Nothing signs a widget package and nothing verifies a signature in v1. The
 substitute is a **digest freeze**:
 
 - host-core computes SHA-256 over the package's relative paths, lengths and bytes
   (dot-directories skipped).
 - First sight: the row is `untrusted`, and the enabled toggle is refused until
-  the user accepts that digest from the capability page.
+  the user accepts that digest from the widget page.
 - Accepted: `trusted`, and the accepted digest is persisted in
-  `<data>/capabilities/state.json`.
+  `<data>/widgets/state.json`.
 - Files changed afterwards: `modified` — the grant is withdrawn, permissions fall
   back to the sandbox, and the row turns warning-coloured.
 - Re-accepting sends the digest the user is looking at; if the files changed again
@@ -143,7 +143,7 @@ in" a visible event rather than an invisible privilege escalation.
 
 ## 8. State
 
-`<data>/capabilities/state.json`: `{ "disabled": [id…], "trusted": { "<id>": "<digest>" } }`,
+`<data>/widgets/state.json`: `{ "disabled": [id…], "trusted": { "<id>": "<digest>" } }`,
 written temp-file-then-rename. Corrupt state is replaced by defaults rather than
 blocking the list.
 
@@ -151,18 +151,18 @@ blocking the list.
 
 | Layer | Items |
 | --- | --- |
-| host-core | `capabilities.list`, `setEnabled`, `setTrusted`, `dir` |
-| IPC | `pi-desktop/capabilities/{list,runtime,setEnabled,setTrust,reveal,invoke}` |
+| host-core | `widgets.list`, `setEnabled`, `setTrusted`, `dir` |
+| IPC | `pi-desktop/widgets/{list,runtime,setEnabled,setTrust,reveal,invoke}` |
 | Renderer | `pages/CapabilitiesPage.tsx`, entry button on `pages/ToolsPage.tsx` |
-| Sidecar | `capability.{sync,list,invoke,logs,clear}` |
+| Sidecar | `widget.{sync,list,invoke,logs,clear}` |
 
 The Tools page keeps the entry button (package count, opens the page). The
-capability page owns enable, trust, reveal and action listing; it never touches
+widget page owns enable, trust, reveal and action listing; it never touches
 the filesystem directly.
 
 ## 10. Distribution
 
 Zip the package folder and hand it over; the receiving side drops the folder into
-its own `capabilities` directory. No marketplace, no version negotiation, no
+its own `widgets` directory. No marketplace, no version negotiation, no
 update channel in v1 — see `14-plugin-roadmap.md` for the plugin counterpart and
 ADR 0384 for why this stays out of the plugin registry.

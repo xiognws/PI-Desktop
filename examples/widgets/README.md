@@ -1,23 +1,23 @@
-# Example capability package (D691)
+# Example widget package (D691)
 
-A capability package is a folder with a `capability.json` manifest and one entry
-module. Pi-Workspace loads it from `<userData>/capabilities/<folder>/` — not
+A widget package is a folder with a `widget.json` manifest and one entry
+module. Pi-Workspace loads it from `<userData>/widgets/<folder>/` — not
 from the application image — so a package is added, replaced, or removed without
 rebuilding the client.
 
 ```text
-<userData>/capabilities/tide-probe/
-  capability.json
+<userData>/widgets/tide-probe/
+  widget.json
   index.mjs        # or index.js / index.cjs, once it default-exports a function
 ```
 
 To try the sample, copy this directory into the user data folder and reload the
-Capabilities page (Tools → capability entry). A package is **untrusted** when it
+Widgets page (Tools → widget entry). A package is **untrusted** when it
 first appears: it does not load until the digest the client computed is accepted
 on the page. Any later edit to a file changes the digest, revokes trust, and
 marks the package `modified`, so accepted code is the code that runs.
 
-## capability.json
+## widget.json
 
 ```json
 {
@@ -48,10 +48,10 @@ marks the package `modified`, so accepted code is the code that runs.
 
 - `schemaVersion` — manifest shape. Version 1 is the only shape the client reads.
 - `apiVersion` — extension API the entry module was written against.
-- `permissions` — requested capabilities. The client grants a subset; anything
+- `permissions` — requested widgets. The client grants a subset; anything
   in `read` / `write` is granted by default, and `net`, `agent`, `host` are
   only granted when the user allows them.
-- `actions` — the names the client (and the `Capability` agent tool) may
+- `actions` — the names the client (and the `Widget` agent tool) may
   invoke. An action that is not declared here cannot be reached, even if the
   module registers it.
 
@@ -89,4 +89,4 @@ export default async function activate(api) {
 
 A package is a folder, so distribution is a zip of that folder. There is no
 installer and no registry: the recipient drops it into
-`<userData>/capabilities/` and accepts the digest on the Capabilities page.
+`<userData>/widgets/` and accepts the digest on the Widgets page.

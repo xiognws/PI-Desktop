@@ -1,6 +1,6 @@
-# ADR 0384：能力包在 agent sidecar 中运行
+# ADR 0384：扩展件在 agent sidecar 中运行
 
-> [英文源 ADR](/adr/0384-capability-packages-run-in-the-agent-sidecar) 是状态与决策内容的最终依据。
+> [英文源 ADR](/adr/0384-widget-packages-run-in-the-agent-sidecar) 是状态与决策内容的最终依据。
 
 - 状态：已实现（候选）
 - 日期：2026-11-09
@@ -12,12 +12,12 @@
 工具包（D687）只有元数据与资源，不含任何会执行的东西；可信扩展（ADR 0214）是 agent
 进程里的钩子，靠插件申请 `agent.extension` 才被授予，安装、版本、市场都由插件注册表管。
 
-能力包要的形态是：用户把文件夹丢进自己的数据目录、启动时被扫描、有可调用面、还能反过来
+扩展件要的形态是：用户把文件夹丢进自己的数据目录、启动时被扫描、有可调用面、还能反过来
 调用宿主——权限比钩子大，但没有插件的安装与市场机器。
 
 ## 决策
 
-能力包放在 `<userData>/capabilities/<folder>/capability.json` 加一个入口模块，
+扩展件放在 `<userData>/widgets/<folder>/widget.json` 加一个入口模块，
 **在 agent sidecar 中加载与执行**，不在 Electron 主进程，也不在渲染层。
 
 - host-core 负责发现、权限授予与信任状态：对包内相对路径与字节算 SHA-256；首次为
@@ -25,9 +25,9 @@
   重新确认会被拒。
 - sidecar 负责执行：`CapabilityRegistry` 是进程级而非会话级，两个窗口不会把同一个包
   加载两次；动作 30 秒上限。
-- 双向：渲染层 → IPC → `capability.invoke`；动作内 `call(method, params)` 经
+- 双向：渲染层 → IPC → `widget.invoke`；动作内 `call(method, params)` 经
   `ParentHostProxy` 回到主进程正常 RPC，仅限 `CAPABILITY_HOST_METHODS` 且需要 `host` 权限。
-- agent 通过 `Capability` 工具（`list` / `invoke`）触达能力包，仅在 agent 模式挂载。
+- agent 通过 `Capability` 工具（`list` / `invoke`）触达扩展件，仅在 agent 模式挂载。
 - 权限五级 `read`/`write`/`net`/`agent`/`host`；未信任的包被沙箱限制为 `read`+`write`。
 
 ## 其它方案
@@ -47,7 +47,7 @@ DOM 与会话交给用户代码，而冻结的进程模型本来就禁止在那�
 
 ## 后果
 
-崩溃或卡死的能力包退化为一次失败的会话，而不是死掉的窗口。权限比插件矩阵粗——`host` 是
+崩溃或卡死的扩展件退化为一次失败的会话，而不是死掉的窗口。权限比插件矩阵粗——`host` 是
 一个开关而不是方法清单——之后可以在不改清单的前提下细化。不做签名意味着信任是本机、
 本地的；分发 zip 意味着接收方审查的是自己那份拷贝的摘要。v1 没有卸载钩子，安装了进程级
 状态的包会一直保留到 sidecar 重启。

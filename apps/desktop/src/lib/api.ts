@@ -44,9 +44,9 @@ import type {
   ArtifactListFilter,
   ArtifactRow,
   ToolPackageSummary,
-  CapabilityInvokeResult,
-  CapabilityRuntimeState,
-  CapabilitySummary,
+  WidgetInvokeResult,
+  WidgetRuntimeState,
+  WidgetSummary,
   BrowserAction,
   BrowserState,
   CommandItem,
@@ -1214,26 +1214,26 @@ export const api = {
       id,
       enabled,
     }),
-  listCapabilities: () =>
-    invoke<{ packages: CapabilitySummary[] }>(IPC.invoke.capabilitiesList, {}),
-  setCapabilityEnabled: (id: string, enabled: boolean) =>
-    invoke<{ packages: CapabilitySummary[] }>(IPC.invoke.capabilitiesSetEnabled, { id, enabled }),
-  setCapabilityTrust: (id: string, digest: string, trusted: boolean) =>
-    invoke<{ packages: CapabilitySummary[] }>(IPC.invoke.capabilitiesTrust, {
+  listWidgets: () =>
+    invoke<{ packages: WidgetSummary[] }>(IPC.invoke.widgetsList, {}),
+  setWidgetEnabled: (id: string, enabled: boolean) =>
+    invoke<{ packages: WidgetSummary[] }>(IPC.invoke.widgetsSetEnabled, { id, enabled }),
+  setWidgetTrust: (id: string, digest: string, trusted: boolean) =>
+    invoke<{ packages: WidgetSummary[] }>(IPC.invoke.widgetsTrust, {
       id,
       digest,
       trusted,
     }),
-  revealCapability: (id: string) => invoke<{ path: string }>(IPC.invoke.capabilitiesReveal, { id }),
-  revealCapabilitiesDir: () =>
-    invoke<{ path: string }>(IPC.invoke.capabilitiesRoot, {}),
-  capabilityRuntime: () =>
-    invoke<{ packages: CapabilitySummary[]; states: CapabilityRuntimeState[] }>(
-      IPC.invoke.capabilitiesRuntime,
+  revealWidget: (id: string) => invoke<{ path: string }>(IPC.invoke.widgetsReveal, { id }),
+  revealWidgetsDir: () =>
+    invoke<{ path: string }>(IPC.invoke.widgetsRoot, {}),
+  widgetRuntime: () =>
+    invoke<{ packages: WidgetSummary[]; states: WidgetRuntimeState[] }>(
+      IPC.invoke.widgetsRuntime,
       {},
     ),
-  invokeCapability: (id: string, action: string, args?: unknown) =>
-    invoke<CapabilityInvokeResult>(IPC.invoke.capabilitiesInvoke, { id, action, args }),
+  invokeWidget: (id: string, action: string, args?: unknown) =>
+    invoke<WidgetInvokeResult>(IPC.invoke.widgetsInvoke, { id, action, args }),
   cloneProject: (url: string) =>
     invoke<{ workspace: ProjectWorkspace | null; canceled?: boolean }>(
       IPC.invoke.projectClone,

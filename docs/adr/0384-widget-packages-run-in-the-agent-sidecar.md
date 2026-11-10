@@ -13,14 +13,14 @@ agent process: it registers tools, commands, providers and event handlers, and i
 is granted because the *plugin* asked for `agent.extension`, which means the
 plugin registry owns install, versioning and the marketplace lifecycle.
 
-What a capability package needs instead is: a folder the user drops in their own
+What a widget package needs instead is: a folder the user drops in their own
 data directory, scanned at launch, with a callable surface and the ability to call
 back into the host — more reach than a hook, without the marketplace machinery of
 a plugin.
 
 ## Decision
 
-Capability packages live at `<userData>/capabilities/<folder>/capability.json`
+Widget packages live at `<userData>/widgets/<folder>/widget.json`
 plus an entry module, and are **loaded and executed in the agent sidecar**, not in
 Electron main and not in the renderer.
 
@@ -32,7 +32,7 @@ Electron main and not in the renderer.
 - The sidecar owns execution. A `CapabilityRegistry` is process-level, not
   session-level, so two windows cannot load one package twice and double its side
   effects. Actions run under a 30 s deadline.
-- Two directions: renderer → IPC → `capability.invoke`; and inside an action,
+- Two directions: renderer → IPC → `widget.invoke`; and inside an action,
   `call(method, params)` → `ParentHostProxy` → main's normal RPC path, restricted
   to `CAPABILITY_HOST_METHODS` and gated on the `host` permission.
 - The agent reaches packages through a `Capability` tool (`list` / `invoke`),

@@ -1,7 +1,7 @@
-//! Capability packages (D691).
+//! Widget packages (D691).
 //!
-//! A capability package is a directory under `<data>/capabilities/<dir>/` with a
-//! `capability.json` manifest and an entry module. The user drops the folder in
+//! A widget package is a directory under `<data>/widgets/<dir>/` with a
+//! `widget.json` manifest and an entry module. The user drops the folder in
 //! themselves; the app never ships packages, never downloads them, and never
 //! installs anything on the user's behalf.
 //!
@@ -12,7 +12,7 @@
 //! * trust — hash the directory contents and remember the digest the user
 //!   accepted. A package whose bytes changed keeps loading, but only with the
 //!   sandbox floor until the new digest is acknowledged;
-//! * the enabled set — persisted in `<data>/capabilities/state.json`.
+//! * the enabled set — persisted in `<data>/widgets/state.json`.
 //!
 //! Execution lives in the agent sidecar. Nothing here evaluates package code.
 
@@ -24,11 +24,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Manifest file name inside each package directory.
-pub const MANIFEST_FILE: &str = "capability.json";
+pub const MANIFEST_FILE: &str = "widget.json";
 /// Directory, relative to the data directory, that holds the user's packages.
-pub const PACKAGES_DIR: &str = "capabilities";
+pub const PACKAGES_DIR: &str = "widgets";
 /// Relative path of the persisted state inside the data directory.
-const STATE_FILE: &str = "capabilities/state.json";
+const STATE_FILE: &str = "widgets/state.json";
 /// Manifest schema this build understands.
 const SCHEMA_VERSION: u32 = 1;
 /// Runtime API this build understands.
@@ -46,7 +46,7 @@ pub const PERMISSIONS: [&str; 5] = ["read", "write", "net", "agent", "host"];
 /// Permissions a package keeps when it is not trusted at its current digest.
 const SANDBOX_PERMISSIONS: [&str; 2] = ["read", "write"];
 
-/// Absolute directory holding the user's capability packages.
+/// Absolute directory holding the user's widget packages.
 pub fn packages_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(PACKAGES_DIR)
 }
@@ -57,17 +57,17 @@ fn state_path(data_dir: &Path) -> PathBuf {
 
 /// One action a package exposes to the client and to the agent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct CapabilityAction {
+pub struct WidgetAction {
     pub name: String,
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<Vec<String>>,
 }
 
-/// One package as the capability page renders it.
+/// One package as the widget page renders it.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CapabilitySummary {
+pub struct WidgetSummary {
     pub id: String,
     pub name: String,
     pub version: String,
@@ -78,7 +78,7 @@ pub struct CapabilitySummary {
     pub path: String,
     pub requested_permissions: Vec<String>,
     pub granted_permissions: Vec<String>,
-    pub actions: Vec<CapabilityAction>,
+    pub actions: Vec<WidgetAction>,
     pub enabled: bool,
     /// `untrusted` | `trusted` | `modified`
     pub trust: String,
@@ -89,7 +89,7 @@ pub struct CapabilitySummary {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CapabilityManifest {
+struct WidgetManifest {
     #[serde(default)]
     schema_version: u32,
     #[serde(default)]
@@ -121,7 +121,7 @@ struct ManifestAction {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-struct CapabilityState {
+struct WidgetState {
     #[serde(default)]
     disabled: BTreeSet<String>,
     /// Digest the user accepted per package id.
@@ -129,26 +129,26 @@ struct CapabilityState {
     trusted: BTreeMap<String, String>,
 }
 
-fn read_state(data_dir: &Path) -> Result<CapabilityState> {
+fn read_state(data_dir: &Path) -> Result<WidgetState> {
     let path = state_path(data_dir);
     let text = match std::fs::read_to_string(&path) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(CapabilityState::default())
+            return Ok(WidgetState::default())
         }
         Err(error) => return Err(error).with_context(|| format!("read {}", path.display())),
     };
     serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))
 }
 
-fn write_state(data_dir: &Path, state: &CapabilityState) -> Result<()> {
+fn write_state(data_dir: &Path, state: &WidgetState) -> Result<()> {
     let path = state_path(data_dir);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     let text = serde_json::to_string_pretty(state)?;
     // Write-then-rename: a crash mid-write must not leave an unparsable state
-    // file behind, because that would take the whole capability page down.
+    // file behind, because that would take the whole widget page down.
     let staged = path.with_extension("json.tmp");
     std::fs::write(&staged, text).with_context(|| format!("write {}", staged.display()))?;
     std::fs::rename(&staged, &path).with_context(|| format!("replace {}", path.display()))
@@ -243,8 +243,8 @@ fn collect_files(dir: &Path, out: &mut Vec<PathBuf>, total: &mut u64) -> Result<
     Ok(())
 }
 
-fn broken_row(dir_name: &str, path: &Path, message: String) -> CapabilitySummary {
-    CapabilitySummary {
+fn broken_row(dir_name: &str, path: &Path, message: String) -> WidgetSummary {
+    WidgetSummary {
         id: dir_name.to_string(),
         name: dir_name.to_string(),
         version: String::new(),
@@ -262,7 +262,7 @@ fn broken_row(dir_name: &str, path: &Path, message: String) -> CapabilitySummary
     }
 }
 
-fn read_package(dir: &Path, dir_name: &str, state: &CapabilityState) -> CapabilitySummary {
+fn read_package(dir: &Path, dir_name: &str, state: &WidgetState) -> WidgetSummary {
     let manifest_path = dir.join(MANIFEST_FILE);
     let text = match std::fs::read_to_string(&manifest_path) {
         Ok(text) => text,
@@ -274,7 +274,7 @@ fn read_package(dir: &Path, dir_name: &str, state: &CapabilityState) -> Capabili
             )
         }
     };
-    let manifest: CapabilityManifest = match serde_json::from_str(&text) {
+    let manifest: WidgetManifest = match serde_json::from_str(&text) {
         Ok(manifest) => manifest,
         Err(error) => return broken_row(dir_name, dir, format!("{MANIFEST_FILE}: {error}")),
     };
@@ -324,7 +324,7 @@ fn read_package(dir: &Path, dir_name: &str, state: &CapabilityState) -> Capabili
         sandbox_permissions(&requested)
     };
     let enabled = !state.disabled.contains(&id);
-    CapabilitySummary {
+    WidgetSummary {
         id,
         name,
         version: manifest.version.trim().to_string(),
@@ -341,7 +341,7 @@ fn read_package(dir: &Path, dir_name: &str, state: &CapabilityState) -> Capabili
             .actions
             .into_iter()
             .filter(|action| !action.name.trim().is_empty())
-            .map(|action| CapabilityAction {
+            .map(|action| WidgetAction {
                 name: action.name.trim().to_string(),
                 description: action.description.trim().to_string(),
                 params: action
@@ -363,11 +363,11 @@ fn read_package(dir: &Path, dir_name: &str, state: &CapabilityState) -> Capabili
     }
 }
 
-/// Every capability package in the data directory, ordered by display name.
+/// Every widget package in the data directory, ordered by display name.
 ///
-/// A missing `capabilities/` directory is the normal state of a fresh install
+/// A missing `widgets/` directory is the normal state of a fresh install
 /// and reports an empty list rather than an error.
-pub fn list(data_dir: &Path) -> Result<Vec<CapabilitySummary>> {
+pub fn list(data_dir: &Path) -> Result<Vec<WidgetSummary>> {
     let state = read_state(data_dir)?;
     let root = packages_dir(data_dir);
     let entries = match std::fs::read_dir(&root) {
@@ -375,7 +375,7 @@ pub fn list(data_dir: &Path) -> Result<Vec<CapabilitySummary>> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(error).with_context(|| format!("read {}", root.display())),
     };
-    let mut packages: Vec<CapabilitySummary> = Vec::new();
+    let mut packages: Vec<WidgetSummary> = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
     for entry in entries {
         if packages.len() >= MAX_PACKAGES {
@@ -406,7 +406,7 @@ pub fn list(data_dir: &Path) -> Result<Vec<CapabilitySummary>> {
 }
 
 /// Enable or disable one package, then hand the fresh list back.
-pub fn set_enabled(data_dir: &Path, id: &str, enabled: bool) -> Result<Vec<CapabilitySummary>> {
+pub fn set_enabled(data_dir: &Path, id: &str, enabled: bool) -> Result<Vec<WidgetSummary>> {
     let id = id.trim();
     anyhow::ensure!(!id.is_empty(), "id is required");
     let mut state = read_state(data_dir)?;
@@ -429,15 +429,15 @@ pub fn set_trusted(
     id: &str,
     digest: &str,
     trusted: bool,
-) -> Result<Vec<CapabilitySummary>> {
+) -> Result<Vec<WidgetSummary>> {
     let id = id.trim();
     anyhow::ensure!(!id.is_empty(), "id is required");
     let packages = list(data_dir)?;
     let Some(package) = packages.iter().find(|package| package.id == id) else {
-        anyhow::bail!("unknown capability {id}");
+        anyhow::bail!("unknown widget {id}");
     };
     if let Some(error) = package.error.clone() {
-        anyhow::bail!("capability {id} cannot be read: {error}");
+        anyhow::bail!("widget {id} cannot be read: {error}");
     }
     let mut state = read_state(data_dir)?;
     if trusted {
@@ -445,7 +445,7 @@ pub fn set_trusted(
         anyhow::ensure!(!digest.is_empty(), "digest is required");
         anyhow::ensure!(
             digest == package.digest,
-            "capability {id} changed on disk since it was reviewed"
+            "widget {id} changed on disk since it was reviewed"
         );
         state.trusted.insert(id.to_string(), digest.to_string());
     } else {
@@ -463,7 +463,7 @@ pub fn package_dir(data_dir: &Path, id: &str) -> Result<PathBuf> {
     let package = packages
         .iter()
         .find(|package| package.id == id)
-        .ok_or_else(|| anyhow::anyhow!("unknown capability {id}"))?;
+        .ok_or_else(|| anyhow::anyhow!("unknown widget {id}"))?;
     Ok(PathBuf::from(&package.path))
 }
 

@@ -75,7 +75,7 @@ export * from "./startup-animation.js";
 export * from "./radial-menu.js";
 export * from "./racp.js";
 export * from "./trusted-extensions.js";
-export * from "./capabilities.js";
+export * from "./widgets.js";
 export * from "./provider-retry.js";
 export * from "./message-stream.js";
 export * from "./session-collaboration.js";

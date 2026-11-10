@@ -414,7 +414,7 @@ Each ADR includes:
 | 0381 | [The product is Pi-Workspace, and storage identifiers move with the data](0381-rebrand-to-pi-workspace.md) | Accepted (amends ADR 0278) |
 | 0382 | [Ship a pinned Python runtime for Office and file work](0382-bundled-python-runtime.md) | Accepted |
 | 0383 | [Curate the bundled plugin set](0383-bundled-plugin-curation.md) | Accepted (extends ADR 0241 and ADR 0378) |
-| 0384 | [Capability packages run in the agent sidecar](0384-capability-packages-run-in-the-agent-sidecar.md) | Implemented candidate |
+| 0384 | [Widget packages run in the agent sidecar](0384-widget-packages-run-in-the-agent-sidecar.md) | Implemented candidate |
 | 0387 | [Skill curation by idle days](0387-skill-curation-by-idle-days.md) | Accepted (extends ADR 0377 and ADR 0379) |
 | 0388 | [A skill owns four resource containers](0388-skill-resource-containers.md) | Accepted (extends ADR 0379 and ADR 0303) |
 | 0389 | [Consolidating skills by absorbing one into another](0389-skill-consolidation-by-absorb.md) | Accepted (extends ADR 0387) |

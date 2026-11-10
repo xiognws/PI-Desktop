@@ -8,17 +8,17 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import type { CapabilitySummary } from "@pi-workspace/shared";
+import type { WidgetSummary } from "@pi-workspace/shared";
 
-import { CapabilityRunner } from "./runner.js";
+import { WidgetRunner } from "./runner.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const exampleDir = join(here, "..", "..", "..", "..", "examples", "capabilities", "tide-probe");
+const exampleDir = join(here, "..", "..", "..", "..", "examples", "widgets", "tide-probe");
 
-describe("examples/capabilities/tide-probe", () => {
+describe("examples/widgets/tide-probe", () => {
   it("loads from its manifest and runs a declared action", async () => {
-    const runner = new CapabilityRunner({ call: async () => ({ entries: [] }) });
-    const summary: CapabilitySummary = {
+    const runner = new WidgetRunner({ call: async () => ({ entries: [] }) });
+    const summary: WidgetSummary = {
       id: "example.tide-probe",
       name: "Tide probe",
       version: "0.1.0",
