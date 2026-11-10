@@ -9,6 +9,7 @@ import {
   SKILL_REVIEW_TOOL_NOTE,
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
   REVIEW_DEFAULT_MIN_TOOL_CALLS,
+  dedupeSkillLoads,
   ReviewActionCollector,
   accrueReviewToolCalls,
   canReview,
@@ -305,5 +306,37 @@ describe("the review cannot skip without looking", () => {
     expect(collector.toolCallCount()).toBe(0);
     collector.record({ type: "tool_end", toolCallId: "a" });
     expect(collector.toolCallCount()).toBe(1);
+  });
+});
+
+describe("dedupeSkillLoads", () => {
+  it("answers a repeated load with a pointer instead of the document", async () => {
+    // Measured: a fork loaded one plugin skill 16 times and hit the iteration
+    // ceiling without writing anything.
+    const calls: string[] = [];
+    const tools = [
+      { name: "Skill", execute: async (_callId: string, params: { id?: string }) => {
+        calls.push(String(params.id));
+        return { content: [{ type: "text", text: "BODY" }] };
+      } },
+      { name: "Read", execute: async () => ({ content: [] }) },
+    ];
+    const wrapped = dedupeSkillLoads(tools);
+    const first = (await (wrapped[0].execute as any)("c1", { id: "p/a" }, {})) as {
+      content: { text: string }[];
+    };
+    const second = (await (wrapped[0].execute as any)("c2", { id: "p/a" }, {})) as {
+      content: { text: string }[];
+      details?: { alreadyLoaded?: boolean };
+    };
+    expect(first.content[0].text).toBe("BODY");
+    expect(calls).toEqual(["p/a"]);
+    expect(second.content[0].text).toContain("already loaded in this pass");
+    expect(second.details?.alreadyLoaded).toBe(true);
+
+    // A different id still loads, and non-Skill tools are untouched.
+    await (wrapped[0].execute as any)("c3", { id: "p/b" }, {});
+    expect(calls).toEqual(["p/a", "p/b"]);
+    expect(wrapped[1]).toBe(tools[1]);
   });
 });

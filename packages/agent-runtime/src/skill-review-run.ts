@@ -213,6 +213,47 @@ export function reviewToolsFrom<T extends { name: string }>(declared: readonly T
 }
 
 /**
+ * Stop one review pass from loading the same document twice.
+ *
+ * Measured: a fork read `pi.autotest/autotest` sixteen times — the exact
+ * `REVIEW_MAX_ITERATIONS` ceiling — before it wrote anything, and then had no
+ * budget left. The catalog prompt already says "load each skill at most once per
+ * task"; nothing enforced it, and a model that re-reads is indistinguishable from
+ * one that never got the body.
+ *
+ * The second read returns a pointer instead of the document, which is enough for
+ * the model to continue: it still has the body in its own context.
+ */
+export function dedupeSkillLoads<T extends { name: string; execute?: unknown }>(
+  tools: readonly T[],
+): T[] {
+  return tools.map((tool) => {
+    if (tool.name !== "Skill" || typeof tool.execute !== "function") return tool;
+    const original = tool.execute as (callId: string, params: unknown, context: unknown) => Promise<unknown>;
+    const loaded = new Set<string>();
+    return {
+      ...tool,
+      execute: async (callId: string, params: unknown, context: unknown) => {
+        const id = String((params as { id?: unknown } | undefined)?.id ?? "").trim();
+        if (id && loaded.has(id)) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Skill \`${id}\` was already loaded in this pass; its document is above. Use that text instead of loading it again.`,
+              },
+            ],
+            details: { skillId: id, alreadyLoaded: true },
+          };
+        }
+        if (id) loaded.add(id);
+        return original(callId, params, context);
+      },
+    } as T;
+  });
+}
+
+/**
  * Whether a review run could do anything at all.
  *
  * A write tool with nothing to write with is a spawn that pays a full completion

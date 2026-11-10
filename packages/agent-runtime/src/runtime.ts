@@ -50,6 +50,7 @@ import {
   SKILL_REVIEW_TOOL_NOTE,
   ReviewActionCollector,
   canReview,
+  dedupeSkillLoads,
   describeReviewAction,
   reviewToolsFrom,
 } from "./skill-review-run.js";
@@ -2645,10 +2646,13 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     ]);
     // A fork without `skill_manage` and `Skill` would pay a full completion and
     // could not land a single change.
-    if (!canReview(tools)) {
+    // One document, one read: a fork that reloads the same skill until the
+    // iteration ceiling never gets to write (measured: 16 loads, zero writes).
+    const reviewTools = dedupeSkillLoads(tools);
+    if (!canReview(reviewTools)) {
       // Name the tools the fork would actually carry. "no-skill-tools" alone cannot
       // be acted on: a reader needs to see which half is missing.
-      const names = tools.map((tool) => tool.name).sort();
+      const names = reviewTools.map((tool) => tool.name).sort();
       this.emit({
         type: "skill_review",
         outcome: "skipped",
@@ -2676,7 +2680,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           parentToolCallId: "skill-review",
           task: SKILL_REVIEW_PROMPT + (attempt === 1 ? "" : `\n\n${SKILL_REVIEW_NO_LOOK_RETRY}`),
           systemPrompt: SKILL_REVIEW_TOOL_NOTE,
-          tools,
+          tools: reviewTools,
           provider: this.provider,
           thinkingLevel: "off",
           initialMessages: [...this.agent.state.messages],
