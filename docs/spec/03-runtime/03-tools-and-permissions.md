@@ -304,6 +304,11 @@ it costs tokens only when it is loaded.
 
 | call | result |
 | --- | --- |
+In agent mode `memory` and `skill_manage` are declared from the first turn rather than
+deferred behind `ToolSearch` (ADR 0391): measured, a deferred writer was a writer the
+model never reached, so a three-step procedure landed in memory and the library stayed
+empty.
+
 `skill_manage` accepts `create`, `patch`, `write_file`, `remove_file`, `delete`, and
 `absorb`. `absorb` merges the named skill into the skill in `into`: its resource
 files move under the umbrella, collisions keep the umbrella's copy, and the source

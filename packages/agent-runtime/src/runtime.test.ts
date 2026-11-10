@@ -3894,6 +3894,21 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     await runtime.dispose();
   });
 
+  it("tells the agent when a procedure belongs in a skill, not in memory", async () => {
+    // Memory has carried its own rules in the prompt since ADR 0378; the library
+    // had none, and a measured session wrote a three-step release procedure into
+    // memory because `skill_manage` said nothing about *when* to use it.
+    const runtime = createRuntime({ mode: "agent" });
+    const prompt = (runtime as any).agent.state.systemPrompt as string;
+    expect(prompt).toContain("# Writing to the skill library");
+    expect(prompt).toContain("A **procedure** belongs in a skill");
+    expect(prompt).toContain("belongs in \`memory\`");
+    // The writer is a deferred tool in this session, which is exactly why the
+    // rule has to arrive with the prompt rather than with the tool schema.
+    expect((runtime as any).toolCatalog?.has?.("skill_manage")).toBe(true);
+    await runtime.dispose();
+  });
+
   it("pauses asktool until the renderer resolves every question", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
@@ -14499,6 +14514,27 @@ describe("skill review triggering (Hermes background_review port)", () => {
    */
   const reviewEvents = (events: AgentEventEnvelope[]) =>
     events.filter((envelope) => envelope.event.type === "skill_review");
+
+  it("declares both writers on the first agent turn, deferred in chat", () => {
+    // A deferred writer is a writer the model never uses: with both behind a
+    // ToolSearch, three live turns wrote memory only (after searching for it) and
+    // never reached `skill_manage`, so nothing entered the library.
+    const agent = createRuntime({ mode: "agent" });
+    const declaredAgent = (agent as any)
+      .declaredTools()
+      .map((tool: { name: string }) => tool.name);
+    expect(declaredAgent).toContain("memory");
+    expect(declaredAgent).toContain("skill_manage");
+
+    const chat = createRuntime({ mode: "chat" });
+    const declaredChat = (chat as any)
+      .declaredTools()
+      .map((tool: { name: string }) => tool.name);
+    expect(declaredChat).not.toContain("skill_manage");
+
+    void agent.dispose();
+    void chat.dispose();
+  });
 
   it("has skill_manage in the catalog while the declared request omits it", () => {
     const runtime = createRuntime({

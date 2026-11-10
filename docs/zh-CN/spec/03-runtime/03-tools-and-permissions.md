@@ -154,6 +154,10 @@ sidecar 在每个新用户提示开始时重置此延迟集，并从有效会话
 | 不带 `id` | 此刻真实的技能库。提示里的那一节是会话启动时的快照，因此会话中途创建的技能（`skill_manage` 或后台复盘 fork 写入的）只在这里可见 |
 | 带 `id` | 该文档、它的 `SKILL.md` 路径，以及它拥有的每个 `references/*.md`，无需猜测文件名或对目录做 glob |
 
+在智能体模式下 `memory` 与 `skill_manage` 第一轮就进入声明的工具集，不放在
+`ToolSearch` 之后（ADR 0391）：实测表明延后的写工具模型根本不会去取——结果三步流程被写进记忆，
+技能库一个字节都没增长。
+
 `skill_manage` 接受 `create`、`patch`、`write_file`、`remove_file`、`delete` 与 `absorb`。
 `absorb` 把指定技能合并进 `into` 指向的总技能：资源文件移到总技能下，同名冲突保留总技能的版本，
 源文档只被关闭而不删除（ADR 0389）。资源写入会带上会话的 `projectPath`，因此项目级技能可以用

@@ -38,6 +38,7 @@ import { imageGenerationDescription, imageGenerationParameters } from "./image-g
 import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
 import { createMemoryTool } from "./memory-agent-tool.js";
 import { createSkillManageTool } from "./skill-manage-tool.js";
+import { SKILL_WRITING_RULES } from "./skill-authoring.js";
 import { createSkillTool } from "./skill-tool.js";
 import {
   accrueReviewToolCalls,
@@ -820,6 +821,14 @@ const AGENT_CORE_TOOL_NAMES = new Set([
   // model has to go looking for is one it will not use. Registration keeps its
   // own gate: the tool only exists when the catalog is non-empty.
   SKILL_TOOL_NAME,
+  // The two writers, for the same reason `Skill` is here. Measured on a real
+  // session: three turns that each carried a durable lesson — an environment
+  // quirk, a lock pitfall, a three-step release procedure — reached `memory`
+  // only after spending a ToolSearch on it, and never reached `skill_manage` at
+  // all, so the library gained nothing. A capability the model has to go looking
+  // for is one it will not use, and writing back is the point of the feature.
+  "memory",
+  "skill_manage",
 ]);
 const MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES = 64;
 const MAX_TOOL_SEARCH_RESULT_NAMES = 24;
@@ -2891,6 +2900,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         [TOOL_ACTIVATION_SECTION]: toolActivationSection(this.declarationPolicy.key, this.activeDeferredToolNames),
       } : {}),
       ...pluginSkillsPromptSections(this.pluginSkills),
+      // The library's writer needs the same kind of rule the memory section gives
+      // the memory tool: without it every reusable procedure lands in memory and
+      // the library never grows (measured: three turns, zero `skill_manage`).
+      ...(this.mode === "agent" ? { skillWriting: SKILL_WRITING_RULES } : {}),
       // The resumable-delegation list deliberately stays out: it changes on
       // every settlement, and a system-prompt change rewrites the request
       // prefix provider prompt caches key on (ADR 0337). `TaskList` carries it
@@ -5200,6 +5213,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
       if (skillsPrompt) blocks.push(skillsPrompt);
     }
+    // The library's writer needs the same kind of rule the memory section gives
+    // the memory tool: without it every reusable procedure lands in memory and
+    // the library never grows.
     const projectPrompt = projectInstructionsPrompt(instructions ?? undefined);
     if (projectPrompt) blocks.push(projectPrompt);
     return blocks;

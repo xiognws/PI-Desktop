@@ -180,6 +180,8 @@ User-preference embedding (important): when the user expressed a style/format/wo
 If you notice two existing skills that overlap, you may merge them — but only when the merge is obvious from what \`Skill\` returned in THIS review. Patch the umbrella's SKILL.md so it describes what it now covers, then call \`skill_manage\` with action \`absorb\`, \`name\` set to the redundant skill and \`into\` set to the umbrella. Its resource files move under the umbrella and its document leaves the catalog while staying on disk; nothing is deleted. Say in your reply which skills you merged and why. If the overlap is partial — two documents that each carry something the other lacks — do not absorb: note it in your reply and let a person decide. Never delete a skill here.
 
 Do NOT capture as skills${DO_NOT_CAPTURE_BLOCK}
+Before you answer, check one thing: did this session contain a complete reusable PROCEDURE — a sequence the next session facing the same class of task would follow step by step? If it did and you created or patched no skill, say so explicitly in your reply and why (for example: the procedure is already covered by an existing skill, or it is not yet a procedure). A procedure that only exists as a memory entry is invisible to the next session at the moment it needs it.
+
 'Nothing to save.' is a real option but should NOT be the default. If the session ran smoothly with no corrections and produced no new technique, just say 'Nothing to save.' and stop. Otherwise, act.`;
 
 /** Appended by the caller so the model knows the ceiling before it plans. */
