@@ -68,6 +68,10 @@ export default defineConfig({
         external: [
           "original-fs",
           "electron-updater",
+          // A native addon: its loader resolves `*.node` bindings with a runtime
+          // `require`, which does not exist in this ESM bundle — bundling it
+          // throws "require is not defined" before the app reaches `ready`.
+          "@ast-grep/napi",
           "jiti",
           "jiti/static",
           "@picovoice/pvrecorder-node",
