@@ -2,7 +2,7 @@
 
 - Status: Accepted for implementation
 - Date: 2026-10-01
-- Related: Live Voice Work Session Integration, [ADR 0313](0313-live-voice-default-session-target.md), ADR 0311, ADR 0310
+- Related: Live Voice Work Session Integration, ADR 0313, ADR 0311, ADR 0310
 
 ## Context
 

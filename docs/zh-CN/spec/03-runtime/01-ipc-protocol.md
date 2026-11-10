@@ -1997,7 +1997,7 @@ unit and byte counts. There is no cleanup phase. Background polls stay silent.
 
 ## 16. 实时语音 API
 
-实时语音是应用管理的通话通路，其所有权绑定在主窗口上，详见[live-voice.md](live-voice.md)。DTO 定义在 `packages/shared/src/types/live-voice.ts`；preload 只暴露下表列出的白名单通道。Main 从调用 IPC 的受信 frame 推导 owner，并只向该 frame 发送通话事件。payload 不能提供 owner 身份或凭证。停靠挂件窗口只绘制通话控件、不拥有通话，因此它的三条通道单独校验，且永不进入 owner 推导。
+实时语音是应用管理的通话通路，其所有权绑定在主窗口上，详见live-voice.md。DTO 定义在 `packages/shared/src/types/live-voice.ts`；preload 只暴露下表列出的白名单通道。Main 从调用 IPC 的受信 frame 推导 owner，并只向该 frame 发送通话事件。payload 不能提供 owner 身份或凭证。停靠挂件窗口只绘制通话控件、不拥有通话，因此它的三条通道单独校验，且永不进入 owner 推导。
 
 | IPC 通道 | 方向 | 契约 |
 |---|---|---|

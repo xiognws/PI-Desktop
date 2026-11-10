@@ -383,314 +383,6 @@
   and path/filesystem boundaries.
 
 
-### E2E-LEGACY-DICTATION-idle-model-release
-
-- **Preconditions:** Exercise the retained local Dictation service through its
-  `VoiceService` interface with a deterministic controller/model-manager stub
-  and a controlled clock. Do not access a physical microphone or download a
-  model.
-- **Steps:** Start and stop a recording, advance time to just before and then
-  to the 10-minute idle boundary, and inspect unload calls. Repeat with a new
-  recording before the boundary, a rejected new start, an error terminal phase,
-  and service disposal.
-- **Expected:** A settled idle model unloads once at the boundary, never early.
-  A new recording cancels the timer and its terminal phase starts a fresh
-  window. A rejected start does not strand the unload. An active phase at the
-  callback or service disposal prevents unloading.
-- **Coverage:** `apps/desktop/test/voice-service-idle-unload.test.mjs` runs the
-  production `VoiceService` lifecycle with only the runtime and clock mocked.
-  The separate Linux RSS measurement verifies that `TranscribeModel.dispose()`
-  returns memory to the OS and that the existing lazy-load path reloads it.
-- **Specs:** [Live Voice](../03-runtime/live-voice.md).
-
-### E2E-LIVE-VOICE-gemini-work-schema
-
-- **Preconditions:** Production Gemini adapter with a deterministic transport
-  fixture and a bound work profile; no credentials or hardware devices.
-- **Steps:** Start the call with a work target, accept a valid setup, unmute and
-  send PCM. Reject another setup with close 1007 and a UTF-8 reason. Repeat
-  with a transport error followed by close; cancel and close the adapter.
-- **Expected:** Gemini sends the supported Schema subset and connects; OpenAI's
-  schema and Host argument validation remain strict. Setup rejection settles
-  immediately as `LIVE_PROTOCOL_ERROR`, transport errors remain network errors,
-  and only one failure is reported. The raw reason reaches only the provider
-  log; even the connect rejection crossing IPC contains only the public code.
-  Cancellation suppresses terminal noise and close removes socket observers.
-- **Specs:** `03-runtime/live-voice.md`, `09-logging-and-observability.md`.
-- **Acceptance:** C, E, Security, Quality.
-- **Milestone:** Maintenance, issue #1812.
-- **Automation:** `live-voice-gemini-adapter.test.mjs`,
-  `live-voice-service-lifecycle.test.mjs`, and voice-runtime `live/protocol.test.ts`.
-- **Status:** Adapter/service contract-covered; full Electron/Gemini account and
-  physical microphone acceptance remain separate and are not certified here.
-
-### E2E-LIVE-VOICE-public-settings-and-reconnect
-
-- **Preconditions:** A built production Renderer and real Electron/Main/Host,
-  isolated data/profile/project, developer mode off, a local TLS or loopback
-  HTTP Realtime fixture and synthetic microphone. For TLS, trust only the
-  fixture CA in the child process; do not disable TLS, sender, sandbox or
-  microphone checks.
-- **Steps:** Open Live from Composer while disabled and follow Open settings.
-  Find Voice through settings search, bind the fixture account, enable Live,
-  connect, unmute, receive audio/captions, mute and hang up. Cancel a delayed
-  startup, disconnect the provider and explicitly reconnect. Restart with the
-  same isolated profile, inspect persisted settings and disable Live.
-- **Expected:** Voice is reachable without developer mode. Enabling settings
-  does not capture audio; the real built Renderer passes the exact main-frame
-  owner check. Only the chosen account is used. Mute stops input, every end
-  closes media/socket resources, and failures never trigger an automatic new
-  call. Settings survive restart without reconnecting. Legacy Dictation
-  settings are unchanged; a voice-only call creates no Agent session.
-- **Coverage:** `pnpm test:e2e:live-voice` drives the built app and its concrete
-  Realtime GA adapter against local WSS; `pnpm test:e2e:live-voice --
-  --plain-http` repeats the call flow against a loopback `ws://` endpoint.
-  `live-voice-websocket-endpoint.test.mjs` connects the production transport to
-  a local loopback WebSocket and verifies proxy refusal; `live-voice-owner.test.mjs`
-  bundles the production owner module and rejects other files/frames. Fixture
-  audio is not physical-device or real-provider acceptance. Commands and
-  results are recorded in
-  `docs/implementation/live-voice-public-readiness.md`.
-- **Specs:** [Live Voice](../03-runtime/live-voice.md).
-
-### E2E-LIVE-VOICE-provider-call-lifecycle
-
-- **Preconditions:** Isolated desktop profile with Live Voice enabled and one
-  fixture provider binding. Use a deterministic local protocol fixture; do not
-  use a real provider account or paid endpoint for automation.
-- **Steps:** Open Voice settings and confirm only Live Voice controls are
-  visible; legacy Dictation toggles, microphone selection and transcription
-  model controls are absent. Confirm the enabled Composer shows one Live
-  preparation entry without a separate Work or old Dictation microphone button.
-  Bind/select a fixture account for each supported adapter profile. In Settings
-  → Shortcuts, customize the Live Voice toggle and use it to start then end a
-  fixture call. Cancel a pending startup
-  with the `voiceCancel` binding (default `Escape`) when no popup consumes the
-  key; pressing `Escape` during a connected call must not end it. Restore the
-  default, then explicitly Start from preparation, cancel during
-  permission/startup, connect, mute/unmute, interrupt playback, inspect the
-  in-memory transcript, and end. Repeat with Dictation already holding the
-  microphone, a changed active binding, a provider credential removal, renderer
-  hide/reload, and a rejected playback gesture.
-- **Expected:** Live is off by default; persisted Dictation settings remain
-  unchanged but are not exposed in the UI; only the selected Provider ID is used;
-  secrets do not enter Renderer;
-  no Agent, MCP, shell or file action runs; mute gates new input immediately;
-  cancellation stops late media; the transcript is not persisted; every end
-  path releases media and background-throttling leases or quarantines an
-  unconfirmed microphone lease. A new call starts only after explicit user
-  action.
-- **Specs:** [03-runtime/live-voice.md](../03-runtime/live-voice.md),
-  [03-runtime/20-speech.md](../03-runtime/20-speech.md),
-  [04-ux/09-interaction-patterns.md](../04-ux/09-interaction-patterns.md).
-- **Acceptance:** Adapter setup and event parsing are local fixtures; Main
-  lifecycle, owner, lease and settings behavior are covered by targeted tests.
-  `apps/desktop/test/live-voice-shortcuts.test.mjs` covers the configurable
-  toggle/cancel actions, including that Escape never ends a connected call.
-  The full Electron flow and real-provider/device compatibility remain
-  unverified until their respective isolated acceptance environments are run.
-
-### E2E-LIVE-VOICE-realtime-plaintext-user-endpoint
-
-- **Preconditions:** Isolated desktop profile with Live Voice enabled and an
-  OpenAI-compatible API-key Provider whose base URL is a local plain-HTTP
-  Realtime fixture such as `http://127.0.0.1:<port>/v1`. Do not use a real
-  provider account.
-- **Steps:** Bind the Realtime adapter to that Provider and start a call with
-  `networkPolicy.mode` at its default (`relaxed`). End the call, switch the
-  mode to `strict` and start again. Repeat in `relaxed` with a system proxy
-  that does not bypass the fixture host.
-- **Expected:** In `relaxed` mode the call connects over
-  `ws://127.0.0.1:<port>/v1/realtime?model=…` and the one-time plaintext
-  notice is raised. In `strict` mode, and on a proxied route, the call fails
-  before any socket opens with a network-policy error. An `https` base URL
-  still connects only over `wss`; Gemini never uses `ws` and Codex SDP stays
-  HTTPS-only.
-- **Specs:** [Live Voice](../03-runtime/live-voice.md),
-  [ADR 0304](../../adr/0304-user-supplied-endpoint-trust.md).
-- **Acceptance:** `apps/desktop/test/live-voice-websocket-endpoint.test.mjs`
-  covers the scheme mapping, the user/third-party split and the refused base
-  URL shapes; the network guard's `relaxed`/`strict` verdict is covered by the
-  existing public-network tests. The full Electron flow remains unverified
-  until its isolated acceptance environment is run.
-
-### E2E-LIVE-VOICE-four-stage-ui
-
-- **Title:** Disabled, preparation, compact call, and deliberate details.
-- **Preconditions:** Isolated Electron profile with Live Voice initially
-  disabled, deterministic local provider/media fixtures, and local work-session
-  fixtures. No real account, microphone, speaker, paid endpoint, or user's
-  running Desktop instance is used.
-- **Steps:**
-  1. Confirm neither Live nor Work Composer icon exists while disabled. Every
-     account card shows only its provider picker until that account is bound.
-     Enable Live Voice only from Settings → Voice; verify exactly one idle
-     voice icon and that the card keeps its Model configuration link on the
-     heading line beside the help mark.
-  2. Open preparation and expand/collapse work options without starting. Verify
-     no prepare request, microphone acquisition, media initialization, provider
-     connection, or work dispatch occurs. Make the selected binding unavailable
-     while another is ready: show the exact selected identity/reason, disable
-     Start, and do not switch providers implicitly.
-  3. With a ready binding, explicitly Start and observe Connecting plus Cancel
-     in the compact bar, without automatically opening Details. Cancel while
-     prepare or media acquisition is pending and deliver the late completion.
-     Repeat Start to connect muted, then unmute/mute and inspect status.
-  4. Open Details, inspect transcript/provider/work state, and dismiss it with
-     Close, outside press, and Escape. Keep the call connected; use the bar to
-     resume blocked sound, observe a rejected resume, and recover explicitly.
-  5. Navigate between chat, Settings, Plugins, and sessions. The call chrome is
-     a docked desktop widget window, so drag it by its own bar, verify the
-     position survives that navigation and is clamped back inside the work area,
-     and verify the main window draws no call bar. End or disable the
-     feature with delayed Main termination and renderer cleanup, in either
-     completion order. Keep Ending visible and prevent another Start until both
-     settle. Exercise unconfirmed release and verify visible blocked recovery.
-  6. Reopen preparation: work access and context consent are unchecked. Merely
-     expanding the section or selecting a session never starts a call; Start
-     without the work opt-in is voice-only. Opt into work explicitly, select a
-     valid local target, and Start; inspect the fixed binding and work results
-     in Details. End and reopen preparation, then change/create the target,
-     opt out, or cancel and verify context consent resets. Ending Live does not
-     stop already accepted work.
-  7. Use the configured toggle to start a voice-only call directly and end it.
-     During startup, a popup consumes Escape to dismiss itself without
-     cancellation; without a consuming popup, the startup-cancel shortcut works.
-     Escape never ends a connected call. Repeat visible controls in English and
-     Simplified Chinese and check catalog coverage for all shipped locales.
-- **Expected:** Four distinct UI states, deliberate startup and work consent,
-  exact-binding readiness, default mute, global cleanup visibility, accessible
-  controls and focus return, and no changed IPC, persistence or permission
-  boundary. Playback and error recovery do not require opening Details.
-- **Specs:** [Live Voice](../03-runtime/live-voice.md),
-  [Live Work](../03-runtime/live-work-session.md),
-  [Component spec](../04-ux/08-component-spec.md#1171-live-voice-preparation-compact-call-bar-and-details),
-  [Settings IA](../04-ux/06-settings-ia.md#voice).
-- **Acceptance:** C / E / Security / Quality.
-- **Milestone:** Post-MVP experimental interaction maintenance.
-- **Coverage:** Targeted controller/presentation regression tests and
-  `pnpm test:e2e:live-voice-interaction` cover the mounted production controls,
-  controller, store, shortcuts, i18n, cleanup ordering, work consent, and error
-  recovery with simulated shell navigation and fake external edges. This does
-  not mount full AppShell/settings/plugin routes or exercise a real provider,
-  device, permission prompt, or audio output.
-- **Status:** Task-candidate fixture passed 48/48 interaction checks. Full
-  AppShell, real-provider, and device compatibility remain unverified.
-
-### E2E-LIVE-WORK-session-admission
-
-- **Preconditions:** Isolated Live provider fixture, Desktop/Native Pi/Remote
-  session catalog fixtures, and a deterministic fake intent resolver. Provider
-  candidates enter through the existing Live adapter callback; do not use a
-  real account or paid endpoint.
-- **Steps:** Start a call from a Composer with an active Desktop session and
-  verify that session is the default target without a work-access checkbox or
-  pre-call voice selection. Repeat with Native Pi and Remote Composer sessions.
-  Start with no current session and verify the call remains unbound until the
-  user lists sessions and chooses one by voice. Reject missing and duplicate
-  session identities. With context sharing disabled, submit one work request
-  and verify no history read; then test the separate bounded-context consent.
-  Switch targets by voice during a call, submit before and after the switch, and
-  verify the two operations remain associated with their respective sessions.
-  Deliver each receipt, route through the classifier, and inspect backend
-  admission and `voiceOrigin`. Exercise backend-specific queue/steer/stop
-  capabilities, approval denial, stale turn, offline Remote Host, and a
-  terminal event arriving before submit resolves. Query an exact terminal
-  result without creating another Host turn. Request project/session lists,
-  verify labels and opaque call-scoped references, then test opening and
-  creating only through their existing panel actions. With a submission
-  waiting on the user, confirm the compact bar keeps a waiting line and
-  Details shows the pending ask question with an action that opens that exact
-  session; verify another session's pending request stays unattributed. Then
-  answer the open asktool question by voice and confirm the session's card
-  resolves through the Host input path; retry with a label the question never
-  offered, with a partial answer, and with two open questions, and confirm each
-  is refused without a write and without being retried.
-  Exercise feedback while
-  generation, user speech, and playback are active; finish by ending Live after
-  Host admission.
-- **Expected:** The initial target is the current Composer session when present;
-  voice switching affects subsequent requests only. Main validates each target
-  against a fresh multi-backend catalog, and ambiguity/unavailability fails
-  closed. Context reads occur only after independent consent and remain bounded
-  to the current target. Each backend retains its own admission, permission,
-  approval, and capability rules; unsupported operations and offline targets
-  are reported honestly. Duplicate provider IDs do not dispatch twice,
-  terminal state comes from authoritative backend events, result queries project
-  only the exact operation summary, and ending Live does not cancel accepted
-  work. Selection references expose no raw paths or IDs and remain call-scoped.
-  Automatic feedback and task execution remain separate; a renderer signal is
-  not evidence that a person heard the result.
-- **Coverage:** `apps/desktop/test/live-work-scope.test.mjs` covers the fresh
-  Desktop/Native Pi/Remote catalog, source-specific prompt/stop/queue routing,
-  offline Remote failure, initial Native/Remote event subscriptions without a
-  local AgentHost bridge, project/workspace identity, opaque refs, and
-  ambiguous-target rejection. `apps/desktop/test/live-voice-ipc-media.test.mjs`
-  covers separate target/context consent and rejects raw operation/session/turn
-  IDs. `apps/desktop/test/live-voice-service.test.mjs` covers owner-scoped
-  stop/cancel routing by call and operation IDs. `packages/host-runtime/src/live-work/coordinator.test.ts`
-  covers receipt ordering, routing, stale steer, replay, call close, target
-  switching, exact-turn stop and old-session queue cancellation. `packages/host-runtime/src/live-work/context.test.ts`
-  covers bounded context projection. `packages/agent-host/src/agent-host.test.ts`
-  covers history-free state, queue insertion, and voice provenance.
-  `packages/voice-runtime/src/live/protocol.test.ts` covers provider-specific
-  tool declarations and receipts. `packages/host-runtime/src/live-work/result-summary.test.ts`
-  covers exact-turn summary projection and honest fallbacks. The
-  `LiveWorkFeedbackScheduler` tests cover debounce, speech spacing, silent
-  mode, stale downgrade, deduplication, and overflow; desktop service tests
-  cover provider/user/local playback gating and separate delivery status.
-  `apps/desktop/test/live-work-scope.test.mjs` covers selection reference
-  scope/expiry, and `live-work-operations.test.mjs` covers the panel actions.
-  `apps/desktop/test/live-work-decision.test.mjs` covers the waiting-decision
-  projection, its session scoping, bounded plain-text rendering and the panel
-  action that opens the bound session.
-  `packages/host-runtime/src/live-work/ask-answer.test.ts` covers the spoken
-  answer intent and its routing (resolved, refused, unknown and never resent),
-  and `apps/desktop/test/spoken-answer.test.mjs` covers the option-only
-  matching, the bounded read-out and the delivery budget.
-  `voice-runtime/src/live/playback-monitor.test.ts` covers local audio signal
-  detection. This is targeted automated coverage, not the complete
-  W2-001—W2-096 matrix or real-provider E2E.
-- **Status:** Partial; remaining scenarios and the real-device matrix are
-  tracked in `docs/implementation/live-work-evidence.md`.
-- **Specs:** [live-work-session](../03-runtime/live-work-session.md),
-  [live-voice](../03-runtime/live-voice.md).
-
-### E2E-LIVE-WORK-v2.1-reliability
-
-- **Preconditions:** An isolated local Host session, fixture classifier
-  completion, and fake runtime/provider I/O. No real account, user project, or
-  running Desktop instance is used.
-- **Steps:** Capture a null/active target at provider ingress and delay
-  classification; race a validated stop against ordinary classification; make
-  Host dispatch stay unresolved, then return exact read-only admission
-  evidence; deliver terminal before the write acknowledgement; close Live
-  during dispatch; change the authorized workspace before AgentHost admission;
-  enqueue independent work; delay final assistant persistence; query the task
-  result after a stop control operation.
-- **Expected:** Stale/null targets never become later turns. A stop barrier
-  withdraws earlier writes that have not crossed admission. Explicitly busy
-  ordinary submits do not silently enter the queue. Host uncertainty is shown
-  as unknown and reconciled without a second write. Terminal evidence cannot
-  revive or be overwritten by a late acknowledgement. Workspace mismatch
-  creates no turn or queue item. Idle explicit queue entries drain through
-  AgentHost; restored held entries remain held. A result query returns only an
-  exact task result, not an admission or stop acknowledgement.
-- **Coverage:** `packages/host-runtime/src/live-work/coordinator.test.ts`,
-  `packages/host-runtime/src/live-work/operation-ledger.test.ts`,
-  `packages/agent-host/src/agent-host.test.ts`,
-  `apps/desktop/test/live-work-production-composition.test.mjs`, and
-  `apps/desktop/test/agent-host-bridge-work-ack.test.mjs`. The production
-  composition fixture instantiates the Live Work bridge, AgentHost bridge,
-  registered `agentPrompt` handler, and real AgentHost; Host-core persistence,
-  concrete provider adapters/transports, and real device journeys remain
-  outside that test boundary.
-- **Status:** Automated coverage is partial and is recorded per case in
-  `docs/implementation/live-work-v21-coverage.md`. Real device acceptance is
-  not run.
-- **Specs:** [live-work-session](../03-runtime/live-work-session.md),
-  [live-voice](../03-runtime/live-voice.md).
-
 ### E2E-CHAT-fork-completed-reply-while-running
 
 - **Preconditions:** Isolated real desktop profile, configured model, two turns
@@ -10764,7 +10456,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-PLUGIN-background-audio-and-realtime-connection
 
-- **Preconditions**: A voice-assistant fixture plugin holding
+- **Preconditions**: An audio fixture plugin holding
   `background.service`, `audio.capture.background`,
   `audio.playback.background`, `keyboard.globalShortcut`, `net.websocket`, and
   `desktop.control`, with a mock audio backend and a local mock WebSocket
@@ -10930,11 +10622,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Acceptance | Scenarios |
 |---|---|
-| C / E / Security / Quality — Gemini work setup | E2E-LIVE-VOICE-gemini-work-schema |
 | C / Quality — Continue after malformed tool output | E2E-RUNTIME-malformed-tool-call-continue-recovery |
 | B / Security / Quality — Optional provider client certificate requests | E2E-PROVIDER-optional-client-certificate |
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
-| C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
@@ -11018,7 +10708,6 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Milestone | Scenarios |
 |---|---|
-| Post-MVP experimental interaction maintenance | E2E-LIVE-VOICE-four-stage-ui |
 | M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-008d, E2E-008e, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-020, E2E-021, E2E-021a, E2E-027, E2E-031, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-144, E2E-005J, E2E-201, E2E-202, E2E-207, E2E-206 |
 | M2 (sidebar menu placement) | E2E-021c |
@@ -11549,9 +11238,9 @@ This test plan spec is accepted when:
 - Expect the working theme selector without inert toggle or open-target rows.
 - Expect Appearance in General and Permissions + Defaults in AI. The rail
   contains General, AI, Shortcuts, Instructions, Models, Skills, MCP,
-  Subagents, Projects, and Info. Voice may appear between AI and
-  builds with developer mode on; plugin-contributed destinations follow the
-  core groups. There is no Import destination.
+  Subagents, Projects, and Info in builds with developer mode on;
+  plugin-contributed destinations follow the core groups. There is no Import
+  destination and no Voice destination (ADR 0387).
 - Resize between 800px, 1200px, and 1600px widths; the content cards fill the
   available right pane at each size without changing the rail or introducing
   horizontal scrolling.
@@ -19821,7 +19510,7 @@ permission-request UI below has isolated fixture automation.
   window with a pending approval card, and a fixture window containing a
   password field.
 - **Steps**: Attempt to inspect, capture, and act on a Pi-Workspace window,
-  including its approval card and the Live Voice widget, under every permission
+  including its approval card, under every permission
   mode including `auto` and under an `autonomous-in-scope` grant. Focus the
   password field and attempt `inspect`, `screenshot`, and `set_value`. Attempt a
   target on the built-in credential denylist and try to remove that entry.
@@ -19862,30 +19551,6 @@ permission-request UI below has isolated fixture automation.
   `coordinates_outside_the_measured_window_are_refused_not_clamped`, and
   `a_coordinate_action_without_a_basis_is_refused` in host-core.
 - **Status**: NOT RUN — needs a real window that moves mid-step.
-
-### E2E-COMPUTER-USE-voice-request-adds-no-authority-of-its-own
-
-- **Preconditions**: Isolated desktop profile, a Live Voice fixture adapter with
-  a bound work session, no real provider account or microphone. One run with
-  computer use disabled, one with it enabled.
-- **Steps**: Deliver a spoken request that asks the agent to operate an
-  application, with the feature disabled and then enabled. Repeat with the
-  session in Plan and in Goal. Press Stop during a spoken run and repeat the
-  spoken request immediately.
-- **Expected**: With the feature disabled the request fails
-  `COMPUTER_DISABLED`; voice cannot enable it, and nothing is captured or
-  synthesized. With it enabled the request runs as an ordinary Agent turn under
-  the session's policy and the same automatic desktop grant the typed path gets
-  (ADR 0344) — voice adds no authority and skips no refusal — with progress
-  spoken through the existing work-feedback channel. Plan and Goal deny the tool
-  before permission evaluation. A spoken retry inside the Stop cooldown fails
-  `COMPUTER_STOPPED_BY_USER`.
-- **Specs**: [Computer Use](../03-runtime/computer-use.md),
-  [live-voice](../03-runtime/live-voice.md),
-  [live-work-session](../03-runtime/live-work-session.md).
-- **Automation**: none. The spoken path is stage 3 and is deliberately not
-  wired, so there is nothing to drive yet.
-- **Status**: NOT RUN — stage 3.
 
 ### E2E-COMPUTER-USE-platform-support-is-explicit
 

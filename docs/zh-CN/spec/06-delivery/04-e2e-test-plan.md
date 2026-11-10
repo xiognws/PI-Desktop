@@ -50,7 +50,7 @@
 - **覆盖：** `apps/desktop/test/voice-service-idle-unload.test.mjs` 使用真实
   `VoiceService` 生命周期，仅 mock 运行时边界和时钟。独立 Linux RSS 测量验证
   `TranscribeModel.dispose()` 会向操作系统归还内存，且现有延迟加载路径可重新加载。
-- **规格：** [实时语音](../03-runtime/live-voice.md)。
+- **规格：** 实时语音。
 
 ### E2E-LIVE-VOICE-gemini-work-schema
 
@@ -79,7 +79,7 @@
 - **步骤：** 在功能关闭时从 Composer 打开 Live，点击“打开设置”。通过设置搜索找到 Voice，绑定测试账号并启用；连接、取消静音、接收音频和字幕、静音并挂断。取消延迟启动，断开服务后显式重连；使用同一隔离配置重启，检查持久化设置并关闭功能。
 - **预期：** 普通用户可以到达入口；启用设置不会开始采集。真实构建中的 Renderer 通过精确主 frame 所有者校验。只使用所选账号，静音停止输入，每次结束释放媒体/socket，失败不会自动发起新通话。重启保留设置但不重连；旧 Dictation 设置不变，纯通话不创建 Agent 会话。
 - **覆盖：** `pnpm test:e2e:live-voice` 驱动真实构建及具体 Realtime GA adapter，连接本地 WSS；`live-voice-owner.test.mjs` 打包生产 owner 模块并验证其他文件/frame 被拒绝。合成音频不代表物理设备或真实 Provider 验收；命令和结果见 `docs/implementation/live-voice-public-readiness.md`。
-- **规格：** [实时语音](../03-runtime/live-voice.md)。
+- **规格：** 实时语音。
 
 ### E2E-LIVE-WORK-session-admission
 
@@ -96,7 +96,7 @@
 - **预期：** 过期/null 目标不会变成之后的回合。stop 屏障会撤回尚未跨过准入边界的较早写操作。忙碌时的普通提交不会悄悄进入队列。Host 状态不确定时显示 unknown，并且只核对、不再次写入。终态证据不会被迟到 ACK 复活或覆盖。工作区不匹配不会创建回合或队列项。空闲时的显式队列项由 AgentHost 排空，恢复后挂起的条目保持挂起。结果查询只返回准确的任务结果，不返回准入或 stop 确认。
 - **覆盖：** `packages/host-runtime/src/live-work/coordinator.test.ts`、`packages/host-runtime/src/live-work/operation-ledger.test.ts`、`packages/agent-host/src/agent-host.test.ts`、`apps/desktop/test/live-work-production-composition.test.mjs` 和 `apps/desktop/test/agent-host-bridge-work-ack.test.mjs`。生产组合 fixture 实例化 Live Work bridge、AgentHost bridge、已注册的 `agentPrompt` handler 和真实 AgentHost；Host Core 持久化、具体 Provider adapter/transport 和真实设备旅程不在该测试边界内。
 - **状态：** 自动化覆盖为部分完成，逐项记录于 `docs/implementation/live-work-v21-coverage.md`。实机验收未运行。
-- **规格：** [live-work-session](../03-runtime/live-work-session.md)、[live-voice](../03-runtime/live-voice.md)。
+- **规格：** live-work-session、live-voice。
 
 ### E2E-POWER-keep-awake-setting
 
@@ -193,9 +193,9 @@
 - **预期：** 四种明确的界面状态、主动启动和工作授权、确切绑定的就绪状态、
   默认静音、全局清理状态可见、控件无障碍属性和焦点返回正确，且 IPC、持久化或
   权限边界没有变化。恢复播放和错误处理不需要打开详情。
-- **规格：** [Live Voice](../03-runtime/live-voice.md)、
-  [Live Work](../03-runtime/live-work-session.md)、
-  [组件规格](../04-ux/08-component-spec.md#1171-live-voice-准备-紧凑通话栏和详情)、
+- **规格：** Live Voice、
+  Live Work、
+  组件规格、
   [设置 IA](../04-ux/06-settings-ia.md#voice-experimental)。
 - **验收：** C / E / Security / Quality。
 - **里程碑：** MVP 后实验性交互维护。
@@ -10279,8 +10279,8 @@ Electron 一侧——工具自动签发、指示器、"停止"中止轮次、绘
   进度通过现有工作反馈通道朗读。Plan 与 Goal 在权限评估之前拒绝该工具。冷却期内的
   语音重试以 `COMPUTER_STOPPED_BY_USER` 失败。
 - **规格**：[电脑操作](/zh-CN/spec/03-runtime/computer-use)、
-  [live-voice](/zh-CN/spec/03-runtime/live-voice)、
-  [live-work-session](/zh-CN/spec/03-runtime/live-work-session)。
+  live-voice、
+  live-work-session。
 - **状态**：NOT RUN —— 需要真机运行。
 
 ### E2E-COMPUTER-USE-platform-support-is-explicit

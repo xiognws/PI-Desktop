@@ -695,7 +695,6 @@ describe("PLUGIN_PERMISSIONS", () => {
       "browser.cdp",
       "audio.capture.background",
       "audio.playback.background",
-      "speech.adapter.register",
       "keyboard.globalShortcut",
       "net.websocket",
     ]) {

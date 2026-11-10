@@ -4,7 +4,7 @@
 - Date: 2026-09-17
 - Deciders: Pi-Workspace core
 - Related: [ADR 0257](0257-plugin-real-time-capabilities.md) ·
-  [03-runtime/20-speech](../spec/03-runtime/20-speech.md)
+  03-runtime/20-speech
 
 ## Context
 

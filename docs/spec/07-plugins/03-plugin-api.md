@@ -250,21 +250,6 @@ pi.events.on("session:turnEnded", async (event) => {
 });
 ```
 
-### speech (`speech.adapter.register`)
-```ts
-pi.speech.registerAdapter(adapter: {
-  protocol: string
-  label: string
-  roles: Array<"transcribe" | "synthesize">
-  handle: (input) => Promise<{ kind: "text"; text: string } | { kind: "audio"; mimeType: string; data: string } | { kind: "http"; call: SpeechHttpCall }>
-}): Promise<void>
-pi.speech.unregisterAdapter(protocol: string): Promise<void>
-```
-
-The handle stays in the plugin process. Built-in protocol ids `openai_audio`
-and `openai_chat_audio` are reserved. HTTP plans are executed by the host with
-the bound provider key and must stay on that origin.
-
 ### ui
 
 ```ts
@@ -1460,7 +1445,6 @@ the desktop host currently throws include `INVALID_PARAMS` (input validation of
 the session, usage, project, and desktop APIs, alongside `INVALID_ARGUMENT`
 elsewhere), `UNAVAILABLE` (a host service such as the browser is missing),
 `PLUGIN_UNLOADED` (the plugin was unloaded or reloaded while the call ran),
-`CONFLICT` (a speech protocol already in use), `PROVIDER_ERROR` (a speech
 adapter returned empty output), `WORKSPACE_CHANGED`, `OPEN_FAILED`,
 `REVEAL_FAILED`, and `CONNECT_FAILED`. Branch on the codes you handle and treat
 the rest as a generic failure.
@@ -1471,11 +1455,10 @@ Additional host-originated errors:
 |---|---|
 | `PLUGIN_INVALID_RESULT` | `onComposerTransform` returned a non-string, or the host received a string whose JavaScript `length` exceeds 100,000 UTF-16 code units. Return a string within that bound. |
 | `PLUGIN_TOOL_ABORTED` | A plugin tool invocation is cancelled, finished, unknown/expired, or no longer belongs to the calling plugin process. Pending and late host calls in that invocation are refused. An explicit Error abort reason may retain its own code. |
-| `SPEECH_PROTOCOL_UNSUPPORTED` | `runSpeechAdapter` found no registered adapter for the binding's protocol. An invalid adapter reply instead uses `INVALID_ARGUMENT`; empty text/audio uses `PROVIDER_ERROR`. The code is also documented in the [shared registry](../03-runtime/08-error-codes.md) and [speech specification](../03-runtime/20-speech.md). |
 
 Implementation evidence: `apps/desktop/electron/main/plugin-runtime.ts`
 (`MAX_COMPOSER_TRANSFORM_TEXT_LENGTH`, `runComposerTransform`,
-`runSpeechAdapter`, `sendToChild`), `plugin-tool-invocations.ts`
+`sendToChild`), `plugin-tool-invocations.ts`
 (`run`, `assertActive`, `finish`) and `plugin-host-process.mjs`
 (`toolAbortedError`, `cancelInvocation`, `composer.transform`) in the same
 directory. The codes extend the open set above; no new SDK enum is introduced.
@@ -1724,7 +1707,6 @@ The desktop plugin runtime now implements the MVP host API surface used by local
   `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`,
   bounded by `manifest.fs` (ADR 0088)
 - `agent.registerTool` / `unregisterTool` / `agent.complete`
-- `speech.registerAdapter` / `unregisterAdapter` (`speech.adapter.register`)
 - `models.list`, `session.getLlmContext`
 - `session.getActive` and the `session:activated` event (`ui.revealView` needs `ui.view`)
 - `onProviderOAuth` and `pi.providers.oauth.prompt` / `notify` (`provider.oauth`)

@@ -23,7 +23,7 @@ the idle expiry, and Stop.
 The spoken entry point is deliberately not wired in stage 1. When it lands,
 Live Voice gains no authority of its own — a spoken request becomes a work
 request on the bound session
-([Live Voice Work Session Integration](live-work-session.md)), the existing
+(Live Voice Work Session Integration), the existing
 Agent turn calls the tool, and the session's model, permission mode, and
 approval cards apply unchanged. Voice-driven computer use will be task
 delegation, not per-frame teleoperation.

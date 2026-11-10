@@ -34,9 +34,7 @@
   },
   "dependencies": {
     "@ast-grep/napi": "0.51.0",
-    "@picovoice/pvrecorder-node": "1.2.9",
-    "electron-updater": "^6.8.9",
-    "transcribe-cpp": "0.2.2"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "1.4.0",
@@ -50,7 +48,6 @@
     "@pi-workspace/plugin-sdk": "workspace:*",
     "@pi-workspace/racp": "workspace:*",
     "@pi-workspace/shared": "workspace:*",
-    "@pi-workspace/voice-runtime": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -309,11 +306,7 @@
     },
     "asarUnpack": [
       "node_modules/@ast-grep/napi/**/*.node",
-      "node_modules/@ast-grep/napi-*/**/*.node",
-      "node_modules/transcribe-cpp/**/*.node",
-      "node_modules/transcribe-cpp/**/bin/**",
-      "node_modules/@picovoice/pvrecorder-node/**/*.node",
-      "node_modules/@picovoice/pvrecorder-node/**/lib/**"
+      "node_modules/@ast-grep/napi-*/**/*.node"
     ],
     "asar": {
       "smartUnpack": false

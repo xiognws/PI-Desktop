@@ -6,7 +6,7 @@
 - Amends: [ADR 0281](0281-host-speech-capability.md) (its v1 product entry)
 - Related: [04-ux/06-settings-ia.md](../spec/04-ux/06-settings-ia.md) ·
   [04-ux/08-component-spec.md](../spec/04-ux/08-component-spec.md) ·
-  [03-runtime/20-speech.md](../spec/03-runtime/20-speech.md) ·
+  03-runtime/20-speech.md ·
   [06-delivery/04-e2e-test-plan.md](../spec/06-delivery/04-e2e-test-plan.md)
 
 ## Context

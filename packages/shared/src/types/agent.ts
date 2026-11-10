@@ -39,8 +39,6 @@ export type AgentPromptRequest = {
    * mints its own.
    */
   messageId?: string;
-  /** Main-trusted source metadata for a Live Voice work admission. */
-  voiceOrigin?: VoiceOrigin;
   /**
    * Renderer snapshot of the chat session visible when the prompt was sent.
    * Electron installs it before asynchronous turn setup for notification
@@ -58,6 +56,12 @@ export type AgentPromptRequest = {
    * once it lands.
    */
   permissionMode?: RacpPermissionMode;
+  /**
+   * Provenance of an input accepted through a Live Voice work operation. The
+   * feature is gone; the field stays because host-core already stores it on
+   * durable rows and older records must keep parsing.
+   */
+  voiceOrigin?: VoiceOrigin;
 };
 
 export type AgentPromptAttachment = {
