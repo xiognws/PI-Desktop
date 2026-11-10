@@ -69,10 +69,46 @@ function useMemoryData(scope: ScopeFilter) {
   return { records, setRecords, stats, loading, error, load };
 }
 
+/**
+ * What the agent actually wrote, from the flat entry list the model reads.
+ *
+ * The scored store below (`memories`, ADR 0371) is the older model and it can be
+ * empty while the agent has been recording for days — the two are different
+ * tables, and a page that shows only the older one reads as "memory is broken".
+ */
+function useAgentEntries() {
+  const [entries, setEntries] = useState<{ memory: string[]; user: string[] }>({
+    memory: [],
+    user: [],
+  });
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [memory, user] = await Promise.all([
+          api.memoryEntries("memory"),
+          api.memoryEntries("user"),
+        ]);
+        if (!cancelled) {
+          setEntries({ memory: memory?.entries ?? [], user: user?.entries ?? [] });
+        }
+      } catch {
+        // A section that cannot read the list must not fail the whole page.
+        if (!cancelled) setEntries({ memory: [], user: [] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return entries;
+}
+
 export function MemoryPane() {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<ScopeFilter>("all");
   const { records, setRecords, stats, loading, error, load } = useMemoryData(scope);
+  const agentEntries = useAgentEntries();
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -163,6 +199,38 @@ export function MemoryPane() {
             onChange={(value) => setScope(value)}
             options={scopeOptions}
           />
+        </div>
+
+        <div className="rounded-md border border-border/60 p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-sm font-medium">{t("settings.memoryAgentTitle")}</span>
+            <span className="text-xs text-muted">
+              {t("settings.memoryAgentCounts", {
+                memory: agentEntries.memory.length,
+                user: agentEntries.user.length,
+              })}
+            </span>
+          </div>
+          {agentEntries.memory.length + agentEntries.user.length === 0 ? (
+            <p className="mt-1 text-xs text-muted">{t("settings.memoryAgentEmpty")}</p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-1">
+              {[
+                ...agentEntries.user.map((text, index) => ({ text, target: "user" as const, index })),
+                ...agentEntries.memory.map((text, index) => ({ text, target: "memory" as const, index })),
+              ].map((entry) => (
+                <li key={`${entry.target}-${entry.index}`} className="flex items-baseline gap-2 text-xs">
+                  <Badge>{t(
+                    entry.target === "user"
+                      ? "settings.memoryAgentUser"
+                      : "settings.memoryAgentMemory",
+                  )}</Badge>
+                  <span className="min-w-0 flex-1 break-words">{entry.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-muted">{t("settings.memoryAgentHint")}</p>
         </div>
 
         {stats ? (

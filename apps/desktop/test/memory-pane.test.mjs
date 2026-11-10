@@ -83,3 +83,13 @@ test("both shipped locales carry every memory key", () => {
   assert.match(en, /^\s*memory: "Memory",/m);
   assert.match(zh, /^\s*memory: "记忆",/m);
 });
+
+test("the memory page shows what the agent wrote, not only the scored store", () => {
+  // A user opening 记忆 saw an empty page while the agent had five entries: the
+  // page read the older scored store (`memories`) and the agent writes the flat
+  // entry list (`memory_entries`). Both have to be visible here.
+  assert.match(pane, /api\.memoryEntries\("memory"\)/);
+  assert.match(pane, /api\.memoryEntries\("user"\)/);
+  assert.match(pane, /settings\.memoryAgentTitle/);
+  assert.match(pane, /settings\.memoryAgentHint/);
+});
