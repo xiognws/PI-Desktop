@@ -1,0 +1,26 @@
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 317
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 880-897
+services/autotest/src/autotest/workflow/store.py
+  h_201ed4c689ac8b 578-606
+services/autotest/tests/test_workflow.py
+  h_201ed4c689ac8b 181-187,197-198
+services/autotest/ui/src/router/index.ts
+  h_201ed4c689ac8b 38-43
+services/autotest/ui/src/views/Approvals.vue
+  h_201ed4c689ac8b 1-162
+services/autotest/ui/src/views/ProjectLayout.vue
+  h_201ed4c689ac8b 169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ad7c9bb44bf16ef343a45e743749f1809fc9fdee",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
