@@ -1,0 +1,14 @@
+apps/desktop/test/computer-use-permission-user-path.test.mjs
+  h_201ed4c689ac8b 66-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3c28ac6a22ffa10b2ca15b4550f1e457ae66b784",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
