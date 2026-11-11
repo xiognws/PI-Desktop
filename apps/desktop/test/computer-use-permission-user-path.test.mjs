@@ -225,5 +225,7 @@ app.whenReady().then(async () => {
     const line = output.split(/\r?\n/).find((item) => item.startsWith("COMPUTER_PERMISSION_PROBE "));
     assert.ok(line, output.slice(-6000));
     assert.deepEqual(JSON.parse(line.slice("COMPUTER_PERMISSION_PROBE ".length)), { passed: true, requestCount: 7 });
-  } finally { await rm(temp, { recursive: true, force: true }); }
+  // Windows 上 Chromium 退出后还会短暂持有 profile 里的字典/网络文件，
+  // 一次 rm 会 EBUSY/ENOTEMPTY：用 fs.rm 自带的重试退避，不要加 sleep。
+  } finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
 });

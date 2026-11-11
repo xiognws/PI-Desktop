@@ -34,7 +34,12 @@ function reversibleEncryption() {
 
 async function tmpDir() {
   const dir = await mkdtemp(join(tmpdir(), "boot-remote-"));
-  return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
+  return {
+    dir,
+    // 并发跑测试时目录里可能还有刚落盘的子进程产物，一次 rm 会 ENOTEMPTY；
+    // 用 fs.rm 自带的重试，不要靠调用方 sleep。
+    cleanup: () => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
+  };
 }
 
 /** A stand-in for the RacpClient-backed adapter. Records the calls so tests
