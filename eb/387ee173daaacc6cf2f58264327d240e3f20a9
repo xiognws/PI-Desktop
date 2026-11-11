@@ -1,0 +1,22 @@
+apps/desktop/.worktree-menu-ui-6iFQLT/profile/Cache/No_Vary_Search/journal.baj
+  h_201ed4c689ac8b 1
+apps/desktop/.worktree-menu-ui-6iFQLT/profile/Network/49bc027e-1350-42da-ab54-e93017b6ba53.tmp
+  h_201ed4c689ac8b 1
+apps/desktop/resources/manual/Pi-Workspace-0.21.0-构建与使用手册.md
+  h_201ed4c689ac8b 1-801
+apps/desktop/test/rpc-lifecycle-contract.test.mjs
+  h_201ed4c689ac8b 225
+apps/desktop/test/settings-developer-only-destinations.test.mjs
+  h_201ed4c689ac8b 41-48,51-57,63,136-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "eb387ee173daaacc6cf2f58264327d240e3f20a9",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
