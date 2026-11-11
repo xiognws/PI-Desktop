@@ -36,6 +36,12 @@ const router = createRouter({
           component: () => import('@/views/Executions.vue'),
         },
         {
+          // 人工卡点独立成页：审批不该只在某个 run 的展开区里才看得到。
+          path: 'approvals',
+          name: 'Approvals',
+          component: () => import('@/views/Approvals.vue'),
+        },
+        {
           // 执行详情必须带 id：执行记录页点一行就进这里看事件流与用例结果。
           path: 'executions/:id',
           name: 'ExecutionDetail',

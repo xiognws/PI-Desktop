@@ -575,3 +575,32 @@ def search_knowledge(
         }
         for row in rows
     ]
+
+
+def list_pending(conn: sqlite3.Connection, project_id: str, limit: int = 50) -> list[dict]:
+    """项目级待办：跨 run 的所有 waiting 决策，带上它所属 run 的上下文。
+
+    审批页只关心「现在等我点什么」，所以一次查全项目，不让前端按 run 逐个拉。
+    """
+    rows = conn.execute(
+        "SELECT d.id, d.run_id, d.step_id, d.prompt, d.options, d.created_at,"
+        " r.module, r.stage, r.status"
+        " FROM workflow_decisions d JOIN workflow_runs r ON r.id = d.run_id"
+        " WHERE r.project_id = ? AND d.status = 'waiting'"
+        " ORDER BY d.created_at LIMIT ?",
+        (project_id, limit),
+    ).fetchall()
+    return [
+        {
+            "id": row[0],
+            "run_id": row[1],
+            "step_id": row[2],
+            "prompt": row[3],
+            "options": json.loads(row[4] or "[]"),
+            "created_at": row[5],
+            "module": row[6],
+            "stage": row[7],
+            "run_status": row[8],
+        }
+        for row in rows
+    ]

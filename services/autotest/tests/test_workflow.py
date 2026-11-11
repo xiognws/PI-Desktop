@@ -178,6 +178,13 @@ def test_api_decision_roundtrip(client):
     assert run["status"] == "waiting_human"
     assert [item["id"] for item in run["pending"]] == [decision_id]
 
+    # 项目级待办列表：审批页只拉这一个接口
+    board = client.get(f"/api/projects/{project['id']}/workflow/pending").json()["data"]
+    assert board["total"] == 1
+    assert board["decisions"][0]["id"] == decision_id
+    assert board["decisions"][0]["run_id"] == run_id
+    assert board["decisions"][0]["options"] == ["approve", "reject"]
+
     decided = client.post(
         f"/api/projects/{project['id']}/workflow/runs/{run_id}/pending/{decision_id}/decide",
         json={"answer": "approve", "note": "去掉 P2"},
@@ -187,6 +194,8 @@ def test_api_decision_roundtrip(client):
     after = client.get(f"/api/projects/{project['id']}/workflow/runs/{run_id}").json()["data"]
     assert after["status"] == "running"
     assert after["pending"] == []
+    # 批完之后待办列表要立刻空掉，否则审批页会一直显示已处理的项
+    assert client.get(f"/api/projects/{project['id']}/workflow/pending").json()["data"]["total"] == 0
 
 
 def test_knowledge_search_matches_tags_and_text(client, tmp_path):

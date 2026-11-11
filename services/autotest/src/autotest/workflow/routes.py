@@ -877,6 +877,24 @@ def list_runs(project_id: str, limit: int = 20) -> dict:
         return {"ok": True, "data": {"runs": store.list_runs(conn, project_id, limit)}}
 
 
+@router.get("/pending")
+def list_pending(project_id: str, limit: int = 50) -> dict:
+    """项目级待办：所有 waiting 的人工卡点，按时间正序。
+
+    审批页一次拿全项目，不用按 run 逐个拉；limit 夹在 1..200，防止前端要全表。
+    """
+    capped = max(1, min(int(limit), 200))
+    with _project_conn(project_id) as conn:
+        decisions = store.list_pending(conn, project_id, capped)
+    # 项目级列表没有单条 run 可引用，refs 留空（_envelope 要求 run_id）。
+    return {
+        "ok": True,
+        "summary": f"{len(decisions)} 条待审批",
+        "data": {"decisions": decisions, "total": len(decisions)},
+        "refs": [],
+    }
+
+
 @router.get("/runs/{run_id}")
 def get_run(project_id: str, run_id: str) -> dict:
     with _project_conn(project_id) as conn:
