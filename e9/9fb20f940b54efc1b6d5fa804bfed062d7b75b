@@ -1,0 +1,30 @@
+apps/desktop/test/artifacts-page.test.mjs
+  h_201ed4c689ac8b 33-35,38
+apps/desktop/test/computer-use-permission-user-path.test.mjs
+  h_201ed4c689ac8b 219-222,231-243
+apps/desktop/test/drive-root-path-containment.test.mjs
+  h_201ed4c689ac8b 2,5-15
+apps/desktop/test/imported-package-skills-runtime.test.mjs
+  h_201ed4c689ac8b 221,230-237
+apps/desktop/test/packaging-footprint.test.mjs
+  h_201ed4c689ac8b 224-233
+apps/desktop/test/plugin-mcp.test.mjs
+  h_201ed4c689ac8b 393-396,401-402
+apps/desktop/test/single-instance.test.mjs
+  h_201ed4c689ac8b 24-38
+apps/desktop/test/spawned-session-card-render.test.mjs
+  h_201ed4c689ac8b 80-85
+apps/desktop/test/transcript-disclosure-reading.test.mjs
+  h_201ed4c689ac8b 131-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e99fb20f940b54efc1b6d5fa804bfed062d7b75b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
