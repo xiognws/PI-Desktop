@@ -1,0 +1,20 @@
+apps/desktop/electron/main/update-policy.ts
+  h_201ed4c689ac8b 14-28,33,35,46,48,78,80,82
+apps/desktop/electron/main/updater.ts
+  h_201ed4c689ac8b 51,115-120,131,210,216,223,234,363
+apps/desktop/test/update-preference.test.mjs
+  h_201ed4c689ac8b 28,33-44,108-116
+apps/desktop/test/updater-controller.test.mjs
+  h_201ed4c689ac8b 61-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b57f826025d6523677c20ffe312ba3289d46d833",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
