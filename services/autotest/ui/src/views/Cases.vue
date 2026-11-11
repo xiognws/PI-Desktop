@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Plus, ListChecks, X, Upload, Download, Trash2, Play, List, Network, Star } from 'lucide-vue-next'
 import 'jsmind/style/jsmind.css'
 import jsMind from 'jsmind'
@@ -26,6 +26,7 @@ async function loadCases() {
 
 onMounted(() => {
   loadCases()
+  loadScripts()
   window.addEventListener('keydown', handleKeydown)
 })
 
@@ -139,9 +140,53 @@ const filters = ref({
   type: '',
 })
 
+// 筛选在前端做：/cases 没有查询参数，项目内用例是几百条量级，为一个视图
+// 加一套筛选协议不值当。
+const visibleCases = computed(() =>
+  cases.value.filter((c) => {
+    if (filters.value.module && (c.module || '') !== filters.value.module) return false
+    if (filters.value.priority && c.priority !== filters.value.priority) return false
+    if (filters.value.status && c.status !== filters.value.status) return false
+    if (filters.value.type && c.type !== filters.value.type) return false
+    return true
+  }),
+)
+const activeFilterCount = computed(() => Object.values(filters.value).filter(Boolean).length)
+// 下拉选项来自真实用例，而不是写死的几个模块名
+const moduleOptions = computed(() => Array.from(new Set(cases.value.map(c => c.module).filter(Boolean))))
+const typeOptions = computed(() => Array.from(new Set(cases.value.map(c => c.type).filter(Boolean))).sort())
+
+function clearFilters() {
+  filters.value = { module: '', priority: '', status: '', type: '' }
+}
+
 function applyFilters() {
-  // 后面对接后端筛选
   filterOpen.value = false
+}
+
+// 批量改优先级：PUT 是整行更新，所以按行把原值带上再覆盖 priority。
+const batchBusy = ref(false)
+
+async function setSelectedPriority(priority: string) {
+  if (!selectedIds.value.length) return
+  batchBusy.value = true
+  try {
+    for (const id of [...selectedIds.value]) {
+      const row = cases.value.find(c => c.id === id)
+      if (!row) continue
+      const res = await fetch(`/api/projects/${projectId}/cases/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...row, priority }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      row.priority = priority
+    }
+  } catch (e) {
+    alert(`批量改优先级失败：${(e as Error).message}`)
+  } finally {
+    batchBusy.value = false
+  }
 }
 
 // 批量导出选中用例
@@ -326,6 +371,52 @@ const reviewStatusMap: Record<string, { label: string; class: string }> = {
   '已拒绝': { label: '已拒绝', class: 'bg-red-50 text-red-600' },
 }
 
+// 后端返回 review_status（snake_case），弹层原来直接读 reviewStatus，undefined
+// 时 `reviewStatusMap[undefined].class` 会把整个抽屉渲染打断。
+function reviewOf(c: any) {
+  const raw = c?.review_status ?? c?.reviewStatus ?? '待评审'
+  return reviewStatusMap[raw] ?? { label: raw, class: 'bg-gray-100 text-gray-600' }
+}
+
+// 步骤/预期在库里是一行一个的文本（工作流生成时把 list 拍平了），老数据可能是
+// 数组对象。统一成字符串数组给弹层渲染。
+function detailSteps(c: any): string[] {
+  const steps = c?.steps
+  if (Array.isArray(steps)) {
+    return steps.map((s: any) =>
+      typeof s === 'string' ? s : `${s.action ?? s.step ?? ''}${s.expected ? ` → 预期：${s.expected}` : ''}`,
+    )
+  }
+  return String(steps || '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+}
+
+// 用例 → 脚本：scripts.case_id 新数据指向用例 id，老数据存的是用例标题，两种都认。
+const scripts = ref<any[]>([])
+async function loadScripts() {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/scripts`)
+    const data = await res.json()
+    scripts.value = data.scripts || []
+  } catch {
+    scripts.value = []
+  }
+}
+
+function scriptsForCase(c: any) {
+  if (!c) return []
+  const id = String(c.id || '')
+  const name = String(c.name || c.title || '')
+  return scripts.value.filter(s => s.case_id === id || s.case_id === name)
+}
+
+const router = useRouter()
+function openScript(scriptId: string) {
+  router.push(`/project/${projectId}/scripts/${scriptId}/edit`)
+}
+
 const typeMap: Record<string, string> = {
   '正向': 'bg-blue-50 text-blue-600',
   '反向': 'bg-orange-50 text-orange-600',
@@ -406,7 +497,9 @@ watch(viewMode, (val) => {
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <h2 class="text-base font-medium text-gray-900">测试用例</h2>
-          <span class="text-sm text-gray-400">共 {{ cases.length }} 条</span>
+          <span class="text-sm text-gray-400">
+            共 {{ cases.length }} 条<template v-if="activeFilterCount">（筛选后 {{ visibleCases.length }} 条）</template>
+          </span>
           <span v-if="selectedIds.length > 0" class="text-sm text-blue-600">已选 {{ selectedIds.length }} 条</span>
         </div>
         <div class="flex items-center gap-2">
@@ -434,6 +527,17 @@ watch(viewMode, (val) => {
               <Download class="w-4 h-4" />
               导出选中
             </button>
+            <select
+              :value="''"
+              :disabled="batchBusy"
+              @change="setSelectedPriority(($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''"
+              class="px-2 py-1.5 text-sm border border-gray-200 rounded-lg disabled:opacity-50"
+            >
+              <option value="">批量改优先级…</option>
+              <option value="高">高</option>
+              <option value="中">中</option>
+              <option value="低">低</option>
+            </select>
             <button @click="deleteSelected" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50">
               <Trash2 class="w-4 h-4" />
               批量删除
@@ -460,9 +564,7 @@ watch(viewMode, (val) => {
                 <label class="text-xs text-gray-500">模块</label>
                 <select v-model="filters.module" class="w-full mt-1 px-2 py-1 text-sm border border-gray-200 rounded">
                   <option value="">全部</option>
-                  <option value="发动机控制">发动机控制</option>
-                  <option value="变速箱控制">变速箱控制</option>
-                  <option value="电池管理">电池管理</option>
+                  <option v-for="m in moduleOptions" :key="m" :value="m">{{ m }}</option>
                 </select>
               </div>
               <div>
@@ -483,9 +585,21 @@ watch(viewMode, (val) => {
                   <option value="失败">失败</option>
                 </select>
               </div>
-              <button @click="applyFilters" class="w-full py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                应用筛选
-              </button>
+              <div>
+                <label class="text-xs text-gray-500">类型</label>
+                <select v-model="filters.type" class="w-full mt-1 px-2 py-1 text-sm border border-gray-200 rounded">
+                  <option value="">全部</option>
+                  <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
+                </select>
+              </div>
+              <div class="flex gap-2">
+                <button @click="clearFilters" class="flex-1 py-1.5 text-sm border border-gray-200 rounded hover:bg-gray-50">
+                  清空
+                </button>
+                <button @click="applyFilters" class="flex-1 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                  应用筛选
+                </button>
+              </div>
             </div>
           </div>
           <button @click="createDialogOpen = true" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
@@ -513,7 +627,7 @@ watch(viewMode, (val) => {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="c in cases" :key="c.id" class="hover:bg-gray-50">
+            <tr v-for="c in visibleCases" :key="c.id" class="hover:bg-gray-50">
               <td class="px-4 py-3">
                 <input
                   type="checkbox"
@@ -591,7 +705,7 @@ watch(viewMode, (val) => {
               <span class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600">{{ selectedCase.module }}</span>
               <span class="text-xs px-2 py-0.5 rounded" :class="typeMap[selectedCase.type]">{{ selectedCase.type }}场景</span>
               <span class="text-xs px-2 py-0.5 rounded bg-red-50 text-red-600">{{ selectedCase.priority }}优先级</span>
-              <span class="text-xs px-2 py-0.5 rounded" :class="reviewStatusMap[selectedCase.reviewStatus].class">{{ selectedCase.reviewStatus }}</span>
+              <span class="text-xs px-2 py-0.5 rounded" :class="reviewOf(selectedCase).class">{{ reviewOf(selectedCase).label }}</span>
             </div>
           </div>
 
@@ -605,14 +719,35 @@ watch(viewMode, (val) => {
           <div>
             <h4 class="text-sm font-medium text-gray-900 mb-2">测试步骤</h4>
             <div class="space-y-3">
-              <div v-for="s in selectedCase.steps" :key="s.step" class="flex gap-3">
+              <div v-for="(line, index) in detailSteps(selectedCase)" :key="index" class="flex gap-3">
                 <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-medium flex-shrink-0">
-                  {{ s.step }}
+                  {{ index + 1 }}
                 </div>
                 <div class="flex-1">
-                  <p class="text-sm text-gray-900">{{ s.action }}</p>
-                  <p class="text-xs text-gray-500 mt-1">预期：{{ s.expected }}</p>
+                  <p class="text-sm text-gray-900 whitespace-pre-line">{{ line }}</p>
                 </div>
+              </div>
+              <div v-if="!detailSteps(selectedCase).length" class="text-sm text-gray-400">还没有步骤</div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-900 mb-2">
+              关联脚本
+              <span class="text-xs text-gray-400 font-normal">{{ scriptsForCase(selectedCase).length }} 个</span>
+            </h4>
+            <div class="space-y-2">
+              <div
+                v-for="s in scriptsForCase(selectedCase)"
+                :key="s.id"
+                class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2"
+              >
+                <span class="flex-1 text-sm text-gray-800 font-mono truncate">{{ s.name }}</span>
+                <span class="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-500">{{ s.status }}</span>
+                <button class="text-xs text-blue-600 hover:underline" @click="openScript(s.id)">打开</button>
+              </div>
+              <div v-if="!scriptsForCase(selectedCase).length" class="text-sm text-gray-400">
+                还没有脚本。让 Agent 跑一次 script-author，或在「脚本」页新建。
               </div>
             </div>
           </div>

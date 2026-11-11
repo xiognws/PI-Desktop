@@ -136,3 +136,44 @@ def test_script_author_and_log_analyze_over_http(client, tmp_path):
 
     rejected = client.post(f"/api/projects/{project_id}/workflow/log-analyze", json={"raw_log": "   "})
     assert rejected.status_code == 400
+
+
+def test_case_design_lands_in_the_case_table_and_scripts_link_to_it(client):
+    """设计的用例必须落进 test_cases：用例页、执行状态回写、脚本关联都读那张表。"""
+    project_id = client.post("/api/projects", json={"name": "S8", "type": "api"}).json()["id"]
+    run_id = (
+        client.post(
+            f"/api/projects/{project_id}/workflow/prd-parse",
+            json={"text": SAMPLE, "module": "座舱"},
+        ).json()["data"]["run_id"]
+    )
+
+    designed = client.post(
+        f"/api/projects/{project_id}/workflow/case-design",
+        json={"run_id": run_id, "types": ["功能"]},
+    ).json()
+    assert designed["ok"] is True
+    case_total = designed["data"]["case_total"]
+    assert case_total == 2
+
+    listed = client.get(f"/api/projects/{project_id}/cases").json()
+    assert listed["total"] == case_total
+    first = listed["cases"][0]
+    assert first["module"] == "座舱"
+    assert first["type"] == "功能"
+    assert "→ 预期" in first["steps"]
+
+    # 同一个标题重新设计只更新、不新增（module + title 幂等）
+    client.post(
+        f"/api/projects/{project_id}/workflow/case-design",
+        json={"run_id": run_id, "types": ["功能"]},
+    )
+    assert client.get(f"/api/projects/{project_id}/cases").json()["total"] == case_total
+
+    client.post(f"/api/projects/{project_id}/workflow/script-author", json={"run_id": run_id})
+    conn = sqlite3.connect(server.get_project_db(project_id))
+    linked = [row[0] for row in conn.execute("SELECT case_id FROM scripts").fetchall()]
+    case_ids = {row[0] for row in conn.execute("SELECT id FROM test_cases").fetchall()}
+    conn.close()
+    assert linked, "script-author 应该落下脚本"
+    assert all(case_id in case_ids for case_id in linked), linked

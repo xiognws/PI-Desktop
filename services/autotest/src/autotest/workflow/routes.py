@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 import threading
@@ -31,6 +32,79 @@ router = APIRouter(prefix="/api/projects/{project_id}/workflow", tags=["workflow
 # pytest 的 "E   assert 1 <= 30" 与 "ValueError: xxx" 两种最可读的失败行。
 _PYTEST_ERROR_LINE = re.compile(r"^E\s+(.+)$", re.MULTILINE)
 _EXCEPTION_LINE = re.compile(r"^([A-Za-z_][\w.]*(?:Error|Exception))(?::\s*(.*))?$")
+
+
+def _cases_steps_text(case: dict) -> str:
+    """Flatten a designed case's steps into the single text column the table keeps."""
+    steps = case.get("steps") or []
+    expected = case.get("expected") or []
+    lines: list[str] = []
+    for index, step in enumerate(steps, start=1):
+        line = f"{index}. {step}"
+        if index - 1 < len(expected):
+            line += f" → 预期：{expected[index - 1]}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _persist_designed_cases(conn: sqlite3.Connection, module: str, cases: list[dict]) -> dict[str, str]:
+    """把设计出来的用例写进项目 test_cases，返回「标题 → 用例 id」。
+
+    幂等口径是 (module_id, title)：同一个标题重新设计时更新内容而不是再插一条，
+    这样反复跑 case-design 不会让用例页翻倍。返回值给 script_author 用来把
+    scripts.case_id 指向真实用例 id（早先存的是标题，关联只能靠字符串匹配）。
+
+    复用调用方已持有的连接：这里再开一条连接到同一个项目库会直接撞上
+    「database is locked」（路由在 _project_conn 里已经持有写事务）。
+    """
+    ids: dict[str, str] = {}
+    for case in cases:
+        title = str(case.get("title") or "").strip()
+        if not title:
+            continue
+        row = conn.execute(
+            "SELECT id FROM test_cases WHERE title = ? AND COALESCE(module_id, '') = ?",
+            (title, module),
+        ).fetchone()
+        steps_text = _cases_steps_text(case)
+        expected_text = "\n".join(str(item) for item in (case.get("expected") or []))
+        if row is not None:
+            case_id = str(row["id"] if isinstance(row, sqlite3.Row) else row[0])
+            conn.execute(
+                "UPDATE test_cases SET precondition = ?, steps = ?, expected = ?,"
+                " case_type = ?, priority = ?, module_id = ?, updated_at = CURRENT_TIMESTAMP"
+                " WHERE id = ?",
+                (
+                    str(case.get("precondition") or ""),
+                    steps_text,
+                    expected_text,
+                    str(case.get("case_type") or "正向"),
+                    str(case.get("priority") or "中"),
+                    module,
+                    case_id,
+                ),
+            )
+        else:
+            case_id = f"case_{uuid.uuid4().hex[:8]}"
+            function_point = str(case.get("function_point") or "").replace('"', "")
+            conn.execute(
+                "INSERT INTO test_cases (id, module_id, title, precondition, steps, expected,"
+                " case_type, priority, status, tags, favorite)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, '未执行', ?, 0)",
+                (
+                    case_id,
+                    module,
+                    title,
+                    str(case.get("precondition") or ""),
+                    steps_text,
+                    expected_text,
+                    str(case.get("case_type") or "正向"),
+                    str(case.get("priority") or "中"),
+                    json.dumps([function_point] if function_point else [], ensure_ascii=False),
+                ),
+            )
+        ids[title] = case_id
+    return ids
 
 
 def _failure_reason(text: str, fallback: str) -> str:
@@ -216,6 +290,11 @@ def prd_parse(project_id: str, body: PrdParseIn) -> dict:
 
 @router.post("/case-design")
 def case_design(project_id: str, body: CaseDesignIn) -> dict:
+    server = _server()
+    # 项目库由 init_project_db 建（含 test_cases）。库不存在就先建，否则下面把
+    # 设计结果落进用例表时会撞上缺表；已存在的库不动。
+    if not server.get_project_db(project_id).exists():
+        server.init_project_db(project_id)
     with _project_conn(project_id) as conn:
         run = store.get_run(conn, body.run_id)
         if run is None:
@@ -224,6 +303,10 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         if not prd_result:
             raise HTTPException(status_code=409, detail="还没有 PRD 解析结果，先调用 prd-parse")
         result = case_service.design_cases(prd_result, body.types, body.template)
+        # 设计的用例要落进项目的 test_cases：用例页、执行状态回写、脚本关联都读那张
+        # 表。只把它留在 workflow_steps 的 payload 里，界面上就永远是「0 条用例」。
+        case_ids = _persist_designed_cases(conn, str(run.get("module") or ""), result["cases"])
+        result["case_ids"] = case_ids
         store.append_step(
             conn,
             body.run_id,
@@ -358,6 +441,11 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         if not cases:
             raise HTTPException(status_code=409, detail="还没有用例，先调用 case-design")
 
+        # case-design 落库后回传「标题 → 用例 id」：脚本的 case_id 优先指向真实
+        # 用例 id，老数据（case_id 存的是标题）继续按标题兼容。
+        designed_payload = store.last_payload(conn, body.run_id, "autotest_case_design") or {}
+        case_ids: dict[str, str] = designed_payload.get("case_ids") or {}
+
         scripts_dir = (server.WORKSPACE / project_id / "scripts").resolve()
         scripts_dir.mkdir(parents=True, exist_ok=True)
         authored = script_service.author_scripts(cases, body.sdk)
@@ -369,7 +457,14 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             filepath.write_text(item["content"], encoding="utf-8")
             conn.execute(
                 "INSERT INTO scripts (id, case_id, name, language, status, filepath) VALUES (?, ?, ?, ?, ?, ?)",
-                (script_id, item["case_ref"]["title"], item["name"], item["language"], "就绪", str(filepath)),
+                (
+                    script_id,
+                    case_ids.get(str(item["case_ref"]["title"]), item["case_ref"]["title"]),
+                    item["name"],
+                    item["language"],
+                    "就绪",
+                    str(filepath),
+                ),
             )
             created.append(
                 {
