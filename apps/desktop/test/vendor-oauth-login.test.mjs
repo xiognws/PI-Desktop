@@ -24,6 +24,14 @@ import {
 } from "../electron/main/oauth.ts";
 
 /**
+ * An ID the catalog does not know still gets a runnable shape. These tests
+ * assert that shape for live-only models, so take it from the code instead of
+ * repeating its numbers — the fallback moved from 8k to 32k output tokens when
+ * capabilities became one source of truth.
+ */
+const GENERIC = genericModelConfig("unknown-model");
+
+/**
  * A host-core stand-in: the provider table plus the encrypted secret store,
  * reduced to the RPCs the OAuth module is allowed to call.
  */
@@ -276,15 +284,15 @@ test("a completed login stores the credential and configures the row", async () 
   assert.deepEqual(row.models, [
     {
       id: "claude-opus-5",
-      contextWindow: 128_000,
-      maxTokens: 8_192,
+      contextWindow: GENERIC.contextWindow,
+      maxTokens: GENERIC.maxTokens,
       thinkingLevels: ["off"],
       defaultThinkingLevel: "off",
     },
     {
       id: "claude-haiku-5",
-      contextWindow: 128_000,
-      maxTokens: 8_192,
+      contextWindow: GENERIC.contextWindow,
+      maxTokens: GENERIC.maxTokens,
       thinkingLevels: ["off"],
       defaultThinkingLevel: "off",
     },
@@ -1056,7 +1064,7 @@ test("live account metadata never inherits a sibling model record", async () => 
   const binding = await oauth.bindingFor(done.providerId, "grok-4.7");
   assert.equal(binding.modelConfig.source, "generic");
   assert.equal(binding.modelConfig.contextWindow, 128_000);
-  assert.equal(binding.modelConfig.maxTokens, 8_192);
+  assert.equal(binding.modelConfig.maxTokens, GENERIC.maxTokens);
   assert.deepEqual(binding.supportedThinkingLevels, ["off"]);
 });
 
@@ -1117,7 +1125,7 @@ test("a live-only Claude model does not inherit Pi metadata from its sibling", a
   assert.equal(binding.modelConfig.compat, undefined);
   assert.equal(binding.modelConfig.thinkingLevelMap, undefined);
   assert.equal(binding.modelConfig.contextWindow, 128_000);
-  assert.equal(binding.modelConfig.maxTokens, 8_192);
+  assert.equal(binding.modelConfig.maxTokens, GENERIC.maxTokens);
 });
 
 test("live-only reasoning models do not inherit a sibling effort map", async () => {
@@ -1225,7 +1233,7 @@ test("legacy thinking siblings do not define an unknown model's thinking metadat
   });
   assert.equal(binding.modelConfig.source, "generic");
   assert.equal(binding.modelConfig.contextWindow, 128_000);
-  assert.equal(binding.modelConfig.maxTokens, 8_192);
+  assert.equal(binding.modelConfig.maxTokens, GENERIC.maxTokens);
   assert.notEqual(binding.modelConfig.compat?.forceAdaptiveThinking, true);
   assert.equal(binding.modelConfig.thinkingLevelMap, undefined);
   assert.deepEqual(binding.supportedThinkingLevels, ["off"]);
@@ -1242,7 +1250,7 @@ test("live-only models do not inherit thinking restrictions from a sibling", asy
     const effective = modelConfigWithBinding(binding.modelConfig);
     assert.equal(binding.modelConfig.thinkingLevelMap, undefined);
     assert.equal(effective.contextWindow, 128_000);
-    assert.equal(effective.maxTokens, 8_192);
+    assert.equal(effective.maxTokens, GENERIC.maxTokens);
   }
 });
 
