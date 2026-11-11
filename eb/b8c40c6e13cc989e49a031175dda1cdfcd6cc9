@@ -1,0 +1,38 @@
+apps/desktop/src/features/app/AppShell.tsx
+  h_201ed4c689ac8b 28,34-39,41-46,48-53,55-60,62-67,71,77
+apps/desktop/src/features/app/chrome.tsx
+  h_201ed4c689ac8b 27-38
+apps/desktop/src/lib/lazy-retry.ts
+  h_201ed4c689ac8b 1-57
+apps/desktop/test/lazy-retry.test.mjs
+  h_201ed4c689ac8b 1-42
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 190-191
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 189
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 190-191
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 190-191
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 190-191
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 190-191
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 191
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 191
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ebb8c40c6e13cc989e49a031175dda1cdfcd6cc9",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
