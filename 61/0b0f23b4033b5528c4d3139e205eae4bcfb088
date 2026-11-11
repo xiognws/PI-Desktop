@@ -1,0 +1,14 @@
+apps/desktop/test/vendor-oauth-login.test.mjs
+  h_201ed4c689ac8b 26-33,287-288,294-295,1067,1128,1236,1253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "610b0f23b4033b5528c4d3139e205eae4bcfb088",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
