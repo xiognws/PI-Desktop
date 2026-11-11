@@ -421,3 +421,4 @@ Each ADR includes:
 | 0390 | [A learning map drawn from the two stores](0390-learning-map-from-two-stores.md) | Accepted |
 | 0391 | [The two writers are declared, not deferred](0391-writers-are-declared-not-deferred.md) | Accepted (amends ADR 0048) |
 | 0392 | [A procedure lives in the skill, and memory says so](0392-procedure-lives-in-the-skill.md) | Accepted (amends ADR 0391) |
+| 0393 | [The structured memory table is the store; the flat list retires](0393-structured-memory-is-the-store.md) | Accepted (supersedes ADR 0378) |
