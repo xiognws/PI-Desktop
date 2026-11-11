@@ -1,0 +1,18 @@
+crates/host-core/src/memory_entries.rs
+  h_201ed4c689ac8b 28-32,165-170,240-287,290-309
+crates/host-core/src/memory_entries/tests_migrate.rs
+  h_201ed4c689ac8b 1-148
+crates/host-core/src/state.rs
+  h_201ed4c689ac8b 131-134,136-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "072ddecb14c3f6e8be2fb8b2a708eef7154ae158",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
