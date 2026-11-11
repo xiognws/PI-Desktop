@@ -16,7 +16,6 @@ import type { McpControlServer } from "../mcp-control";
 import type { McpOAuthManager } from "../mcp-oauth";
 import { getActiveRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
 import { runConfirmedQuitTeardown } from "./confirmed-quit";
-import type { LiveCallService } from "../live-voice/call-service";
 import { clearRunMarker } from "../run-marker.js";
 
 const QUIT_TURN_SETTLE_BUDGET_MS = 2_000;
@@ -54,7 +53,6 @@ export type ShutdownDependencies = {
   logger: Pick<Logger, "app">;
   confirmQuitDialog: () => Promise<boolean>;
   disposePowerSaveBlockers: () => void;
-  liveCallService?: Pick<LiveCallService, "endForLifecycle">;
   disposeSystemProxyRelay?: () => Promise<void>;
 };
 
@@ -80,7 +78,6 @@ export function registerShutdownHandlers({
   logger,
   confirmQuitDialog,
   disposePowerSaveBlockers,
-  liveCallService,
   disposeSystemProxyRelay,
 }: ShutdownDependencies): void {
   let quitConfirmationPending = false;
@@ -163,7 +160,6 @@ export function registerShutdownHandlers({
       state.toggleWindowAccelerator = null;
     }
     state.shutdownPromise = (async () => {
-      await liveCallService?.endForLifecycle("app-quit");
       // Close every paired remote host before the local host-core so any
       // in-flight remote turn's abort still goes over a live socket. Bounded
       // parallelism inside `closeAll`; safe to run before local disposals.

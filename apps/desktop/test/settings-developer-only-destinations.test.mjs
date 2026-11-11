@@ -30,13 +30,6 @@ const composerToolbar = readFileSync(
   "utf8",
 );
 
-const liveVoiceSettings = readFileSync(
-  new URL(
-    "../src/features/settings/voice/LiveVoiceSettings.tsx",
-    import.meta.url,
-  ),
-  "utf8",
-);
 const settingsPrimitives = readFileSync(
   new URL("../src/features/settings/primitives.tsx", import.meta.url),
   "utf8",
@@ -45,31 +38,32 @@ const settingsPrimitives = readFileSync(
 const identity = (key) => key;
 const developerOnlyIds = SETTINGS_NAV.filter(entry => entry.developerOnly === true).map(entry => entry.id);
 
-test("Live Voice is reachable in every build without developer mode", () => {
+test("Live Voice is gone from the settings index", () => {
+  assert.equal(SETTINGS_NAV.some((entry) => entry.id === "voice"), false);
+  assert.equal(
+    SETTINGS_NAV.some((entry) =>
+      entry.keywordKeys.some((key) => key.startsWith("liveVoice.")),
+    ),
+    false,
+  );
   for (const developerMode of [false, true]) {
     for (const includeDevelopmentOnly of [false, true]) {
-      assert.ok(visibleSettingsNav(developerMode, includeDevelopmentOnly)
-        .some((entry) => entry.id === "voice"));
-      assert.equal(isSettingsDestinationHidden("voice", developerMode, includeDevelopmentOnly), false);
+      const options = { developerMode, includeDevelopmentOnly };
+      assert.equal(
+        visibleSettingsNav(developerMode, includeDevelopmentOnly)
+          .some((entry) => entry.id === "voice"),
+        false,
+      );
+      assert.equal(isSettingsDestinationHidden("voice", developerMode, includeDevelopmentOnly), true);
       for (const query of [
         "liveVoice.title",
         "liveVoice.enable",
         "liveVoice.provider",
-        "liveVoice.adapters.codex-live.title",
-        "liveVoice.adapters.gemini-live.title",
-        "liveVoice.adapters.openai-realtime.title",
       ]) {
-        assert.ok(searchSettings(query, identity, { developerMode, includeDevelopmentOnly })
-          .some((hit) => hit.tab === "voice"));
+        assert.deepEqual(searchSettings(query, identity, options), []);
       }
     }
   }
-  // Voice is a regular Preferences destination now: no Experimental badge on
-  // the rail row or the page title.
-  assert.equal(
-    SETTINGS_NAV.find((entry) => entry.id === "voice")?.experimentalBadgeKey,
-    undefined,
-  );
 });
 
 test("Cloud sync and Remote Hosts are gone from the settings index", () => {
@@ -139,20 +133,10 @@ test("settings routes, global search, and composer use build visibility", () => 
   assert.match(settingsPage, /isSettingsDestinationHidden\([\s\S]*includeDevelopmentOnly/);
   assert.match(settingsPage, /setSettingsTab\("general"\)/);
   assert.match(searchDialog, /includeDevelopmentOnly: import\.meta\.env\.DEV/);
-  assert.match(composer, /useVoiceInput/);
-  assert.doesNotMatch(composer, /VoiceOverlay|voiceEnabled/);
-  assert.match(composerToolbar, /<LiveVoiceControls\b/);
-  assert.doesNotMatch(composerToolbar, /VoiceMicButton|voicePhase|onVoiceToggle|onVoiceCancel/);
-});
-
-test("Live Voice keeps its Model configuration link on the card heading", () => {
-  // The link belongs to the enable card's heading line, not to a floating
-  // control inside the row stack.
-  assert.match(settingsPrimitives, /settings-card-heading-with-action/);
-  assert.match(settingsPrimitives, /action\?: ReactNode/);
-  assert.match(
-    liveVoiceSettings,
-    /action=\{[\s\S]*className="settings-text-action"[\s\S]*settings\.configuration/,
+  // The composer has no voice affordance left (ADR 0387).
+  assert.doesNotMatch(composer, /useVoiceInput|VoiceOverlay|voiceEnabled|VoiceMicButton/);
+  assert.doesNotMatch(
+    composerToolbar,
+    /LiveVoiceControls|VoiceMicButton|voicePhase|onVoiceToggle|onVoiceCancel/,
   );
-  assert.doesNotMatch(liveVoiceSettings, /live-voice-actions/);
 });

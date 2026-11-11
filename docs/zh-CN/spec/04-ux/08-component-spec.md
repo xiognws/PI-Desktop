@@ -2305,8 +2305,8 @@ Live Voice 受现有开发者模式和开发构建门控约束，包含四种展
   仅当弹窗没有先消费按键时，启动取消快捷键才生效；Escape 不会结束已连接的通话。
 
 有关所有权、权限和按通话隔离的工作约定，请参见
-[Live Voice](../03-runtime/live-voice.md) 和
-[Live Work](../03-runtime/live-work-session.md)；这些约定保持不变。
+Live Voice 和
+Live Work；这些约定保持不变。
 
 ### 11.8 斜线命令、@ 文件引用和剪贴板文件（D123–D125、D197、D209、D262、D362、ADR 0024、ADR 0059、ADR 0070、ADR 0131）
 

@@ -113,19 +113,13 @@ const networkProxySource = await readFile(
   new URL("../src/components/settings/NetworkProxySection.tsx", import.meta.url),
   "utf8",
 );
-const voiceSettingsSource = await readFile(
-  new URL("../src/features/settings/voice/VoiceSettingsSection.tsx", import.meta.url),
-  "utf8",
-);
 
 test("Basics and AI tabs expose their respective app and AI controls", () => {
   const generalStart = settingsPageSource.indexOf('{tab === "general" && settings && (');
   const aiStart = settingsPageSource.indexOf('{tab === "ai" && settings && (');
-  const voiceStart = settingsPageSource.indexOf(
-    '{tab === "voice" && !tabHidden && settings && (',
-  );
+  const shortcutsStart = settingsPageSource.indexOf('{tab === "shortcuts" && settings && (');
   const generalSource = settingsPageSource.slice(generalStart, aiStart);
-  const aiSource = settingsPageSource.slice(aiStart, voiceStart);
+  const aiSource = settingsPageSource.slice(aiStart, shortcutsStart);
 
   assert.match(generalSource, /<ThemeRow /);
   assert.match(generalSource, /<LanguageRow /);
@@ -177,17 +171,13 @@ test("Basics and AI tabs expose their respective app and AI controls", () => {
   // The AI tab keeps the Settings picker control: a native <select> popup is
   // platform-drawn and cannot carry the shared menu surface or its check mark.
   assert.doesNotMatch(aiSource, /<select/);
-  // Voice owns a separate destination; the AI tab does not duplicate it.
+  // The voice feature is gone (ADR 0387): no destination, no speech IPC.
   assert.doesNotMatch(aiSource, /VoiceSettingsCard|VoiceSettingsSection|voice-settings/);
-  assert.match(settingsPageSource, /tab === "voice" && !tabHidden && settings && [\s\S]*?<VoiceSettingsSection/);
-  assert.match(voiceSettingsSource, /LiveVoiceSettings as VoiceSettingsSection/);
-  assert.doesNotMatch(voiceSettingsSource, /voiceIpc|voiceEnable|voiceMicrophone|voiceModel/);
-  assert.doesNotMatch(settingsSearchSource, /settings\.voiceEnable|settings\.voiceMicrophone|settings\.voiceModel/);
-  assert.match(settingsSearchSource, /liveVoice\.enable/);
-  assert.doesNotMatch(settingsSearchSource, /settings\.speech/);
+  assert.doesNotMatch(settingsPageSource, /tab === "voice"/);
+  assert.doesNotMatch(settingsSearchSource, /liveVoice\.|settings\.speech/);
   assert.doesNotMatch(stylesSource, /\.settings-speech/);
-  assert.doesNotMatch(enLocaleSource, /speechTitle:|speechVoicePlaceholder:/);
-  assert.match(protocolSource, /speechTranscribe: "pi-desktop\/speech\/transcribe"/);
+  assert.doesNotMatch(enLocaleSource, /speechTitle:|speechVoicePlaceholder:|liveVoice:/);
+  assert.doesNotMatch(protocolSource, /speechTranscribe|"pi-desktop\/speech\/transcribe"/);
 });
 
 test("language persists as part of shared app settings", () => {
@@ -529,15 +519,3 @@ test("native select menus keep readable theme colors across the app on Windows",
   );
 });
 
-test("Live Voice account cards show their options only after a provider is chosen", async () => {
-  const source = await readFile(
-    new URL("../src/features/settings/voice/LiveVoiceSettings.tsx", import.meta.url),
-    "utf8",
-  );
-  // A card with no provider account bound is the picker and nothing else: the
-  // model, voice, and protocol rows belong to a chosen binding instead of
-  // rendering as empty disabled controls.
-  assert.match(source, /\{current && adapter !== "codex-live" \? \(/);
-  assert.match(source, /\{current && adapter === "openai-realtime" \? \(/);
-  assert.doesNotMatch(source, /disabled=\{!current/);
-});

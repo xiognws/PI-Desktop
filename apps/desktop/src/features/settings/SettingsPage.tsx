@@ -29,7 +29,6 @@ import {
   IconServer,
   IconSliders,
   IconSparkles,
-  IconMic,
 } from "../../components/icons";
 import { Badge, Button, cx, SegmentedControl, SettingsToggle } from "../../components/ui";
 import { ModelConfigPage } from "../../components/settings/ModelConfigPage";
@@ -54,7 +53,6 @@ import { ProjectsPage } from "../../pages/ProjectsPage";
 import { AgentSkillsPage } from "../../components/settings/AgentSkillsPage";
 import { AgentMcpPage } from "../../components/settings/AgentMcpPage";
 import { AgentSubagentsPage } from "../../components/settings/AgentSubagentsPage";
-import { VoiceSettingsSection } from "./voice/VoiceSettingsSection";
 import { ComputerUseSettings } from "./computer-use/ComputerUseSettings";
 import {
   CommandShellRow,
@@ -247,7 +245,6 @@ export function SettingsPage() {
       subagents: <IconBot size={14} />,
       memory: <IconBrain size={14} />,
       projects: <IconArchive size={14} />,
-      voice: <IconMic size={14} />,
       about: <IconInfo size={14} />,
     };
     return navEntries.map((entry) => ({
@@ -631,14 +628,6 @@ export function SettingsPage() {
 
               <ComputerUseSettings t={t} settings={settings} saveSettings={saveSettings} />
             </div>
-          )}
-
-          {tab === "voice" && !tabHidden && settings && (
-            <VoiceSettingsSection
-              t={t}
-              settings={settings}
-              saveSettings={saveSettings}
-            />
           )}
 
           {tab === "shortcuts" && settings && (

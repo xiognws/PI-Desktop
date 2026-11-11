@@ -5,7 +5,7 @@
 - Deciders: Pi-Workspace core
 - Related: [ADR 0086](0086-macos-regular-activation-policy.md) ·
   [ADR 0275](0275-plugin-panel-floating-widget.md) ·
-  [03-runtime/live-voice](../spec/03-runtime/live-voice.md) ·
+  03-runtime/live-voice ·
   [03-runtime/01-ipc-protocol](../spec/03-runtime/01-ipc-protocol.md) ·
   [04-ux/08-component-spec](../spec/04-ux/08-component-spec.md)
 

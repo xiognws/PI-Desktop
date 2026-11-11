@@ -36,7 +36,6 @@ import { createFsConsentService } from "../plugin-fs-consent";
 import { pluginWorkspaceInfo, projectFolderPaths } from "../workspace-roots";
 import { createDesktopConsentService } from "../plugin-desktop-consent";
 import { PluginRuntime } from "../plugin-runtime";
-import { createSpeechService } from "./speech-service";
 import { PluginShortcutRegistry } from "../plugin-shortcut-registry";
 import { PluginWebSocketRegistry } from "../plugin-websocket";
 import { hostGlobalShortcutBindings } from "../bootstrap/launcher";
@@ -804,12 +803,6 @@ export function createPluginServices({
       composerSuggestion.clearPlugin(pluginId);
     },
   });
-  const speech = createSpeechService({
-    dataDir,
-    getHost,
-    plugins,
-    logger,
-  });
   return {
     plugins,
     userMcp,
@@ -823,6 +816,5 @@ export function createPluginServices({
     browserHost,
     pluginSession,
     composerSuggestion,
-    speech,
   };
 }

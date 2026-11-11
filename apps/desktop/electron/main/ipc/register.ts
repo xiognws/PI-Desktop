@@ -42,12 +42,7 @@ import { registerWindowIpc } from "./window-ipc";
 import { registerWorktreeIpc } from "./worktree-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
 import { registerComposerIpc } from "./composer-ipc";
-import { registerSpeechIpc } from "./speech-ipc";
-import { registerVoiceIpc } from "./voice-ipc";
-import { registerLiveVoiceIpc } from "./live-voice-ipc";
-import type { LiveCallService } from "../live-voice/call-service";
 import type { ComposerSuggestionAnswer } from "../services/composer-suggestion";
-import type { LiveVoiceWidget } from "../live-voice/widget-window";
 import type { IpcRegistrar } from "./types";
 import type { createTraySessions } from "../tray-sessions";
 import type { createTaskbarUnreadBadge } from "../taskbar-unread-badge";
@@ -84,8 +79,6 @@ export type RegisterIpcDependencies = {
   /** Host activation plus the inline-visualization switch, for runtime consumers. */
   runtimeDisabledBuiltinSkills: () => Promise<string[]>;
   completionNoticeTurns: Set<string>;
-  liveCallService?: LiveCallService;
-  liveVoiceWidget?: LiveVoiceWidget;
   restartForStorage: () => void;
   mcpOAuth?: McpOAuthManager;
   markLifecycleDialogRendererReady: (window: BrowserWindow) => boolean;
@@ -132,7 +125,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     logger,
     plugins,
     localApps,
-    speech,
     sessionCapabilityContext,
     enrichSession,
     acquireSessionOperation,
@@ -206,9 +198,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getPluginPanelTheme,
     isDeveloperMode,
     sendToRenderer,
-    voiceService,
-    liveCallService,
-    liveVoiceWidget,
   } = dependencies;
 
 
@@ -323,7 +312,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     applyKeepAwakeWhileRunning,
     applyUpdatePreference: (preference) => updater.setPreference(preference),
     resolveEffectiveCommandShell,
-    liveCallService,
   });
   registerConfigSyncIpc({
     registrar,
@@ -344,7 +332,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     listRuntimeProviders,
     enrichProviderList,
     bindingForModel,
-    onProviderInvalidated: (providerId) => liveCallService?.invalidateProvider(providerId),
   });
   registerJevIpc({ registrar, logger });
   registerComputerIpc({ registrar, getHost, publishGrant: publishComputerGrant });
@@ -547,15 +534,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getLocale: getUpdaterLocale,
     openPluginMarket,
   });
-  registerSpeechIpc({ registrar, speech });
-
-  if (voiceService) {
-    registerVoiceIpc({ registrar, voiceService });
-  }
-  if (liveCallService && liveVoiceWidget) {
-    registerLiveVoiceIpc({ registrar, service: liveCallService, getMainWindow, widget: liveVoiceWidget });
-  }
-
   registerRemoteHostIpc({ registrar });
 
   registerMarketIpc({

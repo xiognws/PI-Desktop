@@ -18,8 +18,8 @@ test("visualization frames get no permission from the default-session handlers",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
   t.after(() => server.close());
-  const { installLiveMicrophonePermissionHandlers, isGenUiPermissionRequester } = await server.ssrLoadModule(
-    "/electron/main/live-voice/microphone-permissions.ts",
+  const { installGenUiPermissionHandlers, isGenUiPermissionRequester } = await server.ssrLoadModule(
+    "/electron/main/gen-ui-permissions.ts",
   );
 
   const trustedUrl = "http://localhost:5173/";
@@ -31,13 +31,11 @@ test("visualization frames get no permission from the default-session handlers",
   };
   const window = { isDestroyed: () => false, webContents: contents };
   const handlers = {};
-  installLiveMicrophonePermissionHandlers({
+  installGenUiPermissionHandlers({
     targetSession: {
       setPermissionRequestHandler: (handler) => { handlers.request = handler; },
       setPermissionCheckHandler: (handler) => { handlers.check = handler; },
     },
-    getMainWindow: () => window,
-    hasReservation: () => true,
   });
   const request = (permission, details) => {
     let decision = null;
@@ -58,5 +56,7 @@ test("visualization frames get no permission from the default-session handlers",
   // Existing behavior for the app itself is unchanged.
   assert.equal(request("clipboard-sanitized-write", { requestingUrl: trustedUrl, isMainFrame: true }), true);
   assert.equal(handlers.check(contents, "clipboard-sanitized-write", "http://localhost:5173", {}), true);
+  // Media for the app itself is no longer gated by a call lease: the voice
+  // feature is gone (ADR 0387), so the platform default applies.
   assert.equal(request("media", { requestingUrl: trustedUrl, isMainFrame: true, mediaTypes: ["audio"] }), true);
 });

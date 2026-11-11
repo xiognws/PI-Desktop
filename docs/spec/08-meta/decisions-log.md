@@ -8556,3 +8556,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   (page union, route, entry button, trust and digest wiring, all nine locales),
   and `apps/desktop/test/tools-page.test.mjs` (entry button keys in every
   catalog). See ADR 0384 and spec 07-plugins/19.
+
+## 2026-11-10 — The voice feature is removed (ADR 0387)
+
+- Dictation, Live Voice and the host speech capability are deleted, not hidden:
+  `packages/voice-runtime`, `electron/main/live-voice/**`, the recorder and
+  speech services, `src/features/voice/**`, the Voice settings destination and
+  search entry, the `voiceToggle` / `voiceCancel` shortcuts, every `speech/*` and
+  `voice/**` IPC channel (invoke and event), `AppSettings.speech|liveVoice|voice`,
+  the `speech.registerAdapter` plugin API and permission, and the two native
+  dependencies disappear from the tree; `pnpm-lock.yaml` follows.
+- `VoiceOrigin` and the optional `voiceOrigin` payload field stay: host-core
+  already persists them and older rows must keep parsing. Nothing produces the
+  value any more.
+- Specs `03-runtime/20-speech.md`, `03-runtime/live-voice.md` and
+  `03-runtime/live-work-session.md` (plus zh-CN copies) are deleted; the IPC
+  tables, plugin API page, settings IA and E2E plan lose their voice sections.
+- Persisted `speech` / `liveVoice` / `voice` settings keys become inert: no
+  reader, no writer, no migration. See ADR 0387 for the alternatives considered
+  (hiding the entries was rejected: it keeps a native dependency and ~100 tests
+  alive for a surface nobody opens).

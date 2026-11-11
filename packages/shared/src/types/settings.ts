@@ -7,10 +7,8 @@ import type { ContextCompactionSettings } from "./sessions.js";
 import type { Mode } from "./common.js";
 import type { GlobalPermissionMode } from "./permissions.js";
 import type { PluginMarketSource } from "./plugins.js";
-import type { SpeechSettings } from "./speech.js";
 import type { ThinkingLevel } from "./models.js";
 import type { UpdatePreference } from "./platform.js";
-import type { LiveVoiceSettings } from "./live-voice.js";
 
 export type ThemePreference = "system" | "light" | "dark" | `plugin:${string}`;
 
@@ -68,10 +66,6 @@ export type AppSettings = {
   updatePreference?: UpdatePreference;
   /** Last manually announced release; kept local to avoid repeating notices. */
   lastNotifiedUpdateVersion?: string;
-  /** Host speech bindings. Absent means voice actions stay disabled. */
-  speech?: SpeechSettings;
-  /** App-owned real-time voice bindings; separate from local dictation. */
-  liveVoice?: LiveVoiceSettings;
   /** Granted native application control (ADR 0342); off and unbound by default. */
   computerUse?: import("../computer-use.js").ComputerUseSettings;
   defaultMode: Mode;
@@ -278,8 +272,6 @@ export type AppSettings = {
    * disabled, so a fresh install shows a clean sidebar until the user opts in.
    */
   sidebarSessionTime?: boolean;
-  /** Voice input settings (D-voice-runtime). */
-  voice?: VoiceInputSettings;
   /**
    * Opt-in radial context menu for the empty transcript background. Absent
    * keeps the vertical menu; see `RadialMenuPreferences` for the direction
@@ -290,18 +282,6 @@ export type AppSettings = {
 };
 
 export type ChineseVariant = "simplified" | "traditional-taiwan" | "traditional-hong-kong";
-
-export type VoiceInputSettings = {
-  enabled: boolean;
-  /** Microphone device ID; null means system default. */
-  deviceId: string | null;
-  /** Language codes for recognition, e.g. ["zh", "en"]. */
-  languages: string[];
-  /** Chinese output variant. */
-  chineseVariant: ChineseVariant;
-  /** Catalog model ID. Empty string means no model selected yet. */
-  modelId: string;
-};
 
 export type LinkOpenTarget = "workpanel" | "external";
 

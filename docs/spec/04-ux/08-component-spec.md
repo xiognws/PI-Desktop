@@ -3557,8 +3557,8 @@ has four presentation states:
   only acts when no popup has consumed the key; Escape never ends a connected
   call.
 
-See [Live Voice](../03-runtime/live-voice.md) and
-[Live Work](../03-runtime/live-work-session.md) for the unchanged ownership,
+See Live Voice and
+Live Work for the unchanged ownership,
 permission, and call-scoped work contracts.
 
 ### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, D262, D362, D397, ADR 0024, ADR 0059, ADR 0070, ADR 0131, ADR 0221, ADR 0222)

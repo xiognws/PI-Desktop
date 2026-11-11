@@ -21,7 +21,6 @@ import {
   IconStop,
   IconUndo2,
 } from "../../../components/icons";
-import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
 import { ComputerUseIndicator } from "../../computer-use/ComputerUseIndicator";
 import { ComposerModelPicker } from "./ComposerModelPicker";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
@@ -132,7 +131,6 @@ export function ComposerToolbar({
             <IconPlus size={15} aria-hidden="true" />
           </TooltipButton>
         </div>
-        {localToolsAllowed ? <LiveVoiceControls t={t} workSessionId={workSessionId} /> : null}
         {localToolsAllowed ? (
           <ComputerUseIndicator sessionId={workSessionId ?? null} abort={abort} />
         ) : null}

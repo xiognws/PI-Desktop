@@ -8,8 +8,8 @@
 - Related: [ADR 0170](0170-work-panel-browser-as-bundled-plugin.md) ·
   [ADR 0211](0211-plan-safe-plugin-actions.md) ·
   [ADR 0310](0310-local-permission-approvals-without-deadline.md) ·
-  [ADR 0313](0313-live-voice-default-session-target.md) ·
-  [ADR 0315](0315-live-voice-spoken-asktool-answers.md) ·
+  ADR 0313 ·
+  ADR 0315 ·
   [03-runtime/computer-use](../spec/03-runtime/computer-use.md) ·
   [03-runtime/03-tools-and-permissions](../spec/03-runtime/03-tools-and-permissions.md) ·
   [05-security/01-security](../spec/05-security/01-security.md)

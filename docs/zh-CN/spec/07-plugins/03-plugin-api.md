@@ -1229,7 +1229,7 @@ type PluginApiError = {
 |---|---|
 | `PLUGIN_INVALID_RESULT` | `onComposerTransform` 返回非字符串，或宿主收到的字符串按 JavaScript `length` 计算超过 100,000 个 UTF-16 码元。应返回不超过该长度的字符串。 |
 | `PLUGIN_TOOL_ABORTED` | 插件工具调用已取消、已结束、未知／已过期，或已不属于调用方插件进程。该调用中待完成及迟到的宿主请求会被拒绝。若中止原因为显式 Error，则可能保留其自身错误码。 |
-| `SPEECH_PROTOCOL_UNSUPPORTED` | `runSpeechAdapter` 找不到绑定协议对应的已注册适配器。适配器响应结构无效时使用 `INVALID_ARGUMENT`，文本／音频为空时使用 `PROVIDER_ERROR`。此码也见于[共享注册表](../03-runtime/08-error-codes.md)和[语音规格](../03-runtime/20-speech.md)。 |
+| `SPEECH_PROTOCOL_UNSUPPORTED` | `runSpeechAdapter` 找不到绑定协议对应的已注册适配器。适配器响应结构无效时使用 `INVALID_ARGUMENT`，文本／音频为空时使用 `PROVIDER_ERROR`。此码也见于[共享注册表](../03-runtime/08-error-codes.md)和语音规格。 |
 
 实现依据：`apps/desktop/electron/main/plugin-runtime.ts` 中的
 `MAX_COMPOSER_TRANSFORM_TEXT_LENGTH`、`runComposerTransform`、

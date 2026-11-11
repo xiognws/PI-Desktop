@@ -66,11 +66,6 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   lines are rendered. These are visual landmarks only, not a second navigation
   level.
   When search filters the directory, empty clusters and their headings disappear.
-- **Voice** is a regular Preferences destination between AI and Shortcuts,
-  present in every build with no Experimental badge and no developer-mode
-  requirement. Its rail row, page, search hits, and idle Composer entry are
-  available to all users.
-  It is the only place to enable Live Voice. See the Voice section below.
 - Loaded plugin Settings entries may appear only in a final **Extensions** group
   after all core groups. The host owns their ordering, search result, titlebar
   and fallback to General. The rail icon is the destination's host token
@@ -339,48 +334,16 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   Manual `/compact` remains available from the command palette for an idle
   session; the transcript shows where each compaction happened and the context
   usage inspector shows whether a checkpoint is installed.
-Speech bindings (`AppSettings.speech`) are **not a Settings surface** (ADR
-0291). The host keeps the speech capability and the `speech/*` IPC for plugins
-and for bindings that are already stored, but nothing here picks a
-transcription or speech provider, protocol, model, or voice, and search indexes
-no speech keys.
+The voice feature (dictation, Live Voice and the host speech capability) is
+removed from the product (ADR 0387), so there is no Voice destination, no
+`speech/*` IPC and no speech bindings to configure. Persisted `speech` /
+`liveVoice` / `voice` keys are inert.
 
 Token usage is **not a Settings destination** (D335 / ADR 0173). Completed-turn
 history stays host-owned (`session.endTurn.usage`, `stats.getTokenUsageHistory`).
 The user-facing dashboard is marketplace plugin `pi.token-insights`, opened from
 the command palette (`usage`, `tokens`, `用量`). Settings search does not index
 a usage tab.
-
-### Voice
-
-- This destination owns Live Voice enablement and provider bindings, and is
-  reachable in every build without developer mode. Its enable card keeps the
-  explanation behind the heading's help mark and the Model configuration link
-  on the card's heading line, so no control floats between the rows. Disabled
-  Live Voice has no Composer voice or work icon; enabling it reveals one
-  preparation entry, never auto-starts a call, and never grants work access.
-- Bind an existing compatible provider account, choose the exact next-call
-  binding, and configure its model, voice, and explicit Realtime profile where
-  applicable. An account card with nothing bound shows only its picker: the
-  next-call, model, voice, and profile rows appear with the binding instead of
-  rendering as empty disabled controls. Readiness describes that selected
-  binding, not whether any other configured provider is ready. Credentials
-  remain in the existing Host/Main systems and are not shown or copied into the
-  renderer.
-- Provider-binding edits remain locked while that binding is active. Turning
-  Live Voice off ends the call, but the global compact call bar remains visible
-  through Main termination and renderer media cleanup, including while Settings
-  replaces the chat shell. An unconfirmed release keeps its error visible and
-  suppresses another Start until the app is restarted.
-- Work authorization belongs to an explicit opt-in and target in next-call
-  preparation, not to the Settings enable switch. Context sharing is a separate
-  unchecked, transient next-call choice. Settings copy distinguishes the
-  default voice-only call from explicitly authorized work requests.
-- Legacy Dictation and Host Speech settings remain hidden and their stored
-  values retain their meaning. No new persisted preference, IPC, provider
-  fallback, or permission rule is introduced. See
-  [Live Voice](../03-runtime/live-voice.md) and
-  [Live Work](../03-runtime/live-work-session.md).
 
 ### Shortcuts (`shortcuts` tab)
 - **Keyboard shortcuts** card:
