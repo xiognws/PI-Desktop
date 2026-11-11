@@ -54,6 +54,8 @@ export type ShutdownDependencies = {
   confirmQuitDialog: () => Promise<boolean>;
   disposePowerSaveBlockers: () => void;
   disposeSystemProxyRelay?: () => Promise<void>;
+  /** Close any optional local model-entry gateway this process opened. */
+  disposeLocalModelEntries?: () => Promise<void>;
 };
 
 /** Register the last-window and before-quit resource lifecycle handlers. */
@@ -79,6 +81,7 @@ export function registerShutdownHandlers({
   confirmQuitDialog,
   disposePowerSaveBlockers,
   disposeSystemProxyRelay,
+  disposeLocalModelEntries,
 }: ShutdownDependencies): void {
   let quitConfirmationPending = false;
   app.on("window-all-closed", () => {
@@ -235,6 +238,7 @@ export function registerShutdownHandlers({
         remoteHostsShutdown,
       ]);
       await disposeSystemProxyRelay?.();
+      await disposeLocalModelEntries?.();
     })();
 
     const releaseQuit = () => {

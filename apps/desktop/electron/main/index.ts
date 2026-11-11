@@ -68,9 +68,8 @@ import { createEventPersistence } from "./runtime/event-persistence";
 import { catalogs, resolveLocale } from "@pi-workspace/i18n";
 import { createPlanRuntime } from "./runtime/plans";
 import { createRuntimeLifecycle } from "./runtime/lifecycle";
-import {
-  createProviderCatalogRuntime,
-} from "./runtime/provider-catalog";
+import { createProviderCatalogRuntime } from "./runtime/provider-catalog";
+import { createWorkBuddyService } from "./workbuddy/service";
 import { createSessionLaunchRuntime } from "./runtime/session-launch";
 import { createSessionCoordination } from "./runtime/session-coordination";
 import { createScheduledRuntime } from "./runtime/scheduled";
@@ -364,6 +363,28 @@ const providerCatalogRuntime = createProviderCatalogRuntime({
   getHost,
   modelsDevCatalog,
 });
+/**
+ * Optional local model entries (WorkBuddy today). The entry is discovered from
+ * the machine, served by a loopback gateway owned by this process, and
+ * registered as an ordinary provider row — see `electron/main/workbuddy/`.
+ * A machine without the local app produces no row and no error.
+ */
+const localModelEntries = createWorkBuddyService({
+  getHost: () => {
+    const host = getHost();
+    if (!host) return null;
+    return { call: (method, params) => host.call(method, params) };
+  },
+  log: (event) => logger.app("runtime", "info", "local model entry", { data: JSON.stringify(event) }),
+});
+/**
+ * The capture rig and the headless boot probe must not read the developer's real
+ * WorkBuddy profile or open a listener, so the entry stays off there.
+ */
+const localModelEntriesEnabled =
+  process.env.PI_DESKTOP_CAPTURE !== "1" &&
+  process.env.PI_DESKTOP_BOOT_PROBE !== "1" &&
+  process.env.PI_DESKTOP_DISABLE_LOCAL_ENTRIES !== "1";
 const {
   bindingForModel,
   effectiveSubagentModelConfig,
@@ -1080,6 +1101,12 @@ registerApplicationStartup({
   ensureWindow,
   bootHostStatus,
   flushPendingApplicationMenuCommands,
+  startLocalModelEntries: () => {
+    if (!localModelEntriesEnabled) return;
+    void localModelEntries.start().catch((error: unknown) => {
+      logger.app("runtime", "warn", "local model entry failed", { data: String(error) });
+    });
+  },
   invokeSessionCollaboration: sessionCollaboration.invoke,
   onSessionQueueChange: () => {
     void sessionCollaboration.drain().catch((error: unknown) => {
@@ -1110,6 +1137,7 @@ registerShutdownHandlers({
   confirmQuitDialog,
   disposePowerSaveBlockers,
   disposeSystemProxyRelay,
+  disposeLocalModelEntries: () => localModelEntries.dispose(),
 });
 
 registerApplicationActivation({

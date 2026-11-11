@@ -123,6 +123,12 @@ export type StartupDependencies = {
   ensureWindow: () => Promise<boolean>;
   bootHostStatus: (bootError: unknown) => unknown;
   flushPendingApplicationMenuCommands: () => void;
+  /**
+   * Start optional local model entries (a desktop app's own models exposed as a
+   * provider). Called once the first window exists; it must never block boot or
+   * throw, because a machine without the local app has nothing to start.
+   */
+  startLocalModelEntries?: () => void;
   getSidecar?: () => unknown;
   invokeSessionCollaboration?: (input: McpControlInvokeInput) => Promise<unknown>;
   onSessionQueueChange?: () => void;
@@ -417,6 +423,10 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       }
     }
     await ensureWindow();
+    // Optional local model entries (WorkBuddy today). Detection, the loopback
+    // gateway and the provider row all run off the boot path: a slow or missing
+    // local app must not delay the first window.
+    deps.startLocalModelEntries?.();
     if (process.env.PI_DESKTOP_MCP_CONTROL === "1") {
       try {
         state.mcpControl = new McpControlServer({

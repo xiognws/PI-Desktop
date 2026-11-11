@@ -421,3 +421,4 @@ Each ADR includes:
 | 0390 | [A learning map drawn from the two stores](0390-learning-map-from-two-stores.md) | Accepted |
 | 0391 | [The two writers are declared, not deferred](0391-writers-are-declared-not-deferred.md) | Accepted (amends ADR 0048) |
 | 0392 | [A procedure lives in the skill, and memory says so](0392-procedure-lives-in-the-skill.md) | Accepted (amends ADR 0391) |
+| 0393 | [A desktop app's own models are a local entry, not a plugin](0393-local-desktop-model-entries.md) | Accepted |

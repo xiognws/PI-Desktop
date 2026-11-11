@@ -818,3 +818,44 @@ exact origins and paths, never display names or model substrings.
 The resolved adapter remains authoritative for search extraction and replay.
 Unknown connection formats are described as not integrated by this app rather
 than unsupported by the vendor. See the provider configuration specification.
+
+
+## 21. Local desktop model entries
+
+A desktop AI app installed on the same machine can contribute its own models as
+an ordinary provider (ADR 0393). WorkBuddy (Tencent CodeBuddy) is the first, and
+the contract is written so that a second app is a new source module rather than a
+second mechanism.
+
+```text
+detect (local files, no secrets)
+  → loopback gateway (127.0.0.1, ephemeral port, owned by Electron main)
+  → provider row (vendorKey = source id) with the account's model bindings
+  → Settings list / model picker / session bindings (unchanged surfaces)
+```
+
+Rules:
+
+1. **Optional by construction.** A machine without the app produces no provider
+   row and no error. A row whose app was uninstalled is switched off
+   (`enabled = false`), not deleted, so its stored key survives a reinstall.
+2. **Detection reads no credentials.** Installed/signed-in come from the app's
+   plaintext account fields and session expiry; the model list comes from its
+   cached catalog. A sealed token envelope is never parsed, and nothing about it
+   is logged.
+3. **The gateway is the only place vendor quirks live.** It serves
+   `GET /v1/models` and `POST /v1/chat/completions` on loopback, always streams
+   upstream, splits a system prompt beyond the vendor's ceiling into a system
+   head plus a user reference message, and walks a fixed request-shape ladder on
+   the vendor's channel-check refusal. The model transport stays vendor-agnostic.
+4. **`/v1/models` needs no credential; chat does.** Chat accepts the provider row's
+   API key as the vendor access token and forwards it per request. The gateway
+   stores, caches, and logs no credential, and the row shows the ordinary
+   "needs an API key" state until one is saved.
+5. **The row is stable and self-healing.** It is found by `vendorKey` on later
+   launches; an unchanged launch writes nothing. Discovery runs per
+   `/v1/models` request, so a catalog the account gains later appears on the next
+   picker refresh without a restart.
+6. **Lifecycle is owned.** The listener binds loopback only, and the shutdown
+   sequence closes it. Capture and headless boot probes disable the entry so a
+   developer's real desktop profile is never read.
