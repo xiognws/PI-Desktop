@@ -25,6 +25,11 @@ use anyhow::{anyhow, Result};
 use rusqlite::params;
 
 use crate::db::{now_ms, Database};
+use crate::memory::{MemoryKind, MemoryScope, MemorySource, NewMemory};
+
+/// Longest title the import derives from an entry's first line. Titles exist so
+/// the memory page and a retrieval hit can name a row; a paragraph is a body.
+const MAX_IMPORT_TITLE_CHARS: usize = 80;
 
 /// Separates entries in the stored document. Mirrors `ENTRY_DELIMITER` in
 /// `@pi-workspace/agent-runtime`.
@@ -157,6 +162,12 @@ impl Database {
     /// else to `memory`. A row that would blow the character budget is left
     /// behind rather than truncated, and is retried on the next launch after the
     /// agent frees space. Copied rows are stamped, so this runs once per row.
+    ///
+    /// ADR 0393 reversed the direction: the structured store is now the store and
+    /// this list retires, so nothing calls this any more. It stays for one release
+    /// so a database written by a newer build still opens here without its list
+    /// being rewritten from half-migrated rows.
+    #[allow(dead_code)]
     pub fn migrate_legacy_memories(&self) -> Result<usize> {
         let now = now_ms() as i64;
         let conn = self.conn();
@@ -226,8 +237,76 @@ impl Database {
         }
         Ok(migrated.len())
     }
+
+    /// Import the retiring flat list into the structured store (ADR 0393).
+    ///
+    /// The list held what the agent had to say and `memories` held nothing, so
+    /// this is the direction migration now runs: every entry becomes one memory,
+    /// with the target deciding its kind (`user` describes the person, so
+    /// `preference`; `memory` is the agent's own notes, so `fact`).
+    ///
+    /// Rows are never deleted or rewritten: the list stays readable for one
+    /// release, and a wrong migration costs nothing because the text is still
+    /// there. `content_hash` makes the import idempotent — a second launch finds
+    /// each memory live and identical, and reports it as deduped rather than
+    /// inserted. One bad entry (an oversized body, say) is logged and skipped;
+    /// aborting would strand every later entry behind it.
+    ///
+    /// Returns how many memories were newly inserted.
+    pub fn migrate_entries_into_memories(&self) -> Result<usize> {
+        let mut inserted = 0usize;
+        for target in [MemoryTarget::User, MemoryTarget::Memory] {
+            let kind = match target {
+                MemoryTarget::User => MemoryKind::Preference,
+                MemoryTarget::Memory => MemoryKind::Fact,
+            };
+            for entry in self.memory_entries(target)? {
+                let text = entry.trim();
+                if text.is_empty() {
+                    continue;
+                }
+                let mut input = NewMemory::new(
+                    MemoryScope::Global,
+                    kind,
+                    import_title(text),
+                    text.to_string(),
+                );
+                input.source = MemorySource::Import;
+                match self.remember(input) {
+                    Ok(outcome) if !outcome.deduped => inserted += 1,
+                    Ok(_) => {}
+                    Err(error) => tracing::warn!(
+                        %error,
+                        target = target.as_str(),
+                        "could not import a memory entry"
+                    ),
+                }
+            }
+        }
+        Ok(inserted)
+    }
 }
 
+/// Title derived from an entry: its first line, or the beginning of the entry
+/// when the first line is blank. Clipped by characters, not bytes, so a Chinese
+/// title is not cut mid-character.
+fn import_title(entry: &str) -> String {
+    let first_line = entry.lines().next().unwrap_or("").trim();
+    let source = if first_line.is_empty() {
+        entry.trim()
+    } else {
+        first_line
+    };
+    source
+        .chars()
+        .take(MAX_IMPORT_TITLE_CHARS)
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests_migrate;
 #[cfg(test)]
 mod tests {
     use super::*;
