@@ -858,6 +858,44 @@ async def list_executions(project_id: str):
     return {"executions": executions}
 
 
+@app.get("/api/projects/{project_id}/cases/{case_id}/executions")
+async def list_case_executions(project_id: str, case_id: str, limit: int = 20):
+    """一条用例的历次执行结果（用例详情抽屉用）。
+
+    `execution_cases` 只记「脚本带 case_id 的执行」，所以这里为空不代表用例没跑过
+    —— 早期骨架脚本的 case_id 是脚本自己的 id，那些执行不会出现在这张表里。
+    """
+    require_project(project_id)
+    db_path = get_project_db(project_id)
+    if not db_path.exists():
+        init_project_db(project_id)
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT ec.execution_id, ec.result, ec.duration_ms, ec.error_message, "
+        "       e.name, e.status, e.started_at, e.finished_at "
+        "FROM execution_cases ec JOIN executions e ON e.id = ec.execution_id "
+        "WHERE ec.case_id = ? ORDER BY e.started_at DESC, ec.execution_id DESC LIMIT ?",
+        (case_id, max(1, min(limit, 100))),
+    ).fetchall()
+    passed = conn.execute(
+        "SELECT COUNT(*) FROM execution_cases WHERE case_id = ? AND result = '通过'",
+        (case_id,),
+    ).fetchone()[0]
+    total = conn.execute(
+        "SELECT COUNT(*) FROM execution_cases WHERE case_id = ?", (case_id,)
+    ).fetchone()[0]
+    conn.close()
+
+    return {
+        "case_id": case_id,
+        "total": total,
+        "passed": passed,
+        "history": [dict(row) for row in rows],
+    }
+
+
 # ====== 测试报告 ======
 @app.get("/api/projects/{project_id}/reports")
 async def list_reports(project_id: str):

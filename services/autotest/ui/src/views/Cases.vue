@@ -350,10 +350,36 @@ function toggleSelect(id: number) {
 const drawerOpen = ref(false)
 const selectedCase = ref<any>(null)
 
+// 这条用例的历次执行。`execution_cases` 只记「脚本带 case_id 的执行」，所以空
+// 列表不一定代表没跑过 —— 文案要说清楚，否则会被当成数据丢了。
+const caseHistory = ref<any[]>([])
+const caseHistoryStats = ref<{ total: number; passed: number } | null>(null)
+const historyLoading = ref(false)
+
+async function loadCaseHistory(caseId: string | number) {
+  historyLoading.value = true
+  try {
+    const res = await fetch(`/api/projects/${projectId}/cases/${caseId}/executions?limit=10`)
+    if (!res.ok) throw new Error(`${res.status}`)
+    const data = await res.json()
+    caseHistory.value = data.history || []
+    caseHistoryStats.value = { total: data.total ?? 0, passed: data.passed ?? 0 }
+  } catch (e) {
+    caseHistory.value = []
+    caseHistoryStats.value = null
+    console.error('获取用例执行历史失败', e)
+  } finally {
+    historyLoading.value = false
+  }
+}
+
 async function openDetail(c: any) {
   // 先显示列表里的基本信息
   selectedCase.value = { ...c }
   drawerOpen.value = true
+  caseHistory.value = []
+  caseHistoryStats.value = null
+  void loadCaseHistory(c.id)
 
   // 然后从后端获取完整详情
   try {
@@ -363,6 +389,18 @@ async function openDetail(c: any) {
   } catch (e) {
     console.error('获取用例详情失败', e)
   }
+}
+
+function resultClass(result: string) {
+  if (result === '通过') return 'bg-green-50 text-green-600'
+  if (result === '失败' || result === '错误') return 'bg-red-50 text-red-600'
+  if (result === '已跳过') return 'bg-gray-100 text-gray-500'
+  return 'bg-yellow-50 text-yellow-600'
+}
+
+function openExecution(executionId: number) {
+  drawerOpen.value = false
+  router.push(`/project/${projectId}/executions/${executionId}`)
 }
 
 const reviewStatusMap: Record<string, { label: string; class: string }> = {
@@ -749,6 +787,35 @@ watch(viewMode, (val) => {
               <div v-if="!scriptsForCase(selectedCase).length" class="text-sm text-gray-400">
                 还没有脚本。让 Agent 跑一次 script-author，或在「脚本」页新建。
               </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-900 mb-2">
+              执行历史
+              <span v-if="caseHistoryStats" class="text-xs text-gray-400 font-normal">
+                {{ caseHistoryStats.passed }}/{{ caseHistoryStats.total }} 通过
+              </span>
+            </h4>
+            <div v-if="historyLoading" class="text-sm text-gray-400">加载中…</div>
+            <div v-else-if="caseHistory.length" class="space-y-1">
+              <button
+                v-for="h in caseHistory"
+                :key="`${h.execution_id}-${h.started_at}`"
+                class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50"
+                @click="openExecution(h.execution_id)"
+              >
+                <span class="text-xs px-2 py-0.5 rounded flex-shrink-0" :class="resultClass(h.result)">{{ h.result }}</span>
+                <span class="flex-1 text-sm text-gray-800 truncate">{{ h.name }}</span>
+                <span v-if="h.duration_ms != null" class="text-xs text-gray-400 flex-shrink-0">{{ Math.round(h.duration_ms) }} ms</span>
+                <span class="text-xs text-gray-400 flex-shrink-0">{{ h.started_at }}</span>
+              </button>
+              <p v-for="h in caseHistory.filter(x => x.error_message)" :key="`err-${h.execution_id}`" class="ml-3 text-xs text-red-600 truncate">
+                #{{ h.execution_id }}: {{ h.error_message }}
+              </p>
+            </div>
+            <div v-else class="text-sm text-gray-400">
+              还没有可关联的执行记录（只有带用例 id 的脚本执行会记在这里）。
             </div>
           </div>
 
