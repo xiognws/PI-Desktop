@@ -1914,6 +1914,9 @@ export function isolatedWorkspaceGuidance(): string {
   ].join(" ");
 }
 
+/** How long a cached skill body is trusted while comparing memory writes. */
+const SKILL_BODY_CACHE_MS = 30_000;
+
 export class DesktopAgentRuntime {
   private agent: Agent;
   private models: Models;
@@ -1955,6 +1958,17 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private pluginSkills: PluginSkillDef[];
+
+  /**
+   * Skill bodies for the memory/duplicate check, cached per session.
+   *
+   * The catalogue line alone cannot tell whether a dictated procedure is already
+   * documented — measured, a Chinese four-step procedure and its English
+   * one-line description shared exactly one token, and a real duplicate was
+   * written to memory. The body carries the same paths in the same language.
+   * A skill edited during the session is re-read after `SKILL_BODY_CACHE_MS`.
+   */
+  private skillBodies = new Map<string, { body: string; at: number }>();
   private trustedExtensionSpecs: TrustedExtensionSpec[];
   /** Resolves the widget tools at call time (D691); empty when none. */
   private widgetTools: () => AgentTool[];
@@ -2639,12 +2653,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         ? []
         : [
             createMemoryTool(this.host, {
-              skills: () =>
-                this.pluginSkills.map((skill) => ({
-                  id: skill.id,
-                  name: skill.name,
-                  description: skill.description,
-                })),
+              skills: () => this.skillCatalogueForOverlap(),
             }),
           ]),
       // The same gap one layer down: `memory` is deferred, so the fork only had it
@@ -2901,6 +2910,34 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       projectPath: this.projectPath,
       sessionId: this.sessionId,
     });
+  }
+
+  /** The catalogue the memory tool compares against, with documents when readable. */
+  private async skillCatalogueForOverlap(): Promise<
+    { id: string; name?: string; description?: string; body?: string }[]
+  > {
+    const now = Date.now();
+    const out: { id: string; name?: string; description?: string; body?: string }[] = [];
+    for (const skill of this.pluginSkills) {
+      const cached = this.skillBodies.get(skill.id);
+      if (cached && now - cached.at < SKILL_BODY_CACHE_MS) {
+        out.push({ id: skill.id, name: skill.name, description: skill.description, body: cached.body });
+        continue;
+      }
+      let body = "";
+      try {
+        const read = await this.host.call<{ body?: string | null }>("skills.read", { id: skill.id });
+        body = read?.body ?? "";
+      } catch {
+        // Built-in and plugin skills have no user-library document; their
+        // description is all there is, and an unreadable skill must never block
+        // a memory write.
+        body = "";
+      }
+      this.skillBodies.set(skill.id, { body, at: now });
+      out.push({ id: skill.id, name: skill.name, description: skill.description, body });
+    }
+    return out;
   }
 
   private composeSystemPrompt(): string {

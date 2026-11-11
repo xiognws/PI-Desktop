@@ -34,7 +34,7 @@ import {
 } from "./memory-store.js";
 import { scrubSecretsInBatch } from "@pi-workspace/shared";
 
-import { duplicateOfSkill, type SkillSummary } from "./memory-skill-overlap.js";
+import { procedureNeedingASkill, type SkillSummary } from "./memory-skill-overlap.js";
 
 /** Appended to a result whose content had a credential masked out of it. */
 const MEMORY_SCRUB_NOTE =
@@ -283,8 +283,11 @@ export type MemoryToolHost = Pick<RuntimeHost, "call">;
  */
 /** What the memory tool needs to know about the library it shares a lesson with. */
 export type MemoryToolOptions = {
-  /** The skill catalogue, read at write time rather than at construction. */
-  skills?: () => readonly SkillSummary[];
+  /**
+   * The skill catalogue, read at write time rather than at construction — and it
+   * may need to read skill documents, so it is allowed to be async.
+   */
+  skills?: () => readonly SkillSummary[] | Promise<readonly SkillSummary[]>;
 };
 
 export function createMemoryTool(host: MemoryToolHost, options: MemoryToolOptions = {}): AgentTool {
@@ -376,25 +379,30 @@ export function createMemoryTool(host: MemoryToolHost, options: MemoryToolOption
       // One lesson, one place. The prompt says a procedure belongs in the skill;
       // measured, the same four-step procedure still landed in the library *and*
       // in memory, because the main turn and the review fork do not see each
-      // other's writes. Refusing here is the only place both are visible.
-      const skills = options.skills?.() ?? [];
-      if (skills.length > 0) {
-        for (const store of stores) {
-          const current = currentByStore.get(store) ?? [];
-          const duplicate = duplicateOfSkill(entriesByStore.get(store) ?? [], current, skills);
-          if (duplicate) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `Not saved: that is the same procedure skill \`${duplicate.skillId}\` already carries. A procedure lives in the skill and nowhere else — patch that skill (\`skill_manage\` action \`patch\`, or add a \`references/\` file) and keep memory for facts, preferences and one-line quirks. If this really is a fact rather than the procedure, state it as the fact alone.`,
-                },
-              ],
-              details: { errorCode: "MEMORY_COVERED_BY_SKILL", skillId: duplicate.skillId },
-              isError: true,
-            };
-          }
-        }
+      // other's writes. Refusing here is the only place both are visible, and the
+      // check is the shape of the sentence — steps or a fact — because a library
+      // line of English cannot be compared against a dictated Chinese procedure.
+      const skills = (await options.skills?.()) ?? [];
+      for (const store of stores) {
+        const current = currentByStore.get(store) ?? [];
+        const procedure = procedureNeedingASkill(entriesByStore.get(store) ?? [], current, skills);
+        if (!procedure) continue;
+        const where = procedure.skillId
+          ? `skill \`${procedure.skillId}\` covers this class of task`
+          : "it belongs in a skill";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Not saved: this is a procedure (steps), not a fact — ${where}. Write it with \`skill_manage\` (action \`create\`, or \`patch\` the skill above and add a \`references/\` file), and keep memory for facts, preferences and one-line quirks. If what you actually learned is a single fact, state the fact alone and it will be stored.`,
+            },
+          ],
+          details: {
+            errorCode: "MEMORY_PROCEDURE_NEEDS_SKILL",
+            ...(procedure.skillId ? { skillId: procedure.skillId } : {}),
+          },
+          isError: true,
+        };
       }
       const masked = [...scrubbed.values()].some((entry) => entry.masked);
       try {

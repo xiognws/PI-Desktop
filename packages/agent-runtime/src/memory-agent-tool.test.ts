@@ -161,7 +161,7 @@ function runWithSkills(
     });
 }
 
-describe("memory refuses what a skill already carries", () => {
+describe("memory refuses a procedure and points at the skill", () => {
   const skill = {
     id: "add-desktop-ipc-channel",
     name: "Add a Desktop IPC Channel",
@@ -188,7 +188,7 @@ describe("memory refuses what a skill already carries", () => {
       [skill],
     );
     expect(isError).toBe(true);
-    expect(details?.errorCode).toBe("MEMORY_COVERED_BY_SKILL");
+    expect(details?.errorCode).toBe("MEMORY_PROCEDURE_NEEDS_SKILL");
     expect(text).toContain("add-desktop-ipc-channel");
     // Nothing was written.
     expect(host.state.entries).toEqual([]);

@@ -4,6 +4,7 @@ import {
   coveredBySkill,
   duplicateOfSkill,
   looksLikeProcedure,
+  procedureNeedingASkill,
   topicTokens,
 } from "./memory-skill-overlap.js";
 
@@ -44,6 +45,26 @@ describe("coveredBySkill", () => {
     expect(coveredBySkill("这台机器上 electron 二进制在 D:\\Code 下的 dist 目录", [ipcSkill])).toBeUndefined();
   });
 
+  it("catches a Chinese procedure against an English skill document", () => {
+    // The case that escaped in a live session: the catalogue line is one sentence
+    // of English, the dictated procedure is Chinese and full of paths, and the
+    // one-line description shares exactly one token with it.
+    const body = [
+      "Fixed four-step procedure for wiring a new Electron IPC channel end to end.",
+      "1. Register the channel name in packages/shared/src/protocol.ts.",
+      "2. Add the handler under electron/main/ipc.",
+      "3. Wrap the call in src/lib/api.ts.",
+      "4. Add a node --test case.",
+    ].join("\n");
+    const entry =
+      "桌面端加 IPC 通道四步：1. protocol.ts 注册 → 2. ipc handler 写法 → 3. api 封装 → 4. 补测试";
+    expect(coveredBySkill(entry, [{ id: "add-desktop-ipc-channel", description: "Use when adding IPC.", body }])?.skillId).toBe(
+      "add-desktop-ipc-channel",
+    );
+    // The description alone cannot see it: that is why the body is read.
+    expect(coveredBySkill(entry, [{ id: "add-desktop-ipc-channel", description: "Use when adding IPC." }])).toBeUndefined();
+  });
+
   it("ignores a procedure that no skill covers", () => {
     const entry = "1. 先跑 git fetch → 2. 再 rebase → 3. 最后 push";
     expect(coveredBySkill(entry, [ipcSkill])).toBeUndefined();
@@ -60,6 +81,36 @@ describe("duplicateOfSkill", () => {
     expect(duplicateOfSkill([stored, added], [stored], [ipcSkill])?.skillId).toBe(
       "add-desktop-ipc-channel",
     );
+  });
+});
+
+describe("procedureNeedingASkill", () => {
+  const npmSkill = {
+    id: "add-npm-script",
+    description: "Use when asked to add or modify an npm script in a project's package.json.",
+    body: "Adds a new entry to the scripts block of a project's package.json, then verifies it runs.",
+  };
+
+  it("refuses a procedure even when no skill matches its words", () => {
+    // The gate is the sentence type: this procedure belongs in a skill whether or
+    // not one exists yet, and the lexical comparison is what failed twice live.
+    const entry =
+      "给某个包加 npm 脚本的做法：1. 打开那个包的 package.json → 2. 在 scripts 里加一条 → 3. 从根目录用 pnpm 跑一次确认能执行";
+    const hit = procedureNeedingASkill([entry], [], [npmSkill]);
+    expect(hit).toBeDefined();
+    expect(hit?.skillId).toBe("add-npm-script");
+  });
+
+  it("names no skill when the library has nothing close", () => {
+    const entry = "发布流程：1. 先 fetch → 2. 再 rebase → 3. 最后 push";
+    const hit = procedureNeedingASkill([entry], [], []);
+    expect(hit).toBeDefined();
+    expect(hit?.skillId).toBeUndefined();
+  });
+
+  it("never re-judges an entry that is already stored", () => {
+    const stored = "1. protocol.ts → 2. ipc handler → 3. api.ts 封装";
+    expect(procedureNeedingASkill([stored], [stored], [npmSkill])).toBeUndefined();
   });
 });
 
