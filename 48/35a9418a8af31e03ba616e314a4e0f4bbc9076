@@ -1,0 +1,54 @@
+apps/desktop/electron.vite.config.ts
+  h_201ed4c689ac8b 93-94
+apps/desktop/electron/autotest/context.ts
+  h_201ed4c689ac8b 1-22
+apps/desktop/electron/autotest/window.ts
+  h_201ed4c689ac8b 60-61,65,77-78,83,106,108
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 64,101,1075-1091,1111-1112
+apps/desktop/electron/preload/autotest.ts
+  h_201ed4c689ac8b 1-22
+apps/desktop/electron/test/autotest-context.test.mjs
+  h_201ed4c689ac8b 1-59
+apps/desktop/src/features/app/useAppShellRuntime.tsx
+  h_201ed4c689ac8b 20,691-699,997
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 2219-2229
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 319,344-365
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 640-641
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 655-656
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 640-641
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 640-641
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 652-653
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 642-643
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 652-653
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 645-646
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 645-646
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 512-517,521-522
+services/autotest/ui/src/types/autotest-host.d.ts
+  h_201ed4c689ac8b 1-13
+services/autotest/ui/src/views/Knowledge.vue
+  h_201ed4c689ac8b 133-167,231-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4835a9418a8af31e03ba616e314a4e0f4bbc9076",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
