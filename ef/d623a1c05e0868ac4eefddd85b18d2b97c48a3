@@ -1,0 +1,24 @@
+apps/desktop/src/features/chat/transcript/SkillReviewRow.tsx
+  h_201ed4c689ac8b 4,32-35,38-48,51
+apps/desktop/src/features/chat/transcript/skill-review-text.ts
+  h_201ed4c689ac8b 59-77
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 3943-3966
+apps/desktop/test/skill-review-row-render.test.mjs
+  h_201ed4c689ac8b 69,74-77
+packages/agent-runtime/src/plugin-skills-prompt.test.ts
+  h_201ed4c689ac8b 85-102
+packages/agent-runtime/src/plugin-skills-prompt.ts
+  h_201ed4c689ac8b 24-33,35-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "efd623a1c05e0868ac4eefddd85b18d2b97c48a3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
