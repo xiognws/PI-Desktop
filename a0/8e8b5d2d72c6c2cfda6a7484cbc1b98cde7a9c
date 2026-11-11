@@ -1,0 +1,18 @@
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 10,37-109,293-297,306-309,444-448,460-467
+services/autotest/tests/test_workflow_scripts.py
+  h_201ed4c689ac8b 139-179
+services/autotest/ui/src/views/Cases.vue
+  h_201ed4c689ac8b 2-3,29,143-162,167-191,374-419,500-502,530-540,567,588-602,630,708,722,724,727,730-751
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a08e8b5d2d72c6c2cfda6a7484cbc1b98cde7a9c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
