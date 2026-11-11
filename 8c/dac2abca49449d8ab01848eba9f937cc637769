@@ -1,0 +1,22 @@
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 25,316-326
+apps/desktop/electron/main/ipc/settings-ipc.ts
+  h_201ed4c689ac8b 7,75-80
+apps/desktop/electron/main/window-preferences.ts
+  h_201ed4c689ac8b 68-113
+apps/desktop/test/startup-animation.test.mjs
+  h_201ed4c689ac8b 368
+docs/spec/02-architecture/03-repo-structure.md
+  h_201ed4c689ac8b 155-157,160-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8cdac2abca49449d8ab01848eba9f937cc637769",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
