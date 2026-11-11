@@ -87,6 +87,13 @@ const router = createRouter({
           name: 'Reports',
           component: () => import('@/views/Reports.vue'),
         },
+        {
+          // 这页只展示真实存在且真正生效的东西（平台运行时、MCP 清单、工作区路径），
+          // 不再有写死的假表单。
+          path: 'settings',
+          name: 'ProjectSettings',
+          component: () => import('@/views/Settings.vue'),
+        },
       ],
     },
     {

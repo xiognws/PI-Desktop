@@ -183,6 +183,7 @@ function backToHome() {
             { path: 'cases', name: '用例' },
             { path: 'scripts', name: '脚本' },
             { path: 'reports', name: '报告' },
+            { path: 'settings', name: '设置' },
           ]"
           :key="nav.path"
           :to="`/project/${projectId}/${nav.path}`"
