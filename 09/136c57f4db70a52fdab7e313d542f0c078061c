@@ -1,0 +1,32 @@
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 692-701
+apps/desktop/src/features/chat/transcript/ChatTranscript.tsx
+  h_201ed4c689ac8b 550-556
+docs/adr/0392-procedure-lives-in-the-skill.md
+  h_201ed4c689ac8b 1-77
+docs/adr/README.md
+  h_201ed4c689ac8b 423
+packages/agent-runtime/src/memory-agent-tool.test.ts
+  h_201ed4c689ac8b 141-208
+packages/agent-runtime/src/memory-agent-tool.ts
+  h_201ed4c689ac8b 37-38,58-59,284-290,376-398
+packages/agent-runtime/src/memory-skill-overlap.test.ts
+  h_201ed4c689ac8b 1-72
+packages/agent-runtime/src/memory-skill-overlap.ts
+  h_201ed4c689ac8b 1-117
+packages/agent-runtime/src/runtime.test.ts
+  h_201ed4c689ac8b 5-6,3873-3874,9629,9633-9636,12795-12797,12800,14560-14563
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 2640-2649
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "09136c57f4db70a52fdab7e313d542f0c078061c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
