@@ -1,0 +1,26 @@
+.gitignore
+  h_201ed4c689ac8b 61-62,66-67
+apps/desktop/package.json
+  h_201ed4c689ac8b 15
+apps/desktop/test/artifacts-page.test.mjs
+  h_201ed4c689ac8b 34,37
+apps/desktop/test/composer-deep-file-search-user-path.test.mjs
+  h_201ed4c689ac8b 265-266
+apps/desktop/test/jev-settings-user-path.test.mjs
+  h_201ed4c689ac8b 269-270
+apps/desktop/test/remote-host-registry.test.mjs
+  h_201ed4c689ac8b 43-44
+apps/desktop/test/update-cache.test.mjs
+  h_201ed4c689ac8b 29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "242a5c58468ea7a05fcc8c714e29f5993902cef3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
