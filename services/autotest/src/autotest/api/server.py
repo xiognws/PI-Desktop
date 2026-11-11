@@ -13,7 +13,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSock
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 import asyncio
 import json
@@ -1495,6 +1495,32 @@ async def lsp_websocket(websocket: WebSocket, project_id: str):
 app.include_router(workflow_router)
 # 知识库：文件导入 → 切分 → 落库（项目级，本地）。
 app.include_router(knowledge_router)
+
+
+@app.get("/api/projects/{project_id}/files")
+async def read_project_file(project_id: str, path: str):
+    """读项目目录内的文件（截图 / 日志 / 产物）。
+
+    RunEvent 的 artifact 带的是执行现场的绝对路径，执行详情要能直接预览截图，
+    所以这里按路径回读。安全口径是**必须落在本项目目录内**：绝对路径要满足包含
+    关系，相对路径以项目目录为根，越界一律 404，不做任何"规范化后再放行"。
+    """
+    require_project(project_id)
+    project_dir = (WORKSPACE / project_id).resolve()
+    raw = Path(path)
+    candidate = raw if raw.is_absolute() else (project_dir / raw)
+    try:
+        target = candidate.resolve(strict=True)
+    except OSError:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    root = project_dir
+    try:
+        target.relative_to(root)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return FileResponse(target)
 
 # 未匹配的 /api 路径一律 404 JSON（否则会落到静态文件挂载，返回 405/HTML）
 @app.api_route(

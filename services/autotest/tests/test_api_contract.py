@@ -338,3 +338,33 @@ def test_backend_restart_is_idempotent_when_the_port_is_listening(client, monkey
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "already-running"
     assert calls == []
+
+
+
+def test_project_file_endpoint_serves_inside_and_refuses_escape(client, tmp_path):
+    """执行详情要预览截图，所以按路径回读；越界必须 404，不能变成任意文件读。"""
+    project_id = client.post("/api/projects", json={"name": "S9", "type": "api"}).json()["id"]
+    project_dir = server.WORKSPACE / project_id
+    shots = project_dir / "executions" / "1"
+    shots.mkdir(parents=True, exist_ok=True)
+    image = shots / "shot.png"
+    image.write_bytes(bytes([0x89, 0x50, 0x4E, 0x47]))
+
+    absolute = client.get(f"/api/projects/{project_id}/files", params={"path": str(image)})
+    assert absolute.status_code == 200
+    assert absolute.content.startswith(bytes([0x89, 0x50, 0x4E, 0x47]))
+
+    relative = client.get(
+        f"/api/projects/{project_id}/files", params={"path": "executions/1/shot.png"}
+    )
+    assert relative.status_code == 200
+
+    outside = tmp_path / "secret.txt"
+    outside.write_text("nope", encoding="utf-8")
+    escaped = client.get(f"/api/projects/{project_id}/files", params={"path": str(outside)})
+    assert escaped.status_code == 404
+
+    traversal = client.get(
+        f"/api/projects/{project_id}/files", params={"path": "../../../etc/passwd"}
+    )
+    assert traversal.status_code == 404

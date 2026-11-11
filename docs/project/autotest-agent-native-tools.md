@@ -313,7 +313,7 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 |---|---|---|
 | 运行记录 `runs` | `GET …/workflow/runs`、`GET …/runs/{id}` | 阶段时间线、每步摘要、人工卡点批准/驳回；**「执行用例」**（`POST …/runs/{id}/execute`）与**「生成报告」**（`POST …/runs/{id}/report`）就在这一页，展开中的 run 每 5s 自动刷新 |
 | 执行 `executions` | `GET …/executions` | 列表 + 状态筛选（全部/执行中/已完成/失败）、有执行在跑时 4s 自动刷新、进度条、进入详情 |
-| 执行详情 `executions/:id` | `GET …/executions/{id}`、`…/events` | RunEvent 时间线、用例结果、产物/截图、**取消执行** |
+| 执行详情 `executions/:id` | `GET …/executions/{id}`、`…/events`、`GET …/files?path=` | RunEvent 时间线、按步骤折叠（通过的默认收起）、只看失败、日志里失败行高亮、产物缩略图（截图直读、其它可下载）、**取消执行**。`/files` 只放行本项目目录内的文件，越界一律 404 |
 | 缺陷 `bugs` | `GET …/workflow/bugs`、`PATCH …/bugs/{id}` | 跨 run 的缺陷单（`occurrences` 累计），人工流转 `open/fixed/verified/wontfix` |
 | 知识库 `knowledge` | `GET …/knowledge/documents`、`…/workflow/knowledge/search` | 批量导入（md/pdf/docx/html…）、切分预览、FTS5/BM25 检索 + 复制 |
 | 需求 `requirements` | `GET/POST …/requirements` | 上传 PRD 原文、读回正文 |
