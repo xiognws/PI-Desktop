@@ -2,9 +2,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { BarChart3, Download, TrendingUp, RefreshCw } from 'lucide-vue-next'
+import MarkdownBlock from '../components/MarkdownBlock.vue'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
+
+// 报告弹层两种看法：渲染后的 Markdown（默认）与原文。
+const reportView = ref<'rendered' | 'raw'>('rendered')
 
 // 报告由 workflow run 产出：跑过 report 步骤的 run 才有 markdown 可取。
 type RunRow = {
@@ -168,7 +172,23 @@ onMounted(loadRuns)
             <button class="text-gray-400 hover:text-gray-800" @click="opened = null">关闭</button>
           </div>
         </div>
-        <pre class="flex-1 overflow-auto p-4 text-xs leading-relaxed whitespace-pre-wrap text-gray-800">{{ opened.markdown }}</pre>
+        <div class="h-9 px-4 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
+          <button
+            class="text-xs px-2 py-0.5 rounded"
+            :class="reportView === 'rendered' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'"
+            @click="reportView = 'rendered'"
+          >阅读</button>
+          <button
+            class="text-xs px-2 py-0.5 rounded"
+            :class="reportView === 'raw' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'"
+            @click="reportView = 'raw'"
+          >原文</button>
+          <span class="ml-auto text-xs text-gray-400">Markdown</span>
+        </div>
+        <div class="flex-1 overflow-auto p-4">
+          <MarkdownBlock v-if="reportView === 'rendered'" :source="opened.markdown" />
+          <pre v-else class="text-xs leading-relaxed whitespace-pre-wrap text-gray-800">{{ opened.markdown }}</pre>
+        </div>
       </div>
     </div>
   </div>
