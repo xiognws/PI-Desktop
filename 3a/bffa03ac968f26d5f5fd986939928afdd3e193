@@ -1,0 +1,16 @@
+apps/desktop/test/settings-developer-only-destinations.test.mjs
+  h_201ed4c689ac8b 41-48,51-57,63,136-140
+apps/desktop/test/rpc-lifecycle-contract.test.mjs
+  h_201ed4c689ac8b 225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3abffa03ac968f26d5f5fd986939928afdd3e193",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
