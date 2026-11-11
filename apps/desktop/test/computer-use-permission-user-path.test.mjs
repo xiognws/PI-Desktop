@@ -63,7 +63,21 @@ const render = () => flushSync(() => rootNode.render(React.createElement(Compute
   t: i18n.t.bind(i18n), settings: { computerUse: { enabled: false } },
   saveSettings() { throw new Error("Requesting permission must not enable computer use or create a grant"); },
 })));
-const frame = () => new Promise(requestAnimationFrame);
+// A hidden window whose page is never composited can stop delivering animation
+// frames, and then every assertion below waits forever. The tick therefore takes
+// whichever comes first — the frame when there is one, a timer otherwise. What
+// the probe checks is state, not paint.
+const frame = () =>
+  new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    requestAnimationFrame(done);
+    setTimeout(done, 16);
+  });
 const settle = async () => { await frame(); await frame(); };
 function check(condition, message) { if (!condition) throw new Error(message); }
 async function until(predicate, message) {
