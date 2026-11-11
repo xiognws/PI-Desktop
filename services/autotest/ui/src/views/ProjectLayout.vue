@@ -18,12 +18,21 @@ const projectId = route.params.projectId as string
 const projectName = ref('加载中...')
 
 // 从后端获取项目信息
+const projectMissing = ref(false)
 async function loadProject() {
   try {
     const res = await fetch('/api/projects')
     const data = await res.json()
     const p = data.projects?.find((p: any) => p.id === projectId)
-    if (p) projectName.value = p.name
+    if (p) {
+      projectName.value = p.name
+      projectMissing.value = false
+    } else {
+      // 项目被删/换了数据目录后，旧链接的所有子页面都会 404：
+      // 直接告诉用户并给回首页的入口，比刷一屏「加载失败」有用。
+      projectMissing.value = true
+      projectName.value = '项目不存在'
+    }
   } catch (e) {
     projectName.value = '项目'
   }
@@ -164,6 +173,7 @@ function backToHome() {
       <nav class="flex items-center gap-1">
         <router-link
           v-for="nav in [
+            { path: 'overview', name: '概览' },
             { path: 'runs', name: '运行记录' },
             { path: 'executions', name: '执行' },
             { path: 'approvals', name: '待审批' },
@@ -280,7 +290,16 @@ function backToHome() {
 
       <!-- 中间主工作区（AI 对话由桌面端提供，这里不再内嵌） -->
       <main class="flex-1 flex flex-col overflow-hidden bg-gray-50">
-        <router-view />
+        <div v-if="projectMissing" class="flex-1 flex items-center justify-center">
+          <div class="text-center">
+            <p class="text-sm text-gray-700">这个项目（<span class="font-mono text-xs">{{ projectId }}</span>）当前数据目录里不存在。</p>
+            <p class="mt-1 text-xs text-gray-400">可能是换了数据目录，或者项目已被删除。</p>
+            <router-link to="/" class="mt-4 inline-block px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              返回项目列表
+            </router-link>
+          </div>
+        </div>
+        <router-view v-else />
       </main>
     </div>
 
