@@ -143,6 +143,89 @@ impl Database {
         tx.commit()?;
         Ok(cleaned)
     }
+
+    /// One-way migration of the retired scored store into the list the model reads.
+    ///
+    /// `memories` (ADR 0371) has had no writer since ADR 0380 moved the agent's
+    /// memory to this table — nothing in the app calls `memory.remember` any more —
+    /// so the rows left in it are whatever a past release recorded. Keeping them
+    /// behind a second, invisible store is what made the memory page look empty
+    /// while the agent had plenty to say.
+    ///
+    /// Only rows that are still live and not already migrated are read;
+    /// `kind = preference` describes the person and goes to `user`, everything
+    /// else to `memory`. A row that would blow the character budget is left
+    /// behind rather than truncated, and is retried on the next launch after the
+    /// agent frees space. Copied rows are stamped, so this runs once per row.
+    pub fn migrate_legacy_memories(&self) -> Result<usize> {
+        let now = now_ms() as i64;
+        let conn = self.conn();
+        let mut statement = conn.prepare(
+            "SELECT id, kind, title, body FROM memories
+             WHERE superseded_by IS NULL
+               AND (valid_until IS NULL OR valid_until > ?1)
+             ORDER BY created_at ASC",
+        )?;
+        let collected = statement
+            .query_map([now], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+        let rows: Vec<(String, String, String, String)> = collected;
+        if rows.is_empty() {
+            return Ok(0);
+        }
+
+        let mut user_entries = self.memory_entries(MemoryTarget::User)?;
+        let mut memory_entries = self.memory_entries(MemoryTarget::Memory)?;
+        let mut migrated: Vec<String> = Vec::new();
+
+        for (id, kind, title, body) in rows {
+            let target = if kind.eq_ignore_ascii_case("preference") {
+                MemoryTarget::User
+            } else {
+                MemoryTarget::Memory
+            };
+            let title = title.trim();
+            let body = body.trim();
+            let text = if !title.is_empty() && !body.is_empty() && title != body {
+                format!("{title}: {body}")
+            } else if !body.is_empty() {
+                body.to_string()
+            } else {
+                title.to_string()
+            };
+            let entries = match target {
+                MemoryTarget::User => &mut user_entries,
+                MemoryTarget::Memory => &mut memory_entries,
+            };
+            if text.is_empty() || entries.iter().any(|existing| existing.trim() == text) {
+                migrated.push(id);
+                continue;
+            }
+            let mut candidate = entries.clone();
+            candidate.push(text);
+            if char_count(&candidate) > target.char_limit() {
+                // No room yet: leave it pending so a later launch can take it.
+                continue;
+            }
+            *entries = candidate;
+            migrated.push(id);
+        }
+
+        self.write_memory_entries(MemoryTarget::User, &user_entries)?;
+        self.write_memory_entries(MemoryTarget::Memory, &memory_entries)?;
+        if !migrated.is_empty() {
+            let mut update = self
+                .conn()
+                .prepare("UPDATE memories SET superseded_by = 'memory_entries' WHERE id = ?1")?;
+            for id in &migrated {
+                update.execute([id])?;
+            }
+        }
+        Ok(migrated.len())
+    }
 }
 
 #[cfg(test)]
@@ -235,6 +318,64 @@ mod tests {
             .write_memory_entries(MemoryTarget::Memory, &["bad\u{0}entry".to_string()])
             .unwrap_err();
         assert!(error.to_string().contains("NUL"), "{error}");
+    }
+
+    #[test]
+    fn migrates_the_retired_store_into_the_entry_list_once() {
+        use crate::memory::{MemoryKind, MemoryScope, NewMemory};
+
+        let (_dir, db) = database();
+        db.remember(NewMemory::new(
+            MemoryScope::Global,
+            MemoryKind::Fact,
+            "Cache root",
+            "D:/PiWorkspace/cache holds the scratch files",
+        ))
+        .unwrap();
+        db.remember(NewMemory::new(
+            MemoryScope::Global,
+            MemoryKind::Preference,
+            "Replies",
+            "prefers terse Chinese replies",
+        ))
+        .unwrap();
+
+        assert_eq!(db.migrate_legacy_memories().unwrap(), 2);
+        assert_eq!(
+            db.memory_entries(MemoryTarget::Memory).unwrap(),
+            vec!["Cache root: D:/PiWorkspace/cache holds the scratch files".to_string()]
+        );
+        assert_eq!(
+            db.memory_entries(MemoryTarget::User).unwrap(),
+            vec!["Replies: prefers terse Chinese replies".to_string()]
+        );
+
+        // Stamped, so a second launch copies nothing.
+        assert_eq!(db.migrate_legacy_memories().unwrap(), 0);
+        assert_eq!(db.memory_entries(MemoryTarget::Memory).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_legacy_row_that_does_not_fit_stays_behind_for_a_later_launch() {
+        use crate::memory::{MemoryKind, MemoryScope, NewMemory};
+
+        let (_dir, db) = database();
+        let full = "x".repeat(MEMORY_CHAR_LIMIT - 20);
+        db.write_memory_entries(MemoryTarget::Memory, &[full])
+            .unwrap();
+        db.remember(NewMemory::new(
+            MemoryScope::Global,
+            MemoryKind::Fact,
+            "Too big",
+            "y".repeat(60),
+        ))
+        .unwrap();
+
+        assert_eq!(db.migrate_legacy_memories().unwrap(), 0);
+        // Still pending: nothing was stamped, so freeing space and launching
+        // again takes it.
+        db.write_memory_entries(MemoryTarget::Memory, &[]).unwrap();
+        assert_eq!(db.migrate_legacy_memories().unwrap(), 1);
     }
 }
 
