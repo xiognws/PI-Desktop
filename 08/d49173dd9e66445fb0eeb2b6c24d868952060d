@@ -1,0 +1,36 @@
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 180-193,310,312,314-322
+services/autotest/src/autotest/executors/python_native.py
+  h_201ed4c689ac8b 6-12,17,21,30-105,114,122,133-146,148,184-196,201,209-210,216,218
+services/autotest/src/autotest/executors/service.py
+  h_201ed4c689ac8b 125-128
+services/autotest/src/autotest/workflow/analysis.py
+  h_201ed4c689ac8b 53-65,109-116
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 10,31-57,632-633,641
+services/autotest/tests/test_executors.py
+  h_201ed4c689ac8b 385-474
+services/autotest/tests/test_workflow_execution.py
+  h_201ed4c689ac8b 172-174
+services/autotest/ui/src/router/index.ts
+  h_201ed4c689ac8b 33-43
+services/autotest/ui/src/views/Executions.vue
+  h_201ed4c689ac8b 2,4,10-52,65-66,68-69,73,75-77,81-96,98,108-122,127-128,131,138,143,153,157,161-162
+services/autotest/ui/src/views/ProjectLayout.vue
+  h_201ed4c689ac8b 168
+services/autotest/ui/src/views/Runs.vue
+  h_201ed4c689ac8b 2,142-221,277-299
+services/autotest/ui/src/views/Scripts.vue
+  h_201ed4c689ac8b 74-140,174,177-180,184-197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "08d49173dd9e66445fb0eeb2b6c24d868952060d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
