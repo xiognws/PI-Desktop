@@ -1,0 +1,22 @@
+packages/agent-runtime/src/memory-agent-tool.test.ts
+  h_201ed4c689ac8b 164,191
+packages/agent-runtime/src/memory-agent-tool.ts
+  h_201ed4c689ac8b 37,286-290,382-405
+packages/agent-runtime/src/memory-skill-overlap.test.ts
+  h_201ed4c689ac8b 7,48-67,87-116
+packages/agent-runtime/src/memory-skill-overlap.ts
+  h_201ed4c689ac8b 18-34,85-88,93,98-100,102-105,114,116-128,130-144,149
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 1917-1919,1961-1971,2656,2915-2942
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "09ac464c5e6ee88953d5fcde1c2321166d55de5b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
