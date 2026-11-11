@@ -300,6 +300,15 @@ export const en = {
     appHelp: "Pi-Workspace Help",
     openLogs: "Open Logs",
     checkForUpdates: "Check for Updates…",
+    autotestWorkbench: "Autotest Workbench",
+  },
+  autotest: {
+    unavailableTitle: "Autotest Workbench Unavailable",
+    unavailableMessage: "The local Autotest service is not ready (status: {status}).",
+    unavailableDetail:
+      "The backend did not answer /api/health. Retrying starts it again; if it still fails, the reason is written to the application log.",
+    retry: "Retry Start",
+    close: "Close",
   },
   updates: {
     title: "Updates",

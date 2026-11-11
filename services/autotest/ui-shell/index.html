@@ -1,0 +1,1214 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autotest 工作台</title>
+    <style>
+      :root {
+        --bg: #f3f6f9;
+        --surface: #ffffff;
+        --line: #e2e8ee;
+        --line-soft: #edf1f5;
+        --text: #172029;
+        --muted: #64707c;
+        --faint: #94a1ad;
+        --accent: #1789cf;
+        --accent-hover: #1274b2;
+        --accent-weak: #e5f2fb;
+        --good: #157347;
+        --warn: #9a5b08;
+        --warn-weak: #fbf3e7;
+        --bad: #b02a24;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
+        display: grid;
+        grid-template-rows: 56px 1fr;
+        height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+      header {
+        display: flex; align-items: center; gap: 10px; padding: 0 20px;
+        background: var(--surface); border-bottom: 1px solid var(--line);
+      }
+      header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .01em; }
+      .tabs { display: flex; gap: 2px; margin-left: 12px; }
+      .tab {
+        height: 30px; padding: 0 12px; border: 0; background: transparent;
+        color: var(--muted); font: inherit; font-size: 12.5px; border-radius: 5px;
+      }
+      .tab:hover { color: var(--text); background: #f1f5f9; }
+      .tab.on { color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+      .grow { flex: 1; }
+      .ctx-label { font-size: 11.5px; color: var(--muted); }
+      #projects {
+        height: 30px; min-width: 150px; max-width: 260px; padding: 0 8px;
+        border: 1px solid var(--line); border-radius: 5px;
+        background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px;
+      }
+      #projects:focus-visible { outline: 2px solid var(--accent-weak); border-color: var(--accent); }
+      .status { display: flex; align-items: center; gap: 6px; color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+      .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line); flex: none; }
+      .dot.ok { background: var(--good); }
+      .dot.bad { background: var(--bad); }
+      #health-text { white-space: nowrap; }
+      #origin {
+        color: var(--faint); font-size: 11px;
+        font-family: Consolas, ui-monospace, monospace;
+      }
+      .pages { min-height: 0; overflow: hidden; }
+      .page { height: 100%; min-height: 0; }
+      main.page {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr);
+        background: var(--surface);
+      }
+      .pane { display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
+      .pane-detail { overflow: hidden; }
+      .pane-runs { border-right: 1px solid var(--line); }
+      .sec-head {
+        flex: none;
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        height: 44px; padding: 0 16px; border-bottom: 1px solid var(--line);
+        font-size: 12.5px; font-weight: 600; color: var(--text); background: var(--surface);
+      }
+      .head-actions { display: flex; align-items: center; gap: 10px; font-weight: 400; }
+      .scope {
+        margin-left: 6px; font-size: 11.5px; font-weight: 400; color: var(--faint);
+      }
+      #detail-run { font-family: Consolas, ui-monospace, monospace; color: var(--faint); font-size: 11.5px; }
+      .list { min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+      .pane-runs .list { flex: 1 1 auto; }
+      .row {
+        display: block; width: 100%;
+        padding: 10px 16px; border: 0; border-bottom: 1px solid var(--line-soft);
+        border-left: 2px solid transparent; background: transparent;
+        color: var(--text); text-align: left; cursor: pointer;
+        font: inherit; font-size: 13px; line-height: 1.45;
+      }
+      .row:hover { background: #f6f9fb; }
+      .row.active { background: var(--accent-weak); border-left-color: var(--accent); }
+      .row .line { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .row-more {
+        display: block; width: 100%; height: 36px;
+        border: 0; border-bottom: 1px solid var(--line-soft);
+        background: var(--surface); color: var(--muted);
+        font: inherit; font-size: 12px; cursor: pointer;
+      }
+      .row-more:hover { background: #f1f5f9; }
+      .row .line > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+      .row .meta {
+        margin-top: 2px; color: var(--faint); font-size: 11px;
+        font-family: Consolas, ui-monospace, monospace;
+      }
+      button {
+        font: inherit; font-size: 12px; height: 30px; padding: 0 11px; cursor: pointer;
+        color: var(--text); background: var(--surface);
+        border: 1px solid var(--line); border-radius: 5px;
+      }
+      button:hover { background: #f1f5f9; }
+      button:active { background: #e7edf2; }
+      button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      button.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+      button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+      [hidden] { display: none !important; }
+      .detail { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 28px; }
+      .kv { display: grid; grid-template-columns: 68px 1fr; gap: 8px 16px; margin: 0 0 6px; font-size: 12.5px; }
+      .kv dt { color: var(--muted); }
+      .kv dd { margin: 0; min-width: 0; }
+      h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 24px 0 4px; letter-spacing: .02em; }
+      .steps { display: flex; flex-direction: column; }
+      .step {
+        display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline;
+        padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 12.5px;
+      }
+      .step .tool {
+        flex: 0 0 172px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-family: Consolas, ui-monospace, monospace; color: var(--accent);
+      }
+      .step .sum { color: var(--muted); flex: 1 1 120px; min-width: 0; }
+      .badge { font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+      .badge.waiting_human, .badge.warning { color: var(--warn); }
+      .badge.done, .badge.ok, .badge.pass { color: var(--good); }
+      .badge.failed, .badge.fail, .badge.error, .badge.blocker { color: var(--bad); }
+      .decision {
+        padding: 12px 14px; margin: 12px 0;
+        border-left: 3px solid var(--warn); background: var(--warn-weak);
+      }
+      .decision .prompt { margin-bottom: 10px; font-size: 12.5px; }
+      .decision .actions { display: flex; gap: 8px; }
+      .actions { display: flex; gap: 8px; align-items: center; }
+      .empty { padding: 16px 0; color: var(--muted); font-size: 12.5px; }
+
+      /* 缺陷页 */
+      .bugs-page {
+        display: flex; flex-direction: column; min-height: 0; background: var(--surface);
+      }
+      .bugs-head { padding: 0 24px; }
+      .bugs-filter { gap: 2px; font-weight: 400; }
+      .bugs-filter .tab { height: 28px; padding: 0 10px; font-size: 12px; }
+      .bugs-list { flex: 1; min-height: 0; overflow: auto; }
+      .bug-row {
+        display: flex; gap: 16px; align-items: flex-start;
+        padding: 12px 24px; border-bottom: 1px solid var(--line-soft);
+      }
+      .bug-row:hover { background: #f8fbfd; }
+      .bug-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+      .bug-title { font-size: 13px; font-weight: 500; color: var(--text); }
+      .bug-meta {
+        font-size: 11px; color: var(--faint);
+        font-family: Consolas, ui-monospace, monospace;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .bug-run {
+        height: auto; padding: 0; border: 0; background: none;
+        font: inherit; color: var(--accent); cursor: pointer;
+      }
+      .bug-run:hover { text-decoration: underline; }
+      .bug-detail {
+        display: flex; flex-direction: column; gap: 4px;
+        margin-top: 6px; padding: 8px 10px; background: #f7fafc;
+        border-left: 2px solid var(--accent-weak); font-size: 12px; color: var(--muted);
+        white-space: pre-wrap; word-break: break-word;
+      }
+      .bug-detail[hidden] { display: none; }
+      .bug-detail-line { display: flex; gap: 8px; line-height: 1.5; }
+      .bug-detail-line span { flex: none; width: 30px; color: var(--faint); }
+      .bug-side {
+        flex: none; display: flex; align-items: center; gap: 8px; padding-top: 1px;
+      }
+      .bug-side .badge { font-variant-numeric: tabular-nums; }
+      .bug-side button { height: 26px; padding: 0 9px; font-size: 11.5px; color: var(--muted); }
+
+      /* 知识库整页 */
+      .kb-page {
+        display: flex; flex-direction: column; min-height: 0; background: var(--surface);
+      }
+      .kb-search-bar {
+        flex: none; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        padding: 14px 24px; border-bottom: 1px solid var(--line);
+      }
+      .kb-body {
+        flex: 1; min-height: 0; overflow: auto; padding: 0 24px 24px;
+        display: flex; flex-direction: column;
+      }
+      .kb-block { display: flex; flex-direction: column; gap: 10px; padding: 18px 0; border-bottom: 1px solid var(--line-soft); }
+      .kb-block:last-child { border-bottom: 0; }
+      .block-head { display: flex; align-items: center; gap: 10px; }
+      .block-title { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+      .block-hint { font-size: 11.5px; color: var(--faint); }
+      .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .kb-page input {
+        height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px;
+        background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px;
+      }
+      .kb-page input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-weak); }
+      .kb-search { flex: 1 1 380px; min-width: 220px; }
+      .kb-module { width: 110px; }
+      .kb-tags { width: 160px; }
+      .kb-chunk { width: 92px; }
+      .status-line { font-size: 12px; color: var(--muted); }
+      .hits {
+        display: flex; flex-direction: column;
+        border-top: 1px solid var(--line-soft);
+      }
+      .hits > span { padding: 12px 2px; font-size: 12.5px; color: var(--muted); }
+      .kb-hit {
+        display: flex; align-items: flex-start; gap: 12px;
+        padding: 11px 2px; border-bottom: 1px solid var(--line-soft); font-size: 12.5px;
+      }
+      .kb-hit:hover { background: #f8fbfd; }
+      .kb-hit.score { border-left: 2px solid var(--accent); padding-left: 10px; }
+      .hit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+      .hit-title {
+        font-size: 12.5px; font-weight: 500; color: var(--text);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .hit-excerpt {
+        font-size: 12px; line-height: 1.55; color: var(--muted);
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+      }
+      .kb-hit button { flex: none; height: 26px; padding: 0 10px; font-size: 11.5px; color: var(--muted); }
+      .kb-docs {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 0 24px; grid-auto-rows: 36px;
+      }
+      .kb-doc {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        min-width: 0; border-bottom: 1px solid var(--line-soft);
+        font-size: 12px; color: var(--muted);
+      }
+      .kb-doc > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .kb-doc button { flex: none; height: 26px; padding: 0 9px; font-size: 11.5px; color: var(--muted); }
+      .field-label { font-size: 11.5px; color: var(--faint); }
+      .kb-chunks { max-height: 62vh; overflow: auto; display: flex; flex-direction: column; }
+      .kb-chunk-pager {
+        display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+        padding: 8px 0 0; font-size: 11px; color: var(--faint);
+        font-variant-numeric: tabular-nums;
+      }
+      .kb-chunk-pager button { height: 26px; padding: 0 10px; font-size: 11.5px; }
+      .kb-chunk-pager button:disabled { color: var(--faint); background: var(--surface); cursor: default; }
+      .kb-chunk-item {
+        padding: 10px 2px; border-bottom: 1px solid var(--line-soft);
+        font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px;
+      }
+      .kb-chunk-item .head { color: var(--text); display: flex; gap: 10px; align-items: center; }
+      .kb-chunk-item .head > span:first-child { font-family: Consolas, ui-monospace, monospace; color: var(--accent); }
+      .kb-chunk-item .body { white-space: pre-wrap; line-height: 1.6; max-height: 120px; overflow: auto; }
+      .report-body {
+        max-height: 68vh; overflow: auto; white-space: pre-wrap; line-height: 1.65;
+        font-size: 12.5px; color: var(--text); padding: 2px;
+      }
+      .bug-item {
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        padding: 9px 2px; border-bottom: 1px solid var(--line-soft);
+        font-size: 11.5px; color: var(--muted);
+      }
+      .bug-item .title { color: var(--text); font-size: 12.5px; font-weight: 500; }
+      .bug-act { height: 26px; padding: 0 9px; font-size: 11.5px; color: var(--muted); }
+      .modal {
+        position: fixed; inset: 0; background: rgba(20, 22, 26, .28);
+        display: flex; align-items: center; justify-content: center; z-index: 20; padding: 24px;
+      }
+      .modal[hidden] { display: none; }
+      .modal .card {
+        width: min(760px, 94vw); max-height: 88vh; background: var(--surface);
+        border-radius: 10px; box-shadow: 0 12px 32px rgba(20, 22, 26, .12);
+        padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; overflow: hidden;
+      }
+      .modal .card > .sec-head {
+        margin: -16px -18px 0; padding: 0 18px;
+      }
+      .modal input, .modal textarea {
+        background: var(--surface); color: var(--text); border: 1px solid var(--line);
+        border-radius: 5px; padding: 8px 10px; font: inherit; font-size: 12.5px;
+      }
+      .modal input:focus, .modal textarea:focus { outline: none; border-color: var(--accent); }
+      .modal textarea { min-height: 200px; resize: vertical; }
+      .modal .actions { display: flex; gap: 8px; justify-content: flex-end; }
+      .toast {
+        position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+        background: #11202b; color: #fff; border-radius: 6px; padding: 8px 14px;
+        font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .16s;
+      }
+      .toast.show { opacity: 1; }
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-thumb { background: #ccd7e0; border-radius: 5px; border: 3px solid var(--surface); }
+      ::-webkit-scrollbar-thumb:hover { background: #b6c4ce; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      @media (max-width: 1080px) {
+        main.page { grid-template-columns: 280px minmax(0, 1fr); }
+        #origin { display: none; }
+      }
+      @media (max-width: 860px) {
+        header { gap: 8px; padding: 0 14px; }
+        .ctx-label, #health-text { display: none; }
+        #projects { max-width: 170px; }
+        main.page { grid-template-columns: 240px minmax(0, 1fr); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .toast { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Autotest</h1>
+      <nav class="tabs">
+        <button id="tab-runs" class="tab on">运行记录</button>
+        <button id="tab-bugs" class="tab">缺陷</button>
+        <button id="tab-kb" class="tab">知识库</button>
+      </nav>
+      <span class="grow"></span>
+      <span class="ctx-label">项目</span>
+      <select id="projects"></select>
+      <button id="btn-new-project">新建</button>
+      <span class="status"><span class="dot" id="health-dot"></span><span id="health-text"></span></span>
+      <span id="origin"></span>
+    </header>
+
+    <div class="pages">
+      <main class="page" id="page-runs">
+        <section class="pane pane-runs">
+          <div class="sec-head">
+            <span>运行记录<span id="runs-scope" class="scope"></span></span>
+            <button id="btn-refresh-runs">刷新</button>
+          </div>
+          <div class="list" id="runs"></div>
+        </section>
+
+        <section class="pane pane-detail">
+          <div class="sec-head">
+            <span>运行详情</span>
+            <span class="head-actions">
+              <span id="detail-run"></span>
+            </span>
+          </div>
+          <div class="detail" id="detail">
+            <div class="empty">选一条运行记录，这里会显示阶段、步骤与待确认项。</div>
+          </div>
+        </section>
+      </main>
+
+      <section class="page bugs-page" id="page-bugs" hidden>
+        <div class="sec-head bugs-head">
+          <span>缺陷单<span id="bugs-scope" class="scope"></span></span>
+          <span class="bar bugs-filter">
+            <button class="tab on" data-bugfilter="">全部</button>
+            <button class="tab" data-bugfilter="open">待修</button>
+            <button class="tab" data-bugfilter="fixed">已修</button>
+            <button class="tab" data-bugfilter="verified">已验证</button>
+            <button class="tab" data-bugfilter="wontfix">忽略</button>
+            <button id="btn-refresh-bugs">刷新</button>
+          </span>
+        </div>
+        <div class="list bugs-list" id="bugs"></div>
+      </section>
+
+      <section class="page kb-page" id="page-kb" hidden>
+        <div class="kb-search-bar">
+          <input id="kw" class="kb-search" placeholder="检索关键词：DTC、0x22、UDS…" />
+          <input id="kw-module" class="kb-module" placeholder="模块" />
+          <input id="kw-tags" class="kb-tags" placeholder="标签" />
+          <button id="btn-search" class="primary">检索</button>
+        </div>
+        <div class="kb-body">
+          <div class="kb-block">
+            <div class="block-head">
+              <span class="block-title">检索结果</span>
+              <span class="block-hint">标题 + 摘要 + 来源，复制后粘进会话即可</span>
+            </div>
+            <div class="hits" id="hits"><span>输入关键词后点「检索」。</span></div>
+          </div>
+
+          <div class="kb-block">
+            <div class="block-head">
+              <span class="block-title">入库</span>
+              <span class="block-hint">支持多文件一次上传，逐个抽文本 / 切分 / 查重</span>
+            </div>
+            <div class="bar">
+              <button id="btn-kb-upload">导入文件</button>
+              <button id="btn-kb-specs">导入 specs</button>
+              <button id="btn-kb-text">粘贴文本</button>
+              <input id="kb-file" type="file" multiple hidden
+                accept=".md,.markdown,.txt,.log,.csv,.tsv,.json,.jsonl,.yaml,.yml,.xml,.ini,.cfg,.html,.htm,.pdf,.docx,.py,.ts,.tsx,.js,.java,.c,.h,.sql,.robot,.feature" />
+              <input id="kb-module" class="kb-module" placeholder="模块" />
+              <input id="kb-tags" class="kb-tags" placeholder="标签，逗号分隔" />
+              <span class="field-label">切分</span>
+              <input id="kb-chunk" class="kb-chunk" type="number" min="200" max="8000" step="100" value="1200" title="每块字符数" />
+            </div>
+            <span class="status-line" id="kb-status"></span>
+          </div>
+
+          <div class="kb-block">
+            <div class="block-head">
+              <span class="block-title">文档库</span>
+              <span class="block-hint">「查看」看切分结果，「删」移除文档与索引</span>
+            </div>
+            <div class="kb-docs" id="kb-docs"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal" id="kb-modal" hidden>
+      <div class="card">
+        <div style="font-size: 12px; color: var(--muted)">粘贴一段文字入库（会自动按标题/长度切分）</div>
+        <input id="kb-text-title" placeholder="标题（必填）" />
+        <textarea id="kb-text-content" placeholder="正文内容"></textarea>
+        <div class="actions">
+          <button id="kb-text-cancel">取消</button>
+          <button id="kb-text-save" class="primary">入库</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="kb-chunk-modal" hidden>
+      <div class="card">
+        <div class="sec-head"><span id="kb-chunk-title">切分预览</span><button id="kb-chunk-close">关闭</button></div>
+        <div class="kb-chunks" id="kb-chunks"></div>
+        <div class="kb-chunk-pager">
+          <button id="kb-chunk-prev">上一页</button>
+          <span id="kb-chunk-page"></span>
+          <button id="kb-chunk-next">下一页</button>
+        </div>      </div>
+    </div>
+
+    <div class="modal" id="report-modal" hidden>
+      <div class="card">
+        <div class="sec-head"><span id="report-title">测试报告</span><button id="report-close">关闭</button></div>
+        <div class="report-body" id="report-body"></div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+
+      const state = {
+        projectId: null,
+        runId: null,
+        timer: null,
+        hits: [],
+        bugFilter: "",
+        chunkDoc: null,
+        runLimit: 20,
+        runLenBeforeMore: null,
+      };
+
+      const el = (id) => document.getElementById(id);
+
+      function toast(message) {
+        const node = el("toast");
+        node.textContent = message;
+        node.classList.add("show");
+        clearTimeout(toast.timer);
+        toast.timer = setTimeout(() => node.classList.remove("show"), 2200);
+      }
+
+      async function api(path, options) {
+        // FormData 由浏览器自己带 boundary，手动加 content-type 反而会让后端解析失败
+        const isForm = options && options.body instanceof FormData;
+        const response = await fetch(path, {
+          headers: isForm ? {} : { "content-type": "application/json" },
+          ...options,
+        });
+        const text = await response.text();
+        let payload = null;
+        try {
+          payload = text ? JSON.parse(text) : null;
+        } catch {
+          payload = { raw: text };
+        }
+        if (!response.ok) {
+          const detail = payload && payload.detail ? payload.detail : response.status;
+          throw new Error(String(detail));
+        }
+        return payload;
+      }
+
+      async function checkHealth() {
+        try {
+          const health = await api("/api/health");
+          el("health-dot").className = "dot ok";
+          el("health-text").textContent = `服务正常 · v${health.version || "?"} · pid ${health.pid || "?"}`;
+        } catch (error) {
+          el("health-dot").className = "dot bad";
+          el("health-text").textContent = `服务不可用：${error.message}`;
+        }
+      }
+
+      async function loadProjects() {
+        const payload = await api("/api/projects");
+        const select = el("projects");
+        const projects = payload.projects || [];
+        if (!projects.length) {
+          select.innerHTML = '<option value="">还没有项目</option>';
+          state.projectId = null;
+          return;
+        }
+        select.innerHTML = projects
+          .map((project) => `<option value="${project.id}">${escapeHtml(project.name || project.id)}（${project.id}）</option>`)
+          .join("");
+        if (!state.projectId || !projects.some((project) => project.id === state.projectId)) {
+          state.projectId = projects[0].id;
+        }
+        select.value = state.projectId;
+      }
+
+      function selectProject(projectId) {
+        state.projectId = projectId || null;
+        state.runId = null;
+        state.runLimit = 20;
+        el("detail-run").textContent = "";
+        el("detail").innerHTML = '<div class="empty">选择一条运行记录。</div>';
+        loadRuns();
+        loadBugs();
+        loadKnowledgeDocs();
+      }
+
+      async function createProject() {
+        const name = prompt("项目名称", "新建测试项目");
+        if (!name) return;
+        try {
+          const created = await api("/api/projects", {
+            method: "POST",
+            body: JSON.stringify({ name, type: "api" }),
+          });
+          state.projectId = created.id;
+          toast(`已创建 ${created.id}`);
+          await loadProjects();
+          await loadRuns();
+        } catch (error) {
+          toast(`创建失败：${error.message}`);
+        }
+      }
+
+      function shortTime(value) {
+        if (!value) return "";
+        return String(value).replace("T", " ").slice(5, 16);
+      }
+
+      async function loadRuns() {
+        const list = el("runs");
+        el("runs-scope").textContent = "";
+        if (!state.projectId) {
+          list.innerHTML = '<div class="empty">先在上面选项目。</div>';
+          return;
+        }
+        try {
+          const payload = await api(
+            `/api/projects/${state.projectId}/workflow/runs?limit=${state.runLimit}`,
+          );
+          const runs = (payload.data && payload.data.runs) || [];
+          el("runs-scope").textContent = runs.length ? ` · ${runs.length} 条` : "";
+          list.innerHTML = "";
+          if (!runs.length) {
+            list.innerHTML = '<div class="empty">该项目还没有 run。让 Agent 跑一次 autotest_prd_parse。</div>';
+            return;
+          }
+          for (const run of runs) {
+            const node = document.createElement("button");
+            node.className = "row" + (run.id === state.runId ? " active" : "");
+            node.innerHTML = `<div class="line"><span>${run.module || "(无模块)"}</span><span class="badge ${run.status}">${run.status}</span></div><div class="meta">${run.id} · ${shortTime(run.updated_at)}</div>`;
+            node.onclick = () => selectRun(run.id);
+            list.appendChild(node);
+          }
+          // 取满了说明可能还有更早的 run：给一个加载更多，而不是把时间线截断在 20 条
+          // 若上一次「加载更多」并没有换来新记录（总数恰好是页大小的整数倍），就不再重复给按钮
+          const beforeMore = state.runLenBeforeMore;
+          state.runLenBeforeMore = null;
+          if (runs.length >= state.runLimit && !(beforeMore !== null && runs.length <= beforeMore)) {
+            const more = document.createElement("button");
+            more.className = "row-more";
+            more.textContent = `加载更多（已显示 ${runs.length} 条）`;
+            more.onclick = () => {
+              state.runLenBeforeMore = runs.length;
+              state.runLimit += 20;
+              loadRuns();
+            };
+            list.appendChild(more);
+          }
+        } catch (error) {
+          list.innerHTML = `<div class="empty">读取失败：${error.message}</div>`;
+        }
+      }
+
+      async function loadBugs() {
+        const list = el("bugs");
+        el("bugs-scope").textContent = "";
+        if (!state.projectId) {
+          list.innerHTML = '<div class="empty">先在顶部选择项目。</div>';
+          return;
+        }
+        const params = new URLSearchParams({ limit: "100" });
+        if (state.bugFilter) params.set("status", state.bugFilter);
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/workflow/bugs?${params.toString()}`);
+          const bugs = (payload.data && payload.data.bugs) || [];
+          el("bugs-scope").textContent = bugs.length ? ` · ${bugs.length} 条` : "";
+          if (!bugs.length) {
+            list.innerHTML = '<div class="empty">没有符合条件的缺陷单。失败用例出报告后会自动建单。</div>';
+            return;
+          }
+          const severityClass = (value) => (value === "blocker" ? "failed" : "");
+          const detailLine = (label, value) =>
+            value ? `<div class="bug-detail-line"><span>${label}</span>${escapeHtml(value)}</div>` : "";
+          list.innerHTML = bugs
+            .map((bug) => {
+              const actions =
+                bug.status === "open"
+                  ? `<button data-bug="${escapeHtml(bug.id)}" data-status="fixed">标记已修</button>` +
+                    `<button data-bug="${escapeHtml(bug.id)}" data-status="wontfix">忽略</button>`
+                  : bug.status === "fixed"
+                    ? `<button data-bug="${escapeHtml(bug.id)}" data-status="open">重开</button>` +
+                      `<button data-bug="${escapeHtml(bug.id)}" data-status="wontfix">忽略</button>`
+                    : `<button data-bug="${escapeHtml(bug.id)}" data-status="open">重开</button>`;
+              const runId = bug.last_run_id || bug.run_id || "";
+              const repro = bug.repro
+                ? (/^\d+$/.test(String(bug.repro)) ? `执行 #${bug.repro}` : String(bug.repro))
+                : "";
+              const detail =
+                `<div class="bug-detail" hidden>` +
+                detailLine("摘要", bug.summary) +
+                detailLine("复现", repro) +
+                detailLine("类型", bug.error_type) +
+                `<div class="bug-detail-line"><span>时间</span>首次 ${escapeHtml(shortTime(bug.created_at))}` +
+                ` · 最近 ${escapeHtml(shortTime(bug.last_seen_at || bug.created_at))}</div>` +
+                `</div>`;
+              return (
+                `<div class="bug-row" data-bugrow="${escapeHtml(bug.id)}"><div class="bug-main">` +
+                `<div class="bug-title">${escapeHtml(bug.title || "(无标题)")}</div>` +
+                `<div class="bug-meta">${escapeHtml(bug.id)} · ${escapeHtml(bug.script_name || "")}` +
+                ` · 出现 ${bug.occurrences || 1} 次 · ` +
+                `<button class="bug-run" data-run="${escapeHtml(runId)}">${escapeHtml(runId)}</button></div>` +
+                detail +
+                `</div><div class="bug-side">` +
+                `<span class="badge ${severityClass(bug.severity)}">${escapeHtml(bug.severity || "")}</span>` +
+                `<span class="badge">${escapeHtml(bug.status || "")}</span>${actions}</div></div>`
+              );
+            })
+            .join("");
+          for (const button of list.querySelectorAll("[data-bug]")) {
+            button.onclick = () => setProjectBugStatus(button.dataset.bug, button.dataset.status);
+          }
+          for (const runButton of list.querySelectorAll(".bug-run")) {
+            runButton.onclick = (event) => {
+              event.stopPropagation();
+              jumpToRun(runButton.dataset.run);
+            };
+          }
+          for (const row of list.querySelectorAll(".bug-row")) {
+            row.querySelector(".bug-main").onclick = () => {
+              const detailNode = row.querySelector(".bug-detail");
+              detailNode.hidden = !detailNode.hidden;
+            };
+          }
+        } catch (error) {
+          list.innerHTML = `<div class="empty">读取失败：${error.message}</div>`;
+        }
+      }
+
+      async function setProjectBugStatus(bugId, status) {
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/workflow/bugs/${bugId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status }),
+          });
+          toast(payload.summary || `${bugId} → ${status}`);
+          await loadBugs();
+        } catch (error) {
+          toast(`更新失败：${error.message}`);
+        }
+      }
+
+      function jumpToRun(runId) {
+        if (!runId) return;
+        setPage("runs");
+        selectRun(runId);
+      }
+
+      function selectRun(runId) {
+        state.runId = runId;
+        loadRuns();
+        loadDetail();
+        startPolling();
+      }
+
+      function startPolling() {
+        clearInterval(state.timer);
+        state.timer = setInterval(() => {
+          if (state.runId) loadDetail();
+        }, 3000);
+      }
+
+      async function decide(decisionId, answer) {
+        try {
+          await api(
+            `/api/projects/${state.projectId}/workflow/runs/${state.runId}/pending/${decisionId}/decide`,
+            { method: "POST", body: JSON.stringify({ answer, note: "" }) },
+          );
+          toast(`已提交：${answer}`);
+          await loadDetail();
+          await loadRuns();
+        } catch (error) {
+          toast(`提交失败：${error.message}`);
+        }
+      }
+
+      async function loadDetail() {
+        if (!state.projectId || !state.runId) return;
+        el("detail-run").textContent = state.runId;
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/workflow/runs/${state.runId}/status`);
+          const data = payload.data || {};
+          const steps = data.steps || [];
+          const pending = data.pending || [];
+          const failures = data.failures || [];
+          const execution = data.execution || {};
+          const hasExecution = Object.keys(execution).length > 0;
+
+          const block = [];
+          block.push(
+            `<dl class="kv">` +
+              `<dt>阶段</dt><dd>${data.stage || ""}</dd>` +
+              `<dt>状态</dt><dd><span class="badge ${data.status}">${data.status || ""}</span></dd>` +
+              `<dt>步骤数</dt><dd>${steps.length}</dd>` +
+              (hasExecution
+                ? `<dt>执行</dt><dd>通过 ${execution.pass || 0} / ${execution.total || 0}｜失败 ${execution.fail || 0}｜异常 ${execution.error || 0}｜${Math.round(execution.duration_ms || 0)} ms</dd>`
+                : "") +
+              (data.bugs ? `<dt>缺陷单</dt><dd><a id="link-bugs" style="color: var(--accent); cursor: pointer">${data.bugs} 条（查看）</a></dd>` : "") +
+            `</dl>`,
+          );
+
+          if (pending.length) {
+            block.push("<h3>待人工确认</h3>");
+            for (const item of pending) {
+              block.push(
+                `<div class="decision"><div class="prompt">${item.prompt || ""}</div>` +
+                  `<div class="actions">` +
+                  (item.options || ["approve", "reject"])
+                    .map((option) => `<button data-decision="${item.decision_id}" data-answer="${option}">${option}</button>`)
+                    .join("") +
+                  `</div></div>`,
+              );
+            }
+          }
+
+          block.push("<h3>步骤</h3><div class='steps'>");
+          if (!steps.length) block.push('<div class="empty">无步骤</div>');
+          for (const step of steps) {
+            block.push(
+              `<div class="step"><span class="badge">${step.seq}</span>` +
+                `<span class="tool">${step.tool}</span>` +
+                `<span class="badge ${step.status}">${step.status}</span>` +
+                `<span class="sum">${step.summary || ""}</span></div>`,
+            );
+          }
+          block.push("</div>");
+
+          if (failures.length) {
+            block.push("<h3>失败用例</h3>");
+            for (const item of failures) {
+              block.push(
+                `<div class="step"><span class="tool">${item.script_name || ""}</span>` +
+                  `<span class="badge failed">${item.status || ""}</span>` +
+                  `<span class="sum">${(item.failure || "").slice(0, 160)}</span></div>`,
+              );
+            }
+          }
+
+          // 报告存在时给一个入口：读后端存下来的 Markdown，不重新生成
+          const hasReport = steps.some((step) => step.tool === "autotest_report");
+          if (hasReport) {
+            block.push(`<div class="actions"><button id="btn-open-report">查看报告</button></div>`);
+          }
+
+          el("detail").innerHTML = block.join("");
+          for (const button of el("detail").querySelectorAll("[data-decision]")) {
+            button.onclick = () => decide(button.dataset.decision, button.dataset.answer);
+          }
+          const reportButton = el("detail").querySelector("#btn-open-report");
+          if (reportButton) reportButton.onclick = () => showReport();
+          const bugLink = el("detail").querySelector("#link-bugs");
+          if (bugLink) bugLink.onclick = () => showBugs();
+        } catch (error) {
+          el("detail").innerHTML = `<div class="empty">读取失败：${error.message}</div>`;
+        }
+      }
+
+      async function showReport() {
+        if (!state.projectId || !state.runId) return;
+        el("report-title").textContent = `测试报告 · ${state.runId}`;
+        el("report-body").textContent = "读取中…";
+        el("report-modal").hidden = false;
+        try {
+          const payload = await api(
+            `/api/projects/${state.projectId}/workflow/runs/${state.runId}/report-content`,
+          );
+          const markdown = (payload.data || {}).markdown || "";
+          el("report-title").textContent = `测试报告 · ${(payload.data || {}).name || state.runId}`;
+          el("report-body").textContent = markdown || "报告为空";
+        } catch (error) {
+          el("report-body").textContent = `读取失败：${error.message}`;
+        }
+      }
+
+      async function showBugs() {
+        if (!state.projectId || !state.runId) return;
+        el("report-title").textContent = `缺陷单 · ${state.runId}`;
+        el("report-body").textContent = "读取中…";
+        el("report-modal").hidden = false;
+        try {
+          const payload = await api(
+            `/api/projects/${state.projectId}/workflow/runs/${state.runId}/bugs`,
+          );
+          const bugs = (payload.data || {}).bugs || [];
+          if (!bugs.length) {
+            el("report-body").textContent = "这次运行没有缺陷单";
+            return;
+          }
+          el("report-body").innerHTML = bugs
+            .map((bug) => {
+              const next =
+                bug.status === "open" || bug.status === "fixed"
+                  ? `<button class="bug-act" data-bug="${escapeHtml(bug.id)}" data-status="fixed">标记已修</button>` +
+                    `<button class="bug-act" data-bug="${escapeHtml(bug.id)}" data-status="wontfix">忽略</button>`
+                  : `<button class="bug-act" data-bug="${escapeHtml(bug.id)}" data-status="open">重开</button>`;
+              return (
+                `<div class="bug-item"><span>${escapeHtml(bug.id)}</span>` +
+                `<span class="badge ${bug.severity === "blocker" ? "failed" : ""}">${escapeHtml(bug.severity)}</span>` +
+                `<span class="title">${escapeHtml(bug.title || "")}</span>` +
+                `<span class="badge">${escapeHtml(bug.status || "")}</span>` +
+                `<span>出现 ${escapeHtml(String(bug.occurrences || 1))} 次</span>` +
+                next +
+                `</div>`
+              );
+            })
+            .join("");
+          for (const button of el("report-body").querySelectorAll(".bug-act")) {
+            button.onclick = () => setBugStatus(button.dataset.bug, button.dataset.status);
+          }
+        } catch (error) {
+          el("report-body").textContent = `读取失败：${error.message}`;
+        }
+      }
+
+      async function setBugStatus(bugId, status) {
+        try {
+          const payload = await api(
+            `/api/projects/${state.projectId}/workflow/runs/${state.runId}/bugs/${bugId}`,
+            { method: "PATCH", body: JSON.stringify({ status }) },
+          );
+          toast(payload.summary || `${bugId} → ${status}`);
+          await showBugs();
+        } catch (error) {
+          toast(`更新失败：${error.message}`);
+        }
+      }
+
+      async function searchKnowledge() {
+        if (!state.projectId) {
+          toast("先选项目");
+          return;
+        }
+        const q = el("kw").value.trim();
+        const filters = new URLSearchParams({ q, limit: "8" });
+        if (el("kw-module").value.trim()) filters.set("module", el("kw-module").value.trim());
+        if (el("kw-tags").value.trim()) filters.set("tags", el("kw-tags").value.trim());
+        try {
+          const payload = await api(
+            `/api/projects/${state.projectId}/workflow/knowledge/search?${filters.toString()}`,
+          );
+          const records = (payload.data && payload.data.records) || [];
+          state.hits = records;
+          if (!records.length) {
+            el("hits").innerHTML = '<span style="color: var(--muted)">无命中</span>';
+            return;
+          }
+          el("hits").innerHTML = records
+            .map((item, index) => {
+              const scored = item.score !== null && item.score !== undefined;
+              return (
+                `<div class="kb-hit${scored ? " score" : ""}">` +
+                `<div class="hit-main">` +
+                `<div class="hit-title">${escapeHtml(item.title)}${scored ? "" : " · 模糊"}</div>` +
+                `<div class="hit-excerpt">${escapeHtml(item.excerpt || "")}</div>` +
+                `</div>` +
+                `<button data-hit="${index}">复制</button></div>`
+              );
+            })
+            .join("");
+          for (const button of el("hits").querySelectorAll("[data-hit]")) {
+            button.onclick = () => copyHit(Number(button.dataset.hit));
+          }
+        } catch (error) {
+          el("hits").innerHTML = `<span style="color: var(--bad)">检索失败：${error.message}</span>`;
+        }
+      }
+
+      async function copyHit(index) {
+        const hit = (state.hits || [])[index];
+        if (!hit) return;
+        // 检索只返回 400 字符摘要；粘贴进会话的就是这段摘要 + 来源，够 Agent 定位
+        const text = `${hit.title}\n来源：${hit.source_ref}\n\n${hit.excerpt || ""}`;
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("已复制，粘贴到会话即可作为上下文");
+        } catch {
+          toast("复制失败：浏览器拒绝了剪贴板权限");
+        }
+      }
+
+      async function importSpecs() {
+        if (!state.projectId) {
+          toast("先选项目");
+          return;
+        }
+        const params = kbParams();
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/knowledge/documents/from-specs`, {
+            method: "POST",
+            body: JSON.stringify({
+              module: params.module,
+              tags: params.tags,
+              chunk_chars: Number(params.chunk_chars) || 1200,
+            }),
+          });
+          toast(payload.summary || "已导入 specs");
+          el("kb-status").textContent = payload.summary || "";
+          await loadKnowledgeDocs();
+        } catch (error) {
+          toast(`导入 specs 失败：${error.message}`);
+        }
+      }
+
+      el("btn-new-project").onclick = createProject;
+      el("btn-refresh-runs").onclick = loadRuns;
+      el("btn-search").onclick = searchKnowledge;
+      el("kw").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") searchKnowledge();
+      });
+
+      // ===== 知识库：导入文件 / 粘贴文本 / 文档列表 =====
+      function kbParams() {
+        return {
+          module: el("kb-module").value.trim(),
+          tags: el("kb-tags").value.trim(),
+          chunk_chars: el("kb-chunk").value.trim() || "1200",
+        };
+      }
+
+      async function uploadKnowledgeFiles(files) {
+        if (!state.projectId) {
+          toast("先选项目");
+          return;
+        }
+        if (!files || !files.length) return;
+        const params = kbParams();
+        el("kb-status").textContent = `上传中 ${files.length} 个文件…`;
+        // 一次请求带走全部文件，后端逐个抽文本/切分/查重，单个失败不影响其它
+        const form = new FormData();
+        for (const file of files) form.append("files", file, file.name);
+        form.append("module", params.module);
+        form.append("tags", params.tags);
+        form.append("chunk_chars", params.chunk_chars);
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/knowledge/documents/batch`, {
+            method: "POST",
+            body: form,
+          });
+          const data = payload.data || {};
+          el("kb-status").textContent = payload.summary || "";
+          if (data.failed && data.failed.length) {
+            toast(`${data.failed[0].filename} 失败：${data.failed[0].error}`);
+          } else {
+            toast(payload.summary || "导入完成");
+          }
+        } catch (error) {
+          el("kb-status").textContent = `导入失败：${error.message}`;
+          toast(`导入失败：${error.message}`);
+        }
+        await loadKnowledgeDocs();
+      }
+
+      async function loadKnowledgeDocs() {
+        const node = el("kb-docs");
+        if (!state.projectId) {
+          node.innerHTML = '<span class="kb-doc">先在顶部选择项目</span>';
+          return;
+        }
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/knowledge/documents`);
+          const docs = (payload.data && payload.data.documents) || [];
+          if (!docs.length) {
+            node.innerHTML = '<span class="kb-doc">知识库为空：点「导入文件」把 PRD、规范、日志、PDF 切分入库</span>';
+            return;
+          }
+          node.innerHTML = "";
+          for (const doc of docs) {
+            const item = document.createElement("span");
+            item.className = "kb-doc";
+            item.innerHTML =
+              `<span>${doc.filename} · ${doc.format} · ${doc.chunk_count} 条${doc.truncated ? " · 已截断" : ""}</span>` +
+              `<button data-view="${doc.doc_id}" data-name="${doc.filename}">查看</button>` +
+              `<button data-del="${doc.doc_id}">删</button>`;
+            node.appendChild(item);
+          }
+          for (const button of node.querySelectorAll("[data-del]")) {
+            button.onclick = () => deleteKnowledgeDoc(button.dataset.del);
+          }
+          for (const button of node.querySelectorAll("[data-view]")) {
+            button.onclick = () => previewDoc(button.dataset.view, button.dataset.name);
+          }
+        } catch (error) {
+          node.innerHTML = `<span class="kb-doc">读取文档失败：${error.message}</span>`;
+        }
+      }
+
+      const CHUNK_PAGE = 50;
+
+      async function previewDoc(docId, filename, offset = 0) {
+        el("kb-chunk-title").textContent = `切分预览 · ${filename || docId}`;
+        if (!offset) el("kb-chunks").innerHTML = '<div class="kb-chunk-item">读取中…</div>';
+        el("kb-chunk-modal").hidden = false;
+        try {
+          // 一页 50 条足够看出切分是否合理；超出时用底部分页按 offset 继续
+          const payload = await api(
+            `/api/projects/${state.projectId}/knowledge/documents/${docId}/chunks?limit=${CHUNK_PAGE}&offset=${Math.max(0, offset)}`,
+          );
+          const data = payload.data || {};
+          const chunks = data.chunks || [];
+          const total = Number(data.total || 0);
+          state.chunkDoc = { id: docId, name: filename || docId, offset: Math.max(0, offset), total };
+          if (!chunks.length) {
+            el("kb-chunks").innerHTML = '<div class="kb-chunk-item">没有更多切分条目</div>';
+            el("kb-chunk-page").textContent = total ? `共 ${total} 条` : "";
+            el("kb-chunk-prev").disabled = state.chunkDoc.offset <= 0;
+            el("kb-chunk-next").disabled = true;
+            return;
+          }
+          el("kb-chunk-title").textContent = `切分预览 · ${filename || docId}（共 ${total} 条）`;
+          el("kb-chunks").innerHTML = chunks
+            .map(
+              (chunk) =>
+                `<div class="kb-chunk-item"><div class="head"><span>${chunk.source_ref || ""}</span>` +
+                `<span>${chunk.title || ""}</span><span>${chunk.chars} 字</span></div>` +
+                `<div class="body">${escapeHtml(chunk.excerpt || "")}</div></div>`,
+            )
+            .join("");
+          const from = state.chunkDoc.offset + 1;
+          const to = state.chunkDoc.offset + chunks.length;
+          el("kb-chunk-page").textContent = `${from}–${to} / ${total}`;
+          el("kb-chunk-prev").disabled = state.chunkDoc.offset <= 0;
+          el("kb-chunk-next").disabled = to >= total;
+        } catch (error) {
+          el("kb-chunks").innerHTML = `<div class="kb-chunk-item">读取失败：${escapeHtml(error.message)}</div>`;
+          el("kb-chunk-page").textContent = "";
+          el("kb-chunk-prev").disabled = true;
+          el("kb-chunk-next").disabled = true;
+        }
+      }
+
+      function escapeHtml(text) {
+        return String(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      async function deleteKnowledgeDoc(docId) {
+        if (!confirm(`删除文档 ${docId} 及其切分条目？`)) return;
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/knowledge/documents/${docId}`, {
+            method: "DELETE",
+          });
+          toast(payload.summary || "已删除");
+          await loadKnowledgeDocs();
+        } catch (error) {
+          toast(`删除失败：${error.message}`);
+        }
+      }
+
+      async function submitKnowledgeText() {
+        const title = el("kb-text-title").value.trim();
+        const content = el("kb-text-content").value.trim();
+        if (!title || !content) {
+          toast("标题和正文都要填");
+          return;
+        }
+        const params = kbParams();
+        try {
+          const payload = await api(`/api/projects/${state.projectId}/knowledge/documents/text`, {
+            method: "POST",
+            body: JSON.stringify({
+              title,
+              content,
+              module: params.module,
+              tags: params.tags,
+              chunk_chars: Number(params.chunk_chars) || 1200,
+            }),
+          });
+          el("kb-modal").hidden = true;
+          el("kb-text-title").value = "";
+          el("kb-text-content").value = "";
+          toast(payload.summary || "已入库");
+          await loadKnowledgeDocs();
+        } catch (error) {
+          toast(`入库失败：${error.message}`);
+        }
+      }
+
+      el("btn-kb-upload").onclick = () => {
+        if (!state.projectId) {
+          toast("先选项目");
+          return;
+        }
+        el("kb-file").click();
+      };
+      el("btn-kb-specs").onclick = importSpecs;
+      el("kb-file").onchange = (event) => {
+        uploadKnowledgeFiles(Array.from(event.target.files || []));
+        event.target.value = "";
+      };
+      el("btn-kb-text").onclick = () => {
+        if (!state.projectId) {
+          toast("先选项目");
+          return;
+        }
+        el("kb-modal").hidden = false;
+      };
+      el("kb-text-cancel").onclick = () => {
+        el("kb-modal").hidden = true;
+      };
+      el("kb-text-save").onclick = submitKnowledgeText;
+      el("kb-chunk-close").onclick = () => {
+        el("kb-chunk-modal").hidden = true;
+      };
+      el("kb-chunk-prev").onclick = () => {
+        const doc = state.chunkDoc;
+        if (doc && doc.offset > 0) previewDoc(doc.id, doc.name, Math.max(0, doc.offset - CHUNK_PAGE));
+      };
+      el("kb-chunk-next").onclick = () => {
+        const doc = state.chunkDoc;
+        if (doc && doc.offset + CHUNK_PAGE < doc.total) previewDoc(doc.id, doc.name, doc.offset + CHUNK_PAGE);
+      };
+      el("report-close").onclick = () => {
+        el("report-modal").hidden = true;
+      };
+
+      function setPage(page) {
+        el("page-runs").hidden = page !== "runs";
+        el("page-bugs").hidden = page !== "bugs";
+        el("page-kb").hidden = page !== "kb";
+        el("tab-runs").classList.toggle("on", page === "runs");
+        el("tab-bugs").classList.toggle("on", page === "bugs");
+        el("tab-kb").classList.toggle("on", page === "kb");
+      }
+
+      el("tab-runs").onclick = () => setPage("runs");
+      el("tab-bugs").onclick = () => {
+        setPage("bugs");
+        loadBugs();
+      };
+      el("tab-kb").onclick = () => {
+        setPage("kb");
+        loadKnowledgeDocs();
+      };
+      el("btn-refresh-bugs").onclick = loadBugs;
+      for (const button of document.querySelectorAll("[data-bugfilter]")) {
+        button.onclick = () => {
+          state.bugFilter = button.dataset.bugfilter || "";
+          for (const other of document.querySelectorAll("[data-bugfilter]")) {
+            other.classList.toggle("on", other === button);
+          }
+          loadBugs();
+        };
+      }
+      el("projects").onchange = () => selectProject(el("projects").value);
+
+      el("origin").textContent = location.origin;
+
+      async function boot() {
+        setPage("runs");
+        checkHealth();
+        await loadProjects();
+        loadRuns();
+        loadBugs();
+        loadKnowledgeDocs();
+        setInterval(checkHealth, 10000);
+      }
+
+      boot();
+    
+</script>
+
+  </body>
+</html>

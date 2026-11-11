@@ -292,7 +292,16 @@ export const fr = {
     "toggleDevTools": "Outils de développement",
     "appHelp": "Aide Pi-Workspace",
     "openLogs": "Journaux ouverts",
-    "checkForUpdates": "Rechercher les mises à jour…"
+    "checkForUpdates": "Rechercher les mises à jour…",
+    "autotestWorkbench": "Atelier de test",
+  },
+  "autotest": {
+    "unavailableTitle": "Atelier de test indisponible",
+    "unavailableMessage": "Le service de test local n'est pas encore prêt (état : {status}).",
+    "unavailableDetail":
+      "Le backend ne répond pas à /api/health. « Réessayer » relance le service ; en cas d'échec persistant, la raison est écrite dans le journal de l'application.",
+    "retry": "Réessayer",
+    "close": "Fermer",
   },
   "updates": {
     "title": "Mises à jour",

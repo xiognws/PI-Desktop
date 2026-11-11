@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   session,
 } from "electron";
@@ -58,6 +59,14 @@ import { getStorageBootstrap } from "./storage/bootstrap";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import { registerIpcHandlers } from "./ipc/register";
 import { installGenUiPermissionHandlers } from "./gen-ui-permissions";
+import { AutotestService } from "../autotest/service";
+import { recoverAutotestWorkbench } from "../autotest/prompt";
+import {
+  autotestWorkbenchUrl,
+  createAutotestWindow,
+  registerAutotestWorkbenchOpener,
+  type AutotestWindowLike,
+} from "../autotest/window";
 import { getActiveRemoteHostsBoot } from "./bootstrap/remote-hosts";
 import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
@@ -1048,6 +1057,96 @@ app.on("web-contents-created", (_event, contents) => {
 // used to own this handler is gone (ADR 0387), the gen-UI denial is not.
 void app.whenReady().then(() => {
   installGenUiPermissionHandlers({ targetSession: session.defaultSession });
+});
+
+// Autotest 服务：独立进程跑 uvicorn，只监听 loopback。启动成功后把端口写进
+// `<dataDir>/autotest/runtime.json`；sidecar 内的扩展工具读该文件直连，
+// 不经 main 转发，也没有 MCP/工具网关这一层。
+const autotestService = new AutotestService({
+  dataDir,
+  resourcesPath: process.resourcesPath,
+  log: (message) => logger.app("runtime", "info", `[autotest] ${message}`),
+});
+void app.whenReady().then(() => autotestService.start());
+app.once("will-quit", () => void autotestService.stop());
+
+// 独立工作台窗口：菜单项通过 registerAutotestWorkbenchOpener 触发。页面由本机
+// FastAPI 托管（同源，无 CORS），窗口只加载 loopback 地址，不挂 preload。
+let autotestWindow: AutotestWindowLike | null = null;
+// 同一时刻只允许一个「不可用」提示；重试期间不再叠对话框。
+let autotestPromptOpen = false;
+
+function autotestCatalog(): (typeof catalogs)[keyof typeof catalogs]["autotest"] {
+  return catalogs[resolveLocale(app.getLocale())].autotest;
+}
+
+function focusOrCreateAutotestWindow(url: string): void {
+  if (autotestWindow && !(autotestWindow.isDestroyed?.() ?? false)) {
+    autotestWindow.focus?.();
+    return;
+  }
+  const title = catalogs[resolveLocale(app.getLocale())].menu.autotestWorkbench;
+  const created = createAutotestWindow({
+    url,
+    title,
+    createWindow: (options) => {
+      const window = new BrowserWindow(options);
+      // 窗口以 show:false 创建，加载完成再显示，避免白屏闪一下。
+      window.once("ready-to-show", () => window.show());
+      return window;
+    },
+    log: (message) => logger.app("runtime", "warn", `[autotest] ${message}`),
+  });
+  created.on("closed", () => {
+    autotestWindow = null;
+  });
+  autotestWindow = created;
+}
+
+/**
+ * 服务没 ready 时给出可操作的提示，而不是只写日志。用户点「重试启动」就重启一次
+ * 服务；重启后仍不就绪会带着失败原因再提示一次，由用户决定继续还是放弃。
+ */
+async function promptAutotestUnavailable(snapshot: { status: string; error: string }): Promise<void> {
+  if (autotestPromptOpen) return;
+  autotestPromptOpen = true;
+  try {
+    await recoverAutotestWorkbench(
+      {
+        showMessageBox: (options) => {
+          const parent = getMainWindow();
+          return parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options);
+        },
+        state: () => autotestService.state(),
+        restart: () => autotestService.restart(),
+        onReady: () => {
+          const url = autotestWorkbenchUrl(autotestService.state().port);
+          if (url) focusOrCreateAutotestWindow(url);
+          else logger.app("runtime", "warn", "[autotest] service is ready but the port is unusable");
+        },
+        log: (message) => logger.app("runtime", "warn", `[autotest] ${message}`),
+      },
+      autotestCatalog(),
+      snapshot,
+    );
+  } finally {
+    autotestPromptOpen = false;
+  }
+}
+
+registerAutotestWorkbenchOpener(() => {
+  const snapshot = autotestService.state();
+  const url = autotestWorkbenchUrl(snapshot.port);
+  if (snapshot.status === "ready" && url) {
+    focusOrCreateAutotestWindow(url);
+    return;
+  }
+  logger.app(
+    "runtime",
+    "warn",
+    `[autotest] workbench unavailable: ${snapshot.status}${snapshot.error ? ` (${snapshot.error})` : ""}`,
+  );
+  void promptAutotestUnavailable(snapshot);
 });
 
 registerApplicationStartup({

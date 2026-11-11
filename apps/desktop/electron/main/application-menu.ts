@@ -12,6 +12,8 @@ import {
 } from "@pi-workspace/shared";
 import { catalogs, resolveLocale } from "@pi-workspace/i18n";
 
+import { openAutotestWorkbench } from "../autotest/window";
+
 export type ApplicationMenuOptions = {
   platform?: NodeJS.Platform;
   locale?: string;
@@ -192,6 +194,15 @@ export function buildApplicationMenuTemplate({
           accelerator("toggleFullScreen"),
           dispatchNative,
         ),
+        { type: "separator" },
+        // 独立的测试工作台窗口：页面由本机 FastAPI 托管，主进程只负责开窗口，
+        // 所以直接调主进程函数，不经过 renderer 的命令通道。
+        {
+          label: labels.menu.autotestWorkbench,
+          click: () => {
+            openAutotestWorkbench();
+          },
+        },
         // Only surfaced with developer mode on, so the console stays out of
         // reach for regular users (settings.developerMode).
         ...(developerMode

@@ -1,6 +1,10 @@
 # Autotest platform as a Desktop plugin
 
-Status: implementation plan, P0 in progress
+Status: **superseded** — the plugin shell, its panel and its JS pipeline engine
+were removed; the workflow now runs as agent-extension tools over a standalone
+FastAPI service (`services/autotest`). See `autotest-agent-native-tools.md`.
+The history below is kept as the record of the plugin-based approach.
+
 Owner: plugin `autotest` (separate package), no Desktop core change expected
 
 ## 1. Scope

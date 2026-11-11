@@ -54,9 +54,12 @@ coverage/
 .pi/
 .cc-connect/
 
-# Autotest plugin: local provisioning (deps live here, not in git)
+# Autotest service: local provisioning (deps live here, not in git)
 .venv/
-plugins/autotest/platform/.venv/
+# autotest 依赖目录：用 Pi 自带 Python，包装在这里而不是解释器里
+services/autotest/.deps/
+# 手工起服务或测试留下的默认库目录（服务正常跑在 dataDir 下）
+services/autotest/data/
 runtime/e2e/.autotest-runs/
 
 .playwright-mcp/
@@ -90,7 +93,6 @@ worktrees
 !/apps/desktop/resources/plugins/pi.gitlens/
 !/apps/desktop/resources/plugins/io.github.muzimu217.vision-kit/
 !/apps/desktop/resources/plugins/pi.todo/
-!/apps/desktop/resources/plugins/autotest/
 !/apps/desktop/resources/plugins/pi.token-insights/
 # Startup-resilience fixes ship inside these three plugins: each one broke the
 # plugin restore chain at launch (a host API that does not exist, an
@@ -124,13 +126,6 @@ worktrees
 *.egg-info/
 __pycache__/
 *.pyc
-
-# Local venvs and dependency trees created to build or test a Python-bearing
-# plugin (the Autotest platform). The plugin's own package `.gitignore` covers
-# its venv; the UI dependency tree is ignored here because it is a 39k-file
-# pnpm store that also breaks `pi-plugin pack`'s 2000-file package limit when a
-# developer has built the panel locally.
-plugins/autotest/platform/ui/node_modules/
 
 # The Python runtime this build ships: a full CPython tree plus the pinned
 # wheel stack, regenerated on the build machine by

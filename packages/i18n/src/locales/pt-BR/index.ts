@@ -291,7 +291,16 @@ export const ptBR = {
     toggleDevTools: "Ferramentas de desenvolvedor",
     appHelp: "Ajuda do Pi-Workspace",
     openLogs: "Abrir logs",
-    checkForUpdates: "Verificar atualizações…"
+    checkForUpdates: "Verificar atualizações…",
+    autotestWorkbench: "Bancada de testes",
+  },
+  autotest: {
+    unavailableTitle: "Bancada de testes indisponível",
+    unavailableMessage: "O serviço local de testes ainda não está pronto (status: {status}).",
+    unavailableDetail:
+      "O backend não respondeu a /api/health. “Tentar novamente” inicia o serviço outra vez; se ainda falhar, o motivo é gravado no log do aplicativo.",
+    retry: "Tentar novamente",
+    close: "Fechar",
   },
   updates: {
     title: "Atualizações",

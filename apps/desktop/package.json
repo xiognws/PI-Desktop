@@ -19,18 +19,19 @@
     "preview": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs && node --test electron/test/*.test.mjs",
     "lint": "node ../../scripts/check-style-tokens.mjs",
     "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
     "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "bundle:python": "node ../../scripts/bundle-python-runtime.mjs",
     "stage:manual": "node ../../scripts/stage-desktop-manual.mjs",
-    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run stage:manual && electron-vite build && electron-builder --dir",
-    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
+    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && electron-builder --dir",
+    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
     "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
-    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --linux --publish never"
+    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
+    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --linux --publish never",
+    "bundle:autotest-ui": "npm --prefix ../../services/autotest/ui ci --no-audit --no-fund && npm --prefix ../../services/autotest/ui run build"
   },
   "dependencies": {
     "@ast-grep/napi": "0.51.0",
@@ -156,6 +157,26 @@
       {
         "from": "resources/manual",
         "to": "manual"
+      },
+      {
+        "from": "../../services/autotest/src",
+        "to": "autotest/src"
+      },
+      {
+        "from": "../../services/autotest/ui-shell",
+        "to": "autotest/ui-shell"
+      },
+      {
+        "from": "../../services/autotest/ui/dist",
+        "to": "autotest/ui/dist"
+      },
+      {
+        "from": "../../services/autotest/runner",
+        "to": "autotest/runner"
+      },
+      {
+        "from": "../../services/autotest/.deps",
+        "to": "autotest/.deps"
       }
     ],
     "mac": {

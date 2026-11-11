@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "com.autotest.workflow",
+  "name": "Autotest Workflow",
+  "version": "0.1.0",
+  "description": "Agent-native test workflow tools (PRD parse, case design, review, run status). Local loopback only.",
+  "author": "pi-workspace",
+  "main": "main.cjs",
+  "permissions": ["agent.extension"],
+  "contributes": {
+    "agentExtensions": ["src/tools.ts"]
+  },
+  "enabledByDefault": false
+}

@@ -302,6 +302,15 @@ export const tr = {
     appHelp: "Pi-Workspace yardımı",
     openLogs: "Günlükleri aç",
     checkForUpdates: "Güncellemeleri denetle…",
+    autotestWorkbench: "Test tezgahı",
+  },
+  autotest: {
+    unavailableTitle: "Test tezgahı kullanılamıyor",
+    unavailableMessage: "Yerel test servisi henüz hazır değil (durum: {status}).",
+    unavailableDetail:
+      "Arka uç /api/health isteğine yanıt vermedi. “Yeniden başlat” servisi tekrar başlatır; yine başarısız olursa nedeni uygulama günlüğüne yazılır.",
+    retry: "Yeniden başlat",
+    close: "Kapat",
   },
   updates: {
     title: "Güncellemeler",

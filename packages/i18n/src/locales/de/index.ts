@@ -292,7 +292,16 @@ export const de = {
     "toggleDevTools": "Entwicklertools",
     "appHelp": "Pi-Workspace-Hilfe",
     "openLogs": "Protokolle öffnen",
-    "checkForUpdates": "Nach Updates suchen…"
+    "checkForUpdates": "Nach Updates suchen…",
+    "autotestWorkbench": "Autotest-Workbench",
+  },
+  "autotest": {
+    "unavailableTitle": "Autotest-Workbench nicht verfügbar",
+    "unavailableMessage": "Der lokale Testdienst ist noch nicht bereit (Status: {status}).",
+    "unavailableDetail":
+      "Das Backend antwortet nicht auf /api/health. „Neu starten“ startet den Dienst erneut; schlägt es weiterhin fehl, steht der Grund im Anwendungsprotokoll.",
+    "retry": "Neu starten",
+    "close": "Schließen",
   },
   "updates": {
     "title": "Updates",

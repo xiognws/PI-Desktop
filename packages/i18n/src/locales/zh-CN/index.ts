@@ -295,6 +295,15 @@ export const zhCN = {
     appHelp: "Pi-Workspace 帮助",
     openLogs: "打开日志",
     checkForUpdates: "检查更新…",
+    autotestWorkbench: "测试工作台",
+  },
+  autotest: {
+    unavailableTitle: "测试工作台暂不可用",
+    unavailableMessage: "本地测试服务尚未就绪（当前状态：{status}）。",
+    unavailableDetail:
+      "后端没有响应 /api/health。点「重试启动」会重新拉起服务；仍然失败时原因会写进应用日志。",
+    retry: "重试启动",
+    close: "关闭",
   },
   updates: {
     title: "软件更新",

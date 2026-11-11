@@ -295,6 +295,15 @@ export const zhTW = {
     appHelp: "Pi-Workspace 幫助",
     openLogs: "開啟日誌",
     checkForUpdates: "檢查更新…",
+    autotestWorkbench: "測試工作臺",
+  },
+  autotest: {
+    unavailableTitle: "測試工作臺暫不可用",
+    unavailableMessage: "本機測試服務尚未就緒（目前狀態：{status}）。",
+    unavailableDetail:
+      "後端沒有回應 /api/health。點「重試啟動」會重新拉起服務；仍然失敗時原因會寫進應用程式日誌。",
+    retry: "重試啟動",
+    close: "關閉",
   },
   updates: {
     title: "軟體更新",

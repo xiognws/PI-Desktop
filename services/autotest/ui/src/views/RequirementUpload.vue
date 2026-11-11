@@ -1,0 +1,154 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { FileText, Upload, RefreshCw, ChevronRight } from 'lucide-vue-next'
+
+const route = useRoute()
+const projectId = route.params.projectId as string
+
+type Requirement = {
+  id: string
+  filename: string
+  size: number | null
+  status: string
+  created_at: string
+}
+
+const requirements = ref<Requirement[]>([])
+const uploading = ref(false)
+const message = ref('')
+const error = ref('')
+const fileInput = ref<HTMLInputElement>()
+const dragging = ref(false)
+
+async function load() {
+  try {
+    const response = await fetch(`/api/projects/${projectId}/requirements`)
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+    const data = await response.json()
+    requirements.value = data.requirements ?? []
+    error.value = ''
+  } catch (problem) {
+    error.value = String((problem as Error).message ?? problem)
+  }
+}
+
+async function send(file: File) {
+  uploading.value = true
+  message.value = ''
+  error.value = ''
+  try {
+    const body = new FormData()
+    body.append('file', file)
+    const response = await fetch(`/api/projects/${projectId}/requirements/upload`, {
+      method: 'POST',
+      body,
+    })
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+    message.value = `${file.name} 已上传`
+    await load()
+  } catch (problem) {
+    error.value = String((problem as Error).message ?? problem)
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function onPick(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  await send(file)
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+async function onDrop(event: DragEvent) {
+  dragging.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (file) await send(file)
+}
+
+function sizeText(bytes: number | null) {
+  if (!bytes) return ''
+  return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
+}
+
+onMounted(load)
+</script>
+
+<template>
+  <div class="flex-1 flex flex-col overflow-auto bg-white">
+    <div class="p-6">
+      <div class="mb-6">
+        <h2 class="text-lg font-medium text-gray-900">上传需求文档</h2>
+        <p class="text-sm text-gray-500 mt-1">上传需求文档 → 在 Pi 客户端让 Agent 拆功能点、出用例 → 回「用例」页查看</p>
+      </div>
+
+      <!-- 步骤条 -->
+      <div class="flex items-center gap-2 mb-6">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-blue-600 text-white">1</div>
+          <span class="text-sm text-gray-900">上传文档</span>
+        </div>
+        <ChevronRight class="w-4 h-4 text-gray-300" />
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-gray-200 text-gray-500">2</div>
+          <span class="text-sm text-gray-400">Agent 拆功能点</span>
+        </div>
+        <ChevronRight class="w-4 h-4 text-gray-300" />
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-gray-200 text-gray-500">3</div>
+          <span class="text-sm text-gray-400">用例页查看用例</span>
+        </div>
+        <button
+          class="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+          @click="load"
+        >
+          <RefreshCw class="w-4 h-4" />
+          刷新
+        </button>
+      </div>
+
+      <!-- 上传区 -->
+      <div class="bg-white rounded-lg border border-gray-200 p-8">
+        <input ref="fileInput" type="file" class="hidden" accept=".pdf,.doc,.docx,.md,.txt" @change="onPick" />
+        <div
+          class="border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer"
+          :class="dragging ? 'border-blue-500 bg-blue-50/40' : 'border-gray-300 hover:border-blue-400'"
+          @click="fileInput?.click()"
+          @dragover.prevent="dragging = true"
+          @dragleave.prevent="dragging = false"
+          @drop.prevent="onDrop"
+        >
+          <Upload class="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p class="text-sm text-gray-600 mb-2">{{ uploading ? '上传中…' : '点击或拖拽文件到此处上传' }}</p>
+          <p class="text-xs text-gray-400">支持 PDF / Word / Markdown / 纯文本</p>
+        </div>
+        <div class="mt-3 flex items-center gap-4 text-sm">
+          <span v-if="message" class="text-green-600">{{ message }}</span>
+          <span v-if="error" class="text-red-600">{{ error }}</span>
+          <span class="text-xs text-gray-400 ml-auto">拆解功能点与生成用例由桌面端 Agent 完成，本页只负责归档需求原文</span>
+        </div>
+      </div>
+
+      <!-- 已上传 -->
+      <div class="flex items-center gap-2 mt-6 mb-3">
+        <h3 class="text-sm font-medium text-gray-900">已上传</h3>
+        <span class="text-xs text-gray-400">{{ requirements.length }} 个文件</span>
+      </div>
+      <div class="space-y-3">
+        <div v-for="item in requirements" :key="item.id" class="bg-gray-50 rounded-lg border border-gray-200 p-4 flex items-center gap-3">
+          <FileText class="w-5 h-5 text-gray-400" />
+          <div class="min-w-0 flex-1">
+            <div class="font-medium text-gray-900 truncate">{{ item.filename }}</div>
+            <div class="text-xs text-gray-400 mt-1">{{ sizeText(item.size) }} · {{ item.created_at }}</div>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-600">{{ item.status }}</span>
+        </div>
+        <div v-if="!requirements.length" class="text-center py-10 text-sm text-gray-400 bg-gray-50 rounded-lg border border-gray-200">
+          还没有上传需求文档
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

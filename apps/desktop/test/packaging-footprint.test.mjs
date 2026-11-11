@@ -221,6 +221,42 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "resources/models.dev",
       to: "models.dev",
     },
+    // The bundled Python runtime (office documents, native tooling). Read as a
+    // real interpreter tree, so it cannot live inside the asar.
+    {
+      from: "resources/python",
+      to: "python",
+    },
+    // The end-user handbook shipped next to the app, read as a plain file.
+    {
+      from: "resources/manual",
+      to: "manual",
+    },
+    // Autotest workbench: the FastAPI service runs as a child process out of
+    // <resources>/autotest, so its sources, deps, runner and hosted pages all
+    // ship as plain directories. Missing any of them starts the app fine and
+    // only breaks the workbench, which is why autotest-packaging.test.mjs
+    // guards the same contract.
+    {
+      from: "../../services/autotest/src",
+      to: "autotest/src",
+    },
+    {
+      from: "../../services/autotest/ui-shell",
+      to: "autotest/ui-shell",
+    },
+    {
+      from: "../../services/autotest/ui/dist",
+      to: "autotest/ui/dist",
+    },
+    {
+      from: "../../services/autotest/runner",
+      to: "autotest/runner",
+    },
+    {
+      from: "../../services/autotest/.deps",
+      to: "autotest/.deps",
+    },
   ]);
   assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });
