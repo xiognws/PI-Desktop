@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { PlayCircle, RefreshCw, FileText, ChevronDown, ChevronRight } from 'lucide-vue-next'
 
@@ -139,6 +139,86 @@ async function openReport(id: string) {
   }
 }
 
+// ---- 执行与报告：把「跑起来」和「出报告」两件事搬到界面上 ----------------
+// 后端这两个动作本来就存在（/workflow/runs/{id}/execute、/report），但界面上
+// 一直没有入口，等于只能靠 Agent 会话触发。工具返回摘要 + 句柄，这里只显示
+// 摘要并刷新时间线；大对象（用例、缺陷）去各自的页面看。
+
+const busyAction = ref('')
+
+async function refreshDetail(id: string) {
+  if (!id || expandedId.value !== id) return
+  try {
+    const res = await fetch(`/api/projects/${projectId}/workflow/runs/${id}`)
+    const body = await res.json()
+    detail.value = body?.data || null
+  } catch {
+    // 轮询失败不打断界面，下一次再试。
+  }
+}
+
+async function startExecution(runId: string) {
+  busyAction.value = `execute:${runId}`
+  try {
+    const res = await fetch(`/api/projects/${projectId}/workflow/runs/${runId}/execute`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      // script_ids 留空 = 投递这个 run 已落库的全部脚本；timeout 给足 120s
+      body: JSON.stringify({ script_ids: null, timeout_s: 120 }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || body?.ok === false) {
+      throw new Error(body?.summary || body?.detail || `HTTP ${res.status}`)
+    }
+    message.value = body?.summary || '已投递执行，进度见「执行」页'
+    await refreshDetail(runId)
+    await loadRuns()
+  } catch (e: any) {
+    message.value = `投递执行失败：${e?.message || ''}`
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function generateReport(runId: string) {
+  busyAction.value = `report:${runId}`
+  try {
+    const res = await fetch(`/api/projects/${projectId}/workflow/runs/${runId}/report`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || body?.ok === false) {
+      throw new Error(body?.summary || body?.detail || `HTTP ${res.status}`)
+    }
+    message.value = body?.summary || '报告已生成'
+    await refreshDetail(runId)
+    await openReport(runId)
+  } catch (e: any) {
+    message.value = `生成报告失败：${e?.message || ''}`
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+// 展开的运行还在进行中时每 5s 拉一次详情：执行投递后阶段/步骤会变化，
+// 不轮询就得手点刷新才知道跑到哪一步。
+let pollTimer: ReturnType<typeof setInterval> | null = null
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = null
+}
+function syncPolling() {
+  stopPolling()
+  const status = detail.value?.status
+  if (!expandedId.value) return
+  if (status !== 'running' && status !== 'waiting_human') return
+  pollTimer = setInterval(() => void refreshDetail(expandedId.value), 5000)
+}
+watch([expandedId, () => detail.value?.status], syncPolling)
+onBeforeUnmount(stopPolling)
+
 onMounted(loadRuns)
 </script>
 
@@ -194,6 +274,29 @@ onMounted(loadRuns)
                 <FileText class="w-4 h-4" />
                 查看报告
               </button>
+              <!-- 跑起来 / 出报告：以前只能靠 Agent 会话触发，这里是同一个后端的入口 -->
+              <button
+                class="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 disabled:opacity-50"
+                :disabled="busyAction === `execute:${run.id}`"
+                @click="startExecution(run.id)"
+              >
+                <PlayCircle class="w-4 h-4" />
+                {{ busyAction === `execute:${run.id}` ? '投递中…' : '执行用例' }}
+              </button>
+              <button
+                class="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 disabled:opacity-50"
+                :disabled="busyAction === `report:${run.id}`"
+                @click="generateReport(run.id)"
+              >
+                <FileText class="w-4 h-4" />
+                {{ busyAction === `report:${run.id}` ? '生成中…' : '生成报告' }}
+              </button>
+              <router-link
+                :to="`/project/${projectId}/executions`"
+                class="text-sm text-gray-500 hover:text-blue-600"
+              >
+                执行记录 →
+              </router-link>
             </div>
           </div>
 

@@ -31,6 +31,17 @@ const router = createRouter({
           component: () => import('@/views/Runs.vue'),
         },
         {
+          path: 'executions',
+          name: 'Executions',
+          component: () => import('@/views/Executions.vue'),
+        },
+        {
+          // 执行详情必须带 id：执行记录页点一行就进这里看事件流与用例结果。
+          path: 'executions/:id',
+          name: 'ExecutionDetail',
+          component: () => import('@/views/ExecutionDetail.vue'),
+        },
+        {
           path: 'bugs',
           name: 'Defects',
           component: () => import('@/views/Defects.vue'),

@@ -382,3 +382,93 @@ def test_case_result_is_written_back_to_execution_cases(tmp_path):
     assert row[1] == "失败"
     assert "expected 1 got 0" in (row[2] or "")
     assert status == "失败"
+
+
+# ------------------------------------------------------- pytest driven runs ----
+# 自动生成的脚本是 pytest 骨架（模块级 `def test_…`）。直接当脚本跑永远不会调用
+# 那些函数，退出码 0 会被记成「通过」——报告里 100% 通过率就是这么来的。
+
+
+def test_pytest_module_runs_through_pytest_and_reports_failure(tmp_path):
+    project_dir, db_path = make_project(tmp_path)
+    script = project_dir / "case_fail.py"
+    script.write_text(
+        textwrap.dedent(
+            """
+            def test_volume_upper_bound():
+                limit = 30
+                observed = 31
+                assert observed <= limit, f"音量超过上限：observed={observed}"
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = execute_script(db_path, "proj_test", script_row(script), project_dir=project_dir)
+
+    assert result["status"] == "fail"
+    assert result["events"][-1]["counts"] == {"pass": 0, "fail": 1, "skip": 0}
+    step_detail = next(e for e in result["events"] if e["type"] == "step.end")["detail"]
+    assert step_detail["driver"] == "pytest"
+    assert step_detail["counts"].get("failed") == 1
+    assert "音量超过上限" in (step_detail["stdout"] + step_detail["stderr"])
+
+
+def test_pytest_skeleton_is_a_skip_not_a_pass(tmp_path):
+    project_dir, db_path = make_project(tmp_path)
+    script = project_dir / "case_skeleton.py"
+    script.write_text(
+        textwrap.dedent(
+            """
+            import os
+
+            def test_skeleton():
+                if "PYTEST_CURRENT_TEST" in os.environ:
+                    import pytest
+                    pytest.skip("自动生成的骨架：补充断言后重新执行")
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = execute_script(db_path, "proj_test", script_row(script), project_dir=project_dir)
+
+    # 整条 run 的结论只有 pass/fail/error/cancelled：骨架跳过不算失败，但也不能
+    # 计成通过——counts 里如实记 skip，报告和界面据此显示「跳过」。
+    assert result["status"] == "pass"
+    assert result["events"][-1]["counts"] == {"pass": 0, "fail": 0, "skip": 1}
+
+
+def test_plain_script_without_test_functions_still_runs_directly(tmp_path):
+    project_dir, db_path = make_project(tmp_path)
+    script = project_dir / "plain.py"
+    script.write_text('print("直接执行")\n', encoding="utf-8")
+
+    result = execute_script(db_path, "proj_test", script_row(script), project_dir=project_dir)
+
+    assert result["status"] == "pass"
+    step_detail = next(e for e in result["events"] if e["type"] == "step.end")["detail"]
+    assert step_detail["driver"] == "script"
+
+
+def test_pytest_helpers_parse_the_summary_line(tmp_path):
+    from autotest.executors.python_native import (
+        looks_like_pytest_module,
+        parse_pytest_counts,
+        pytest_case_status,
+    )
+
+    module = tmp_path / "m.py"
+    module.write_text("def test_a():\n    pass\n", encoding="utf-8")
+    plain = tmp_path / "p.py"
+    plain.write_text("print('hi')\n", encoding="utf-8")
+    assert looks_like_pytest_module(module) is True
+    assert looks_like_pytest_module(plain) is False
+
+    counts = parse_pytest_counts("....F\n\n1 failed, 2 passed, 1 skipped in 0.12s\n")
+    assert counts == {"failed": 1, "passed": 2, "skipped": 1}
+    assert pytest_case_status(counts, 1)[0] == "fail"
+    assert pytest_case_status({"passed": 3}, 0) == ("pass", None)
+    assert pytest_case_status({"skipped": 2}, 0)[0] == "skip"
+    # 没有收集到用例（退出码 5）不能被当成通过
+    assert pytest_case_status({}, 5)[0] == "fail"

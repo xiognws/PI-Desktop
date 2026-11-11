@@ -71,6 +71,73 @@ onMounted(() => {
 function openEdit(s: any) {
   router.push(`/project/${projectId}/scripts/${s.id}/edit`)
 }
+
+// ---- 门禁：脚本没过 gate 不许执行 ----------------------------------------
+// 后端有 /scripts/{id}/check（静态检查）和 /scripts/{id}/gate（门禁判定），
+// 但界面上没有入口，等于「未过门禁不得执行」这条硬约束只写在工具里。这里把
+// 两个动作放出来，并把结果记在卡片上；gate 没过时「运行」直接置灰。
+
+type GateState = { state: 'idle' | 'checking' | 'gating' | 'ok' | 'fail'; detail: string }
+const gates = ref<Record<string, GateState>>({})
+
+function gateOf(id: string): GateState {
+  return gates.value[id] ?? { state: 'idle', detail: '' }
+}
+
+async function checkScript(s: any) {
+  gates.value[s.id] = { state: 'checking', detail: '检查中…' }
+  try {
+    const res = await fetch(`/api/projects/${projectId}/scripts/${s.id}/check`, { method: 'POST' })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`)
+    const count = Number(body?.errorCount ?? body?.errors?.length ?? 0)
+    const firstError = (body?.errors || [])[0]
+    const unavailable = body?.unavailable ? `（${body.unavailable}）` : ''
+    gates.value[s.id] = {
+      state: count > 0 ? 'fail' : 'ok',
+      detail: count > 0
+        ? `${count} 处问题：${typeof firstError === 'string' ? firstError : JSON.stringify(firstError)}`
+        : `静态检查通过${unavailable}`,
+    }
+  } catch (e) {
+    gates.value[s.id] = { state: 'fail', detail: `检查失败：${(e as Error).message}` }
+  }
+}
+
+async function runGate(s: any) {
+  gates.value[s.id] = { state: 'gating', detail: '判定中…' }
+  try {
+    const res = await fetch(`/api/projects/${projectId}/scripts/${s.id}/gate`, { method: 'POST' })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`)
+    const ok = body?.ok === true
+    const failures = (body?.failures || []) as unknown[]
+    gates.value[s.id] = {
+      state: ok ? 'ok' : 'fail',
+      detail: ok ? '门禁通过，可以执行' : `门禁未过：${failures.map(f => (typeof f === 'string' ? f : JSON.stringify(f))).join('；')}`,
+    }
+    await loadScripts()
+  } catch (e) {
+    gates.value[s.id] = { state: 'fail', detail: `门禁失败：${(e as Error).message}` }
+  }
+}
+
+function gateClass(id: string) {
+  const state = gateOf(id).state
+  if (state === 'ok') return 'bg-green-50 text-green-600'
+  if (state === 'fail') return 'bg-red-50 text-red-600'
+  if (state === 'checking' || state === 'gating') return 'bg-blue-50 text-blue-600'
+  return 'bg-gray-100 text-gray-500'
+}
+
+function gateLabel(id: string) {
+  const state = gateOf(id).state
+  if (state === 'ok') return '门禁通过'
+  if (state === 'fail') return '门禁未过'
+  if (state === 'checking') return '检查中…'
+  if (state === 'gating') return '判定中…'
+  return '未过门禁'
+}
 </script>
 
 <template>
@@ -104,12 +171,30 @@ function openEdit(s: any) {
               :class="s.status === '就绪' ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'">
               {{ s.status }}
             </span>
+            <span class="text-xs px-2 py-0.5 rounded" :class="gateClass(s.id)">{{ gateLabel(s.id) }}</span>
             <span class="text-xs text-gray-400">{{ s.language }}</span>
           </div>
+          <p v-if="gateOf(s.id).detail" class="mt-2 text-xs leading-relaxed"
+            :class="gateOf(s.id).state === 'fail' ? 'text-red-600' : 'text-gray-500'">
+            {{ gateOf(s.id).detail }}
+          </p>
           <div class="mt-4 flex gap-2">
             <button @click="openEdit(s)" class="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded hover:bg-gray-100">编辑</button>
             <button
-              :disabled="runningIds.includes(s.id)"
+              :disabled="gateOf(s.id).state === 'checking' || gateOf(s.id).state === 'gating'"
+              @click="checkScript(s)"
+              class="px-3 py-1.5 text-xs border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-50">
+              校验
+            </button>
+            <button
+              :disabled="gateOf(s.id).state === 'checking' || gateOf(s.id).state === 'gating'"
+              @click="runGate(s)"
+              class="px-3 py-1.5 text-xs border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-50">
+              过门禁
+            </button>
+            <button
+              :disabled="runningIds.includes(s.id) || gateOf(s.id).state === 'fail'"
+              :title="gateOf(s.id).state === 'fail' ? '门禁未过，先修脚本再过门禁' : ''"
               @click="runScript(s)"
               class="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1">
               <Play class="w-3 h-3" />

@@ -177,6 +177,20 @@ Agent: 后端按反馈修订 caseSet → autotest_case_review
 拒绝再生成，逼模型进报告。**不存在「模型自己宣布通过」的路径**：`report` 的
 counts 只从 `execution_cases` 聚合，模型只写结论段落。
 
+### 6.1 执行器按脚本形态选驱动（pytest vs 直接跑）
+
+生成的用例是 pytest 骨架（模块级 `def test_…`）。`python-native` 执行器早先是
+`python <file>` 直跑，**那些测试函数永远不会被调用**，退出码 0 就记成「通过」——
+骨架阶段等于 100% 假通过。现在执行器先看文件里有没有 `def test_`：
+
+- **有** → `python -m pytest <file> -q --no-header -p no:cacheprovider`，用汇总行
+  （`1 failed, 2 passed`）算 counts；失败块（`=== FAILURES ===`）原文写进
+  `case_end.failure`，缺陷单标题、执行详情、日志分析都引用这一行。
+- **没有** → 仍然 `python <file>`，行为与以前完全一致。
+- `skip` 不再把整条 run 判成 fail（骨架就是 skip），但 counts 里如实记
+  `skip`，报告与界面按「跳过」显示。
+- 没收集到任何用例（pytest 退出码 5）判为 fail，不当作通过。
+
 ## 7. 存储
 
 沿用现有「每项目一个 SQLite」（`storage/sqlite.py` + `migrations.py`），只加四张表：
@@ -293,15 +307,19 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 
 ## 8. 前端
 
-`apps/autotest-ui`（Vue 3 + Vite），5 个页面，不复制现有 17 视图：
+`services/autotest/ui`（Vue 3 + Vite），项目内 7 个导航页 + 执行详情：
 
-| 页面 | 数据来源 | 能做什么 |
+| 页面（路由） | 数据来源 | 能做什么 |
 |---|---|---|
-| 任务 | `POST /api/workflow-runs` | 选项目/模块、上传 PRD、选测试类型、启动 |
-| 进度 | `GET /api/workflow-runs/{id}` + SSE | 阶段时间线、每次工具调用的摘要、实时日志 |
-| 审批 | `GET /api/workflow-runs/{id}/pending` | 用例表格（可改优先级/删行）、批准/驳回 |
-| 执行 | 现有 executions/events 路由 | 步骤、截图、产物、取消 |
-| 知识库 | `GET /api/knowledge/search` | 关键词+标签+模块，复制/加入上下文 |
+| 运行记录 `runs` | `GET …/workflow/runs`、`GET …/runs/{id}` | 阶段时间线、每步摘要、人工卡点批准/驳回；**「执行用例」**（`POST …/runs/{id}/execute`）与**「生成报告」**（`POST …/runs/{id}/report`）就在这一页，展开中的 run 每 5s 自动刷新 |
+| 执行 `executions` | `GET …/executions` | 列表 + 状态筛选（全部/执行中/已完成/失败）、有执行在跑时 4s 自动刷新、进度条、进入详情 |
+| 执行详情 `executions/:id` | `GET …/executions/{id}`、`…/events` | RunEvent 时间线、用例结果、产物/截图、**取消执行** |
+| 缺陷 `bugs` | `GET …/workflow/bugs`、`PATCH …/bugs/{id}` | 跨 run 的缺陷单（`occurrences` 累计），人工流转 `open/fixed/verified/wontfix` |
+| 知识库 `knowledge` | `GET …/knowledge/documents`、`…/workflow/knowledge/search` | 批量导入（md/pdf/docx/html…）、切分预览、FTS5/BM25 检索 + 复制 |
+| 需求 `requirements` | `GET/POST …/requirements` | 上传 PRD 原文、读回正文 |
+| 用例 `cases` | `GET/POST …/cases` | 用例 CRUD、单条运行 |
+| 脚本 `scripts` | `GET/POST …/scripts`、`…/scripts/{id}/check|gate|run` | 列表 + 编辑器；**「校验」「过门禁」**；门禁未过时「运行」置灰（把「未过 gate 不得执行」这条约束搬到界面上） |
+| 报告 `reports` | `GET …/runs/{id}/report-content` | 按 run 读 Markdown 正文（含缺陷清单） |
 
 承载方式：**独立窗口**，但 P4 才接；P2 先用浏览器。
 

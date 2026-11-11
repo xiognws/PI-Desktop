@@ -169,6 +169,9 @@ def test_failed_script_reaches_analysis_and_report(client):
     assert bugs["total"] == 1
     assert bugs["bugs"][0]["script_name"] == "manual_fail.py"
     assert bugs["bugs"][0]["severity"] == "major"
+    # 缺陷标题要引可读的那一行（断言行），不能是 pytest 的 `____ test ____` 装饰线
+    assert "assert" in bugs["bugs"][0]["title"]
+    assert bugs["bugs"][0]["error_type"] == "AssertionError"
 
     body = client.get(f"/api/projects/{project_id}/workflow/runs/{run_id}/report-content").json()["data"]
     assert body["name"] == report["data"]["path"].rsplit("\\", 1)[-1].rsplit("/", 1)[-1]

@@ -50,6 +50,19 @@ def _error_type(message: str) -> str:
     return matches[-1] if matches else ""
 
 
+def guess_error_type(text: str) -> str:
+    """Best-effort exception name for a whole log/failure block.
+
+    Callers outside the analyzer (bug creation) need the same answer the
+    analysis would give, without building the full report.
+    """
+    for line in reversed((text or "").splitlines()):
+        found = _error_type(line)
+        if found:
+            return found
+    return ""
+
+
 def _suggestions(error_type: str, message: str) -> list[str]:
     picked: list[str] = []
     for key, reason, advice in _HINTS:
@@ -93,7 +106,14 @@ def analyze_log(raw_log: str, trace_id: str = "", module: str = "") -> dict:
             suspects.append(suspect)
 
     last_error = error_lines[-1] if error_lines else ""
-    error_type = _error_type(last_error)
+    # 取「最后一个能识别出异常类型」的失败行，而不是字面上最后一行：
+    # pytest 的收尾是 `FAILED x.py::t - assert ...`，它本身没有异常名，
+    # 真正的 AssertionError 在它上面一行。
+    error_type = ""
+    for line in reversed(error_lines):
+        error_type = _error_type(line)
+        if error_type:
+            break
     summary = _clip(last_error) if last_error else _clip(next((l for l in reversed(lines) if l.strip()), ""))
 
     return {

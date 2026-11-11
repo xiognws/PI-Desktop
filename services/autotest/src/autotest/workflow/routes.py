@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 import uuid
@@ -26,6 +27,33 @@ from autotest.workflow import scripts as script_service
 from autotest.workflow import store
 
 router = APIRouter(prefix="/api/projects/{project_id}/workflow", tags=["workflow"])
+
+# pytest 的 "E   assert 1 <= 30" 与 "ValueError: xxx" 两种最可读的失败行。
+_PYTEST_ERROR_LINE = re.compile(r"^E\s+(.+)$", re.MULTILINE)
+_EXCEPTION_LINE = re.compile(r"^([A-Za-z_][\w.]*(?:Error|Exception))(?::\s*(.*))?$")
+
+
+def _failure_reason(text: str, fallback: str) -> str:
+    """Pick the line a human would quote from a failure block.
+
+    pytest 的失败块第一行是 `____ test_name ____` 这层装饰，直接取第一行会让缺陷
+    标题变成一串下划线。优先取断言行（`E   assert …`），其次异常行，最后才是
+    第一行有内容的文本。
+    """
+    lines = [line.rstrip() for line in (text or "").splitlines()]
+    for line in reversed(lines):
+        matched = _PYTEST_ERROR_LINE.match(line)
+        if matched and matched.group(1).strip():
+            return matched.group(1).strip()[:200]
+    for line in reversed(lines):
+        if _EXCEPTION_LINE.match(line.strip()):
+            return line.strip()[:200]
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or set(stripped) <= set("_= "):
+            continue
+        return stripped[:200]
+    return fallback
 
 
 def _server():
@@ -601,8 +629,8 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
             script_name = str(item.get("script_name") or item.get("script_id") or "")
             if script_name and store.bug_exists(conn, run_id, script_name):
                 continue
-            first_line = str(item.get("failure") or "").strip().splitlines()
-            reason = (first_line[0][:100] if first_line else f"状态 {item.get('status')}")
+            failure_text = str(item.get("failure") or "")
+            reason = _failure_reason(failure_text, f"状态 {item.get('status')}")
             store.create_bug(
                 conn,
                 run_id,
@@ -610,7 +638,7 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
                 script_name=script_name,
                 case_id=str(item.get("case_id") or ""),
                 severity="blocker" if item.get("status") == "error" else "major",
-                error_type=error_type,
+                error_type=error_type or analysis_service.guess_error_type(failure_text),
                 summary=reason,
                 repro=str(item.get("execution_id") or ""),
             )

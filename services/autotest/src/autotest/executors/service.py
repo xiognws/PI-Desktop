@@ -122,8 +122,10 @@ def execute_script(
             if stored["type"] == "case.end":
                 case_status = str(stored.get("status", "pass"))
                 counts[case_status if case_status in counts else "fail"] += 1
-                if case_status != "pass":
-                    status = "fail" if case_status != "error" else "error"
+                # skip 不改整条 run 的结论：自动生成的骨架用例就是 skip，
+                # 把它算成失败会让「还没写断言」看起来像红了的缺陷。
+                if case_status in ("fail", "error"):
+                    status = "error" if case_status == "error" else "fail"
                     failure = stored.get("failure")
     except Exception as error:  # noqa: BLE001 - a run must never take the server down
         status = "error"
