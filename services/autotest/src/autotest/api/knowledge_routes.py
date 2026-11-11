@@ -348,6 +348,65 @@ def list_chunks(project_id: str, doc_id: str, limit: int = 20, offset: int = 0) 
     }
 
 
+@router.get("/documents/stats")
+def document_stats(project_id: str) -> dict:
+    """按模块分组的文档/切分统计（知识库侧栏与导入回执共用）。"""
+    with _project_conn(project_id) as conn:
+        stats = knowledge_store.module_stats(conn, project_id)
+    return {"ok": True, "data": stats}
+
+
+class DocumentPatchIn(BaseModel):
+    # None = 不改这个字段；空字符串 = 清空（未分组 / 无标签）。
+    module: str | None = None
+    tags: str | None = None
+
+
+@router.patch("/documents/{doc_id}")
+def patch_document(project_id: str, doc_id: str, body: DocumentPatchIn) -> dict:
+    """改文档的模块/标签。只动元数据，不重切、不影响已有检索条目。"""
+    with _project_conn(project_id) as conn:
+        updated = knowledge_store.update_document(
+            conn, project_id, doc_id, module=body.module, tags=body.tags
+        )
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"文档不存在: {doc_id}")
+    return {"ok": True, "summary": f"已更新 {updated['filename']}", "data": {"document": updated}}
+
+
+class DeleteBatchIn(BaseModel):
+    ids: list[str]
+
+
+@router.post("/documents/delete-batch")
+def delete_documents_batch(project_id: str, body: DeleteBatchIn) -> dict:
+    """批量删除。逐个走单删路径：文件 + 条目 + 文档行要么全删，要么那一条报错。"""
+    project_dir = _project_dir(project_id)
+    knowledge_dir = (project_dir / "knowledge").resolve()
+    deleted: list[str] = []
+    failed: list[dict] = []
+    chunks = 0
+    for doc_id in body.ids:
+        try:
+            with _project_conn(project_id) as conn:
+                if knowledge_store.get_document(conn, project_id, doc_id) is None:
+                    failed.append({"doc_id": doc_id, "reason": "文档不存在"})
+                    continue
+                chunks += knowledge_store.delete_document(conn, project_id, doc_id)
+            doc_dir = project_dir / "knowledge" / doc_id
+            if doc_id.startswith("doc-") and knowledge_dir in doc_dir.resolve().parents and doc_dir.is_dir():
+                shutil.rmtree(doc_dir, ignore_errors=True)
+            deleted.append(doc_id)
+        except Exception as exc:  # 单条失败不影响其余
+            failed.append({"doc_id": doc_id, "reason": str(exc)})
+    return {
+        "ok": True,
+        "summary": f"已删除 {len(deleted)} 份文档（{chunks} 条切分）"
+        + (f"，{len(failed)} 份失败" if failed else ""),
+        "data": {"deleted": deleted, "failed": failed, "deleted_chunks": chunks},
+    }
+
+
 @router.delete("/documents/{doc_id}")
 def delete_document(project_id: str, doc_id: str) -> dict:
     project_dir = _project_dir(project_id)

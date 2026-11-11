@@ -28,9 +28,12 @@ function shortTime(value?: string) {
   return value ? value.replace('T', ' ').slice(5, 16) : ''
 }
 
-// 从左侧「项目结构」点模块进来时，没有关键词也要能看该模块的文档
+// 从左侧「项目结构」点模块进来时，没有关键词也要能看该模块的文档。
+// 「未分组」在后端口径里是空 module，这里统一成一个标签，避免两处各写一遍。
+const UNGROUPED = '未分组'
+const moduleOf = (doc: Doc) => doc.module || UNGROUPED
 const visibleDocs = computed(() =>
-  kwModule.value ? docs.value.filter(d => (d.module || '未标模块') === kwModule.value) : docs.value,
+  kwModule.value ? docs.value.filter(d => moduleOf(d) === kwModule.value) : docs.value,
 )
 
 async function searchKnowledge() {
@@ -59,8 +62,86 @@ async function loadDocs() {
     const res = await fetch(`/api/projects/${projectId}/knowledge/documents`)
     const body = await res.json()
     docs.value = body?.data?.documents || []
+    void loadStats()
   } catch {
     status.value = '加载文档库失败'
+  }
+}
+
+// 模块分组：文档数与切分数由后端一次算好，前端不再自己加总（两套口径迟早对不上）。
+const stats = ref<{ modules: { module: string; docs: number; chunks: number }[]; total: { docs: number; chunks: number } } | null>(null)
+
+async function loadStats() {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/knowledge/documents/stats`)
+    const body = await res.json()
+    stats.value = body?.data || null
+  } catch {
+    stats.value = null
+  }
+}
+
+// 改模块/标签：只动元数据，不重切。空字符串是合法值（清空 → 未分组）。
+const editingId = ref('')
+const editModule = ref('')
+const editTags = ref('')
+
+function startEdit(doc: Doc) {
+  editingId.value = doc.doc_id
+  editModule.value = doc.module || ''
+  editTags.value = doc.tags || ''
+}
+
+async function saveEdit(doc: Doc) {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/knowledge/documents/${doc.doc_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module: editModule.value.trim(), tags: editTags.value.trim() }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`)
+    status.value = body?.summary || '已更新'
+    editingId.value = ''
+    await loadDocs()
+  } catch (e: any) {
+    status.value = e?.message || '更新失败'
+  }
+}
+
+// 批量删除：选中的文档逐个走单删（文件 + 切分 + 文档行），失败的那些留在列表里。
+const checkedIds = ref<string[]>([])
+const allChecked = computed(
+  () => visibleDocs.value.length > 0 && visibleDocs.value.every(d => checkedIds.value.includes(d.doc_id)),
+)
+
+function toggleCheck(id: string) {
+  const idx = checkedIds.value.indexOf(id)
+  if (idx > -1) checkedIds.value.splice(idx, 1)
+  else checkedIds.value.push(id)
+}
+
+function toggleAll() {
+  checkedIds.value = allChecked.value ? [] : visibleDocs.value.map(d => d.doc_id)
+}
+
+async function removeChecked() {
+  if (!checkedIds.value.length) return
+  const ids = [...checkedIds.value]
+  try {
+    const res = await fetch(`/api/projects/${projectId}/knowledge/documents/delete-batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`)
+    status.value = body?.summary || `已删除 ${ids.length} 份`
+    checkedIds.value = []
+    if (chunkDoc.value && ids.includes(chunkDoc.value.doc.doc_id)) chunkDoc.value = null
+    await loadDocs()
+  } catch (e: any) {
+    status.value = e?.message || '批量删除失败'
   }
 }
 
@@ -242,19 +323,62 @@ onMounted(async () => {
       <!-- 文档库 -->
       <div class="flex items-center gap-2 mb-3">
         <h3 class="text-sm font-medium text-gray-900">文档库</h3>
-        <span class="text-xs text-gray-400">{{ visibleDocs.length }} 篇<span v-if="kwModule">（{{ kwModule }}）</span></span>
-        <button class="ml-auto p-1 text-gray-400 hover:text-gray-700" @click="loadDocs"><RefreshCw class="w-3.5 h-3.5" /></button>
+        <span class="text-xs text-gray-400">
+          {{ visibleDocs.length }} 篇<span v-if="kwModule">（{{ kwModule }}）</span>
+          <span v-if="stats"> · 共 {{ stats.total.chunks }} 段</span>
+        </span>
+        <button
+          v-if="checkedIds.length"
+          class="ml-auto text-xs text-red-600 hover:underline"
+          @click="removeChecked()"
+        >删除选中 {{ checkedIds.length }}</button>
+        <button class="p-1 text-gray-400 hover:text-gray-700" :class="checkedIds.length ? '' : 'ml-auto'" @click="loadDocs"><RefreshCw class="w-3.5 h-3.5" /></button>
       </div>
+
+      <!-- 模块分组：点一下只筛文档库，不影响上面的检索条件 -->
+      <div v-if="stats && stats.modules.length" class="flex flex-wrap items-center gap-2 mb-3">
+        <button
+          class="text-xs px-2 py-1 rounded border"
+          :class="!kwModule ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600'"
+          @click="kwModule = ''"
+        >全部 {{ stats.total.docs }}</button>
+        <button
+          v-for="m in stats.modules"
+          :key="m.module"
+          class="text-xs px-2 py-1 rounded border"
+          :class="kwModule === m.module ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600'"
+          @click="kwModule = kwModule === m.module ? '' : m.module"
+        >{{ m.module }} {{ m.docs }}<span class="ml-1 text-gray-400">{{ m.chunks }} 段</span></button>
+      </div>
+
       <div class="grid grid-cols-2 gap-4">
         <div v-for="doc in visibleDocs" :key="doc.doc_id" class="bg-white rounded-lg border border-gray-200 p-4 flex items-start gap-3">
+          <input
+            type="checkbox"
+            class="mt-1"
+            :checked="checkedIds.includes(doc.doc_id)"
+            @change="toggleCheck(doc.doc_id)"
+          />
           <FileText class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
           <div class="min-w-0 flex-1">
             <div class="font-medium text-gray-900 truncate">{{ doc.filename || doc.doc_id }}</div>
-            <div class="text-xs text-gray-400 mt-1">
-              {{ doc.module || '未标模块' }} · {{ doc.chunk_count ?? 0 }} 段 · {{ shortTime(doc.created_at) }}
+
+            <div v-if="editingId !== doc.doc_id" class="text-xs text-gray-400 mt-1">
+              {{ moduleOf(doc) }} · {{ doc.chunk_count ?? 0 }} 段 · {{ shortTime(doc.created_at) }}
+              <span v-if="doc.tags" class="text-gray-500"> · {{ doc.tags }}</span>
             </div>
+            <div v-else class="mt-2 space-y-2">
+              <input v-model="editModule" class="w-full h-7 px-2 text-xs border border-gray-200 rounded" placeholder="模块（留空 = 未分组）" />
+              <input v-model="editTags" class="w-full h-7 px-2 text-xs border border-gray-200 rounded" placeholder="标签，逗号分隔" />
+            </div>
+
             <div class="flex items-center gap-3 mt-2">
               <button class="text-xs text-blue-600 hover:underline" @click="previewChunks(doc, 0)">查看切分</button>
+              <template v-if="editingId === doc.doc_id">
+                <button class="text-xs text-blue-600 hover:underline" @click="saveEdit(doc)">保存</button>
+                <button class="text-xs text-gray-400 hover:text-gray-700" @click="editingId = ''">取消</button>
+              </template>
+              <button v-else class="text-xs text-gray-500 hover:underline" @click="startEdit(doc)">改模块</button>
               <button class="text-xs text-gray-400 hover:text-red-600" @click="removeDoc(doc)">删除</button>
             </div>
           </div>
@@ -262,6 +386,10 @@ onMounted(async () => {
         <div v-if="!visibleDocs.length" class="col-span-2 text-center py-12 text-sm text-gray-400 bg-white rounded-lg border border-gray-200">
           还没有文档，点右上「导入文件」
         </div>
+      </div>
+      <div v-if="visibleDocs.length" class="mt-2 flex items-center gap-2 text-xs text-gray-500">
+        <input type="checkbox" :checked="allChecked" @change="toggleAll()" />
+        <span>全选本页 {{ visibleDocs.length }} 篇</span>
       </div>
     </div>
 

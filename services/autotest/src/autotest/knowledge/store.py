@@ -280,6 +280,59 @@ def delete_document(conn: sqlite3.Connection, project_id: str, doc_id: str) -> i
     return int(deleted)
 
 
+def update_document(
+    conn: sqlite3.Connection,
+    project_id: str,
+    doc_id: str,
+    module: str | None = None,
+    tags: str | None = None,
+) -> dict | None:
+    """只改元数据（module / tags），切分与检索记录不动。
+
+    传 None 表示「这个字段不该被这次修改碰到」——空字符串是合法取值（清空）。
+    """
+    assigns: list[str] = []
+    params: list[object] = []
+    if module is not None:
+        assigns.append("module = ?")
+        params.append(module)
+    if tags is not None:
+        assigns.append("tags = ?")
+        params.append(tags)
+    if not assigns:
+        return get_document(conn, project_id, doc_id)
+    params.extend([project_id, doc_id])
+    conn.execute(
+        f"UPDATE knowledge_docs SET {', '.join(assigns)} WHERE project_id = ? AND id = ?",
+        params,
+    )
+    return get_document(conn, project_id, doc_id)
+
+
+def module_stats(conn: sqlite3.Connection, project_id: str) -> dict:
+    """按模块统计文档/切分数量（知识库侧栏的分组）。
+
+    空模块归到「未分组」：早期导入没填模块，直接丢掉这些文档会让总数对不上。
+    """
+    rows = conn.execute(
+        "SELECT COALESCE(NULLIF(module, ''), '未分组') AS module,"
+        "       COUNT(*) AS docs,"
+        "       COALESCE(SUM(chunk_count), 0) AS chunks"
+        " FROM knowledge_docs WHERE project_id = ? GROUP BY 1 ORDER BY docs DESC, module ASC",
+        (project_id,),
+    ).fetchall()
+    modules = [
+        {"module": row[0], "docs": int(row[1]), "chunks": int(row[2])} for row in rows
+    ]
+    return {
+        "modules": modules,
+        "total": {
+            "docs": sum(item["docs"] for item in modules),
+            "chunks": sum(item["chunks"] for item in modules),
+        },
+    }
+
+
 def search_records(
     conn: sqlite3.Connection,
     project_id: str,
