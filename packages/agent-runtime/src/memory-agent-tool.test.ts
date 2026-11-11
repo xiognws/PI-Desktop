@@ -138,6 +138,74 @@ async function run(host: ReturnType<typeof fakeHost>, params: Record<string, unk
   return { text: result.content.map((part) => part.text).join("\n"), isError: result.isError };
 }
 
+/** A host plus the skill catalogue the runtime would pass in. */
+function runWithSkills(
+  host: ReturnType<typeof fakeHost>,
+  params: Record<string, unknown>,
+  skills: { id: string; name: string; description: string }[],
+) {
+  const tool = createMemoryTool(host as never, { skills: () => skills });
+  return tool
+    .execute("call-1", params as never, undefined as never)
+    .then((result) => {
+      const value = result as {
+        content: { text: string }[];
+        isError?: boolean;
+        details?: Record<string, unknown>;
+      };
+      return {
+        text: value.content.map((part) => part.text).join("\n"),
+        isError: value.isError,
+        details: value.details,
+      };
+    });
+}
+
+describe("memory refuses what a skill already carries", () => {
+  const skill = {
+    id: "add-desktop-ipc-channel",
+    name: "Add a Desktop IPC Channel",
+    description:
+      "Use when adding a new frontend IPC channel in PI-Desktop: protocol.ts channel, electron/main/ipc handler, api.ts wrapper, test.",
+  };
+
+  it("names the skill instead of storing the procedure twice", async () => {
+    // Measured: the same four-step IPC procedure ended up as a skill and as two
+    // memory entries, written by two paths that never see each other.
+    const host = fakeHost([]);
+    const { text, isError, details } = await runWithSkills(
+      host,
+      {
+        target: "memory",
+        operations: [
+          {
+            action: "add",
+            content:
+              "加新 IPC 通道四步：1. packages/shared/src/protocol.ts 注册通道 → 2. electron/main/ipc 加 handler → 3. src/lib/api.ts 封装 → 4. 补 node --test 用例",
+          },
+        ],
+      },
+      [skill],
+    );
+    expect(isError).toBe(true);
+    expect(details?.errorCode).toBe("MEMORY_COVERED_BY_SKILL");
+    expect(text).toContain("add-desktop-ipc-channel");
+    // Nothing was written.
+    expect(host.state.entries).toEqual([]);
+  });
+
+  it("still stores a fact that merely mentions the same area", async () => {
+    const host = fakeHost([]);
+    const { isError } = await runWithSkills(
+      host,
+      { target: "memory", operations: [{ action: "add", content: "这台机器上 electron 二进制在 D:\Code 下的 dist 目录" }] },
+      [skill],
+    );
+    expect(isError).toBeFalsy();
+    expect(host.state.entries).toHaveLength(1);
+  });
+});
+
 describe("createMemoryTool", () => {
   it("adds an entry and persists it", async () => {
     const host = fakeHost(["existing"]);

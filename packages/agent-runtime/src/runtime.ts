@@ -2637,7 +2637,16 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       // anywhere, which is the memory half of the loop going quiet.
       ...(declared.some((tool) => tool.name === "memory")
         ? []
-        : [createMemoryTool(this.host)]),
+        : [
+            createMemoryTool(this.host, {
+              skills: () =>
+                this.pluginSkills.map((skill) => ({
+                  id: skill.id,
+                  name: skill.name,
+                  description: skill.description,
+                })),
+            }),
+          ]),
       // The same gap one layer down: `memory` is deferred, so the fork only had it
       // when the turn happened to activate it. A pass that learns a preference —
       // the case the review prompt calls a first-class signal — could not write it

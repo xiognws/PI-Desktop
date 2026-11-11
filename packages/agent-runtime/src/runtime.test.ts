@@ -2,6 +2,8 @@ import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
+import { CONTEXT_CALIBRATION_OVERHEAD_CAP } from "./context-calibration.js";
 import { Type } from "typebox";
 import { type Agent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core";
 import {
@@ -3868,6 +3870,8 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       "Write",
       "Glob",
       "Grep",
+      "memory",
+      "skill_manage",
       "asktool",
       "Skill",
       "EnterPlanMode",
@@ -9622,11 +9626,14 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
     await runtime.dispose();
   });
 
-  it("omits the Skill tool and section when no plugin taught a skill", async () => {
+  it("omits the Skill tool and library section when no plugin taught a skill", async () => {
     const runtime = createRuntime();
     const agent = (runtime as any).agent;
 
-    expect(agent.state.systemPrompt).not.toContain("# Skills");
+    // `# Writing to the skill library` (ADR 0391) is always present — the rules
+    // apply from the first turn. What depends on the library is the catalogue
+    // itself, and the tool that reads it.
+    expect(agent.state.systemPrompt).not.toContain("# Skills\n");
     expect(agent.state.tools.some((tool: any) => tool.name === "Skill")).toBe(false);
 
     await runtime.dispose();
@@ -12785,10 +12792,12 @@ describe("context estimate calibration", () => {
     expect(overhead()).toBe(0);
 
     // The third usable observation crosses the threshold: the two above plus
-    // this one, each measuring `3 * raw - raw`.
+    // this one, each measuring `3 * raw - raw`. The result is capped, and `raw`
+    // grew with the system prompt (ADR 0391 added the writing rules), so the
+    // assertion states the cap instead of assuming the sample stays under it.
     (runtime as any).inFlightContextEstimate = { ...parked };
     (runtime as any).recordContextCalibration(report(raw * 3), false);
-    expect(overhead()).toBe(raw * 2);
+    expect(overhead()).toBe(Math.min(raw * 2, CONTEXT_CALIBRATION_OVERHEAD_CAP));
 
     await runtime.dispose();
   });
@@ -14548,9 +14557,10 @@ describe("skill review triggering (Hermes background_review port)", () => {
     };
     expect(internal.toolCatalog.has("skill_manage")).toBe(true);
     expect(internal.toolCatalog.has("memory")).toBe(true);
-    // The deferred set is what the model must activate; it is not a statement
-    // about what a background fork may use.
-    expect(internal.declaredTools().map((tool) => tool.name)).not.toContain("skill_manage");
+    // ADR 0391: the writers are declared on the first turn. Deferring them cost a
+    // ToolSearch round per write, and measured, the model spent that round on
+    // memory and wrote no skill at all.
+    expect(internal.declaredTools().map((tool) => tool.name)).toContain("skill_manage");
     return runtime.dispose();
   });
 

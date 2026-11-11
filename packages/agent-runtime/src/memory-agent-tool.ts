@@ -34,6 +34,8 @@ import {
 } from "./memory-store.js";
 import { scrubSecretsInBatch } from "@pi-workspace/shared";
 
+import { duplicateOfSkill, type SkillSummary } from "./memory-skill-overlap.js";
+
 /** Appended to a result whose content had a credential masked out of it. */
 const MEMORY_SCRUB_NOTE =
   "\n\nA credential-shaped string in this content was replaced with ***REDACTED*** before saving: memory is re-sent to the model on every later turn.";
@@ -52,6 +54,8 @@ const MEMORY_TOOL_DESCRIPTION = [
   "- `replace` swaps a WHOLE entry. Use it when the entry is wrong from the start.",
   "- `remove` deletes a whole entry. Use it to drop stale or superseded notes.",
   "- `batch` applies several operations atomically against the final size limit, so one call can remove stale entries and add new ones in the same turn. Put `target` on an operation to edit a store other than the call's own `target`.",
+  "",
+  "A procedure — two or more steps that will still be true next month — belongs in a skill, not here. This tool refuses an entry that repeats a procedure a skill already carries (`MEMORY_COVERED_BY_SKILL`): patch that skill instead, and use memory for the one-line fact or quirk a person would forget.",
   "",
   "`old_text` only LOCATES an entry; it does not have to be the whole entry, but it must select exactly one. Copy it from the entry as written. If nothing matches, the result lists the closest entries — copy from one of those and retry in this turn.",
   "",
@@ -277,7 +281,13 @@ export type MemoryToolHost = Pick<RuntimeHost, "call">;
  * operation to the host and editing there — would need the matching rules twice,
  * and two implementations of "which entry did the model mean" diverge silently.
  */
-export function createMemoryTool(host: MemoryToolHost): AgentTool {
+/** What the memory tool needs to know about the library it shares a lesson with. */
+export type MemoryToolOptions = {
+  /** The skill catalogue, read at write time rather than at construction. */
+  skills?: () => readonly SkillSummary[];
+};
+
+export function createMemoryTool(host: MemoryToolHost, options: MemoryToolOptions = {}): AgentTool {
   return {
     name: "memory",
     label: "Memory",
@@ -362,6 +372,29 @@ export function createMemoryTool(host: MemoryToolHost): AgentTool {
           entries: safe,
           masked: safe.some((entry, index) => entry !== entries[index]),
         });
+      }
+      // One lesson, one place. The prompt says a procedure belongs in the skill;
+      // measured, the same four-step procedure still landed in the library *and*
+      // in memory, because the main turn and the review fork do not see each
+      // other's writes. Refusing here is the only place both are visible.
+      const skills = options.skills?.() ?? [];
+      if (skills.length > 0) {
+        for (const store of stores) {
+          const current = currentByStore.get(store) ?? [];
+          const duplicate = duplicateOfSkill(entriesByStore.get(store) ?? [], current, skills);
+          if (duplicate) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Not saved: that is the same procedure skill \`${duplicate.skillId}\` already carries. A procedure lives in the skill and nowhere else — patch that skill (\`skill_manage\` action \`patch\`, or add a \`references/\` file) and keep memory for facts, preferences and one-line quirks. If this really is a fact rather than the procedure, state it as the fact alone.`,
+                },
+              ],
+              details: { errorCode: "MEMORY_COVERED_BY_SKILL", skillId: duplicate.skillId },
+              isError: true,
+            };
+          }
+        }
       }
       const masked = [...scrubbed.values()].some((entry) => entry.masked);
       try {

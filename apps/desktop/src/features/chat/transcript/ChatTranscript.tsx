@@ -538,7 +538,6 @@ function TranscriptBody({
             isRunning={isRunning}
             liveDelegations={liveDelegations}
             liveTurnId={liveTurnId}
-            trailingSlot={<SkillReviewRow sessionId={sessionId ?? ""} />}
           />
           {tailEntry ? (
             <TranscriptTail
@@ -548,6 +547,13 @@ function TranscriptBody({
               runtimeActivity={specializedActivity}
             />
           ) : null}
+          {/*
+            The review of the turn that just ended belongs after it. It used to be
+            the history's trailing slot, which put it above `TranscriptTail` — the
+            live turn — so a pass that had already finished was reported before
+            the reply it was reviewing, and read as if it ran first.
+          */}
+          <SkillReviewRow sessionId={sessionId ?? ""} />
           {hasMoreAfter && !automaticContinuation ? (
             <button
               type="button"
