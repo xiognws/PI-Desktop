@@ -1,0 +1,50 @@
+apps/desktop/electron/main/bootstrap/shutdown.ts
+  h_201ed4c689ac8b 57-58,84,241
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 126-131,426-429
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 71-72,366-387,1104-1109,1140
+apps/desktop/electron/main/workbuddy/bridge.ts
+  h_201ed4c689ac8b 1-459
+apps/desktop/electron/main/workbuddy/catalog.ts
+  h_201ed4c689ac8b 1-166
+apps/desktop/electron/main/workbuddy/detect.ts
+  h_201ed4c689ac8b 1-190
+apps/desktop/electron/main/workbuddy/paths.ts
+  h_201ed4c689ac8b 1-113
+apps/desktop/electron/main/workbuddy/provider.ts
+  h_201ed4c689ac8b 1-154
+apps/desktop/electron/main/workbuddy/service.ts
+  h_201ed4c689ac8b 1-188
+apps/desktop/electron/main/workbuddy/sources.ts
+  h_201ed4c689ac8b 1-56
+apps/desktop/electron/main/workbuddy/types.ts
+  h_201ed4c689ac8b 1-78
+apps/desktop/electron/main/workbuddy/upstream.ts
+  h_201ed4c689ac8b 1-373
+apps/desktop/test/workbuddy-bridge.test.mjs
+  h_201ed4c689ac8b 1-334
+apps/desktop/test/workbuddy-detection.test.mjs
+  h_201ed4c689ac8b 1-242
+apps/desktop/test/workbuddy-entry.test.mjs
+  h_201ed4c689ac8b 1-267
+docs/adr/0393-local-desktop-model-entries.md
+  h_201ed4c689ac8b 1-101
+docs/adr/README.md
+  h_201ed4c689ac8b 424
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 821-861
+docs/zh-CN/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 697-730
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d180215b28e4b4553a89a9c2c561d6245b4df6bb",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
