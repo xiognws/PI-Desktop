@@ -22,7 +22,7 @@ import {
 } from "../startup-animation";
 import { installStartupAnimationProtocol } from "../startup-animation-protocol";
 import { applyNetworkProxyFromAppSettings } from "../network-proxy";
-import { readCloseBehavior } from "../window-preferences";
+import { readCloseBehavior, readStartupAnimationPreferences } from "../window-preferences";
 import { createAgentHostBridge, type AgentHostBridge } from "../agent-host-bridge";
 import { createBackendRouter, type BackendRouter } from "../remote/backend-router";
 import { createRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
@@ -313,6 +313,17 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // it is needed to paint a shell: the renderer already shows its boot state
     // and asks for data once IPC answers. Awaiting the backend here put that
     // whole cost in front of the first frame.
+    //
+    // The boot animation is the one thing that has to be known before that
+    // window exists — it travels as a creation argument — so its preference is
+    // read from the mirror the settings writer keeps next to the data
+    // directory rather than from host-core, which is not up yet.
+    if (process.env.PI_DESKTOP_CAPTURE !== "1") {
+      state.startupAnimation = await resolveStartupAnimation({
+        dataDir,
+        settings: readStartupAnimationPreferences(dataDir),
+      });
+    }
     await ensureWindow();
     let bootError: unknown = null;
     try {

@@ -152,9 +152,16 @@ how `pnpm dev` runs beside the packaged app (D599).
  │    ├── cache/
  │    ├── market/             # catalog and downloaded packages
  │    └── registry.json
- ├── window-state.json       # last main-window bounds (main)
- └── close-behavior.json     # persisted close-to-tray choice (main)
+├── window-state.json       # last main-window bounds (main)
+├── startup-animation.json  # boot-animation preference mirror (main)
+└── close-behavior.json     # persisted close-to-tray choice (main)
 ```
+
+`startup-animation.json` exists because the boot animation descriptor is a
+window creation argument: it has to be resolved before the first `BrowserWindow`
+and therefore before host-core can answer `settings.get`. The settings writer
+keeps this mirror in step; a missing file reads as "unset" and the defaults
+apply.
 
 ## 4. Naming conventions
 
