@@ -1,0 +1,20 @@
+services/autotest/src/autotest/api/knowledge_routes.py
+  h_201ed4c689ac8b 351-409
+services/autotest/src/autotest/knowledge/store.py
+  h_201ed4c689ac8b 283-335
+services/autotest/tests/test_knowledge_manage.py
+  h_201ed4c689ac8b 1-145
+services/autotest/ui/src/views/Knowledge.vue
+  h_201ed4c689ac8b 31-34,36,65,71-147,326-351,353,356-361,365-372,374,377-381,390-393
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5ab207ac9fb76dd1743cb37d3e806601f0e0ae84",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
