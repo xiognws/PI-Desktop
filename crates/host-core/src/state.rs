@@ -128,6 +128,14 @@ impl AppState {
             Ok(_) => {}
             Err(error) => tracing::warn!(%error, "in-flight reply sweep failed"),
         }
+        // The retired scored memory store (ADR 0371) has had no writer since the
+        // agent moved to the flat entry list; fold whatever it still holds into
+        // that list so one store is all the model or the page has to look at.
+        match db.migrate_legacy_memories() {
+            Ok(0) => {}
+            Ok(count) => tracing::info!(count, "migrated legacy memories into the entry list"),
+            Err(error) => tracing::warn!(%error, "legacy memory migration failed"),
+        }
         let secrets = SecretStore::open(data_dir)?;
         // The marketplace channel is read before the manager builds its first
         // catalog, so a source configured for networks without GitHub access
