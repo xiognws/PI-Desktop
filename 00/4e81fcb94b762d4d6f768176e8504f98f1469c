@@ -1,0 +1,16 @@
+crates/host-core/src/memory_entries.rs
+  h_201ed4c689ac8b 146-228,322-379
+crates/host-core/src/state.rs
+  h_201ed4c689ac8b 131-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "004e81fcb94b762d4d6f768176e8504f98f1469c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
