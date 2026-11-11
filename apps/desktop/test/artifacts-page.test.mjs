@@ -30,10 +30,12 @@ test("the artifacts page is reachable from the shell, the sidebar and global sea
   // Shell: lazy route, so the page is not in the first chunk.
   assert.match(shellSource, /const ArtifactsPage = lazy\(\(\) =>\n  import\("\.\.\/\.\.\/pages\/ArtifactsPage"\)/);
   assert.match(shellSource, /page === "artifacts" \? \(/);
-  // The page type has to carry the id, or the route cannot be typed.
+  // The page type has to carry the id, or the route cannot be typed. The union
+  // is formatted one member per line, so match across the line breaks instead
+  // of pinning one long line.
   assert.match(
     stateSource,
-    /page: "chat" \| "scheduled" \| "plugins" \| "artifacts" \| "tools" \| "settings"/,
+    /page:\s*\|?\s*"chat"[\s\S]*?\| "scheduled"[\s\S]*?\| "plugins"[\s\S]*?\| "artifacts"[\s\S]*?\| "tools"[\s\S]*?\| "settings"/,
   );
   // A full page hides the work panel and must not be treated as a chat surface.
   assert.match(

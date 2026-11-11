@@ -218,7 +218,7 @@ test("loading an older generated ESM wrapper rewrites it in place and initialize
   assert.equal(runtime.getAgentExtensions().length, 1);
 });
 
-test("loading a customized imported main.js does not rewrite the wrapper", async (t) => {
+test("a customized imported main.js is neither repaired nor rewritten", async (t) => {
   const { source, importRoot, runtime } = createHarness(t, { packageType: "module" });
   const imported = generateImportedExtensionPlugin(source, importRoot);
   const oldManifest = JSON.parse(readFileSync(join(imported.path, "manifest.json"), "utf8"));
@@ -227,7 +227,14 @@ test("loading a customized imported main.js does not rewrite the wrapper", async
   writeFileSync(join(imported.path, "main.js"), "module.exports = { custom: true };\n");
   const originalJs = readFileSync(join(imported.path, "main.js"), "utf8");
 
-  await assert.rejects(runtime.loadFromPath(imported.path), /module is not defined in ES module scope/);
+  // The wrapper repair only touches the generated no-op file, so a hand-edited
+  // entry keeps its bytes. It also still loads: the host decides how to
+  // evaluate an entry from its source (see isEsmSource), so a package that
+  // declares `type: "module"` around CommonJS content is no longer rejected —
+  // that mismatch is what the npm importer produces, not what a plugin author
+  // writes.
+  const loaded = await runtime.loadFromPath(imported.path);
+  assert.equal(loaded.main, "main.js");
   assert.equal(JSON.parse(readFileSync(join(imported.path, "manifest.json"), "utf8")).main, "main.js");
   assert.equal(readFileSync(join(imported.path, "main.js"), "utf8"), originalJs);
 });

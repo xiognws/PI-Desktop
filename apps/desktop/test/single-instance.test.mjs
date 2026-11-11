@@ -21,7 +21,21 @@ const bundledEntry = await build({
   // A CJS build also rejects an accidentally reintroduced top-level await.
   bundle: true, platform: "node", format: "cjs", write: false,
   plugins: [{ name: "installation-external-boundaries", setup(builder) {
-    builder.onResolve({ filter: /^@pi-workspace\/shared$/ }, () => ({ path: fileURLToPath(new URL("../../../packages/shared/src/protocol.ts", import.meta.url)) }));
+    // The boot path only needs the shared constants, so the test stubs the
+    // barrel instead of linking the whole package. Keep it to the two modules
+    // the installation entry actually reads: the protocol table and the data
+    // root layout. Both are free of `node:` imports.
+    builder.onResolve({ filter: /^@pi-workspace\/shared$/ }, () => ({ path: "shared-boot-stub", namespace: "installation-test-boundary" }));
+    builder.onLoad({ filter: /^shared-boot-stub$/, namespace: "installation-test-boundary" }, () => ({
+      contents: [
+        'export * from "./protocol.ts";',
+        'export * from "./pi-home.ts";',
+      ].join("\n"),
+      loader: "js",
+      // The stub is virtual, so esbuild needs the directory the relative
+      // re-exports resolve against.
+      resolveDir: fileURLToPath(new URL("../../../packages/shared/src/", import.meta.url)),
+    }));
     builder.onResolve({ filter: /^electron$|^\.\/(logger|main-process-errors|index|storage\/bootstrap)$/ }, (args) => ({ path: args.path, namespace: "installation-test-boundary" }));
     builder.onLoad({ filter: /.*/, namespace: "installation-test-boundary" }, (args) => {
       if (args.path === "electron") return { contents: "export const app = globalThis.__installationHarness.app; export class BrowserWindow { static getAllWindows() { return []; } }" };

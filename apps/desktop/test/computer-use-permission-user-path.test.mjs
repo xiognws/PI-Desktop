@@ -216,7 +216,10 @@ app.whenReady().then(async () => {
       stream.setEncoding("utf8");
       stream.on("data", (chunk) => { output += chunk; });
     }
-    const timer = setTimeout(() => child.kill("SIGKILL"), 45_000);
+    // A cold Electron launch on a loaded CI box (and this machine runs several
+    // sessions at once) needs more than the old 45 s watchdog, which killed the
+    // child before it could print its probe line.
+    const timer = setTimeout(() => child.kill("SIGKILL"), 120_000);
     let code;
     try {
       code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });
@@ -225,5 +228,17 @@ app.whenReady().then(async () => {
     const line = output.split(/\r?\n/).find((item) => item.startsWith("COMPUTER_PERMISSION_PROBE "));
     assert.ok(line, output.slice(-6000));
     assert.deepEqual(JSON.parse(line.slice("COMPUTER_PERMISSION_PROBE ".length)), { passed: true, requestCount: 7 });
-  } finally { await rm(temp, { recursive: true, force: true }); }
+  } finally {
+    // Electron lets go of the profile a moment after the process exits, so the
+    // dictionary file can still be locked when the temp directory is removed.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        await rm(temp, { recursive: true, force: true });
+        break;
+      } catch (error) {
+        if (attempt >= 4) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+  }
 });

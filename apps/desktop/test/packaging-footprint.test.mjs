@@ -221,6 +221,16 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "resources/models.dev",
       to: "models.dev",
     },
+    // The embedded Python runtime and the build handbook shipped inside the
+    // installer: both are read from disk next to `resources/`.
+    {
+      from: "resources/python",
+      to: "python",
+    },
+    {
+      from: "resources/manual",
+      to: "manual",
+    },
   ]);
   assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });
