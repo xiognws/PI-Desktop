@@ -187,7 +187,8 @@ export const de = {
     "tagline": "Lokaler AI-Codierungspartner",
     "starting": "Pi-Workspace wird gestartet…",
     "loadingView": "Ansicht wird geladen…",
-    "uiCrashed": "Mit der Schnittstelle ist ein Fehler aufgetreten"
+    "uiCrashed":  "Mit der Schnittstelle ist ein Fehler aufgetreten",
+    "uiCrashRetry": "Erneut versuchen"
   },
   "startup": {
     "slowTitle": "Startet noch…",

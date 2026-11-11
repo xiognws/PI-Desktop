@@ -187,7 +187,8 @@ export const fr = {
     "tagline": "Partenaire de codage IA local",
     "starting": "Démarrage de Pi-Workspace…",
     "loadingView": "Chargement de la vue…",
-    "uiCrashed": "Un problème s'est produit avec l'interface"
+    "uiCrashed":  "Un problème s'est produit avec l'interface",
+    "uiCrashRetry": "Réessayer"
   },
   "startup": {
     "slowTitle": "Démarrage toujours en cours…",

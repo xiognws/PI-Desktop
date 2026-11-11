@@ -186,6 +186,7 @@ export const en = {
     starting: "Starting Pi-Workspace…",
     loadingView: "Loading view…",
     uiCrashed: "Something went wrong with the interface",
+    uiCrashRetry: "Try again",
   },
   startup: {
     slowTitle: "Still starting…",

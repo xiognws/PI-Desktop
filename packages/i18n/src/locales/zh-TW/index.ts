@@ -188,6 +188,7 @@ export const zhTW = {
     starting: "正在啟動 Pi-Workspace…",
     loadingView: "正在載入頁面…",
     uiCrashed: "介面出現了問題",
+    uiCrashRetry: "重試",
   },
   startup: {
     slowTitle: "仍在啟動…",

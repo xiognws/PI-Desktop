@@ -25,45 +25,56 @@ import { cx, TooltipButton } from "../../components/ui";
 import { WindowControls } from "../../components/WindowControls";
 import { useCopyTex } from "../../hooks/use-copy-tex";
 import { api } from "../../lib/api";
+import { lazyRoute } from "../../lib/lazy-retry";
 import { PortalVisibilityProvider } from "../../lib/portal-visibility";
 import { workPanelLayout } from "../../lib/work-panel-resize";
 import { CollapsedTitlebarActions, RoutePending } from "./chrome";
 import { useAppShellRuntime } from "./useAppShellRuntime";
 
-const SettingsPage = lazy(() =>
-  import("../../pages/SettingsPage").then((module) => ({
-    default: module.SettingsPage,
-  })),
+const SettingsPage = lazy(
+  lazyRoute(() =>
+    import("../../pages/SettingsPage").then((module) => ({
+      default: module.SettingsPage,
+    })),
+  ),
 );
-const ScheduledPage = lazy(() =>
-  import("../../pages/ScheduledPage").then((module) => ({
-    default: module.ScheduledPage,
-  })),
+const ScheduledPage = lazy(
+  lazyRoute(() =>
+    import("../../pages/ScheduledPage").then((module) => ({
+      default: module.ScheduledPage,
+    })),
+  ),
 );
-const PluginsPage = lazy(() =>
-  import("../../pages/PluginsPage").then((module) => ({
-    default: module.PluginsPage,
-  })),
+const PluginsPage = lazy(
+  lazyRoute(() =>
+    import("../../pages/PluginsPage").then((module) => ({
+      default: module.PluginsPage,
+    })),
+  ),
 );
-const ArtifactsPage = lazy(() =>
-  import("../../pages/ArtifactsPage").then((module) => ({
-    default: module.ArtifactsPage,
-  })),
+const ArtifactsPage = lazy(
+  lazyRoute(() =>
+    import("../../pages/ArtifactsPage").then((module) => ({
+      default: module.ArtifactsPage,
+    })),
+  ),
 );
-const ToolsPage = lazy(() =>
-  import("../../pages/ToolsPage").then((module) => ({
-    default: module.ToolsPage,
-  })),
+const ToolsPage = lazy(
+  lazyRoute(() =>
+    import("../../pages/ToolsPage").then((module) => ({
+      default: module.ToolsPage,
+    })),
+  ),
 );
 const loadChatSurface = () => import("../../components/ChatSurface");
 const ChatSurface = lazy(() =>
-  loadChatSurface().then((module) => ({
+  lazyRoute(loadChatSurface)().then((module) => ({
     default: module.ChatSurface,
   })),
 );
 const loadWorkPanel = () => import("../../components/workpanel/WorkPanel");
 const WorkPanel = lazy(() =>
-  loadWorkPanel().then((module) => ({ default: module.WorkPanel })),
+  lazyRoute(loadWorkPanel)().then((module) => ({ default: module.WorkPanel })),
 );
 
 export function AppShell() {

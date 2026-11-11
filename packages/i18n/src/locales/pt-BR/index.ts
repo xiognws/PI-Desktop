@@ -187,7 +187,8 @@ export const ptBR = {
     tagline: "Parceiro local de programação com IA",
     starting: "Iniciando o Pi-Workspace…",
     loadingView: "Carregando visualização…",
-    uiCrashed: "Algo deu errado com a interface"
+    uiCrashed:  "Algo deu errado com a interface",
+    uiCrashRetry: "Tentar novamente"
   },
   startup: {
     slowTitle: "Ainda iniciando…",

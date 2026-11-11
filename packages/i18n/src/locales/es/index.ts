@@ -187,7 +187,8 @@ export const es = {
     "tagline": "Socio de codificación de IA local",
     "starting": "Iniciando Pi-Workspace…",
     "loadingView": "Cargando vista…",
-    "uiCrashed": "Algo salió mal con la interfaz"
+    "uiCrashed":  "Algo salió mal con la interfaz",
+    "uiCrashRetry": "Reintentar"
   },
   "startup": {
     "slowTitle": "Aún iniciando…",

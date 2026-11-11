@@ -188,6 +188,7 @@ export const zhCN = {
     starting: "正在启动 Pi-Workspace…",
     loadingView: "正在加载页面…",
     uiCrashed: "界面出现了问题",
+    uiCrashRetry: "重试",
   },
   startup: {
     slowTitle: "仍在启动…",

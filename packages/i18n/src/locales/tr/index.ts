@@ -188,6 +188,7 @@ export const tr = {
     starting: "Pi-Workspace başlatılıyor…",
     loadingView: "Görünüm yükleniyor…",
     uiCrashed: "Arayüzde bir sorun oluştu",
+    uiCrashRetry: "Yeniden dene",
   },
   startup: {
     slowTitle: "Hâlâ başlatılıyor…",
