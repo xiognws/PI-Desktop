@@ -1,0 +1,16 @@
+services/autotest/ui/src/router/index.ts
+  h_201ed4c689ac8b 90-96
+services/autotest/ui/src/views/ProjectLayout.vue
+  h_201ed4c689ac8b 186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9246384f3b0ea2e72e5b1770951dd57b6038dbba",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
