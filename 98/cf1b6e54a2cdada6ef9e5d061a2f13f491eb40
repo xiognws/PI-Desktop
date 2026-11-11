@@ -1,0 +1,14 @@
+apps/desktop/src/components/settings/AgentSkillsPage.tsx
+  h_201ed4c689ac8b 183-185,187-188,525-526,551,554
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "98cf1b6e54a2cdada6ef9e5d061a2f13f491eb40",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
