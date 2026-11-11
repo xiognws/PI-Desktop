@@ -1,0 +1,16 @@
+apps/desktop/test/boot-remote-hosts.test.mjs
+  h_201ed4c689ac8b 37-42
+apps/desktop/test/computer-use-permission-user-path.test.mjs
+  h_201ed4c689ac8b 228-230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ee352dc73cd20afa36ecc1cce55111023082d41f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
