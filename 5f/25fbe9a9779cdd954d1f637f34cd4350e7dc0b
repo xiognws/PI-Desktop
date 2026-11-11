@@ -1,0 +1,20 @@
+services/autotest/ui/package-lock.json
+  h_201ed4c689ac8b 15,19,134-154,2966-2968,4723-4725,4731,4889-4909
+services/autotest/ui/package.json
+  h_201ed4c689ac8b 16,20
+services/autotest/ui/src/components/MarkdownBlock.vue
+  h_201ed4c689ac8b 1-99
+services/autotest/ui/src/views/Reports.vue
+  h_201ed4c689ac8b 5,10-12,175-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5f25fbe9a9779cdd954d1f637f34cd4350e7dc0b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
