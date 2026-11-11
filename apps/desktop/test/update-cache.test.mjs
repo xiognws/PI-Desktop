@@ -26,7 +26,8 @@ async function withTempDir(run) {
   try {
     await run(root);
   } finally {
-    await rm(root, { recursive: true, force: true });
+    // Parallel tests still hold just-written files open for a moment on Windows.
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }
 

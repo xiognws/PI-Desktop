@@ -58,9 +58,13 @@ coverage/
 .venv/
 # autotest 依赖目录：用 Pi 自带 Python，包装在这里而不是解释器里
 services/autotest/.deps/
+# Vue 工作台产物：由 `pnpm run bundle:autotest-ui` 生成、随 extraResources 发布
+services/autotest/ui/dist/
 # 手工起服务或测试留下的默认库目录（服务正常跑在 dataDir 下）
 services/autotest/data/
 runtime/e2e/.autotest-runs/
+# 内测手册由 `pnpm run stage:manual` 从 docs/handbook 生成，不进 git
+apps/desktop/resources/manual/
 
 .playwright-mcp/
 .claude/

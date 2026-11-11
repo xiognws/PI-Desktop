@@ -40,7 +40,8 @@ async function tmpDir() {
   return {
     dir,
     async cleanup() {
-      await rm(dir, { recursive: true, force: true });
+      // Parallel tests still hold the just-written files open for a moment.
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     },
   };
 }

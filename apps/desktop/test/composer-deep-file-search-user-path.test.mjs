@@ -262,6 +262,7 @@ app.whenReady().then(async () => {
     assert.equal(result.passed, true);
     assert.deepEqual(result.queries, ["FeatureController", "Feat", "Save", "Missing", "Broken"]);
   } finally {
-    await rm(temp, { recursive: true, force: true });
+    // Chromium keeps profile files locked for a moment after the child exits.
+    await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
