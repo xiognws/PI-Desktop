@@ -180,8 +180,12 @@ export function AgentSkillsPage() {
       setCuration(null);
     }
   }, [selectedProjectPath]);
+  // The maintenance pass is a second walk of the same library the list already
+  // scanned, and the list is what the user came for. Start it after the first
+  // paint so the rows appear without waiting for a report about them.
   useEffect(() => {
-    void refreshCuration();
+    const timer = setTimeout(() => void refreshCuration(), 0);
+    return () => clearTimeout(timer);
   }, [refreshCuration]);
   const archiveIdle = async () => {
     setCurating(true);
@@ -518,7 +522,8 @@ export function AgentSkillsPage() {
   // "Idle" is what the maintenance card is about: stale plus archivable.
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    // Two more host reads for a card below the fold: let the skill list land first.
+    const start = () => void (async () => {
       try {
         const [memory, user] = await Promise.all([
           api.memoryEntries("memory"),
@@ -543,8 +548,10 @@ export function AgentSkillsPage() {
         if (!cancelled) setMemoryEntries([]);
       }
     })();
+    const timer = setTimeout(start, 0);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [loading]);
 
