@@ -637,6 +637,8 @@ export const de = {
     "compactionRow": "Kontext komprimiert · #{{times}}",
     "skillReviewApplied": "Skill-Review · {{count}} Aktualisierung",
     "skillReviewAppliedDetail": "Selbstverbesserung: {{detail}}",
+    autotestContextInserted: "In das Eingabefeld eingefügt",
+    autotestContextFailed: "Kein Eingabefeld zum Einfügen — öffne zuerst einen Chat",
     "skillReviewNothing": "Skill-Review · geprüft, nichts Neues",
     "skillReviewNoLook": "Skill-Review · Bibliothek nicht gelesen",
     "skillReviewFailed": "Skill-Review · fehlgeschlagen",

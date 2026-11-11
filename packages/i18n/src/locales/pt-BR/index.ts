@@ -639,6 +639,8 @@ export const ptBR = {
     compactionRow: "Contexto compactado · #{{times}}",
     skillReviewApplied: "Revisão de habilidades · {{count}} atualização",
     skillReviewAppliedDetail: "Revisão de autoaperfeiçoamento: {{detail}}",
+    autotestContextInserted: "Inserido no campo de entrada",
+    autotestContextFailed: "Nenhum campo de entrada — abra uma conversa primeiro",
     skillReviewNothing: "Skill review · looked, nothing new",
     skillReviewNoLook: "Skill review · did not read the library",
     skillReviewFailed: "Skill review · failed",

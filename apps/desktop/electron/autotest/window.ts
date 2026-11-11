@@ -57,10 +57,12 @@ export type AutotestWindowOptions = {
     nodeIntegration: boolean;
     sandbox: boolean;
     webviewTag: boolean;
+    /** 最小 preload：只暴露 insertContext，页面拿不到通用 invoke。 */
+    preload?: string;
   };
 };
 
-export function autotestWindowOptions(title: string): AutotestWindowOptions {
+export function autotestWindowOptions(title: string, preload?: string): AutotestWindowOptions {
   return {
     width: AUTOTEST_WINDOW_WIDTH,
     height: AUTOTEST_WINDOW_HEIGHT,
@@ -72,11 +74,13 @@ export function autotestWindowOptions(title: string): AutotestWindowOptions {
     autoHideMenuBar: true,
     backgroundColor: "#101418",
     webPreferences: {
-      // 后端页面是外部内容：不给 Node、不给 preload，也不允许嵌 webview。
+      // 后端页面是外部内容：不给 Node、不允许嵌 webview；preload 是唯一出口，
+      // 它只把「一段文本进输入框」暴露成函数，别的能力一概没有。
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       webviewTag: false,
+      ...(preload ? { preload } : {}),
     },
   };
 }
@@ -99,9 +103,9 @@ export type CreateWindow = (options: AutotestWindowOptions) => AutotestWindowLik
  * 公网，都只允许留在 loopback。
  */
 export function createAutotestWindow(
-  deps: { url: string; title: string; createWindow: CreateWindow; log?: (message: string) => void },
+  deps: { url: string; title: string; createWindow: CreateWindow; preload?: string; log?: (message: string) => void },
 ): AutotestWindowLike {
-  const window = deps.createWindow(autotestWindowOptions(deps.title));
+  const window = deps.createWindow(autotestWindowOptions(deps.title, deps.preload));
   window.setMenu(null);
   window.webContents?.setWindowOpenHandler?.(() => ({ action: "deny" }));
 

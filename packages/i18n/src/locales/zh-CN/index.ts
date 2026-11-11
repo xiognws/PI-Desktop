@@ -642,6 +642,8 @@ export const zhCN = {
     compactionRow: "上下文已压缩 · 第 {{times}} 次",
     skillReviewApplied: "技能回顾 · 已更新 {{count}} 项",
     skillReviewAppliedDetail: "💾 自我改进回顾：{{detail}}",
+    autotestContextInserted: "已插入到输入框",
+    autotestContextFailed: "没有可插入的输入框，先打开一个会话",
     skillReviewNothing: "技能回顾 · 已查看技能库，无新内容",
     skillReviewNoLook: "技能回顾 · 未读取技能库",
     skillReviewFailed: "技能回顾 · 失败",

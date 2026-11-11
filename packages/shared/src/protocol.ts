@@ -509,9 +509,17 @@ export const IPC = {
     workPanelTabMenu: "pi-desktop/workPanel/tabMenu",
     traySetSessionPreferences: "pi-desktop/tray/setSessionPreferences",
     nativeMenuAction: "pi-desktop/menu/nativeAction",
+    /**
+     * 测试工作台把一段知识片段送进桌面会话：只有工作台窗口的 preload 会调用，
+     * main 校验长度后转发成 `event.autotestContextInsert`，由 renderer 插进当前
+     * 输入框。传文本不是传对象 —— 渲染层只认字符串，多一层结构只会多一个越界面。
+     */
+    autotestInsertContext: "pi-desktop/autotest/insertContext",
   },
   event: {
     pluginChanged: "pi-desktop/event/pluginChanged",
+    /** 知识片段到达主窗口，renderer 负责插进 composer 草稿。 */
+    autotestContextInsert: "pi-desktop/autotest/event/contextInsert",
     /** Progress of an install or update, while it is still running. */
     pluginInstallProgress: "pi-desktop/plugin/event/installProgress",
     /** Host-originated app settings mutation (e.g. plugin `app.setTheme`). */

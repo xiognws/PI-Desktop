@@ -17,6 +17,7 @@ import { StartupAnimation } from "../../components/StartupAnimation";
 import { StartupSplash } from "../../components/StartupSplash";
 import { api } from "../../lib/api";
 import { composerSuggestion } from "../chat/composer/plugins/suggestion-bridge";
+import { composerDraftBridge } from "../chat/composer/plugins/draft-bridge";
 import { usePluginBrowseState } from "../plugins/browse-state";
 import { subscribeRemoteInteractions } from "../../lib/remote-interactions";
 import { playNotificationChime } from "../../lib/notification-sound";
@@ -687,6 +688,15 @@ export function useAppShellRuntime() {
     );
     // Host-pushed toasts (plugin runtime etc.) are informational.
     const offToast = api.onToast((message) => showToast(message));
+    // 「加入上下文」：工作台把一段知识片段送进来，插到当前草稿的光标处。
+    // 没有正在编辑的输入框时 insertText 会抛，静默丢弃会让人以为点了没用。
+    const offAutotestContext = api.onAutotestContext(({ text }) => {
+      try {
+        composerDraftBridge.insertText(text);
+      } catch {
+        showToast(t("chat.autotestContextFailed"), { variant: "warning" });
+      }
+    });
     const offNotificationSound = api.onNotificationSound(playNotificationChime);
     // The first plaintext hop to an endpoint the user typed. The shell owns the
     // wording, and recording `insecureNoticeAcknowledged` keeps it to once; a
@@ -984,6 +994,7 @@ export function useAppShellRuntime() {
       offPlansChanged();
       offTodosChanged();
       offToast();
+      offAutotestContext();
       offNotificationSound();
       offInsecureEndpoint();
       offBrowserPreview();

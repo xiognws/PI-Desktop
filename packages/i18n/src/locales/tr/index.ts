@@ -649,6 +649,8 @@ export const tr = {
     compactionRow: "Bağlam sıkıştırıldı · #{{times}}",
     skillReviewApplied: "Skill incelemesi · {{count}} güncelleme",
     skillReviewAppliedDetail: "Kendini geliştirme incelemesi: {{detail}}",
+    autotestContextInserted: "Giriş alanına eklendi",
+    autotestContextFailed: "Ekleme yapılacak giriş alanı yok — önce bir sohbet açın",
     skillReviewNothing: "Skill review · looked, nothing new",
     skillReviewNoLook: "Skill review · did not read the library",
     skillReviewFailed: "Skill review · failed",

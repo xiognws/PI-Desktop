@@ -642,6 +642,8 @@ export const zhTW = {
     compactionRow: "上下文已壓縮 · 第 {{times}} 次",
     skillReviewApplied: "技能回顧 · 已更新 {{count}} 項",
     skillReviewAppliedDetail: "💾 自我改進回顧：{{detail}}",
+    autotestContextInserted: "已插入到輸入框",
+    autotestContextFailed: "沒有可插入的輸入框，先開啟一個工作階段",
     skillReviewNothing: "技能回顧 · 已查看技能庫，無新內容",
     skillReviewNoLook: "技能回顧 · 未讀取技能庫",
     skillReviewFailed: "技能回顧 · 失敗",

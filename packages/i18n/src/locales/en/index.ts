@@ -652,6 +652,8 @@ export const en = {
     compactionRow: "Context compacted · #{{times}}",
     skillReviewApplied: "Skill review · {{count}} update",
     skillReviewAppliedDetail: "Self-improvement review: {{detail}}",
+    autotestContextInserted: "Inserted into the composer",
+    autotestContextFailed: "No composer to insert into — open a chat first",
     skillReviewNothing: "Skill review · looked, nothing new",
     skillReviewNoLook: "Skill review · did not read the library",
     skillReviewFailed: "Skill review · failed",

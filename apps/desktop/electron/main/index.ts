@@ -61,6 +61,7 @@ import { registerIpcHandlers } from "./ipc/register";
 import { installGenUiPermissionHandlers } from "./gen-ui-permissions";
 import { AutotestService } from "../autotest/service";
 import { recoverAutotestWorkbench } from "../autotest/prompt";
+import { normalizeContextText } from "../autotest/context";
 import {
   autotestWorkbenchUrl,
   createAutotestWindow,
@@ -97,6 +98,7 @@ import { createWorkPanelRuntime } from "./bootstrap/work-panel";
 import { createCloseBehaviorRuntime } from "./bootstrap/close-behavior";
 import { registerShutdownHandlers } from "./bootstrap/shutdown";
 import { stripWinLongPrefix } from "./path-utils";
+import { getModuleDirectory } from "./module-path";
 
 // Native resize streams can pause briefly while the pointer crosses a display
 // scale boundary. Keep recovery out of that gesture and only run it after the
@@ -1070,6 +1072,23 @@ const autotestService = new AutotestService({
 void app.whenReady().then(() => autotestService.start());
 app.once("will-quit", () => void autotestService.stop());
 
+// 工作台 → 主窗口的「加入上下文」。校验在这里做，真正的插入交给 renderer：
+// composer 的草稿只存在于渲染层，main 不去猜它长什么样。
+ipcMain.handle(IPC.invoke.autotestInsertContext, (event, raw: unknown) => {
+  const mainWebContents = mainState.mainWindow?.webContents;
+  // 主窗口自己不需要这条通道；挡掉它，等于只给工作台窗口留了这个出口。
+  if (mainWebContents && event.sender === mainWebContents) {
+    return { ok: false, error: "FORBIDDEN" };
+  }
+  const normalized = normalizeContextText(raw);
+  if (!normalized.ok) return { ok: false, error: normalized.error };
+  if (!mainWebContents || mainState.mainWindow?.isDestroyed()) {
+    return { ok: false, error: "NO_WINDOW" };
+  }
+  sendToRenderer(IPC.event.autotestContextInsert, { text: normalized.text });
+  return { ok: true };
+});
+
 // 独立工作台窗口：菜单项通过 registerAutotestWorkbenchOpener 触发。页面由本机
 // FastAPI 托管（同源，无 CORS），窗口只加载 loopback 地址，不挂 preload。
 let autotestWindow: AutotestWindowLike | null = null;
@@ -1089,6 +1108,8 @@ function focusOrCreateAutotestWindow(url: string): void {
   const created = createAutotestWindow({
     url,
     title,
+    // 工作台是外部页面，只有这份最小 preload 把「一段文本进输入框」交出去。
+    preload: join(getModuleDirectory(import.meta.url), "../preload/autotest.cjs"),
     createWindow: (options) => {
       const window = new BrowserWindow(options);
       // 窗口以 show:false 创建，加载完成再显示，避免白屏闪一下。

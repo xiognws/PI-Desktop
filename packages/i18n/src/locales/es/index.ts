@@ -637,6 +637,8 @@ export const es = {
     "compactionRow": "Contexto compactado · #{{times}}",
     "skillReviewApplied": "Revisión de habilidades · {{count}} actualización",
     "skillReviewAppliedDetail": "Revisión de auto-mejora: {{detail}}",
+    autotestContextInserted: "Insertado en el cuadro de entrada",
+    autotestContextFailed: "No hay cuadro de entrada — abre un chat primero",
     "skillReviewNothing": "Revisión de habilidades · revisado, nada nuevo",
     "skillReviewNoLook": "Revisión de habilidades · no leyó la biblioteca",
     "skillReviewFailed": "Revisión de habilidades · falló",

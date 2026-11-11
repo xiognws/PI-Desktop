@@ -2216,6 +2216,17 @@ export const api = {
       listener((payload as { message: string }).message),
     );
   },
+  /**
+   * 测试工作台把知识片段送进主窗口：只带文本，插进 composer 由调用方决定。
+   * 非字符串直接丢弃 —— 这条消息跨窗口而来，不该假设发送端一定守规矩。
+   */
+  onAutotestContext: (listener: (payload: { text: string }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.autotestContextInsert, (payload) => {
+      const text = (payload as { text?: unknown })?.text;
+      if (typeof text === "string" && text.length > 0) listener({ text });
+    });
+  },
   onInsecureEndpointNotice: (listener: (payload: { host: string }) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.insecureEndpointNotice, (payload) =>

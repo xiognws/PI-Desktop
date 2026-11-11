@@ -130,6 +130,41 @@ function copyHit(hit: Hit) {
   status.value = '已复制到剪贴板'
 }
 
+// 「加入上下文」：把这条件送进桌面会话的输入框（工作台窗口的 preload 只暴露
+// 这一个能力）。浏览器里直接打开时没有 preload，回落到复制 —— 不装作成功。
+function hitText(hit: Hit) {
+  const excerpt = (hit.excerpt || '').slice(0, 400)
+  return [hit.title || hit.source_ref || '知识片段', hit.source_ref, excerpt].filter(Boolean).join('\n')
+}
+
+const CONTEXT_ERRORS: Record<string, string> = {
+  NO_WINDOW: '桌面主窗口没打开，先把主窗口打开再试',
+  FORBIDDEN: '这条通道不接受主窗口自调用',
+  EMPTY: '内容为空，没有可插入的文本',
+  TOO_LONG: '片段太长（上限 8KB）',
+  NOT_TEXT: '内容格式不对',
+}
+
+async function insertHit(hit: Hit) {
+  if (!window.autotestHost?.insertContext) {
+    copyHit(hit)
+    status.value = '浏览器里没有桌面会话，已复制到剪贴板'
+    return
+  }
+  try {
+    const result = await window.autotestHost.insertContext(hitText(hit))
+    if (result.ok) {
+      status.value = '已插入到桌面会话的输入框'
+      return
+    }
+    status.value = CONTEXT_ERRORS[String(result.error)] || `插入失败（${result.error || '未知原因'}），已复制`
+    copyHit(hit)
+  } catch (e) {
+    status.value = `插入失败：${(e as Error).message}，已复制`
+    copyHit(hit)
+  }
+}
+
 onMounted(async () => {
   await loadDocs()
   if (kw.value) await searchKnowledge()
@@ -193,7 +228,8 @@ onMounted(async () => {
             <span class="font-medium text-gray-900">{{ hit.title || hit.source_ref || '未命名段落' }}</span>
             <span v-if="hit.module" class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600">{{ hit.module }}</span>
             <span v-if="hit.score === null || hit.score === undefined" class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500">模糊匹配</span>
-            <button class="ml-auto text-xs text-blue-600 hover:underline" @click="copyHit(hit)">复制</button>
+            <button class="ml-auto text-xs text-blue-600 hover:underline" @click="insertHit(hit)">加入上下文</button>
+            <button class="text-xs text-gray-500 hover:underline" @click="copyHit(hit)">复制</button>
           </div>
           <p class="text-sm text-gray-600 mb-3 leading-relaxed">{{ hit.excerpt || '' }}</p>
           <div class="flex items-center justify-between text-xs text-gray-400">

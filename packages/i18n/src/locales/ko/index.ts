@@ -649,6 +649,8 @@ export const ko = {
     compactionRow: "컨텍스트 압축됨 · #{{times}}",
     skillReviewApplied: "스킬 검토 · {{count}}개 업데이트",
     skillReviewAppliedDetail: "자기 개선 검토: {{detail}}",
+    autotestContextInserted: "입력창에 삽입했습니다",
+    autotestContextFailed: "삽입할 입력창이 없습니다 — 먼저 대화를 여세요",
     skillReviewNothing: "스킬 검토 · 확인했지만 새 내용 없음",
     skillReviewNoLook: "스킬 검토 · 라이브러리를 읽지 않음",
     skillReviewFailed: "스킬 검토 · 실패",

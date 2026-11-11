@@ -90,6 +90,8 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, "electron/preload/index.ts"),
           "plugin-panel": resolve(__dirname, "electron/preload/plugin-panel.ts"),
+          // 测试工作台窗口是外部页面（本机 FastAPI 托管），单独一份最小 preload。
+          autotest: resolve(__dirname, "electron/preload/autotest.ts"),
         },
         output: {
           format: "cjs",

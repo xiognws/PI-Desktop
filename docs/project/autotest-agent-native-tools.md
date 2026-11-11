@@ -316,7 +316,7 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 | 执行详情 `executions/:id` | `GET …/executions/{id}`、`…/events`、`GET …/files?path=` | RunEvent 时间线、按步骤折叠（通过的默认收起）、只看失败、日志里失败行高亮、产物缩略图（截图直读、其它可下载）、**取消执行**。`/files` 只放行本项目目录内的文件，越界一律 404 |
 | 待审批 `approvals` | `GET …/workflow/pending` | 项目级人工卡点一览（跨 run）、批准/驳回、10s 轮询跟上会话侧的答复 |
 | 缺陷 `bugs` | `GET …/workflow/bugs`、`PATCH …/bugs/{id}` | 跨 run 的缺陷单（`occurrences` 累计），人工流转 `open/fixed/verified/wontfix` |
-| 知识库 `knowledge` | `GET …/knowledge/documents`、`…/workflow/knowledge/search` | 批量导入（md/pdf/docx/html…）、切分预览、FTS5/BM25 检索 + 复制 |
+| 知识库 `knowledge` | `GET …/knowledge/documents`、`…/workflow/knowledge/search` | 批量导入（md/pdf/docx/html…）、切分预览、FTS5/BM25 检索、复制、**加入上下文**（经 preload 送进桌面会话输入框） |
 | 需求 `requirements` | `GET/POST …/requirements` | 上传 PRD 原文、读回正文 |
 | 用例 `cases` | `GET/POST …/cases` | 用例 CRUD、单条运行 |
 | 脚本 `scripts` | `GET/POST …/scripts`、`…/scripts/{id}/check|gate|run` | 列表 + 编辑器；**「校验」「过门禁」**；门禁未过时「运行」置灰（把「未过 gate 不得执行」这条约束搬到界面上） |
@@ -340,6 +340,28 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 审批的唯一真源是 `workflow_decisions`：窗口点「批准」→
 `POST …/pending/{id}/decide` → 写库；工具端下次轮询读到 `approved` 继续。
 不需要 `session.answer`，因为这个设计里根本没有会话卡在 `asktool` 上。
+
+### 8.1 「加入上下文」这条 IPC 面（唯一的跨窗口通道）
+
+知识库检索结果要能进桌面会话，就得跨窗口。这条通道刻意做成最小面：
+
+```text
+工作台页面（FastAPI 托管，sandbox:true）
+  → window.autotestHost.insertContext(text)        ← preload: electron/preload/autotest.ts
+  → invoke  pi-desktop/autotest/insertContext      ← IPC.invoke.autotestInsertContext
+  → main: normalizeContextText()（只收字符串，trim，≤8KB）
+  → event   pi-desktop/autotest/event/contextInsert ← IPC.event.autotestContextInsert
+  → renderer: composerDraftBridge.insertText(text)  ← 插到当前草稿的光标处
+```
+
+约束：
+
+- preload **只暴露一个函数**，没有通用 `invoke`；页面拿不到白名单里的其他通道。
+- main 挡住主窗口自调用（这条通道是给工作台窗口的），并区分 `EMPTY / NOT_TEXT /
+  TOO_LONG / NO_WINDOW / FORBIDDEN` 返回值。
+- 插入落在只存在于渲染层的草稿上，main 不假装知道 composer 的形状；没有正在编辑
+  的输入框时 renderer 弹 `chat.autotestContextFailed` 提示，工作台回落复制。
+- 页面在浏览器里直接打开（无 preload）时按钮退回「复制到剪贴板」，不假装成功。
 
 入口与失败路径（已落地）：菜单「视图 → 测试工作台」是唯一 UI 入口，主进程直接调
 `openAutotestWorkbench()`（不经 renderer 命令通道），服务 `ready` 才开窗，已开则

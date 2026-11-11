@@ -637,6 +637,8 @@ export const fr = {
     "compactionRow": "Contexte compacté · #{{times}}",
     "skillReviewApplied": "Revue des compétences · {{count}} mise à jour",
     "skillReviewAppliedDetail": "Revue d'auto-amélioration : {{detail}}",
+    autotestContextInserted: "Inséré dans la zone de saisie",
+    autotestContextFailed: "Aucune zone de saisie — ouvrez d abord une conversation",
     "skillReviewNothing": "Revue des compétences · vérifié, rien de nouveau",
     "skillReviewNoLook": "Revue des compétences · bibliothèque non lue",
     "skillReviewFailed": "Revue des compétences · échec",
