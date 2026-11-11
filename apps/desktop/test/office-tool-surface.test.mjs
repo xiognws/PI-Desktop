@@ -20,9 +20,14 @@ const runtimeSource = readFileSync(
 );
 
 test("every mode offers both Office tools", () => {
-  const start = runtimeSource.indexOf('this.mode === "agent"');
-  assert.ok(start > 0, "the builtin tool list is where this test expects");
-  const block = runtimeSource.slice(start, runtimeSource.indexOf("const builtins", start));
+  const builtinsAt = runtimeSource.indexOf("const builtins");
+  assert.ok(builtinsAt > 0, "the builtin tool list is where this test expects");
+  // The two branches of the `tools` ternary: one per mode. Anchor on the
+  // declaration itself — `this.mode === "agent"` also appears earlier in the
+  // file (skill-writing rules), which used to widen this slice.
+  const start = runtimeSource.lastIndexOf("const tools =", builtinsAt);
+  assert.ok(start > 0, "the tools list declaration must precede `const builtins`");
+  const block = runtimeSource.slice(start, builtinsAt);
   // Once for the agent list, once for the contract-mode list.
   assert.equal(block.match(/"OfficeRead"/g)?.length, 2);
   assert.equal(block.match(/"OfficeWrite"/g)?.length, 2);

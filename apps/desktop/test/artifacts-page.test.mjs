@@ -27,8 +27,13 @@ const registerSource = await read("../electron/main/ipc/register.ts");
 const hostSource = await read("../../../crates/host-core/src/artifacts.rs");
 
 test("the artifacts page is reachable from the shell, the sidebar and global search", () => {
-  // Shell: lazy route, so the page is not in the first chunk.
-  assert.match(shellSource, /const ArtifactsPage = lazy\(\(\) =>\n  import\("\.\.\/\.\.\/pages\/ArtifactsPage"\)/);
+  // Shell: lazy route, so the page is not in the first chunk. Every lazy route
+  // goes through `lazyRoute`, which retries a failed dynamic import once before
+  // the surface gives up.
+  assert.match(
+    shellSource,
+    /const ArtifactsPage = lazy\(\s*lazyRoute\(\(\) =>\s*import\("\.\.\/\.\.\/pages\/ArtifactsPage"\)/,
+  );
   assert.match(shellSource, /page === "artifacts" \? \(/);
   // The page type has to carry the id, or the route cannot be typed. The union
   // is formatted one member per line, so match across the line breaks instead
