@@ -48,6 +48,7 @@ import {
   resolveStoredUpdatePreference,
   resolveUpdateMode as resolveUpdateModePolicy,
   supportsAutomaticUpdates,
+  type UpdatePolicyOptions,
   type WindowsDistribution,
 } from "./update-policy";
 import { ManualUpdateReminderTracker } from "./manual-update-reminder";
@@ -111,6 +112,12 @@ export type UpdaterOptions = {
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
   distribution?: WindowsDistribution;
+  /**
+   * Overrides the build-time "update feed reachable" flag. Production leaves it
+   * unset so the shipped decision (no public feed on the intranet) holds; the
+   * delivery-mode tests set it to exercise the policy behind that flag.
+   */
+  updatePolicy?: UpdatePolicyOptions;
 };
 
 export class AppUpdaterController {
@@ -121,6 +128,7 @@ export class AppUpdaterController {
   private readonly isPackaged: boolean;
   private readonly env: NodeJS.ProcessEnv;
   private readonly distribution?: WindowsDistribution;
+  private readonly updatePolicy?: UpdatePolicyOptions;
   private readonly defaultPreference: UpdatePreference;
   private readonly automaticSupported: boolean;
   private readonly readUpdateSettings?: () => Promise<UpdaterSettings>;
@@ -199,17 +207,20 @@ export class AppUpdaterController {
     this.isPackaged = isPackaged;
     this.env = process.env;
     this.distribution = distribution;
+    this.updatePolicy = options.updatePolicy;
     this.defaultPreference = resolveDefaultUpdatePreference(
       platform,
       isPackaged,
       this.env,
       distribution,
+      this.updatePolicy,
     );
     this.preference = this.defaultPreference;
     this.automaticSupported = supportsAutomaticUpdates(
       platform,
       isPackaged,
       this.env,
+      this.updatePolicy,
     );
     this.readUpdateSettings = options.readUpdateSettings;
     this.persistLastNotifiedVersion = options.persistLastNotifiedVersion;
@@ -220,6 +231,7 @@ export class AppUpdaterController {
       this.env,
       distribution,
       this.preference,
+      this.updatePolicy,
     );
     const defaultCacheBasePath = defaultUpdateCacheBasePath({
       platform,
@@ -348,6 +360,7 @@ export class AppUpdaterController {
       this.env,
       this.distribution,
       effectivePreference,
+      this.updatePolicy,
     );
     const preferenceChanged =
       effectivePreference !== this.preference || mode !== previousMode;

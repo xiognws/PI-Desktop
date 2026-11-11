@@ -23,13 +23,24 @@ const [
 ]);
 
 const {
-  resolveDefaultUpdatePreference,
   resolveEffectiveUpdatePreference,
   resolveStoredUpdatePreference,
-  resolveUpdateMode,
+  UPDATE_FEED_REACHABLE,
 } = policy;
 const { ManualUpdateReminderTracker } = reminders;
 const { persistUpdatePreference } = settingsPreference;
+
+// This build ships with no reachable update feed (the intranet cannot reach
+// github.com), so every delivery mode resolves to "disabled" here. The policy
+// behind that flag still has to be right for the day a release ships an
+// internal feed, so these tests exercise it with the flag on.
+const FEED = { feedReachable: true };
+// Named parameters, not `...args`: the flag is the last positional argument, so
+// spreading a short call would land it in the `env` slot.
+const resolveDefaultUpdatePreference = (platform, isPackaged, env = {}, distribution) =>
+  policy.resolveDefaultUpdatePreference(platform, isPackaged, env, distribution, FEED);
+const resolveUpdateMode = (platform, isPackaged, env = {}, distribution, preference) =>
+  policy.resolveUpdateMode(platform, isPackaged, env, distribution, preference, FEED);
 
  test("installed builds keep automatic by default while portable and ZIP builds default to manual", () => {
   assert.equal(resolveDefaultUpdatePreference("win32", true, {}, "installed"), "automatic");
@@ -93,4 +104,13 @@ test("dismissed update banner hides via persisted state, not component memory", 
   // record the dismissal through the updatesDismiss IPC channel (#1317).
   assert.match(updateBannerSource, /update\.dismissed === true/);
   assert.match(updateBannerSource, /api\.updatesDismiss\(\)/);
+});
+
+test("this build ships with the update feed off, so every mode resolves to disabled", () => {
+  assert.equal(UPDATE_FEED_REACHABLE, false);
+  assert.equal(policy.supportsAutomaticUpdates("win32", true, {}), false);
+  assert.equal(policy.supportsAutomaticUpdates("darwin", true, {}), false);
+  assert.equal(policy.resolveDefaultUpdatePreference("win32", true, {}, "installed"), "manual");
+  assert.equal(policy.resolveUpdateMode("win32", true, {}, "installed", "automatic"), "disabled");
+  assert.equal(policy.resolveUpdateMode("darwin", true, {}, undefined, "automatic"), "disabled");
 });

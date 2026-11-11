@@ -11,12 +11,28 @@ export type WindowsDistribution = "installed" | "zip" | "portable";
  */
 const PUBLIC_UPDATE_FEED_REACHABLE = false;
 
+/**
+ * Whether this build ships with a reachable update feed. Exported so the shipped
+ * default can be asserted directly, and so callers (tests, a future internal
+ * release channel) can exercise the policy below without editing the constant.
+ */
+export const UPDATE_FEED_REACHABLE = PUBLIC_UPDATE_FEED_REACHABLE;
+
+export type UpdatePolicyOptions = {
+  /** Defaults to the shipped flag above. */
+  feedReachable?: boolean;
+};
+
+const feedReachable = (options?: UpdatePolicyOptions): boolean =>
+  options?.feedReachable ?? PUBLIC_UPDATE_FEED_REACHABLE;
+
 export function supportsAutomaticUpdates(
   platform: NodeJS.Platform,
   isPackaged: boolean,
   env: NodeJS.ProcessEnv = process.env,
+  options?: UpdatePolicyOptions,
 ): boolean {
-  if (!PUBLIC_UPDATE_FEED_REACHABLE) return false;
+  if (!feedReachable(options)) return false;
   if (!isPackaged) return false;
   if (platform === "win32" || platform === "darwin") return true;
   return platform === "linux" && Boolean(env.APPIMAGE);
@@ -27,8 +43,9 @@ export function resolveDefaultUpdatePreference(
   isPackaged: boolean,
   env: NodeJS.ProcessEnv = process.env,
   distribution?: WindowsDistribution,
+  options?: UpdatePolicyOptions,
 ): UpdatePreference {
-  if (!supportsAutomaticUpdates(platform, isPackaged, env)) return "manual";
+  if (!supportsAutomaticUpdates(platform, isPackaged, env, options)) return "manual";
   if (
     platform === "win32" &&
     (Boolean(env.PORTABLE_EXECUTABLE_FILE) || distribution === "zip" || distribution === "portable")
@@ -58,10 +75,11 @@ export function resolveUpdateMode(
   env: NodeJS.ProcessEnv = process.env,
   distribution?: WindowsDistribution,
   preference?: UpdatePreference,
+  options?: UpdatePolicyOptions,
 ): UpdateMode {
-  if (!PUBLIC_UPDATE_FEED_REACHABLE) return "disabled";
+  if (!feedReachable(options)) return "disabled";
   if (!isPackaged) return "disabled";
-  if (!supportsAutomaticUpdates(platform, isPackaged, env)) return "manual";
+  if (!supportsAutomaticUpdates(platform, isPackaged, env, options)) return "manual";
   const selected =
     preference ??
     resolveDefaultUpdatePreference(platform, isPackaged, env, distribution);
