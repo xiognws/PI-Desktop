@@ -1,0 +1,16 @@
+docs/adr/0393-structured-memory-is-the-store.md
+  h_201ed4c689ac8b 1-80
+docs/adr/README.md
+  h_201ed4c689ac8b 424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d5d5d83f3aef3cbc8c4fcddaab52889d28b269b1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
