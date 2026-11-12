@@ -311,40 +311,8 @@ pub struct MemoryStats {
     pub by_kind: serde_json::Value,
 }
 
-/// Normalise text into one token per CJK ideograph: `压缩` becomes `压 缩`, a
-/// whole-term match on either. Latin words are left untouched and runs of
-/// whitespace collapse to one space.
-///
-/// The flat entry lists (`memory_entries::search_entries`) compare whole tokens
-/// and need this. The structured-memory index does not: its `trigram` tokenizer
-/// matches substrings of the raw text directly, which is why `sync_fts_for` and
-/// the v29 -> v30 rebuild store the text unchanged.
-pub fn normalise_search_text(text: &str) -> String {
-    let mut out = String::with_capacity(text.len() * 2);
-    let mut pending_space = false;
-    for ch in text.chars() {
-        if ch.is_whitespace() {
-            pending_space = true;
-            continue;
-        }
-        if is_cjk(ch) {
-            if !out.is_empty() && !out.ends_with(' ') {
-                out.push(' ');
-            }
-            out.push(ch);
-            out.push(' ');
-            pending_space = false;
-            continue;
-        }
-        if pending_space && !out.is_empty() {
-            out.push(' ');
-        }
-        pending_space = false;
-        out.push(ch);
-    }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
+/// Whether a character belongs to a CJK script. A term containing one is a
+/// whole word on its own: there is no space to split on.
 fn is_cjk(ch: char) -> bool {
     matches!(
         ch as u32,
@@ -984,6 +952,102 @@ pub(crate) fn rebuild_memories_fts(conn: &Connection) -> Result<()> {
         insert.execute(params![rowid, title, body, tags])?;
     }
     Ok(())
+}
+
+/// Longest title derived from a retired entry's first line. A title names a row
+/// in the memory page and in a recall hit; a paragraph is a body.
+const MAX_IMPORT_TITLE_CHARS: usize = 80;
+
+/// Title derived from a retired entry: its first line, or the start of the entry
+/// when the first line is blank. Clipped by characters, not bytes, so a Chinese
+/// title is not cut mid-character.
+fn entry_title(entry: &str) -> String {
+    let first_line = entry.lines().next().unwrap_or("").trim();
+    let source = if first_line.is_empty() {
+        entry.trim()
+    } else {
+        first_line
+    };
+    let title: String = source.chars().take(MAX_IMPORT_TITLE_CHARS).collect();
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        entry.trim().chars().take(MAX_IMPORT_TITLE_CHARS).collect()
+    } else {
+        title
+    }
+}
+
+/// Import the retired flat entry list into the store — the last reader of
+/// `memory_entries` (ADR 0393, schema v31).
+///
+/// The table held what the agent had to say while `memories` held the structured
+/// rows, and the two were never reconciled: this is the direction that copy now
+/// runs, once, inside the transaction that drops the table. A `user`-target entry
+/// describes the person, so `preference`; everything else is the agent's own note
+/// and becomes `fact`.
+///
+/// `INSERT OR IGNORE` against the dedupe index is what makes a re-run harmless —
+/// a row already imported (by an earlier launch, or by a previous attempt) is
+/// skipped instead of duplicated. One bad row (NUL byte, oversized body) is
+/// logged and skipped rather than aborting the migration: the alternative is a
+/// database that cannot open because of one note.
+pub(crate) fn import_retired_entries_tx(tx: &rusqlite::Transaction<'_>) -> Result<usize> {
+    let rows: Vec<(String, String)> = {
+        let mut stmt =
+            tx.prepare("SELECT target, content FROM memory_entries ORDER BY target, ordinal")?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    let now = now_ms();
+    let mut insert = tx.prepare(
+        "INSERT OR IGNORE INTO memories (
+            id, scope, project_path, session_id, kind, title, body, tags, source,
+            confidence, pinned, content_hash, use_count, created_at, updated_at,
+            last_used_at, valid_from, valid_until, superseded_by
+         ) VALUES (?1, 'global', NULL, NULL, ?2, ?3, ?4, '[]', 'import', 0.7, 0, ?5, 0, ?6, ?6, NULL, ?6, NULL, NULL)",
+    )?;
+    let mut inserted = 0usize;
+    for (target, content) in rows {
+        let text = content.trim();
+        if text.is_empty() {
+            continue;
+        }
+        if text.contains('\u{0}') || text.chars().count() > MAX_BODY_BYTES {
+            tracing::warn!(target = %target, "skipped an entry the store cannot hold");
+            continue;
+        }
+        let kind = if target == "user" {
+            MemoryKind::Preference
+        } else {
+            MemoryKind::Fact
+        };
+        let title = entry_title(text);
+        if title.is_empty() {
+            continue;
+        }
+        let id = uuid::Uuid::new_v4().to_string();
+        let hash = content_hash(&title, text);
+        let written = insert.execute(params![id, kind.as_str(), title, text, hash, now])?;
+        if written == 0 {
+            continue;
+        }
+        inserted += 1;
+        let rowid: Option<i64> = tx
+            .query_row(
+                "SELECT rowid FROM memories WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let Some(rowid) = rowid {
+            let (title, body, tags) = index_row(&title, text, "[]");
+            tx.execute(
+                "INSERT INTO memories_fts (rowid, title, body, tags) VALUES (?1, ?2, ?3, ?4)",
+                params![rowid, title, body, tags],
+            )?;
+        }
+    }
+    Ok(inserted)
 }
 
 fn row_to_memory(row: &rusqlite::Row<'_>) -> rusqlite::Result<MemoryRecord> {

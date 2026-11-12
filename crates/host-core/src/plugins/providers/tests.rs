@@ -102,10 +102,11 @@ fn a_new_database_carries_the_owner_column_at_the_current_schema_version() {
     // session-list index, v23 the session title source, v24 the worktree
     // registry, v25 model discovery state, v26 the lossless image storage
     // envelope, v27 the durable memory store, v28 the session Fast mode switch,
-    // and v29 the replayed-reasoning text repair. A fresh database is stamped
+    // v29 the replayed-reasoning text repair, v30 the trigram memory index and
+    // v31 the retirement of the flat memory entries. A fresh database is stamped
     // with the newest version, so the column set is the current one. The pin is
     // deliberate: moving the schema means re-reading this list.
-    assert_eq!(SCHEMA_VERSION, 29);
+    assert_eq!(SCHEMA_VERSION, 31);
     let version: i64 = db
         .conn()
         .query_row("PRAGMA user_version", [], |row| row.get(0))

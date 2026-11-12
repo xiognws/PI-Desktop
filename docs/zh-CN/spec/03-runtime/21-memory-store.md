@@ -138,7 +138,7 @@ SELECT m.*, bm25(memories_fts) AS score
 | 方法 | 参数 | 返回 |
 |---|---|---|
 | `memory.remember` | `scope`、`kind`、`title`、`body`、`projectPath?`、`sessionId?`、`tags?`、`source?`、`confidence?`、`pinned?` | `{ memory, deduped }` |
-| `memory.recall` | `query`、`scope?`、`projectPath?`、`sessionId?`、`limit?`（≤ 50）、`entriesLimit?`（≤ 20） | `{ memories: [{ memory, score }], entries: [{ target, index, text, score }] }` —— 见 §9.3 |
+| `memory.recall` | `query`、`scope?`、`projectPath?`、`sessionId?`、`limit?`（≤ 50） | `{ memories: [{ memory, score }] }` |
 | `memory.list` | `scope?`、`kind?`、`pinned?`、`projectPath?`、`sessionId?`、`includeSuperseded?`、`limit?`、`offset?` | `{ memories, total }` |
 | `memory.update` | `id` 加上 `title`、`body`、`tags`、`confidence`、`pinned` 中的任意项 | `{ memory }` |
 | `memory.forget` | `id` **或** `sessionId` | `{ removed }` |
@@ -162,6 +162,13 @@ FTS 表，用的就是全新 schema 的同一份 DDL，因此全新库与升级�
 还会在 `sessions.fast_mode`（schema v27，ADR 0334）缺失时补上它，因为被 merge 前
 的记忆构建盖上 27 号戳的库带着记忆表却没有那一列。事务提交前由
 `create_migration_backup` 写入上一版本的备份，v26 库一次启动即走 v26 → v27 → v28。
+
+Schema 版本 30 → 31（`db/memory_entries_retire_migration.rs`）终结第二个存储。它在同一个
+事务里先把 `MEMORIES_DDL` / `MEMORIES_FTS_DDL` 收敛到位，把残留的 `memory_entries` 行
+导入 `memories`（`crate::memory::import_retired_entries_tx`：`user` → `preference`，其余
+→ `fact`，首行作 title，`source = 'import'`，靠去重索引上的 `INSERT OR IGNORE` 让重跑成为
+空操作），然后 `DROP TABLE IF EXISTS memory_entries, memory_proposals`。全新库不会创建
+这两张表，因而永远不走这一步；此步骤对 `memories` 只插入，从不删除或改写。
 
 ## 9. 此处未规定（后续阶段）
 
@@ -187,9 +194,10 @@ FTS 表，用的就是全新 schema 的同一份 DDL，因此全新库与升级�
 - **召回有界且尽力而为**：2 秒超时，空/出错/超时都只意味着没有块，绝不导致该轮失败；
   仅 Agent 模式（Plan 与 Goal 轮在任何宿主动作前就声明了只含拒绝的工具集，而项目
   指令本身已带上下文）。
-- **写入工具不属于这个存储。** `Remember`（`memory-tool.rs`）不再向 Agent
-  声明：记忆写入走 §9.3 的扁平条目列表，那才是模型能直接读取和编辑的东西。
-  下面的召回仍然读*这个*存储，这正是 §9.3 记录的缺口。
+- **写入工具就是本存储的。** `Remember`（`memory-tool.rs`）不向 Agent 声明；
+  `memory` 工具（`packages/agent-runtime/src/memory-agent-tool.ts`）通过
+  `memory.remember` / `memory.update` / `memory.forget` 写 `memories`，并通过
+  `memory.recall` 读回。
 
 ### 9.2 阶段 2b：保留策略（已实现）
 
@@ -215,44 +223,21 @@ FTS 表，用的就是全新 schema 的同一份 DDL，因此全新库与升级�
 
 阶段 1 只交付了存储、去重、取代与召回。
 
-### 9.3 Agent 曾经写入的条目列表（已被 ADR 0393 退役）
+### 9.3 已不存在的条目列表
 
-> **已退役。** 下面的扁平列表是历史，不是当前行为：`memories` 已是唯一存储，
-> 工具对它做保留 / 更新 / 遗忘 / 检索（见 §10）。本节保留，是因为它记录的缺陷
-> ——同一条经验被两个互不相见的写入者同时写进技能和记忆——正是流程门禁至今
-> 仍会拒绝"步骤式正文"的原因。
+> **已退役，且已删除。** Schema v31 把扁平列表残留的行导入后直接删表；`memory.*` 不再
+> 有 `entries` / `writeEntries` 方法，`memory.recall` 只从 `memories` 作答。本节保留，
+> 是因为它记录的缺陷——同一条经验被两个互不相见的写入者同时写进技能和记忆——正是
+> 流程门禁至今仍会拒绝"步骤式正文"的原因。
 
-写记忆的工具是 `memory`，不是 `Remember`
-（`packages/agent-runtime/src/memory-agent-tool.ts`），它编辑的也不是上面那个
-计分存储，而是两份扁平条目列表：
+`memory` 工具（`packages/agent-runtime/src/memory-agent-tool.ts`）曾经编辑的两份扁平
+条目列表，而不是上面这张表：`memory` 放 Agent 自己的笔记，`user` 描述用户是谁，各自
+带一整库字符预算（2 200 / 1 375 字符，抄自 Hermes 的 `MEMORY.md` / `USER.md`）。两份
+列表都作为会话开始时的快照整份写进系统提示，由宿主的 `memory.entries` /
+`memory.writeEntries` 写入——那是第二个存储：没有标签、没有有效期、没有取代链、没有作用域。
 
-| | `memory` | `user` |
-|---|---|---|
-| 内容 | Agent 自己的笔记：项目如何运作、什么失败了以及为什么、决定及其理由 | 用户是谁：偏好、语言、角色、长期有效的指示 |
-| 预算 | `MEMORY_CHAR_LIMIT` 2 200 字符 | `USER_CHAR_LIMIT` 1 375 字符 |
-
-- **动作**：`add` / `replace` / `patch` / `remove` / `batch`。`patch` 替换某一条
-  内部的单段文本；`batch` 针对*最终*大小一起生效，因此「删掉过时条目并加入新
-  条目」是一次调用。
-- **编辑语义在哪里**：运行时（`memory-store.ts`）决定「模型指的是哪一条」以及一个
-  批次是否装得进预算；宿主每次调用执行一次整表原子写入（`memory.entries` /
-  `memory.writeEntries`）。
-- **注入**：两份列表都作为会话开始时冻结的快照进入系统提示词
-  （`memory-prompt.ts`），而工具结果会回显新列表，因为冻结的快照否则就是一份
-  模型看不见的文档。
-- **风险等级**：`low`；仅 Agent 模式（Plan 与 Goal 轮在任何宿主动作前就声明了
-  只含拒绝的工具集）。
-
-**召回同时读两个存储**（已修订）：`memory.recall` 现在也检索条目列表，命中放在
-`entries` 键下 —— `{ target, index, text, score }`，先按命中的查询词数量排序，再按
-条目长度；分词沿用索引自身的归一化（§5），所以两个汉字的查询就是两个词，能命中
-句子中间。上面的计分表仍以 `memories` 回答旧版本数据库里的行；它已无写入方，
-让它退役是另一项改动（项目级记忆，ADR 0234）。
-
-**每回合那次查询确有其事**（§9.1）：运行时调用可选的 `memoryRecall` 成员，
-sidecar 的 parent-host proxy 把它转成 `memory.recall` 经 `host.proxy` 发出，而该方法
-在 `HOST_PROXY_ALLOWED` 白名单里——所以正常 Agent 模式会话两半都通：冻结的快照
-（始终在系统提示里）+ 对条目列表的查询（每回合、最多 5 条、3000 字符、尽力而为）。
+这一切都不再存在：条目已成为结构化记忆，表已删除，工具对 `memories` 做保留、更新、
+遗忘与检索（§10）。
 
 ## 10. 扁平列表已退役（ADR 0393）
 
@@ -263,10 +248,11 @@ sidecar 的 parent-host proxy 把它转成 `memory.recall` 经 `host.proxy` 发�
 
 该列表已退役：
 
-- **单一存储。** `memories` 是唯一的记忆存储。启动时把残留条目一次性导入
-  （`migrate_entries_into_memories`）：`user` 目标的条目成为 `kind = preference`，其余为
+- **单一存储，单一数据表。** `memories` 是唯一的记忆存储。残留条目由 schema v31
+  导入（`import_retired_entries_tx`）：`user` 目标的条目成为 `kind = preference`，其余为
   `kind = fact`；首行作为 title、条目全文作为 body；`content_hash` 让重复导入成为空操作。
-  条目表在下一个版本前保持可读，且不再有任何写入者。
+  `memory_entries` 与从未被使用的 `memory_proposals` 在同一事务中被删除，因此之后的任何
+  版本都不可能再读到一个没有写入者的存储。
 - **保留语义，而非追加。** `memory.remember` 按 `content_hash` 去重，内容矛盾时用
   `superseded_by` 取代旧记忆而不删除。智能体工具在该面上提供
   `remember` / `update` / `forget` / `search`；整库编辑动作（`add`、`patch`、`replace`、

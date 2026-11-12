@@ -39,23 +39,6 @@ impl Database {
             [],
         );
 
-        // Entry-list memory (ADR 0378). `IF NOT EXISTS` is what lets this be an
-        // addition rather than a migration: the table is new, so no existing row
-        // is rewritten, no schema version moves, and a database created before
-        // this feature simply gains an empty table. It is also why a *fresh*
-        // database gets it — the base schema above predates the memory store, so
-        // tables added after it exist only through this path or a migration.
-        let _ = self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS memory_entries (
-               target     TEXT NOT NULL CHECK (target IN ('memory', 'user')),
-               ordinal    INTEGER NOT NULL,
-               content    TEXT NOT NULL,
-               updated_at INTEGER NOT NULL,
-               PRIMARY KEY (target, ordinal)
-             ) WITHOUT ROWID",
-            [],
-        );
-
         // The write path asks one question about a message over and over: does
         // the last copy of this id still sit in the transcript as a provisional,
         // streaming assistant row? The index row already mirrors that copy — it

@@ -112,42 +112,27 @@ describe("memoryContextPrefix", () => {
   });
 });
 
-describe("entry-list recall (ADR 0378)", () => {
-  it("renders what the agent wrote, labelled by target", async () => {
+describe("structured recall (ADR 0393)", () => {
+  it("renders every hit the host returns, labelled by scope and kind", async () => {
     const { host } = hostWithRecall(async () => ({
-      memories: [],
-      entries: [
-        { target: "memory", index: 0, text: "this repo builds with pnpm", score: 1 },
-        { target: "user", index: 1, text: "prefers Chinese replies", score: 0.5 },
+      memories: [
+        hit({ id: "m1", title: "this repo builds with pnpm", body: "never runs npm install" }),
+        hit({ id: "m2", title: "Replies", body: "prefers Chinese replies" }),
       ],
     }));
     const prefix = await memoryContextPrefix(host, "how do I build", {});
-    expect(prefix).toContain("- [memory] this repo builds with pnpm");
-    expect(prefix).toContain("- [user] prefers Chinese replies");
+    expect(prefix).toContain("this repo builds with pnpm");
+    expect(prefix).toContain("never runs npm install");
+    expect(prefix).toContain("prefers Chinese replies");
   });
 
-  it("does not need the scored table to say anything", async () => {
+  it("asks for the store and ignores a leftover entry-list key", async () => {
+    // The flat entry list is gone (ADR 0393). A host that still answers with an
+    // `entries` key must not leak it into the block: the store is the only text
+    // a model is allowed to see.
     const { host } = hostWithRecall(async () => ({
+      memories: [],
       entries: [{ target: "memory", text: "deploy host is sda-build-02" }],
-    }));
-    expect(await memoryContextPrefix(host, "deploy", {})).toContain("sda-build-02");
-  });
-
-  it("renders the structured hits before the retired entry list", async () => {
-    const { host } = hostWithRecall(async () => ({
-      memories: [hit()],
-      entries: [{ target: "memory", text: "fresh note" }],
-    }));
-    const prefix = (await memoryContextPrefix(host, "deploy", {})) ?? "";
-    // The store is the live half: a note migration copied out of the list must read
-    // as the memory that owns it, not as the legacy record it came from (ADR 0393).
-    expect(prefix.indexOf("deploy target")).toBeGreaterThan(-1);
-    expect(prefix.indexOf("fresh note")).toBeGreaterThan(prefix.indexOf("deploy target"));
-  });
-
-  it("skips an entry with no text and returns nothing when both halves are empty", async () => {
-    const { host } = hostWithRecall(async () => ({
-      entries: [{ target: "memory", text: "   " }],
     }));
     expect(await memoryContextPrefix(host, "deploy", {})).toBeUndefined();
   });

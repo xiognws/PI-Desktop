@@ -1066,16 +1066,6 @@ export type SkillReviewPolicy = {
   showQuietPasses?: boolean;
 };
 
-/**
- * The retired flat entry lists (ADR 0393).
- *
- * The launch payload still carries them and the settings page still reads them
- * for the learning map, so the shape stays accepted; nothing renders them into a
- * prompt any more. Memory is the structured store, and per-turn recall
- * (`memory-context.ts`) decides what reaches a model.
- */
-export type LegacyMemoryEntries = { memory: readonly string[]; user: readonly string[] };
-
 export type AgentRuntimeOptions = {
   host: RuntimeHost;
   sessionId: string;
@@ -1117,12 +1107,6 @@ export type AgentRuntimeOptions = {
   projectInstructions?: ProjectInstructions;
   /** Durable project context loaded from host-owned project memory. */
   projectMemory?: string;
-  /**
-   * Retired flat entry lists (ADR 0393), accepted from the launch payload and
-   * ignored: memory is the structured store now, and the per-turn recall block
-   * replaces the snapshot this used to render.
-   */
-  memoryEntries?: LegacyMemoryEntries;
   /** Persisted transcript to seed the agent with (session isolation: each
    * session's agent carries only its own history). */
   history?: UiMessage[];
@@ -1205,8 +1189,6 @@ export type RuntimeMatchConfig = {
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
-  /** Retired flat entry lists (ADR 0393); accepted and no longer used. */
-  memoryEntries?: LegacyMemoryEntries;
   projectPath?: string;
   /** Remote tool root. Model requests and runtime state remain on this machine. */
   remoteWorkspace?: { hostKey: string; path: string };

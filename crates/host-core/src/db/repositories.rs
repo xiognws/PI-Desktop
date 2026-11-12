@@ -225,8 +225,9 @@ impl Database {
             // chain below is safe for either flavour. v27 is the session Fast
             // mode switch, or the memory store when the file came from a
             // pre-merge memory build; v28 converges both. v29 is the reply-text
-            // repair, and v30 rebuilds the memory keyword index.
-            26 | 27 | 28 | 29 => {}
+            // repair, v30 rebuilds the memory keyword index, and v31 retires the
+            // flat entry list.
+            26..=30 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -309,6 +310,14 @@ impl Database {
         // phrase. `memories` is read, never rewritten.
         if migrated_version == 29 {
             super::migrations::migrate_v29_to_v30(&conn, path)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        }
+        // The flat entry list retires (ADR 0393). The entries are imported into
+        // `memories` and the table is dropped in the same transaction, so a
+        // database that still holds entries keeps them as structured memories
+        // and nothing reads the retired shape afterwards.
+        if migrated_version == 30 {
+            super::migrate_v30_to_v31(&conn, path)?;
         }
         // A stamp is not proof of shape. The memory branch stamped v28/v29 with
         // the memory tables but no `sessions.fast_mode`, while the merged line put

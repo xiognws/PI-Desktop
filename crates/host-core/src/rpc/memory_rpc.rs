@@ -30,8 +30,6 @@ pub(super) async fn handle(
         "memory.forget" => forget(state, params).await,
         "memory.tidy" => tidy(state, params).await,
         "memory.stats" => stats(state, params).await,
-        "memory.entries" => entries(state, params).await,
-        "memory.writeEntries" => write_entries(state, params).await,
         other => Err(rpc_err(
             1003,
             format!("unknown memory method: {other}"),
@@ -167,80 +165,18 @@ async fn remember(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, J
 async fn recall(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
     let query = required_str(&params, "query")?.to_string();
     let limit = optional_usize(&params, "limit")?;
-    let entry_limit = optional_usize(&params, "entriesLimit")?
-        .unwrap_or(5)
-        .min(20);
     let st = state.lock().await;
     let hits = st
         .db
         .recall(RecallQuery {
-            query: query.clone(),
+            query,
             scope: scope_param(&params)?,
             project_path: optional_str(&params, "projectPath")?,
             session_id: optional_str(&params, "sessionId")?,
             limit,
         })
         .map_err(internal)?;
-    // The entry lists are what the agent actually writes (ADR 0378); recall used
-    // to search only the scored table, which nothing writes, so a note the agent
-    // kept was reachable through the prompt snapshot and invisible to a query.
-    // Both lists are searched here, best effort: a failure to read them costs the
-    // extra hits, never the call.
-    let memory_entries = st
-        .db
-        .memory_entries(crate::memory_entries::MemoryTarget::Memory)
-        .unwrap_or_default();
-    let user_entries = st
-        .db
-        .memory_entries(crate::memory_entries::MemoryTarget::User)
-        .unwrap_or_default();
-    let entries =
-        crate::memory_entries::search_entries(&memory_entries, &user_entries, &query, entry_limit);
-    Ok(json!({ "memories": hits, "entries": entries }))
-}
-
-fn memory_target(params: &Value) -> Result<crate::memory_entries::MemoryTarget, JsonRpcError> {
-    let value = required_str(params, "target")?;
-    crate::memory_entries::MemoryTarget::parse(value)
-        .ok_or_else(|| invalid(format!("unknown memory target: {value}")))
-}
-
-/// Entries for one target, in stored order (ADR 0378).
-async fn entries(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
-    let target = memory_target(&params)?;
-    let st = state.lock().await;
-    let entries = st.db.memory_entries(target).map_err(internal)?;
-    Ok(json!({ "target": target.as_str(), "entries": entries }))
-}
-
-/// Replace one target's whole entry list.
-///
-/// A whole-list write keeps the batch semantics honest: the caller already holds
-/// the list (it is in the model's prompt), frees space and spends it in one
-/// call, and the host validates only the final result — the same contract as
-/// `applyMemoryBatch` in `@pi-workspace/agent-runtime`. A budget violation is the
-/// model's mistake, so it reports as invalid params rather than an internal
-/// failure.
-async fn write_entries(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {
-    let target = memory_target(&params)?;
-    let items = params
-        .get("entries")
-        .and_then(Value::as_array)
-        .ok_or_else(|| invalid("entries must be an array of strings"))?;
-    let mut requested = Vec::with_capacity(items.len());
-    for item in items {
-        requested.push(
-            item.as_str()
-                .ok_or_else(|| invalid("entries must be an array of strings"))?
-                .to_string(),
-        );
-    }
-    let st = state.lock().await;
-    let written = st
-        .db
-        .write_memory_entries(target, &requested)
-        .map_err(|error| invalid(error.to_string()))?;
-    Ok(json!({ "target": target.as_str(), "entries": written }))
+    Ok(json!({ "memories": hits }))
 }
 
 async fn list(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value, JsonRpcError> {

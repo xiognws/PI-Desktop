@@ -128,14 +128,9 @@ impl AppState {
             Ok(_) => {}
             Err(error) => tracing::warn!(%error, "in-flight reply sweep failed"),
         }
-        // The flat entry list retires (ADR 0393): `memories` is the store, so
-        // fold the entries into it once at startup. The list itself is left
-        // untouched and readable for one release.
-        match db.migrate_entries_into_memories() {
-            Ok(0) => {}
-            Ok(count) => tracing::info!(count, "imported memory entries into the memory store"),
-            Err(error) => tracing::warn!(%error, "memory entry import failed"),
-        }
+        // Memory has one store (ADR 0393): `memories`. The flat entry list it
+        // replaced is imported and dropped by schema v31, so startup has nothing
+        // left to copy.
         let secrets = SecretStore::open(data_dir)?;
         // The marketplace channel is read before the manager builds its first
         // catalog, so a source configured for networks without GitHub access

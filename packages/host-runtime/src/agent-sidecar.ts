@@ -74,8 +74,8 @@ const HOST_PROXY_ALLOWED = new Set([
   // own memories, and per-turn recall asks the store for the hits. Without these
   // the sidecar cannot reach the memory store at all: the `memory` tool fails on
   // its write, and recall silently returns nothing because it is best-effort.
-  // The flat entry list (`memory.entries` / `memory.writeEntries`) is retired —
-  // no sidecar caller remains, and its table is no longer written by anything.
+  // The flat entry list (`memory.entries` / `memory.writeEntries`) is gone —
+  // no sidecar caller remains, and schema v31 dropped its table.
   "memory.remember",
   "memory.recall",
   "memory.update",

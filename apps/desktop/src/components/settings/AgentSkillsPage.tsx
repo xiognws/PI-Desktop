@@ -7,7 +7,7 @@ import {
   type SkillCurationReport,
   type UserSkillRecord,
 } from "@pi-workspace/shared";
-import { api } from "../../lib/api";
+import { api, type MemoryRecord } from "../../lib/api";
 import { capabilityQuery, deriveProjectOverrides, type CapabilityOverride } from "../../lib/capability-scope";
 import { useAppStore } from "../../stores/app-store";
 import { useHostCollection } from "../../hooks/use-host-collection";
@@ -55,7 +55,7 @@ import { ImportToggleButton } from "../../features/settings/import-workbench";
 
 import { SettingsRow, SettingsCard } from "../../features/settings/primitives";
 import { SettingsToggle, TooltipButton } from "../ui";
-import { buildLearningMap } from "../../lib/learning-map";
+import { buildLearningMap, type LearningMemory } from "../../lib/learning-map";
 import { LearningMapCanvas } from "./LearningMapCanvas";
 import {
   curationById,
@@ -65,6 +65,30 @@ import {
 } from "../../lib/skill-usage";
 import { archivedSkillRows, type ArchivedSkillRow } from "../../lib/skill-archive";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
+
+/**
+ * Memories read for the map. It draws at most two dozen nodes, so this is a
+ * recent window rather than the whole store: `memory.list` orders pinned first,
+ * then newest, which is the order "what the agent learned lately" wants.
+ */
+const LEARNING_MAP_MEMORY_LIMIT = 100;
+
+/**
+ * One stored memory as a map node input.
+ *
+ * A `preference` is the person and everything else is the agent's own note — the
+ * two colours the map drew when the data came from two lists. The label is the
+ * title; the body joins it so the vocabulary overlap sees the whole memory.
+ */
+function learningMapMemory(memory: MemoryRecord): LearningMemory {
+  const title = memory.title.trim();
+  const body = memory.body.trim();
+  return {
+    id: memory.id,
+    text: !body || body === title ? title : `${title}: ${body}`,
+    target: memory.kind === "preference" ? "user" : "memory",
+  };
+}
 
 function projectSkillsPath(projectPath: string | null): string {
   return projectPath ? `${projectPath}/.agents/skills` : "<project-root>/.agents/skills";
@@ -203,10 +227,14 @@ export function AgentSkillsPage() {
     level: AgentCapabilityLevel;
   } | null>(null);
   const [merging, setMerging] = useState(false);
-  /** The agent's own memory entries, drawn on the learning map beside the skills. */
-  const [memoryEntries, setMemoryEntries] = useState<
-    { id: string; text: string; target: "memory" | "user" }[]
-  >([]);
+  /**
+   * The agent's own memories, drawn on the learning map beside the skills.
+   *
+   * One store (ADR 0393): a `preference` is what the retired `user` list meant
+   * and everything else is the agent's own note, so the map keeps its two
+   * colours without a second table to read them from.
+   */
+  const [mapMemories, setMapMemories] = useState<LearningMemory[]>([]);
   const [curating, setCurating] = useState(false);
   const refreshCuration = useCallback(async () => {
     try {
@@ -587,27 +615,13 @@ export function AgentSkillsPage() {
     // Two more host reads for a card below the fold: let the skill list land first.
     const start = () => void (async () => {
       try {
-        const [memory, user] = await Promise.all([
-          api.memoryEntries("memory"),
-          api.memoryEntries("user"),
-        ]);
+        const listed = await api.listMemories({ limit: LEARNING_MAP_MEMORY_LIMIT });
         if (cancelled) return;
-        setMemoryEntries([
-          ...(memory?.entries ?? []).map((text, index) => ({
-            id: `memory-${index}`,
-            text,
-            target: "memory" as const,
-          })),
-          ...(user?.entries ?? []).map((text, index) => ({
-            id: `user-${index}`,
-            text,
-            target: "user" as const,
-          })),
-        ]);
+        setMapMemories((listed?.memories ?? []).map(learningMapMemory));
       } catch {
-        // A map of the skills alone is still worth showing; the entries are a
-        // second store and failing to read them is not a page error.
-        if (!cancelled) setMemoryEntries([]);
+        // A map of the skills alone is still worth showing; the store is a
+        // second read and failing it is not a page error.
+        if (!cancelled) setMapMemories([]);
       }
     })();
     const timer = setTimeout(start, 0);
@@ -638,9 +652,9 @@ export function AgentSkillsPage() {
             enabled: row.enabled,
             useCount: row.useCount,
           })),
-        memoryEntries,
+        mapMemories,
       ),
-    [visible.global, visible.project, memoryEntries],
+    [visible.global, visible.project, mapMemories],
   );
 
   const curationRows = useMemo(() => curationById(curation?.entries), [curation]);

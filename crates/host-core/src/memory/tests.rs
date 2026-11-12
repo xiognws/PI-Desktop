@@ -469,19 +469,6 @@ fn list_filters_and_counts() {
 }
 
 #[test]
-fn search_normalisation_tokenises_cjk_and_keeps_latin_words() {
-    assert_eq!(normalise_search_text("上下文压缩"), "上 下 文 压 缩");
-    assert_eq!(
-        normalise_search_text("keepRecentTokens 20000"),
-        "keepRecentTokens 20000"
-    );
-    assert_eq!(
-        normalise_search_text("  混合  text\tthen 中文 "),
-        "混 合 text then 中 文"
-    );
-}
-
-#[test]
 fn recall_plan_quotes_indexable_terms_and_keeps_short_ones() {
     let plan = RecallPlan::parse("压缩 20000 keepRecentTokens push");
     assert_eq!(

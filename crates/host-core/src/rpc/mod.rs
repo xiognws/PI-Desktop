@@ -6451,19 +6451,26 @@ mod tests {
 
         handle_request(
             state.clone(),
-            "memory.writeEntries",
-            json!({ "target": "memory", "entries": [
-                "This project builds with pnpm and never runs npm install.",
-                "Unrelated note about the weather.",
-            ] }),
+            "memory.remember",
+            json!({
+                "scope": "global",
+                "kind": "fact",
+                "title": "Build tool",
+                "body": "This project builds with pnpm and never runs npm install.",
+            }),
             tx.clone(),
         )
         .await
         .unwrap();
         handle_request(
             state.clone(),
-            "memory.writeEntries",
-            json!({ "target": "user", "entries": ["Prefers pnpm workspaces."] }),
+            "memory.remember",
+            json!({
+                "scope": "global",
+                "kind": "preference",
+                "title": "Replies",
+                "body": "Prefers pnpm workspaces.",
+            }),
             tx.clone(),
         )
         .await
@@ -6472,21 +6479,16 @@ mod tests {
         let recalled = handle_request(state, "memory.recall", json!({ "query": "pnpm" }), tx)
             .await
             .unwrap();
-        // The scored table still answers under its own key (nothing writes it any
-        // more, but a database upgraded from an older build may still hold rows).
-        assert!(recalled["memories"].is_array());
-        let entries = recalled["entries"].as_array().unwrap();
-        assert_eq!(entries.len(), 2, "both lists are searched");
-        let memory_hit = entries
+        // One store, one key: recall answers from `memories` and nothing else.
+        let hits = recalled["memories"].as_array().unwrap();
+        assert_eq!(hits.len(), 2, "both written memories are recalled");
+        let hit = hits
             .iter()
-            .find(|hit| hit["target"] == json!("memory"))
-            .expect("the agent's own note is found");
-        assert_eq!(memory_hit["index"], json!(0));
-        assert!(memory_hit["text"]
-            .as_str()
-            .unwrap()
-            .contains("pnpm and never runs npm install"));
-        assert!(memory_hit["score"].as_f64().unwrap() > 0.0);
+            .find(|hit| hit["memory"]["body"] == json!("Prefers pnpm workspaces."))
+            .expect("the preference is found");
+        assert_eq!(hit["memory"]["kind"], json!("preference"));
+        assert!(hit["score"].as_f64().is_some(), "each hit carries its rank");
+        assert!(recalled.get("entries").is_none());
     }
 
     #[tokio::test]

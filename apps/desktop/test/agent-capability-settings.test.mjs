@@ -559,10 +559,14 @@ test("a merged row says where it went", () => {
   assert.match(skills, /into: skill\.absorbedInto/);
 });
 
-test("the learning map draws skills and memory entries together", () => {
+test("the learning map draws skills and memories from the one store", () => {
   assert.match(skills, /buildLearningMap\(/);
-  assert.match(skills, /api\.memoryEntries\("memory"\)/);
-  assert.match(skills, /api\.memoryEntries\("user"\)/);
+  // The map reads the structured store (ADR 0393): `memory.list`, not the retired
+  // flat entry lists, and it maps rows onto the graph's node shape.
+  assert.match(skills, /api\.listMemories\(\{ limit: LEARNING_MAP_MEMORY_LIMIT \}\)/);
+  assert.match(skills, /function learningMapMemory\(memory: MemoryRecord\)/);
+  assert.match(skills, /memory\.kind === "preference" \? "user" : "memory"/);
+  assert.doesNotMatch(skills, /api\.memoryEntries/);
   assert.match(skills, /<LearningMapCanvas/);
   // A skill that is switched off is not part of what the agent can currently use,
   // so it is not drawn as an active node.

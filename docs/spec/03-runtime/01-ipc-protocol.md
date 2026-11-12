@@ -1708,10 +1708,10 @@ are intact (ADR 0395).
   are swept on every scan so a deleted document cannot hand its count to a
   same-named successor, and surface on `UserSkillRecord` as
   `useCount` / `lastUsedAt` / `pinned`.
-- `memory.entries({ target })` → `{ target, entries: string[] }` — read-only view of
-  the flat entry list the `memory` tool writes, forwarded to the renderer so the
-  learning map can draw skills and memory entries together (ADR 0390). This is a
-  different store from `memory.list`.
+- `memory.list({ scope?, kind?, pinned?, projectPath?, sessionId?, includeSuperseded?, limit?, offset? })`
+  → `{ memories, total }` — the store the learning map draws from, mapped by kind
+  (`preference` = the person, everything else = the agent's own note). The flat
+  `memory.entries` channel this replaced is gone with its table (ADR 0393).
 - `skills.absorb({ id, into, level?, projectPath? })` → `{ absorbed, into, copied, skipped }` —
   merge one skill into another (ADR 0389). The source's resource files move under
   the umbrella; a file the umbrella already has is kept as the umbrella's and

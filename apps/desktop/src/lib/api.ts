@@ -1206,9 +1206,6 @@ export const api = {
   /** Relevance-ranked retrieval over the same store (ADR 0393). */
   recallMemories: (input: MemoryRecallInput) =>
     invoke<{ memories: MemoryHit[] }>(IPC.invoke.memoryRecall, input),
-  /** The agent-written entry list for one store (`memory` / `user`). */
-  memoryEntries: (target: "memory" | "user") =>
-    invoke<{ target: string; entries: string[] }>(IPC.invoke.memoryEntries, { target }),
   memoryStats: () => invoke<{ stats: MemoryStats }>(IPC.invoke.memoryStats),
   updateMemory: (input: MemoryUpdateInput) =>
     invoke<{ memory: MemoryRecord }>(IPC.invoke.memoryUpdate, input),

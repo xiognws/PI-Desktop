@@ -187,7 +187,6 @@ function createRuntime(
     customSystemPrompt: import("./custom-system-prompt.js").CustomSystemPrompt;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
     projectMemory: string;
-    memoryEntries: { memory: string[]; user: string[] };
     pluginTools: PluginToolDef[];
     subagents: SubagentDefinition[];
     subagentProviders: Record<string, RuntimeProviderConfig>;
@@ -229,7 +228,6 @@ function createRuntime(
     subagentModelKeys: overrides.subagentModelKeys,
     projectInstructions: overrides.projectInstructions,
     projectMemory: overrides.projectMemory,
-    memoryEntries: overrides.memoryEntries,
     pluginSkills: overrides.pluginSkills,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
@@ -250,18 +248,12 @@ describe("structured memory wiring (ADR 0393)", () => {
       recalledMemoryContext(input: string): Promise<string | undefined>;
     };
 
-  it("keeps the retired entry lists out of the system prompt", () => {
-    // The flat list no longer reaches a prompt: the structured store plus per-turn
-    // recall replaced the session snapshot that used to be rendered here.
-    const runtime = createRuntime({
-      memoryEntries: {
-        memory: ["PowerShell scripts must be UTF-8 with BOM"],
-        user: ["prefers Chinese replies"],
-      },
-    });
-    expect(internals(runtime).composeSystemPrompt()).not.toContain(
-      "PowerShell scripts must be UTF-8 with BOM",
-    );
+  it("keeps memory out of the system prompt", () => {
+    // Memory reaches a request only through per-turn recall in the user message
+    // (ADR 0337): a system-prompt block would rewrite the cached prefix, and
+    // recall changes on every turn.
+    const runtime = createRuntime({});
+    expect(internals(runtime).composeSystemPrompt()).not.toContain("<memory_context>");
   });
 
   it("still recalls memories into the turn, scoped to the project", async () => {

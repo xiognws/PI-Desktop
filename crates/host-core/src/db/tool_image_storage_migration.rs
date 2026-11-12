@@ -58,6 +58,10 @@ mod tests {
         let path = dir.path().join("pi.sqlite");
         legacy_database(&path);
         let before = Connection::open(&path).unwrap();
+        // `sqlite_master` is deliberately not compared: a migration may rebuild an
+        // index table (v29 -> v30 recreates `memories_fts` on the trigram
+        // tokenizer), which moves the shadow tables' rootpages without changing a
+        // single user row. The row snapshots below are what must not drift.
         let tables = [
             "kv",
             "providers",
@@ -66,7 +70,6 @@ mod tests {
             "messages",
             "turns",
             "message_revisions",
-            "sqlite_master",
         ];
         let snapshots: Vec<_> = tables.iter().map(|table| rows(&before, table)).collect();
         drop(before);
@@ -80,7 +83,7 @@ mod tests {
             std::fs::write(file, b"legacy bytes are not rewritten on database open\n").unwrap();
         }
         let db = Database::open(&path).unwrap();
-        assert_eq!(version(db.conn()), 29);
+        assert_eq!(version(db.conn()), SCHEMA_VERSION);
         let backup_path = migration_backup_path(&path, 25);
         let backup = Connection::open(&backup_path).unwrap();
         assert_eq!(version(&backup), 25);
@@ -98,7 +101,7 @@ mod tests {
         drop(db);
         let original_backup = std::fs::read(&backup_path).unwrap();
         let db = Database::open(&path).unwrap();
-        assert_eq!(version(db.conn()), 29);
+        assert_eq!(version(db.conn()), SCHEMA_VERSION);
         assert_eq!(
             std::fs::read(backup_path).unwrap(),
             original_backup,
@@ -107,18 +110,26 @@ mod tests {
     }
 
     #[test]
-    fn fresh_database_uses_29_and_future_30_is_refused() {
+    fn fresh_database_uses_the_latest_version_and_a_future_one_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("pi.sqlite");
         let db = Database::open(&path).unwrap();
-        assert_eq!(version(db.conn()), 29);
-        db.conn().pragma_update(None, "user_version", 30).unwrap();
+        assert_eq!(version(db.conn()), SCHEMA_VERSION);
+        db.conn()
+            .pragma_update(None, "user_version", SCHEMA_VERSION + 1)
+            .unwrap();
         drop(db);
         let error = Database::open(&path)
             .err()
             .expect("future schema must be refused");
-        assert!(error.to_string().contains("30 is newer than supported 29"));
-        assert_eq!(version(&Connection::open(path).unwrap()), 30);
+        assert!(error.to_string().contains(&format!(
+            "{} is newer than supported {SCHEMA_VERSION}",
+            SCHEMA_VERSION + 1
+        )));
+        assert_eq!(
+            version(&Connection::open(path).unwrap()),
+            SCHEMA_VERSION + 1
+        );
     }
 
     #[test]
@@ -146,7 +157,7 @@ mod tests {
         .unwrap();
         drop(conn);
         let db = Database::open(&path).unwrap();
-        assert_eq!(version(db.conn()), 29);
+        assert_eq!(version(db.conn()), SCHEMA_VERSION);
         for schema in [24, 25] {
             let backup = Connection::open(migration_backup_path(&path, schema)).unwrap();
             assert_eq!(version(&backup), schema);

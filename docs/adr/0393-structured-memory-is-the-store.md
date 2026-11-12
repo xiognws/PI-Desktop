@@ -35,8 +35,8 @@ reaching the context - which is what `memories` already is.
 2. **The flat list retires.** Existing `memory_entries` rows are migrated in
    (`kind` inferred: a `user`-target entry becomes `preference`, everything else
    `fact`; `title` = the first line, `body` = the entry, `content_hash` computed,
-   `source = "migrated"`). The table stays readable for one release so nothing is
-   lost if the migration is wrong, and nothing writes it again.
+   `source = "import"`). The table stayed readable for one release so nothing was
+   lost if the migration was wrong; schema v31 then drops it (see Consequences).
 3. **Writing is retain, not append.** One tool call stores a memory with `kind`,
    `title`, `body`, `tags`, and scopes it to the project or session. A matching
    `content_hash` updates instead of duplicating; a contradicting memory supersedes
@@ -65,8 +65,20 @@ reaching the context - which is what `memories` already is.
 - Retrieval quality becomes the thing that matters. It has to be observable: the
   memory page shows each row's `kind`, `pinned`, `use_count`, and whether it was
   retrieved in the current session.
-- The `memory_proposals` queue exists and stays unused for now; nothing in this
-  decision requires approval before writing.
+- **The second store is gone, not just unwritten (schema v31).** The one-release
+  grace period ended in `db/memory_entries_retire_migration.rs`: inside one
+  transaction it converges the store's DDL, calls
+  `memory::import_retired_entries_tx` (the same inference as above, with
+  `INSERT OR IGNORE` against the dedupe index so a re-run is a no-op) and then
+  `DROP TABLE IF EXISTS memory_entries, memory_proposals`. A database that still
+  held entries keeps them as structured memories; a fresh database creates
+  neither table. `memories` rows are only inserted, never deleted, by the step.
+  The alternative — leaving the table behind — is what would let a later change
+  read a store that has no writer, which is how this one came about.
+- `memory_proposals` needed no migration of its own: it had no DDL, reader or
+  writer anywhere in the repository, so the drop is a guarded no-op that records
+  the retirement rather than a data move. The approval queue described above does
+  not exist in the schema and the product does not pre-approve writes.
 
 ## Alternatives considered
 

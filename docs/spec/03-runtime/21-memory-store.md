@@ -153,7 +153,7 @@ turns a 0.1 ms "recent 20" query into 130 ms.
 | Method | Params | Returns |
 |---|---|---|
 | `memory.remember` | `scope`, `kind`, `title`, `body`, `projectPath?`, `sessionId?`, `tags?`, `source?`, `confidence?`, `pinned?` | `{ memory, deduped }` |
-| `memory.recall` | `query`, `scope?`, `projectPath?`, `sessionId?`, `limit?` (≤ 50), `entriesLimit?` (≤ 20) | `{ memories: [{ memory, score }], entries: [{ target, index, text, score }] }` — see §9.3 |
+| `memory.recall` | `query`, `scope?`, `projectPath?`, `sessionId?`, `limit?` (≤ 50) | `{ memories: [{ memory, score }] }` |
 | `memory.list` | `scope?`, `kind?`, `pinned?`, `projectPath?`, `sessionId?`, `includeSuperseded?`, `limit?`, `offset?` | `{ memories, total }` |
 | `memory.update` | `id` + any of `title`, `body`, `tags`, `confidence`, `pinned` | `{ memory }` |
 | `memory.forget` | `id` **or** `sessionId` | `{ removed }` |
@@ -183,6 +183,16 @@ without that column. A backup of the previous version is written by
 `create_migration_backup` before the transaction commits, and a v26 database
 walks v26 → v27 → v28 in one launch.
 
+Schema version 30 → 31 (`db/memory_entries_retire_migration.rs`) ends the second
+store. In one transaction it converges `MEMORIES_DDL` / `MEMORIES_FTS_DDL`, imports
+every remaining `memory_entries` row into `memories`
+(`crate::memory::import_retired_entries_tx`: `user` → `preference`, everything else
+→ `fact`, title from the first line, `source = 'import'`, `INSERT OR IGNORE`
+against the dedupe index so a re-run is a no-op) and then
+`DROP TABLE IF EXISTS memory_entries, memory_proposals`. A fresh database creates
+neither table, so it never runs this step. `memories` rows are only ever inserted
+here — never deleted or rewritten.
+
 ## 9. Not specified here (later stages)
 
 | Stage | Content |
@@ -211,10 +221,11 @@ walks v26 → v27 → v28 in one launch.
   yield no block and never fail the turn; Agent mode only (Plan and Goal turns
   declare a denial-only tool set before any host action, and project
   instructions already carry their context).
-- **The writing tool is not this store's.** `Remember`
-  (`memory-tool.rs`) is no longer declared to the agent: memory writes go to the
-  flat entry lists in §9.3, which is what the model can read and edit directly.
-  Recall below still reads *this* store, which is the gap §9.3 records.
+- **The writing tool is this store's.** `Remember` (`memory-tool.rs`) is not
+  declared to the agent; the `memory` tool
+  (`packages/agent-runtime/src/memory-agent-tool.ts`) writes `memories` through
+  `memory.remember` / `memory.update` / `memory.forget` and reads it back with
+  `memory.recall`.
 
 ### 9.2 Stage 2b: retention (implemented)
 
@@ -244,51 +255,25 @@ a pinned row.
 
 Stage 1 shipped storage, dedupe, supersession and recall only.
 
-### 9.3 The entry lists the agent used to write (retired by ADR 0393)
+### 9.3 The entry lists that no longer exist
 
-> **Retired.** The flat list below is history, not current behavior: `memories` is
-> the only store, and the tool retains, updates, forgets and searches it (§10).
-> The section stays because the defect it records — one lesson written to a skill
-> *and* to memory by two writers that never see each other — is why the procedure
-> gate still refuses a step-shaped body.
+> **Retired, and deleted.** Schema v31 imports whatever the flat list held and
+> drops the table; `memory.*` no longer has an `entries` or `writeEntries`
+> method, and `memory.recall` answers from `memories` only. The section stays
+> because the defect it records — one lesson written to a skill *and* to memory
+> by two writers that never see each other — is why the procedure gate still
+> refuses a step-shaped body.
 
-The tool that writes memory is `memory`, not `Remember`
-(`packages/agent-runtime/src/memory-agent-tool.ts`), and it edits two flat entry
-lists instead of the scored store above:
+The `memory` tool (`packages/agent-runtime/src/memory-agent-tool.ts`) once edited
+two flat entry lists instead of this table: `memory` for the agent's own notes,
+`user` for who the person is, each with a whole-store character budget (2 200 and
+1 375 chars, copied from Hermes' `MEMORY.md` / `USER.md`). Both lists were
+rendered into the system prompt as a session-start snapshot, and the host wrote
+them with `memory.entries` / `memory.writeEntries` — a second store, with no
+tags, no validity window, no supersede chain and no scoping.
 
-| | `memory` | `user` |
-|---|---|---|
-| Holds | the agent's own notes: how a project works, what failed and why, decisions and their reasons | who the user is: preferences, language, role, standing instructions |
-| Budget | `MEMORY_CHAR_LIMIT` 2 200 chars | `USER_CHAR_LIMIT` 1 375 chars |
-
-- **Actions**: `add` / `replace` / `patch` / `remove` / `batch`. `patch` replaces
-  one span inside one entry; `batch` applies several operations against the
-  *final* size, so pruning stale entries and adding new ones is one call.
-- **Where the edit semantics live**: the runtime (`memory-store.ts`) decides
-  "which entry did the model mean" and whether a batch fits the budget; the host
-  performs one atomic whole-list write per call (`memory.entries` /
-  `memory.writeEntries`).
-- **Injection**: both lists enter the system prompt as a snapshot frozen at
-  session start (`memory-prompt.ts`), and the tool's result echoes the new list,
-  because a frozen snapshot is otherwise a document the model cannot see.
-- **Risk class**: `low`; Agent mode only (Plan and Goal turns declare a
-  denial-only tool set before any host action).
-
-**Recall reads both stores** (amended): `memory.recall` searches the entry lists
-as well and returns its hits under `entries` — `{ target, index, text, score }`,
-ranked by how many of the query's terms the entry contains, then by entry length.
-Terms use the index's own normalisation (§5), so a two-character CJK query is two
-terms and matches inside a sentence. The scored table above still answers under
-`memories` for databases that hold rows from an older build; nothing writes it,
-and retiring it is a separate change with its own compatibility question
-(project-scoped memory, ADR 0234).
-
-**The per-turn block reaches these lists** (§9.1): the runtime asks the optional
-`memoryRecall` member, the sidecar's parent-host proxy forwards it as
-`memory.recall` through `host.proxy`, and that method is on the
-`HOST_PROXY_ALLOWED` list — so a normal Agent-mode session has both halves: the
-frozen prompt snapshot (always) and a query over the entry lists (per turn, five
-hits, 3 000 chars, best effort).
+Nothing of that survives: the entries became structured memories, the table is
+dropped, and the tool retains, updates, forgets and searches `memories` (§10).
 
 ## 10. The flat list retired (ADR 0393)
 
@@ -301,11 +286,13 @@ every request.
 
 The list is retired:
 
-- **One store.** `memories` is the only memory store. At startup the remaining
-  entries are imported once (`migrate_entries_into_memories`): a `user`-target
-  entry becomes `kind = preference`, everything else `kind = fact`; the first line
-  becomes the title and the entry the body; `content_hash` makes a repeated import
-  a no-op. The entry table stays readable for one release and nothing writes it.
+- **One store, and one table.** `memories` is the only memory store. The
+  remaining entries were imported by schema v31 (`import_retired_entries_tx`): a
+  `user`-target entry becomes `kind = preference`, everything else `kind = fact`;
+  the first line becomes the title and the entry the body; `content_hash` makes a
+  repeated import a no-op. `memory_entries` and the never-used
+  `memory_proposals` are dropped in the same transaction, so no release after
+  this one can read a store nothing writes.
 - **Retain, not append.** `memory.remember` deduplicates on `content_hash` and a
   contradicting memory supersedes the old one (`superseded_by`) instead of
   deleting it. The agent tool exposes `remember` / `update` / `forget` / `search`

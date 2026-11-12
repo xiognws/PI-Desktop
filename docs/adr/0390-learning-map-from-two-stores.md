@@ -2,6 +2,10 @@
 
 Status: Accepted
 Date: 2026-11-09
+Amended: the map still draws skills and memories together, but its memory half now
+reads `memory.list` — the flat entry store this ADR read through `memory.entries`
+was retired and its table dropped (ADR 0393, schema v31). See
+[0393](0393-structured-memory-is-the-store.md).
 
 ## Context
 
