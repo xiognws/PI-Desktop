@@ -67,3 +67,27 @@ describe("createSkillTool", () => {
     expect((result.content as Array<{ text: string }>)[0]?.text).toContain("library is empty");
   });
 });
+
+describe("the tool says the library is host-owned", () => {
+  it("tells the model not to go looking for skill files", async () => {
+    // Measured: asked to file a procedure, the model Globbed `C:\Users\<id>\.agents`
+    // and `D:\workspace\projects\app\pi\Desktop` - paths that are not this app's
+    // library - and each attempt raised a permission prompt for a directory
+    // outside the workspace.
+    const tool = toolWith(async () => ({ content: [{ type: "text" as const, text: "no" }], details: {} }));
+    expect(tool.description).toContain("host-owned");
+    expect(tool.description).toMatch(/Do not search the filesystem/);
+  });
+
+  it("names every skill the session was launched with, project ones included", async () => {
+    const withProject = [
+      { id: "tidy-logs", name: "Tidy logs", description: "Use when logs pile up." },
+      ...skills,
+    ];
+    const tool = createSkillTool({ skills: withProject, load: async () => ({ content: [], details: {} }) });
+    const result = await tool.execute("call-1", {});
+    const text = (result.content as Array<{ text: string }>)[0]?.text ?? "";
+    expect(text).toContain("tidy-logs");
+    expect(result.details?.count).toBe(3);
+  });
+});

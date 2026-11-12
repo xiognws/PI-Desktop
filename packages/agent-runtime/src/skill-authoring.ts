@@ -13,7 +13,7 @@ export const SKILL_AUTHORING_GUIDE = `SKILL.md quality bar:
 
 Frontmatter:
 - name: lowercase-hyphenated, matches the directory.
-- description: ONE sentence, <=120 characters, ends with a period. State when to use it, not the implementation.
+- description: ONE sentence, <=60 characters, ends with a period. State when to use it, not the implementation: the catalog shows 60 characters of it on every turn.
 
 Required body sections (Chinese headings are fine: 何时使用 / 工作流程 / 陷阱 / 验证):
 1. Title + 2-3 sentence intro: what it does, what it does NOT do.
@@ -47,4 +47,5 @@ Memory and skills are both durable, and they are not interchangeable: memory hol
 - A skill is class-level. Name the class of problem, not the issue that surfaced it; a rule that only applies to this afternoon's task is a memory entry at best.
 - The library is worth keeping only if it stays small and sharp: one skill per class of task, with the deep material in \`references/\`. Before writing, ask whether the next session facing this class of task would act differently — if not, do not write it.
 - One lesson, one place. A procedure belongs in the skill and nowhere else: do not also write it as a memory entry, because next session then reads the steps twice and the copy that ages worse wins. Memory keeps the facts a skill does not state.
-- Reading comes first: \`Skill\` with no id lists the live library; with an id it returns the document and its reference files. Patch what exists before creating what does not.`;
+- Reading comes first: \`Skill\` with no id lists the live library; with an id it returns the document and its reference files. Patch what exists before creating what does not.
+- The library is **host-owned**. \`Skill\` and \`skill_manage\` are the only ways to read or write it. Do not search the filesystem for skill folders (\`~/.agents\`, \`<project>/.agents\`, a \`skills/\` directory): those paths are not this app's library, a search there costs a permission prompt for a directory outside the workspace, and whatever it finds is someone else's file.`;
