@@ -1,0 +1,14 @@
+services/autotest/src/autotest/api/server.py
+  h_201ed4c689ac8b 24,1345-1369,1398-1407,1419-1431
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "42a2a76bff92ac0a2d4edf49e0106b184862033c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
