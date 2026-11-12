@@ -1,0 +1,14 @@
+services/autotest/ui/src/views/Executions.vue
+  h_201ed4c689ac8b 2,46-73,138-142,163,196-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ba22441ad4f147216818b5a8d49053e70fb4f551",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
