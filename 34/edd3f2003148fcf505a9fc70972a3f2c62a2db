@@ -1,0 +1,58 @@
+apps/desktop/electron/main/ipc/skills-ipc.ts
+  h_201ed4c689ac8b 3,157-197
+apps/desktop/src/components/settings/AgentSkillsPage.tsx
+  h_201ed4c689ac8b 66,83-85,94-95,134-154,162-163,170-177,247-270,648-659,910-944,1159-1184
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 120,1568-1577
+apps/desktop/src/lib/settings-search.ts
+  h_201ed4c689ac8b 209
+apps/desktop/src/lib/skill-archive.ts
+  h_201ed4c689ac8b 1-44
+apps/desktop/test/app-shell-settings-accessibility.test.mjs
+  h_201ed4c689ac8b 39-42
+apps/desktop/test/skill-archive-section.test.mjs
+  h_201ed4c689ac8b 1-92
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 5624-5636,6813-6834,6847-6870
+crates/host-core/src/user_skills.rs
+  h_201ed4c689ac8b 2070-2186
+crates/host-core/src/user_skills/tests_curator.rs
+  h_201ed4c689ac8b 49-105
+docs/adr/0395-skill-archive-by-move-and-daily-pass.md
+  h_201ed4c689ac8b 92-96
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1658-1666,1750-1756
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1351-1356
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1361-1366
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1351-1356
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1351-1356
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1357-1362
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1331-1336
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1357-1362
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1348-1353
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1348-1353
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 423-424,437-438
+packages/shared/src/types/capabilities.ts
+  h_201ed4c689ac8b 162-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "34edd3f2003148fcf505a9fc70972a3f2c62a2db",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
