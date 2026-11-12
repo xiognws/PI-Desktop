@@ -1,0 +1,16 @@
+docs/spec/03-runtime/21-memory-store.md
+  h_201ed4c689ac8b 286-316
+docs/zh-CN/spec/03-runtime/21-memory-store.md
+  h_201ed4c689ac8b 251-273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e1253df0d7333638e29b7e559cb169dae99f61c7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
