@@ -511,12 +511,22 @@ def _run_batch_thread(
     try:
         store.ensure_workflow_tables(conn)
         stats = payload["stats"]
+        step_status = "ok" if stats["fail"] == 0 and stats["error"] == 0 else "warning"
+        # 先把投递时那条 autotest_run（running）收尾，结果再单独记一条：
+        # 不收尾的话步骤列表里会永远有一条在跑，界面和轮询的 Agent 都被它骗住。
+        store.close_latest_step(
+            conn,
+            run_id,
+            "autotest_run",
+            status=step_status,
+            summary=f"跑完 {stats['total']} 个脚本，通过 {stats['pass']}",
+        )
         store.append_step(
             conn,
             run_id,
             tool="autotest_run_result",
             stage="executed",
-            status="ok" if stats["fail"] == 0 and stats["error"] == 0 else "warning",
+            status=step_status,
             summary=f"{stats['pass']}/{stats['total']} 通过，失败 {stats['fail']}，异常 {stats['error']}",
             payload=payload,
         )

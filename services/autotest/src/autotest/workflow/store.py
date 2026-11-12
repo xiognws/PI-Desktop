@@ -196,6 +196,39 @@ def append_step(
     return int(cursor.lastrowid)
 
 
+def close_latest_step(
+    conn: sqlite3.Connection,
+    run_id: str,
+    tool: str,
+    status: str = "ok",
+    summary: str | None = None,
+) -> int:
+    """把某个工具最近一条「还挂在 running」的步骤收尾，返回受影响行数。
+
+    投递执行时会先追加一条 `autotest_run`（status=running），真正的结果稍后由后台
+    线程写成独立的 `autotest_run_result`。没有这一步收尾，run 的步骤列表里那条会
+    永远停在 running，界面/Agent 都会以为还在跑。
+    """
+    row = conn.execute(
+        "SELECT id FROM workflow_steps WHERE run_id = ? AND tool = ? AND status = 'running'"
+        " ORDER BY seq DESC LIMIT 1",
+        (run_id, tool),
+    ).fetchone()
+    if row is None:
+        return 0
+    if summary is None:
+        conn.execute(
+            "UPDATE workflow_steps SET status = ?, ended_at = ? WHERE id = ?",
+            (status, _now(), row[0]),
+        )
+    else:
+        conn.execute(
+            "UPDATE workflow_steps SET status = ?, summary = ?, ended_at = ? WHERE id = ?",
+            (status, summary, _now(), row[0]),
+        )
+    return 1
+
+
 def create_decision(
     conn: sqlite3.Connection,
     run_id: str,

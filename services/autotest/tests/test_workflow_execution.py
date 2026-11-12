@@ -347,3 +347,30 @@ def test_project_bug_list_is_project_scoped(client):
         f"/api/projects/{b_id}/workflow/bugs/{bug_id}", json={"status": "fixed"}
     ).status_code == 404
 
+
+
+def test_execute_closes_the_dispatch_step_instead_of_leaving_it_running(client):
+    """跑完之后不能还有步骤挂在 running。
+
+    投递时先写一条 `autotest_run`（running），结果由后台线程写 `autotest_run_result`。
+    不收尾前者，run 的步骤列表里就永远有一条在跑 —— 界面转圈、轮询的 Agent 也以为没结束。
+    """
+    project_id, run_id = _start_run(client)
+    client.post(f"/api/projects/{project_id}/workflow/case-design", json={"run_id": run_id, "types": ["功能"]})
+    client.post(f"/api/projects/{project_id}/workflow/script-author", json={"run_id": run_id})
+    client.post(f"/api/projects/{project_id}/workflow/runs/{run_id}/execute", json={"timeout_s": 30})
+
+    status = _wait_for(client, project_id, run_id, "autotest_run_result")
+    running = [step["tool"] for step in status["steps"] if step["status"] == "running"]
+    assert running == [], f"跑完仍有步骤挂在 running: {running}"
+
+    dispatch = [step for step in status["steps"] if step["tool"] == "autotest_run"][0]
+    assert dispatch["status"] in ("ok", "warning")
+    assert "跑完" in dispatch["summary"]
+
+    # 生命周期仍按设计走：执行完只到 executed，报告出完才收尾成 done
+    assert status["stage"] == "executed"
+    assert status["status"] == "running"
+    client.post(f"/api/projects/{project_id}/workflow/runs/{run_id}/report", json={})
+    final = client.get(f"/api/projects/{project_id}/workflow/runs/{run_id}/status").json()["data"]
+    assert (final["stage"], final["status"]) == ("reported", "done")
