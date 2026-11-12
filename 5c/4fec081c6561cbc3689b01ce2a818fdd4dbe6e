@@ -1,0 +1,26 @@
+apps/desktop/src/features/chat/transcript/ChatTranscript.tsx
+  h_201ed4c689ac8b 59,159-164,541-548,550-551,553-554
+apps/desktop/src/features/chat/transcript/SkillReviewRow.tsx
+  h_201ed4c689ac8b 1,3,5,7-8,20-23,25,51-238
+apps/desktop/src/stores/app-state.ts
+  h_201ed4c689ac8b 123-127,132-138,180-189,191
+apps/desktop/src/stores/slices/events-slice.ts
+  h_201ed4c689ac8b 44,100-137,276-288,292-295
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 3926-3927,3936-3955
+apps/desktop/test/interaction-performance.test.mjs
+  h_201ed4c689ac8b 90-93
+apps/desktop/test/skill-review-row-render.test.mjs
+  h_201ed4c689ac8b 14-20,22-23,28-49,59-64,67-69,73,76-87,89-107,113-121,124-125,135-255,259-261,264-265,270,286-287,293-295
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5c4fec081c6561cbc3689b01ce2a818fdd4dbe6e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
