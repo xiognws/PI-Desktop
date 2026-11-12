@@ -7,6 +7,8 @@ import {
   FileText,
   ListChecks,
   PlayCircle,
+  Pencil,
+  Trash2,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -63,6 +65,67 @@ async function loadProjects() {
     }))
   } catch (e) {
     console.error('加载项目失败', e)
+  }
+}
+
+// 重命名 / 删除：删除是「移进回收目录」，但仍然要用户把项目名打对才放行。
+const renameTarget = ref<any>(null)
+const renameName = ref('')
+const deleteTarget = ref<any>(null)
+const deleteConfirmText = ref('')
+const inlineMessage = ref('')
+
+function openRename(p: any) {
+  renameTarget.value = p
+  renameName.value = p.name || ''
+  inlineMessage.value = ''
+}
+
+async function submitRename() {
+  const target = renameTarget.value
+  if (!target) return
+  const name = renameName.value.trim()
+  if (!name) {
+    inlineMessage.value = '项目名不能为空'
+    return
+  }
+  try {
+    const res = await fetch(`/api/projects/${target.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`)
+    inlineMessage.value = `已改名为「${name}」`
+    renameTarget.value = null
+    await loadProjects()
+  } catch (e: any) {
+    inlineMessage.value = e?.message || '改名失败'
+  }
+}
+
+function openDelete(p: any) {
+  deleteTarget.value = p
+  deleteConfirmText.value = ''
+  inlineMessage.value = ''
+}
+
+async function submitDelete() {
+  const target = deleteTarget.value
+  if (!target) return
+  try {
+    const res = await fetch(
+      `/api/projects/${target.id}?confirm=${encodeURIComponent(deleteConfirmText.value.trim())}`,
+      { method: 'DELETE' },
+    )
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`)
+    inlineMessage.value = body?.message || '项目已移入回收目录'
+    deleteTarget.value = null
+    await loadProjects()
+  } catch (e: any) {
+    inlineMessage.value = e?.message || '删除失败'
   }
 }
 
@@ -166,7 +229,19 @@ function enterProject(id: string) {
                     <p class="text-xs text-gray-500">{{ p.description }}</p>
                   </div>
                 </div>
-                <span class="text-xs text-gray-400">{{ p.last_active }}</span>
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-400">{{ p.last_active }}</span>
+                  <button
+                    class="p-1 text-gray-400 hover:text-blue-600"
+                    title="重命名"
+                    @click.stop="openRename(p)"
+                  ><Pencil class="w-4 h-4" /></button>
+                  <button
+                    class="p-1 text-gray-400 hover:text-red-600"
+                    title="删除项目（移入回收目录）"
+                    @click.stop="openDelete(p)"
+                  ><Trash2 class="w-4 h-4" /></button>
+                </div>
               </div>
               <div class="flex items-center gap-6 text-sm text-gray-500 pl-13">
                 <span>{{ p.type }}</span>
@@ -177,6 +252,42 @@ function enterProject(id: string) {
           </div>
         </div>
       </div>
+      <div v-if="inlineMessage" class="mt-3 text-xs text-gray-600">{{ inlineMessage }}</div>
+
+      <!-- 重命名对话框 -->
+      <div v-if="renameTarget" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-96">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">重命名项目</h3>
+          <input v-model="renameName" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+          <p class="text-xs text-gray-400 mt-2">项目 id（{{ renameTarget.id }}）不变，只改显示名。</p>
+          <div class="flex gap-3 mt-6">
+            <button @click="renameTarget = null" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">取消</button>
+            <button @click="submitRename" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 删除确认 -->
+      <div v-if="deleteTarget" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-[420px]">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">删除「{{ deleteTarget.name }}」？</h3>
+          <p class="text-sm text-gray-600 mb-3">
+            项目里的需求、用例、脚本、执行记录和报告都会一起移出列表。目录不会被真正删除，
+            而是移到 workspace 的 <code class="text-xs">.trash/</code> 下，需要时可以捡回来。
+          </p>
+          <label class="block text-sm text-gray-700 mb-1">输入项目 id 确认：<code class="text-xs">{{ deleteTarget.id }}</code></label>
+          <input v-model="deleteConfirmText" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" :placeholder="deleteTarget.id" />
+          <div class="flex gap-3 mt-6">
+            <button @click="deleteTarget = null" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">取消</button>
+            <button
+              :disabled="deleteConfirmText.trim() !== deleteTarget.id"
+              class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              @click="submitDelete"
+            >确认删除</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 新建项目对话框 -->
       <div v-if="createDialogOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg p-6 w-96">

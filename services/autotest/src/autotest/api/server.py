@@ -388,6 +388,71 @@ async def create_project(p: ProjectCreate):
     return {"id": project_id, **config}
 
 
+class ProjectPatch(BaseModel):
+    # None = 不改这个字段；空字符串 = 清空描述。
+    name: str | None = None
+    description: str | None = None
+
+
+@app.patch("/api/projects/{project_id}")
+async def update_project(project_id: str, body: ProjectPatch):
+    """改项目名 / 描述。
+
+    只改 `project.json`：项目 id 就是目录名，改它等于搬家 —— 产物路径、数据库位置和
+    已生成脚本里的绝对路径都会跟着失效，所以这里不给改。
+    """
+    project_dir = require_project(project_id)
+    config_file = project_dir / "project.json"
+    with open(config_file, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="项目名不能为空")
+        config["name"] = name
+    if body.description is not None:
+        config["description"] = body.description.strip()
+    config["last_active"] = datetime.now().strftime("%Y-%m-%d")
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+    return {"id": project_id, **config}
+
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: str, confirm: str = ""):
+    """删除项目：**移进回收目录**，不真删。
+
+    项目目录里是用户的需求、用例、脚本、执行产物和报告，误删重建不回来，所以
+    1) 必须带 `confirm=<project_id>`（前端做二次确认）；
+    2) 整个目录移到 `<workspace>/.trash/<project_id>-<时间戳>`，从列表消失但能捡回来；
+    3) 有执行在跑时拒绝删除，避免删掉正在写入的数据库。
+    """
+    project_dir = require_project(project_id)
+    if confirm.strip() != project_id:
+        raise HTTPException(status_code=400, detail="删除需要二次确认：confirm 必须等于项目 id")
+
+    from autotest.executors.service import RUNNING
+
+    if any(str(key).startswith(f"{project_id}:") for key in RUNNING):
+        raise HTTPException(status_code=409, detail="这个项目还有执行在跑，先取消或等它结束")
+
+    trash_dir = WORKSPACE.parent / ".trash"
+    trash_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    target = trash_dir / f"{project_id}-{stamp}"
+    try:
+        project_dir.rename(target)
+    except OSError as error:  # Windows: 目录里有文件被占用
+        raise HTTPException(status_code=409, detail=f"项目目录被占用，暂时无法移走：{error}") from error
+    return {
+        "id": project_id,
+        "trashed_to": str(target),
+        "message": f"项目已移入回收目录，可从 {target} 恢复",
+    }
+
+
 # ====== 用例管理 ======
 @app.get("/api/projects/{project_id}/cases")
 async def list_cases(project_id: str):
@@ -1078,6 +1143,46 @@ async def get_requirement_content(project_id: str, filename: str):
         raise HTTPException(status_code=404, detail="需求文件不存在")
     text = file_path.read_text(encoding="utf-8", errors="replace")
     return {"filename": filename, "text": text, "chars": len(text)}
+
+
+@app.delete("/api/projects/{project_id}/requirements/{filename}")
+async def delete_requirement(project_id: str, filename: str):
+    """删掉一份已上传的需求（文件 + 记录）。
+
+    `filename` 只接受纯文件名：需求都平铺在 `specs/` 下，带路径分隔符或 `..` 的
+    请求一律拒绝，避免删到项目外的文件。
+    """
+    project_dir = require_project(project_id)
+    name = filename.strip()
+    if not name or "/" in name or "\\" in name or name in (".", ".."):
+        raise HTTPException(status_code=400, detail="文件名不合法")
+
+    specs_dir = (project_dir / "specs").resolve()
+    target = (specs_dir / name).resolve()
+    if specs_dir != target.parent:
+        raise HTTPException(status_code=400, detail="文件名不合法")
+
+    db_path = get_project_db(project_id)
+    removed_rows = 0
+    if db_path.exists():
+        conn = sqlite3.connect(db_path)
+        removed_rows = conn.execute("DELETE FROM requirements WHERE filename = ?", (name,)).rowcount
+        conn.commit()
+        conn.close()
+
+    file_removed = False
+    if target.is_file():
+        target.unlink()
+        file_removed = True
+
+    if not file_removed and not removed_rows:
+        raise HTTPException(status_code=404, detail=f"需求不存在: {name}")
+    return {
+        "filename": name,
+        "file_removed": file_removed,
+        "records_removed": int(removed_rows),
+        "message": f"已删除需求 {name}",
+    }
 
 
 @app.post("/api/projects/{project_id}/scripts/{script_id}/gate")
