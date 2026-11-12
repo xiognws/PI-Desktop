@@ -1,0 +1,160 @@
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 25,316-326
+apps/desktop/electron/main/ipc/memory-ipc.ts
+  h_201ed4c689ac8b 67-83,152-159
+apps/desktop/electron/main/ipc/settings-ipc.ts
+  h_201ed4c689ac8b 7,75-80
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 692-701
+apps/desktop/electron/main/update-policy.ts
+  h_201ed4c689ac8b 14-28,33,35,46,48,78,80,82
+apps/desktop/electron/main/updater.ts
+  h_201ed4c689ac8b 51,115-120,131,210,216,223,234,363
+apps/desktop/electron/main/window-preferences.ts
+  h_201ed4c689ac8b 68-113
+apps/desktop/src/components/settings/MemoryList.tsx
+  h_201ed4c689ac8b 1-115
+apps/desktop/src/components/settings/MemoryPane.tsx
+  h_201ed4c689ac8b 2,4-11,13,16-18,20-21,23,25-26,28-30,32-36,41-55,57-60,64-68,70,72,74,77-81,88-91,93,100,106-107,109,121,123,129-136,143-145,179,181,185-192
+apps/desktop/src/features/app/AppShell.tsx
+  h_201ed4c689ac8b 28,34-39,41-46,48-53,55-60,62-67,71,77
+apps/desktop/src/features/app/chrome.tsx
+  h_201ed4c689ac8b 27-38
+apps/desktop/src/features/chat/transcript/ChatTranscript.tsx
+  h_201ed4c689ac8b 550-556
+apps/desktop/src/features/chat/transcript/SkillReviewRow.tsx
+  h_201ed4c689ac8b 4,32-35,38-48,51
+apps/desktop/src/features/chat/transcript/skill-review-text.ts
+  h_201ed4c689ac8b 59-77
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 782-788,800-807,1197-1199
+apps/desktop/src/lib/lazy-retry.ts
+  h_201ed4c689ac8b 2,4-7,9,11-15,18-36,39,42-56
+apps/desktop/src/lib/memory-view.ts
+  h_201ed4c689ac8b 2,4-8,10-14,16-26,29-48,51,53-55,57-63,66-75,77,79-80,82-103,105-124
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 3943-3966
+apps/desktop/test/artifacts-page.test.mjs
+  h_201ed4c689ac8b 30-36,38-40,43
+apps/desktop/test/computer-use-permission-user-path.test.mjs
+  h_201ed4c689ac8b 66-80,233-236
+apps/desktop/test/drive-root-path-containment.test.mjs
+  h_201ed4c689ac8b 2,5-15
+apps/desktop/test/imported-package-skills-runtime.test.mjs
+  h_201ed4c689ac8b 221,230-237
+apps/desktop/test/lazy-retry.test.mjs
+  h_201ed4c689ac8b 4,6-17,20-28,30,33-41
+apps/desktop/test/memory-pane.test.mjs
+  h_201ed4c689ac8b 3,6-13,21,26-77,79-80,90-98,103-111,124,129-138,142-151,155-166,169-170,177-178,180-188,192-230,233-269,272-300
+apps/desktop/test/office-tool-surface.test.mjs
+  h_201ed4c689ac8b 23-30
+apps/desktop/test/packaging-footprint.test.mjs
+  h_201ed4c689ac8b 224-225
+apps/desktop/test/plugin-mcp.test.mjs
+  h_201ed4c689ac8b 393-396,401-402
+apps/desktop/test/runtime-build-contract.test.mjs
+  h_201ed4c689ac8b 9-13,16-19
+apps/desktop/test/single-instance.test.mjs
+  h_201ed4c689ac8b 24-38
+apps/desktop/test/skill-review-row-render.test.mjs
+  h_201ed4c689ac8b 69,74-77
+apps/desktop/test/spawned-session-card-render.test.mjs
+  h_201ed4c689ac8b 80-85
+apps/desktop/test/startup-animation.test.mjs
+  h_201ed4c689ac8b 368
+apps/desktop/test/transcript-disclosure-reading.test.mjs
+  h_201ed4c689ac8b 131-149
+apps/desktop/test/update-preference.test.mjs
+  h_201ed4c689ac8b 28,33-44,108-116
+apps/desktop/test/updater-controller.test.mjs
+  h_201ed4c689ac8b 61-63
+apps/desktop/test/vendor-oauth-login.test.mjs
+  h_201ed4c689ac8b 26-33,287-288,294-295,1067,1128,1236,1253
+crates/host-core/src/db.rs
+  h_201ed4c689ac8b 10,48-50
+crates/host-core/src/db/migrations.rs
+  h_201ed4c689ac8b 824-851
+crates/host-core/src/db/repositories.rs
+  h_201ed4c689ac8b 227-229,305-311
+crates/host-core/src/db/schema.rs
+  h_201ed4c689ac8b 29,31-32,81-83,85-101,106,112-114,208
+crates/host-core/src/db/tests.rs
+  h_201ed4c689ac8b 35
+crates/host-core/src/memory.rs
+  h_201ed4c689ac8b 3-9,22,27,314-321,359-402,404-419,518-523,525-526,533-592,925,928,934-988
+crates/host-core/src/memory/tests.rs
+  h_201ed4c689ac8b 159-259,485-486,488-489,491-494,496-497,499-506,538-542,550-553,578-581,590-672
+crates/host-core/src/memory_entries.rs
+  h_201ed4c689ac8b 28-32,165-170,240-287,290-309
+crates/host-core/src/memory_entries/tests_migrate.rs
+  h_201ed4c689ac8b 1-148
+crates/host-core/src/state.rs
+  h_201ed4c689ac8b 131-134,136-137
+docs/adr/0392-procedure-lives-in-the-skill.md
+  h_201ed4c689ac8b 1-77
+docs/adr/0393-structured-memory-is-the-store.md
+  h_201ed4c689ac8b 1-80
+docs/adr/README.md
+  h_201ed4c689ac8b 423-424
+docs/spec/02-architecture/03-repo-structure.md
+  h_201ed4c689ac8b 155-157,160-165
+docs/spec/03-runtime/21-memory-store.md
+  h_201ed4c689ac8b 247-253,292-322
+docs/zh-CN/spec/03-runtime/21-memory-store.md
+  h_201ed4c689ac8b 218-223,256-278
+packages/agent-runtime/src/memory-agent-tool.test.ts
+  h_201ed4c689ac8b 2-79,81-84,87-108,111-117,120-125,127-129,132-140,143-149,152-165,168-182,184-188,191-195,197-198,202-220,222-233,236-250,252,254-260,262-263,266-278,282-289,292-305,309-315,317-324,327-330,334-353,357-365,368-373,375-388,391-403,406-442
+packages/agent-runtime/src/memory-agent-tool.ts
+  h_201ed4c689ac8b 2,4-10,12-17,19-21,24,29-31,34-37,39-49,52,54,57-60,62,64,67,70-76,78-80,83,86,89-91,94-97,99-101,104-106,109-111,114-122,127-162,165-174,177-183,187-190,192-197,199,202-241,243-249,251-344,346-508,517-532
+packages/agent-runtime/src/memory-context.test.ts
+  h_201ed4c689ac8b 136,142-145
+packages/agent-runtime/src/memory-context.ts
+  h_201ed4c689ac8b 60,62-64,108-109,124-132
+packages/agent-runtime/src/memory-skill-overlap.test.ts
+  h_201ed4c689ac8b 3-32,36-65,68-70,74-83,87-92,94-101,104-108,111-113,117-121
+packages/agent-runtime/src/memory-skill-overlap.ts
+  h_201ed4c689ac8b 1-158
+packages/agent-runtime/src/plugin-skills-prompt.test.ts
+  h_201ed4c689ac8b 85-102
+packages/agent-runtime/src/plugin-skills-prompt.ts
+  h_201ed4c689ac8b 24-33,35-39
+packages/agent-runtime/src/runtime.test.ts
+  h_201ed4c689ac8b 5-6,199-203,246-251,253-255,262-264,267-284,286-310,3908-3909,9664,9668-9671,12830-12832,12835,14595-14598
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 1069-1078,1121-1123,1125,1208-1209,1926-1928,1970-1980,2661-2667,2924-2951,3231-3233,4629-4632,4634-4642,9979-9984
+packages/agent-runtime/src/sidecar.ts
+  h_201ed4c689ac8b 160
+packages/host-runtime/src/agent-sidecar.ts
+  h_201ed4c689ac8b 73-79,81-82
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 190-191,1191-1195
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 189,1201-1205
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 190-191,1191-1195
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 190-191,1191-1195
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 190-191,1197-1201
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 190-191,1175-1179
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 191,1197-1201
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 191,1188-1192
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 191,1188-1192
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "61a6b28930b037762d2d556a9810dcb3032abb0b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
