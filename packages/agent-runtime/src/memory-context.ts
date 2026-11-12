@@ -57,11 +57,11 @@ type RecalledMemory = {
 };
 
 /**
- * A hit from the entry lists — the notes the agent writes itself (ADR 0378).
+ * A hit from the retired entry lists (ADR 0378, retired by ADR 0393).
  *
- * These are the live corpus: the scored `memories` table above has had no writer
- * since the agent started keeping flat lists, so a recall that renders only
- * `memories` shows nothing at all.
+ * Migration copied these rows into `memories` and nothing writes the list any
+ * more, so they render after the structured hits: the store is the copy that can
+ * still be corrected, and it should read first.
  */
 type RecalledEntry = {
   target?: string;
@@ -105,17 +105,8 @@ export async function memoryContextPrefix(
 
   const lines: string[] = [];
   let used = HEADER.length + FOOTER.length;
-  // Entry-list hits first: they are the notes the agent wrote for itself, and the
-  // only half of the store that anything still writes to.
-  for (const entry of entries) {
-    const text = (entry.text ?? "").trim();
-    if (!text) continue;
-    const label = entry.target === "user" ? "user" : "memory";
-    const line = `- [${label}] ${text}`;
-    if (used + line.length + 1 > MAX_BLOCK_CHARS) break;
-    lines.push(line);
-    used += line.length + 1;
-  }
+  // Structured hits first: they are the live store, and the retired entry list
+  // below holds at most the rows migration copied out of it.
   for (const hit of hits) {
     const memory = hit?.memory;
     if (!memory) continue;
@@ -126,6 +117,15 @@ export async function memoryContextPrefix(
     const confidence =
       typeof memory.confidence === "number" ? ` (confidence ${memory.confidence.toFixed(2)})` : "";
     const line = `- ${label ? `[${label}] ` : ""}${title}${title && body ? ": " : ""}${body}${confidence}`;
+    if (used + line.length + 1 > MAX_BLOCK_CHARS) break;
+    lines.push(line);
+    used += line.length + 1;
+  }
+  for (const entry of entries) {
+    const text = (entry.text ?? "").trim();
+    if (!text) continue;
+    const label = entry.target === "user" ? "user" : "memory";
+    const line = `- [${label}] ${text}`;
     if (used + line.length + 1 > MAX_BLOCK_CHARS) break;
     lines.push(line);
     used += line.length + 1;

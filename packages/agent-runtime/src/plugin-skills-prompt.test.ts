@@ -89,14 +89,14 @@ describe("formatSkillLibrary", () => {
     // around it.
     const long = "Use when a very long description keeps going past the index budget for no reason at all.";
     const line = formatSkillLibrary([
-      { id: "x", name: "X", description: long, source: "builtin" },
+      { id: "x", name: "X", description: long },
     ]);
     const shown = line.split(": ").slice(1).join(": ").trim();
     expect(shown.length).toBeLessThanOrEqual(60);
     expect(shown.endsWith("…")).toBe(true);
 
     const short = "Use when a description fits.";
-    expect(formatSkillLibrary([{ id: "y", name: "Y", description: short, source: "builtin" }])).toContain(
+    expect(formatSkillLibrary([{ id: "y", name: "Y", description: short }])).toContain(
       `: ${short}`,
     );
   });

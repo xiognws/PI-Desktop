@@ -289,7 +289,6 @@ import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
 import type { CustomSystemPrompt } from "./custom-system-prompt.js";
 import { projectMemoryPrompt } from "./project-memory-prompt.js";
-import { memorySnapshotContext, type MemorySnapshot } from "./memory-prompt.js";
 import { memoryContextPrefix, prependMemoryContext } from "./memory-context.js";
 import {
   pluginSkillsPrompt,
@@ -1067,6 +1066,16 @@ export type SkillReviewPolicy = {
   showQuietPasses?: boolean;
 };
 
+/**
+ * The retired flat entry lists (ADR 0393).
+ *
+ * The launch payload still carries them and the settings page still reads them
+ * for the learning map, so the shape stays accepted; nothing renders them into a
+ * prompt any more. Memory is the structured store, and per-turn recall
+ * (`memory-context.ts`) decides what reaches a model.
+ */
+export type LegacyMemoryEntries = { memory: readonly string[]; user: readonly string[] };
+
 export type AgentRuntimeOptions = {
   host: RuntimeHost;
   sessionId: string;
@@ -1109,11 +1118,11 @@ export type AgentRuntimeOptions = {
   /** Durable project context loaded from host-owned project memory. */
   projectMemory?: string;
   /**
-   * Frozen entry-list memory (ADR 0378), read when the session launched. It is
-   * snapshotted rather than re-read per turn so the system prompt stays stable
-   * and the provider prompt cache keeps working.
+   * Retired flat entry lists (ADR 0393), accepted from the launch payload and
+   * ignored: memory is the structured store now, and the per-turn recall block
+   * replaces the snapshot this used to render.
    */
-  memoryEntries?: MemorySnapshot;
+  memoryEntries?: LegacyMemoryEntries;
   /** Persisted transcript to seed the agent with (session isolation: each
    * session's agent carries only its own history). */
   history?: UiMessage[];
@@ -1196,8 +1205,8 @@ export type RuntimeMatchConfig = {
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
-  /** Frozen entry-list memory (ADR 0378), read when the session launched. */
-  memoryEntries?: MemorySnapshot;
+  /** Retired flat entry lists (ADR 0393); accepted and no longer used. */
+  memoryEntries?: LegacyMemoryEntries;
   projectPath?: string;
   /** Remote tool root. Model requests and runtime state remain on this machine. */
   remoteWorkspace?: { hostKey: string; path: string };
@@ -2043,7 +2052,6 @@ export class DesktopAgentRuntime {
   private builtinTools = new WeakSet<AgentTool>();
   private instructionExecution = new AsyncLocalStorage<(instructions: ProjectInstructions | undefined) => void>();
   private projectMemory?: string;
-  private memoryEntries?: MemorySnapshot;
   /** Per-prompt claims prevent repeated path-resolution RPCs for one directory. */
   private pathInstructionClaims = new Map<
     string,
@@ -2247,7 +2255,6 @@ export class DesktopAgentRuntime {
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
     this.projectMemory = opts.projectMemory?.trim() || undefined;
-    this.memoryEntries = opts.memoryEntries;
     this.compactionEnabled = compactionEnabled(opts.compactionSettings);
     this.compactionStrategy = resolveCompactionStrategy(opts.compactionStrategy);
 
@@ -2654,6 +2661,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         : [
             createMemoryTool(this.host, {
               skills: () => this.skillCatalogueForOverlap(),
+              ...(this.projectPath ? { projectPath: this.projectPath } : {}),
+              sessionId: this.sessionId,
             }),
           ]),
       // The same gap one layer down: `memory` is deferred, so the fork only had it
@@ -3219,11 +3228,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       // prompt recomposes from the fresh content.
       ["customSystemPrompt", safeJson(this.customSystemPrompt ?? null) === safeJson(config.customSystemPrompt ?? null)],
       ["projectMemory", (this.projectMemory ?? "") === (config.projectMemory?.trim() ?? "")],
-      // A changed memory snapshot must retire the runtime: it is baked into the
-      // prompt at construction, so reusing a runtime built before a write would
-      // keep serving the old, empty list and the agent would answer "I have no
-      // memory" while the store holds entries.
-      ["memoryEntries", safeJson(this.memoryEntries ?? null) === safeJson(config.memoryEntries ?? null)],
+      // `memoryEntries` is deliberately absent: the flat list no longer reaches a
+      // prompt (ADR 0393), so a runtime must not be retired over a change it cannot
+      // observe.
       ["projectPath", (this.projectPath ?? "") === (config.remoteWorkspace?.path ?? config.projectPath?.trim() ?? "")],
       ["remoteWorkspace", safeJson(this.remoteWorkspace ?? null) === safeJson(config.remoteWorkspace ?? null)],
       ["workspaceRoot", (this.workspaceRoot ?? "") === (config.workspaceRoot?.trim() ?? "")],
@@ -4619,11 +4626,20 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       this.mode === "agent" && this.jevApiKey
         ? [createJevClassifierTool(this.jevApiKey)]
         : [];
-    // Entry-list memory (ADR 0378). Built here rather than in host-core because
-    // the edit semantics (which entry did the model mean, and does the batch fit
-    // the budget) live in `memory-store.ts`; the host only persists the result.
+    // Structured memory (ADR 0393). Built here because the tool needs the skill
+    // catalogue (a procedure is refused by shape and pointed at the skill that
+    // covers it) and the session identity (a `project` or `session` scope names a
+    // column); the store itself lives in host-core behind `memory.*`.
     const memoryTools: AgentTool[] =
-      this.mode === "agent" ? [createMemoryTool(this.host)] : [];
+      this.mode === "agent"
+        ? [
+            createMemoryTool(this.host, {
+              skills: () => this.skillCatalogueForOverlap(),
+              ...(this.projectPath ? { projectPath: this.projectPath } : {}),
+              sessionId: this.sessionId,
+            }),
+          ]
+        : [];
     // The write path for the skill library: Hermes' `skill_manage`, whose every
     // action is a `skills.*` RPC. The library's read path already exists — the
     // catalog lists the user's own skills and the `Skill` tool loads their
@@ -9960,12 +9976,12 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         throw turnAbortedError("Turn aborted during extension hooks");
       }
       // Durable notes travel with the user message, not the system prompt
-      // (ADR 0378). Two reasons: the transcript system messages are rebuilt from
-      // section keys, and a system-prompt change rewrites the provider prompt
-      // cache. This also means a note written this turn is visible next turn.
-      const snapshotPrefix = memorySnapshotContext(this.memoryEntries);
-      const recallPrefix = await this.recalledMemoryContext(modelInput);
-      const memoryPrefix = [snapshotPrefix, recallPrefix].filter(Boolean).join("\n\n") || undefined;
+      // (ADR 0337 / 0393). Two reasons: the transcript system messages are rebuilt
+      // from section keys, and a system-prompt change rewrites the provider prompt
+      // cache. Recall is the only way memory enters a turn, so what it returns is
+      // what the model knows — the store can hold thousands of memories at a fixed
+      // context cost.
+      const memoryPrefix = await this.recalledMemoryContext(modelInput);
       if (typeof modelInput === "string") {
         await this.agent.prompt(memoryPrefix ? `${memoryPrefix}\n\n${modelInput}` : modelInput);
       } else {

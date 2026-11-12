@@ -244,7 +244,13 @@ a pinned row.
 
 Stage 1 shipped storage, dedupe, supersession and recall only.
 
-### 9.3 The entry lists the agent actually writes (implemented, ADR 0380)
+### 9.3 The entry lists the agent used to write (retired by ADR 0393)
+
+> **Retired.** The flat list below is history, not current behavior: `memories` is
+> the only store, and the tool retains, updates, forgets and searches it (§10).
+> The section stays because the defect it records — one lesson written to a skill
+> *and* to memory by two writers that never see each other — is why the procedure
+> gate still refuses a step-shaped body.
 
 The tool that writes memory is `memory`, not `Remember`
 (`packages/agent-runtime/src/memory-agent-tool.ts`), and it edits two flat entry

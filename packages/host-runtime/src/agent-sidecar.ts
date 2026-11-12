@@ -70,13 +70,16 @@ const HOST_PROXY_ALLOWED = new Set([
   "provider.resolveAuth",
   "provider.resolveSubagentModel",
   "app.health",
-  // Durable memory (ADR 0371 / 0378). The agent reads and writes its own note
-  // list, and per-turn recall asks the store for hits. Without these the sidecar
-  // cannot reach the memory store at all: the `memory` tool fails on its first
-  // read, and recall silently returns nothing because it is best-effort.
-  "memory.entries",
-  "memory.writeEntries",
+  // Durable memory (ADR 0371 / 0393). The agent retains, patches and forgets its
+  // own memories, and per-turn recall asks the store for the hits. Without these
+  // the sidecar cannot reach the memory store at all: the `memory` tool fails on
+  // its write, and recall silently returns nothing because it is best-effort.
+  // The flat entry list (`memory.entries` / `memory.writeEntries`) is retired —
+  // no sidecar caller remains, and its table is no longer written by anything.
+  "memory.remember",
   "memory.recall",
+  "memory.update",
+  "memory.forget",
   // Capability packages (D691) reach the host through the same proxy, so the
   // read-only memory surface they advertise has to be reachable: a package that
   // calls memory.list with the host permission otherwise fails with

@@ -196,7 +196,11 @@ function createRuntime(
     commandShell: CommandShellOption;
     jevApiKey: string;
     turnId: string;
-    host: { call: ReturnType<typeof vi.fn>; onNotification?: ReturnType<typeof vi.fn> };
+    host: {
+      call: ReturnType<typeof vi.fn>;
+      onNotification?: ReturnType<typeof vi.fn>;
+      memoryRecall?: (input: { query: string; projectPath?: string; sessionId?: string; limit?: number }) => Promise<unknown>;
+    };
     onEvent: (envelope: unknown) => void;
   }> = {},
 ) {
@@ -239,40 +243,71 @@ function runtimeTool(runtime: DesktopAgentRuntime, name: string): AgentTool {
 }
 
 
-describe("entry-list memory snapshot (ADR 0378)", () => {
-  const compose = (runtime: DesktopAgentRuntime): string =>
-    (runtime as unknown as { composeSystemPrompt(): string }).composeSystemPrompt();
+describe("structured memory wiring (ADR 0393)", () => {
+  const internals = (runtime: DesktopAgentRuntime) =>
+    runtime as unknown as {
+      composeSystemPrompt(): string;
+      recalledMemoryContext(input: string): Promise<string | undefined>;
+    };
 
-  it("keeps the snapshot out of the system prompt", () => {
-    // The block rides with the user message instead: the transcript's system
-    // messages are rebuilt from section keys, and a system-prompt change
-    // rewrites the provider prompt cache.
+  it("keeps the retired entry lists out of the system prompt", () => {
+    // The flat list no longer reaches a prompt: the structured store plus per-turn
+    // recall replaced the session snapshot that used to be rendered here.
     const runtime = createRuntime({
       memoryEntries: {
         memory: ["PowerShell scripts must be UTF-8 with BOM"],
         user: ["prefers Chinese replies"],
       },
     });
-    expect(compose(runtime)).not.toContain("PowerShell scripts must be UTF-8 with BOM");
+    expect(internals(runtime).composeSystemPrompt()).not.toContain(
+      "PowerShell scripts must be UTF-8 with BOM",
+    );
   });
 
-  it("retires a runtime whose snapshot differs from the requested one", () => {
-    // The snapshot is baked into the system prompt at construction, so a runtime
-    // built before a write must not be reused: it would keep serving the old,
-    // empty list while the store already holds entries.
-    const runtime = createRuntime({ memoryEntries: { memory: [], user: [] } });
-    const matches = (
-      runtime as unknown as {
-        matches(config: Record<string, unknown>): boolean;
-      }
-    ).matches({
-      mode: "agent",
-      provider: provider,
-      thinkingLevel: "medium",
-      commandShell: commandShell,
-      memoryEntries: { memory: ["a new note"], user: [] },
+  it("still recalls memories into the turn, scoped to the project", async () => {
+    // Recall is now the only path from the store into a request, so it has to run
+    // on every turn — not only when some other feature happens to need it.
+    const recall = vi.fn(async () => ({
+      memories: [
+        {
+          memory: {
+            id: "m1",
+            kind: "fact",
+            title: "deploy target",
+            body: "the deploy host is sda-build-02",
+          },
+        },
+      ],
+    }));
+    const runtime = createRuntime({
+      projectPath: "/w/pi",
+      host: { call: vi.fn(), onNotification: vi.fn(() => () => {}), memoryRecall: recall },
     });
-    expect(matches).toBe(false);
+    const prefix = await internals(runtime).recalledMemoryContext("where do we deploy");
+    expect(recall).toHaveBeenCalledWith({
+      query: "where do we deploy",
+      projectPath: "/w/pi",
+      sessionId: "session-1",
+      limit: 5,
+    });
+    expect(prefix).toContain("sda-build-02");
+  });
+
+  it("declares the structured actions on the memory tool", () => {
+    const runtime = createRuntime({ projectPath: "/w/pi" });
+    const tool = runtimeTool(runtime, "memory");
+    const action = (
+      tool.parameters as { properties?: { action?: { anyOf?: { const?: unknown }[] } } }
+    ).properties?.action;
+    expect(action?.anyOf?.map((entry) => entry.const)).toEqual([
+      "remember",
+      "update",
+      "forget",
+      "search",
+    ]);
+    // The description is the whole contract a model gets; it must name the gate.
+    expect(tool.description).toContain("MEMORY_PROCEDURE_NEEDS_SKILL");
+    expect(tool.description).toContain("belongs in a skill");
   });
 });
 
