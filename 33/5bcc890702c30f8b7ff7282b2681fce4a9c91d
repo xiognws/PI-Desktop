@@ -1,0 +1,18 @@
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 3919-3921,3923-3929,3933
+packages/agent-runtime/src/skill-review-run.test.ts
+  h_201ed4c689ac8b 116-117,121
+packages/agent-runtime/src/skill-review-run.ts
+  h_201ed4c689ac8b 275-281,284-291,307,318-323,333-340,343-347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "335bcc890702c30f8b7ff7282b2681fce4a9c91d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
