@@ -1,0 +1,18 @@
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 233-237,620-654
+services/autotest/tests/test_bug_batch.py
+  h_201ed4c689ac8b 1-117
+services/autotest/ui/src/views/Defects.vue
+  h_201ed4c689ac8b 125-173,260-279,286-291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c3596f4d2841fb53b602fa93fcc3c2280119b256",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
