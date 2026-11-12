@@ -137,9 +137,14 @@ def test_batch_delete_reports_deleted_and_missing(client, project_id):
     remaining = client.get(f"/api/projects/{project_id}/knowledge/documents").json()["data"]
     assert [doc["doc_id"] for doc in remaining["documents"]] == [keep]
 
-    # 检索不应再命中被删文档的内容
-    hits = client.get(
-        f"/api/projects/{project_id}/knowledge/search", params={"query": "误唤醒率"}
+    # 检索不应再命中被删文档的内容。路径是 workflow 下的那条 —— 写成
+    # /knowledge/search 会 404，而「0 命中」的断言会假通过，所以先确认检索本身可用。
+    before = client.get(
+        f"/api/projects/{project_id}/workflow/knowledge/search", params={"q": "误唤醒率", "limit": 10}
     ).json()
-    srcs = [hit["source_ref"] for hit in (hits.get("data") or {}).get("hits", [])]
+    assert before["data"]["total"] >= 1, "删除前检索就该命中，否则这条断言证明不了什么"
+    after = client.get(
+        f"/api/projects/{project_id}/workflow/knowledge/search", params={"q": "误唤醒率", "limit": 10}
+    ).json()
+    srcs = [hit["source_ref"] for hit in after["data"]["records"]]
     assert all(a not in src for src in srcs)
