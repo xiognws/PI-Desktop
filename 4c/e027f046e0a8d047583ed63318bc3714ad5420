@@ -1,0 +1,44 @@
+apps/desktop/electron/main/ipc/memory-ipc.ts
+  h_201ed4c689ac8b 67-83,152-159
+apps/desktop/src/components/settings/MemoryList.tsx
+  h_201ed4c689ac8b 1-115
+apps/desktop/src/components/settings/MemoryPane.tsx
+  h_201ed4c689ac8b 2,4-11,13,16-18,20-21,23,25-26,28-30,32-36,41-55,57-60,64-68,70,72,74,77-81,88-91,93,100,106-107,109,121,123,129-136,143-145,179,181,185-192
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 782-788,800-807,1197-1199
+apps/desktop/src/lib/memory-view.ts
+  h_201ed4c689ac8b 2,4-8,10-14,16,18-19,21,23-26,29-36,39-47,51,53-55,57-64,66-97,99-101,105-124
+apps/desktop/test/memory-pane.test.mjs
+  h_201ed4c689ac8b 3,6-13,21,26-77,79-80,90-98,103-111,124,129-138,142-151,155-166,169-170,177-178,180-188,192-230,233-269,272-300
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1180-1184
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1190-1194
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1180-1184
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1180-1184
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1186-1190
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1164-1168
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1186-1190
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1177-1181
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1177-1181
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4ce027f046e0a8d047583ed63318bc3714ad5420",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
