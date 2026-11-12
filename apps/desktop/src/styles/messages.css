@@ -3916,20 +3916,21 @@
    the turn, not to the assistant's prose, so it does not hang off the message
    gutter. */
 .skill-review-row {
+  /* Left-aligned with the message column, not centred under it: the review belongs
+     to the turn above it, and a centred band between messages reads as a separate
+     system notice. */
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
-  gap: 6px;
-  margin: 4px auto 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  /* Close to the reply it reports on: the previous spacing pushed the row to the
+     middle of the gap between two turns, where it looked unattached. */
+  margin: 0 0 2px;
+  padding: 0;
   font-size: var(--text-xs, 11px);
   color: var(--muted-foreground);
   line-height: var(--leading-normal);
-  text-align: center;
-}
-
-.skill-review-row[data-outcome="applied"] .skill-review-text {
-  color: var(--accent);
+  text-align: left;
 }
 
 .skill-review-detail {
