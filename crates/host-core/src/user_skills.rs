@@ -1,5 +1,6 @@
 use self::curator::{CurationReport, CurationState, CuratorPolicy};
 use self::links::{SkillLink, SkillLinkStore};
+use self::origin::{SkillOriginStore, AGENT_AUTHOR};
 use self::pins::SkillPinStore;
 use self::usage::{SkillUsage, SkillUsageStore};
 use crate::activation::ActivationScope;
@@ -29,6 +30,15 @@ pub const MAX_SKILL_PACKAGE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_NAME_CHARS: usize = 120;
 const MAX_DESCRIPTION_CHARS: usize = 400;
 const SKILL_KIND: &str = "skills";
+/// Where a curated skill's document goes (ADR 0395).
+///
+/// A directory inside the library rather than a status field: the scan skips
+/// it, so an archived skill is out of the catalog and out of every prompt,
+/// while the document, its resources and its id stay exactly as they were.
+/// "Archived" has to mean *gone from view*, otherwise a skill whose copy
+/// quality dropped keeps costing prompt space for another quarter.
+const ARCHIVE_DIR: &str = ".archive";
+
 /// Built-in skills have no scanned document, so their activation lives in a
 /// separate state file from user skills. The user-skill scan prunes missing
 /// documents and must not erase a built-in preference.
@@ -108,6 +118,11 @@ pub struct UserSkillInput {
     /// treated as `<id>.md`. A caller that pre-scanned the candidate can pass
     /// `"dir"` to require the SKILL.md convention.
     pub shape: Option<String>,
+    /// Who wrote this document. `"agent"` marks the skill as the maintenance
+    /// pass's to manage; anything else (and absence) means a person wrote it.
+    /// Read by `create`, ignored by `update` — an origin is recorded once and
+    /// never rewritten by an edit.
+    pub created_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,6 +165,8 @@ pub struct UserSkillRegistry {
     usage: SkillUsageStore,
     /// Skills the user asked the maintenance pass to leave alone.
     pins: SkillPinStore,
+    /// Which documents the agent wrote, so the pass only retires its own.
+    origins: SkillOriginStore,
     /// Where an absorbed skill went, so a quiet document can explain itself.
     links: SkillLinkStore,
 }
@@ -456,6 +473,66 @@ fn directory_skill_root(path: &Path, skills_dir: &Path) -> Option<PathBuf> {
     Some(dir.to_path_buf())
 }
 
+/// The directory a curated skill waits in: `<root>/.archive`.
+///
+/// Inside the library on purpose, so a restore is one move on the same file
+/// system and the archived document keeps every sibling resource beside it.
+fn archive_dir(root: &Path) -> PathBuf {
+    root.join(ARCHIVE_DIR)
+}
+
+/// The ids the archive holds, in the same spelling a scanned record would use.
+///
+/// The sweep that drops state for deleted documents must not treat an archived
+/// skill as deleted: its activation, counters, pin and origin are the reason a
+/// restore comes back as the same skill and not as a stranger.
+fn archived_ids(root: &Path) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    let Ok(entries) = fs::read_dir(archive_dir(root)) else {
+        return ids;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        let id = if path.is_dir() {
+            // A directory-shaped skill is archived whole, `SKILL.md` included.
+            path.join("SKILL.md").is_file().then_some(name)
+        } else {
+            path.extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+                .then(|| {
+                    path.file_stem()
+                        .map(|stem| stem.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                })
+        };
+        if let Some(id) = id.filter(|id| valid_id(id)) {
+            ids.insert(id);
+        }
+    }
+    ids
+}
+
+/// Where an archived skill sits and where it came from: `(from, to)`.
+///
+/// The flat shape comes back as `<root>/<id>.md` and the package as
+/// `<root>/<id>/`. Both are named after the record id, which is what the
+/// archive step wrote, so a restore needs no stored path — and a directory the
+/// user later renames cannot send the move somewhere else.
+fn archived_skill(root: &Path, id: &str) -> Option<(PathBuf, PathBuf)> {
+    let archive = archive_dir(root);
+    let flat = archive.join(format!("{id}.md"));
+    if flat.is_file() {
+        return Some((flat, root.join(format!("{id}.md"))));
+    }
+    let package = archive.join(id);
+    if package.join("SKILL.md").is_file() {
+        return Some((package, root.join(id)));
+    }
+    None
+}
+
 /// Is this path a link or a reparse point (Windows junction)?
 ///
 /// `remove_dir_all` follows both, so a poisoned tree inside the library could
@@ -549,6 +626,64 @@ fn delete_skill_files(document: &Path, roots: &[PathBuf]) -> Result<()> {
     fs::remove_file(document)
         .map_err(|error| anyhow::anyhow!("remove {}: {error}", document.display()))?;
     Ok(())
+}
+
+/// Move one skill out of the catalog and into `<root>/.archive/`.
+///
+/// `Ok(false)` means the skill stays where it is, because moving it would be
+/// wrong or pointless rather than merely inconvenient:
+///
+/// * a link or junction — its bytes belong to the directory it points at, and
+///   the cross-device fallback would delete them;
+/// * a document that does not resolve inside this library;
+/// * a destination the archive already holds — the pass never overwrites what
+///   it finds, and a copy there means the skill is already safe.
+///
+/// A directory-shaped skill moves as a package, so its `references/` travel
+/// with `SKILL.md`; splitting them would hand the skill back incomplete.
+fn archive_skill_files(document: &Path, root: &Path, id: &str) -> Result<bool> {
+    if !valid_id(id) {
+        return Ok(false);
+    }
+    let resolve = |path: &Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let resolved_root = resolve(root);
+    let resolved = resolve(document);
+    if resolved == resolved_root || !resolved.starts_with(&resolved_root) {
+        return Ok(false);
+    }
+    if is_redirect(document) {
+        return Ok(false);
+    }
+    let package = directory_skill_root(document, root);
+    if package.as_deref().is_some_and(is_redirect) {
+        return Ok(false);
+    }
+    let (from, to) = match package {
+        Some(dir) => (dir, archive_dir(root).join(id)),
+        None => (
+            document.to_path_buf(),
+            archive_dir(root).join(format!("{id}.md")),
+        ),
+    };
+    if !from.exists() || to.exists() {
+        return Ok(false);
+    }
+    move_capability_file(&from, &to)?;
+    Ok(true)
+}
+
+/// Restart a restored document's idle clock.
+///
+/// A restore is the user asking for the skill back, which is evidence of use —
+/// and the move keeps the file's timestamp, so without this the next automatic
+/// pass would take the same document out again and the restore would read as a
+/// no-op. A timestamp that cannot be written is not a reason to fail: the
+/// document is already back either way.
+fn touch_document(path: &Path) {
+    let Ok(file) = fs::OpenOptions::new().write(true).open(path) else {
+        return;
+    };
+    let _ = file.set_times(fs::FileTimes::new().set_modified(std::time::SystemTime::now()));
 }
 
 /// The containers a skill may own beside its `SKILL.md` (ADR 0388).
@@ -981,6 +1116,7 @@ impl UserSkillRegistry {
             builtins: CapabilityState::new(data_dir, BUILTIN_SKILL_KIND),
             usage: SkillUsageStore::new(data_dir),
             pins: SkillPinStore::new(data_dir),
+            origins: SkillOriginStore::new(data_dir),
             links: SkillLinkStore::new(data_dir),
         }
     }
@@ -1018,6 +1154,12 @@ impl UserSkillRegistry {
         // produced by the single-file importer.
         if let Ok(entries) = fs::read_dir(&directory) {
             for entry in entries.flatten() {
+                // The archive is a directory in the library, never a skill: an
+                // archived document is deliberately out of the catalog, and a
+                // scan that picked it up would make the pass pointless.
+                if entry.file_name().to_string_lossy() == ARCHIVE_DIR {
+                    continue;
+                }
                 let path = entry.path();
                 if path.is_dir() {
                     let skill_file = path.join("SKILL.md");
@@ -1094,15 +1236,22 @@ impl UserSkillRegistry {
             });
         }
         let ids: HashSet<String> = records.iter().map(|record| record.id.clone()).collect();
-        self.state.prune(SKILL_KIND, level, project_path, &ids)?;
+        // An archived document still exists, only out of view: its activation,
+        // counters, pin and origin must survive this sweep, or a restore would
+        // come back as a stranger — unpinned, unread, and "written by a person".
+        let mut known = ids;
+        known.extend(archived_ids(&directory));
+        self.state.prune(SKILL_KIND, level, project_path, &known)?;
         // Same sweep for the counters: a document that no longer exists must not
         // hand its "used twice" badge to whatever is created next under that name.
         self.usage
-            .retain(level, owner_project_path.as_deref(), &ids)?;
+            .retain(level, owner_project_path.as_deref(), &known)?;
         self.pins
-            .retain(level, owner_project_path.as_deref(), &ids)?;
+            .retain(level, owner_project_path.as_deref(), &known)?;
+        self.origins
+            .retain(level, owner_project_path.as_deref(), &known)?;
         self.links
-            .retain(level, owner_project_path.as_deref(), &ids)?;
+            .retain(level, owner_project_path.as_deref(), &known)?;
         records.sort_by(|a, b| {
             a.name
                 .to_lowercase()
@@ -1234,8 +1383,21 @@ impl UserSkillRegistry {
             self.state
                 .set_enabled(SKILL_KIND, level, &id, project_path.as_deref(), false)?;
         }
-        self.find(&id, Some(level), project_path.as_deref())?
-            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: created skill was not found"))
+        let record = self
+            .find(&id, Some(level), project_path.as_deref())?
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: created skill was not found"))?;
+        // Only an explicit marker makes the document the pass's: a caller that
+        // says nothing is treated as a person, which is the side that never
+        // loses a file. Recorded after the scan above so the sweep cannot drop
+        // the entry it has just been given.
+        if agent_authored(input.created_by.as_deref()) {
+            self.origins.record_agent_authored(
+                level,
+                &record.id,
+                record.project_path.as_deref(),
+            )?;
+        }
+        Ok(record)
     }
 
     /// Write one sibling resource inside a skill's own directory.
@@ -1672,17 +1834,17 @@ impl UserSkillRegistry {
         let level = record_level;
         // The counters belonged to that document. Dropping them here is the
         // *intentional* delete; the scan's sweep covers files removed on disk.
-        self.usage.forget(
-            level,
-            &record.id,
-            Some(
-                record
-                    .project_path
-                    .as_deref()
-                    .unwrap_or_else(|| project_path.unwrap_or("")),
-            )
-            .filter(|path| !path.is_empty()),
-        );
+        let owner = Some(
+            record
+                .project_path
+                .as_deref()
+                .unwrap_or_else(|| project_path.unwrap_or("")),
+        )
+        .filter(|path| !path.is_empty());
+        self.usage.forget(level, &record.id, owner);
+        // The origin belonged to that document too, and a same-named successor
+        // must not inherit "the agent wrote this".
+        self.origins.forget(level, &record.id, owner);
         let _ = self.find(id, Some(level), record.project_path.as_deref())?;
         Ok(true)
     }
@@ -1851,12 +2013,12 @@ impl UserSkillRegistry {
     }
 
     /// Decide which skills stopped earning their place, and — when asked to act —
-    /// switch the archivable ones off.
+    /// move the archivable ones into `<root>/.archive/`.
     ///
-    /// Nothing is deleted and nothing is moved: "archived" is the same
-    /// activation flag the row's toggle writes, so the user can bring a skill
-    /// back from the settings page in one click. `dry_run` is the default at the
-    /// RPC boundary and the only mode the daily pass uses.
+    /// Archiving moves the document; it does not flip a flag. A skill that is
+    /// still in the library still costs prompt space, which is the one thing
+    /// this pass exists to reclaim. Nothing is deleted and nothing is rewritten:
+    /// [`Self::restore`] puts the same bytes back where they came from.
     pub fn curate(
         &mut self,
         project_path: Option<&str>,
@@ -1864,31 +2026,120 @@ impl UserSkillRegistry {
         dry_run: bool,
     ) -> Result<CurationReport> {
         let records = self.active_for(project_path)?;
-        let mut report = crate::user_skills::curator::plan(&records, &self.usage, policy)?;
+        let mut report =
+            crate::user_skills::curator::plan(&records, &self.usage, &self.origins, policy)?;
         report.dry_run = dry_run;
         if !dry_run {
-            let archivable: Vec<(CapabilityLevel, String, Option<String>)> = report
+            // The plan classifies; the record carries the path the move needs.
+            // Pairing them by level and id keeps a project document with the
+            // same name as a global one from archiving the wrong file.
+            let doomed: HashSet<(String, String)> = report
                 .entries
                 .iter()
                 .filter(|entry| entry.state == CurationState::Archive)
-                .map(|entry| {
-                    let level = CapabilityLevel::parse(Some(&entry.level))
-                        .unwrap_or(CapabilityLevel::Global);
-                    (level, entry.id.clone(), entry.project_path.clone())
+                .map(|entry| (entry.level.clone(), entry.id.clone()))
+                .collect();
+            let archivable: Vec<UserSkillRecord> = records
+                .into_iter()
+                .filter(|record| {
+                    record.level.as_deref().is_some_and(|level| {
+                        doomed.contains(&(level.to_string(), record.id.clone()))
+                    })
                 })
                 .collect();
-            for (level, id, owner) in archivable {
-                self.state.set_enabled(
-                    SKILL_KIND,
-                    level,
-                    &id,
-                    owner.as_deref().or(project_path),
-                    false,
-                )?;
-                report.archived.push(id);
+            for record in archivable {
+                if self.archive_skill(&record)? {
+                    report.archived.push(record.id.clone());
+                }
             }
         }
         Ok(report)
+    }
+
+    /// Move one record's document into the archive of its own library.
+    fn archive_skill(&self, record: &UserSkillRecord) -> Result<bool> {
+        let level = record
+            .level
+            .as_deref()
+            .and_then(|value| CapabilityLevel::parse(Some(value)).ok())
+            .unwrap_or(CapabilityLevel::Global);
+        let root = capability_dir(level, record.project_path.as_deref(), "skills")?;
+        archive_skill_files(&PathBuf::from(&record.path), &root, &record.id)
+    }
+
+    /// Bring one archived skill back into the catalog.
+    ///
+    /// The maintenance pass moved the document out of the library rather than
+    /// switching a flag, so undo is that move in reverse — and the skill is
+    /// switched back on in the same breath, because a restore nobody can see is
+    /// not a restore. An id the archive does not hold, and a destination that is
+    /// already occupied, are `SKILL_INVALID` rather than a guess: two documents
+    /// must never fight over one name.
+    pub fn restore(
+        &mut self,
+        id: &str,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+    ) -> Result<UserSkillRecord> {
+        let id = id.trim();
+        if !valid_id(id) {
+            bail!("SKILL_INVALID: invalid skill id `{id}`");
+        }
+        let selected = project_path
+            .map(normalize_project_path)
+            .filter(|path| !path.is_empty());
+        // A named level restores in that level only; otherwise the global
+        // library is tried first and the selected project second, the same order
+        // `find` reads them in.
+        let scopes: Vec<(CapabilityLevel, Option<String>)> = match level {
+            Some(level) => {
+                let project = if level == CapabilityLevel::Project {
+                    selected.clone()
+                } else {
+                    None
+                };
+                vec![(level, project)]
+            }
+            None => {
+                let mut scopes = vec![(CapabilityLevel::Global, None)];
+                if let Some(project) = selected.clone() {
+                    scopes.push((CapabilityLevel::Project, Some(project)));
+                }
+                scopes
+            }
+        };
+        let mut restored: Option<(CapabilityLevel, Option<String>)> = None;
+        for (scope, project) in scopes {
+            let root = capability_dir(scope, project.as_deref(), "skills")?;
+            let Some((from, to)) = archived_skill(&root, id) else {
+                continue;
+            };
+            if to.exists() {
+                bail!(
+                    "SKILL_INVALID: cannot restore `{id}`: {} already exists",
+                    to.display()
+                );
+            }
+            move_capability_file(&from, &to)?;
+            // The package's own timestamp is not what the pass reads.
+            let document = if to.is_dir() {
+                to.join("SKILL.md")
+            } else {
+                to.clone()
+            };
+            touch_document(&document);
+            restored = Some((scope, project));
+            break;
+        }
+        let Some((scope, project)) = restored else {
+            bail!("SKILL_INVALID: no archived skill with id `{id}`");
+        };
+        self.state
+            .set_enabled(SKILL_KIND, scope, id, project.as_deref(), true)?;
+        self.list(scope, project.as_deref())?
+            .into_iter()
+            .find(|record| record.id == id)
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: restored `{id}` was not scanned"))
     }
 
     pub fn set_scope(
@@ -1903,6 +2154,18 @@ impl UserSkillRegistry {
     }
 }
 
+/// Does this marker claim "the agent wrote it"?
+///
+/// Only the explicit word counts, and case does not matter: a caller that
+/// capitalized the constant still made the same claim. Everything else — a
+/// missing field, `"user"`, `"imported"`, a typo — reads as "a person wrote
+/// this", which is the side that never archives a document.
+fn agent_authored(created_by: Option<&str>) -> bool {
+    created_by
+        .map(str::trim)
+        .is_some_and(|author| author.eq_ignore_ascii_case(AGENT_AUTHOR))
+}
+
 fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationScope {
     match level {
         CapabilityLevel::Global => ActivationScope::default(),
@@ -1915,6 +2178,7 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
 
 pub mod curator;
 pub mod links;
+pub mod origin;
 mod package_sync;
 /// Package bounds are asserted in their own module: `tests.rs` is close to the
 /// rust file-size limit, and these tests share one fixture.

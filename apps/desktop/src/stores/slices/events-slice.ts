@@ -41,7 +41,7 @@ import {
   mergePlanCheckpoint,
 } from "../../lib/plan-mode-state";
 import { formatToolValue } from "../../lib/tool-display";
-import type { AppState } from "../app-state";
+import type { AppState, SkillReviewNotice } from "../app-state";
 import type { SessionRuntime } from "../runtime/session-runtime";
 import type { StoreAccess } from "./types";
 
@@ -95,6 +95,44 @@ function isSessionTodoSnapshot(value: unknown): value is SessionTodoSnapshot {
       ["high", "medium", "low"].includes(item.priority)
     );
   });
+}
+
+/**
+ * Identity of one review arrival. The store keeps every notice of a session, so
+ * each row the transcript draws needs a key that survives later arrivals; the
+ * runtime's envelope has none.
+ */
+let skillReviewNoticeSeq = 0;
+function nextSkillReviewId(): string {
+  skillReviewNoticeSeq += 1;
+  return `skill-review-${Date.now().toString(36)}-${skillReviewNoticeSeq}`;
+}
+
+/**
+ * The newest transcript message the session has right now — the turn the review
+ * that just landed reports on.
+ *
+ * The active pane reads `messages`; a background session is only in the runtime's
+ * transcript cache or in the last painted pane transcript. Reading these in that
+ * order keeps the anchor as fresh as the newest row the user can already see.
+ * An id that stops existing (session reloaded, entry paged out) is handled by the
+ * transcript, which falls back to the end of the list.
+ */
+function newestTranscriptMessageId(
+  state: AppState,
+  runtime: SessionRuntime,
+  sessionId: string,
+): string | undefined {
+  const candidates = [
+    state.activeSessionId === sessionId ? state.messages : undefined,
+    runtime.sessionTranscriptCache.get(sessionId),
+    state.retainedTranscripts[sessionId],
+  ];
+  for (const transcript of candidates) {
+    const newest = transcript && transcript.length > 0 ? transcript[transcript.length - 1] : undefined;
+    if (newest) return newest.id;
+  }
+  return undefined;
 }
 
 export function createEventsSlice({
@@ -235,18 +273,26 @@ export function createEventsSlice({
       }
       const event = envelope.event;
       if (event.type === "skill_review") {
-        // Keyed by session for the row's lifetime. The envelope's turn id is the
-        // runtime's, which the transcript's rows never compare against, so it is not
-        // kept: the row is placed by the history list, under the turn just finished.
-        // In memory only — the durable record is the skill-review log.
+        // One notice per arrival, oldest first, and each remembers the newest
+        // message the session had when it landed. That id is the only link back to
+        // the turn: the envelope carries the runtime's turn id, which the
+        // transcript's rows never compare against. In memory only — the durable
+        // record is the skill-review log.
+        const anchor = newestTranscriptMessageId(get(), runtime, envelope.sessionId);
+        const notice: SkillReviewNotice = {
+          id: nextSkillReviewId(),
+          outcome: event.outcome,
+          ...(event.reason ? { reason: event.reason } : {}),
+          actions: event.actions ?? [],
+          ...(anchor ? { afterMessageId: anchor } : {}),
+        };
         set((state) => ({
           skillReviewBySession: {
             ...state.skillReviewBySession,
-            [envelope.sessionId]: {
-              outcome: event.outcome,
-              ...(event.reason ? { reason: event.reason } : {}),
-              actions: event.actions ?? [],
-            },
+            [envelope.sessionId]: [
+              ...(state.skillReviewBySession[envelope.sessionId] ?? []),
+              notice,
+            ],
           },
         }));
         return;

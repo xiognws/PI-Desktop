@@ -1267,6 +1267,8 @@ sklm: {
     skillsProjectPath: "프로젝트 스킬 경로",
     skillReviewUiTitle: "자기 개선 리뷰",
     skillReviewUiDesc: "매 턴이 끝난 뒤 스킬 라이브러리를 검토해 오래 남을 교훈을 기록합니다. 끄면 스킬 리뷰 행이 표시되지 않습니다.",
+    skillCurateAutoTitle: "유휴 스킬 자동 보관",
+    skillCurateAutoDesc: "하루에 최대 한 번 유지 관리를 실행해, 오랫동안 아무도 열지 않은 에이전트 작성 스킬을 .archive로 옮깁니다. 복원하면 다시 돌아옵니다.",
     mcp: "MCP 서버",
     mcpGlobalPath: "전역 MCP 경로",
     mcpProjectPath: "프로젝트 MCP 경로",

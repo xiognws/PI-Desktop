@@ -87,7 +87,10 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   );
   // Both the call site and the prop type carry the history array; the type is
   // what keeps a later rename from quietly widening this array to a fresh one.
-  assert.match(transcript, /<TranscriptHistory\s+entries=\{historyEntries\}/);
+  // The pane hands its array to the annotated list, which slices it per review
+  // row and still feeds every slice to the memoized `TranscriptHistory`.
+  assert.match(transcript, /<SkillReviewAnnotatedHistory\s+entries=\{historyEntries\}/);
+  assert.match(transcript, /<TranscriptHistory\s+entries=\{segment\.entries\}/);
   assert.match(transcript, /type TranscriptHistoryProps = \{\s*entries: TranscriptEntry\[\];/);
   assert.match(transcript, /<TranscriptTail[\s\S]*?entry=\{tailEntry\}/);
   assert.match(transcript, /activityGroupPropsEqual/);

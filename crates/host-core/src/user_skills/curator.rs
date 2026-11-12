@@ -2,12 +2,16 @@
 //!
 //! Hermes retires skills with a curator that reads per-skill activity and moves
 //! stale ones to an archive. This is the same idea with one deliberate
-//! difference: **nothing here runs on a timer**. A skill that disappears from the
-//! catalog because a background job fired is indistinguishable, from the user's
-//! side, from a bug or a lost file — there is no "why did this turn off" surface
-//! yet. So the pass reports unless the caller asks it to act, and the one-click
-//! archive in the settings page is the only thing that acts, with the list in
-//! front of the person doing it.
+//! difference: **this module only decides**. It has no clock, no timer and no
+//! filesystem: the caller says when to run and what to do with the answer. That
+//! separation is what makes the pass testable and reviewable, and it is why the
+//! rules below are pure functions.
+//!
+//! Acting on a decision is the registry's job: `UserSkillRegistry::curate`
+//! moves the archivable documents into `<root>/.archive/`, and `restore` moves
+//! them back. Both are recorded rather than silent — `report.archived` names
+//! what moved, and the Electron main process runs the pass at most once a day,
+//! logging `curator.auto_applied` with the counts (ADR 0395).
 //!
 //! The rule itself is small and explainable:
 //!
@@ -17,6 +21,12 @@
 //! | `stale` | age ≥ `stale_after_days` but younger than the archive threshold |
 //! | `keep` | everything else |
 //!
+//! Age only decides for documents the agent wrote. The library also holds what a
+//! person wrote by hand or imported, and idle days say nothing about whether that
+//! work still matters — so a document without the `created_by: agent` marker is
+//! `keep` whatever its age, with `not-agent-authored` as the reason. Ownership, not
+//! age, decides who may retire a document; see [`super::origin`] and ADR 0394.
+//!
 //! "Age" always means *time since the last evidence of use*. An edited document
 //! resets it (the file timestamp moves), which is the behaviour a person expects:
 //! a skill you just improved is not idle.
@@ -24,6 +34,7 @@
 use anyhow::Result;
 use serde::Serialize;
 
+use super::origin::SkillOriginStore;
 use super::usage::SkillUsageStore;
 use super::{CapabilityLevel, UserSkillRecord};
 
@@ -72,6 +83,22 @@ pub enum CurationState {
     Archive,
 }
 
+/// Which rule produced a [`CurationState`].
+///
+/// The state says what the pass would do; the reason says why, so a skill that
+/// stays despite its age is not read as a fresh one. Kebab-case on the wire, so
+/// the value a reader sees is the phrase in the report: `not-agent-authored`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CurationReason {
+    /// The idle-day rule decided, in whichever direction.
+    Idle,
+    /// A pin exempted the skill: the user's answer to the rule.
+    Pinned,
+    /// The agent did not write this document, so the pass does not own it.
+    NotAgentAuthored,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurationEntry {
@@ -85,6 +112,8 @@ pub struct CurationEntry {
     pub last_activity_at: i64,
     pub idle_days: i64,
     pub state: CurationState,
+    /// Which rule produced `state`.
+    pub reason: CurationReason,
     /// Pinned skills are always `keep`; the flag is reported so a reader can see
     /// why a skill with no load history is not on the list.
     pub pinned: bool,
@@ -112,7 +141,7 @@ pub fn classify(
     (idle_days, state)
 }
 
-/// What a pass found, and — when it was not a dry run — what it turned off.
+/// What a pass found, and — when it was not a dry run — what it moved out.
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurationReport {
@@ -140,12 +169,13 @@ fn document_timestamp_ms(record: &UserSkillRecord) -> i64 {
 /// Report, and optionally archive, the user skills of every level whose
 /// documents are already loaded by the caller.
 ///
-/// The caller owns scanning (and therefore the activation state); this function
-/// only decides and — when `dry_run` is false — asks [`UserSkillRegistry::set_enabled`]
-/// to switch the archivable ones off. Nothing is deleted.
+/// The caller owns scanning (and therefore the activation state) and owns the
+/// move; this function only decides. Nothing is deleted, and a dry run changes
+/// nothing at all.
 pub fn plan(
     records: &[UserSkillRecord],
     usage: &SkillUsageStore,
+    origins: &SkillOriginStore,
     policy: CuratorPolicy,
 ) -> Result<CurationReport> {
     let policy = policy.normalized();
@@ -169,11 +199,16 @@ pub fn plan(
             now,
             policy,
         );
-        // A pin is the user's answer to the rule: report the skill, never act on it.
-        let state = if record.pinned {
-            CurationState::Keep
+        // A pin is the user's answer to the rule: report the skill, never act
+        // on it. Otherwise the pass only manages what the agent wrote: a
+        // hand-written document is not a maintenance candidate at any age,
+        // because archiving it would be retiring somebody else's work.
+        let (state, reason) = if record.pinned {
+            (CurationState::Keep, CurationReason::Pinned)
+        } else if !origins.is_agent_authored(level, &record.id, record.project_path.as_deref()) {
+            (CurationState::Keep, CurationReason::NotAgentAuthored)
         } else {
-            classified
+            (classified, CurationReason::Idle)
         };
         report.entries.push(CurationEntry {
             id: record.id.clone(),
@@ -186,6 +221,7 @@ pub fn plan(
                 .unwrap_or_else(|| document_timestamp_ms(record)),
             idle_days,
             state,
+            reason,
             pinned: record.pinned,
         });
     }

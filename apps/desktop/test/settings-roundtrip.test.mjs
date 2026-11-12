@@ -238,3 +238,26 @@ test("the skill review row switch defaults on and crosses both boundaries as a b
     else globalThis.window = previousWindow;
   }
 });
+
+test("the automatic curation switch defaults on and crosses both boundaries as a boolean", () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { piDesktop: { platform: "win32" } };
+  try {
+    for (const validate of [renderer.validateSettingsWrite, main.validateSettingsWrite]) {
+      // Absent means main may run the pass: a settings document written before
+      // this preference existed must not silently stop it.
+      assert.equal(validate({ defaultMode: "agent" }).curateAutomatically, undefined);
+      assert.equal(validate({ curateAutomatically: false }).curateAutomatically, false);
+      assert.equal(validate({ curateAutomatically: true }).curateAutomatically, true);
+      for (const value of ["off", 0, null, {}]) {
+        assert.throws(
+          () => validate({ curateAutomatically: value }),
+          /curateAutomatically is invalid/,
+        );
+      }
+    }
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});

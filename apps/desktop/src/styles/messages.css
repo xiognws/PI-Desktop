@@ -3916,20 +3916,41 @@
    the turn, not to the assistant's prose, so it does not hang off the message
    gutter. */
 .skill-review-row {
+  /* Left-aligned with the message column, not centred under it: the review belongs
+     to the turn above it, and a centred band between messages reads as a separate
+     system notice. */
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
-  gap: 6px;
-  margin: 4px auto 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  /* The turn above owns the gap (see the `:has()` rule below); this is only the
+     distance to whatever follows the row. */
+  margin: 0 0 2px;
+  padding: 0;
   font-size: var(--text-xs, 11px);
   color: var(--muted-foreground);
   line-height: var(--leading-normal);
-  text-align: center;
+  text-align: left;
 }
 
-.skill-review-row[data-outcome="applied"] .skill-review-text {
-  color: var(--accent);
+/*
+  Attach the row to the turn it reports on.
+
+  An assistant row carries `padding-bottom: 14px` (chat-shell.css) to separate it
+  from the next turn, and the row drew flush against that padding box, so the
+  reply's last line sat 14px above the review — far enough to read as a separate
+  notice. Measured on the dev client (CDP 9223, 1900px-wide window): the reply's
+  last line to the row's top edge was 14px, while the parts of one turn sit 4px
+  apart (`.message-col` gap). The turn gives up its inter-row padding here and the
+  row inherits the intra-turn rhythm instead; a turn with no review under it keeps
+  the 14px.
+
+  `:has()` is what lets the *preceding* row react to this one, and it keeps
+  working when the notice renders nothing (the switch off, a gate reason): no
+  element, no tightened padding.
+*/
+.message-row:has(+ .skill-review-row) {
+  padding-bottom: 4px;
 }
 
 .skill-review-detail {

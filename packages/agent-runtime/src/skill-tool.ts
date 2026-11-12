@@ -25,6 +25,8 @@ export const SKILL_TOOL_DESCRIPTION = [
   "",
   "Call it with no `id` to list the library as it stands now (id, name, description): the Skills section is a snapshot taken at session start, so a skill created since then is only visible here. Call it with an `id` to get that skill's document, its location, and its reference files.",
   "",
+  "The library is host-owned: this listing is the whole of it. Do not search the filesystem for skill directories to find out what exists.",
+  "",
   "When a task matches a skill's description, load the skill first and follow it; do not guess at its content. Load each skill at most once per task.",
 ].join("\n");
 

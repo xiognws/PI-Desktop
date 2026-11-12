@@ -622,6 +622,14 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     });
   }
   if (
+    Object.prototype.hasOwnProperty.call(value, "curateAutomatically") &&
+    typeof value.curateAutomatically !== "boolean"
+  ) {
+    throw Object.assign(new Error("curateAutomatically is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
+  if (
     Object.prototype.hasOwnProperty.call(value, "inlineVisualizations") &&
     typeof value.inlineVisualizations !== "boolean"
   ) {

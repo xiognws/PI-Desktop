@@ -272,7 +272,22 @@ export type ReviewAction = {
   subject: string;
   /** `references/<topic>.md` for support-file actions. */
   file?: string;
+  /**
+   * What the write says, shortened. Hermes prints a review's memory and skill
+   * writes with a preview of the text ("Skill patched: 'x' — old… → new…"), which
+   * is the part a reader can judge; a bare "patched 'x'" only reports that
+   * something happened.
+   */
+  preview?: string;
 };
+
+/** Characters of the written text a review line shows. */
+const PREVIEW_CHARS = 80;
+
+function clipPreview(value: string): string {
+  const flat = value.replace(/\s+/g, " ").trim();
+  return flat.length > PREVIEW_CHARS ? `${flat.slice(0, PREVIEW_CHARS - 1)}…` : flat;
+}
 
 /**
  * Which action a successful tool call amounts to.
@@ -289,7 +304,7 @@ export function reviewActionFromCall(toolName: string, args: unknown): ReviewAct
     const target = text("target") || "memory";
     const body = text("content") || text("old_text") || text("text");
     // A read of the store is not an action; only a write with something in it.
-    return body ? { kind: "memory", subject: target } : undefined;
+    return body ? { kind: "memory", subject: target, preview: clipPreview(body) } : undefined;
   }
   if (toolName !== "skill_manage") return undefined;
   const action = text("action");
@@ -300,8 +315,12 @@ export function reviewActionFromCall(toolName: string, args: unknown): ReviewAct
     case "create":
       return { kind: "created", subject: name };
     case "patch":
-    case "edit":
-      return { kind: "patched", subject: name };
+    case "edit": {
+      const written = text("new_string") || text("body") || text("content");
+      return written
+        ? { kind: "patched", subject: name, preview: clipPreview(written) }
+        : { kind: "patched", subject: name };
+    }
     case "write_file":
       return file ? { kind: "wrote", subject: name, file } : undefined;
     case "remove_file":
@@ -311,10 +330,21 @@ export function reviewActionFromCall(toolName: string, args: unknown): ReviewAct
   }
 }
 
-/** One human-facing line per action, the way Hermes reports a review pass. */
+/**
+ * One human-facing line per action, the way Hermes reports a review pass.
+ *
+ * Hermes writes "Skill patched: 'x' — <preview>" and "➕ memory: <preview>": the
+ * verb, the subject, and enough of the text that a reader can tell whether the
+ * write is the one they would have made. The glyph is the row's job, so it is not
+ * repeated here.
+ */
 export function describeReviewAction(action: ReviewAction): string {
   const where = action.file ? `${action.subject}/${action.file}` : action.subject;
-  return `${action.kind} '${where}'`;
+  if (action.kind === "memory") {
+    const target = action.subject === "user" ? "user memory" : "memory";
+    return action.preview ? `${target}: ${action.preview}` : `${target} updated`;
+  }
+  return action.preview ? `${action.kind} '${where}' — ${action.preview}` : `${action.kind} '${where}'`;
 }
 
 /**

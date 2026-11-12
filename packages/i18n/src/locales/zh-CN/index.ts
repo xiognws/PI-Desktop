@@ -1258,6 +1258,8 @@ sklm: {
     skillsProjectPath: "项目技能路径",
     skillReviewUiTitle: "自我改进回顾",
     skillReviewUiDesc: "每个回合结束后审查技能库，把值得沉淀的经验写进技能；关闭后不再显示“技能回顾”行。",
+    skillCurateAutoTitle: "自动归档闲置技能",
+    skillCurateAutoDesc: "每天最多自动运行一次维护检查，把长期无人打开、且由智能体编写的技能移入 .archive；恢复即可取回。",
     mcp: "MCP 服务器",
     mcpGlobalPath: "全局 MCP 路径",
     mcpProjectPath: "项目 MCP 路径",

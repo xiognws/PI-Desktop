@@ -1245,6 +1245,8 @@ export const ptBR = {
     skillsProjectPath: "Caminho de habilidades do projeto",
     skillReviewUiTitle: "Revisão de autoaperfeiçoamento",
     skillReviewUiDesc: "Revisa a biblioteca de habilidades após cada turno e grava nela as lições duradouras. Desativado oculta a linha de revisão.",
+    skillCurateAutoTitle: "Arquivar habilidades inativas automaticamente",
+    skillCurateAutoDesc: "Executa a manutenção no máximo uma vez por dia e move para .archive as habilidades escritas pelo agente que ninguém abriu há meses. Restaurar traz uma de volta.",
     mcp: "Servidores MCP",
     mcpGlobalPath: "Caminho MCP global",
     mcpProjectPath: "Caminho MCP do projeto",

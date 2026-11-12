@@ -689,9 +689,13 @@ async fn visualization_alias_spelling_preserves_root_identity_even_inside_the_wo
 async fn rpc_skill_library_write_and_read_never_raise_a_permission_card() {
     // The host resolves the library root when it builds the call's contained
     // roots, so point the global agents directory at a scratch location before
-    // any RPC runs. Unlike the other cases here this test must not share the
-    // process-wide setting with concurrent tests.
+    // any RPC runs. This test used to set the variable bare, which raced every
+    // `with_global_agents` test in the same process: a concurrent repointing
+    // moved the library between the write and the read, and the tool then
+    // reported PATH_OUTSIDE_WORKSPACE. It takes the same lock they do, held as a
+    // guard because the awaits below cannot carry a closure.
     let library = tempfile::tempdir().unwrap();
+    let _agents_env = crate::agent_capabilities::test_support::agents_env_guard();
     std::env::set_var(crate::agent_capabilities::AGENTS_DIR_ENV, library.path());
     let f = fixture();
     let (state, id) = rpc_session(&f, false, "ask").await;

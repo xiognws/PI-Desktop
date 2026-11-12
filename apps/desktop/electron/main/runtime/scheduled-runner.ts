@@ -36,6 +36,13 @@ export function createScheduledRunner(options: {
   getHost: () => Host | null;
   execute: (id: string) => Promise<unknown>;
   report: (error: unknown) => void;
+  /**
+   * Housekeeping that shares this tick instead of owning a timer of its own —
+   * the automatic skill-curation pass. Awaited while the poll is held, so a slow
+   * pass cannot overlap a later one, and a failure is reported rather than
+   * thrown: a tick that stops polling is a worse outage than a missed pass.
+   */
+  maintenance?: () => Promise<void> | void;
 }) {
   let stopped = false;
   let polling = false;
@@ -66,6 +73,13 @@ export function createScheduledRunner(options: {
             if (dispatches.get(id) === owner) dispatches.delete(id);
           }
         })();
+      }
+      if (!stopped && options.maintenance) {
+        try {
+          await options.maintenance();
+        } catch (error) {
+          options.report(error);
+        }
       }
     } catch (error) {
       options.report(error);

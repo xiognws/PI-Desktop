@@ -113,9 +113,12 @@ describe("reviewActionFromCall", () => {
   });
 
   it("counts a memory write, never a memory read", () => {
+    // The preview is part of the action: Hermes prints "memory: <preview>" and a
+    // bare target tells a reader nothing about what was written.
     expect(reviewActionFromCall("memory", { target: "user", content: "prefers terse" })).toEqual({
       kind: "memory",
       subject: "user",
+      preview: "prefers terse",
     });
     expect(reviewActionFromCall("memory", { target: "memory" })).toBeUndefined();
     expect(reviewActionFromCall("memory", {})).toBeUndefined();

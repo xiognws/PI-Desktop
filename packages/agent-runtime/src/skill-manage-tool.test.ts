@@ -86,6 +86,9 @@ describe("skill_manage: create", () => {
     expect(host.calls[0].params).toEqual({
       skill: {
         name: "add-npm-script",
+        // The marker is what lets the maintenance pass archive this skill later
+        // (ADR 0394); a hand-written skill carries no such claim.
+        createdBy: "agent",
         description: "Use when asked to add an npm script.",
         body: "## When to Use\n…",
       },

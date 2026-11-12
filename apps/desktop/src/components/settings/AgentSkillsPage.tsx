@@ -105,6 +105,18 @@ export function AgentSkillsPage() {
       useAppStore.setState({ settings: current });
     });
   };
+  // The maintenance pass runs itself at most once a day; this is the switch
+  // that says whether it may. Absent reads as on, the same default main uses.
+  const curateAutomatically = settings?.curateAutomatically !== false;
+  const saveCurateAutomatically = (enabled: boolean): void => {
+    const current = useAppStore.getState().settings;
+    if (!current) return;
+    const next = { ...current, curateAutomatically: enabled };
+    useAppStore.setState({ settings: next });
+    void api.setSettings(next).catch(() => {
+      useAppStore.setState({ settings: current });
+    });
+  };
   const showToast = useAppStore((state) => state.showToast);
   const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const fetchSkills = useCallback(async (): Promise<SkillCollection> => {
@@ -1090,6 +1102,16 @@ export function AgentSkillsPage() {
             checked={showReview}
             label={t("settings.skillReviewUiTitle")}
             onChange={() => saveSkillReviewVisible(!showReview)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.skillCurateAutoTitle")}
+          description={t("settings.skillCurateAutoDesc")}
+        >
+          <SettingsToggle
+            checked={curateAutomatically}
+            label={t("settings.skillCurateAutoTitle")}
+            onChange={() => saveCurateAutomatically(!curateAutomatically)}
           />
         </SettingsRow>
       </SettingsCard>

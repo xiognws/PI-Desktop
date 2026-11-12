@@ -1,5 +1,6 @@
 import { app, BrowserWindow, crashReporter, Menu, safeStorage } from "electron";
 import { createScheduledRunner } from "../runtime/scheduled-runner";
+import { createCuratorMaintenance } from "../runtime/curator-runner";
 import { onConfirmedQuit } from "./confirmed-quit";
 import {
   APP_NAME,
@@ -94,6 +95,12 @@ export type StartupDependencies = {
    * be derived from the startup state alone.
    */
   isSessionBusy: (sessionId: string) => boolean;
+  /**
+   * Whether any session is running a turn (or still finishing one). Unattended
+   * work — the automatic curation pass — waits for an idle app, and it has no
+   * session id to hand `isSessionBusy`.
+   */
+  isAnySessionBusy: () => boolean;
   getHost: () => HostProcess | null;
   getMainWindow: () => BrowserWindow | null;
   sendToRenderer: (channel: string, payload: unknown) => void;
@@ -163,6 +170,7 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       modelsDevCatalog,
       plugins,
       isSessionBusy,
+      isAnySessionBusy,
       getHost,
       getMainWindow,
       sendToRenderer,
@@ -336,10 +344,19 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       });
     }
     if (!bootError) planUiProbe.install();
+    const curatorMaintenance = createCuratorMaintenance({
+      getHost,
+      isBusy: isAnySessionBusy,
+      log: (level, message, data) =>
+        logger.app("runtime", level, message, data ? { data } : undefined),
+    });
     const scheduledRunner = createScheduledRunner({
       getHost,
       execute: (id) => invokeIpc(IPC.invoke.scheduledExecute, [id, true]),
       report: (error) => logger.app("runtime", "warn", "scheduled task dispatch failed", { data: String(error) }),
+      // The curation pass rides this tick rather than owning a timer: one
+      // 30-second poll drives both, so neither can run twice or out of phase.
+      maintenance: () => curatorMaintenance.run(),
     });
     scheduledRunner.start();
     logger.app("runtime", "info", "scheduled runner started");
