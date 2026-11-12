@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PlayCircle, RefreshCw } from 'lucide-vue-next'
 
@@ -43,7 +43,34 @@ function matchesFilter(e: Execution) {
   return e.status !== '已完成' && e.status !== '执行中'
 }
 
-const visible = computed(() => executions.value.filter(matchesFilter))
+// 按脚本名/执行号搜一下：跑了几十轮之后，翻列表找人肉找不动。
+const query = ref('')
+const PAGE_SIZE = 20
+const page = ref(1)
+
+function matchesQuery(e: Execution) {
+  const needle = query.value.trim().toLowerCase()
+  if (!needle) return true
+  return e.name.toLowerCase().includes(needle) || String(e.id) === needle
+}
+
+const visible = computed(() => executions.value.filter(matchesFilter).filter(matchesQuery))
+const pageCount = computed(() => Math.max(1, Math.ceil(visible.value.length / PAGE_SIZE)))
+// 分页只切前端这一份列表：接口本来就把整项目的历史一次给全，加参数只会让
+// 轮询和翻页互相打架。
+const paged = computed(() => {
+  const start = (page.value - 1) * PAGE_SIZE
+  return visible.value.slice(start, start + PAGE_SIZE)
+})
+const rangeText = computed(() => {
+  if (!visible.value.length) return '0 条'
+  const start = (page.value - 1) * PAGE_SIZE + 1
+  return `${start}–${Math.min(start + PAGE_SIZE - 1, visible.value.length)} / ${visible.value.length}`
+})
+
+// 换筛选或搜索词就回第一页；列表变短（比如轮询后筛选结果变少）也别停在空页。
+watch([filter, query], () => { page.value = 1 })
+watch(pageCount, (count) => { if (page.value > count) page.value = count })
 const hasRunning = computed(() => executions.value.some((e) => e.status === '执行中' || e.running > 0))
 
 function percent(e: Execution) {
@@ -108,6 +135,11 @@ onBeforeUnmount(stopPolling)
           <span v-if="hasRunning" class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600">实时刷新中</span>
         </div>
         <div class="flex items-center gap-1">
+          <input
+            v-model="query"
+            class="h-7 w-40 px-2 mr-2 text-xs border border-gray-200 rounded-lg"
+            placeholder="搜脚本名 / 执行号"
+          />
           <button
             v-for="f in FILTERS"
             :key="f.key"
@@ -128,7 +160,7 @@ onBeforeUnmount(stopPolling)
 
     <div class="flex-1 overflow-auto bg-white">
       <div class="p-6 space-y-4">
-        <div v-for="e in visible" :key="e.id"
+        <div v-for="e in paged" :key="e.id"
           class="bg-gray-50 rounded-lg border border-gray-200 p-5 cursor-pointer hover:border-blue-300"
           @click="openExecution(e.id)">
           <div class="flex items-center justify-between mb-3">
@@ -160,6 +192,20 @@ onBeforeUnmount(stopPolling)
 
         <div v-if="!visible.length" class="text-center py-12 text-gray-400 text-sm">
           {{ executions.length ? '当前筛选下没有执行记录' : '暂无执行记录：在「运行记录」里点“执行用例”，或在「脚本」页运行单个脚本' }}
+        </div>
+
+        <div v-if="visible.length > PAGE_SIZE" class="flex items-center justify-center gap-3 pt-2 text-xs text-gray-600">
+          <button
+            class="px-2 py-1 border border-gray-200 rounded disabled:opacity-40"
+            :disabled="page <= 1"
+            @click="page--"
+          >上一页</button>
+          <span>{{ rangeText }} · 第 {{ page }} / {{ pageCount }} 页</span>
+          <button
+            class="px-2 py-1 border border-gray-200 rounded disabled:opacity-40"
+            :disabled="page >= pageCount"
+            @click="page++"
+          >下一页</button>
         </div>
       </div>
     </div>
