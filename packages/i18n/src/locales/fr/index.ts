@@ -187,7 +187,8 @@ export const fr = {
     "tagline": "Partenaire de codage IA local",
     "starting": "Démarrage de Pi-Workspace…",
     "loadingView": "Chargement de la vue…",
-    "uiCrashed": "Un problème s'est produit avec l'interface"
+    "uiCrashed":  "Un problème s'est produit avec l'interface",
+    "uiCrashRetry": "Réessayer"
   },
   "startup": {
     "slowTitle": "Démarrage toujours en cours…",
@@ -1187,7 +1188,11 @@ sklm: {
     "memoryEmptyFiltered": "No memory matches this search.",
     "memoryLoading": "Loading memories…",
     "memoryStatsLine": "{{live}} live · {{pinned}} pinned · {{total}} total",
-    "memoryMeta": "Recalled {{used}}× · {{date}}",
+    "memoryUsedCount": "Utilisée {{count}}×",
+    "memoryLastUsed": "dernière utilisation {{when}}",
+    "memoryNeverUsed": "Jamais rappelée",
+    "memoryTags": "Étiquettes",
+    "memoryBody": "Contenu",
     "memorySuperseded": "Superseded",
 
     "nav": {
@@ -1344,16 +1349,6 @@ sklm: {
     "learningMapMemory": "Souvenir",
     "learningMapUser": "Profil utilisateur",
     "learningMapEdge": "recouvrement {{weight}}",
-    "memoryAgentTitle": "Souvenirs écrits par l’agent",
-    "memoryAgentCounts": "{{memory}} souvenirs · {{user}} profil",
-    "memoryAgentEmpty": "Rien d’écrit pour l’instant : les entrées apparaissent ici dès que l’agent enregistre quelque chose avec l’outil memory.",
-    "memoryAgentMemory": "Souvenir",
-    "memoryAgentUser": "Profil",
-    "memoryAgentHint": "Ce sont les entrées que le modèle lit en contexte. La liste ci-dessous est l’ancien stockage noté.",
-    "memoryAgentRemove": "Supprimer « {{text}} »",
-    "memoryMergeAction": "Fusionner l’ancien stockage",
-    "memoryMergeRunning": "Fusion…",
-    "memoryMergeDone": "{{added}} copiés dans la liste lue par le modèle ; {{skipped}} ne tenaient pas dans le budget.",
     "skillUsageUsed": "Utilisée {{count}}×",
     "skillUsageUnusedOf": "{{unused}} sur {{total}} jamais utilisées",
     "skillCurateTitle": "Maintenance des compétences",

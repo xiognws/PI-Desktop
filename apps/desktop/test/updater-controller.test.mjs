@@ -58,6 +58,9 @@ function createController({ updater, settings = {}, persist = async () => {} }) 
     currentVersion: "0.16.0",
     platform: "darwin",
     isPackaged: true,
+    // The shipped build disables the updater because the intranet has no feed;
+    // these tests cover the delivery logic behind that flag.
+    updatePolicy: { feedReachable: true },
     autoUpdater: updater,
     readUpdateSettings: async () => settings,
     persistDismissedVersion: persist,

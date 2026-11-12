@@ -77,6 +77,11 @@ test("a finished spawn drops the running mark", async () => {
 test("a title that repeats the task does not print it twice", async () => {
   await withCardRender(({ render }) => {
     const html = render({ ...session, title: "run the test suite" });
-    assert.equal(html.split("run the test suite").length - 1, 1);
+    // The phrase appears once as printed text; the second mention lives in the
+    // button's aria-label, which is read to a screen reader, not printed. Strip
+    // the attributes before counting, and assert the task line was dropped.
+    const visible = html.replace(/\saria-label="[^"]*"/g, "");
+    assert.equal(visible.split("run the test suite").length - 1, 1);
+    assert.doesNotMatch(html, /class="spawned-session-task"/);
   });
 });

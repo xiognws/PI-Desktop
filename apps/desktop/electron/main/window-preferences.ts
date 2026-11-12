@@ -65,3 +65,49 @@ export function writeCloseBehavior(dataDir: string, behavior: CloseBehavior) {
     // best-effort persistence
   }
 }
+
+function startupAnimationPath(dataDir: string) {
+  return join(dataDir, "startup-animation.json");
+}
+
+/**
+ * The boot-animation preference, mirrored for the one reader that runs before
+ * host-core answers.
+ *
+ * The descriptor reaches the renderer as a window creation argument, so it has
+ * to be resolved before the first `BrowserWindow` exists — and settings are not
+ * readable that early. This mirror is written whenever settings are saved and
+ * read by the boot sequence; a missing file reads as "unset" and the animation
+ * module falls back to its defaults, which matches a fresh install.
+ */
+export function readStartupAnimationPreferences(
+  dataDir: string,
+): { startupAnimation?: unknown } | null {
+  try {
+    const raw = JSON.parse(readFileSync(startupAnimationPath(dataDir), "utf8"));
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const value = (raw as { startupAnimation?: unknown }).startupAnimation;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    return { startupAnimation: value };
+  } catch {
+    return null;
+  }
+}
+
+export function writeStartupAnimationPreferences(
+  dataDir: string,
+  settings: { startupAnimation?: unknown } | null,
+) {
+  const value = settings?.startupAnimation;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  try {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(
+      startupAnimationPath(dataDir),
+      JSON.stringify({ startupAnimation: value }),
+      "utf8",
+    );
+  } catch {
+    // best-effort persistence
+  }
+}

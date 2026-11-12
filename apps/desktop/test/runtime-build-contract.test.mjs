@@ -6,9 +6,17 @@ const desktopPackageUrl = new URL("../package.json", import.meta.url);
 const dependencyBuild = "pnpm --filter '@pi-workspace/desktop^...' build";
 const depsScript = "pnpm run build:deps";
 
+// The scripts quote the workspace filter with double quotes so PowerShell can
+// run them (see the predev fix); the contract is the command, not the quote
+// character.
+const unquote = (value) => String(value ?? "").replace(/"/g, "'");
+
 const readScripts = async () => {
   const pkg = JSON.parse(await readFile(desktopPackageUrl, "utf8"));
-  return pkg.scripts ?? {};
+  const scripts = pkg.scripts ?? {};
+  return Object.fromEntries(
+    Object.entries(scripts).map(([name, value]) => [name, unquote(value)]),
+  );
 };
 
 test("build:deps rebuilds every workspace dependency consumed by Electron", async () => {

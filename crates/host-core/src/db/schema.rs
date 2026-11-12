@@ -26,11 +26,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_session_todo_active
 /// Same DDL as the fresh schema, exposed for the v20 -> v21 migration.
 pub(crate) const SESSION_TODO_DDL: &str = session_todo_ddl!();
 
-/// `memories` table, its keyword index, and the supporting indexes in one
+/// `memories` table and the indexes that back listing and scope lookups in one
 /// place, so the fresh schema and the v27 -> v28 migration cannot drift
-/// (ADR 0371). Retrieval is keyword-first: the FTS5 table stores a *copy* of
-/// the text rather than external content, because the write path normalises
-/// CJK text to one token per ideograph (see `memory::normalise_search_text`).
+/// (ADR 0371). The keyword index lives beside it in `memories_fts_ddl!`,
+/// because v30 rebuilds that table on its own.
 macro_rules! memories_ddl {
     () => {
         r#"
@@ -79,16 +78,39 @@ CREATE INDEX IF NOT EXISTS idx_memories_pinned
   ON memories(use_count DESC) WHERE pinned = 1;
 CREATE INDEX IF NOT EXISTS idx_memories_live
   ON memories(scope, created_at DESC) WHERE superseded_by IS NULL;
+"#
+    };
+}
 
+/// The structured-memory keyword index, split out so v29 -> v30 can drop and
+/// recreate it without restating the table.
+///
+/// `trigram` because the default `unicode61` tokenizer reads a whole Chinese
+/// phrase as one token: `上下文压缩` was findable only by typing it exactly, so
+/// recall was English-only in practice. A trigram index answers any substring of
+/// three characters or more, in either script. Two consequences the write and
+/// read paths have to hold up:
+///
+/// * The table stores the **raw** title, body and tags. Normalising CJK to one
+///   token per ideograph (the pre-v30 scheme, still used by the entry-list
+///   search) puts a space inside every run and hides it from a substring match.
+/// * A query shorter than three characters cannot be expressed at all, so
+///   `memory::recall` answers those with an `instr()` scan.
+macro_rules! memories_fts_ddl {
+    () => {
+        r#"
 CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
   title,
   body,
   tags,
-  tokenize = 'unicode61 remove_diacritics 2'
+  tokenize = 'trigram'
 );
 "#
     };
 }
+
+/// The keyword index on its own, for the v29 -> v30 rebuild.
+pub(crate) const MEMORIES_FTS_DDL: &str = memories_fts_ddl!();
 
 /// Same DDL as the fresh schema, exposed for the v27 -> v28 migration.
 pub(crate) const MEMORIES_DDL: &str = memories_ddl!();
@@ -183,6 +205,7 @@ CREATE INDEX idx_sessions_deleted ON sessions(deleted_at) WHERE deleted_at IS NO
 "#,
     session_todo_ddl!(),
     memories_ddl!(),
+    memories_fts_ddl!(),
     r#"
 
 CREATE TABLE session_import_origins (

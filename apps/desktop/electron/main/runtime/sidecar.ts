@@ -689,6 +689,16 @@ export function createSidecarRuntime({
         loadBuiltinSkillBody(id) ??
         (await loadUserSkillBody(id, projectPath)) ??
         plugins.loadSkillBody(id);
+      // Nothing resolved: say so instead of counting a load of a document that
+      // does not exist. Recording first (the original order) turned every typo
+      // into a real "used once" badge on a skill nobody ever wrote.
+      if (!skill) {
+        return {
+          ok: false,
+          isError: true,
+          content: `Skill: no skill has the id \`${id}\`. Call Skill with no arguments to list the library.`,
+        };
+      }
       // Count the load before answering, but never fail it: a bookkeeping write
       // that loses a race with a host restart costs a badge, not the document.
       // Built-in and plugin skills are not in the user library, and the host

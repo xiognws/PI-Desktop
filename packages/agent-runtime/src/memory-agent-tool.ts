@@ -1,283 +1,512 @@
 /**
- * The `memory` tool (ADR 0380), modelled on Hermes' `tools/memory_tool.py`.
+ * The `memory` tool (ADR 0393): structured retain and recall.
  *
- * The model edits memory the way a person edits a note file: it sees the entries
- * (they are in the system prompt), and it names an action plus enough text to
- * locate what it means. It never re-emits the whole document, because
- * re-emission is where content silently disappears.
+ * Memory is one structured store (`memories` in host-core), not a document the
+ * agent edits. The model retains a memory — a title, a body, a kind, optional
+ * tags, a scope — and later retrieves the relevant ones by query. Nothing here
+ * renders the store into the system prompt: the prompt carries only what a
+ * per-turn recall finds relevant (`memory-context.ts`), so the cost of
+ * remembering does not grow with the store and capacity stops being a reason to
+ * delete a useful note.
  *
- * The edit semantics live in `memory-store.ts` and run **here**, in the runtime,
- * not in host-core: the host owns durable storage (one atomic whole-list write
- * per call), this side owns matching and editing. Keeping one implementation
- * means the tested semantics and the running one cannot drift.
+ * Every write is one host RPC (`memory.remember` / `memory.update` /
+ * `memory.forget`) and every read is `memory.recall`, so the runtime, the
+ * settings page and the background review share one implementation of dedupe,
+ * supersession and scope filtering. What stays here is only what the store
+ * cannot tell a model: which argument is missing, which memory an answer refers
+ * to, and the one rule a search cannot express — a procedure belongs in a skill.
  *
- * The result always echoes the new entry list. The system prompt holds a frozen
- * snapshot taken at session start, so without the echo the model would be
- * editing a document it can no longer see.
+ * A refused edit is reported as ordinary text, not a hard failure: the model can
+ * fix its own argument and retry in the same turn (same convention as
+ * `skill_manage`).
  */
 
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
 
-import type { RuntimeHost } from "./host-client.js";
-import {
-  applyMemoryBatch,
-  applyMemoryOperation,
-  ENTRY_DELIMITER,
-  MEMORY_CHAR_LIMIT,
-  memoryCharCount,
-  USER_CHAR_LIMIT,
-  type MemoryOperation,
-  type MemoryResult,
-  type MemorySuccess,
-  type MemoryTarget,
-} from "./memory-store.js";
 import { scrubSecretsInBatch } from "@pi-workspace/shared";
+
+import type { RuntimeHost } from "./host-client.js";
+import { procedureNeedingASkill, type SkillSummary } from "./memory-skill-overlap.js";
 
 /** Appended to a result whose content had a credential masked out of it. */
 const MEMORY_SCRUB_NOTE =
-  "\n\nA credential-shaped string in this content was replaced with ***REDACTED*** before saving: memory is re-sent to the model on every later turn.";
+  "\n\nA credential-shaped string in this content was replaced with ***REDACTED*** before saving: memory is recalled into later prompts.";
 
-/** How many characters of the store the tool result may echo back. */
-const MAX_ECHO_CHARS = 4000;
+/** Characters of a recalled body shown per hit; the whole text is one `search` away. */
+const MAX_HIT_BODY_CHARS = 400;
+
+/** Hits a `search` asks the host for when the model does not say. */
+const DEFAULT_SEARCH_LIMIT = 8;
+
+/** Host-core caps recall here, so asking for more would be silently ignored. */
+const MAX_SEARCH_LIMIT = 50;
+
+const MEMORY_KINDS = ["fact", "preference", "decision", "pitfall", "procedure"] as const;
+const MEMORY_SCOPES = ["global", "project", "session"] as const;
+
+type MemoryKindName = (typeof MEMORY_KINDS)[number];
+type MemoryScopeName = (typeof MEMORY_SCOPES)[number];
 
 const MEMORY_TOOL_DESCRIPTION = [
-  "Read and edit your durable memory: a flat list of entries kept across sessions.",
+  "Store and recall durable memory: one structured list of memories that stays with you across sessions.",
   "",
-  "Two targets. `memory` holds your own notes: how this project works, what failed and why, decisions and their reasons. `user` holds who the user is: their preferences, language, role, and standing instructions. Both enter your system prompt as a snapshot taken when the session started, so a write now is saved for the NEXT session and will not appear in the prompt you are reading.",
+  "Memory holds what stays true after this conversation, one memory per thing learned: a preference the user stated, a decision and its reason, a pitfall you actually hit, a constraint of this repository or machine. Each memory has a short `title`, a `body`, a `kind`, optional `tags` and a `scope`. Nothing here enters your system prompt in full — the memories relevant to a turn are recalled alongside the user's message, so the store can grow without costing context and there is no size budget to manage.",
   "",
   "Actions:",
-  "- `add` appends one entry. Adding an entry that already exists is a no-op.",
-  "- `patch` replaces ONE span inside an entry and keeps the rest verbatim. This is the usual way to correct or extend a note. `old_text` must occur exactly once in the matched entry.",
-  "- `replace` swaps a WHOLE entry. Use it when the entry is wrong from the start.",
-  "- `remove` deletes a whole entry. Use it to drop stale or superseded notes.",
-  "- `batch` applies several operations atomically against the final size limit, so one call can remove stale entries and add new ones in the same turn. Put `target` on an operation to edit a store other than the call's own `target`.",
+  "- `remember` stores one memory. Required: `title` (a few words naming what it is about) and `body` (the memory itself). Optional: `kind` — `fact` (default), `preference`, `decision`, `pitfall`; `tags`; `scope` — `global` (default, true everywhere), `project` (this project only), `session` (this conversation only); `pinned` (recalled every turn). Writing the same title and body again refreshes the existing memory instead of duplicating it.",
+  "- `update` changes a memory you already hold, by `id`: any of `title`, `body`, `tags`, `pinned`, `confidence`. Use it when the fact changed, rather than storing a contradicting second copy.",
+  "- `forget` deletes one memory by `id`. Use it for what turned out wrong, or that the user asked you to drop.",
+  "- `search` runs a keyword query over the store and returns the closest memories with their ids, best first. Search before `remember` when you may already know this, and before `update` or `forget` when you do not have the id. Query with the words the memory would contain, not with a question.",
   "",
-  "`old_text` only LOCATES an entry; it does not have to be the whole entry, but it must select exactly one. Copy it from the entry as written. If nothing matches, the result lists the closest entries — copy from one of those and retry in this turn.",
+  "A procedure — two or more steps that will still be true next month — belongs in a skill, not here: write it with `skill_manage`. This tool refuses a body that reads like steps (`MEMORY_PROCEDURE_NEEDS_SKILL`) and names the skill to patch when one already covers it. Facts, preferences and one-line quirks are exactly what memory is for.",
   "",
-  "Record what stays true after this conversation: a stated preference, a decision with its reason, a pitfall you actually hit, a procedure that worked. Do not record task progress, file contents you can re-read, secrets, or anything the user asked you to forget. Say what you learned, not what you did.",
-  "",
-  "Write every entry in the language the user writes in. An entry is read back to the user and reused in later sessions with them; translating it into English makes it harder for them to check and harder for you to match their wording later.",
-  "",
-  `Each target has a character budget (${MEMORY_CHAR_LIMIT} for memory, ${USER_CHAR_LIMIT} for user). When it is full, remove or shorten stale entries in the same batch as the write.`,
+  "Record what you learned, not the task you ran: not progress, not file contents you can re-read, not secrets. Write in the language the user writes in — a memory is read back to them, and matched against their words, in a later session.",
 ].join("\n");
-
-const operationSchema = Type.Object(
-  {
-    action: Type.Union(
-      [Type.Literal("add"), Type.Literal("replace"), Type.Literal("patch"), Type.Literal("remove")],
-      { description: "What to do with the matched entry." },
-    ),
-    target: Type.Optional(
-      Type.Union([Type.Literal("memory"), Type.Literal("user")], {
-        description:
-          "Which store this operation edits. Defaults to the call's `target`; set it to mix both stores in one batch.",
-      }),
-    ),
-    content: Type.Optional(
-      Type.String({
-        description:
-          "The new text. Required for add (the entry), replace (the whole entry) and patch (the replacement for old_text).",
-      }),
-    ),
-    old_text: Type.Optional(
-      Type.String({
-        description:
-          "Text copied from the entry this operation targets. Required for replace, patch and remove; must select exactly one entry.",
-      }),
-    ),
-  },
-  { additionalProperties: false },
-);
 
 const MEMORY_TOOL_PARAMETERS = Type.Object(
   {
-    target: Type.Union([Type.Literal("memory"), Type.Literal("user")], {
-      description: "`memory` for your own notes, `user` for who the user is.",
-    }),
-    action: Type.Optional(
-      Type.Union(
-        [
-          Type.Literal("add"),
-          Type.Literal("replace"),
-          Type.Literal("patch"),
-          Type.Literal("remove"),
-          Type.Literal("batch"),
-        ],
-        { description: "One action, or `batch` with `operations`." },
-      ),
+    action: Type.Union(
+      [
+        Type.Literal("remember"),
+        Type.Literal("update"),
+        Type.Literal("forget"),
+        Type.Literal("search"),
+      ],
+      { description: "What to do with the store." },
     ),
-    content: Type.Optional(
+    title: Type.Optional(
+      Type.String({
+        description: "remember / update. A few words naming the thing this memory is about.",
+      }),
+    ),
+    body: Type.Optional(
       Type.String({
         description:
-          "New text for add / replace (the whole entry) / patch (the replacement for old_text).",
+          "remember / update. The memory itself: one fact, preference, decision or pitfall.",
       }),
     ),
-    old_text: Type.Optional(
+    kind: Type.Optional(
+      Type.Union(MEMORY_KINDS.map((kind) => Type.Literal(kind)), {
+        description: "remember only. Defaults to `fact`.",
+      }),
+    ),
+    tags: Type.Optional(
+      Type.Array(Type.String(), {
+        description: "remember / update. Short labels that make this memory findable later.",
+      }),
+    ),
+    scope: Type.Optional(
+      Type.Union(MEMORY_SCOPES.map((scope) => Type.Literal(scope)), {
+        description: "remember only. Defaults to `global`.",
+      }),
+    ),
+    pinned: Type.Optional(
+      Type.Boolean({
+        description: "remember / update. Recalled on every turn; for standing instructions only.",
+      }),
+    ),
+    confidence: Type.Optional(
+      Type.Number({
+        description: "update only. 0..1, how sure this memory is; it is written as 0.7.",
+      }),
+    ),
+    id: Type.Optional(
       Type.String({
-        description:
-          "Text copied from the entry to edit. Required for replace, patch and remove; must select exactly one entry.",
+        description: "update / forget. The id a `remember` or `search` result gave you.",
       }),
     ),
-    operations: Type.Optional(
-      Type.Array(operationSchema, {
-        description: "Several operations applied atomically against the final size limit.",
-      }),
+    query: Type.Optional(Type.String({ description: "search. Words the memory would contain." })),
+    limit: Type.Optional(
+      Type.Number({ description: "search. How many hits at most. Defaults to 8, capped at 50." }),
     ),
   },
   { additionalProperties: false },
 );
 
-type RawMemoryParams = {
-  target?: unknown;
-  action?: unknown;
-  content?: unknown;
-  old_text?: unknown;
-  operations?: unknown;
+/**
+ * The record shape host-core answers with. Every field is optional here because
+ * the tool renders whatever the host sent rather than trusting its own copy: a
+ * field added host-side then shows up in the result without a runtime change.
+ */
+type MemoryRecord = {
+  id?: string;
+  scope?: string;
+  kind?: string;
+  title?: string;
+  body?: string;
+  tags?: readonly string[];
+  confidence?: number;
+  pinned?: boolean;
 };
 
-function asTarget(value: unknown): MemoryTarget | undefined {
-  return value === "memory" || value === "user" ? value : undefined;
+type RememberReply = { memory?: MemoryRecord; deduped?: boolean };
+type UpdateReply = { memory?: MemoryRecord };
+type ForgetReply = { removed?: number };
+type RecallHit = { memory?: MemoryRecord; score?: number };
+type RecallReply = { memories?: RecallHit[] };
+
+/** Host surface the tool needs: the structured memory RPCs. */
+export type MemoryToolHost = Pick<RuntimeHost, "call">;
+
+/** What the memory tool needs to know about the session it writes for. */
+export type MemoryToolOptions = {
+  /**
+   * The skill catalogue, read at write time rather than at construction — and it
+   * may need to read skill documents, so it is allowed to be async.
+   */
+  skills?: () => readonly SkillSummary[] | Promise<readonly SkillSummary[]>;
+  /** The open project, needed to store and find `project`-scoped memories. */
+  projectPath?: string;
+  /** This conversation, needed for `session`-scoped memories. */
+  sessionId?: string;
+};
+
+function text(
+  message: string,
+  details: Record<string, unknown> = {},
+  isError?: boolean,
+): AgentToolResult<Record<string, unknown>> {
+  return {
+    content: [{ type: "text" as const, text: message }],
+    details,
+    ...(isError ? { isError: true } : {}),
+  };
 }
 
-function asText(value: unknown): string | undefined {
+/** The host's own words for a rejected call; `String(error)` on a transport is noise. */
+function hostMessage(error: unknown): string {
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === "string" && message.trim() ? message : String(error);
+}
+
+function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/**
- * Turn the model's arguments into the operation list the store applies.
- *
- * Returns a message instead of a list when the call cannot be understood. The
- * messages name the fix, because a model that is told only "invalid" retries the
- * same call.
- */
-export function readMemoryOperations(
-  raw: RawMemoryParams,
-): { operations: MemoryOperation[] } | { error: string } {
-  const batch = raw.operations;
-  if (Array.isArray(batch)) {
-    if (batch.length === 0) return { error: "operations cannot be empty." };
-    if (raw.action !== undefined) {
-      return {
-        error:
-          "Pass either a single `action` or an `operations` list, not both. Use `operations` for several edits in one turn.",
-      };
-    }
-    const operations: MemoryOperation[] = [];
-    for (const [index, item] of batch.entries()) {
-      const position = `operation ${index + 1}`;
-      if (typeof item !== "object" || item === null) {
-        return { error: `${position}: must be an object with action, content and old_text.` };
-      }
-      const entry = item as Record<string, unknown>;
-      const action = entry.action;
-      const content = asText(entry.content);
-      const oldText = asText(entry.old_text);
-      // An operation may name its own store. Silently dropping the key - which is
-      // what happened before this check - made a batch that meant "this belongs to
-      // the user, that belongs to the project" land wholly in the outer target and
-      // report success, so the model never learned it had written the wrong list.
-      if (entry.target !== undefined && asTarget(entry.target) === undefined) {
-        return {
-          error: `${position}: target must be "memory" or "user", not ${JSON.stringify(entry.target)}.`,
-        };
-      }
-      // Carry the per-operation store through normalisation; dropping it here is
-      // what made the key look accepted while the write went to the outer target.
-      const ownTarget = entry.target === undefined ? {} : { target: asTarget(entry.target) as MemoryTarget };
-      if (action === "add") {
-        if (!content?.trim()) return { error: `${position}: content is required for add.` };
-        operations.push({ action: "add", content, ...ownTarget });
-        continue;
-      }
-      if (action === "replace" || action === "patch") {
-        if (!oldText?.trim()) return { error: `${position}: old_text is required for ${action}.` };
-        if (!content?.trim()) return { error: `${position}: content is required for ${action}.` };
-        operations.push({ action, old_text: oldText, content, ...ownTarget });
-        continue;
-      }
-      if (action === "remove") {
-        if (!oldText?.trim()) return { error: `${position}: old_text is required for remove.` };
-        operations.push({ action: "remove", old_text: oldText, ...ownTarget });
-        continue;
-      }
-      return {
-        error: `${position}: unknown action. Use add, replace, patch, or remove.`,
-      };
-    }
-    return { operations };
-  }
-
-  const action = raw.action;
-  const content = asText(raw.content);
-  const oldText = asText(raw.old_text);
-  if (action === "add") {
-    if (!content?.trim()) return { error: "content is required for add." };
-    return { operations: [{ action: "add", content }] };
-  }
-  if (action === "replace" || action === "patch") {
-    if (!oldText?.trim()) return { error: `old_text is required for ${action}.` };
-    if (!content?.trim()) return { error: `content is required for ${action}.` };
-    return { operations: [{ action, old_text: oldText, content }] };
-  }
-  if (action === "remove") {
-    if (!oldText?.trim()) return { error: "old_text is required for remove." };
-    return { operations: [{ action: "remove", old_text: oldText }] };
-  }
-  if (action === "batch") {
-    return { error: "`batch` needs an `operations` list." };
-  }
-  if (action === undefined) {
-    return {
-      error:
-        "action is required. Use add, replace, patch, remove, or batch with an operations list.",
-    };
-  }
-  return { error: `unknown action '${String(action)}'. Use add, replace, patch, remove, or batch.` };
+function trimmed(value: unknown): string | undefined {
+  const candidate = asString(value)?.trim();
+  return candidate ? candidate : undefined;
 }
 
-/**
- * Render the store back to the model.
- *
- * The whole list is echoed because the prompt snapshot is frozen: this result is
- * the only place the model can see the effect of its own write.
- */
-export function renderMemoryResult(target: MemoryTarget, result: MemoryResult): string {
-  if (!result.success) {
-    const parts = [result.error];
-    if (result.closestEntries?.length) {
-      parts.push("", "closest_entries:", ...result.closestEntries.map((entry) => `- ${entry}`));
-    }
-    if (result.currentEntries) {
-      parts.push("", "current_entries:", ...result.currentEntries.map((entry) => `- ${entry}`));
-    }
-    return parts.join("\n");
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") return undefined;
+    if (item.trim()) out.push(item.trim());
   }
-  const stored = result.entries.join(ENTRY_DELIMITER);
-  const usage = `${memoryCharCount(result.entries)}/${target === "user" ? USER_CHAR_LIMIT : MEMORY_CHAR_LIMIT}`;
-  const echoed =
-    stored.length > MAX_ECHO_CHARS
-      ? `${stored.slice(0, MAX_ECHO_CHARS)}… (truncated)`
-      : stored;
-  return [
-    result.message,
-    `Now ${result.entries.length} entr${result.entries.length === 1 ? "y" : "ies"}, ${usage} chars.`,
-    "",
-    echoed,
-  ].join("\n");
+  return out;
 }
 
-/** Host surface the tool needs: read and write one target's entry list. */
-export type MemoryToolHost = Pick<RuntimeHost, "call">;
+function asEnum<T extends string>(values: readonly T[], value: unknown): T | undefined {
+  return values.find((candidate) => candidate === value);
+}
 
-/**
- * Build the `memory` tool bound to one runtime host.
- *
- * A read-modify-write per call is deliberate. The alternative — sending the
- * operation to the host and editing there — would need the matching rules twice,
- * and two implementations of "which entry did the model mean" diverge silently.
- */
-export function createMemoryTool(host: MemoryToolHost): AgentTool {
+/** `[fact] Title (tags: a, b) — id m1`: one line that names the memory. */
+function describeMemory(record: MemoryRecord | undefined): string {
+  const title = record?.title?.trim();
+  const kind = record?.kind?.trim();
+  const tags = (record?.tags ?? []).filter((tag) => tag.trim().length > 0);
+  const parts = [[kind ? `[${kind}]` : "", title ?? "(untitled)"].filter(Boolean).join(" ")];
+  if (tags.length > 0) parts.push(`(tags: ${tags.join(", ")})`);
+  if (record?.id) parts.push(`— id ${record.id}`);
+  return parts.join(" ");
+}
+
+/** A body shortened for a hit line, so one long memory cannot crowd out the rest. */
+function trimBody(body: string | undefined): string {
+  const value = (body ?? "").trim();
+  if (!value) return "";
+  return value.length > MAX_HIT_BODY_CHARS ? `${value.slice(0, MAX_HIT_BODY_CHARS)}…` : value;
+}
+
+/** Mask credential-shaped text in one memory's fields, keeping the batch property. */
+function scrubFields(fields: readonly string[]): { safe: string[]; masked: boolean } {
+  const safe = scrubSecretsInBatch(fields);
+  return { safe, masked: safe.some((value, index) => value !== fields[index]) };
+}
+
+export function createMemoryTool(host: MemoryToolHost, options: MemoryToolOptions = {}): AgentTool {
+  /** Retain: validate, gate, mask, then one host call. */
+  const remember = async (
+    raw: Record<string, unknown>,
+  ): Promise<AgentToolResult<Record<string, unknown>>> => {
+    const title = trimmed(raw.title);
+    if (!title) {
+      return text(
+        "title is required for remember: a few words naming the thing this memory is about.",
+        { errorCode: "MEMORY_INVALID_ARGUMENT" },
+        true,
+      );
+    }
+    const body = trimmed(raw.body);
+    if (!body) {
+      return text(
+        "body is required for remember: the fact, preference, decision or pitfall itself.",
+        { errorCode: "MEMORY_INVALID_ARGUMENT" },
+        true,
+      );
+    }
+    const rawKind = raw.kind;
+    const kind: MemoryKindName | undefined =
+      rawKind === undefined ? "fact" : asEnum(MEMORY_KINDS, rawKind);
+    if (!kind) {
+      return text(`kind must be one of ${MEMORY_KINDS.join(", ")}.`, {
+        errorCode: "MEMORY_INVALID_ARGUMENT",
+      }, true);
+    }
+    const rawScope = raw.scope;
+    const scope: MemoryScopeName | undefined =
+      rawScope === undefined ? "global" : asEnum(MEMORY_SCOPES, rawScope);
+    if (!scope) {
+      return text(`scope must be one of ${MEMORY_SCOPES.join(", ")}.`, {
+        errorCode: "MEMORY_INVALID_ARGUMENT",
+      }, true);
+    }
+    // A scope names a column the host validates: a project memory without a project
+    // path is refused host-side, and saying so here turns a failed call into a fix.
+    if (scope === "project" && !options.projectPath) {
+      return text(
+        "scope `project` needs an open project, and this session has none. Use `global` for what is true anywhere, or `session` for this conversation only.",
+        { errorCode: "MEMORY_INVALID_ARGUMENT" },
+        true,
+      );
+    }
+    if (scope === "session" && !options.sessionId) {
+      return text(
+        "scope `session` needs a conversation id, which this session does not have. Use `global` instead.",
+        { errorCode: "MEMORY_INVALID_ARGUMENT" },
+        true,
+      );
+    }
+    const rawTags = raw.tags;
+    const tags = rawTags === undefined ? [] : asStringArray(rawTags);
+    if (!tags) {
+      return text("tags must be an array of strings.", { errorCode: "MEMORY_INVALID_ARGUMENT" }, true);
+    }
+    const pinned = raw.pinned;
+    if (pinned !== undefined && typeof pinned !== "boolean") {
+      return text("pinned must be true or false.", { errorCode: "MEMORY_INVALID_ARGUMENT" }, true);
+    }
+    // One lesson, one place. A procedure belongs in a skill *whether or not* one
+    // exists yet, and the check is the shape of the sentence — steps or a fact —
+    // because a catalogue's one line of English cannot be compared against a
+    // dictated Chinese procedure. A fact that merely mentions the same subsystem
+    // ("this machine blocks TCP 22" beside a publish skill) is what memory is for.
+    const skills = (await options.skills?.()) ?? [];
+    const procedure = procedureNeedingASkill([body], [], skills);
+    if (procedure) {
+      const where = procedure.skillId
+        ? `skill \`${procedure.skillId}\` covers this class of task`
+        : "it belongs in a skill";
+      return text(
+        `Not saved: this is a procedure (steps), not a fact — ${where}. Write it with \`skill_manage\` (action \`create\`, or \`patch\` the skill above and add a \`references/\` file), and keep memory for facts, preferences and one-line quirks. If what you actually learned is a single fact, state the fact alone and it will be stored.`,
+        {
+          errorCode: "MEMORY_PROCEDURE_NEEDS_SKILL",
+          ...(procedure.skillId ? { skillId: procedure.skillId } : {}),
+        },
+        true,
+      );
+    }
+    // Memory is recalled into later prompts, so credential-shaped text is masked on
+    // the way in — the log redactor's vocabulary, in the other direction. The batch
+    // runs over every field at once because a token stated once with its label is
+    // often repeated bare beside it.
+    const originals = [title, body, ...tags];
+    const scrubbed = scrubFields(originals);
+    const [safeTitle, safeBody, ...safeTags] = scrubbed.safe;
+    const params: Record<string, unknown> = { scope, kind, title: safeTitle, body: safeBody };
+    if (safeTags.length > 0) params.tags = safeTags;
+    if (typeof pinned === "boolean") params.pinned = pinned;
+    // Global memory must not carry either column; the host refuses it if it does.
+    if (scope === "project" && options.projectPath) params.projectPath = options.projectPath;
+    if (scope === "session" && options.sessionId) params.sessionId = options.sessionId;
+    let reply: RememberReply;
+    try {
+      reply = await host.call<RememberReply>("memory.remember", params);
+    } catch (error) {
+      return text(`Memory was not saved: ${hostMessage(error)}`, {
+        errorCode: "MEMORY_WRITE_FAILED",
+      }, true);
+    }
+    const line = reply.deduped
+      ? `Already stored — refreshed ${describeMemory(reply.memory)}.`
+      : `Saved ${describeMemory(reply.memory)} (scope ${scope}).`;
+    return text(scrubbed.masked ? `${line}${MEMORY_SCRUB_NOTE}` : line, {
+      action: "remember",
+      scope,
+      kind,
+      ...(reply.memory?.id ? { id: reply.memory.id } : {}),
+      ...(reply.deduped ? { deduped: true } : {}),
+      ...(scrubbed.masked ? { masked: true } : {}),
+    });
+  };
+
+  /** Patch one memory: any subset of the editable fields, one host call. */
+  const update = async (
+    raw: Record<string, unknown>,
+  ): Promise<AgentToolResult<Record<string, unknown>>> => {
+    const id = trimmed(raw.id);
+    if (!id) {
+      return text("id is required for update: `search` first if you do not have it.", {
+        errorCode: "MEMORY_INVALID_ARGUMENT",
+      }, true);
+    }
+    const title = trimmed(raw.title);
+    const body = trimmed(raw.body);
+    const rawTags = raw.tags;
+    const tags = rawTags === undefined ? undefined : asStringArray(rawTags);
+    if (rawTags !== undefined && !tags) {
+      return text("tags must be an array of strings.", { errorCode: "MEMORY_INVALID_ARGUMENT" }, true);
+    }
+    const pinned = raw.pinned;
+    if (pinned !== undefined && typeof pinned !== "boolean") {
+      return text("pinned must be true or false.", { errorCode: "MEMORY_INVALID_ARGUMENT" }, true);
+    }
+    const confidence = raw.confidence;
+    if (
+      confidence !== undefined &&
+      (typeof confidence !== "number" ||
+        !Number.isFinite(confidence) ||
+        confidence < 0 ||
+        confidence > 1)
+    ) {
+      return text("confidence must be a number between 0 and 1.", {
+        errorCode: "MEMORY_INVALID_ARGUMENT",
+      }, true);
+    }
+    const fields: Record<string, unknown> = {};
+    if (title !== undefined || body !== undefined) {
+      // Same masking as `remember`: a rewritten field must not become the one place
+      // a credential survives.
+      const scrubbed = scrubFields([title ?? "", body ?? ""]);
+      if (title !== undefined) fields.title = scrubbed.safe[0];
+      if (body !== undefined) fields.body = scrubbed.safe[1];
+    }
+    if (tags !== undefined) fields.tags = tags;
+    if (typeof pinned === "boolean") fields.pinned = pinned;
+    if (typeof confidence === "number") fields.confidence = confidence;
+    if (Object.keys(fields).length === 0) {
+      return text("nothing to update: pass at least one of title, body, tags, pinned, confidence.", {
+        errorCode: "MEMORY_INVALID_ARGUMENT",
+      }, true);
+    }
+    let reply: UpdateReply;
+    try {
+      reply = await host.call<UpdateReply>("memory.update", { id, ...fields });
+    } catch (error) {
+      const message = hostMessage(error);
+      if (/not found/i.test(message)) {
+        return text(
+          `No memory with id ${id}. Use \`search\` to find the id, or \`remember\` to store it again.`,
+          { errorCode: "MEMORY_NOT_FOUND" },
+          true,
+        );
+      }
+      return text(`Memory ${id} was not updated: ${message}`, {
+        errorCode: "MEMORY_WRITE_FAILED",
+      }, true);
+    }
+    return text(`Updated ${describeMemory(reply.memory ?? { id })}.`, {
+      action: "update",
+      id,
+      fields: Object.keys(fields),
+    });
+  };
+
+  /** Forget one memory by id, and say plainly when nothing was there. */
+  const forget = async (
+    raw: Record<string, unknown>,
+  ): Promise<AgentToolResult<Record<string, unknown>>> => {
+    const id = trimmed(raw.id);
+    if (!id) {
+      return text("id is required for forget: `search` first if you do not have it.", {
+        errorCode: "MEMORY_INVALID_ARGUMENT",
+      }, true);
+    }
+    let reply: ForgetReply;
+    try {
+      reply = await host.call<ForgetReply>("memory.forget", { id });
+    } catch (error) {
+      return text(`Memory ${id} was not removed: ${hostMessage(error)}`, {
+        errorCode: "MEMORY_WRITE_FAILED",
+      }, true);
+    }
+    const removed = reply.removed ?? 0;
+    if (removed === 0) {
+      return text(`No memory with id ${id} was stored, so nothing was removed.`, {
+        action: "forget",
+        id,
+        removed: 0,
+      });
+    }
+    return text(`Forgot memory ${id}.`, { action: "forget", id, removed });
+  };
+
+  /** Retrieve: the host ranks, this side only renders. */
+  const search = async (
+    raw: Record<string, unknown>,
+  ): Promise<AgentToolResult<Record<string, unknown>>> => {
+    const query = trimmed(raw.query);
+    if (!query) {
+      return text("query is required for search: the words the memory would contain.", {
+        errorCode: "MEMORY_INVALID_ARGUMENT",
+      }, true);
+    }
+    const rawLimit = raw.limit;
+    const requested =
+      typeof rawLimit === "number" && Number.isFinite(rawLimit)
+        ? Math.floor(rawLimit)
+        : DEFAULT_SEARCH_LIMIT;
+    const limit = Math.min(Math.max(requested, 1), MAX_SEARCH_LIMIT);
+    const params: Record<string, unknown> = { query, limit };
+    // Narrowing is the host's: a project's memories are visible only with the project
+    // path, its session's only with the session id (and global ones always).
+    if (options.projectPath) params.projectPath = options.projectPath;
+    if (options.sessionId) params.sessionId = options.sessionId;
+    let reply: RecallReply;
+    try {
+      reply = await host.call<RecallReply>("memory.recall", params);
+    } catch (error) {
+      return text(`Memory could not be searched: ${hostMessage(error)}`, {
+        errorCode: "MEMORY_SEARCH_FAILED",
+      }, true);
+    }
+    // Host order is the ranking; re-sorting here would throw the ranking away.
+    const hits: { memory: MemoryRecord; score?: number }[] = [];
+    for (const hit of Array.isArray(reply.memories) ? reply.memories : []) {
+      const memory = hit?.memory;
+      if (!memory) continue;
+      if (!memory.title?.trim() && !memory.body?.trim()) continue;
+      hits.push({ memory, score: hit.score });
+    }
+    if (hits.length === 0) {
+      return text(
+        `No memory matched '${query}'. Try the words the memory would contain, or \`remember\` it if you have not stored it yet.`,
+        { action: "search", query, hits: 0 },
+      );
+    }
+    const lines = hits.map((hit, index) => {
+      const score = typeof hit.score === "number" ? ` (score ${hit.score.toFixed(3)})` : "";
+      const body = trimBody(hit.memory.body);
+      return [
+        `${index + 1}. ${describeMemory(hit.memory)}${score}`,
+        ...(body ? [`   ${body}`] : []),
+      ].join("\n");
+    });
+    return text(
+      [
+        `${hits.length} memor${hits.length === 1 ? "y" : "ies"} matched '${query}', best first:`,
+        "",
+        ...lines,
+        "",
+        "`update` and `forget` take one of these ids.",
+      ].join("\n"),
+      { action: "search", query, hits: hits.length },
+    );
+  };
+
   return {
     name: "memory",
     label: "Memory",
@@ -285,128 +514,23 @@ export function createMemoryTool(host: MemoryToolHost): AgentTool {
     parameters: MEMORY_TOOL_PARAMETERS,
     executionMode: "sequential",
     execute: async (_toolCallId, rawParams) => {
-      const target = asTarget((rawParams as RawMemoryParams).target);
-      if (!target) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "target is required: use `memory` for your own notes or `user` for who the user is.",
-            },
-          ],
-          details: { errorCode: "MEMORY_INVALID_TARGET" },
-          isError: true,
-        };
+      const raw = (rawParams ?? {}) as Record<string, unknown>;
+      switch (raw.action) {
+        case "remember":
+          return remember(raw);
+        case "update":
+          return update(raw);
+        case "forget":
+          return forget(raw);
+        case "search":
+          return search(raw);
+        default:
+          return text(
+            "action is required: `remember` to store one memory, `update` or `forget` by id, or `search` to find what is already stored.",
+            { errorCode: "MEMORY_INVALID_ACTION" },
+            true,
+          );
       }
-      const parsed = readMemoryOperations(rawParams as RawMemoryParams);
-      if ("error" in parsed) {
-        return {
-          content: [{ type: "text", text: parsed.error }],
-          details: { errorCode: "MEMORY_INVALID_ARGUMENT" },
-          isError: true,
-        };
-      }
-      const readEntries = async (store: MemoryTarget): Promise<string[]> => {
-        const read = await host.call<{ entries?: string[] }>("memory.entries", { target: store });
-        return Array.isArray(read.entries) ? read.entries : [];
-      };
-      // Group the operations by the store each one addresses. A batch that only
-      // names the outer target is the single-group case and behaves exactly as
-      // before, including the all-or-nothing budget check over the final result.
-      const groups = new Map<MemoryTarget, MemoryOperation[]>();
-      for (const operation of parsed.operations) {
-        const store = operation.target ?? target;
-        const bucket = groups.get(store);
-        if (bucket) bucket.push(operation);
-        else groups.set(store, [operation]);
-      }
-      const stores = [...groups.keys()];
-      const currentByStore = new Map<MemoryTarget, string[]>();
-      for (const store of stores) currentByStore.set(store, await readEntries(store));
-
-      // Every store is validated before anything is written, so a batch that
-      // fails on its second store cannot leave the first one half-applied.
-      const staged = new Map<MemoryTarget, MemorySuccess>();
-      for (const store of stores) {
-        const operations = groups.get(store) ?? [];
-        const current = currentByStore.get(store) ?? [];
-        const result =
-          operations.length === 1
-            ? applyMemoryOperation(store, current, operations[0])
-            : applyMemoryBatch(store, current, operations);
-        if (!result.success) {
-          // A refused edit is the model's to fix, not a tool failure: report it as
-          // text so the model can retry in the same turn.
-          return {
-            content: [{ type: "text", text: renderMemoryResult(store, result) }],
-            details: { errorCode: `MEMORY_${result.failureClass.toUpperCase()}` },
-          };
-        }
-        staged.set(store, result);
-      }
-      const entriesByStore = new Map<MemoryTarget, string[]>(
-        stores.map((store) => [store, staged.get(store)?.entries ?? currentByStore.get(store) ?? []]),
-      );
-      // Memory becomes prompt content, so it is re-sent to the provider on every later
-      // turn. Credential-shaped text is masked on the way in, with the same vocabulary
-      // the log redactor uses, in the other direction: what leaves the process rather
-      // than what is written to a local file. A token caught anywhere in the batch is
-      // masked everywhere in it, because the model often states a key once with its
-      // label and then repeats it bare in the next entry. Masking runs over the whole
-      // batch first so one store cannot keep a token the other one stripped.
-      const scrubbed = new Map<MemoryTarget, { entries: string[]; masked: boolean }>();
-      for (const store of stores) {
-        const entries = entriesByStore.get(store) ?? [];
-        const safe = scrubSecretsInBatch(entries);
-        scrubbed.set(store, {
-          entries: safe,
-          masked: safe.some((entry, index) => entry !== entries[index]),
-        });
-      }
-      const masked = [...scrubbed.values()].some((entry) => entry.masked);
-      try {
-        for (const store of stores) {
-          await host.call("memory.writeEntries", {
-            target: store,
-            entries: scrubbed.get(store)?.entries ?? [],
-          });
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Memory was not saved: ${String((error as { message?: string })?.message ?? error)}`,
-            },
-          ],
-          details: { errorCode: "MEMORY_WRITE_FAILED" },
-          isError: true,
-        };
-      }
-      const rendered = stores.map((store) => {
-        const result = staged.get(store);
-        const entries = scrubbed.get(store)?.entries ?? [];
-        return renderMemoryResult(store, result ? { ...result, entries } : {
-          success: true,
-          message: "Entry added.",
-          entries,
-        });
-      });
-      const details: Record<string, unknown> = {
-        entries: (entriesByStore.get(target) ?? []).length,
-        target,
-      };
-      if (stores.length > 1) details.targets = stores;
-      if (masked) details.masked = true;
-      return {
-        content: [
-          {
-            type: "text",
-            text: rendered.join("\n\n") + (masked ? MEMORY_SCRUB_NOTE : ""),
-          },
-        ],
-        details,
-      };
     },
   };
 }

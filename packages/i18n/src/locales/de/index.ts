@@ -187,7 +187,8 @@ export const de = {
     "tagline": "Lokaler AI-Codierungspartner",
     "starting": "Pi-Workspace wird gestartet…",
     "loadingView": "Ansicht wird geladen…",
-    "uiCrashed": "Mit der Schnittstelle ist ein Fehler aufgetreten"
+    "uiCrashed":  "Mit der Schnittstelle ist ein Fehler aufgetreten",
+    "uiCrashRetry": "Erneut versuchen"
   },
   "startup": {
     "slowTitle": "Startet noch…",
@@ -1187,7 +1188,11 @@ sklm: {
     "memoryEmptyFiltered": "No memory matches this search.",
     "memoryLoading": "Loading memories…",
     "memoryStatsLine": "{{live}} live · {{pinned}} pinned · {{total}} total",
-    "memoryMeta": "Recalled {{used}}× · {{date}}",
+    "memoryUsedCount": "{{count}}× verwendet",
+    "memoryLastUsed": "zuletzt genutzt {{when}}",
+    "memoryNeverUsed": "Nie abgerufen",
+    "memoryTags": "Schlagwörter",
+    "memoryBody": "Inhalt",
     "memorySuperseded": "Superseded",
 
     "nav": {
@@ -1344,16 +1349,6 @@ sklm: {
     "learningMapMemory": "Erinnerung",
     "learningMapUser": "Nutzerprofil",
     "learningMapEdge": "Überlappung {{weight}}",
-    "memoryAgentTitle": "Vom Agenten geschriebene Erinnerungen",
-    "memoryAgentCounts": "{{memory}} Erinnerungen · {{user}} Profil",
-    "memoryAgentEmpty": "Noch nichts geschrieben — Einträge erscheinen hier, sobald der Agent mit dem memory-Tool etwas festhält.",
-    "memoryAgentMemory": "Erinnerung",
-    "memoryAgentUser": "Profil",
-    "memoryAgentHint": "Das sind die Einträge, die das Modell im Kontext liest. Die Liste darunter ist der ältere bewertete Speicher.",
-    "memoryAgentRemove": "„{{text}}“ entfernen",
-    "memoryMergeAction": "Alten Speicher zusammenführen",
-    "memoryMergeRunning": "Wird zusammengeführt…",
-    "memoryMergeDone": "{{added}} in die Liste des Modells kopiert; {{skipped}} passten nicht ins Budget.",
     "skillUsageUsed": "{{count}}× verwendet",
     "skillUsageUnusedOf": "{{unused}} von {{total}} nie verwendet",
     "skillCurateTitle": "Fähigkeiten pflegen",

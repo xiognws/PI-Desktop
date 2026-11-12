@@ -32,7 +32,7 @@ fn the_v27_to_v28_migration_adds_the_missing_fast_mode_column() {
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
     // This test runs the v27 -> v28 step alone, so the version stops at 28; the
-    // full `Database::open` chain continues to 29.
+    // full `Database::open` chain continues to the latest version.
     assert_eq!(version, 28);
 }
 

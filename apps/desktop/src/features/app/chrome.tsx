@@ -24,6 +24,18 @@ export class ErrorBoundary extends Component<
             <pre className="whitespace-pre-wrap text-sm-plus text-error">
               {this.state.error.message}
             </pre>
+            {/*
+              A failed dynamic import is usually transient — one bad module fetch
+              while the network re-registers — so the panel offers the recovery
+              instead of sending the user to a full app restart.
+            */}
+            <button
+              type="button"
+              className="mt-3 rounded-md border border-border-default px-3 py-1.5 text-sm-plus"
+              onClick={() => this.setState({ error: null })}
+            >
+              {i18n.t("app.uiCrashRetry")}
+            </button>
           </div>
         </div>
       );

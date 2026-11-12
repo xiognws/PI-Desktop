@@ -128,10 +128,25 @@ test("real input, a new turn and every navigation drop the held position", () =>
     transcript,
     /releaseDisclosureAnchor\(\);\s*cancelFollowScroll\(\);\s*pinnedRef\.current = true;\s*setShowJump\(false\);\s*scrollToBottom\(\);/,
   );
-  assert.match(
-    transcript,
-    /const jumpToLatest = useCallback\(\(arrive\?: \(\) => void\) => \{\s*(?:\/\/[^\n]*\n\s*)*lastScrollGestureAtRef\.current = -Infinity;\s*cancelReadingPosition\(\);\s*cancelHistoryPaging\(\);\s*cancelFollowScroll\(\);\s*releaseDisclosureAnchor\(\);\s*pinnedRef\.current = true;/,
-  );
+  // The signature carries an optional arrival callback and the body has grown
+  // (a follow bookmark, a navigation start), so assert the ordered handover
+  // rather than one contiguous snippet: every competing owner is retired before
+  // the viewport is pinned to latest.
+  const jumpBody = transcript.slice(transcript.indexOf("const jumpToLatest = useCallback("));
+  assert.ok(jumpBody.length > 0, "jumpToLatest must exist");
+  let cursor = -1;
+  for (const step of [
+    "lastScrollGestureAtRef.current = -Infinity;",
+    "cancelReadingPosition();",
+    "cancelHistoryPaging();",
+    "cancelFollowScroll();",
+    "releaseDisclosureAnchor();",
+    "pinnedRef.current = true;",
+  ]) {
+    const at = jumpBody.indexOf(step, cursor + 1);
+    assert.ok(at > cursor, `jumpToLatest must still run ${step} in order`);
+    cursor = at;
+  }
   assert.match(
     transcript,
     /if \(becameHidden\) \{\s*releaseDisclosureAnchor\(\);/,

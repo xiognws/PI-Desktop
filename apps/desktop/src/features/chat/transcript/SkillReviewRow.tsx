@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { useAppStore } from "../../../stores/app-store";
-import { skillReviewReports, skillReviewText } from "./skill-review-text";
+import { skillReviewLines, skillReviewReports, skillReviewText } from "./skill-review-text";
 
 /**
  * One quiet line under a finished turn reporting the self-improvement review.
@@ -29,18 +29,23 @@ export function SkillReviewRow({ sessionId }: { sessionId: string }) {
   if (!visible) return null;
   if (!notice) return null;
   if (!skillReviewReports(notice)) return null;
-  // The actions are the row's whole content: "it patched these skills" is what a
-  // reader acts on, so they are printed for every outcome that wrote, not only
-  // when the wording falls back to an empty pluralised count.
-  const detail = notice.actions.join(" · ");
+  // One line per write, glyph first — the shape Hermes uses for a review's memory
+  // and skill operations. A single "N updates" sentence told the reader that
+  // something happened but not what, which is the part they act on.
+  const lines = skillReviewLines(notice);
   return (
     <div className="skill-review-row" data-outcome={notice.outcome} role="status">
-      <span className="skill-review-text">{skillReviewText(notice, t)}</span>
-      {detail ? (
-        <span className="skill-review-detail" title={detail}>
-          {detail}
-        </span>
-      ) : null}
+      {lines.length > 0 ? (
+        <ul className="skill-review-lines">
+          {lines.map((line) => (
+            <li key={line} className="skill-review-line">
+              {line}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <span className="skill-review-text">{skillReviewText(notice, t)}</span>
+      )}
     </div>
   );
 }

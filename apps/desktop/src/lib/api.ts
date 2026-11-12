@@ -779,6 +779,13 @@ export type MemoryStats = {
   byKind: Record<string, number>;
 };
 
+/** One recall hit (ADR 0393): the host's relevance ranking, not ours. */
+export type MemoryHit = {
+  memory: MemoryRecord;
+  /** BM25 score; lower is more relevant (SQLite convention). */
+  score: number;
+};
+
 export type MemoryListFilter = {
   scope?: MemoryScope;
   kind?: MemoryKind;
@@ -788,6 +795,14 @@ export type MemoryListFilter = {
   includeSuperseded?: boolean;
   limit?: number;
   offset?: number;
+};
+
+export type MemoryRecallInput = {
+  query: string;
+  scope?: MemoryScope;
+  projectPath?: string;
+  sessionId?: string;
+  limit?: number;
 };
 
 export type MemoryUpdateInput = {
@@ -1179,15 +1194,12 @@ export const api = {
     }),
   listMemories: (filter?: MemoryListFilter) =>
     invoke<{ memories: MemoryRecord[]; total: number }>(IPC.invoke.memoryList, filter),
+  /** Relevance-ranked retrieval over the same store (ADR 0393). */
+  recallMemories: (input: MemoryRecallInput) =>
+    invoke<{ memories: MemoryHit[] }>(IPC.invoke.memoryRecall, input),
   /** The agent-written entry list for one store (`memory` / `user`). */
   memoryEntries: (target: "memory" | "user") =>
     invoke<{ target: string; entries: string[] }>(IPC.invoke.memoryEntries, { target }),
-  /** Replace one store's whole entry list; the host validates the budget. */
-  writeMemoryEntries: (target: "memory" | "user", entries: string[]) =>
-    invoke<{ target: string; entries: string[] }>(IPC.invoke.memoryWriteEntries, {
-      target,
-      entries,
-    }),
   memoryStats: () => invoke<{ stats: MemoryStats }>(IPC.invoke.memoryStats),
   updateMemory: (input: MemoryUpdateInput) =>
     invoke<{ memory: MemoryRecord }>(IPC.invoke.memoryUpdate, input),

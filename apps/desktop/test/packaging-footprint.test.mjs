@@ -221,13 +221,12 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "resources/models.dev",
       to: "models.dev",
     },
-    // The bundled Python runtime (office documents, native tooling). Read as a
-    // real interpreter tree, so it cannot live inside the asar.
+    // The embedded Python runtime and the build handbook shipped inside the
+    // installer: both are read from disk next to `resources/`.
     {
       from: "resources/python",
       to: "python",
     },
-    // The end-user handbook shipped next to the app, read as a plain file.
     {
       from: "resources/manual",
       to: "manual",

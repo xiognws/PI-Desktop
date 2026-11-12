@@ -2,6 +2,8 @@ import { link, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
+import { CONTEXT_CALIBRATION_OVERHEAD_CAP } from "./context-calibration.js";
 import { Type } from "typebox";
 import { type Agent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core";
 import {
@@ -194,7 +196,11 @@ function createRuntime(
     commandShell: CommandShellOption;
     jevApiKey: string;
     turnId: string;
-    host: { call: ReturnType<typeof vi.fn>; onNotification?: ReturnType<typeof vi.fn> };
+    host: {
+      call: ReturnType<typeof vi.fn>;
+      onNotification?: ReturnType<typeof vi.fn>;
+      memoryRecall?: (input: { query: string; projectPath?: string; sessionId?: string; limit?: number }) => Promise<unknown>;
+    };
     onEvent: (envelope: unknown) => void;
   }> = {},
 ) {
@@ -237,40 +243,71 @@ function runtimeTool(runtime: DesktopAgentRuntime, name: string): AgentTool {
 }
 
 
-describe("entry-list memory snapshot (ADR 0378)", () => {
-  const compose = (runtime: DesktopAgentRuntime): string =>
-    (runtime as unknown as { composeSystemPrompt(): string }).composeSystemPrompt();
+describe("structured memory wiring (ADR 0393)", () => {
+  const internals = (runtime: DesktopAgentRuntime) =>
+    runtime as unknown as {
+      composeSystemPrompt(): string;
+      recalledMemoryContext(input: string): Promise<string | undefined>;
+    };
 
-  it("keeps the snapshot out of the system prompt", () => {
-    // The block rides with the user message instead: the transcript's system
-    // messages are rebuilt from section keys, and a system-prompt change
-    // rewrites the provider prompt cache.
+  it("keeps the retired entry lists out of the system prompt", () => {
+    // The flat list no longer reaches a prompt: the structured store plus per-turn
+    // recall replaced the session snapshot that used to be rendered here.
     const runtime = createRuntime({
       memoryEntries: {
         memory: ["PowerShell scripts must be UTF-8 with BOM"],
         user: ["prefers Chinese replies"],
       },
     });
-    expect(compose(runtime)).not.toContain("PowerShell scripts must be UTF-8 with BOM");
+    expect(internals(runtime).composeSystemPrompt()).not.toContain(
+      "PowerShell scripts must be UTF-8 with BOM",
+    );
   });
 
-  it("retires a runtime whose snapshot differs from the requested one", () => {
-    // The snapshot is baked into the system prompt at construction, so a runtime
-    // built before a write must not be reused: it would keep serving the old,
-    // empty list while the store already holds entries.
-    const runtime = createRuntime({ memoryEntries: { memory: [], user: [] } });
-    const matches = (
-      runtime as unknown as {
-        matches(config: Record<string, unknown>): boolean;
-      }
-    ).matches({
-      mode: "agent",
-      provider: provider,
-      thinkingLevel: "medium",
-      commandShell: commandShell,
-      memoryEntries: { memory: ["a new note"], user: [] },
+  it("still recalls memories into the turn, scoped to the project", async () => {
+    // Recall is now the only path from the store into a request, so it has to run
+    // on every turn — not only when some other feature happens to need it.
+    const recall = vi.fn(async () => ({
+      memories: [
+        {
+          memory: {
+            id: "m1",
+            kind: "fact",
+            title: "deploy target",
+            body: "the deploy host is sda-build-02",
+          },
+        },
+      ],
+    }));
+    const runtime = createRuntime({
+      projectPath: "/w/pi",
+      host: { call: vi.fn(), onNotification: vi.fn(() => () => {}), memoryRecall: recall },
     });
-    expect(matches).toBe(false);
+    const prefix = await internals(runtime).recalledMemoryContext("where do we deploy");
+    expect(recall).toHaveBeenCalledWith({
+      query: "where do we deploy",
+      projectPath: "/w/pi",
+      sessionId: "session-1",
+      limit: 5,
+    });
+    expect(prefix).toContain("sda-build-02");
+  });
+
+  it("declares the structured actions on the memory tool", () => {
+    const runtime = createRuntime({ projectPath: "/w/pi" });
+    const tool = runtimeTool(runtime, "memory");
+    const action = (
+      tool.parameters as { properties?: { action?: { anyOf?: { const?: unknown }[] } } }
+    ).properties?.action;
+    expect(action?.anyOf?.map((entry) => entry.const)).toEqual([
+      "remember",
+      "update",
+      "forget",
+      "search",
+    ]);
+    // The description is the whole contract a model gets; it must name the gate.
+    expect(tool.description).toContain("MEMORY_PROCEDURE_NEEDS_SKILL");
+    expect(tool.description).toContain("belongs in a skill");
   });
 });
 
@@ -3868,6 +3905,8 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       "Write",
       "Glob",
       "Grep",
+      "memory",
+      "skill_manage",
       "asktool",
       "Skill",
       "EnterPlanMode",
@@ -9622,11 +9661,14 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
     await runtime.dispose();
   });
 
-  it("omits the Skill tool and section when no plugin taught a skill", async () => {
+  it("omits the Skill tool and library section when no plugin taught a skill", async () => {
     const runtime = createRuntime();
     const agent = (runtime as any).agent;
 
-    expect(agent.state.systemPrompt).not.toContain("# Skills");
+    // `# Writing to the skill library` (ADR 0391) is always present — the rules
+    // apply from the first turn. What depends on the library is the catalogue
+    // itself, and the tool that reads it.
+    expect(agent.state.systemPrompt).not.toContain("# Skills\n");
     expect(agent.state.tools.some((tool: any) => tool.name === "Skill")).toBe(false);
 
     await runtime.dispose();
@@ -12785,10 +12827,12 @@ describe("context estimate calibration", () => {
     expect(overhead()).toBe(0);
 
     // The third usable observation crosses the threshold: the two above plus
-    // this one, each measuring `3 * raw - raw`.
+    // this one, each measuring `3 * raw - raw`. The result is capped, and `raw`
+    // grew with the system prompt (ADR 0391 added the writing rules), so the
+    // assertion states the cap instead of assuming the sample stays under it.
     (runtime as any).inFlightContextEstimate = { ...parked };
     (runtime as any).recordContextCalibration(report(raw * 3), false);
-    expect(overhead()).toBe(raw * 2);
+    expect(overhead()).toBe(Math.min(raw * 2, CONTEXT_CALIBRATION_OVERHEAD_CAP));
 
     await runtime.dispose();
   });
@@ -14548,9 +14592,10 @@ describe("skill review triggering (Hermes background_review port)", () => {
     };
     expect(internal.toolCatalog.has("skill_manage")).toBe(true);
     expect(internal.toolCatalog.has("memory")).toBe(true);
-    // The deferred set is what the model must activate; it is not a statement
-    // about what a background fork may use.
-    expect(internal.declaredTools().map((tool) => tool.name)).not.toContain("skill_manage");
+    // ADR 0391: the writers are declared on the first turn. Deferring them cost a
+    // ToolSearch round per write, and measured, the model spent that round on
+    // memory and wrote no skill at all.
+    expect(internal.declaredTools().map((tool) => tool.name)).toContain("skill_manage");
     return runtime.dispose();
   });
 

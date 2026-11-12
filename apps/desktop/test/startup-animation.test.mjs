@@ -365,7 +365,7 @@ test("the descriptor reaches the renderer before its first paint", () => {
   assert.match(windowBoot, /additionalArguments: \[[\s\S]*encodeStartupAnimationArgument/);
   assert.match(preload, /startupAnimation: decodeStartupAnimationArgument\(process\.argv\)/);
   // Narrow subpath, not the package barrel: the preload is one bundled file.
-  assert.match(preload, /from "@pi-desktop\/shared\/startup-animation"/);
+  assert.match(preload, /from "@pi-workspace\/shared\/startup-animation"/);
 });
 
 test("only the first window of the process plays the animation", () => {

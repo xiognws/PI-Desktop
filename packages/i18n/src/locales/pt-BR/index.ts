@@ -187,7 +187,8 @@ export const ptBR = {
     tagline: "Parceiro local de programação com IA",
     starting: "Iniciando o Pi-Workspace…",
     loadingView: "Carregando visualização…",
-    uiCrashed: "Algo deu errado com a interface"
+    uiCrashed:  "Algo deu errado com a interface",
+    uiCrashRetry: "Tentar novamente"
   },
   startup: {
     slowTitle: "Ainda iniciando…",
@@ -1171,7 +1172,11 @@ export const ptBR = {
     memoryEmptyFiltered: "No memory matches this search.",
     memoryLoading: "Loading memories…",
     memoryStatsLine: "{{live}} live · {{pinned}} pinned · {{total}} total",
-    memoryMeta: "Recalled {{used}}× · {{date}}",
+    memoryUsedCount: "Usada {{count}}×",
+    memoryLastUsed: "último uso {{when}}",
+    memoryNeverUsed: "Nunca recuperada",
+    memoryTags: "Etiquetas",
+    memoryBody: "Conteúdo",
     memorySuperseded: "Superseded",
 
     nav: {
@@ -1324,16 +1329,6 @@ export const ptBR = {
     learningMapMemory: "Memória",
     learningMapUser: "Perfil do usuário",
     learningMapEdge: "sobreposição {{weight}}",
-    memoryAgentTitle: "Memórias escritas pelo agente",
-    memoryAgentCounts: "{{memory}} memórias · {{user}} perfil",
-    memoryAgentEmpty: "Nada escrito ainda: aparece aqui quando o agente registrar algo com a ferramenta memory.",
-    memoryAgentMemory: "Memória",
-    memoryAgentUser: "Perfil",
-    memoryAgentHint: "Estas são as entradas que o modelo lê no contexto. A lista abaixo é o armazenamento pontuado antigo.",
-    memoryAgentRemove: "Remover “{{text}}”",
-    memoryMergeAction: "Mesclar o armazenamento antigo",
-    memoryMergeRunning: "Mesclando…",
-    memoryMergeDone: "{{added}} copiadas para a lista que o modelo lê; {{skipped}} não couberam no orçamento.",
     skillUsageUsed: "Usada {{count}}×",
     skillUsageUnusedOf: "{{unused}} de {{total}} nunca usadas",
     skillCurateTitle: "Manutenção de habilidades",

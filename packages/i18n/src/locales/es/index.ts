@@ -187,7 +187,8 @@ export const es = {
     "tagline": "Socio de codificación de IA local",
     "starting": "Iniciando Pi-Workspace…",
     "loadingView": "Cargando vista…",
-    "uiCrashed": "Algo salió mal con la interfaz"
+    "uiCrashed":  "Algo salió mal con la interfaz",
+    "uiCrashRetry": "Reintentar"
   },
   "startup": {
     "slowTitle": "Aún iniciando…",
@@ -1187,7 +1188,11 @@ sklm: {
     "memoryEmptyFiltered": "No memory matches this search.",
     "memoryLoading": "Loading memories…",
     "memoryStatsLine": "{{live}} live · {{pinned}} pinned · {{total}} total",
-    "memoryMeta": "Recalled {{used}}× · {{date}}",
+    "memoryUsedCount": "Usado {{count}}×",
+    "memoryLastUsed": "usado por última vez {{when}}",
+    "memoryNeverUsed": "Nunca recuperado",
+    "memoryTags": "Etiquetas",
+    "memoryBody": "Contenido",
     "memorySuperseded": "Superseded",
 
     "nav": {
@@ -1344,16 +1349,6 @@ sklm: {
     "learningMapMemory": "Recuerdo",
     "learningMapUser": "Perfil del usuario",
     "learningMapEdge": "solapamiento {{weight}}",
-    "memoryAgentTitle": "Recuerdos escritos por el agente",
-    "memoryAgentCounts": "{{memory}} recuerdos · {{user}} perfil",
-    "memoryAgentEmpty": "Aún no hay nada escrito: aparecerá aquí cuando el agente registre algo con la herramienta memory.",
-    "memoryAgentMemory": "Recuerdo",
-    "memoryAgentUser": "Perfil",
-    "memoryAgentHint": "Estas son las entradas que el modelo lee en contexto. La lista de abajo es el almacén puntuado anterior.",
-    "memoryAgentRemove": "Quitar «{{text}}»",
-    "memoryMergeAction": "Fusionar el almacén antiguo",
-    "memoryMergeRunning": "Fusionando…",
-    "memoryMergeDone": "Se copiaron {{added}} a la lista que lee el modelo; {{skipped}} no cabían en el presupuesto.",
     "skillUsageUsed": "Usada {{count}}×",
     "skillUsageUnusedOf": "{{unused}} de {{total}} nunca usadas",
     "skillCurateTitle": "Mantenimiento de habilidades",

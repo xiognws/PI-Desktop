@@ -133,14 +133,16 @@ describe("entry-list recall (ADR 0378)", () => {
     expect(await memoryContextPrefix(host, "deploy", {})).toContain("sda-build-02");
   });
 
-  it("still renders scored hits, after the entries", async () => {
+  it("renders the structured hits before the retired entry list", async () => {
     const { host } = hostWithRecall(async () => ({
       memories: [hit()],
       entries: [{ target: "memory", text: "fresh note" }],
     }));
     const prefix = (await memoryContextPrefix(host, "deploy", {})) ?? "";
-    expect(prefix.indexOf("fresh note")).toBeGreaterThan(-1);
-    expect(prefix.indexOf("deploy target")).toBeGreaterThan(prefix.indexOf("fresh note"));
+    // The store is the live half: a note migration copied out of the list must read
+    // as the memory that owns it, not as the legacy record it came from (ADR 0393).
+    expect(prefix.indexOf("deploy target")).toBeGreaterThan(-1);
+    expect(prefix.indexOf("fresh note")).toBeGreaterThan(prefix.indexOf("deploy target"));
   });
 
   it("skips an entry with no text and returns nothing when both halves are empty", async () => {

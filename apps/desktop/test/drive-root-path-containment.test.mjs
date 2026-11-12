@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
+import { register } from "node:module";
 import { join, posix, resolve as resolvePath, win32 } from "node:path";
 import test from "node:test";
-import { isWithinRoot } from "../../../packages/agent-runtime/src/project-instructions.ts";
-import { resolveWithinRoot } from "../../../packages/host-runtime/src/workspace-files.ts";
+
+// The boot-path modules use bundler-style `.js` specifiers that only exist as
+// `.ts` in the source tree, so the TypeScript sibling has to be resolvable.
+register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
+
+const { isWithinRoot } = await import(
+  "../../../packages/agent-runtime/src/project-instructions.ts"
+);
+const { resolveWithinRoot } = await import(
+  "../../../packages/host-runtime/src/workspace-files.ts"
+);
 
 // Windows drive and UNC roots already end in a separator. Containment must
 // use path.win32 here so the regression runs on Linux, where the process

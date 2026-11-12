@@ -64,6 +64,23 @@ function listParams(input: unknown): Raw {
   return params;
 }
 
+/** Recall takes a required query plus the optional narrowing the host accepts. */
+function recallParams(input: unknown): Raw {
+  if (!isRecord(input)) return {};
+  const params: Raw = {};
+  const query = pickString(input, "query");
+  if (query) params.query = query;
+  const scope = pickString(input, "scope");
+  if (scope) params.scope = scope;
+  const projectPath = pickString(input, "projectPath");
+  if (projectPath) params.projectPath = projectPath;
+  const sessionId = pickString(input, "sessionId");
+  if (sessionId) params.sessionId = sessionId;
+  const limit = pickNumber(input, "limit");
+  if (limit !== undefined) params.limit = limit;
+  return params;
+}
+
 function updateParams(input: unknown): Raw {
   if (!isRecord(input)) return {};
   const params: Raw = {};
@@ -133,6 +150,14 @@ export function registerMemoryIpc({
     forward("memory.list", listParams(input)),
   );
   /**
+   * Relevance-ranked retrieval over the same store (ADR 0393). The page's
+   * search box is a recall, not a client-side filter: the host owns the index
+   * and the ranking, so the UI never re-sorts hits by a field it invented.
+   */
+  registrar.handle(IPC.invoke.memoryRecall, async (input?: unknown) =>
+    forward("memory.recall", recallParams(input)),
+  );
+  /**
    * The flat entry list the `memory` tool writes — a different store from
    * `memory.list` (the scored table), and the one the learning map draws.
    */
@@ -142,21 +167,6 @@ export function registerMemoryIpc({
       throw new Error("invalid memory target");
     }
     return forward("memory.entries", { target });
-  });
-  /**
-   * Replace one store's whole entry list — the same contract the `memory` tool
-   * uses, so a person editing the list here cannot produce a state the model
-   * could not have produced itself. The host validates the budget.
-   */
-  registrar.handle(IPC.invoke.memoryWriteEntries, async (input?: unknown) => {
-    const payload = (input ?? {}) as { target?: unknown; entries?: unknown };
-    if (payload.target !== "memory" && payload.target !== "user") {
-      throw new Error("invalid memory target");
-    }
-    if (!Array.isArray(payload.entries) || payload.entries.some((e) => typeof e !== "string")) {
-      throw new Error("entries must be an array of strings");
-    }
-    return forward("memory.writeEntries", { target: payload.target, entries: payload.entries });
   });
 
   registrar.handle(IPC.invoke.memoryStats, async () => forward("memory.stats", {}));

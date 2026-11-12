@@ -66,12 +66,15 @@ const applied = {
   actions: ["created: alpha"],
 };
 
-test("the row reports the review under the turn it belongs to", async () => {
+test("the row reports each write on its own line, the way Hermes does", async () => {
   await withRow(({ render }) => {
     const html = render(applied, { skillReviewVisible: true });
     assert.match(html, /skill-review-row/);
-    assert.match(html, /Self-improvement review: created: alpha/);
     assert.match(html, /role="status"/);
+    // One line per operation with a glyph, not a summary sentence: the reader
+    // wants to know which skill changed, not that "1 update" happened.
+    assert.match(html, /<li class="skill-review-line">✍ created: alpha<\/li>/);
+    assert.doesNotMatch(html, /Self-improvement review:/);
   });
 });
 

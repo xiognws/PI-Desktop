@@ -3940,6 +3940,30 @@
   opacity: 0.75;
 }
 
+/* One line per write from the review, glyph first — Hermes prints a review's
+   memory and skill operations as their own lines rather than one summary
+   sentence, so the reader sees which skill changed. */
+.skill-review-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skill-review-line {
+  max-width: 76ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-review-row[data-outcome="applied"] .skill-review-line {
+  color: var(--accent);
+  opacity: 0.85;
+}
+
 /*
   A SessionTask spawn in the transcript (ADR 0386).
 

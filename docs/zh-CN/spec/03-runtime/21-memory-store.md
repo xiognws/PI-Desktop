@@ -215,7 +215,12 @@ FTS 表，用的就是全新 schema 的同一份 DDL，因此全新库与升级�
 
 阶段 1 只交付了存储、去重、取代与召回。
 
-### 9.3 Agent 实际写入的条目列表（已实现，ADR 0380）
+### 9.3 Agent 曾经写入的条目列表（已被 ADR 0393 退役）
+
+> **已退役。** 下面的扁平列表是历史，不是当前行为：`memories` 已是唯一存储，
+> 工具对它做保留 / 更新 / 遗忘 / 检索（见 §10）。本节保留，是因为它记录的缺陷
+> ——同一条经验被两个互不相见的写入者同时写进技能和记忆——正是流程门禁至今
+> 仍会拒绝"步骤式正文"的原因。
 
 写记忆的工具是 `memory`，不是 `Remember`
 （`packages/agent-runtime/src/memory-agent-tool.ts`），它编辑的也不是上面那个
@@ -248,3 +253,26 @@ FTS 表，用的就是全新 schema 的同一份 DDL，因此全新库与升级�
 sidecar 的 parent-host proxy 把它转成 `memory.recall` 经 `host.proxy` 发出，而该方法
 在 `HOST_PROXY_ALLOWED` 白名单里——所以正常 Agent 模式会话两半都通：冻结的快照
 （始终在系统提示里）+ 对条目列表的查询（每回合、最多 5 条、3000 字符、尽力而为）。
+
+## 10. 扁平列表已退役（ADR 0393）
+
+记忆曾同时存在两份：本表，以及一张扁平的两目标列表（`memory` / `user`，整库字符预算
+2200 / 1375），后者每次会话开始时被整份写入系统提示。那张列表抄的是 Hermes 的
+`MEMORY.md`/`USER.md` 布局，而本产品并不使用它；它的预算也不是存储限制（SQLite 并不在意），
+而是"整库进每次请求"的代价。
+
+该列表已退役：
+
+- **单一存储。** `memories` 是唯一的记忆存储。启动时把残留条目一次性导入
+  （`migrate_entries_into_memories`）：`user` 目标的条目成为 `kind = preference`，其余为
+  `kind = fact`；首行作为 title、条目全文作为 body；`content_hash` 让重复导入成为空操作。
+  条目表在下一个版本前保持可读，且不再有任何写入者。
+- **保留语义，而非追加。** `memory.remember` 按 `content_hash` 去重，内容矛盾时用
+  `superseded_by` 取代旧记忆而不删除。智能体工具在该面上提供
+  `remember` / `update` / `forget` / `search`；整库编辑动作（`add`、`patch`、`replace`、
+  `remove`、`batch`）与字符预算均已移除。
+- **检索，而非注入。** 不再把整库写入系统提示。每回合用 `memory.recall` 取与用户消息相关的
+  记忆，把命中放进**用户消息**并限制字符数，因此请求前缀保持稳定（ADR 0337），记忆成本
+  也不随库存增长。
+- **中文可检索。** 全文索引改用 `trigram` 分词：此前的 `unicode61` 把整句中文视作一个
+  token，导致召回只在英文下有效。短于三个字符的查询退化为对 title 与 body 的扫描。

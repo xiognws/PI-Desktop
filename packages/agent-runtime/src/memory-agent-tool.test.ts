@@ -1,348 +1,444 @@
 import { describe, expect, it } from "vitest";
-import {
-  createMemoryTool,
-  readMemoryOperations,
-  renderMemoryResult,
-} from "./memory-agent-tool.js";
-import { ENTRY_DELIMITER } from "./memory-store.js";
 
-describe("readMemoryOperations", () => {
-  it("normalizes each single action", () => {
-    expect(readMemoryOperations({ action: "add", content: "a note" })).toEqual({
-      operations: [{ action: "add", content: "a note" }],
-    });
-    expect(readMemoryOperations({ action: "remove", old_text: "a note" })).toEqual({
-      operations: [{ action: "remove", old_text: "a note" }],
-    });
-    expect(
-      readMemoryOperations({ action: "patch", old_text: "tea", content: "coffee" }),
-    ).toEqual({ operations: [{ action: "patch", old_text: "tea", content: "coffee" }] });
-    expect(
-      readMemoryOperations({ action: "replace", old_text: "tea", content: "coffee" }),
-    ).toEqual({ operations: [{ action: "replace", old_text: "tea", content: "coffee" }] });
-  });
+import { createMemoryTool, type MemoryToolOptions } from "./memory-agent-tool.js";
+import type { SkillSummary } from "./memory-skill-overlap.js";
 
-  it("requires the fields each action needs", () => {
-    expect(readMemoryOperations({ action: "add" })).toHaveProperty("error");
-    expect(readMemoryOperations({ action: "patch", content: "x" })).toHaveProperty("error");
-    expect(readMemoryOperations({ action: "remove" })).toHaveProperty("error");
-    expect(readMemoryOperations({})).toHaveProperty("error");
-    expect(readMemoryOperations({ action: "nonsense" })).toHaveProperty("error");
-  });
+type Call = { method: string; params: Record<string, unknown> };
 
-  it("refuses a batch that is not an operations list", () => {
-    expect(readMemoryOperations({ action: "batch" })).toHaveProperty("error");
-    expect(readMemoryOperations({ operations: [] })).toHaveProperty("error");
-  });
-
-  it("refuses both an action and an operations list", () => {
-    const result = readMemoryOperations({
-      action: "add",
-      operations: [{ action: "add", content: "x" }],
-    });
-    expect(result).toHaveProperty("error");
-  });
-
-  it("normalizes a batch and validates each operation", () => {
-    expect(
-      readMemoryOperations({
-        operations: [
-          { action: "remove", old_text: "stale" },
-          { action: "add", content: "fresh" },
-        ],
-      }),
-    ).toEqual({
-      operations: [
-        { action: "remove", old_text: "stale" },
-        { action: "add", content: "fresh" },
-      ],
-    });
-    const bad = readMemoryOperations({
-      operations: [{ action: "remove", old_text: "stale" }, { action: "add" }],
-    });
-    expect(bad).toHaveProperty("error");
-    expect((bad as { error: string }).error).toContain("operation 2");
-  });
-});
-
-describe("renderMemoryResult", () => {
-  it("echoes the new list, because the prompt snapshot is frozen", () => {
-    const text = renderMemoryResult("memory", {
-      success: true,
-      message: "Entry added.",
-      entries: ["one", "two"],
-    });
-    expect(text).toContain("Entry added.");
-    expect(text).toContain("2 entries");
-    expect(text).toContain(`one${ENTRY_DELIMITER}two`);
-  });
-
-  it("shows the budget in use", () => {
-    const text = renderMemoryResult("user", {
-      success: true,
-      message: "Entry added.",
-      entries: ["x".repeat(10)],
-    });
-    expect(text).toContain("/1375");
-  });
-
-  it("lists the closest entries when nothing matched", () => {
-    const text = renderMemoryResult("memory", {
-      success: false,
-      error: "No entry matched 'tea'.",
-      failureClass: "no_match",
-      closestEntries: ["the user prefers coffee"],
-    });
-    expect(text).toContain("closest_entries:");
-    expect(text).toContain("- the user prefers coffee");
-  });
-
-  it("lists current entries when the budget is exceeded", () => {
-    const text = renderMemoryResult("memory", {
-      success: false,
-      error: "Would put memory at 3000/2200 chars",
-      failureClass: "over_budget",
-      currentEntries: ["a big entry"],
-    });
-    expect(text).toContain("current_entries:");
-    expect(text).toContain("- a big entry");
-  });
-});
-
-/** Minimal host that keeps one target's entries in memory. */
-function fakeHost(initial: string[] = []) {
-  const state = { entries: [...initial] };
+/** A host that records the RPC it was asked for, so routing is visible in a test. */
+function fakeHost(replies: Record<string, unknown> = {}) {
+  const calls: Call[] = [];
   return {
-    state,
-    call: async <T>(method: string, params: unknown): Promise<T> => {
-      const input = params as { target?: string; entries?: string[] };
-      if (method === "memory.entries") {
-        return { entries: [...state.entries] } as T;
+    calls,
+    call: async <T>(method: string, params?: unknown): Promise<T> => {
+      calls.push({ method, params: (params ?? {}) as Record<string, unknown> });
+      if (method in replies) {
+        const reply = replies[method];
+        if (reply instanceof Error) throw reply;
+        return reply as T;
       }
-      if (method === "memory.writeEntries") {
-        state.entries = [...(input.entries ?? [])];
-        return { entries: [...state.entries] } as T;
+      if (method === "memory.remember") {
+        return {
+          memory: { id: "m-new", scope: "global", kind: "fact", title: "t", body: "b" },
+          deduped: false,
+        } as T;
       }
+      if (method === "memory.update") return { memory: { id: "m-1" } } as T;
+      if (method === "memory.forget") return { removed: 1 } as T;
+      if (method === "memory.recall") return { memories: [] } as T;
       throw new Error(`unexpected method ${method}`);
     },
   };
 }
 
-async function run(host: ReturnType<typeof fakeHost>, params: Record<string, unknown>) {
-  const tool = createMemoryTool(host as never);
-  const result = (await tool.execute(
-    "call-1",
-    params as never,
-    undefined as never,
-  )) as { content: { text: string }[]; isError?: boolean; details?: Record<string, unknown> };
-  return { text: result.content.map((part) => part.text).join("\n"), isError: result.isError };
+type ToolResult = {
+  text: string;
+  isError: boolean | undefined;
+  details: Record<string, unknown>;
+};
+
+async function run(
+  params: Record<string, unknown>,
+  options: { replies?: Record<string, unknown>; toolOptions?: MemoryToolOptions } = {},
+): Promise<{ result: ToolResult; host: ReturnType<typeof fakeHost> }> {
+  const host = fakeHost(options.replies);
+  const tool = createMemoryTool(host, options.toolOptions ?? {});
+  const raw = (await tool.execute("call-1", params as never, undefined as never)) as {
+    content: { text: string }[];
+    isError?: boolean;
+    details?: Record<string, unknown>;
+  };
+  return {
+    host,
+    result: {
+      text: raw.content.map((part) => part.text).join("\n"),
+      isError: raw.isError,
+      details: raw.details ?? {},
+    },
+  };
 }
 
-describe("createMemoryTool", () => {
-  it("adds an entry and persists it", async () => {
-    const host = fakeHost(["existing"]);
-    const { text, isError } = await run(host, {
-      target: "memory",
-      action: "add",
-      content: "a new note",
+const skill: SkillSummary = {
+  id: "add-desktop-ipc-channel",
+  name: "Add a Desktop IPC Channel",
+  description:
+    "Use when adding a new frontend IPC channel in PI-Desktop: protocol.ts channel, electron/main/ipc handler, api.ts wrapper, test.",
+};
+
+describe("remember", () => {
+  it("stores one structured memory through memory.remember", async () => {
+    const { result, host } = await run({ action: "remember", title: "Build tool", body: "the repo builds with pnpm" });
+    expect(result.isError).toBeFalsy();
+    expect(host.calls).toHaveLength(1);
+    expect(host.calls[0].method).toBe("memory.remember");
+    // `kind` and `scope` are required host-side, so the tool always sends them.
+    expect(host.calls[0].params).toEqual({
+      scope: "global",
+      kind: "fact",
+      title: "Build tool",
+      body: "the repo builds with pnpm",
     });
-    expect(isError).toBeFalsy();
-    expect(text).toContain("Entry added.");
-    expect(host.state.entries).toEqual(["existing", "a new note"]);
+    expect(result.text).toContain("m-new");
+    expect(result.text).toContain("scope global");
+    expect(result.details.action).toBe("remember");
+    expect(result.details.id).toBe("m-new");
   });
 
-  it("patches one span and keeps the rest of the entry", async () => {
-    const host = fakeHost(["likes tea and biscuits"]);
-    await run(host, { target: "user", action: "patch", old_text: "tea", content: "coffee" });
-    expect(host.state.entries).toEqual(["likes coffee and biscuits"]);
-  });
-
-  it("applies a batch atomically", async () => {
-    const host = fakeHost(["stale note", "keep"]);
-    await run(host, {
-      target: "memory",
-      operations: [
-        { action: "remove", old_text: "stale note" },
-        { action: "add", content: "fresh note" },
-      ],
-    });
-    expect(host.state.entries).toEqual(["keep", "fresh note"]);
-  });
-
-  it("reports a refused edit as text so the model can retry, not as a tool error", async () => {
-    const host = fakeHost(["the user prefers coffee"]);
-    const { text, isError } = await run(host, {
-      target: "memory",
-      action: "replace",
-      old_text: "the user prefers tea",
-      content: "x",
-    });
-    expect(isError).toBeFalsy();
-    expect(text).toContain("No entry matched");
-    expect(text).toContain("closest_entries:");
-    // Nothing was written.
-    expect(host.state.entries).toEqual(["the user prefers coffee"]);
-  });
-
-  it("rejects a missing target before touching the store", async () => {
-    const host = fakeHost(["a"]);
-    const { isError, text } = await run(host, { action: "add", content: "x" });
-    expect(isError).toBe(true);
-    expect(text).toContain("target is required");
-    expect(host.state.entries).toEqual(["a"]);
-  });
-
-  it("surfaces a write failure as a tool error", async () => {
-    const host = fakeHost([]);
-    const failing = {
-      state: host.state,
-      call: async (method: string) => {
-        if (method === "memory.entries") return { entries: [] };
-        throw new Error("host offline");
+  it("carries kind, tags, pinned and the project it belongs to", async () => {
+    const { host } = await run(
+      {
+        action: "remember",
+        title: "Deploy target",
+        body: "the deploy host is sda-build-02",
+        kind: "decision",
+        tags: ["deploy", "  host  "],
+        scope: "project",
+        pinned: true,
       },
-    };
-    const { isError, text } = await run(failing as never, {
-      target: "memory",
-      action: "add",
-      content: "x",
+      { toolOptions: { projectPath: "/w/pi", sessionId: "s1" } },
+    );
+    expect(host.calls[0].params).toEqual({
+      scope: "project",
+      kind: "decision",
+      title: "Deploy target",
+      body: "the deploy host is sda-build-02",
+      tags: ["deploy", "host"],
+      pinned: true,
+      projectPath: "/w/pi",
     });
-    expect(isError).toBe(true);
-    expect(text).toContain("was not saved");
   });
-});
 
-describe("the memory tool scrubs what it stores", () => {
-  function harness() {
-    const writes: Array<{ target: string; entries: string[] }> = [];
-    const host = {
-      call: async (method: string, params: never) => {
-        if (method === "memory.entries") return { entries: [] };
-        if (method === "memory.writeEntries") {
-          writes.push(params as { target: string; entries: string[] });
-          return {};
-        }
-        return {};
+  it("scopes to the conversation when asked", async () => {
+    const { host } = await run(
+      { action: "remember", title: "t", body: "this run is on the release branch", scope: "session" },
+      { toolOptions: { projectPath: "/w/pi", sessionId: "s1" } },
+    );
+    expect(host.calls[0].params).toMatchObject({ scope: "session", sessionId: "s1" });
+    expect(host.calls[0].params).not.toHaveProperty("projectPath");
+  });
+
+  it("refuses a project scope in a session with no project, before any RPC", async () => {
+    const { result, host } = await run({
+      action: "remember",
+      title: "t",
+      body: "b",
+      scope: "project",
+    });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("needs an open project");
+    expect(host.calls).toHaveLength(0);
+  });
+
+  it("requires a title and a body", async () => {
+    const noTitle = await run({ action: "remember", body: "b" });
+    expect(noTitle.result.isError).toBe(true);
+    expect(noTitle.result.text).toContain("title is required");
+    const noBody = await run({ action: "remember", title: "t" });
+    expect(noBody.result.isError).toBe(true);
+    expect(noBody.result.text).toContain("body is required");
+    expect(noTitle.host.calls).toHaveLength(0);
+    expect(noBody.host.calls).toHaveLength(0);
+  });
+
+  it("rejects an unknown kind or scope instead of forwarding it", async () => {
+    const badKind = await run({ action: "remember", title: "t", body: "b", kind: "gossip" });
+    expect(badKind.result.details.errorCode).toBe("MEMORY_INVALID_ARGUMENT");
+    expect(badKind.host.calls).toHaveLength(0);
+    const badScope = await run({ action: "remember", title: "t", body: "b", scope: "universe" });
+    expect(badScope.result.details.errorCode).toBe("MEMORY_INVALID_ARGUMENT");
+    expect(badScope.host.calls).toHaveLength(0);
+  });
+
+  it("says when the write refreshed an existing memory", async () => {
+    const { result } = await run(
+      { action: "remember", title: "t", body: "b" },
+      {
+        replies: {
+          "memory.remember": {
+            memory: { id: "m-1", title: "t", kind: "fact" },
+            deduped: true,
+          },
+        },
       },
-    };
-    return { writes, tool: createMemoryTool(host as never) };
-  }
+    );
+    expect(result.text).toContain("Already stored");
+    expect(result.details.deduped).toBe(true);
+  });
+
+  it("surfaces a host failure as a tool error", async () => {
+    const { result } = await run(
+      { action: "remember", title: "t", body: "b" },
+      { replies: { "memory.remember": new Error("host offline") } },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.details.errorCode).toBe("MEMORY_WRITE_FAILED");
+    expect(result.text).toContain("host offline");
+  });
 
   it("masks a credential before it reaches the host, and says so", async () => {
-    const { writes, tool } = harness();
-    const result = (await (tool.execute as never as (
-      id: string,
-      params: unknown,
-    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>)(
-      "call-1",
-      { target: "memory", action: "add", content: "the provider key is sk-ABCDEFGHIJKLMNOPQRST" },
-    ));
-
-    expect(writes).toHaveLength(1);
-    expect(writes[0].entries[0]).not.toContain("sk-ABCDEFGHIJKLMNOPQRST");
-    expect(writes[0].entries[0]).toContain("***REDACTED***");
-    expect(result.content[0].text).toContain("***REDACTED***");
+    const { result, host } = await run({
+      action: "remember",
+      title: "provider key",
+      body: "the provider key is sk-abcdefghijklmnop",
+    });
+    const sent = `${String(host.calls[0].params.title)} ${String(host.calls[0].params.body)}`;
+    expect(sent).not.toContain("sk-abcdefghijklmnop");
+    expect(sent).toContain("***REDACTED***");
     expect(result.details.masked).toBe(true);
+    expect(result.text).toContain("***REDACTED***");
   });
 
   it("says nothing extra when there was nothing to mask", async () => {
-    const { writes, tool } = harness();
-    const result = (await (tool.execute as never as (
-      id: string,
-      params: unknown,
-    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>)(
-      "call-2",
-      { target: "memory", action: "add", content: "the relay board is external-only" },
-    ));
-
-    expect(writes[0].entries[0]).toContain("external-only");
-    expect(result.content[0].text).not.toContain("***REDACTED***");
+    const { result } = await run({
+      action: "remember",
+      title: "Relay board",
+      body: "the relay board is external-only",
+    });
     expect(result.details.masked).toBeUndefined();
+    expect(result.text).not.toContain("***REDACTED***");
   });
 });
 
-/** Host that keeps both stores separate, so a misrouted write is visible. */
-function twoStoreHost(initial: { memory?: string[]; user?: string[] } = {}) {
-  const state = { memory: [...(initial.memory ?? [])], user: [...(initial.user ?? [])] };
-  const writes: Array<{ target: string; entries: string[] }> = [];
-  return {
-    state,
-    writes,
-    call: async <T>(method: string, params: unknown): Promise<T> => {
-      const input = params as { target?: "memory" | "user"; entries?: string[] };
-      if (method === "memory.entries") {
-        return { entries: [...(state[input.target ?? "memory"] ?? [])] } as T;
-      }
-      if (method === "memory.writeEntries") {
-        const store = input.target ?? "memory";
-        state[store] = [...(input.entries ?? [])];
-        writes.push({ target: store, entries: [...state[store]] });
-        return { entries: [...state[store]] } as T;
-      }
-      throw new Error(`unexpected method ${method}`);
+describe("the procedure gate", () => {
+  it("refuses a procedure and names the skill to patch instead", async () => {
+    // Measured: the same four-step procedure landed in the library *and* in
+    // memory, written by two paths that never see each other's writes.
+    const { result, host } = await run(
+      {
+        action: "remember",
+        title: "Adding an IPC channel",
+        body: "加新 IPC 通道四步：1. packages/shared/src/protocol.ts 注册通道 → 2. electron/main/ipc 加 handler → 3. src/lib/api.ts 封装 → 4. 补 node --test 用例",
+      },
+      { toolOptions: { skills: () => [skill] } },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.details.errorCode).toBe("MEMORY_PROCEDURE_NEEDS_SKILL");
+    expect(result.details.skillId).toBe("add-desktop-ipc-channel");
+    expect(result.text).toContain("add-desktop-ipc-channel");
+    // Nothing was written.
+    expect(host.calls).toHaveLength(0);
+  });
+
+  it("still stores a fact that merely mentions the same area", async () => {
+    const { result, host } = await run(
+      {
+        action: "remember",
+        title: "Electron binaries",
+        body: "这台机器上 electron 二进制在 D:\\Code 下的 dist 目录",
+      },
+      { toolOptions: { skills: () => [skill] } },
+    );
+    expect(result.isError).toBeFalsy();
+    expect(host.calls).toHaveLength(1);
+    expect(host.calls[0].method).toBe("memory.remember");
+  });
+
+  it("does not gate update or search", async () => {
+    // Retrieval and patching an existing memory must never be blocked by the
+    // shape of a sentence the agent did not write this time.
+    const updated = await run(
+      { action: "update", id: "m-1", body: "1. first step → 2. second step" },
+      { toolOptions: { skills: () => [skill] } },
+    );
+    expect(updated.result.isError).toBeFalsy();
+    expect(updated.host.calls[0].method).toBe("memory.update");
+    const searched = await run(
+      { action: "search", query: "first step second step" },
+      { toolOptions: { skills: () => [skill] } },
+    );
+    expect(searched.result.isError).toBeFalsy();
+    expect(searched.host.calls[0].method).toBe("memory.recall");
+  });
+});
+
+describe("update", () => {
+  it("sends only the fields it was given", async () => {
+    const { result, host } = await run({ action: "update", id: "m-1", body: "the deploy host moved" });
+    expect(result.isError).toBeFalsy();
+    expect(host.calls[0]).toEqual({
+      method: "memory.update",
+      params: { id: "m-1", body: "the deploy host moved" },
+    });
+    expect(result.details.fields).toEqual(["body"]);
+    expect(result.text).toContain("m-1");
+  });
+
+  it("passes tags, pinned and confidence through", async () => {
+    const { host } = await run({
+      action: "update",
+      id: "m-1",
+      tags: ["deploy"],
+      pinned: false,
+      confidence: 0.4,
+    });
+    expect(host.calls[0].params).toEqual({
+      id: "m-1",
+      tags: ["deploy"],
+      pinned: false,
+      confidence: 0.4,
+    });
+  });
+
+  it("requires an id and at least one field", async () => {
+    const noId = await run({ action: "update", body: "x" });
+    expect(noId.result.details.errorCode).toBe("MEMORY_INVALID_ARGUMENT");
+    const nothing = await run({ action: "update", id: "m-1" });
+    expect(nothing.result.isError).toBe(true);
+    expect(nothing.result.text).toContain("nothing to update");
+    expect(noId.host.calls).toHaveLength(0);
+    expect(nothing.host.calls).toHaveLength(0);
+  });
+
+  it("rejects a confidence outside 0..1", async () => {
+    const { result, host } = await run({ action: "update", id: "m-1", confidence: 4 });
+    expect(result.details.errorCode).toBe("MEMORY_INVALID_ARGUMENT");
+    expect(host.calls).toHaveLength(0);
+  });
+
+  it("turns a missing memory into a search hint", async () => {
+    const { result } = await run(
+      { action: "update", id: "m-gone", body: "x" },
+      { replies: { "memory.update": new Error("memory m-gone not found: no rows") } },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.details.errorCode).toBe("MEMORY_NOT_FOUND");
+    expect(result.text).toContain("No memory with id m-gone");
+  });
+});
+
+describe("forget", () => {
+  it("deletes by id", async () => {
+    const { result, host } = await run({ action: "forget", id: "m-1" });
+    expect(host.calls[0]).toEqual({ method: "memory.forget", params: { id: "m-1" } });
+    expect(result.text).toContain("Forgot memory m-1");
+    expect(result.details.removed).toBe(1);
+  });
+
+  it("says nothing was there instead of claiming success", async () => {
+    const { result } = await run(
+      { action: "forget", id: "m-missing" },
+      { replies: { "memory.forget": { removed: 0 } } },
+    );
+    expect(result.isError).toBeFalsy();
+    expect(result.text).toContain("nothing was removed");
+    expect(result.details.removed).toBe(0);
+  });
+
+  it("requires an id", async () => {
+    const { result, host } = await run({ action: "forget" });
+    expect(result.details.errorCode).toBe("MEMORY_INVALID_ARGUMENT");
+    expect(host.calls).toHaveLength(0);
+  });
+});
+
+describe("search", () => {
+  const hits = {
+    "memory.recall": {
+      memories: [
+        {
+          memory: {
+            id: "m-1",
+            kind: "preference",
+            title: "Reply language",
+            body: "prefers Chinese replies",
+            tags: ["language"],
+            confidence: 0.9,
+          },
+          score: -1.2,
+        },
+        {
+          memory: { id: "m-2", kind: "fact", title: "Deploy host", body: "sda-build-02" },
+          score: -2.4,
+        },
+      ],
     },
   };
-}
 
-describe("a batch may address both stores", () => {
-  it("routes each operation to the store it names", async () => {
-    const host = twoStoreHost({ memory: ["project uses pnpm"], user: ["prefers short replies"] });
-    const tool = createMemoryTool(host as never);
-    const result = (await (tool.execute as never as (
-      id: string,
-      params: unknown,
-    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>)("call-1", {
-      target: "memory",
-      operations: [
-        { action: "add", content: "release tags are signed" },
-        { action: "add", target: "user", content: "works in UTC+8" },
-      ],
-    }));
-
-    // The pre-fix code dropped the per-operation target and wrote both entries into
-    // `memory`, then reported success, so the user store silently lost its entry.
-    expect(host.state.memory).toEqual(["project uses pnpm", "release tags are signed"]);
-    expect(host.state.user).toEqual(["prefers short replies", "works in UTC+8"]);
-    expect(result.details.targets).toEqual(["memory", "user"]);
-    expect(result.content[0].text).toContain("works in UTC+8");
-  });
-
-  it("writes nothing in either store when one operation is refused", async () => {
-    const host = twoStoreHost({ memory: ["keep me"], user: ["keep me too"] });
-    const tool = createMemoryTool(host as never);
-    const result = (await (tool.execute as never as (
-      id: string,
-      params: unknown,
-    ) => Promise<{ content: Array<{ text: string }> }>)("call-2", {
-      target: "memory",
-      operations: [
-        { action: "add", content: "should not land" },
-        { action: "remove", target: "user", old_text: "not present" },
-      ],
-    }));
-
-    expect(host.state.memory).toEqual(["keep me"]);
-    expect(host.state.user).toEqual(["keep me too"]);
-    expect(host.writes).toHaveLength(0);
-    expect(result.content[0].text).toContain("No entry matched");
-  });
-
-  it("rejects an unknown per-operation target instead of dropping it", () => {
-    const parsed = readMemoryOperations({
-      target: "memory",
-      operations: [{ action: "add", target: "project", content: "x" }],
+  it("asks the host with the query, the limit and the session scope", async () => {
+    const { host } = await run(
+      { action: "search", query: "reply language", limit: 3 },
+      { toolOptions: { projectPath: "/w/pi", sessionId: "s1" }, replies: hits },
+    );
+    expect(host.calls[0]).toEqual({
+      method: "memory.recall",
+      params: { query: "reply language", limit: 3, projectPath: "/w/pi", sessionId: "s1" },
     });
-    expect(parsed).toHaveProperty("error");
-    expect((parsed as { error: string }).error).toContain("target must be");
   });
 
-  it("keeps one store's batch unchanged when the call names only that store", async () => {
-    const host = twoStoreHost({ memory: ["stale"], user: [] });
-    const tool = createMemoryTool(host as never);
-    await (tool.execute as never as (id: string, params: unknown) => Promise<unknown>)("call-3", {
-      target: "memory",
-      operations: [{ action: "remove", old_text: "stale" }, { action: "add", content: "fresh" }],
-    });
-    expect(host.state.memory).toEqual(["fresh"]);
-    expect(host.state.user).toEqual([]);
+  it("defaults the limit and caps it at the host maximum", async () => {
+    const fallback = await run({ action: "search", query: "deploy" });
+    expect(fallback.host.calls[0].params.limit).toBe(8);
+    const capped = await run({ action: "search", query: "deploy", limit: 500 });
+    expect(capped.host.calls[0].params.limit).toBe(50);
+  });
+
+  it("renders title, kind, tags, score and id in the host's order", async () => {
+    const { result } = await run({ action: "search", query: "reply" }, { replies: hits });
+    expect(result.isError).toBeFalsy();
+    expect(result.text).toContain("2 memories matched 'reply', best first:");
+    const first = result.text.indexOf("Reply language");
+    const second = result.text.indexOf("Deploy host");
+    // Re-sorting here would throw the host's ranking away.
+    expect(first).toBeGreaterThan(-1);
+    expect(second).toBeGreaterThan(first);
+    expect(result.text).toContain("[preference] Reply language (tags: language) — id m-1");
+    expect(result.text).toContain("score -1.200");
+    expect(result.text).toContain("prefers Chinese replies");
+    expect(result.text).toContain("id m-2");
+    expect(result.details.hits).toBe(2);
+  });
+
+  it("trims a long body so one memory cannot crowd out the rest", async () => {
+    const { result } = await run(
+      { action: "search", query: "long" },
+      {
+        replies: {
+          "memory.recall": {
+            memories: [{ memory: { id: "m-1", title: "Long", body: "x".repeat(1000) }, score: 0 }],
+          },
+        },
+      },
+    );
+    expect(result.text).toContain("…");
+    expect(result.text.length).toBeLessThan(600);
+  });
+
+  it("says plainly when nothing matched", async () => {
+    const { result } = await run({ action: "search", query: "nothing here" });
+    expect(result.isError).toBeFalsy();
+    expect(result.text).toContain("No memory matched 'nothing here'");
+    expect(result.details.hits).toBe(0);
+  });
+
+  it("skips a hit with no content", async () => {
+    const { result } = await run(
+      { action: "search", query: "empty" },
+      { replies: { "memory.recall": { memories: [{ memory: { id: "m-1", title: "  ", body: " " } }] } } },
+    );
+    expect(result.text).toContain("No memory matched");
+  });
+
+  it("requires a query and reports a host failure", async () => {
+    const missing = await run({ action: "search" });
+    expect(missing.result.details.errorCode).toBe("MEMORY_INVALID_ARGUMENT");
+    expect(missing.host.calls).toHaveLength(0);
+    const failed = await run(
+      { action: "search", query: "deploy" },
+      { replies: { "memory.recall": new Error("host offline") } },
+    );
+    expect(failed.result.isError).toBe(true);
+    expect(failed.result.details.errorCode).toBe("MEMORY_SEARCH_FAILED");
+  });
+});
+
+describe("the action is required", () => {
+  it("names the four actions when it is missing or unknown", async () => {
+    const missing = await run({});
+    expect(missing.result.isError).toBe(true);
+    expect(missing.result.details.errorCode).toBe("MEMORY_INVALID_ACTION");
+    expect(missing.result.text).toContain("remember");
+    const unknown = await run({ action: "add" });
+    expect(unknown.result.details.errorCode).toBe("MEMORY_INVALID_ACTION");
+    expect(unknown.host.calls).toHaveLength(0);
   });
 });

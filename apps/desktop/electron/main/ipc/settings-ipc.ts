@@ -4,6 +4,7 @@ import type { HostProcess } from "../host-process";
 import type { IpcRegistrar } from "./types";
 import type { AppSettings } from "@pi-workspace/shared";
 import { currentSystemProxyRelayUrl } from "../network-proxy";
+import { writeStartupAnimationPreferences } from "../window-preferences";
 
 export type SettingsIpcDependencies = {
   registrar: IpcRegistrar;
@@ -71,6 +72,12 @@ export function registerSettingsIpc({
     if (!host) throw new Error("host unavailable");
     const validatedSettings = validateSettingsWrite(settings);
     const result: AppSettings = await host.call<AppSettings>("settings.set", validatedSettings);
+    // Mirror the boot-animation preference: the next launch resolves the
+    // descriptor before host-core answers, when settings are still unreadable.
+    writeStartupAnimationPreferences(
+      dataDir,
+      result as { startupAnimation?: unknown },
+    );
     const updatePreference = (validatedSettings as { updatePreference?: unknown })
       .updatePreference;
     if (updatePreference === "automatic" || updatePreference === "manual") {

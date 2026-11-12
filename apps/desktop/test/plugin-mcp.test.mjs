@@ -390,13 +390,16 @@ test("a remote mcp server negotiates over http and keeps its session", async (t)
 });
 
 test("a remote MCP tool can run longer than the connection timeout", async (t) => {
-  const { url } = await startHttpServer(t, { slowToolDelayMs: 80 });
+  // The point is the relationship, not the absolute numbers: the tool outlives
+  // the connect budget. Both are raised off the 20 ms floor because a local
+  // handshake under a loaded machine can miss it and report a false timeout.
+  const { url } = await startHttpServer(t, { slowToolDelayMs: 400 });
   const client = new McpServerClient({
     rootPath: mkdtempSync(join(tmpdir(), "pi-mcp-http-")),
     server: { id: "remote", transport: "http", url },
     values: {},
-    connectTimeoutMs: 20,
-    callTimeoutMs: 500,
+    connectTimeoutMs: 200,
+    callTimeoutMs: 2_000,
   });
   t.after(() => client.close());
 

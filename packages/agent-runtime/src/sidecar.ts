@@ -157,7 +157,7 @@ type RuntimeParams = {
   customSystemPrompt?: CustomSystemPrompt;
   projectInstructions?: ProjectInstructions;
   projectMemory?: string;
-  /** Frozen entry-list memory read when the session launched (ADR 0378). */
+  /** Retired flat entry lists from the launch payload (ADR 0393); accepted, unused. */
   memoryEntries?: { memory: string[]; user: string[] };
   compactionSettings?: ContextCompactionSettings;
   attachmentsDir?: string;

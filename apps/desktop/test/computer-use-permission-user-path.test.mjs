@@ -63,7 +63,21 @@ const render = () => flushSync(() => rootNode.render(React.createElement(Compute
   t: i18n.t.bind(i18n), settings: { computerUse: { enabled: false } },
   saveSettings() { throw new Error("Requesting permission must not enable computer use or create a grant"); },
 })));
-const frame = () => new Promise(requestAnimationFrame);
+// A hidden window whose page is never composited can stop delivering animation
+// frames, and then every assertion below waits forever. The tick therefore takes
+// whichever comes first — the frame when there is one, a timer otherwise. What
+// the probe checks is state, not paint.
+const frame = () =>
+  new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    requestAnimationFrame(done);
+    setTimeout(done, 16);
+  });
 const settle = async () => { await frame(); await frame(); };
 function check(condition, message) { if (!condition) throw new Error(message); }
 async function until(predicate, message) {
@@ -216,7 +230,10 @@ app.whenReady().then(async () => {
       stream.setEncoding("utf8");
       stream.on("data", (chunk) => { output += chunk; });
     }
-    const timer = setTimeout(() => child.kill("SIGKILL"), 45_000);
+    // A cold Electron launch on a loaded CI box (and this machine runs several
+    // sessions at once) needs more than the old 45 s watchdog, which killed the
+    // child before it could print its probe line.
+    const timer = setTimeout(() => child.kill("SIGKILL"), 120_000);
     let code;
     try {
       code = await new Promise((resolve, reject) => { child.once("error", reject); child.once("close", resolve); });

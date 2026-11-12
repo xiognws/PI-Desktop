@@ -21,8 +21,22 @@ const SKILLS_HEADER = [
 
 export const SKILL_SECTION_PREFIX = "skill:";
 
+/**
+ * Characters of a description the catalog shows.
+ *
+ * Hermes carries the same figure as an authoring standard ("ONE sentence, <=60
+ * characters") because the index truncates there and the index is paid for on
+ * every turn. Without a cap, one verbose description costs more than the six
+ * entries around it — and the body is a `Skill` call away, so nothing is lost.
+ */
+export const SKILL_DESCRIPTION_INDEX_CHARS = 60;
+
 function skillEntry(skill: PluginSkillDef): string {
-  const description = skill.description?.trim();
+  const raw = skill.description?.trim() ?? "";
+  const description =
+    raw.length > SKILL_DESCRIPTION_INDEX_CHARS
+      ? `${raw.slice(0, SKILL_DESCRIPTION_INDEX_CHARS - 1).trimEnd()}…`
+      : raw;
   return `- \`${skill.id}\` — ${skill.name}${description ? `: ${description}` : ""}`;
 }
 
