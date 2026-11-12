@@ -199,7 +199,9 @@ def execute_script(
             "passed = ?, failed = ?, running = 0, replay_hits = ?, model_calls = ? WHERE id = ?",
             (
                 finished_status,
-                counts["pass"],
+                # 行上只记「通过/失败」两栏，skip 在结论里等同通过（骨架用例就是 skip），
+                # 否则运行记录会显示「已完成 通过 0/1」，和 run 汇总的 2/2 自相矛盾。
+                counts["pass"] + counts["skip"],
                 counts["fail"],
                 replay_hits,
                 0,

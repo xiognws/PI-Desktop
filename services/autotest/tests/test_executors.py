@@ -438,6 +438,14 @@ def test_pytest_skeleton_is_a_skip_not_a_pass(tmp_path):
     assert result["status"] == "pass"
     assert result["events"][-1]["counts"] == {"pass": 0, "fail": 0, "skip": 1}
 
+    # 事件流如实记 skip，但 executions 行只有「通过/失败」两栏：跳过按通过计，
+    # 否则运行记录页显示「已完成 通过 0/1」，和 run 汇总的 1/1 自相矛盾。
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT passed, failed FROM executions WHERE id = ?", (result["execution_id"],)
+        ).fetchone()
+    assert row == (1, 0)
+
 
 def test_plain_script_without_test_functions_still_runs_directly(tmp_path):
     project_dir, db_path = make_project(tmp_path)
