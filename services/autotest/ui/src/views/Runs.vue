@@ -53,6 +53,11 @@ const STEP_LABELS: Record<string, string> = {
 function statusLabel(status?: string) {
   return status ? STATUS_LABELS[status] || status : ''
 }
+// 执行早已结束、但还没生成报告：状态仍是 running，需要明确告诉用户下一步是「生成报告」。
+function needsReport(run: Run) {
+  return run.status === 'running' && run.stage === 'executed'
+}
+
 function statusClass(status?: string) {
   if (status === 'running') return 'bg-blue-50 text-blue-600'
   if (status === 'waiting_human') return 'bg-yellow-50 text-yellow-600'
@@ -249,6 +254,13 @@ onMounted(loadRuns)
                 <span class="font-medium text-gray-900 font-mono">{{ run.id }}</span>
                 <span class="text-xs px-2 py-0.5 rounded" :class="statusClass(run.status)">{{ statusLabel(run.status) }}</span>
                 <span class="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-600">{{ run.module || '未标模块' }}</span>
+                <!-- 跑完了但还没出报告时，run 的状态会一直是 running（生命周期如此）。
+                     不给提示的话，人只会觉得它卡住了。 -->
+                <span
+                  v-if="needsReport(run)"
+                  class="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200"
+                  title="执行已完成，但流水线要到生成报告才算收尾"
+                >已执行 · 待出报告</span>
               </div>
               <span class="text-xs text-gray-400 flex-shrink-0">{{ shortTime(run.created_at) }}</span>
             </div>
