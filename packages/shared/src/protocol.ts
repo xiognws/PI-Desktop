@@ -369,6 +369,9 @@ export const IPC = {
     pluginDisable: "pi-desktop/plugin/disable",
     pluginSetScope: "pi-desktop/plugin/setScope",
     pluginUninstall: "pi-desktop/plugin/uninstall",
+    /** Preinstalled plugins the user removed, and the way back. */
+    pluginPreinstalledRemoved: "pi-desktop/plugin/preinstalledRemoved",
+    pluginRestorePreinstalled: "pi-desktop/plugin/restorePreinstalled",
     pluginSetAutoUpdate: "pi-desktop/plugin/setAutoUpdate",
     pluginSettingsGet: "pi-desktop/plugin/settings/get",
     pluginSettingsSet: "pi-desktop/plugin/settings/set",

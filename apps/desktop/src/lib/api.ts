@@ -1439,6 +1439,13 @@ export const api = {
   enablePlugin: (id: string) => invoke(IPC.invoke.pluginEnable, id),
   disablePlugin: (id: string) => invoke(IPC.invoke.pluginDisable, id),
   uninstallPlugin: (id: string) => invoke(IPC.invoke.pluginUninstall, id),
+  /** Preinstalled plugins the user removed; the page offers them back. */
+  preinstalledPluginsRemoved: () =>
+    invoke<{ removed: { id: string; version: string }[] }>(
+      IPC.invoke.pluginPreinstalledRemoved,
+    ),
+  restorePreinstalledPlugin: (id: string) =>
+    invoke(IPC.invoke.pluginRestorePreinstalled, id),
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   getPluginSettings: (id: string) =>

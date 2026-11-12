@@ -404,6 +404,32 @@ export function registerPluginIpc({
     return res;
   });
 
+  /** Preinstalled ids the user removed, so the page can offer them back. */
+  handle(IPC.invoke.pluginPreinstalledRemoved, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call<{ removed: { id: string; version: string }[] }>(
+      "plugins.preinstalledRemoved",
+    );
+  });
+
+  /**
+   * Undo a removal. The host clears the record and rebuilds the row from the
+   * shipped manifest, so what comes back is the image's current version rather
+   * than whatever was removed.
+   */
+  handle(IPC.invoke.pluginRestorePreinstalled, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call<{ plugin: any }>("plugins.restorePreinstalled", { id });
+    if (res.plugin?.path) {
+      await plugins.loadFromPath(res.plugin.path, res.plugin.permissions ?? [], {
+        development: false,
+      });
+    }
+    logger.app("plugin", "info", "preinstalled plugin restored", { pluginId: id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "install", pluginId: id });
+    return res;
+  });
+
   handle(IPC.invoke.pluginSetAutoUpdate, async (payload: { id: string; enabled: boolean }) => {
     if (!host) throw new Error("host unavailable");
     return host.call("plugins.setAutoUpdate", {

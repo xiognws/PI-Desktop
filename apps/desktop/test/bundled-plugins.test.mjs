@@ -185,8 +185,12 @@ test("bundled plugins are packaged and located at runtime", () => {
     "resources/plugins must be copied outside the asar",
   );
   // host-core cannot know whether it runs from resources/ or a checkout, so
-  // Electron resolves the directory and hands it over.
-  assert.match(hostProcessSource, /function resolveBuiltinPluginsDir\(\)/);
-  assert.match(hostProcessSource, /PI_DESKTOP_BUILTIN_PLUGINS_DIR/);
-  assert.match(hostProcessSource, /join\(process\.resourcesPath \|\| "", "plugins"\)/);
+  // Electron resolves the directories and hands them over (ADR 0396).
+  assert.match(hostProcessSource, /import \{[\s\S]*resolvePreinstalledPluginsDirs[\s\S]*\} from "\.\/plugin-paths\.ts"/);
+  assert.match(hostProcessSource, /PI_DESKTOP_PREINSTALLED_DIRS/);
+  // The directories the user pointed at travel the same way, and are a list for
+  // the same reason: naming one is a deliberate act, not a build decision.
+  assert.match(hostProcessSource, /PI_DESKTOP_EXTRA_PLUGIN_DIRS/);
+  const pluginPathsSource = read("electron/main/plugin-paths.ts");
+  assert.match(pluginPathsSource, /join\(resources, "plugins"\)/);
 });

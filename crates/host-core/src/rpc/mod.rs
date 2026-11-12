@@ -5407,6 +5407,30 @@ async fn handle_request(
             }
             Ok(json!({ "ok": ok }))
         }
+        // Preinstalled plugins the user removed, so the page can offer them back.
+        "plugins.preinstalledRemoved" => {
+            let st = state.lock().await;
+            let removed: Vec<Value> = st
+                .plugins
+                .preinstalled_removed()
+                .into_iter()
+                .map(|(id, version)| json!({ "id": id, "version": version }))
+                .collect();
+            Ok(json!({ "removed": removed }))
+        }
+        // Undo a removal: the image's copy goes back to being the default.
+        "plugins.restorePreinstalled" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let plugin = st
+                .plugins
+                .restore_preinstalled(id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "plugin": plugin }))
+        }
         "plugins.getPermissions" => {
             let id = params
                 .get("id")

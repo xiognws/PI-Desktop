@@ -326,11 +326,22 @@ export type PluginSummary = {
   enabled: boolean;
   /** Where the plugin is allowed to run; absent records predate scopes. */
   scope?: ActivationScope;
-  source: "builtin" | "installed" | "dev" | "marketplace";
   /**
-   * True while this application build ships the plugin from
-   * `resources/plugins`. A bundled plugin cannot be uninstalled, but it can be
-   * updated, and this flag follows that update (ADR 0241).
+   * Where the row came from.
+   *
+   * `preinstalled` ships with the install image, and `external` comes from a
+   * directory the user pointed the host at. Neither is a lock: a preinstalled
+   * plugin can be removed (the host remembers the decision), and an external
+   * one is read in place from the user's own directory. `builtin` is what rows
+   * written by earlier builds carry; the host rewrites it on read.
+   */
+  source: "preinstalled" | "builtin" | "installed" | "dev" | "marketplace" | "external";
+  /**
+   * True while this install image ships the plugin from `resources/plugins`
+   * (ADR 0241).
+   *
+   * `bundled` describes where the copy came from, not what the user may do with
+   * it: the plugin can still be disabled, updated, or uninstalled.
    */
   bundled?: boolean;
   status: "ready" | "error" | "disabled" | "load_error";

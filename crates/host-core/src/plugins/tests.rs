@@ -280,7 +280,7 @@ fn market_entry_offers_an_update_only_when_the_catalog_is_newer() {
             std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
         }
         let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        mgr.sync_builtin(Some(ship.path())).unwrap();
+        mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
         assert_eq!(mgr.get("pi.todo").unwrap().version, "0.6.0");
 
         // Same catalog shape at three versions, so the only difference between
@@ -1185,7 +1185,7 @@ fn view_contributions_require_permission_and_an_existing_entry() {
 }
 
 #[test]
-fn bundled_plugins_refresh_from_disk_but_keep_user_state() {
+fn preinstalled_plugins_refresh_from_disk_but_keep_user_state() {
     let ship = tempdir().unwrap();
     let plugin_manifest = |version: &str| {
         json!({
@@ -1209,20 +1209,15 @@ fn bundled_plugins_refresh_from_disk_but_keep_user_state() {
 
     let data = tempdir().unwrap();
     let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
 
-    let listed = mgr.get("pi.files").expect("bundled plugin is registered");
-    assert_eq!(listed.source, "builtin");
+    let listed = mgr
+        .get("pi.files")
+        .expect("preinstalled plugin is registered");
+    assert_eq!(listed.source, "preinstalled");
     assert_eq!(listed.version, "1.0.0");
-    assert!(listed.enabled, "a bundled plugin is on by default");
+    assert!(listed.enabled, "a preinstalled plugin is on by default");
     assert!(listed.capabilities.contains(&"views".to_string()));
-
-    // A bundled plugin is part of the app, so it cannot be uninstalled.
-    assert!(mgr
-        .uninstall("pi.files")
-        .unwrap_err()
-        .to_string()
-        .contains("cannot be uninstalled"),);
 
     // The user turning it off must survive the next launch, even though the
     // rest of the row is rebuilt from the shipped manifest.
@@ -1232,14 +1227,14 @@ fn bundled_plugins_refresh_from_disk_but_keep_user_state() {
         plugin_manifest("2.0.0"),
         &[("views/tree.html", "<html></html>")],
     );
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
     let after = mgr.get("pi.files").unwrap();
     assert_eq!(after.version, "2.0.0", "an app update refreshes the row");
     assert!(!after.enabled, "the user's choice is not overwritten");
 
     // A build that stops shipping it leaves no orphan row behind.
     fs::remove_dir_all(&root).unwrap();
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
     assert!(mgr.get("pi.files").is_none());
 }
 
@@ -1263,26 +1258,26 @@ fn bundled_plugin_can_default_to_disabled_without_overwriting_user_state() {
 
     let data = tempdir().unwrap();
     let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
-    mgr.sync_builtin(Some(ship.path())).unwrap();
-    let listed = mgr.get("pi.opt-in").expect("bundled plugin is registered");
-    assert!(!listed.enabled, "opt-in bundled plugins start disabled");
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    let listed = mgr
+        .get("pi.opt-in")
+        .expect("preinstalled plugin is registered");
+    assert!(
+        !listed.enabled,
+        "opt-in preinstalled plugins start disabled"
+    );
     assert_eq!(listed.status, "disabled");
-    assert!(mgr
-        .uninstall("pi.opt-in")
-        .unwrap_err()
-        .to_string()
-        .contains("cannot be uninstalled"),);
 
     mgr.set_enabled("pi.opt-in", true).unwrap();
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
     let after = mgr.get("pi.opt-in").unwrap();
     assert!(after.enabled, "an explicit enable survives the next launch");
 }
 
-/// The user updates a bundled plugin; the update must outlive the next launch
-/// while the plugin stays uninstallable (ADR 0241).
+/// The user updates a preinstalled plugin; the update must outlive the next
+/// launch, and removing it afterwards must not seed the shipped copy back.
 #[test]
-fn a_bundled_plugin_keeps_the_update_the_user_installed() {
+fn a_preinstalled_plugin_keeps_the_update_the_user_installed() {
     let ship = tempdir().unwrap();
     let shipped = ship.path().join("pi.view");
     let shipped_manifest = |version: &str| {
@@ -1299,7 +1294,7 @@ fn a_bundled_plugin_keeps_the_update_the_user_installed() {
 
     let data = tempdir().unwrap();
     let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
     assert!(mgr.get("pi.view").unwrap().bundled);
 
     let update = data.path().join("package");
@@ -1322,7 +1317,7 @@ fn a_bundled_plugin_keeps_the_update_the_user_installed() {
 
     // The next launch reconciles against the shipped 1.0.0 again.
     let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
     let after = mgr.get("pi.view").unwrap();
     assert_eq!(
         after.version, "1.1.0",
@@ -1332,12 +1327,20 @@ fn a_bundled_plugin_keeps_the_update_the_user_installed() {
     assert!(after.bundled);
     assert_eq!(after.path, installed.plugin.path);
 
-    // Updating is allowed; removing is still not.
+    // Updating is allowed, and so is removing: the removal of a plugin the user
+    // installed is remembered as a decision, so the shipped copy does not come
+    // back on the next launch.
+    assert!(mgr.uninstall("pi.view").unwrap());
     assert!(mgr
-        .uninstall("pi.view")
-        .unwrap_err()
-        .to_string()
-        .contains("cannot be uninstalled"));
+        .preinstalled_removed()
+        .iter()
+        .any(|(id, _)| id == "pi.view"));
+    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    assert!(
+        mgr.get("pi.view").is_none(),
+        "a removal survives the next launch"
+    );
 }
 
 /// The other direction: an app update that ships a newer version than the one
@@ -1361,7 +1364,7 @@ fn a_newer_shipped_version_replaces_an_older_user_install() {
 
     let data = tempdir().unwrap();
     let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
 
     let update = data.path().join("package");
     write_plugin(&update, manifest("1.1.0"), &[]);
@@ -1378,17 +1381,17 @@ fn a_newer_shipped_version_replaces_an_older_user_install() {
     // The app update ships 2.0.0.
     fs::remove_dir_all(&shipped).unwrap();
     write_plugin(&shipped, manifest("2.0.0"), &[]);
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
     let after = mgr.get("pi.view").unwrap();
     assert_eq!(after.version, "2.0.0");
-    assert_eq!(after.source, "builtin");
+    assert_eq!(after.source, "preinstalled");
     assert!(after.bundled);
 }
 
 /// A build that stops shipping the plugin stops protecting it: the user's
 /// install is left alone, and it becomes theirs to remove.
 #[test]
-fn a_plugin_a_build_stops_shipping_is_no_longer_bundled() {
+fn a_plugin_a_build_stops_shipping_is_no_longer_preinstalled() {
     let ship = tempdir().unwrap();
     let shipped = ship.path().join("pi.view");
     let manifest = |version: &str| {
@@ -1405,7 +1408,7 @@ fn a_plugin_a_build_stops_shipping_is_no_longer_bundled() {
 
     let data = tempdir().unwrap();
     let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
 
     let update = data.path().join("package");
     write_plugin(&update, manifest("1.1.0"), &[]);
@@ -1420,7 +1423,7 @@ fn a_plugin_a_build_stops_shipping_is_no_longer_bundled() {
     .unwrap();
 
     fs::remove_dir_all(&shipped).unwrap();
-    mgr.sync_builtin(Some(ship.path())).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
     let after = mgr.get("pi.view").expect("the user's install survives");
     assert_eq!(after.version, "1.1.0");
     assert!(
@@ -1428,6 +1431,127 @@ fn a_plugin_a_build_stops_shipping_is_no_longer_bundled() {
         "a plugin this build does not ship is not advertised as bundled"
     );
     assert!(mgr.uninstall("pi.view").unwrap());
+}
+
+/// Removing a preinstalled plugin is a decision, not a gap in the image: the
+/// next launch must not seed it back, and asking for it again must work.
+#[test]
+fn a_removed_preinstalled_plugin_is_not_seeded_back_until_restored() {
+    let ship = tempdir().unwrap();
+    let shipped = ship.path().join("pi.notes");
+    write_plugin(
+        &shipped,
+        json!({
+            "schemaVersion": 1,
+            "id": "pi.notes",
+            "name": "Notes",
+            "version": "1.0.0",
+            "main": "main.js",
+            "permissions": ["ui.panel"],
+        }),
+        &[],
+    );
+
+    let data = tempdir().unwrap();
+    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    assert!(mgr.uninstall("pi.notes").unwrap());
+    assert!(mgr.get("pi.notes").is_none());
+    // The shipped directory belongs to the installation.
+    assert!(shipped.join("manifest.json").exists());
+    assert_eq!(mgr.preinstalled_removed().len(), 1);
+
+    // Next launch: the image still ships it, the record says the user does not
+    // want it.
+    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    assert!(
+        mgr.get("pi.notes").is_none(),
+        "a reminder of the removal must survive a restart"
+    );
+
+    // An app update does not change that answer either.
+    write_plugin(
+        &shipped,
+        json!({
+            "schemaVersion": 1,
+            "id": "pi.notes",
+            "name": "Notes",
+            "version": "2.0.0",
+            "main": "main.js",
+            "permissions": ["ui.panel"],
+        }),
+        &[],
+    );
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    assert!(mgr.get("pi.notes").is_none());
+
+    // ...until the user asks for it back, and then the current image wins.
+    let restored = mgr.restore_preinstalled("pi.notes").unwrap().unwrap();
+    assert_eq!(restored.version, "2.0.0");
+    assert!(restored.enabled);
+    assert!(mgr.preinstalled_removed().is_empty());
+
+    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    assert!(
+        mgr.get("pi.notes").is_some(),
+        "a restore is not undone by the next launch"
+    );
+}
+
+/// A directory the user pointed at wins over the copy the image ships under the
+/// same id — that is what pointing at one means.
+#[test]
+fn an_extra_directory_wins_over_the_shipped_copy() {
+    let ship = tempdir().unwrap();
+    let shipped = ship.path().join("acme.todo");
+    let manifest = |version: &str| {
+        json!({
+            "schemaVersion": 1,
+            "id": "acme.todo",
+            "name": "Todo",
+            "version": version,
+            "main": "main.js",
+            "permissions": ["ui.panel"],
+        })
+    };
+    write_plugin(&shipped, manifest("1.0.0"), &[]);
+
+    let mine = tempdir().unwrap();
+    let checkout = mine.path().join("acme.todo");
+    write_plugin(&checkout, manifest("2.0.0"), &[]);
+
+    let data = tempdir().unwrap();
+    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    mgr.sync_extra(&[mine.path().to_path_buf()]).unwrap();
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+
+    let row = mgr.get("acme.todo").expect("the user's copy is registered");
+    assert_eq!(row.source, "external");
+    assert_eq!(row.version, "2.0.0");
+    assert_eq!(row.path.as_deref(), checkout.to_str());
+    assert!(
+        !row.bundled,
+        "the image does not ship the version being run"
+    );
+
+    // Removing the row does not delete anything in the user's directory.
+    assert!(mgr.uninstall("acme.todo").unwrap());
+    assert!(checkout.join("manifest.json").exists());
+    assert!(mgr.get("acme.todo").is_none());
+
+    // Dropping the directory from the list retires the row, and the image's
+    // copy becomes the registered one again.
+    mgr.sync_extra(&[mine.path().to_path_buf()]).unwrap();
+    assert_eq!(mgr.get("acme.todo").unwrap().source, "external");
+    mgr.sync_extra(&[]).unwrap();
+    assert!(mgr.get("acme.todo").is_none());
+    mgr.sync_preinstalled(&[ship.path().to_path_buf()]).unwrap();
+    let back = mgr.get("acme.todo").unwrap();
+    assert_eq!(back.source, "preinstalled");
+    assert_eq!(back.version, "1.0.0");
 }
 
 #[test]

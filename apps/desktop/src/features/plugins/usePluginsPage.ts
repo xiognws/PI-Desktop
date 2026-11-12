@@ -470,6 +470,38 @@ export function usePluginsPage() {
     }
   };
 
+  /**
+   * Preinstalled plugins this user removed.
+   *
+   * The host keeps the decision, so the page can offer the ones that are gone
+   * instead of them silently disappearing from the product. Fetched alongside
+   * the installed list and refreshed after a removal.
+   */
+  const [removedPreinstalled, setRemovedPreinstalled] = useState<
+    { id: string; version: string }[]
+  >([]);
+  const refreshRemovedPreinstalled = async () => {
+    try {
+      const res = await api.preinstalledPluginsRemoved();
+      setRemovedPreinstalled(res.removed ?? []);
+    } catch {
+      setRemovedPreinstalled([]);
+    }
+  };
+  const restorePreinstalled = (id: string) =>
+    run(async () => {
+      await api.restorePreinstalledPlugin(id);
+      await refreshPlugins();
+      await refreshRemovedPreinstalled();
+    });
+
+  useEffect(() => {
+    void refreshRemovedPreinstalled();
+    // Mount only: the list changes through the actions on this page, which
+    // refresh it themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const loadDev = () =>
     run(async () => {
       const result = await api.loadDevPlugin();
@@ -823,6 +855,9 @@ export function usePluginsPage() {
     activeVersion,
     run,
     loadDev,
+    removedPreinstalled,
+    refreshRemovedPreinstalled,
+    restorePreinstalled,
     importExtension,
     reloadPlugin,
     installPackage,

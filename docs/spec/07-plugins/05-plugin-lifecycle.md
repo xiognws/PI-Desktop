@@ -204,7 +204,8 @@ Record at least:
 Fields:
 - pluginId
 - version
-- source (`installed` | `dev` | `marketplace`)
+- source (`preinstalled` | `installed` | `dev` | `marketplace` | `external`;
+  `builtin` is what rows written by earlier builds carry and is rewritten on read)
 - ts
 - errorCode?
 - attempt? / delayMs? (service restarts)
@@ -221,5 +222,19 @@ Before uninstall:
 Default recommendation:
 - Clean up settings/data on uninstall (D016: uninstall deletes plugin data by default)
 - A keep-data option is a future proposal, not a current uninstall guarantee.
-  Development source directories are not deleted; bundled plugin ids cannot be
-  uninstalled and may be disabled instead
+
+What uninstall may delete is limited to the data directory
+(`plugins/installed/<id>`, `plugins/data/<id>`, `plugins/logs/<id>.log`).
+Development source directories, directories the user pointed the host at
+(`source: external`), and the plugin directories an install image ships
+(`source: preinstalled`) are never deleted; removing one of those removes the
+registry row only.
+
+A preinstalled plugin can be uninstalled (ADR 0396). The removal is recorded in
+`<data>/plugins/preinstalled-state.json` with `state: removed`, which is what
+stops the next launch — or the next app update — from seeding it back.
+`plugins.restorePreinstalled` clears the record and rebuilds the row from the
+shipped manifest, so a restored plugin comes back at the image's current
+version. A user-installed copy of a preinstalled id is recorded as
+`state: modified` and survives launches; only a strictly newer shipped version
+replaces it.

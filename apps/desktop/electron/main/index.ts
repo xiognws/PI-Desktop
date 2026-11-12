@@ -190,6 +190,10 @@ const dataDir = storage.preferences.roots.data;
 // it as a parameter, and a profile split across two directories is the
 // divergence D236 closes.
 process.env.PI_DESKTOP_DATA_DIR = dataDir;
+// host-core records which build seeded the preinstalled plugins, and the child
+// process cannot ask Electron for it. Set here rather than inside the host
+// wrapper so the value is in place before anything spawns it.
+process.env.PI_DESKTOP_APP_VERSION = app.getVersion();
 
 // Agent extensions (D387/D388, ADR 0214): plugins contribute the modules,
 // the sidecar loads them; this bridge carries commands, diagnostics, and

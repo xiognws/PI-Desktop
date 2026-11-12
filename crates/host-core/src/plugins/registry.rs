@@ -1,28 +1,24 @@
 use super::*;
 use std::collections::BTreeSet;
 
-/// Directory holding the plugins this application build ships, if any.
-///
-/// Electron resolves the packaged location and passes it down, because only it
-/// knows whether the app is running from `resources/` or a source checkout.
-fn builtin_plugins_dir() -> Option<PathBuf> {
-    let raw = std::env::var("PI_DESKTOP_BUILTIN_PLUGINS_DIR").ok()?;
-    let path = PathBuf::from(raw.trim());
-    if path.as_os_str().is_empty() || !path.is_dir() {
-        return None;
-    }
-    Some(path)
-}
-
 pub struct PluginManager {
     pub(crate) data_dir: PathBuf,
     pub(crate) runtime: Vec<PluginSummary>,
-    /// Ids this build ships from `resources/plugins` (ADR 0241).
+    /// Ids this image ships as preinstalled plugins (ADR 0241, ADR 0396).
     ///
     /// Recomputed from disk on every launch and never persisted: a plugin this
-    /// build stops shipping must stop being protected immediately, whatever the
-    /// row that survives it looks like.
-    pub(crate) bundled_ids: BTreeSet<String>,
+    /// build stops shipping must stop being treated as preinstalled
+    /// immediately, whatever the row that survives it looks like.
+    pub(crate) preinstalled_ids: BTreeSet<String>,
+    /// What the user decided about each preinstalled plugin.
+    ///
+    /// Persisted in `plugins/preinstalled-state.json` next to the registry, and
+    /// the only memory that survives an app update: see `preinstalled.rs`.
+    pub(crate) preinstalled_state: super::preinstalled::PreinstalledStateFile,
+    /// Directories scanned for preinstalled plugins, resolved once at start.
+    pub(crate) preinstalled_dirs: Vec<PathBuf>,
+    /// Directories the user pointed the host at, resolved once at start.
+    pub(crate) extra_dirs: Vec<PathBuf>,
     /// Catalog channel pinned by app settings.
     pub(crate) market_channel: MarketChannel,
     /// Cancel token of the install currently running, when one is.
@@ -51,137 +47,26 @@ impl PluginManager {
         let mut mgr = Self {
             data_dir: data_dir.to_path_buf(),
             runtime: Vec::new(),
-            bundled_ids: BTreeSet::new(),
+            preinstalled_ids: BTreeSet::new(),
+            preinstalled_state: super::preinstalled::PreinstalledStateFile::default(),
+            preinstalled_dirs: super::preinstalled::preinstalled_dirs(),
+            extra_dirs: super::preinstalled::extra_dirs(),
             market_channel,
             install_cancel: None,
             locale: "en".into(),
         };
         let _ = mgr.ensure_dirs();
         let _ = mgr.ensure_default_catalog();
+        mgr.load_preinstalled_state();
         let _ = mgr.reload_from_disk();
-        let _ = mgr.sync_builtin(builtin_plugins_dir().as_deref());
+        // Directories the user pointed at come first: naming one is a
+        // deliberate act, so that copy wins over anything the image or the
+        // marketplace put under the same id. Then the image's own set.
+        let extra = mgr.extra_dirs.clone();
+        let _ = mgr.sync_extra(&extra);
+        let shipped = mgr.preinstalled_dirs.clone();
+        let _ = mgr.sync_preinstalled(&shipped);
         mgr
-    }
-
-    /// Reconcile the registry with the plugins this application build ships.
-    ///
-    /// Bundled plugins are not installed by the user and cannot be uninstalled,
-    /// but they are ordinary plugins in every other respect — the whole point of
-    /// ADR 0104 is that first-party panel surfaces go through the same
-    /// contribution channel third parties use. Their row is therefore rebuilt
-    /// from the shipped manifest on every launch (so an app update refreshes the
-    /// version and contributions), while the two pieces of state the *user*
-    /// owns — whether it is enabled, and its activation scope — are carried
-    /// across. A bundled plugin that disappears from a newer build leaves the
-    /// registry with it.
-    ///
-    /// The user *may* update a bundled plugin from the marketplace (ADR 0241).
-    /// Their copy is not state to discard: it stays registered for as long as
-    /// this build does not ship something newer, so an update survives the next
-    /// launch while a stale install cannot hold an app update back.
-    pub fn sync_builtin(&mut self, dir: Option<&Path>) -> Result<()> {
-        let mut shipped: Vec<PluginSummary> = Vec::new();
-        if let Some(dir) = dir {
-            let entries = match fs::read_dir(dir) {
-                Ok(entries) => entries,
-                // A build without bundled plugins is valid, not an error.
-                Err(_) => {
-                    self.bundled_ids.clear();
-                    for plugin in &mut self.runtime {
-                        plugin.bundled = false;
-                    }
-                    return self.drop_missing_builtin(&shipped);
-                }
-            };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.join("manifest.json").exists() {
-                    continue;
-                }
-                let manifest = match Self::read_manifest(&path) {
-                    Ok(manifest) => manifest,
-                    // A malformed bundled plugin is a build defect. Skip it
-                    // rather than refusing to start the whole host.
-                    Err(_) => continue,
-                };
-                let previous = self.runtime.iter().find(|p| p.id == manifest.id);
-                let now = Utc::now().to_rfc3339();
-                let enabled = previous
-                    .map(|p| p.enabled)
-                    .unwrap_or(manifest.enabled_by_default.unwrap_or(true));
-                shipped.push(PluginSummary {
-                    id: manifest.id.clone(),
-                    name: manifest.name.clone(),
-                    version: manifest.version.clone(),
-                    enabled,
-                    scope: previous.map(|p| p.scope.clone()).unwrap_or_default(),
-                    source: "builtin".into(),
-                    bundled: true,
-                    status: if enabled {
-                        "ready".into()
-                    } else {
-                        "disabled".into()
-                    },
-                    error_message: None,
-                    permissions: manifest.permissions.clone(),
-                    path: Some(path.to_string_lossy().to_string()),
-                    capabilities: derive_capabilities(&manifest),
-                    description: manifest.description.clone(),
-                    author: manifest.author.clone(),
-                    installed_at: previous
-                        .and_then(|p| p.installed_at.clone())
-                        .or(Some(now.clone())),
-                    updated_at: Some(now),
-                    marketplace: None,
-                    auto_update: None,
-                    update_available: None,
-                    // A bundled plugin has no publisher to yank it; its
-                    // lifecycle is the application's own release cycle.
-                    yanked: None,
-                    ui: manifest.ui.clone(),
-                    fs: manifest.fs.clone(),
-                    settings: derive_settings(&manifest),
-                    i18n: manifest.i18n.clone(),
-                });
-            }
-        }
-
-        self.bundled_ids = shipped.iter().map(|p| p.id.clone()).collect();
-        self.drop_missing_builtin(&shipped)?;
-        for summary in shipped {
-            // An install the user made over a bundled plugin is theirs to keep:
-            // it stays registered unless this build ships something newer.
-            let user_copy = self
-                .runtime
-                .iter()
-                .find(|p| p.id == summary.id && p.source != "builtin")
-                .filter(|p| compare_plugin_versions(&p.version, &summary.version) != Ordering::Less)
-                .cloned();
-            self.runtime.retain(|p| p.id != summary.id);
-            self.runtime.push(match user_copy {
-                Some(existing) => PluginSummary {
-                    bundled: true,
-                    ..existing
-                },
-                None => summary,
-            });
-        }
-        // What this build ships decides the flag, not what the row says: a
-        // plugin dropped from a newer build stops being bundled on the same
-        // launch that drops it.
-        let bundled_ids = self.bundled_ids.clone();
-        for plugin in &mut self.runtime {
-            plugin.bundled = bundled_ids.contains(&plugin.id);
-        }
-        self.save()
-    }
-
-    /// Forget bundled rows this build no longer ships.
-    fn drop_missing_builtin(&mut self, shipped: &[PluginSummary]) -> Result<()> {
-        let keep: Vec<&str> = shipped.iter().map(|p| p.id.as_str()).collect();
-        self.runtime
-            .retain(|p| p.source != "builtin" || keep.contains(&p.id.as_str()));
-        Ok(())
     }
 
     pub(crate) fn ensure_dirs(&self) -> Result<()> {
@@ -260,6 +145,15 @@ impl PluginManager {
         }
         let raw = fs::read_to_string(path)?;
         self.runtime = serde_json::from_str(&raw).unwrap_or_default();
+        for plugin in &mut self.runtime {
+            // Rows written before preinstalled plugins were removable say
+            // "builtin". The meaning is the same, but a row left as "builtin"
+            // would be read by the sync pass as a user install and would keep
+            // the image's own copy from ever being refreshed.
+            if plugin.source == "builtin" {
+                plugin.source = "preinstalled".into();
+            }
+        }
         for plugin in &mut self.runtime {
             let Some(plugin_path) = plugin.path.as_deref() else {
                 continue;
@@ -372,15 +266,19 @@ impl PluginManager {
 
     pub fn uninstall(&mut self, id: &str) -> Result<bool> {
         let existing = self.get(id);
-        // A bundled plugin is part of the application, so there is nothing to
-        // remove and its files are not ours to delete. Disabling is the
-        // supported way to turn one off (ADR 0104).
+        // A preinstalled plugin is a plugin like any other: the user may remove
+        // it, and the image does not get a vote. What has to survive the
+        // removal is the *decision* — the tombstone in
+        // `plugins/preinstalled-state.json` is what stops the next launch, or
+        // the next app update, from seeding it back.
         //
-        // The id decides this, not the row: a bundled plugin the user updated
-        // from the marketplace stays uninstallable even though it now lives
-        // under `plugins/installed` and carries a marketplace source (ADR 0241).
-        if self.bundled_ids.contains(id) {
-            bail!("PLUGIN_INVALID: a bundled plugin cannot be uninstalled; disable it instead");
+        // The files stay: a preinstalled plugin's directory belongs to the
+        // installation, and an `external` plugin's belongs to the user. Neither
+        // is ours to delete, so removing either only removes the row.
+        if let Some(plugin) = &existing {
+            if self.preinstalled_ids.contains(id) {
+                self.mark_preinstalled_removed(id, &plugin.version);
+            }
         }
         let before = self.runtime.len();
         self.runtime.retain(|p| p.id != id);
