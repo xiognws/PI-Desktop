@@ -1,0 +1,20 @@
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 322,344-350
+services/autotest/src/autotest/executors/service.py
+  h_201ed4c689ac8b 220-222,224
+services/autotest/tests/test_script_editor_contract.py
+  h_201ed4c689ac8b 1-103
+services/autotest/ui/src/views/ScriptEditor.vue
+  h_201ed4c689ac8b 2,4,27-52,165-166,168-178,225-228,230-231,233,237,244-328,333,335-336,339-351,357,359-360,366-383,417-439,441,443-448,481-505,507-509
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "09760db29c2ef48cc3aedebda13372f16bba6f98",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
