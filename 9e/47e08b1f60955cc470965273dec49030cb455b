@@ -1,0 +1,30 @@
+crates/host-core/src/user_skills.rs
+  h_201ed4c689ac8b 3,112-116,159-160,992,1113-1114,1248-1262,1699-1709,1891-1892,1931-1942,1955
+crates/host-core/src/user_skills/curator.rs
+  h_201ed4c689ac8b 20-25,33,82-97,111-112,174,198-205,207,220
+crates/host-core/src/user_skills/origin.rs
+  h_201ed4c689ac8b 1-260
+crates/host-core/src/user_skills/tests_curator.rs
+  h_201ed4c689ac8b 5,9-16,39-41,132,135,160-162,212-214,229-359
+docs/adr/0394-curator-touches-only-agent-skills.md
+  h_201ed4c689ac8b 1-70
+docs/adr/README.md
+  h_201ed4c689ac8b 425
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1654-1659,1709-1711,1716-1725
+packages/agent-runtime/src/skill-manage-tool.test.ts
+  h_201ed4c689ac8b 89-91
+packages/agent-runtime/src/skill-manage-tool.ts
+  h_201ed4c689ac8b 139-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9e47e08b1f60955cc470965273dec49030cb455b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
