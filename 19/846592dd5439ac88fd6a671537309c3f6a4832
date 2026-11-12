@@ -1,0 +1,18 @@
+services/autotest/src/autotest/api/server.py
+  h_201ed4c689ac8b 391-455,1148-1187
+services/autotest/tests/test_project_lifecycle.py
+  h_201ed4c689ac8b 1-124
+services/autotest/ui/src/views/Home.vue
+  h_201ed4c689ac8b 10-11,71-131,232-244,255-290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "19846592dd5439ac88fd6a671537309c3f6a4832",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
