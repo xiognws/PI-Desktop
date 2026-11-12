@@ -21,6 +21,7 @@ import os
 import socket
 import threading
 import uuid
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -1341,6 +1342,31 @@ async def list_reports():
     return {"reports": []}
 
 
+def _find_langserver() -> Path | None:
+    """找 basedpyright-langserver：项目 .venv → 便携解释器目录 → PATH。"""
+    here = Path.cwd()
+    candidates = [
+        here / ".venv" / "Scripts" / "basedpyright-langserver.exe",
+        here / ".venv" / "bin" / "basedpyright-langserver",
+        Path(sys.executable).parent / "Scripts" / "basedpyright-langserver.exe",
+        Path(sys.executable).parent / "basedpyright-langserver",
+        Path(sys.executable).parent / "basedpyright-langserver.exe",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    found = shutil.which("basedpyright-langserver")
+    return Path(found) if found else None
+
+
+def _lsp_python() -> str:
+    """告诉 langserver 用哪个解释器解析导入：有 .venv 用 .venv，否则用自己。"""
+    venv_python = Path.cwd() / ".venv" / "Scripts" / "python.exe"
+    if venv_python.is_file():
+        return str(venv_python.resolve())
+    return str(Path(sys.executable).resolve())
+
+
 # ====== basedpyright LSP WebSocket ======
 @app.websocket("/ws/lsp/python/{project_id}")
 async def lsp_websocket(websocket: WebSocket, project_id: str):
@@ -1369,8 +1395,16 @@ async def lsp_websocket(websocket: WebSocket, project_id: str):
         "/workspace/scripts/",
     ]
 
-    langserver = str(Path.cwd() / ".venv" / "Scripts" / "basedpyright-langserver.exe")
-    python_exe = str((Path.cwd() / ".venv" / "Scripts" / "python.exe").resolve())
+    # langserver 可能装在 .venv（开发机）、便携解释器目录或 PATH 上。都没有时
+    # 立刻关掉连接：前端据此退化成「没有补全、但能编辑/保存/运行」的编辑器，
+    # 而不是卡在「正在初始化」等一个永远不会来的响应。
+    langserver_path = _find_langserver()
+    if langserver_path is None:
+        print("[LSP] basedpyright-langserver 未安装，前端将退化为无 LSP 模式")
+        await websocket.close(code=1011, reason="basedpyright-langserver 未安装")
+        return
+    langserver = str(langserver_path)
+    python_exe = _lsp_python()
 
     def to_real_uris(text: str) -> str:
         """前端 → basedpyright：虚拟 URI 替换为真实磁盘 URI"""
@@ -1382,14 +1416,19 @@ async def lsp_websocket(websocket: WebSocket, project_id: str):
         """basedpyright → 前端：真实磁盘 URI 替换回虚拟 URI（用 file:///workspace/scripts/）"""
         return text.replace(real_prefix, virtual_prefixes[0])
 
-    proc = await asyncio.create_subprocess_exec(
-        langserver,
-        "--stdio",
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        cwd=str(scripts_dir),
-    )
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            langserver,
+            "--stdio",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(scripts_dir),
+        )
+    except OSError as error:
+        print(f"[LSP] 启动 langserver 失败：{error}")
+        await websocket.close(code=1011, reason="langserver 启动失败")
+        return
 
     async def pump_stdout():
         """读取 basedpyright 输出的 Content-Length 帧，提取 JSON 发给前端"""
