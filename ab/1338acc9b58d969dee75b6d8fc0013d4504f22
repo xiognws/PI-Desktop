@@ -1,0 +1,18 @@
+packages/agent-runtime/src/skill-authoring.ts
+  h_201ed4c689ac8b 16,50-51
+packages/agent-runtime/src/skill-tool.test.ts
+  h_201ed4c689ac8b 70-93
+packages/agent-runtime/src/skill-tool.ts
+  h_201ed4c689ac8b 28-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ab1338acc9b58d969dee75b6d8fc0013d4504f22",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
