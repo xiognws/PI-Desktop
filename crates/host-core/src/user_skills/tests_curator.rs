@@ -47,6 +47,63 @@ fn archive_root() -> PathBuf {
 }
 
 #[test]
+fn the_archive_lists_what_it_holds_and_a_restore_clears_the_row() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let flat = registry
+            .create(agent_input("Waiting", "global", None))
+            .unwrap();
+        let package = registry
+            .create(UserSkillInput {
+                shape: Some("dir".into()),
+                ..agent_input("Packaged wait", "global", None)
+            })
+            .unwrap();
+        backdate(Path::new(&flat.path), 200);
+        backdate(Path::new(&package.path), 200);
+        let report = registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        assert_eq!(report.archived.len(), 2, "{:?}", report.archived);
+
+        // One unreadable document and one directory that is not a skill: the
+        // archive is a directory a user may also write to, and one broken entry
+        // must not hide the rest of it.
+        let archive = archive_root();
+        fs::write(archive.join("junk.md"), [0xff, 0xfe, 0x00]).unwrap();
+        fs::create_dir_all(archive.join("loose-dir")).unwrap();
+
+        let listed = registry.archived(CapabilityLevel::Global, None).unwrap();
+        let ids: Vec<&str> = listed.iter().map(|record| record.id.as_str()).collect();
+        assert_eq!(ids, vec![package.id.as_str(), flat.id.as_str()]);
+        let row = listed
+            .iter()
+            .find(|record| record.id == package.id)
+            .expect("a package is one entry, not one per file");
+        assert_eq!(row.name, "Packaged wait");
+        assert_eq!(row.level.as_deref(), Some("global"));
+        assert_eq!(row.description.as_deref(), Some("Check the relevant files"));
+        assert!(!row.enabled, "an archived document is out of the catalog");
+        assert!(
+            row.path.ends_with("SKILL.md"),
+            "the row points at the archived document: {}",
+            row.path
+        );
+
+        // The id a row carries is the one `restore` takes, and the restore takes
+        // the row out of this list by putting the document back in the catalog.
+        let restored = registry.restore(&flat.id, None, None).unwrap();
+        assert_eq!(restored.id, flat.id);
+        let left = registry.archived(CapabilityLevel::Global, None).unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].id, package.id);
+        assert_eq!(listed_ids(&mut registry), vec![flat.id.clone()]);
+    });
+}
+
+#[test]
 fn an_idle_document_is_reported_before_it_is_archived() {
     let app = tempdir().unwrap();
     let agents = tempdir().unwrap();

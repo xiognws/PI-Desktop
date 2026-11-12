@@ -1,6 +1,6 @@
 import { app, dialog, shell } from "electron";
 import { importSkillFolders, readLastSkillImportDirectory, writeLastSkillImportDirectory } from "../skill-folder-import";
-import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type SkillCurationReport, type UserSkillRecord, type UserSubagentRecord } from "@pi-workspace/shared";
+import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type BuiltinSkillRecord, type SkillArchiveQuery, type SkillCurationReport, type UserSkillRecord, type UserSubagentRecord } from "@pi-workspace/shared";
 import { loadSubagentDefinitions, type UserSubagentDocument } from "@pi-workspace/agent-runtime";
 import { builtinSkillCatalog } from "../builtin-skills";
 import type { HostProcess } from "../host-process";
@@ -153,6 +153,47 @@ export function registerSkillsIpc({
     if (!host) throw new Error("host unavailable");
     return host.call("skills.list", query);
   });
+
+  /**
+   * What one library's `.archive/` holds. Archiving moved the document out of
+   * every scan, so this is the only way a page can draw the archive and offer a
+   * restore; the rows are the same shape `skills.list` returns.
+   */
+  handle(IPC.invoke.skillArchived, async (query: SkillArchiveQuery = {}) => {
+    if (!host) throw new Error("host unavailable");
+    const payload: Record<string, unknown> = {};
+    if (query.level === "global" || query.level === "project") payload.level = query.level;
+    if (typeof query.projectPath === "string" && query.projectPath) {
+      payload.projectPath = query.projectPath;
+    }
+    return host.call("skills.archived", payload);
+  });
+
+  /**
+   * The way back from an archival: the host moves the document out of
+   * `.archive/` and switches it on. Both lists the page draws change, so the
+   * skill-changed event asks every surface to reload rather than patching a row.
+   */
+  handle(
+    IPC.invoke.skillRestore,
+    async (payload: {
+      id?: unknown;
+      level?: unknown;
+      projectPath?: unknown;
+    } = {}) => {
+      if (!host) throw new Error("host unavailable");
+      if (typeof payload.id !== "string" || !payload.id) {
+        throw new Error("invalid skill restore request");
+      }
+      const result = await host.call<{ skill: UserSkillRecord }>("skills.restore", {
+        id: payload.id,
+        ...(typeof payload.level === "string" ? { level: payload.level } : {}),
+        ...(typeof payload.projectPath === "string" ? { projectPath: payload.projectPath } : {}),
+      });
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return result;
+    },
+  );
 
   /**
    * Skill maintenance. `dryRun` defaults to true in the host too, so a stray call

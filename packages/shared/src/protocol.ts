@@ -420,6 +420,8 @@ export const IPC = {
     mcpImportRun: "pi-desktop/mcp/importRun",
     mcpMarketSearch: "pi-desktop/mcp/market/search",
     skillList: "pi-desktop/skill/list",
+    /** What one library's `.archive/` holds, so the page can offer a restore. */
+    skillArchived: "pi-desktop/skill/archived",
     skillBuiltinList: "pi-desktop/skill/builtin/list",
     skillBuiltinSetEnabled: "pi-desktop/skill/builtin/setEnabled",
     skillCreate: "pi-desktop/skill/create",
@@ -432,6 +434,8 @@ export const IPC = {
     skillRemove: "pi-desktop/skill/remove",
     skillSetEnabled: "pi-desktop/skill/setEnabled",
     skillCurate: "pi-desktop/skill/curate",
+    /** Put one archived skill back where the maintenance pass took it from. */
+    skillRestore: "pi-desktop/skill/restore",
     skillSetPinned: "pi-desktop/skill/setPinned",
     skillAbsorb: "pi-desktop/skill/absorb",
     skillSetScope: "pi-desktop/skill/setScope",

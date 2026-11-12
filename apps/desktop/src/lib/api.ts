@@ -117,6 +117,7 @@ import type {
   TraySessionPreferences,
   ToolPermissionResolution,
   BuiltinSkillRecord,
+  SkillArchiveQuery,
   SkillCurationReport,
   UserSkillInput,
   UserSkillRecord,
@@ -1564,6 +1565,16 @@ export const api = {
     invoke<{ id: string; enabled: boolean }>(IPC.invoke.skillBuiltinSetEnabled, { id, enabled }),
   listUserSkills: (query?: AgentCapabilityQuery) =>
     invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList, query),
+  /**
+   * What one library's `.archive/` holds. Archiving moves the document out of
+   * every scan, so this is the only way the page can draw the archive; without
+   * it an archival could not be undone from the UI at all.
+   */
+  listArchivedUserSkills: (query?: SkillArchiveQuery) =>
+    invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillArchived, query ?? {}),
+  /** Move one archived skill back into the catalog and switch it on. */
+  restoreUserSkill: (id: string, query?: AgentCapabilityQuery) =>
+    invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillRestore, { id, ...(query ?? {}) }),
   /**
    * Report the idle skills, or archive them when `dryRun` is explicitly false.
    * The host treats a missing `dryRun` as true, so the page asks first.

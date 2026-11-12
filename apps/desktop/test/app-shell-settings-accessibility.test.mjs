@@ -36,7 +36,10 @@ test("chat code loads inside the existing route boundary and stays mounted in Se
     appShell,
     /const loadChatSurface = \(\) => import\("\.\.\/\.\.\/components\/ChatSurface"\)/,
   );
-  assert.match(appShell, /const ChatSurface = lazy\(\(\) =>\s*loadChatSurface\(\)/);
+  // The route is wrapped in `lazyRoute` so one failed module fetch retries instead
+  // of replacing the surface with the crash panel (ADR 0392); the loader itself is
+  // still the same `import()`.
+  assert.match(appShell, /const ChatSurface = lazy\(\s*\(\) =>\s*lazyRoute\(loadChatSurface\)\(\)/);
   assert.match(appShell, /useEffect\(\(\) => \{\s*void loadChatSurface\(\)\.catch/);
   assert.doesNotMatch(appShell, /import \{ ChatSurface \} from/);
   assert.match(

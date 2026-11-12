@@ -63,6 +63,7 @@ import {
   skillUsageBadge,
   tallySkillUsage,
 } from "../../lib/skill-usage";
+import { archivedSkillRows, type ArchivedSkillRow } from "../../lib/skill-archive";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
 
 function projectSkillsPath(projectPath: string | null): string {
@@ -79,6 +80,9 @@ type SkillCollection = {
   builtins: BuiltinSkillRecord[];
   global: UserSkillRecord[];
   project: UserSkillRecord[];
+  /** What each library's `.archive/` holds, so the section can offer a restore. */
+  archivedGlobal: UserSkillRecord[];
+  archivedProject: UserSkillRecord[];
   /** Stored per-project overrides on global rows, from the accepted fetch. */
   globalOverrides: Record<string, CapabilityOverride>;
 };
@@ -87,6 +91,8 @@ const EMPTY_SKILL_COLLECTION: SkillCollection = {
   builtins: [],
   global: [],
   project: [],
+  archivedGlobal: [],
+  archivedProject: [],
   globalOverrides: {},
 };
 
@@ -125,16 +131,27 @@ export function AgentSkillsPage() {
     // disagree (#1957). The project-scoped global query runs beside it only to
     // surface stored overrides: the runtime gives them precedence, so a stale
     // one written by the old UI must stay visible and resettable, not hidden.
-    const [builtins, global, project, globalEffective] = await Promise.all([
-      api.listBuiltinSkills(),
-      api.listUserSkills({ level: "global" }),
-      selectedProjectPath
-        ? api.listUserSkills({ level: "project", projectPath: selectedProjectPath })
-        : Promise.resolve({ skills: [] as UserSkillRecord[] }),
-      selectedProjectPath
-        ? api.listUserSkills({ level: "global", projectPath: selectedProjectPath })
-        : Promise.resolve({ skills: [] as UserSkillRecord[] }),
-    ]);
+    //
+    // The two archive reads are accessories to the list, so a host that cannot
+    // answer them leaves the section empty instead of failing the page.
+    const nothing: { skills: UserSkillRecord[] } = { skills: [] };
+    const [builtins, global, project, globalEffective, archivedGlobal, archivedProject] =
+      await Promise.all([
+        api.listBuiltinSkills(),
+        api.listUserSkills({ level: "global" }),
+        selectedProjectPath
+          ? api.listUserSkills({ level: "project", projectPath: selectedProjectPath })
+          : Promise.resolve({ skills: [] as UserSkillRecord[] }),
+        selectedProjectPath
+          ? api.listUserSkills({ level: "global", projectPath: selectedProjectPath })
+          : Promise.resolve({ skills: [] as UserSkillRecord[] }),
+        api.listArchivedUserSkills({ level: "global" }).catch(() => nothing),
+        selectedProjectPath
+          ? api
+              .listArchivedUserSkills({ level: "project", projectPath: selectedProjectPath })
+              .catch(() => nothing)
+          : Promise.resolve(nothing),
+      ]);
     // The derived map rides inside the collection: useHostCollection only
     // accepts the newest request, so a late stale fetch can never repaint the
     // override badges of the project the reader has since switched to.
@@ -142,13 +159,22 @@ export function AgentSkillsPage() {
       builtins: builtins.builtins ?? [],
       global: global.skills ?? [],
       project: project.skills ?? [],
+      archivedGlobal: archivedGlobal.skills ?? [],
+      archivedProject: archivedProject.skills ?? [],
       globalOverrides: selectedProjectPath
         ? Object.fromEntries(deriveProjectOverrides(global.skills ?? [], globalEffective.skills ?? []))
         : {},
     };
   }, [selectedProjectPath]);
   const {
-    data: { builtins: builtinSkills, global: globalSkills, project: projectSkills, globalOverrides },
+    data: {
+      builtins: builtinSkills,
+      global: globalSkills,
+      project: projectSkills,
+      archivedGlobal,
+      archivedProject,
+      globalOverrides,
+    },
     setData: setSkills,
     loading,
     refreshing,
@@ -215,6 +241,30 @@ export function AgentSkillsPage() {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
       setCurating(false);
+    }
+  };
+
+  /**
+   * Put one archived document back into the catalog.
+   *
+   * The row names its own library, so the restore says the same level the
+   * document came from: a project row has no global counterpart to fall back to.
+   * The host moves the document and switches it on, so both lists change — the
+   * reload repaints the catalog and the archive together, and the maintenance
+   * report is re-read because a restored skill is no longer idle.
+   */
+  const restoreArchived = async (row: ArchivedSkillRow) => {
+    if (!rowBusy.begin(row.key)) return;
+    const name = row.skill.name || row.skill.id;
+    try {
+      await api.restoreUserSkill(row.skill.id, capabilityQuery(row.level, selectedProjectPath));
+      showToast(t("settings.skillArchivedRestored", { name }), { variant: "success" });
+      await load();
+      await refreshCuration();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      rowBusy.end(row.key);
     }
   };
 
@@ -595,6 +645,18 @@ export function AgentSkillsPage() {
 
   const curationRows = useMemo(() => curationById(curation?.entries), [curation]);
 
+  /**
+   * The archived rows of both libraries, as one list.
+   *
+   * Archiving moves the document out of the catalog, so these rows come from
+   * their own read. Their key names the library they came from, which keeps a
+   * restore's busy state off a live row that happens to hold the same id.
+   */
+  const archivedRows = useMemo(
+    () => archivedSkillRows(archivedGlobal, archivedProject),
+    [archivedGlobal, archivedProject],
+  );
+
   /** A row's usage state, as badges beside its level. */
   const usageBadge = (skill: UserSkillRecord) => {
     const badge = skillUsageBadge(skill);
@@ -845,6 +907,41 @@ export function AgentSkillsPage() {
     );
   };
 
+  /**
+   * One archived row: the two things a document out of the catalog still has —
+   * a name and a library to go back to — plus the only action that means
+   * anything here, which is the undo.
+   */
+  const renderArchivedRow = (row: ArchivedSkillRow) => {
+    const name = row.skill.name || row.skill.id;
+    const busy = rowBusy.isBusy(row.key);
+    return (
+      <CapabilityRow
+        key={row.key}
+        glyph={<IconBookOpen size={16} />}
+        name={name}
+        off={!row.skill.enabled}
+        badges={
+          <span className="agent-capability-badge is-level">
+            {row.level === "global"
+              ? t("settings.capabilityFilterGlobal")
+              : t("settings.capabilityFilterProject")}
+          </span>
+        }
+        description={row.skill.description || t("settings.noCapabilityDescription")}
+        actions={
+          <CapabilityButton
+            busy={busy}
+            title={t("settings.skillArchivedRestoreNamed", { name })}
+            onClick={() => void restoreArchived(row)}
+          >
+            {t("settings.skillArchivedRestore")}
+          </CapabilityButton>
+        }
+      />
+    );
+  };
+
   const renderBuiltinRow = (skill: BuiltinSkillRecord) => {
     const key = builtinRowKey(skill.id);
     const name = skill.name || skill.id;
@@ -1056,6 +1153,32 @@ export function AgentSkillsPage() {
                 : t("settings.skillCurateAction", { count: archivableCount })}
             </CapabilityButton>
           </SettingsRow>
+        </SettingsCard>
+      ) : null}
+
+      {/*
+        The archive is invisible to every other surface, which is why archiving
+        looked one-way: the documents are out of the catalog but still on disk.
+        Listing them here is what makes the restraint of ADR 0395 (nothing is
+        deleted) usable — a pass that cannot be undone is a pass nobody dares
+        let run. Nothing is claimed before the first read lands, so the card
+        waits with the list instead of flashing "nothing is archived".
+      */}
+      {!loading ? (
+        <SettingsCard
+          title={t("settings.skillArchivedTitle")}
+          description={t("settings.skillArchivedDesc")}
+        >
+          {archivedRows.length === 0 ? (
+            <CapabilityEmpty
+              message={t("settings.skillArchivedEmpty")}
+              icon={<IconBookOpen size={18} />}
+            />
+          ) : (
+            <div className="agent-capability-list">
+              {archivedRows.map(renderArchivedRow)}
+            </div>
+          )}
         </SettingsCard>
       ) : null}
 

@@ -1655,6 +1655,15 @@ through `Skill`. It is not gone: the id, the bytes and every sibling resource
 are intact (ADR 0395).
 
 - `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
+- `skills.archived({ level?, projectPath? })` → `{ skills: UserSkillRecord[] }` — the
+  rows waiting in `<skills root>/.archive/`, in the same shape `skills.list`
+  returns and with no body: `id`, `name`, `description`, level and the counters a
+  row is drawn with. `level` defaults to `global`. The id is the archive's own
+  name (`<id>.md`, or `<id>/` for a package, one entry per skill), because that is
+  the key `skills.restore` takes — a row can never offer a restore the host would
+  refuse for name reasons. An entry that cannot be read or parsed is skipped
+  rather than failing the call, so one broken document cannot hide the archive;
+  archived rows report `enabled: false`, which is what "out of the catalog" means.
 - `skills.active({ projectPath? })` → the effective runtime list
 - `skills.create(skill)` — writes one skill document. `skill.createdBy` is
   `"agent"` when the agent wrote it (`skill_manage` always sends it); the host
@@ -1737,6 +1746,13 @@ are intact (ADR 0395).
   next automatic pass does not take it out again immediately. `SKILL_INVALID`
   when the id is not in the archive or when the destination is already occupied;
   nothing is ever overwritten.
+
+The archive's two Desktop channels are `pi-desktop/skill/archived`
+(`{ level?, projectPath? }` → the same `{ skills }`, which is what lets Settings
+draw the archive) and `pi-desktop/skill/restore`
+(`{ id, level?, projectPath? }` → `{ skill }`). A restore emits the skill-changed
+event because both lists the page draws change with it; Settings reloads the
+catalog and the archive together rather than patching one row.
 
 The maintenance pass also runs on its own, at most once a day: Electron main
 reuses the scheduled runner's tick and calls `skills.curate` with `dryRun: false`

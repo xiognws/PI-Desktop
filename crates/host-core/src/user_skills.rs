@@ -2067,6 +2067,123 @@ impl UserSkillRegistry {
         archive_skill_files(&PathBuf::from(&record.path), &root, &record.id)
     }
 
+    /// What one library's archive holds, in the shape [`Self::list`] returns.
+    ///
+    /// The archive is out of every scan, so without this read the only way back
+    /// from an archival is the RPC itself: a page can offer a restore button
+    /// only for a row it can draw, and the row needs an id the host will honour.
+    /// The id is therefore the archive's own name — `<id>.md` or `<id>/` — not a
+    /// slug of the frontmatter, because that is the key [`Self::restore`] takes.
+    ///
+    /// Entries that cannot be read or parsed are skipped rather than failing the
+    /// call: one broken document in the archive must not hide the rest of it.
+    /// Nothing here reads a body into the answer; the catalog only ever needs
+    /// the frontmatter-derived name and description.
+    pub fn archived(
+        &mut self,
+        level: CapabilityLevel,
+        project_path: Option<&str>,
+    ) -> Result<Vec<UserSkillRecord>> {
+        let directory = capability_dir(level, project_path, "skills")?;
+        let owner_project_path = if level == CapabilityLevel::Project {
+            project_path.map(normalize_project_path)
+        } else {
+            None
+        };
+        let mut records = Vec::new();
+        let Ok(entries) = fs::read_dir(archive_dir(&directory)) else {
+            return Ok(records);
+        };
+        for entry in entries.flatten() {
+            let archived = entry.path();
+            // A package is one entry: the directory's name is the id and its
+            // `SKILL.md` is the document, exactly as the archive step left them.
+            let (id, document) = if archived.is_dir() {
+                (
+                    entry.file_name().to_string_lossy().to_string(),
+                    archived.join("SKILL.md"),
+                )
+            } else {
+                let is_markdown = archived
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("md"));
+                if !is_markdown {
+                    continue;
+                }
+                (
+                    archived
+                        .file_stem()
+                        .map(|stem| stem.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    archived.clone(),
+                )
+            };
+            if !valid_id(&id) {
+                continue;
+            }
+            let Ok(raw) = fs::read_to_string(&document) else {
+                continue;
+            };
+            let (front, body) = parse_front_matter(&raw);
+            // The same rule the live scan applies, so the archive cannot list a
+            // document a restore would then refuse to bring back.
+            if body.trim().is_empty() {
+                continue;
+            }
+            let name = clip(
+                front.get("name").map(String::as_str).unwrap_or(&id),
+                MAX_NAME_CHARS,
+            );
+            if name.is_empty() {
+                continue;
+            }
+            let description = front
+                .get("description")
+                .map(|value| clip(value, MAX_DESCRIPTION_CHARS))
+                .filter(|value| !value.is_empty());
+            let updated_at = file_timestamp(&document);
+            let usage = self.usage.get(level, &id, owner_project_path.as_deref());
+            // Read before the record takes ownership of the id, the same order
+            // the live scan reads them in.
+            let pinned = self
+                .pins
+                .is_pinned(level, &id, owner_project_path.as_deref());
+            let absorbed_into = self
+                .links
+                .get(level, &id, owner_project_path.as_deref())
+                .map(|link| link.into);
+            records.push(UserSkillRecord {
+                id,
+                name,
+                level: Some(level.as_str().to_string()),
+                project_path: owner_project_path.clone(),
+                description,
+                // An archived document is out of the catalog, which is what
+                // "archived" means. A restore is what switches it on, so a row
+                // here never claims the skill is in use.
+                enabled: false,
+                scope: scope_for(level, owner_project_path.as_deref()),
+                source: "imported".into(),
+                path: document.to_string_lossy().to_string(),
+                size_bytes: raw.len() as u64,
+                created_at: updated_at.clone(),
+                updated_at,
+                last_used_at: usage.map(|usage| usage.last_used_at),
+                use_count: usage.map(|usage| usage.use_count).unwrap_or(0),
+                pinned,
+                absorbed_into,
+            });
+        }
+        records.sort_by(|a, b| {
+            a.name
+                .to_lowercase()
+                .cmp(&b.name.to_lowercase())
+                .then(a.id.cmp(&b.id))
+        });
+        Ok(records)
+    }
+
     /// Bring one archived skill back into the catalog.
     ///
     /// The maintenance pass moved the document out of the library rather than

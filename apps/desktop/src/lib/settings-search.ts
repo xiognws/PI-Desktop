@@ -206,6 +206,7 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.skillReviewUiDesc",
       "settings.skillCurateAutoTitle",
       "settings.skillCurateAutoDesc",
+      "settings.skillArchivedTitle",
       "settings.globalScopeDescription",
       "settings.projectScopeDescription",
       "settings.importSkill",

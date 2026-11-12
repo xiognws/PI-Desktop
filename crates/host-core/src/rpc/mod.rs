@@ -5621,6 +5621,19 @@ async fn handle_request(
                 .map_err(skill_err)?;
             Ok(json!({ "skills": skills }))
         }
+        "skills.archived" => {
+            // The archive is out of every scan, so the page needs its own read to
+            // draw a row — and a row is all `skills.restore` needs to undo an
+            // archival. Same shape as `skills.list`, no body; no `level` means
+            // the global library.
+            let (level, project_path) = parse_capability_query(&params)?;
+            let mut st = state.lock().await;
+            let skills = st
+                .user_skills
+                .archived(level, project_path.as_deref())
+                .map_err(skill_err)?;
+            Ok(json!({ "skills": skills }))
+        }
         "skills.active" => {
             let project_path = params.get("projectPath").and_then(Value::as_str);
             let mut st = state.lock().await;
@@ -6797,6 +6810,28 @@ mod tests {
             .iter()
             .all(|row| row["id"] != json!(id)));
 
+        // The archive is out of every scan, so the page can only offer a restore
+        // for a row it was given: the listing is that row, with the same shape
+        // the catalog uses and no body.
+        let archived = handle_request(
+            state.clone(),
+            "skills.archived",
+            json!({ "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let row = archived["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == json!(id))
+            .expect("the archived skill is listed");
+        assert_eq!(row["name"], json!("Idle probe"));
+        assert_eq!(row["description"], json!("d"));
+        assert_eq!(row["enabled"], json!(false));
+        assert!(row.get("body").is_none(), "a listing carries no body");
+
         let restored = handle_request(
             state.clone(),
             "skills.restore",
@@ -6808,6 +6843,30 @@ mod tests {
         assert_eq!(restored["skill"]["id"], json!(id));
         assert_eq!(restored["skill"]["enabled"], json!(true));
         assert!(!archive.exists(), "the archive no longer holds it");
+
+        // Both lists change: the archive drops the row and the catalog has it.
+        let archived = handle_request(
+            state.clone(),
+            "skills.archived",
+            json!({ "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(archived["skills"], json!([]));
+        let listed = handle_request(
+            state.clone(),
+            "skills.list",
+            json!({ "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert!(listed["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["id"] == json!(id)));
 
         // Nothing left in the archive: a second restore is a clear refusal, not a
         // silent success that would read as "already done".

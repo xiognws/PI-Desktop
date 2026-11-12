@@ -89,9 +89,11 @@ The threshold itself is unchanged: 90 idle days, agent-authored documents only
 - An archived document is invisible to the product but fully intact on disk,
   which is why the archive can be reached by id alone and why the pass may act
   without a second confirmation.
-- Two surfaces still owe the user a view: nothing in the settings page lists the
-  archive or offers `skills.restore` yet, so today the way back is the RPC. A
-  restore button is the obvious next step and needs no new host behaviour.
+- The way back is `skills.restore` plus a read: the Settings page lists the
+  archive through `skills.archived` and offers a restore per row, because an
+  archived document is in no other list and a button needs a row to sit on. The
+  read is by id alone, which is why it needs no new host behaviour beyond
+  reading `.archive/`.
 - `.archive` is a reserved name in the library. A skill directory by that name
   would be skipped by the scan; ids are slugs and cannot start with a dot, so a
   skill cannot collide with it.

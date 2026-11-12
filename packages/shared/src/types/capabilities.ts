@@ -159,6 +159,19 @@ export type UserSkillRecord = {
   absorbedInto?: string;
 };
 
+/**
+ * A read of one library's archive (ADR 0395).
+ *
+ * `level` is optional and defaults to `global`: the archive is a view of a
+ * library, not of the picker's project, so the global archive stays readable
+ * while no project is selected. Rows come back as `UserSkillRecord` — the shape
+ * `skills.list` returns — because the page draws them with the same row.
+ */
+export type SkillArchiveQuery = {
+  level?: AgentCapabilityLevel;
+  projectPath?: string;
+};
+
 /** How idle one skill is, as the maintenance pass sees it. */
 export type SkillCurationEntry = {
   id: string;
