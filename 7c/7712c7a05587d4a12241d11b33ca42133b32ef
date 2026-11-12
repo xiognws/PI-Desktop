@@ -1,0 +1,16 @@
+services/autotest/src/autotest/executors/service.py
+  h_201ed4c689ac8b 202-204
+services/autotest/tests/test_executors.py
+  h_201ed4c689ac8b 441-448
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7c7712c7a05587d4a12241d11b33ca42133b32ef",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
