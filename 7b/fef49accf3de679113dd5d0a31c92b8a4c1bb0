@@ -1,0 +1,78 @@
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 3,98-103,173,347-352,357-359
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 666,1063
+apps/desktop/electron/main/runtime/curator-runner.ts
+  h_201ed4c689ac8b 1-96
+apps/desktop/electron/main/runtime/provider-catalog.ts
+  h_201ed4c689ac8b 217,251-258
+apps/desktop/electron/main/runtime/scheduled-runner.ts
+  h_201ed4c689ac8b 39-45,77-83
+apps/desktop/electron/main/runtime/session-coordination.ts
+  h_201ed4c689ac8b 322-333,394
+apps/desktop/src/components/settings/AgentSkillsPage.tsx
+  h_201ed4c689ac8b 108-119,1107-1116
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 624-631
+apps/desktop/src/lib/settings-search.ts
+  h_201ed4c689ac8b 207-208
+apps/desktop/test/curator-auto-run.test.mjs
+  h_201ed4c689ac8b 1-142
+apps/desktop/test/scheduled-runner.test.mjs
+  h_201ed4c689ac8b 197-256
+apps/desktop/test/settings-roundtrip.test.mjs
+  h_201ed4c689ac8b 241-263
+crates/host-core/src/agent_capabilities.rs
+  h_201ed4c689ac8b 738,742-752,760
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 1061-1083,5846-5865,6733-6825
+crates/host-core/src/rpc/visualization_tests.rs
+  h_201ed4c689ac8b 692-696,698
+crates/host-core/src/user_skills.rs
+  h_201ed4c689ac8b 33-41,476-535,631-688,1157-1162,1239-1244,1248,1250,1252,1254,2016,2018-2021,2033-2036,2040-2047,2050-2053,2059-2144
+crates/host-core/src/user_skills/curator.rs
+  h_201ed4c689ac8b 5-14,144,172-174
+crates/host-core/src/user_skills/tests_curator.rs
+  h_201ed4c689ac8b 2,33-48,79-82,88-148,150,152-323,451-454
+docs/adr/0387-skill-curation-by-idle-days.md
+  h_201ed4c689ac8b 3-6,45-47,54-57
+docs/adr/0395-skill-archive-by-move-and-daily-pass.md
+  h_201ed4c689ac8b 1-99
+docs/adr/README.md
+  h_201ed4c689ac8b 426
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1652-1656,1720-1748
+docs/zh-CN/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1281-1284,1312-1329
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1253-1254
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1263-1264
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1253-1254
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1253-1254
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1259-1260
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1237-1238
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1259-1260
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1250-1251
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1250-1251
+packages/shared/src/types/settings.ts
+  h_201ed4c689ac8b 243-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7bfef49accf3de679113dd5d0a31c92b8a4c1bb0",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
