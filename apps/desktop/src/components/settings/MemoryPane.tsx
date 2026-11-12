@@ -1,157 +1,112 @@
 /**
- * Durable memory panel (ADR 0371).
+ * Structured memory panel (ADR 0393).
  *
- * Read-mostly: the agent writes memories through its tool, and this surface is
- * where a user audits, pins, searches and deletes them. Search and scope
- * filtering happen client-side over the first page because a session's memory
- * count is small; the host still owns paging for callers that need it.
+ * Read-mostly: the agent retains memories through its tool and the runtime
+ * recalls them by relevance, so this page is where a person audits the store,
+ * pins what must always be present, searches it, and forgets what is wrong.
+ * The `memory` / `user` flat entry list this page used to render is retired —
+ * one store, grouped by kind and scope instead of by two prompt targets.
+ *
+ * Search is a recall on the host, not a client-side filter: the index and the
+ * ranking live there, and this page only decides what to ask for.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  api,
-  type MemoryKind,
-  type MemoryRecord,
-  type MemoryScope,
-  type MemoryStats,
-} from "../../lib/api";
+import { api, type MemoryRecord, type MemoryStats } from "../../lib/api";
+import { LatestWinsGate } from "../../lib/latest-wins";
+import { memoryView, sortMemoryRecords, type MemoryScopeFilter } from "../../lib/memory-view";
 import { SettingsCard } from "../../features/settings/primitives";
-import { mergeLegacyInto, type MemoryTarget } from "../../lib/memory-merge";
-import { Badge, Button, cx, Input, SegmentedControl } from "../ui";
+import { Button, Input, SegmentedControl } from "../ui";
+import { MEMORY_SCOPE_LABEL_KEY, MemoryList } from "./MemoryList";
 
-const PAGE_SIZE = 200;
+const SCOPE_FILTERS: readonly MemoryScopeFilter[] = ["all", "global", "project", "session"];
 
-const SCOPE_FILTERS = ["all", "global", "project", "session"] as const;
-type ScopeFilter = (typeof SCOPE_FILTERS)[number];
+/** Typing settles before a recall is asked for; the host is not a keystroke fan-out. */
+const SEARCH_DELAY_MS = 250;
 
-const KIND_LABEL_KEY: Record<MemoryKind, string> = {
-  fact: "settings.memoryKindFact",
-  preference: "settings.memoryKindPreference",
-  decision: "settings.memoryKindDecision",
-  pitfall: "settings.memoryKindPitfall",
-  procedure: "settings.memoryKindProcedure",
-};
+function describe(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
 
-const SCOPE_LABEL_KEY: Record<MemoryScope, string> = {
-  global: "settings.memoryScopeGlobal",
-  project: "settings.memoryScopeProject",
-  session: "settings.memoryScopeSession",
-};
-
-function useMemoryData(scope: ScopeFilter) {
+export function MemoryPane() {
+  const { t } = useTranslation();
+  const [scope, setScope] = useState<MemoryScopeFilter>("all");
+  const [query, setQuery] = useState("");
+  const trimmed = query.trim();
   const [records, setRecords] = useState<MemoryRecord[]>([]);
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [tidying, setTidying] = useState(false);
+  // Only the newest read may land; a slow list must not overwrite fresh hits.
+  const gateRef = useRef<LatestWinsGate | null>(null);
+  if (gateRef.current === null) gateRef.current = new LatestWinsGate();
 
-  const load = useCallback(async () => {
+  const loadStats = useCallback(async () => {
+    try {
+      const counted = await api.memoryStats();
+      setStats(counted.stats);
+    } catch {
+      // The counts are context only; a page that can list memories stays usable.
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
+    const gate = gateRef.current;
+    if (!gate) return;
+    const token = gate.begin();
     setLoading(true);
     setError(null);
     try {
-      const filter = scope === "all" ? { limit: PAGE_SIZE } : { scope, limit: PAGE_SIZE };
-      const [listed, counted] = await Promise.all([
-        api.listMemories(filter),
-        api.memoryStats(),
-      ]);
-      setRecords(listed.memories);
-      setStats(counted.stats);
+      const view = await memoryView(api, { scope, query });
+      if (!gate.isCurrent(token)) return;
+      setRecords(view.records);
+      // Counts describe the whole store, so a recall result does not change them.
+      if (!view.recalled) await loadStats();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (gate.isCurrent(token)) setError(describe(cause));
     } finally {
-      setLoading(false);
+      if (gate.isCurrent(token)) setLoading(false);
     }
-  }, [scope]);
+  }, [scope, query, loadStats]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { records, setRecords, stats, loading, error, load };
-}
-
-/**
- * What the agent actually wrote, from the flat entry list the model reads.
- *
- * The scored store below (`memories`, ADR 0371) is the older model and it can be
- * empty while the agent has been recording for days — the two are different
- * tables, and a page that shows only the older one reads as "memory is broken".
- */
-function useAgentEntries() {
-  const [entries, setEntries] = useState<{ memory: string[]; user: string[] }>({
-    memory: [],
-    user: [],
-  });
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [memory, user] = await Promise.all([
-          api.memoryEntries("memory"),
-          api.memoryEntries("user"),
-        ]);
-        if (!cancelled) {
-          setEntries({ memory: memory?.entries ?? [], user: user?.entries ?? [] });
-        }
-      } catch {
-        // A section that cannot read the list must not fail the whole page.
-        if (!cancelled) setEntries({ memory: [], user: [] });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return { entries, setEntries };
-}
-
-export function MemoryPane() {
-  const { t, i18n } = useTranslation();
-  const [scope, setScope] = useState<ScopeFilter>("all");
-  const { records, setRecords, stats, loading, error, load } = useMemoryData(scope);
-  const { entries: agentEntries, setEntries: setAgentEntries } = useAgentEntries();
-  const [savingEntries, setSavingEntries] = useState(false);
-  const [mergingLegacy, setMergingLegacy] = useState(false);
-  const [query, setQuery] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [tidying, setTidying] = useState(false);
-
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return records;
-    return records.filter((record) => {
-      const haystack = `${record.title} ${record.body} ${record.tags.join(" ")}`.toLowerCase();
-      return haystack.includes(needle);
-    });
-  }, [records, query]);
+    // An empty query restores the list immediately; a typed one waits for the
+    // debounce window so recall runs against what the person meant to type.
+    const timer = window.setTimeout(() => void refresh(), trimmed ? SEARCH_DELAY_MS : 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh, trimmed]);
 
   const togglePin = async (record: MemoryRecord) => {
     setBusyId(record.id);
     setNotice(null);
     try {
       const { memory } = await api.updateMemory({ id: record.id, pinned: !record.pinned });
-      setRecords((prev) => prev.map((item) => (item.id === memory.id ? memory : item)));
+      setRecords((previous) =>
+        sortMemoryRecords(previous.map((item) => (item.id === memory.id ? memory : item))),
+      );
+      await loadStats();
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(describe(cause));
     } finally {
       setBusyId(null);
     }
   };
 
   const forget = async (record: MemoryRecord) => {
-    const confirmed = window.confirm(
-      t("settings.memoryDeleteConfirm", { title: record.title }),
-    );
+    const confirmed = window.confirm(t("settings.memoryDeleteConfirm", { title: record.title }));
     if (!confirmed) return;
     setBusyId(record.id);
     setNotice(null);
     try {
       await api.forgetMemory({ id: record.id });
-      setRecords((prev) => prev.filter((item) => item.id !== record.id));
-      await load();
+      setRecords((previous) => previous.filter((item) => item.id !== record.id));
+      await loadStats();
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(describe(cause));
     } finally {
       setBusyId(null);
     }
@@ -163,98 +118,31 @@ export function MemoryPane() {
     try {
       const result = await api.tidyMemories();
       setNotice(t("settings.memoryTidyDone", { count: result.removed }));
-      await load();
+      await refresh();
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
+      setNotice(describe(cause));
     } finally {
       setTidying(false);
     }
   };
 
-  const scopeOptions = SCOPE_FILTERS.map((value) => ({
-    value,
-    label:
-      value === "all" ? t("settings.memoryFilterAll") : t(SCOPE_LABEL_KEY[value]),
-  }));
-
-  /**
-   * Copy the older scored store into the entry list the model actually reads.
-   *
-   * Copy, not move: the legacy rows stay where they are, so a bad merge is undone
-   * by deleting the entries it added, and nothing a past session recorded can be
-   * lost by a bug here.
-   */
-  const mergeLegacy = async () => {
-    setMergingLegacy(true);
-    try {
-      const [listed] = await Promise.all([api.listMemories({ limit: PAGE_SIZE })]);
-      let addedTotal = 0;
-      let overflowTotal = 0;
-      for (const target of ["user", "memory"] as MemoryTarget[]) {
-        const current = target === "user" ? agentEntries.user : agentEntries.memory;
-        const result = mergeLegacyInto(current, listed.memories, target);
-        if (result.added.length === 0) {
-          overflowTotal += result.overflow.length;
-          continue;
-        }
-        await api.writeMemoryEntries(target, result.next);
-        addedTotal += result.added.length;
-        overflowTotal += result.overflow.length;
-        setAgentEntries((previous) => ({ ...previous, [target]: result.next }));
-      }
-      setNotice(
-        t("settings.memoryMergeDone", {
-          added: addedTotal,
-          skipped: overflowTotal,
-        }),
-      );
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setMergingLegacy(false);
-    }
-  };
-
-  /**
-   * Drop one entry from a store.
-   *
-   * The list is the model's context, so this is the one edit a person can make
-   * that changes what the next turn reads. It uses the same whole-list write the
-   * `memory` tool uses, which means the host's budget check applies here too.
-   */
-  const removeAgentEntry = async (target: "memory" | "user", index: number) => {
-    const next = agentEntries[target].filter((_, position) => position !== index);
-    const previous = agentEntries;
-    setAgentEntries({ ...agentEntries, [target]: next });
-    setSavingEntries(true);
-    try {
-      await api.writeMemoryEntries(target, next);
-    } catch (cause) {
-      setAgentEntries(previous);
-      setNotice(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setSavingEntries(false);
-    }
-  };
+  const scopeOptions = useMemo(
+    () =>
+      SCOPE_FILTERS.map((value) => ({
+        value,
+        label: value === "all" ? t("settings.memoryFilterAll") : t(MEMORY_SCOPE_LABEL_KEY[value]),
+      })),
+    [t],
+  );
 
   return (
     <SettingsCard
       title={t("settings.memory")}
       description={t("settings.memoryIntro")}
       action={
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void mergeLegacy()}
-            disabled={mergingLegacy || records.length === 0}
-          >
-            {mergingLegacy ? t("settings.memoryMergeRunning") : t("settings.memoryMergeAction")}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => void tidy()} disabled={tidying}>
-            {tidying ? t("settings.memoryTidying") : t("settings.memoryTidy")}
-          </Button>
-        </div>
+        <Button variant="secondary" size="sm" onClick={() => void tidy()} disabled={tidying}>
+          {tidying ? t("settings.memoryTidying") : t("settings.memoryTidy")}
+        </Button>
       }
     >
       <div className="flex flex-col gap-3">
@@ -274,47 +162,6 @@ export function MemoryPane() {
           />
         </div>
 
-        <div className="rounded-md border border-border/60 p-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-sm font-medium">{t("settings.memoryAgentTitle")}</span>
-            <span className="text-xs text-muted">
-              {t("settings.memoryAgentCounts", {
-                memory: agentEntries.memory.length,
-                user: agentEntries.user.length,
-              })}
-            </span>
-          </div>
-          {agentEntries.memory.length + agentEntries.user.length === 0 ? (
-            <p className="mt-1 text-xs text-muted">{t("settings.memoryAgentEmpty")}</p>
-          ) : (
-            <ul className="mt-2 flex flex-col gap-1">
-              {[
-                ...agentEntries.user.map((text, index) => ({ text, target: "user" as const, index })),
-                ...agentEntries.memory.map((text, index) => ({ text, target: "memory" as const, index })),
-              ].map((entry) => (
-                <li key={`${entry.target}-${entry.index}`} className="flex items-baseline gap-2 text-xs">
-                  <Badge>{t(
-                    entry.target === "user"
-                      ? "settings.memoryAgentUser"
-                      : "settings.memoryAgentMemory",
-                  )}</Badge>
-                  <span className="min-w-0 flex-1 break-words">{entry.text}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={savingEntries}
-                    aria-label={t("settings.memoryAgentRemove", { text: entry.text.slice(0, 40) })}
-                    onClick={() => void removeAgentEntry(entry.target, entry.index)}
-                  >
-                    ×
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-2 text-xs text-muted">{t("settings.memoryAgentHint")}</p>
-        </div>
-
         {stats ? (
           <p className="text-xs text-muted">
             {t("settings.memoryStatsLine", {
@@ -329,64 +176,20 @@ export function MemoryPane() {
         {notice ? <p className="text-xs text-muted">{notice}</p> : null}
         {loading ? <p className="text-xs text-muted">{t("settings.memoryLoading")}</p> : null}
 
-        {!loading && visible.length === 0 ? (
+        {!loading && records.length === 0 ? (
           <p className="text-xs text-muted">
-            {query.trim() ? t("settings.memoryEmptyFiltered") : t("settings.memoryEmpty")}
+            {trimmed ? t("settings.memoryEmptyFiltered") : t("settings.memoryEmpty")}
           </p>
         ) : null}
 
-        <ul className="flex flex-col gap-2">
-          {visible.map((record) => (
-            <li
-              key={record.id}
-              className={cx(
-                "rounded-md border border-[var(--border)] px-3 py-2",
-                record.supersededBy && "opacity-60",
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm font-medium">{record.title}</span>
-                    <Badge>{t(KIND_LABEL_KEY[record.kind])}</Badge>
-                    <Badge>{t(SCOPE_LABEL_KEY[record.scope])}</Badge>
-                    {record.pinned ? <Badge>{t("settings.memoryPinned")}</Badge> : null}
-                    {record.supersededBy ? (
-                      <Badge>{t("settings.memorySuperseded")}</Badge>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 whitespace-pre-wrap text-xs text-muted">{record.body}</p>
-                  <p className="mt-1 text-2xs text-muted">
-                    {t("settings.memoryMeta", {
-                      used: record.useCount,
-                      date: new Date(record.lastUsedAt ?? record.createdAt).toLocaleDateString(
-                        i18n.language,
-                      ),
-                    })}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busyId === record.id}
-                    onClick={() => void togglePin(record)}
-                  >
-                    {record.pinned ? t("settings.memoryUnpin") : t("settings.memoryPin")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busyId === record.id}
-                    onClick={() => void forget(record)}
-                  >
-                    {t("settings.memoryDelete")}
-                  </Button>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {records.length > 0 ? (
+          <MemoryList
+            records={records}
+            busyId={busyId}
+            onTogglePin={(record) => void togglePin(record)}
+            onForget={(record) => void forget(record)}
+          />
+        ) : null}
       </div>
     </SettingsCard>
   );
