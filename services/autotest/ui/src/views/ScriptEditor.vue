@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Save, Play, FileCode, FolderOpen, Loader2 } from 'lucide-vue-next'
+import { ArrowLeft, Save, Play, FileCode, FolderOpen, Loader2, ShieldCheck, CheckCircle2, XCircle, Braces } from 'lucide-vue-next'
 import * as vscode from 'vscode'
 import { configureDefaultWorkerFactory } from 'monaco-languageclient/workerFactory'
 import { conf as pyConf } from 'monaco-editor/languages/definitions/python/python.js'
@@ -23,6 +23,32 @@ const running = ref(false)
 const runOutput = ref('')
 const showOutput = ref(false)
 const editorContainer = ref<HTMLDivElement | null>(null)
+
+// 编辑器脏标记：「保存」按钮和自动保存共用，避免以为存了其实没存
+const dirty = ref(false)
+const saving = ref(false)
+// 静态闸门（后端 compile / 首行 @target 校验）的结果
+const gating = ref(false)
+const gateFailures = ref<string[]>([])
+const gateChecked = ref(false)
+// 闸门跑过且没通过 → 运行置灰；闸门没跑过不拦（不然新脚本连跑都跑不了）
+const blockRun = computed(() => gateChecked.value && gateFailures.value.length > 0)
+// 最后一次运行的完整结果：status / failure / duration / execution_id 都要能看见，
+// 只留 stdout 会把「通过还是失败」这个最要紧的信息藏起来
+type RunResult = {
+  status?: string
+  status_label?: string
+  success?: boolean
+  returncode?: number
+  duration_ms?: number
+  execution_id?: number
+  run_id?: string
+  // 执行器给字符串（"AssertionError: xxx"），事件回放给对象（{type,message,line}）
+  failure?: string | { type?: string; message?: string; line?: number } | null
+  stdout?: string
+  stderr?: string
+}
+const runResult = ref<RunResult | null>(null)
 
 let lcWrapper: LanguageClientWrapper | null = null
 let editorApp: EditorApp | null = null
@@ -136,10 +162,20 @@ async function initEditor() {
     },
   }
 
+  // LSP 是加分项，不是编辑器的前提：网关没装 basedpyright（便携包就是这样）时
+  // 连接会失败或一直挂着，不能让它把整个编辑器堵在「正在初始化」。
   lcWrapper = new LanguageClientWrapper(languageClientConfig)
-  await lcWrapper.start()
-  lspConnected.value = true
-  statusText.value = 'LSP 已连接'
+  try {
+    await Promise.race([
+      lcWrapper.start(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('LSP 连接超时')), 6000)),
+    ])
+    lspConnected.value = true
+    statusText.value = 'LSP 已连接'
+  } catch (e) {
+    lspConnected.value = false
+    statusText.value = `无 LSP（${(e as Error).message}）· 编辑/保存/运行不受影响`
+  }
 
   // codeUri 和 README 一致：/workspace/xxx.py，不带 file://，不设 enforceLanguageId
   const codeUri = `/workspace/scripts/${script?.name || 'untitled.py'}`
@@ -186,53 +222,163 @@ async function initEditor() {
     console.error('didOpen error', e)
   }
 
-  // 自动保存：监听文档变化，防抖 1.5 秒后保存
-  try {
+  // 自动保存：挂 Monaco 的 model 事件，不依赖 LSP（没有 langserver 时
+  // didChangeTextDocument 根本不会来，改完等于没存）
+  const monacoEditor = editorApp?.getEditor()
+  if (monacoEditor) {
     let saveTimer: any = null
-    vscode.workspace.onDidChangeTextDocument((e: any) => {
-      if (!e.document.uri.path.includes('.py')) return
+    monacoEditor.onDidChangeModelContent(() => {
+      dirty.value = true
       if (saveTimer) clearTimeout(saveTimer)
-      saveTimer = setTimeout(async () => {
-        try {
-          await fetch(`/api/projects/${projectId}/scripts/${scriptId}/content`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: e.document.getText() }),
-          })
-          statusText.value = `已自动保存 ${new Date().toLocaleTimeString()}`
-        } catch (err) {
-          console.error('自动保存失败', err)
-        }
-      }, 1500)
+      saveTimer = setTimeout(() => void saveNow(), 1500)
     })
-  } catch (e) {
-    console.error('自动保存监听失败', e)
   }
 
-  statusText.value = 'basedpyright 已连接'
+  if (lspConnected.value) statusText.value = 'basedpyright 已连接'
 }
 
 function switchScript(id: string) {
   router.push(`/project/${projectId}/scripts/${id}/edit`)
 }
 
+const PYTEST_TEMPLATE = `def test_case_placeholder():
+    \"\"\"一句话说明这条用例要证明什么。\"\"\"
+    # 1. 前置：构造输入 / 准备数据
+    # 2. 操作：调用被测接口或界面动作
+    result = None
+    # 3. 断言：写具体值，别留 assert True
+    assert result is not None, "把断言写具体"
+`
+
+// 取正文只走 Monaco 实例：vscode.window.activeTextEditor 依赖 language client，
+// 没有 LSP 时它是空的，会让「保存」「模板」全部失效。
+function editorText(): string {
+  return editorApp?.getEditor()?.getModel()?.getValue() ?? ''
+}
+
+/** 手动保存：自动保存是 1.5 秒防抖，改了立刻要落盘时用它，失败必须吼出来。 */
+async function saveNow() {
+  const content = editorText()
+  if (!content) {
+    statusText.value = '编辑器还没就绪，取不到内容'
+    return
+  }
+  saving.value = true
+  try {
+    const res = await fetch(`/api/projects/${projectId}/scripts/${scriptId}/content`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    dirty.value = false
+    statusText.value = `已保存 ${new Date().toLocaleTimeString()}`
+  } catch (e: any) {
+    statusText.value = `保存失败：${e?.message || e}`
+  } finally {
+    saving.value = false
+  }
+}
+
+/** 静态闸门：先落盘再校验，否则校验的是旧内容。 */
+async function runGate() {
+  gating.value = true
+  gateChecked.value = false
+  try {
+    await saveNow()
+    const res = await fetch(`/api/projects/${projectId}/scripts/${scriptId}/gate`, { method: 'POST' })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`)
+    gateFailures.value = data.failures || []
+    gateChecked.value = true
+    statusText.value = gateFailures.value.length ? `闸门：${gateFailures.value.length} 项未通过` : '闸门通过'
+  } catch (e: any) {
+    gateFailures.value = [`校验失败：${e?.message || e}`]
+    gateChecked.value = true
+    statusText.value = '闸门校验失败'
+  } finally {
+    gating.value = false
+  }
+}
+
+function insertTemplate() {
+  const monacoEditor = editorApp?.getEditor()
+  const model = monacoEditor?.getModel()
+  const position = monacoEditor?.getPosition()
+  if (!monacoEditor || !model || !position) {
+    statusText.value = '编辑器还没就绪，无法插入模板'
+    return
+  }
+  monacoEditor.executeEdits('insert-pytest-template', [
+    {
+      range: {
+        startLineNumber: position.lineNumber,
+        startColumn: position.column,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
+      },
+      text: PYTEST_TEMPLATE,
+      forceMoveMarkers: true,
+    },
+  ])
+  monacoEditor.focus()
+  dirty.value = true
+  statusText.value = '已插入 pytest 模板'
+}
+
 async function runScript() {
   running.value = true
   showOutput.value = true
   runOutput.value = ''
+  runResult.value = null
   try {
+    // 跑之前先落盘：否则跑的是上一次保存的版本，结果和眼前代码对不上
+    await saveNow()
     const res = await fetch(`/api/projects/${projectId}/scripts/${scriptId}/run`, { method: 'POST' })
     const data = await res.json()
+    if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`)
+    runResult.value = {
+      status: data.status,
+      status_label: data.status_label,
+      success: data.success,
+      returncode: data.returncode,
+      duration_ms: data.duration_ms,
+      execution_id: data.execution_id,
+      run_id: data.run_id,
+      failure: data.failure || null,
+      stdout: data.stdout || '',
+      stderr: data.stderr || '',
+    }
     runOutput.value = [
       data.stdout ? `$ 输出:\n${data.stdout}` : '',
       data.stderr ? `\n$ 错误:\n${data.stderr}` : '',
       `\n$ 退出码: ${data.returncode}`,
     ].filter(Boolean).join('\n')
+    statusText.value = `运行结束：${data.status_label || data.status || (data.success ? '通过' : '失败')}`
   } catch (e: any) {
-    runOutput.value = '运行失败: ' + e.message
+    runOutput.value = '运行失败: ' + (e?.message || e)
+    statusText.value = '运行失败'
   } finally {
     running.value = false
   }
+}
+
+// failure 两种形状（字符串 / 对象）统一成 {type, line, message}，模板只认一种
+function failureView(): { type: string; line?: number; message: string } | null {
+  const raw = runResult.value?.failure
+  if (!raw) return null
+  if (typeof raw === 'string') {
+    const match = raw.match(/^([A-Za-z_][\w.]*(?:Error|Exception|Exit)):\s*([\s\S]*)$/)
+    return match ? { type: match[1], message: match[2] } : { type: 'Error', message: raw }
+  }
+  return { type: raw.type || 'Error', line: raw.line, message: raw.message || '' }
+}
+
+function resultTone(): string {
+  const status = runResult.value?.status_label || runResult.value?.status
+  if (status === '通过') return 'bg-green-50 text-green-700 border-green-200'
+  if (status === '失败' || status === '异常') return 'bg-red-50 text-red-700 border-red-200'
+  return 'bg-gray-50 text-gray-600 border-gray-200'
 }
 
 onMounted(async () => {
@@ -268,11 +414,38 @@ onBeforeUnmount(() => {
         {{ statusText }}
       </div>
       <div class="ml-auto flex items-center gap-2">
-        <button class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-200">
-          <Save class="w-4 h-4" />
-          保存
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-200"
+          :disabled="gating"
+          @click="runGate"
+        >
+          <Loader2 v-if="gating" class="w-4 h-4 animate-spin" />
+          <ShieldCheck v-else class="w-4 h-4" />
+          校验
         </button>
-        <button @click="runScript" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700" :disabled="running">
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-200"
+          @click="insertTemplate"
+        >
+          <Braces class="w-4 h-4" />
+          模板
+        </button>
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-200"
+          :disabled="saving"
+          @click="saveNow"
+        >
+          <Loader2 v-if="saving" class="w-4 h-4 animate-spin" />
+          <Save v-else class="w-4 h-4" />
+          保存
+          <span v-if="dirty" class="w-1.5 h-1.5 rounded-full bg-amber-500" title="有未保存改动"></span>
+        </button>
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="running || blockRun"
+          :title="blockRun ? '静态闸门未通过，先修问题再运行' : '运行这条脚本'"
+          @click="runScript"
+        >
           <Loader2 v-if="running" class="w-4 h-4 animate-spin" />
           <Play v-else class="w-4 h-4" />
           {{ running ? '运行中...' : '运行' }}
@@ -305,12 +478,35 @@ onBeforeUnmount(() => {
 
       <div class="flex-1 flex flex-col min-w-0">
         <div ref="editorContainer" class="flex-1 min-w-0"></div>
-        <div v-if="showOutput" class="h-48 bg-gray-900 border-t border-gray-700 flex flex-col">
-          <div class="flex items-center justify-between px-3 py-1 bg-gray-800">
-            <span class="text-xs text-gray-300 font-medium">运行输出</span>
-            <button @click="showOutput = false" class="text-gray-400 hover:text-white text-xs">关闭</button>
+        <div v-if="showOutput" class="h-56 bg-gray-900 border-t border-gray-700 flex flex-col">
+          <div class="flex items-center gap-2 px-3 py-1 bg-gray-800">
+            <span class="text-xs text-gray-300 font-medium">运行结果</span>
+            <span
+              v-if="runResult"
+              class="text-xs px-2 py-0.5 rounded border"
+              :class="resultTone()"
+            >{{ runResult.status_label || runResult.status || (runResult.success ? '通过' : '失败') }}</span>
+            <span v-if="runResult?.duration_ms != null" class="text-xs text-gray-400">{{ Math.round(runResult.duration_ms) }} ms</span>
+            <span v-if="runResult?.returncode != null" class="text-xs text-gray-400">exit {{ runResult.returncode }}</span>
+            <span v-if="runResult?.execution_id" class="text-xs text-gray-500">#{{ runResult.execution_id }}</span>
+            <button @click="showOutput = false" class="ml-auto text-gray-400 hover:text-white text-xs">关闭</button>
           </div>
-          <pre class="flex-1 overflow-auto p-3 text-xs text-green-400 font-mono">{{ runOutput }}</pre>
+          <div v-if="failureView()" class="px-3 py-2 text-xs text-red-300 border-b border-gray-700">
+            失败原因：<span class="font-mono">{{ failureView()!.type }}</span>
+            <span v-if="failureView()!.line"> · line {{ failureView()!.line }}</span>
+            <div class="mt-1 whitespace-pre-wrap text-red-200">{{ failureView()!.message }}</div>
+          </div>
+          <pre class="flex-1 overflow-auto p-3 text-xs text-green-400 font-mono">{{ runOutput || '（还没有输出）' }}</pre>
+        </div>
+        <div v-if="gateChecked" class="border-t border-gray-200 bg-white px-3 py-2">
+          <div class="flex items-center gap-2 text-xs font-medium" :class="gateFailures.length ? 'text-red-600' : 'text-green-600'">
+            <XCircle v-if="gateFailures.length" class="w-3.5 h-3.5" />
+            <CheckCircle2 v-else class="w-3.5 h-3.5" />
+            静态闸门{{ gateFailures.length ? `：${gateFailures.length} 项未通过` : '：通过' }}
+          </div>
+          <ul v-if="gateFailures.length" class="mt-1 space-y-0.5">
+            <li v-for="(f, i) in gateFailures" :key="i" class="text-xs text-red-600">· {{ f }}</li>
+          </ul>
         </div>
       </div>
     </div>

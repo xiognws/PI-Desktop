@@ -217,7 +217,11 @@ def execute_script(
         "channel": executor.channel,
         "execution_id": execution_id,
         "run_id": run_id,
+        # status 是执行器枚举（pass/fail/…），入库时已经被翻成中文；
+        # 请求方（脚本编辑器、插件）拿到英文枚举会各自再翻一遍，翻法还会不一致，
+        # 所以这里把同一份中文标签一并给出。
         "status": status,
+        "status_label": case_result_text,
         "failure": failure,
         "duration_ms": round(duration_ms, 1),
         "events": stored_events,

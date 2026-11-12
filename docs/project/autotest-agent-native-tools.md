@@ -319,7 +319,7 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 | 知识库 `knowledge` | `GET …/knowledge/documents`、`…/workflow/knowledge/search` | 批量导入（md/pdf/docx/html…）、切分预览、FTS5/BM25 检索、复制、**加入上下文**（经 preload 送进桌面会话输入框） |
 | 需求 `requirements` | `GET/POST …/requirements` | 上传 PRD 原文、读回正文 |
 | 用例 `cases` | `GET/POST …/cases` | 用例 CRUD、单条运行 |
-| 脚本 `scripts` | `GET/POST …/scripts`、`…/scripts/{id}/check|gate|run` | 列表 + 编辑器；**「校验」「过门禁」**；门禁未过时「运行」置灰（把「未过 gate 不得执行」这条约束搬到界面上） |
+| 脚本 `scripts` | `GET/POST …/scripts`、`…/scripts/{id}/check|gate|run` | 列表 + 编辑器；**「校验」走 `/gate`**（compile / e2e `@target` / 空内容），**「模板」**插入 pytest 骨架，**「保存」**手动落盘（自动保存 1.5s 防抖之外），运行前自动保存；结果面板显示 `status_label` / `failure` / 耗时 / 执行号；闸门跑过且未通过时「运行」置灰（把「未过 gate 不得执行」搬到界面上） |
 | 报告 `reports` | `GET …/runs/{id}/report-content` | 按 run 读 Markdown 正文（含缺陷清单） |
 
 承载方式：**独立窗口**，但 P4 才接；P2 先用浏览器。
@@ -340,6 +340,13 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 审批的唯一真源是 `workflow_decisions`：窗口点「批准」→
 `POST …/pending/{id}/decide` → 写库；工具端下次轮询读到 `approved` 继续。
 不需要 `session.answer`，因为这个设计里根本没有会话卡在 `asktool` 上。
+
+### 8.0.1 `/run` 返回的两个状态字段
+
+执行器内部状态是枚举（`pass` / `fail` / `error` / `cancelled`），入库时翻成中文
+（`通过` / `失败` / `异常` / `已取消`）。早先 `/run` 只回枚举，界面各自再翻一遍，
+翻法还不一致；现在两个都给：`status` 保持枚举（脚本/插件按机器值判断），
+`status_label` 给中文（界面直接显示）。新增字段是向后兼容的，不要改 `status` 的取值。
 
 ### 8.1 「加入上下文」这条 IPC 面（唯一的跨窗口通道）
 
