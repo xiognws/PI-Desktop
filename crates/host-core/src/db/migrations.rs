@@ -821,6 +821,34 @@ pub(crate) fn migrate_v27_to_v28(conn: &Connection, path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Schema v30 moves the structured-memory keyword index to the `trigram`
+/// tokenizer.
+///
+/// `unicode61` reads a whole Chinese phrase as one token, so a Chinese memory was
+/// findable only by typing the phrase exactly — in practice recall worked in
+/// English only. The index is a copy of the memory text, so the step drops it,
+/// recreates it with the new tokenizer and re-indexes every row: `memories` is
+/// only read, no user text is rewritten, and a second run converges on the same
+/// index.
+pub(crate) fn migrate_v29_to_v30_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    crate::memory::rebuild_memories_fts(tx)?;
+    tx.pragma_update(None, "user_version", 30i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v29_to_v30(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 29)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v29_to_v30_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v29 to v30 memory index rebuild; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
 #[path = "migrations_v29_repair.rs"]
 mod v29_repair;
 pub(crate) use v29_repair::*;

@@ -224,8 +224,9 @@ impl Database {
             // is equivalent: MEMORIES_DDL is IF NOT EXISTS, so the migration
             // chain below is safe for either flavour. v27 is the session Fast
             // mode switch, or the memory store when the file came from a
-            // pre-merge memory build; v28 converges both.
-            26 | 27 | 28 => {}
+            // pre-merge memory build; v28 converges both. v29 is the reply-text
+            // repair, and v30 rebuilds the memory keyword index.
+            26 | 27 | 28 | 29 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -301,6 +302,13 @@ impl Database {
         // change, but it rewrites rows, so it keeps the usual backup and bump.
         if migrated_version == 28 {
             super::migrations::migrate_v28_to_v29(&conn, path)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        }
+        // Rebuilds the memory keyword index on the trigram tokenizer, so recall
+        // answers a substring of a Chinese memory instead of only its exact
+        // phrase. `memories` is read, never rewritten.
+        if migrated_version == 29 {
+            super::migrations::migrate_v29_to_v30(&conn, path)?;
         }
         // A stamp is not proof of shape. The memory branch stamped v28/v29 with
         // the memory tables but no `sessions.fast_mode`, while the merged line put

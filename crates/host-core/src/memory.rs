@@ -1,11 +1,12 @@
 //! Durable agent memory (ADR 0371).
 //!
-//! One SQLite table holds every memory; a separate FTS5 table holds a
-//! *normalised copy* of the searchable text. Splitting the index out of the
-//! content table is deliberate: SQLite's bundled tokenizers cannot segment
-//! CJK, so the write path inserts one token per ideograph and the read path
-//! normalises the query the same way. A memory therefore stays greppable in
-//! Chinese and English without shipping a segmenter.
+//! One SQLite table holds every memory; a separate FTS5 table holds a verbatim
+//! copy of the searchable text behind a `trigram` index. Splitting the index out
+//! of the content table is deliberate: SQLite ships no CJK segmenter, and a
+//! trigram index answers any substring of three characters or more in either
+//! script, so a Chinese memory stays greppable without one. A query shorter than
+//! three characters cannot be expressed by a trigram at all and is answered with
+//! an `instr()` scan over the same rows.
 //!
 //! Scopes are the three budgets the runtime injects:
 //!
@@ -18,11 +19,12 @@
 //! and keyword recall only — the same boundary `@memharness/core` draws.
 
 use anyhow::{anyhow, Result};
+use rusqlite::types::Value;
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::db::{now_ms, Database};
+use crate::db::{now_ms, Connection, Database, MEMORIES_FTS_DDL};
 
 mod tidy;
 #[allow(unused_imports)] // TidyOutcome is the documented return type
@@ -309,9 +311,14 @@ pub struct MemoryStats {
     pub by_kind: serde_json::Value,
 }
 
-/// Normalise text for the keyword index: every CJK ideograph becomes its own
-/// token so `压缩` matches `上下文压缩` without a segmenter. Latin words are
-/// left untouched. Runs of whitespace collapse to one space.
+/// Normalise text into one token per CJK ideograph: `压缩` becomes `压 缩`, a
+/// whole-term match on either. Latin words are left untouched and runs of
+/// whitespace collapse to one space.
+///
+/// The flat entry lists (`memory_entries::search_entries`) compare whole tokens
+/// and need this. The structured-memory index does not: its `trigram` tokenizer
+/// matches substrings of the raw text directly, which is why `sync_fts_for` and
+/// the v29 -> v30 rebuild store the text unchanged.
 pub fn normalise_search_text(text: &str) -> String {
     let mut out = String::with_capacity(text.len() * 2);
     let mut pending_space = false;
@@ -349,26 +356,68 @@ fn is_cjk(ch: char) -> bool {
     )
 }
 
-/// Build an FTS5 MATCH expression from free text. Every term is quoted, so
-/// FTS5 operators a user might type (`*`, `-`, `:`, `OR`) are inert, and terms
-/// are AND-ed: a memory must contain all of them.
-pub fn fts_match_query(query: &str) -> String {
-    let normalised = normalise_search_text(query);
-    let mut terms: Vec<String> = Vec::new();
-    for raw in normalised.split_whitespace() {
-        let cleaned: String = raw
-            .chars()
-            .filter(|c| c.is_alphanumeric() || is_cjk(*c) || *c == '_')
-            .collect();
-        if cleaned.is_empty() {
-            continue;
+/// Shortest substring the `trigram` tokenizer can answer.
+const TRIGRAM_MIN_CHARS: usize = 3;
+/// Most terms one recall query contributes; the same cap the pre-v30 index had.
+const MAX_RECALL_TERMS: usize = 16;
+
+/// A recall query, split into what the trigram index can answer and what only a
+/// substring scan can.
+///
+/// FTS5 has no term shorter than a trigram, so `压缩` (two characters) cannot be
+/// a MATCH expression at all — it returns nothing rather than failing. Those
+/// terms are kept here and narrowed with `instr()` over the rows the MATCH
+/// produced, which keeps the AND semantics of a mixed query like `压缩 20000`.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct RecallPlan {
+    /// Terms of at least `TRIGRAM_MIN_CHARS` characters.
+    indexed: Vec<String>,
+    /// Terms too short for the index.
+    short: Vec<String>,
+}
+
+impl RecallPlan {
+    fn parse(query: &str) -> Self {
+        let mut plan = Self::default();
+        for raw in query.split_whitespace() {
+            // Quoting makes an FTS5 expression literal, so the only characters
+            // worth keeping are the ones a user means as text.
+            let term: String = raw
+                .chars()
+                .filter(|c| c.is_alphanumeric() || is_cjk(*c) || *c == '_')
+                .collect();
+            if term.is_empty() {
+                continue;
+            }
+            let bucket = if term.chars().count() >= TRIGRAM_MIN_CHARS {
+                &mut plan.indexed
+            } else {
+                &mut plan.short
+            };
+            if !bucket.contains(&term) {
+                bucket.push(term);
+            }
+            if plan.indexed.len() + plan.short.len() >= MAX_RECALL_TERMS {
+                break;
+            }
         }
-        terms.push(format!("\"{cleaned}\""));
-        if terms.len() >= 16 {
-            break;
-        }
+        plan
     }
-    terms.join(" AND ")
+
+    fn is_empty(&self) -> bool {
+        self.indexed.is_empty() && self.short.is_empty()
+    }
+
+    /// The MATCH expression for the indexable terms: each quoted, AND-ed, so a
+    /// memory has to contain all of them. FTS5 operators a user types (`*`, `-`,
+    /// `:`, `OR`) are inert inside the quotes.
+    fn match_expression(&self) -> String {
+        self.indexed
+            .iter()
+            .map(|term| format!("\"{term}\""))
+            .collect::<Vec<_>>()
+            .join(" AND ")
+    }
 }
 
 /// Dedupe key: identical title+body writes the same hash regardless of scope.
@@ -466,43 +515,81 @@ impl Database {
 
     /// Keyword recall. Scope filtering is part of the query, not a post-filter:
     /// a project session must never see another project's memories.
+    ///
+    /// The trigram index answers the terms it can express as a substring; a term
+    /// too short for one is narrowed with `instr()` in the same statement, so a
+    /// two-character Chinese query still filters instead of matching everything.
+    /// A query with no indexable term at all is a plain scan of `memories`,
+    /// which holds hundreds of rows — reading them is cheaper than not matching.
     pub fn recall(&self, query: RecallQuery) -> Result<Vec<MemoryHit>> {
-        let match_expr = fts_match_query(&query.query);
-        if match_expr.is_empty() {
+        let plan = RecallPlan::parse(&query.query);
+        if plan.is_empty() {
             return Ok(Vec::new());
         }
         let limit = query
             .limit
             .unwrap_or(DEFAULT_RECALL_LIMIT)
             .clamp(1, MAX_RECALL_LIMIT) as i64;
-        let scope = query.scope.map(MemoryScope::as_str);
-        let sql = "SELECT m.id, m.scope, m.project_path, m.session_id, m.kind, m.title, m.body,
-                          m.tags, m.source, m.confidence, m.pinned, m.use_count, m.created_at,
-                          m.updated_at, m.last_used_at, m.valid_from, m.valid_until, m.superseded_by,
-                          bm25(memories_fts) AS score
-                     FROM memories_fts
-                     JOIN memories m ON m.rowid = memories_fts.rowid
-                    WHERE memories_fts MATCH ?1
-                      AND m.superseded_by IS NULL
-                      AND (?2 IS NULL OR m.scope = ?2)
-                      AND (
-                            m.scope = 'global'
-                            OR (m.scope = 'project' AND m.project_path = ?3)
-                            OR (m.scope = 'session' AND m.session_id = ?4)
-                          )
-                    ORDER BY m.pinned DESC, score ASC, m.use_count DESC, m.created_at DESC
-                    LIMIT ?5";
-        let mut stmt = self.conn.prepare(sql)?;
-        let rows = stmt.query_map(
-            params![
-                match_expr,
-                scope,
-                query.project_path.as_deref(),
-                query.session_id.as_deref(),
-                limit
-            ],
-            |row| Ok((row_to_memory(row)?, row.get::<_, f64>(18)?)),
-        )?;
+        let indexed = !plan.indexed.is_empty();
+        let (from, score) = if indexed {
+            (
+                "memories_fts JOIN memories m ON m.rowid = memories_fts.rowid",
+                "bm25(memories_fts)",
+            )
+        } else {
+            // A scan has no ranking signal of its own; recency and use_count
+            // order the page, and the constant keeps the result shape identical.
+            ("memories m", "0.0")
+        };
+        let scope_at = if indexed { 2 } else { 1 };
+        let project_at = scope_at + 1;
+        let session_at = scope_at + 2;
+        let mut next = session_at + 1;
+        let mut match_filter = String::new();
+        if indexed {
+            match_filter.push_str("memories_fts MATCH ?1 AND ");
+        }
+        for _ in &plan.short {
+            match_filter.push_str(&format!(
+                "(instr(lower(m.title), lower(?{next})) > 0
+                  OR instr(lower(m.body), lower(?{next})) > 0) AND "
+            ));
+            next += 1;
+        }
+        let limit_at = next;
+        let sql = format!(
+            "SELECT m.id, m.scope, m.project_path, m.session_id, m.kind, m.title, m.body,
+                    m.tags, m.source, m.confidence, m.pinned, m.use_count, m.created_at,
+                    m.updated_at, m.last_used_at, m.valid_from, m.valid_until, m.superseded_by,
+                    {score} AS score
+               FROM {from}
+              WHERE {match_filter}m.superseded_by IS NULL
+                AND (?{scope_at} IS NULL OR m.scope = ?{scope_at})
+                AND (
+                      m.scope = 'global'
+                      OR (m.scope = 'project' AND m.project_path = ?{project_at})
+                      OR (m.scope = 'session' AND m.session_id = ?{session_at})
+                    )
+              ORDER BY m.pinned DESC, score ASC, m.use_count DESC, m.created_at DESC
+              LIMIT ?{limit_at}"
+        );
+        // Bound in ascending placeholder order, which is what positional binding
+        // means even for a statement that numbers its own parameters.
+        let mut binds: Vec<Value> = Vec::with_capacity(limit_at);
+        if indexed {
+            binds.push(Value::Text(plan.match_expression()));
+        }
+        binds.push(optional_text(query.scope.map(MemoryScope::as_str)));
+        binds.push(optional_text(query.project_path.as_deref()));
+        binds.push(optional_text(query.session_id.as_deref()));
+        for term in &plan.short {
+            binds.push(Value::Text(term.clone()));
+        }
+        binds.push(Value::Integer(limit));
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(binds), |row| {
+            Ok((row_to_memory(row)?, row.get::<_, f64>(18)?))
+        })?;
         let mut hits = Vec::new();
         let mut touched = Vec::new();
         for row in rows {
@@ -835,20 +922,68 @@ impl Database {
         };
         self.conn
             .execute("DELETE FROM memories_fts WHERE rowid = ?1", params![rowid])?;
-        let tags_text = serde_json::from_str::<Vec<String>>(&tags)
-            .unwrap_or_default()
-            .join(" ");
+        let (title, body, tags) = index_row(&title, &body, &tags);
         self.conn.execute(
             "INSERT INTO memories_fts (rowid, title, body, tags) VALUES (?1, ?2, ?3, ?4)",
-            params![
-                rowid,
-                normalise_search_text(&title),
-                normalise_search_text(&body),
-                normalise_search_text(&tags_text)
-            ],
+            params![rowid, title, body, tags],
         )?;
         Ok(())
     }
+}
+
+/// Bind a nullable text parameter.
+fn optional_text(value: Option<&str>) -> Value {
+    value.map_or(Value::Null, |text| Value::Text(text.to_string()))
+}
+
+/// The three columns the keyword index stores for one memory.
+///
+/// The trigram tokenizer indexes substrings of this text, so it is the raw title,
+/// body and tags. Normalising CJK to one token per ideograph here — the pre-v30
+/// scheme — would put a space inside every run and hide it from a substring
+/// query.
+fn index_row(title: &str, body: &str, tags_json: &str) -> (String, String, String) {
+    let tags = serde_json::from_str::<Vec<String>>(tags_json)
+        .unwrap_or_default()
+        .join(" ");
+    (title.to_string(), body.to_string(), tags)
+}
+
+/// Drop the keyword index, recreate it with the current DDL, and re-index every
+/// stored memory.
+///
+/// Runs inside the caller's transaction (schema v29 -> v30). `memories` is only
+/// read: the index is a copy, so a rebuild cannot lose a row or rewrite user
+/// text. Superseded rows are indexed too, because the forget and supersede paths
+/// delete index rows by `rowid` and an index that skipped them would carry
+/// phantom delete targets; recall filters them out in SQL.
+pub(crate) fn rebuild_memories_fts(conn: &Connection) -> Result<()> {
+    // A stamp is not proof of shape: a fixture that dropped the memory tables
+    // keeps its version, and the rebuild has to stay a no-op there.
+    let has_memories: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'memories')",
+        [],
+        |row| row.get(0),
+    )?;
+    if !has_memories {
+        return Ok(());
+    }
+    conn.execute_batch("DROP TABLE IF EXISTS memories_fts;")?;
+    conn.execute_batch(MEMORIES_FTS_DDL)?;
+    let rows: Vec<(i64, String, String, String)> = {
+        let mut stmt = conn.prepare("SELECT rowid, title, body, tags FROM memories")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    let mut insert = conn
+        .prepare("INSERT INTO memories_fts (rowid, title, body, tags) VALUES (?1, ?2, ?3, ?4)")?;
+    for (rowid, title, body, tags) in rows {
+        let (title, body, tags) = index_row(&title, &body, &tags);
+        insert.execute(params![rowid, title, body, tags])?;
+    }
+    Ok(())
 }
 
 fn row_to_memory(row: &rusqlite::Row<'_>) -> rusqlite::Result<MemoryRecord> {

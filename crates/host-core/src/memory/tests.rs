@@ -156,6 +156,107 @@ fn chinese_text_is_recallable_without_a_segmenter() {
     assert!(recall_into(&db, "部署", "/w/pi", "s1").is_empty());
 }
 
+/// The point of the trigram index: a run that spans a phrase, which `unicode61`
+/// (one token per Chinese phrase) could never match.
+#[test]
+fn chinese_memories_match_a_substring_of_three_or_more_characters() {
+    let (db, _dir) = db();
+    db.remember(project_memory(
+        "上下文压缩阈值",
+        "keepRecentTokens 设为 20000",
+        "/w/pi",
+    ))
+    .unwrap();
+
+    for query in ["文压缩", "下文压缩", "缩阈值", "上下文压缩阈值"] {
+        assert_eq!(
+            recall_into(&db, query, "/w/pi", "s1"),
+            vec!["上下文压缩阈值"],
+            "query {query:?} must match a substring of the title"
+        );
+    }
+    assert!(recall_into(&db, "压缩算法", "/w/pi", "s1").is_empty());
+    // The body is indexed the same way.
+    assert_eq!(
+        recall_into(&db, "设为 20000", "/w/pi", "s1"),
+        vec!["上下文压缩阈值"]
+    );
+}
+
+/// A query too short for a trigram is answered by the `instr()` scan, and that
+/// scan keeps every filter the index path applies.
+#[test]
+fn one_and_two_character_queries_fall_back_to_a_scan() {
+    let (db, _dir) = db();
+    db.remember(project_memory(
+        "上下文压缩阈值",
+        "keepRecentTokens 设为 20000",
+        "/w/pi",
+    ))
+    .unwrap();
+    db.remember(project_memory("部署流程", "发布前先跑 pnpm", "/w/pi"))
+        .unwrap();
+
+    assert_eq!(
+        recall_into(&db, "压", "/w/pi", "s1"),
+        vec!["上下文压缩阈值"]
+    );
+    assert_eq!(
+        recall_into(&db, "压缩", "/w/pi", "s1"),
+        vec!["上下文压缩阈值"]
+    );
+    assert_eq!(recall_into(&db, "部署", "/w/pi", "s1"), vec!["部署流程"]);
+    // Scope still decides what the scan may see.
+    assert!(recall_into(&db, "压缩", "/w/other", "s1").is_empty());
+    // As does the session window: a global memory is always in scope.
+    db.remember(NewMemory::new(
+        MemoryScope::Global,
+        MemoryKind::Preference,
+        "语气偏好",
+        "回答保持简短",
+    ))
+    .unwrap();
+    assert_eq!(recall_into(&db, "语气", "/w/other", "s2"), vec!["语气偏好"]);
+}
+
+#[test]
+fn the_scan_fallback_hides_superseded_rows() {
+    let (db, _dir) = db();
+    let old = db
+        .remember(project_memory("部署", "旧主机 sda-build-01", "/w/pi"))
+        .unwrap();
+    let new = db
+        .remember(project_memory("发布", "新主机 sda-build-02", "/w/pi"))
+        .unwrap();
+    db.supersede_memory(&old.memory.id, &new.memory.id).unwrap();
+
+    // Two characters, so this is the scan — which must skip the retired row even
+    // though both rows carry the term.
+    assert_eq!(recall_into(&db, "主机", "/w/pi", "s1"), vec!["发布"]);
+}
+
+#[test]
+fn english_recall_still_matches_words_and_substrings() {
+    let (db, _dir) = db();
+    db.remember(project_memory(
+        "deploy target",
+        "the deploy host is sda-build-02",
+        "/w/pi",
+    ))
+    .unwrap();
+
+    assert_eq!(
+        recall_into(&db, "deploy", "/w/pi", "s1"),
+        vec!["deploy target"]
+    );
+    // Trigram matching is a substring match, not a word match, in English too.
+    assert_eq!(
+        recall_into(&db, "eploy host", "/w/pi", "s1"),
+        vec!["deploy target"]
+    );
+    assert!(recall_into(&db, "gateway", "/w/pi", "s1").is_empty());
+}
+
 #[test]
 fn fts_operators_in_the_query_are_inert() {
     let (db, _dir) = db();
@@ -381,17 +482,28 @@ fn search_normalisation_tokenises_cjk_and_keeps_latin_words() {
 }
 
 #[test]
-fn match_query_quotes_terms() {
+fn recall_plan_quotes_indexable_terms_and_keeps_short_ones() {
+    let plan = RecallPlan::parse("压缩 20000 keepRecentTokens push");
     assert_eq!(
-        fts_match_query("deploy gateway"),
-        "\"deploy\" AND \"gateway\""
+        plan.match_expression(),
+        "\"20000\" AND \"keepRecentTokens\" AND \"push\""
     );
-    assert_eq!(fts_match_query("压缩"), "\"压\" AND \"缩\"");
-    assert_eq!(fts_match_query("   "), "");
+    // A term of one or two characters cannot be a trigram, so it never reaches
+    // the MATCH expression; `recall` narrows with `instr()` instead.
+    assert_eq!(plan.short, vec!["压缩"]);
+    assert_eq!(RecallPlan::parse("压缩").match_expression(), "");
     assert_eq!(
-        fts_match_query("deploy* OR x"),
-        "\"deploy\" AND \"OR\" AND \"x\""
+        RecallPlan::parse("部署 plan").match_expression(),
+        "\"plan\""
     );
+    // Quoting makes an FTS5 operator a literal.
+    assert_eq!(
+        RecallPlan::parse("deploy* OR x").match_expression(),
+        "\"deploy\""
+    );
+    // Duplicates are collapsed and an operator-only query is empty.
+    assert_eq!(RecallPlan::parse("20000 20000").indexed, vec!["20000"]);
+    assert!(RecallPlan::parse("  ** -- ").is_empty());
 }
 
 #[test]
@@ -423,7 +535,11 @@ fn opening_a_v25_database_migrates_instead_of_failing() {
         .conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 29, "v25 database must be migrated to v29");
+    assert_eq!(
+        version,
+        crate::db::SCHEMA_VERSION,
+        "a v25 database must be migrated to the latest schema"
+    );
     let rows: i64 = db
         .conn
         .query_row("SELECT count(*) FROM memories", [], |row| row.get(0))
@@ -431,10 +547,10 @@ fn opening_a_v25_database_migrates_instead_of_failing() {
     assert_eq!(rows, 0, "migration must leave an empty memory store");
 }
 
-/// Regression: a database already stamped at v26 must migrate to v29. v26 is a
-/// pure version stamp, so the same number can come from the merged line or from
-/// a build that created the memory store before the merge; both must open, and
-/// the second one must not fail on tables that already exist.
+/// Regression: a database already stamped at v26 must migrate to the latest
+/// schema. v26 is a pure version stamp, so the same number can come from the
+/// merged line or from a build that created the memory store before the merge;
+/// both must open, and the second one must not fail on tables that already exist.
 #[test]
 fn opening_a_v26_database_migrates_instead_of_failing() {
     for memories_already_present in [false, true] {
@@ -459,8 +575,10 @@ fn opening_a_v26_database_migrates_instead_of_failing() {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(
-            version, 29,
-            "v26 database (memories present: {memories_already_present}) must be migrated to v29"
+            version,
+            crate::db::SCHEMA_VERSION,
+            "a v26 database (memories present: {memories_already_present}) must be \
+             migrated to the latest schema"
         );
         let rows: i64 = db
             .conn
@@ -468,4 +586,87 @@ fn opening_a_v26_database_migrates_instead_of_failing() {
             .unwrap();
         assert_eq!(rows, 0, "migration must leave an empty memory store");
     }
+}
+
+/// A profile written before v30 carries the `unicode61` index, where a whole
+/// Chinese phrase is one token and only that exact phrase matched. Opening it
+/// must rebuild the index — without rewriting a single stored row.
+#[test]
+fn a_pre_v30_database_becomes_searchable_for_chinese_after_the_migration() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let memory_id = {
+        let db = Database::open(&path).unwrap();
+        let outcome = db
+            .remember(project_memory(
+                "上下文压缩阈值",
+                "keepRecentTokens 设为 20000",
+                "/w/pi",
+            ))
+            .unwrap();
+        // Rewind the index to the v29 shape: the old tokenizer over a normalised
+        // copy, plus the old stamp.
+        db.conn
+            .execute_batch(
+                "DROP TABLE memories_fts;
+                 CREATE VIRTUAL TABLE memories_fts USING fts5(
+                   title, body, tags, tokenize = 'unicode61 remove_diacritics 2'
+                 );
+                 INSERT INTO memories_fts (rowid, title, body, tags)
+                   SELECT rowid, '上 下 文 压 缩 阈 值',
+                          'keepRecentTokens 设 为 20000', ''
+                     FROM memories;
+                 PRAGMA user_version = 29;",
+            )
+            .unwrap();
+        let old_index_hits: i64 = db
+            .conn
+            .query_row(
+                "SELECT count(*) FROM memories_fts WHERE memories_fts MATCH '\"文压缩\"'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            old_index_hits, 0,
+            "the fixture has to reproduce the old, phrase-only behaviour"
+        );
+        outcome.memory.id
+    };
+
+    let db = Database::open(&path).unwrap();
+    let version: i64 = db
+        .conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, crate::db::SCHEMA_VERSION);
+    // The same memory, now reachable by substring.
+    assert_eq!(
+        recall_into(&db, "文压缩", "/w/pi", "s1"),
+        vec!["上下文压缩阈值"]
+    );
+
+    // Nothing in `memories` was rewritten, and no row was lost.
+    let stored = db.get_memory(&memory_id).unwrap();
+    assert_eq!(stored.title, "上下文压缩阈值");
+    assert_eq!(stored.body, "keepRecentTokens 设为 20000");
+    let rows: i64 = db
+        .conn
+        .query_row("SELECT count(*) FROM memories", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(rows, 1);
+    // The re-index stored the raw text, not a per-ideograph normalisation.
+    let indexed: String = db
+        .conn
+        .query_row("SELECT title FROM memories_fts", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(indexed, "上下文压缩阈值");
+
+    // Re-running the rebuild converges on the same index, so the step is safe to
+    // repeat.
+    super::rebuild_memories_fts(db.conn()).unwrap();
+    assert_eq!(
+        recall_into(&db, "文压缩", "/w/pi", "s1"),
+        vec!["上下文压缩阈值"]
+    );
 }
