@@ -1,0 +1,16 @@
+services/autotest/src/autotest/workflow/scripts.py
+  h_201ed4c689ac8b 14,16,37-38,49,62-80,103-108,116-119
+services/autotest/tests/test_workflow_scripts.py
+  h_201ed4c689ac8b 180-225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3c06d1532cff3badc7c748b2738a3fd209b0e97c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
