@@ -283,3 +283,34 @@ and retiring it is a separate change with its own compatibility question
 `HOST_PROXY_ALLOWED` list — so a normal Agent-mode session has both halves: the
 frozen prompt snapshot (always) and a query over the entry lists (per turn, five
 hits, 3 000 chars, best effort).
+
+## 10. The flat list retired (ADR 0393)
+
+Memory was briefly stored twice: this table, and a flat two-target list
+(`memory` / `user`, whole-store character budgets of 2200 and 1375) that was
+rendered into the system prompt in full on every session. The list copied Hermes'
+`MEMORY.md`/`USER.md` layout, which the product does not use, and its budgets were
+not a storage limit — SQLite does not care — but the price of putting the store in
+every request.
+
+The list is retired:
+
+- **One store.** `memories` is the only memory store. At startup the remaining
+  entries are imported once (`migrate_entries_into_memories`): a `user`-target
+  entry becomes `kind = preference`, everything else `kind = fact`; the first line
+  becomes the title and the entry the body; `content_hash` makes a repeated import
+  a no-op. The entry table stays readable for one release and nothing writes it.
+- **Retain, not append.** `memory.remember` deduplicates on `content_hash` and a
+  contradicting memory supersedes the old one (`superseded_by`) instead of
+  deleting it. The agent tool exposes `remember` / `update` / `forget` / `search`
+  over this surface; the whole-store editing actions (`add`, `patch`, `replace`,
+  `remove`, `batch`) and the character budgets are gone.
+- **Retrieval, not injection.** Nothing renders the store into the system prompt.
+  Each turn asks `memory.recall` for memories relevant to the user's message and
+  places the hits in the *user* message, capped in characters, so the request
+  prefix stays stable (ADR 0337) and the cost of memory does not grow with the
+  store.
+- **Chinese is searchable.** The FTS index uses the `trigram` tokenizer: the
+  previous `unicode61` treated a whole Chinese phrase as one token, which made
+  recall work in English only. Queries shorter than three characters fall back to
+  a scan over title and body.
