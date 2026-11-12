@@ -1,0 +1,26 @@
+crates/host-core/src/db.rs
+  h_201ed4c689ac8b 10,48-50
+crates/host-core/src/db/migrations.rs
+  h_201ed4c689ac8b 824-851
+crates/host-core/src/db/repositories.rs
+  h_201ed4c689ac8b 227-229,305-311
+crates/host-core/src/db/schema.rs
+  h_201ed4c689ac8b 29,31-32,81-83,85-101,106,112-114,208
+crates/host-core/src/db/tests.rs
+  h_201ed4c689ac8b 35
+crates/host-core/src/memory.rs
+  h_201ed4c689ac8b 3-9,22,27,314-321,359-402,404-419,518-523,525-526,533-592,925,928,934-988
+crates/host-core/src/memory/tests.rs
+  h_201ed4c689ac8b 159-259,485-486,488-489,491-494,496-497,499-506,538-542,550-553,578-581,590-672
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d0fa5fae905cbd39c8af08191ba77113efdb2e03",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
