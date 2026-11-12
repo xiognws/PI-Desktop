@@ -11,9 +11,9 @@ import hashlib
 
 MAX_SCRIPT_CASE_CHARS = 200
 
-_HEADER = '''"""自动生成：{title}
+_HEADER = '''"""自动生成：{title_doc}
 
-功能点：{function_point}
+功能点：{function_point_doc}
 类型：{case_type}    优先级：{priority}
 生成方式：workflow author_script（确定性模板，未调用模型）
 
@@ -34,8 +34,8 @@ EXPECTED = {expected_literal}
 
 
 def test_{slug}():
-    """{title}"""
-    # 前置：{precondition_text}
+    """{title_doc}"""
+    # 前置：{precondition_comment}
     # 步骤：
 {steps_comment}
     # 预期：
@@ -46,7 +46,7 @@ def test_{slug}():
         import pytest
 
         pytest.skip("自动生成的骨架：补充被测调用与断言后重新执行")
-    print("骨架未实现：{title}")
+    print({notice_literal})
 
 
 if __name__ == "__main__":
@@ -57,6 +57,25 @@ if __name__ == "__main__":
 def _clip(value: object) -> str:
     text = str(value or "").strip()
     return text if len(text) <= MAX_SCRIPT_CASE_CHARS else text[:MAX_SCRIPT_CASE_CHARS] + "…"
+
+
+def _doc_safe(text: str) -> str:
+    """放进三引号文档串的文本。
+
+    用例文本来自需求/模型，可能带双引号、三引号甚至反斜杠；直接插进去会把
+    文档串提前闭合，生成的文件从此语法错误（实测：需求里写一个 HTML 属性就够）。
+    """
+    return (
+        text.replace("\\", "\\\\")
+        .replace('"""', '\\"\\"\\"')
+        .replace("\r", " ")
+        .replace("\n", " ")
+    )
+
+
+def _comment_safe(text: str) -> str:
+    """放进 ``#`` 注释的文本：压平换行，否则多出来的行会变成裸代码。"""
+    return text.replace("\r", " ").replace("\n", " ")
 
 
 def _slug(case: dict) -> str:
@@ -81,8 +100,12 @@ def author_script(case: dict, sdk: str = "pytest") -> dict:
 
     steps = [(_clip(item) or "-") for item in (case.get("steps") or [])]
     expected = [(_clip(item) or "-") for item in (case.get("expected") or [])]
-    steps_comment = "\n".join(f"    #   {index}. {step}" for index, step in enumerate(steps, start=1)) or "    #   （用例未给出步骤）"
-    expected_comment = "\n".join(f"    #   - {item}" for item in expected) or "    #   （用例未给出预期）"
+    steps_comment = "\n".join(
+        f"    #   {index}. {_comment_safe(step)}" for index, step in enumerate(steps, start=1)
+    ) or "    #   （用例未给出步骤）"
+    expected_comment = "\n".join(
+        f"    #   - {_comment_safe(item)}" for item in expected
+    ) or "    #   （用例未给出预期）"
 
     content = _HEADER.format(
         title=title,
@@ -90,6 +113,10 @@ def author_script(case: dict, sdk: str = "pytest") -> dict:
         case_type=case_type,
         priority=priority,
         slug=_slug(case),
+        title_doc=_doc_safe(title),
+        notice_literal=repr(f"骨架未实现：{title}"),
+        function_point_doc=_doc_safe(function_point or "未标注"),
+        precondition_comment=_comment_safe(precondition),
         title_literal=repr(title),
         function_point_literal=repr(function_point),
         case_type_literal=repr(case_type),

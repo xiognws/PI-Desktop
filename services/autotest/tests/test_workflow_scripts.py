@@ -177,3 +177,49 @@ def test_case_design_lands_in_the_case_table_and_scripts_link_to_it(client):
     conn.close()
     assert linked, "script-author 应该落下脚本"
     assert all(case_id in case_ids for case_id in linked), linked
+
+
+def test_generated_script_survives_quotes_and_newlines_in_case_text():
+    """用例文本带引号/三引号/换行时，生成的文件必须仍然是合法 Python。
+
+    真实踩过的坑：需求里写了 `<img src=x onerror="...">` 这种带双引号的片段，
+    骨架的 print 行被提前闭合，整个脚本变成语法错误 —— 用例页还显示得好好的，
+    一执行就是 COLLECTION_ERROR。
+    """
+    hostile = {
+        "title": '说“打开空调”，含 onerror="window.__xss=1" 与 \\ 反斜杠\n标题第二行',
+        "function_point": '功能点含三引号 """ 结束',
+        "case_type": "功能",
+        "priority": "中",
+        "precondition": "前置里有\n换行和 \"引号\"",
+        "steps": ['步骤一 "带引号"', "步骤二\n第二行", '步骤三 """'],
+        "expected": ["预期含 \\ 与 \"", "第二行\n也要压平"],
+    }
+    script = script_service.author_script(hostile)
+    content = script["content"]
+
+    # 1) 必须能编译（旧实现在这里 SyntaxError）
+    ast.parse(content)
+    compile(content, "<generated>", "exec")
+
+    # 2) 原始文本没有丢：仍能从常量里读回来
+    namespace: dict = {}
+    exec(compile(content, "<generated>", "exec"), namespace)  # noqa: S102 - 生成物就是被测对象
+    assert namespace["CASE_TITLE"] == hostile["title"]
+    assert namespace["STEPS"] == hostile["steps"]
+
+    # 3) 文档串里的文本被压平：换行不会把标题拆成两行文档
+    docstring = content.split('"""')[1]
+    assert "标题第二行" in docstring
+    assert "\n标题第二行" not in docstring
+
+
+def test_generated_script_keeps_newlines_out_of_comments():
+    """步骤里的换行不能变成注释外的裸代码。"""
+    case = dict(CASE)
+    case["steps"] = ["第一行\nimport sys", "第二行"]
+    content = script_service.author_script(case)["content"]
+    ast.parse(content)
+    for line in content.splitlines():
+        stripped = line.strip()
+        assert not stripped.startswith("import sys"), "换行把注释拆成了代码"
