@@ -422,3 +422,4 @@ Each ADR includes:
 | 0391 | [The two writers are declared, not deferred](0391-writers-are-declared-not-deferred.md) | Accepted (amends ADR 0048) |
 | 0392 | [A procedure lives in the skill, and memory says so](0392-procedure-lives-in-the-skill.md) | Accepted (amends ADR 0391) |
 | 0393 | [The structured memory table is the store; the flat list retires](0393-structured-memory-is-the-store.md) | Accepted (supersedes ADR 0378) |
+| 0394 | [The maintenance pass touches only skills the agent wrote](0394-curator-touches-only-agent-skills.md) | Accepted (extends ADR 0387) |

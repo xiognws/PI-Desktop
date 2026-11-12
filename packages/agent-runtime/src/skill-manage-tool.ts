@@ -136,6 +136,10 @@ async function createSkill(host: SkillManageHost, params: RawParams) {
     const result = await host.call<{ skill?: SkillRecord }>("skills.create", {
       skill: {
         name,
+        // The pass may only retire what the agent wrote (ADR 0394), so the
+        // marker travels with the create. `patch` does not resend it: an origin
+        // is recorded once, not re-claimed on every edit.
+        createdBy: "agent",
         ...(params.description ? { description: params.description } : {}),
         ...(params.body ? { body: params.body } : {}),
       },

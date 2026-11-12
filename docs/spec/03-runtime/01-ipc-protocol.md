@@ -1651,7 +1651,12 @@ one-liner.
 
 - `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
 - `skills.active({ projectPath? })` → the effective runtime list
-- `skills.create(skill)`
+- `skills.create(skill)` — writes one skill document. `skill.createdBy` is
+  `"agent"` when the agent wrote it (`skill_manage` always sends it); the host
+  records that as an origin in `<data>/agent-capabilities/skill-origins.json` and
+  it is what lets the maintenance pass manage the document at all (ADR 0394).
+  Absent, or any other value, means a person wrote it. `skills.update` ignores
+  the field: an origin is recorded once, not re-claimed by an edit.
 - `skills.import({ path, level, projectPath?, shape?, mode?, id?, name?, description? })`
   — imports one Markdown skill. `shape` is `"file"` (default when `path` is a
   regular file) or `"dir"` (Anthropic-style `<name>/SKILL.md` plus resources).
@@ -1701,18 +1706,23 @@ one-liner.
   Both skills must live in the same scope; an unknown id is `SKILL_INVALID`.
 - `skills.setPinned({ id, pinned, level?, projectPath? })` → `{ skill }` — pin or
   unpin one skill. A pin is stored apart from activation (it says "keep this
-  ready", not "this is off") and is the maintenance pass's only exemption: a
-  pinned skill is classified `keep` however idle it is, and the report says so.
+  ready", not "this is off") and is the maintenance pass's exemption of last
+  resort: a pinned skill is classified `keep` however idle it is, and the report
+  says so with `reason: "pinned"`.
   `skill: null` for an unknown id — the page may be acting on a row another
   window already deleted.
 - `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
   → `{ report }` — maintenance over the user library (ADR 0387). `report.entries`
-  classifies every skill `keep` / `stale` / `archive` by idle days, counted from
-  the last load or from the document's own timestamp when nothing ever loaded
-  it; `archived` names what the pass switched off. **`dryRun` defaults to true**,
-  so a stray call reports and changes nothing. Archiving writes the same
-  activation flag as `skills.setEnabled` — it never deletes a document, and one
-  toggle brings the skill back.
+  carries `state` (`keep` / `stale` / `archive`), `reason` (`idle` / `pinned` /
+  `not-agent-authored`) and the idle-day numbers; `archived` names what the pass
+  switched off. The idle-day rule only applies to documents the agent wrote: a
+  skill without a recorded agent origin is `keep` with
+  `reason: "not-agent-authored"` however idle it is, and is never reported as
+  stale or archivable (ADR 0394). Idle days are counted from the last load or
+  from the document's own timestamp when nothing ever loaded it. **`dryRun`
+  defaults to true**, so a stray call reports and changes nothing. Archiving
+  writes the same activation flag as `skills.setEnabled` — it never deletes a
+  document, and one toggle brings the skill back.
 
 Built-in skill activation is global and defaults to enabled. Host stores only
 disabled IDs in `<data>/agent-capabilities/skill-builtins.json`, separately

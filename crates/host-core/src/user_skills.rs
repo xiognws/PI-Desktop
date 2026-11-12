@@ -1,5 +1,6 @@
 use self::curator::{CurationReport, CurationState, CuratorPolicy};
 use self::links::{SkillLink, SkillLinkStore};
+use self::origin::{SkillOriginStore, AGENT_AUTHOR};
 use self::pins::SkillPinStore;
 use self::usage::{SkillUsage, SkillUsageStore};
 use crate::activation::ActivationScope;
@@ -108,6 +109,11 @@ pub struct UserSkillInput {
     /// treated as `<id>.md`. A caller that pre-scanned the candidate can pass
     /// `"dir"` to require the SKILL.md convention.
     pub shape: Option<String>,
+    /// Who wrote this document. `"agent"` marks the skill as the maintenance
+    /// pass's to manage; anything else (and absence) means a person wrote it.
+    /// Read by `create`, ignored by `update` — an origin is recorded once and
+    /// never rewritten by an edit.
+    pub created_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,6 +156,8 @@ pub struct UserSkillRegistry {
     usage: SkillUsageStore,
     /// Skills the user asked the maintenance pass to leave alone.
     pins: SkillPinStore,
+    /// Which documents the agent wrote, so the pass only retires its own.
+    origins: SkillOriginStore,
     /// Where an absorbed skill went, so a quiet document can explain itself.
     links: SkillLinkStore,
 }
@@ -981,6 +989,7 @@ impl UserSkillRegistry {
             builtins: CapabilityState::new(data_dir, BUILTIN_SKILL_KIND),
             usage: SkillUsageStore::new(data_dir),
             pins: SkillPinStore::new(data_dir),
+            origins: SkillOriginStore::new(data_dir),
             links: SkillLinkStore::new(data_dir),
         }
     }
@@ -1100,6 +1109,8 @@ impl UserSkillRegistry {
         self.usage
             .retain(level, owner_project_path.as_deref(), &ids)?;
         self.pins
+            .retain(level, owner_project_path.as_deref(), &ids)?;
+        self.origins
             .retain(level, owner_project_path.as_deref(), &ids)?;
         self.links
             .retain(level, owner_project_path.as_deref(), &ids)?;
@@ -1234,8 +1245,21 @@ impl UserSkillRegistry {
             self.state
                 .set_enabled(SKILL_KIND, level, &id, project_path.as_deref(), false)?;
         }
-        self.find(&id, Some(level), project_path.as_deref())?
-            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: created skill was not found"))
+        let record = self
+            .find(&id, Some(level), project_path.as_deref())?
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: created skill was not found"))?;
+        // Only an explicit marker makes the document the pass's: a caller that
+        // says nothing is treated as a person, which is the side that never
+        // loses a file. Recorded after the scan above so the sweep cannot drop
+        // the entry it has just been given.
+        if agent_authored(input.created_by.as_deref()) {
+            self.origins.record_agent_authored(
+                level,
+                &record.id,
+                record.project_path.as_deref(),
+            )?;
+        }
+        Ok(record)
     }
 
     /// Write one sibling resource inside a skill's own directory.
@@ -1672,17 +1696,17 @@ impl UserSkillRegistry {
         let level = record_level;
         // The counters belonged to that document. Dropping them here is the
         // *intentional* delete; the scan's sweep covers files removed on disk.
-        self.usage.forget(
-            level,
-            &record.id,
-            Some(
-                record
-                    .project_path
-                    .as_deref()
-                    .unwrap_or_else(|| project_path.unwrap_or("")),
-            )
-            .filter(|path| !path.is_empty()),
-        );
+        let owner = Some(
+            record
+                .project_path
+                .as_deref()
+                .unwrap_or_else(|| project_path.unwrap_or("")),
+        )
+        .filter(|path| !path.is_empty());
+        self.usage.forget(level, &record.id, owner);
+        // The origin belonged to that document too, and a same-named successor
+        // must not inherit "the agent wrote this".
+        self.origins.forget(level, &record.id, owner);
         let _ = self.find(id, Some(level), record.project_path.as_deref())?;
         Ok(true)
     }
@@ -1864,7 +1888,8 @@ impl UserSkillRegistry {
         dry_run: bool,
     ) -> Result<CurationReport> {
         let records = self.active_for(project_path)?;
-        let mut report = crate::user_skills::curator::plan(&records, &self.usage, policy)?;
+        let mut report =
+            crate::user_skills::curator::plan(&records, &self.usage, &self.origins, policy)?;
         report.dry_run = dry_run;
         if !dry_run {
             let archivable: Vec<(CapabilityLevel, String, Option<String>)> = report
@@ -1903,6 +1928,18 @@ impl UserSkillRegistry {
     }
 }
 
+/// Does this marker claim "the agent wrote it"?
+///
+/// Only the explicit word counts, and case does not matter: a caller that
+/// capitalized the constant still made the same claim. Everything else — a
+/// missing field, `"user"`, `"imported"`, a typo — reads as "a person wrote
+/// this", which is the side that never archives a document.
+fn agent_authored(created_by: Option<&str>) -> bool {
+    created_by
+        .map(str::trim)
+        .is_some_and(|author| author.eq_ignore_ascii_case(AGENT_AUTHOR))
+}
+
 fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationScope {
     match level {
         CapabilityLevel::Global => ActivationScope::default(),
@@ -1915,6 +1952,7 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
 
 pub mod curator;
 pub mod links;
+pub mod origin;
 mod package_sync;
 /// Package bounds are asserted in their own module: `tests.rs` is close to the
 /// rust file-size limit, and these tests share one fixture.
