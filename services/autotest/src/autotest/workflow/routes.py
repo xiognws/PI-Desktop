@@ -230,6 +230,11 @@ class BugStatusIn(BaseModel):
     status: str
 
 
+class BugBatchIn(BaseModel):
+    ids: list[str]
+    status: str
+
+
 class DecisionCreateIn(BaseModel):
     prompt: str
     options: list[str]
@@ -609,6 +614,41 @@ def update_project_bug(project_id: str, bug_id: str, body: BugStatusIn) -> dict:
         "ok": True,
         "summary": f"{bug_id} → {body.status}",
         "data": {"bug_id": bug_id, "status": body.status},
+    }
+
+
+@router.post("/bugs/status")
+def update_project_bugs_batch(project_id: str, body: BugBatchIn) -> dict:
+    """批量流转缺陷状态（缺陷页多选后一次改多张）。
+
+    逐条处理并分别回报：一张单不存在或状态非法，不该让整批回滚 —— 那会让人把
+    「有几张已经改成功了」也重新点一遍。
+    """
+    ids = [str(item).strip() for item in body.ids if str(item).strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="ids 不能为空")
+    if len(ids) > 200:
+        raise HTTPException(status_code=400, detail="一次最多改 200 张缺陷单")
+
+    updated: list[str] = []
+    failed: list[dict] = []
+    with _project_conn(project_id) as conn:
+        for bug_id in ids:
+            if not store.bug_in_project(conn, bug_id, project_id):
+                failed.append({"id": bug_id, "reason": "项目里没有这条缺陷单"})
+                continue
+            try:
+                store.update_bug_status(conn, bug_id, body.status)
+                updated.append(bug_id)
+            except ValueError as exc:
+                failed.append({"id": bug_id, "reason": str(exc)})
+    summary = f"{len(updated)} 张缺陷单 → {body.status}"
+    if failed:
+        summary += f"，{len(failed)} 张失败"
+    return {
+        "ok": True,
+        "summary": summary,
+        "data": {"updated": updated, "failed": failed, "status": body.status},
     }
 
 

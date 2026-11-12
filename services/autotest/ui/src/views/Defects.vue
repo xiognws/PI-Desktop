@@ -122,6 +122,55 @@ async function setStatus(bug: BugItem, status: string) {
   }
 }
 
+// 多选批量流转：手上一堆「已修」要一起验证时，一张一张点太慢。
+const selected = ref<string[]>([])
+const batchBusy = ref(false)
+
+const allSelected = computed(
+  () => bugs.value.length > 0 && bugs.value.every(b => selected.value.includes(b.id)),
+)
+
+function toggleSelect(id: string) {
+  const idx = selected.value.indexOf(id)
+  if (idx > -1) selected.value.splice(idx, 1)
+  else selected.value.push(id)
+}
+
+function toggleSelectAll() {
+  selected.value = allSelected.value ? [] : bugs.value.map(b => b.id)
+}
+
+// 批量只给「目标状态」四个选项：具体能不能改由后端逐条校验，前端不猜每张单的历史。
+const BATCH_TARGETS = [
+  { key: 'fixed', label: '标记已修' },
+  { key: 'verified', label: '验证通过' },
+  { key: 'wontfix', label: '忽略' },
+  { key: 'open', label: '重开' },
+]
+
+async function batchSetStatus(status: string) {
+  if (!selected.value.length) return
+  batchBusy.value = true
+  try {
+    const res = await fetch(`/api/projects/${projectId}/workflow/bugs/status`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: [...selected.value], status }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body?.detail || `HTTP ${res.status}`)
+    const data = body?.data || {}
+    message.value = body?.summary
+      || `已更新 ${(data.updated || []).length} 张，失败 ${(data.failed || []).length} 张`
+    selected.value = []
+    await loadBugs()
+  } catch (e: any) {
+    message.value = e?.message || '批量更新失败'
+  } finally {
+    batchBusy.value = false
+  }
+}
+
 function actionsFor(status: string) {
   if (status === 'open') {
     return [
@@ -208,12 +257,38 @@ onMounted(loadBugs)
       <span v-if="message" class="ml-3 text-xs text-gray-500">{{ message }}</span>
     </div>
 
+    <!-- 批量操作条：有选中才出现 -->
+    <div v-if="bugs.length" class="flex items-center gap-3 mb-3 text-xs">
+      <label class="flex items-center gap-1.5 text-gray-600">
+        <input type="checkbox" :checked="allSelected" @change="toggleSelectAll()" />
+        全选本页 {{ bugs.length }} 张
+      </label>
+      <template v-if="selected.length">
+        <span class="text-gray-500">已选 {{ selected.length }} 张 →</span>
+        <button
+          v-for="target in BATCH_TARGETS"
+          :key="target.key"
+          class="h-7 px-2.5 rounded border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-700 disabled:opacity-40"
+          :disabled="batchBusy"
+          @click="batchSetStatus(target.key)"
+        >{{ target.label }}</button>
+        <button class="h-7 px-2 text-gray-400 hover:text-gray-700" :disabled="batchBusy" @click="selected = []">取消选择</button>
+      </template>
+      <span v-if="message" class="ml-auto text-gray-500">{{ message }}</span>
+    </div>
+
     <!-- 缺陷列表 -->
     <div class="bg-white rounded-lg border border-gray-200">
       <div class="divide-y divide-gray-100">
         <div v-for="bug in bugs" :key="bug.id" class="p-5 hover:bg-gray-50">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-3 min-w-0">
+              <input
+                type="checkbox"
+                class="flex-shrink-0"
+                :checked="selected.includes(bug.id)"
+                @change="toggleSelect(bug.id)"
+              />
               <Bug class="w-5 h-5 text-red-500 flex-shrink-0" />
               <span class="font-medium text-gray-900 truncate">{{ bug.title || bug.id }}</span>
               <span class="text-xs px-2 py-0.5 rounded flex-shrink-0" :class="statusClass(bug.status)">
