@@ -120,10 +120,22 @@ export type DraftSessionConfiguration = {
 
 
 export type SkillReviewNotice = {
+  /**
+   * Identity of this arrival, not of the review. A session keeps every notice in
+   * arrival order, so the transcript needs a stable key per row it draws.
+   */
+  id: string;
   outcome: "applied" | "skipped" | "failed";
   reason?: string;
   /** One short description per write the review made. */
   actions: string[];
+  /**
+   * Id of the newest transcript message when the review landed — the turn the
+   * notice reports on. The review arrives after that turn has rendered, so this
+   * is the only handle that ties the row to its turn; absent when the session had
+   * no transcript to read, and the row then falls back to the end of the list.
+   */
+  afterMessageId?: string;
 };
 
 export type AppState = {
@@ -165,13 +177,18 @@ export type AppState = {
   runningSessions: Record<string, boolean>;
 
   /**
-   * The latest self-improvement review per session, so the transcript can say whether
-   * it looked and what it concluded. A review that wrote nothing is the common
-   * outcome, and without this row it is indistinguishable from one that never ran.
-   * Keyed by session, not turn: the review reports *after* the turn ended, when the
-   * runtime no longer carries a turn id. Memory only — the durable record is the log.
+   * The self-improvement reviews of each session, oldest first, so the transcript
+   * can say whether a review looked and what it concluded. A review that wrote
+   * nothing is the common outcome, and without these rows it is
+   * indistinguishable from one that never ran.
+   *
+   * Keyed by session, not turn: the review reports *after* the turn ended, when
+   * the runtime no longer carries a turn id. Each notice instead remembers the
+   * newest message it could see when it landed (`afterMessageId`), which is what
+   * places it under the turn it reports on. Memory only — the durable record is
+   * the log.
    */
-  skillReviewBySession: Record<string, SkillReviewNotice>;
+  skillReviewBySession: Record<string, SkillReviewNotice[]>;
   /** Runtime-owned phase for explaining quiet intervals in active turns. */
   agentStatuses: Record<string, AgentStatus>;
   /** Latest in-memory result for each session, used by the active transcript. */

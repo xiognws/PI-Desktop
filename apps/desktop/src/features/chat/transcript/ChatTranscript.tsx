@@ -25,7 +25,6 @@ import {
   RunActivityIndicator,
   WorkingIndicator,
 } from "./ActivityGroup";
-import { TranscriptHistory, TranscriptTail } from "./AssistantTurn";
 import { collectLiveDelegationEntries } from "../../../lib/live-delegation-entries";
 import { reuseReadonlyMap } from "../../../lib/assistant-turns";
 import { liveHistoryTurnId } from "../../../lib/turn-process";
@@ -57,7 +56,7 @@ import {
   resolveRadialMenu,
 } from "../../../lib/radial-menu";
 import { SlotSessionProvider } from "../../../plugins/renderer-slots/use-slots";
-import { SkillReviewRow } from "./SkillReviewRow";
+import { SkillReviewAnnotatedHistory } from "./SkillReviewRow";
 
 type ChatTranscriptProps = {
   sessionId: string | undefined;
@@ -156,6 +155,12 @@ function TranscriptBody({
     Boolean(
       sessionId && state.pendingPlans[sessionId]?.status === "pending",
     ),
+  );
+  // Reviews of this session in arrival order. Each one is drawn under the turn its
+  // anchor names, so a review that has already been superseded stays where it
+  // happened instead of riding the end of the transcript.
+  const skillReviewNotices = useAppStore((state) =>
+    sessionId ? state.skillReviewBySession[sessionId] : undefined,
   );
   // Plan and Goal both project `planning`; the durable mode names which
   // contract is being written, so the indicator can use that kind's copy.
@@ -533,27 +538,23 @@ function TranscriptBody({
             // view, which is exactly the jitter this avoids.
             <div className="transcript-hydration-spacer" aria-hidden />
           ) : null}
-          <TranscriptHistory
+          {/*
+            The review of a turn belongs between it and the next one, the way
+            Hermes prints its summary into the stream when it happens. Each row
+            carries the id of the newest message it saw, so it stays under that
+            turn as later turns push it up into history; a notice whose anchor is
+            gone falls back to the end of the list rather than to the top.
+          */}
+          <SkillReviewAnnotatedHistory
             entries={historyEntries}
+            tailEntry={tailEntry}
+            notices={skillReviewNotices}
             isRunning={isRunning}
+            tailActive={transcriptRunning && tailEntry?.kind === "assistant-turn"}
+            runtimeActivity={specializedActivity}
             liveDelegations={liveDelegations}
             liveTurnId={liveTurnId}
           />
-          {tailEntry ? (
-            <TranscriptTail
-              entry={tailEntry}
-              isRunning={isRunning}
-              isActive={transcriptRunning && tailEntry.kind === "assistant-turn"}
-              runtimeActivity={specializedActivity}
-            />
-          ) : null}
-          {/*
-            The review of the turn that just ended belongs after it. It used to be
-            the history's trailing slot, which put it above `TranscriptTail` — the
-            live turn — so a pass that had already finished was reported before
-            the reply it was reviewing, and read as if it ran first.
-          */}
-          <SkillReviewRow sessionId={sessionId ?? ""} />
           {hasMoreAfter && !automaticContinuation ? (
             <button
               type="button"
