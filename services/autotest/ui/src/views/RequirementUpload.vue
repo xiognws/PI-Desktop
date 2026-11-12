@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { FileText, Upload, RefreshCw, ChevronRight } from 'lucide-vue-next'
+import { FileText, Upload, RefreshCw, ChevronRight, Trash2, BookOpen } from 'lucide-vue-next'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -66,6 +66,54 @@ async function onDrop(event: DragEvent) {
   dragging.value = false
   const file = event.dataTransfer?.files?.[0]
   if (file) await send(file)
+}
+
+// 删除单份需求：只删这份文件和它的记录，不动同目录下其它需求。
+async function removeRequirement(item: Requirement) {
+  message.value = ''
+  error.value = ''
+  try {
+    const response = await fetch(
+      `/api/projects/${projectId}/requirements/${encodeURIComponent(item.filename)}`,
+      { method: 'DELETE' },
+    )
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(body?.detail || `HTTP ${response.status}`)
+    message.value = body?.message || `已删除 ${item.filename}`
+    await load()
+  } catch (problem) {
+    error.value = String((problem as Error).message ?? problem)
+  }
+}
+
+// 把 specs/ 里已上传的需求切分进项目知识库（Agent 检索时才能命中需求原文）。
+const archiving = ref(false)
+const archiveResult = ref<{ imported: number; skipped: number; failed: number } | null>(null)
+
+async function archiveToKnowledge() {
+  archiving.value = true
+  message.value = ''
+  error.value = ''
+  try {
+    const response = await fetch(`/api/projects/${projectId}/knowledge/documents/from-specs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ module: '', tags: '需求' }),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(body?.detail || `HTTP ${response.status}`)
+    const data = body?.data || {}
+    archiveResult.value = {
+      imported: (data.imported || []).length,
+      skipped: (data.skipped || []).length,
+      failed: (data.failed || []).length,
+    }
+    message.value = body?.summary || `已入库 ${archiveResult.value.imported} 份`
+  } catch (problem) {
+    error.value = String((problem as Error).message ?? problem)
+  } finally {
+    archiving.value = false
+  }
 }
 
 function sizeText(bytes: number | null) {
@@ -135,6 +183,18 @@ onMounted(load)
       <div class="flex items-center gap-2 mt-6 mb-3">
         <h3 class="text-sm font-medium text-gray-900">已上传</h3>
         <span class="text-xs text-gray-400">{{ requirements.length }} 个文件</span>
+        <span v-if="archiveResult" class="text-xs text-gray-500">
+          入库 {{ archiveResult.imported }} · 跳过 {{ archiveResult.skipped }} · 失败 {{ archiveResult.failed }}
+        </span>
+        <button
+          class="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          :disabled="archiving || !requirements.length"
+          title="把 specs/ 里的需求切分进项目知识库，Agent 检索时才命中得到原文"
+          @click="archiveToKnowledge"
+        >
+          <BookOpen class="w-4 h-4" />
+          {{ archiving ? '入库中…' : '全部入库知识库' }}
+        </button>
       </div>
       <div class="space-y-3">
         <div v-for="item in requirements" :key="item.id" class="bg-gray-50 rounded-lg border border-gray-200 p-4 flex items-center gap-3">
@@ -144,6 +204,11 @@ onMounted(load)
             <div class="text-xs text-gray-400 mt-1">{{ sizeText(item.size) }} · {{ item.created_at }}</div>
           </div>
           <span class="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-600">{{ item.status }}</span>
+          <button
+            class="p-1 text-gray-400 hover:text-red-600"
+            title="删除这份需求"
+            @click="removeRequirement(item)"
+          ><Trash2 class="w-4 h-4" /></button>
         </div>
         <div v-if="!requirements.length" class="text-center py-10 text-sm text-gray-400 bg-gray-50 rounded-lg border border-gray-200">
           还没有上传需求文档

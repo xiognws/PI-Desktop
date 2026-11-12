@@ -317,7 +317,8 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 | 待审批 `approvals` | `GET …/workflow/pending` | 项目级人工卡点一览（跨 run）、批准/驳回、10s 轮询跟上会话侧的答复 |
 | 缺陷 `bugs` | `GET …/workflow/bugs`、`PATCH …/bugs/{id}` | 跨 run 的缺陷单（`occurrences` 累计），人工流转 `open/fixed/verified/wontfix` |
 | 知识库 `knowledge` | `GET …/knowledge/documents`、`…/workflow/knowledge/search` | 批量导入（md/pdf/docx/html…）、切分预览、FTS5/BM25 检索、复制、**加入上下文**（经 preload 送进桌面会话输入框） |
-| 需求 `requirements` | `GET/POST …/requirements` | 上传 PRD 原文、读回正文 |
+| 首页（项目列表） | `GET/POST/PATCH/DELETE /api/projects` | 项目列表 + 新建 + **重命名**（只改显示名，id 不变）+ **删除**：必须输入项目 id 二次确认，目录整体移进 `<workspace 同级>/.trash/<project_id>-<时间戳>` 而不是真删，执行在跑时拒绝删除 |
+| 需求 `requirements` | `GET/POST/DELETE …/requirements`、`POST …/knowledge/documents/from-specs` | 上传 PRD 原文、读回正文、逐份删除；**「全部入库知识库」**把 `specs/` 里已上传的需求切分进项目知识库（Agent 检索才命中得到原文），回执显示新增/跳过/失败条数 |
 | 用例 `cases` | `GET/POST …/cases` | 用例 CRUD、单条运行 |
 | 脚本 `scripts` | `GET/POST …/scripts`、`…/scripts/{id}/check|gate|run` | 列表 + 编辑器；**「校验」走 `/gate`**（compile / e2e `@target` / 空内容），**「模板」**插入 pytest 骨架，**「保存」**手动落盘（自动保存 1.5s 防抖之外），运行前自动保存；结果面板显示 `status_label` / `failure` / 耗时 / 执行号；闸门跑过且未通过时「运行」置灰（把「未过 gate 不得执行」搬到界面上） |
 | 报告 `reports` | `GET …/runs/{id}/report-content` | 按 run 读 Markdown 正文（含缺陷清单） |
