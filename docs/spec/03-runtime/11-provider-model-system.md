@@ -850,12 +850,20 @@ Rules:
    the vendor's channel-check refusal. The model transport stays vendor-agnostic.
 4. **`/v1/models` needs no credential; chat does.** Chat accepts the provider row's
    API key as the vendor access token and forwards it per request. The gateway
-   stores, caches, and logs no credential, and the row shows the ordinary
-   "needs an API key" state until one is saved.
-5. **The row is stable and self-healing.** It is found by `vendorKey` on later
+   stores, caches, and logs no credential.
+5. **The token is acquired from the app, not typed in.** The entry attaches to the
+   desktop app over the Chrome DevTools protocol, hooks the renderer's network
+   calls and storage, and reads the `Authorization` header the app already sends
+   (`typ: Bearer` is the access token, `typ: Offline` the refresh token). An app
+   without a debugging port is restarted with one and restored afterwards — closed
+   again if it was closed, relaunched normally if it was running — so no debugging
+   port outlives the harvest. The app's sealed token file is never parsed. Only the
+   token's expiry is remembered, and reaching it triggers the next harvest; the
+   ordinary "needs an API key" state remains the fallback when acquisition fails.
+6. **The row is stable and self-healing.** It is found by `vendorKey` on later
    launches; an unchanged launch writes nothing. Discovery runs per
    `/v1/models` request, so a catalog the account gains later appears on the next
    picker refresh without a restart.
-6. **Lifecycle is owned.** The listener binds loopback only, and the shutdown
+7. **Lifecycle is owned.** The listener binds loopback only, and the shutdown
    sequence closes it. Capture and headless boot probes disable the entry so a
    developer's real desktop profile is never read.

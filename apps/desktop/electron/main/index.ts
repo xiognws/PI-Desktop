@@ -375,6 +375,7 @@ const localModelEntries = createWorkBuddyService({
     if (!host) return null;
     return { call: (method, params) => host.call(method, params) };
   },
+  dataDir,
   log: (event) => logger.app("runtime", "info", "local model entry", { data: JSON.stringify(event) }),
 });
 /**

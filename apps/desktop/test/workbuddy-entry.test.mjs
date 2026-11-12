@@ -44,6 +44,12 @@ function hostFixture({ hasSecret = false } = {}) {
           providers.set(next.id, next);
           return { provider: next };
         }
+        case "providers.setSecret": {
+          const row = providers.get(params.id);
+          const next = { ...row, hasSecret: Boolean(params.secretValue) };
+          providers.set(next.id, next);
+          return { provider: next };
+        }
         default:
           throw new Error(`unexpected host call ${method}`);
       }
@@ -181,6 +187,7 @@ test("a signed-in machine gets an entry that waits for its token", async () => {
   const fixture = hostFixture();
   const service = createWorkBuddyService({
     getHost: () => fixture.host,
+    autoToken: false,
     sources: [sourceFixture(installed)],
   });
 
@@ -237,6 +244,134 @@ test("a machine without WorkBuddy creates no row at all", async () => {
   assert.equal(status.state, "unavailable");
   assert.equal(status.endpoint, "none");
   assert.equal(fixture.calls.some((call) => call.method === "providers.create"), false);
+  await service.dispose();
+});
+
+test("a signed-in machine with no key harvests the app's own token", async () => {
+  const fixture = hostFixture();
+  const acquired = [];
+  const service = createWorkBuddyService({
+    getHost: () => fixture.host,
+    sources: [sourceFixture(installed)],
+    acquireToken: async () => {
+      acquired.push("called");
+      return {
+        accessToken: "fixture-token-value",
+        expiresAt: Date.parse("2026-12-05T03:51:32Z"),
+        source: "attach",
+      };
+    },
+  });
+
+  const [status] = await service.start();
+
+  assert.deepEqual(acquired, ["called"]);
+  assert.equal(status.state, "ready");
+  assert.match(status.detail ?? "", /token acquired \(attach\)/);
+  const stored = fixture.calls.find((call) => call.method === "providers.setSecret");
+  assert.equal(stored.params.secretValue, "fixture-token-value");
+  await service.dispose();
+});
+
+test("a stored key close to expiry is harvested again", async () => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dataDir = await mkdtemp(join(tmpdir(), "pi-workbuddy-state-"));
+  await writeFile(
+    join(dataDir, "workbuddy-entry.json"),
+    JSON.stringify({ expiresAt: Date.now() + 60_000, acquiredAt: Date.now() - 86_400_000 }),
+  );
+  const fixture = hostFixture();
+  // The row already exists and holds a key; only its expiry says "replace me".
+  fixture.providers.set("row-1", {
+    id: "row-1",
+    name: "WorkBuddy",
+    vendorKey: "workbuddy",
+    hasSecret: true,
+    enabled: true,
+    baseUrl: "http://127.0.0.1:41000/v1",
+    models: [{ id: "hy4free" }],
+  });
+  let attempts = 0;
+  const service = createWorkBuddyService({
+    getHost: () => fixture.host,
+    dataDir,
+    sources: [sourceFixture(installed)],
+    acquireToken: async () => {
+      attempts += 1;
+      return { accessToken: "fresh-token", expiresAt: Date.now() + 30 * 86_400_000, source: "attach" };
+    },
+  });
+
+  const [status] = await service.start();
+
+  assert.equal(attempts, 1);
+  assert.equal(status.state, "ready");
+  const stored = fixture.calls.find((call) => call.method === "providers.setSecret");
+  assert.equal(stored.params.secretValue, "fresh-token");
+  await service.dispose();
+  await rm(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+});
+
+test("a failed harvest keeps the row and reports why", async () => {
+  const fixture = hostFixture();
+  const service = createWorkBuddyService({
+    getHost: () => fixture.host,
+    sources: [sourceFixture(installed)],
+    acquireToken: async () => {
+      throw new Error("no WorkBuddy token was observed");
+    },
+  });
+
+  const [status] = await service.start();
+
+  assert.equal(status.state, "needs-credential");
+  assert.match(status.detail ?? "", /token acquisition failed: no WorkBuddy token was observed/);
+  assert.equal(fixture.calls.some((call) => call.method === "providers.setSecret"), false);
+  await service.dispose();
+});
+
+test("the harvest runs once per process, not on every refresh", async () => {
+  const fixture = hostFixture();
+  let attempts = 0;
+  const service = createWorkBuddyService({
+    getHost: () => fixture.host,
+    sources: [sourceFixture(installed)],
+    acquireToken: async () => {
+      attempts += 1;
+      throw new Error("still nothing");
+    },
+  });
+
+  await service.start();
+  await service.refresh();
+
+  assert.equal(attempts, 1);
+  await service.dispose();
+});
+
+test("a signed-out app is not touched", async () => {
+  const fixture = hostFixture();
+  let attempts = 0;
+  const service = createWorkBuddyService({
+    getHost: () => fixture.host,
+    sources: [
+      sourceFixture({
+        installation: { installed: true, loggedIn: false, sources: [], detail: "expired" },
+        models: MODELS,
+      }),
+    ],
+    acquireToken: async () => {
+      attempts += 1;
+      throw new Error("should not run");
+    },
+  });
+
+  const [status] = await service.start();
+
+  assert.equal(attempts, 0);
+  assert.equal(status.state, "needs-credential");
   await service.dispose();
 });
 

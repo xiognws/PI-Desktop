@@ -11,6 +11,12 @@ import { join } from "node:path";
 
 export type WorkBuddyEnvironment = {
   homeDir: string;
+  /**
+   * Explicit executable candidates. Absent means "derive them from the standard
+   * locations"; present (even as an empty list) means "only these" — the seam a
+   * test uses to describe a machine that has the app nowhere.
+   */
+  executables?: string[];
   /** `%LOCALAPPDATA%` on Windows; the XDG data dir elsewhere. */
   localAppData: string;
   /** `%PROGRAMFILES%` on Windows; `/Applications` elsewhere. */
@@ -73,16 +79,50 @@ export function workBuddyConnectorCatalog(environment: WorkBuddyEnvironment): st
   return join(environment.homeDir, ".pi-workbuddy-connect", ".workbuddy-catalog.json");
 }
 
-/** Executable candidates for an installed desktop app. */
+/**
+ * Program-directory roots to search on Windows.
+ *
+ * The desktop app is commonly installed on a drive that is not the system one,
+ * so the environment's own `ProgramFiles` is only the first candidate; every
+ * mounted drive contributes its `Program Files` roots as well. The list is
+ * generation only — existence is checked by the caller, which keeps this module
+ * free of filesystem reads.
+ */
+export function windowsProgramRoots(environment: WorkBuddyEnvironment): string[] {
+  const roots = new Set<string>();
+  roots.add(environment.programFiles);
+  if (environment.localAppData.endsWith("Local")) {
+    roots.add(join(environment.localAppData, "..", "..", "Program Files"));
+  }
+  for (let code = "C".charCodeAt(0); code <= "Z".charCodeAt(0); code += 1) {
+    const drive = `${String.fromCharCode(code)}:`;
+    roots.add(`${drive}\\Program Files`);
+    roots.add(`${drive}\\Program Files (x86)`);
+    roots.add(`${drive}\\`);
+  }
+  return [...roots];
+}
+
+/** Executable candidates for an installed desktop app, most likely first. */
 export function workBuddyExecutables(environment: WorkBuddyEnvironment): string[] {
   if (environment.platform === "darwin") {
-    return [join(environment.programFiles, "WorkBuddy.app")];
+    return [
+      join(environment.programFiles, "WorkBuddy.app"),
+      join(environment.homeDir, "Applications", "WorkBuddy.app"),
+    ];
   }
   if (environment.platform === "win32") {
-    return [
-      join(environment.programFiles, "WorkBuddy", "WorkBuddy.exe"),
-      join(environment.localAppData, "Programs", "WorkBuddy", "WorkBuddy.exe"),
-    ];
+    const candidates: string[] = [];
+    for (const root of windowsProgramRoots(environment)) {
+      for (const app of ["WorkBuddy", "CodeBuddy"]) {
+        candidates.push(join(root, app, `${app}.exe`));
+      }
+    }
+    for (const app of ["WorkBuddy", "CodeBuddy"]) {
+      candidates.push(join(environment.localAppData, "Programs", app, `${app}.exe`));
+      candidates.push(join(environment.localAppData, app, `${app}.exe`));
+    }
+    return candidates;
   }
   return [
     join(environment.localAppData, "WorkBuddy", "WorkBuddy"),

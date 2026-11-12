@@ -50,6 +50,9 @@ function environment(fixture, now) {
     localAppData: fixture.localAppData,
     programFiles: fixture.programFiles,
     platform: "win32",
+    // The fixture describes one machine; the real drive sweep must not leak into
+    // it, or a developer's own install would make "not installed" untestable.
+    executables: [],
     now,
   };
 }

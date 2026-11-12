@@ -130,7 +130,8 @@ export function detectWorkBuddy(environment: WorkBuddyEnvironment): WorkBuddyDis
   const now = environment.now ?? Date.now();
   const sources: string[] = [];
 
-  const executable = workBuddyExecutables(environment).find((path) => existsSync(path));
+  const executables = environment.executables ?? workBuddyExecutables(environment);
+  const executable = executables.find((path) => existsSync(path));
   if (executable) sources.push("install");
   const dataDir = workBuddyDataDirs(environment).find((dir) => existsSync(dir));
   if (dataDir) sources.push("profile");

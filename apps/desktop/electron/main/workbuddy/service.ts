@@ -10,9 +10,12 @@
  * "unavailable" instead of surfacing an error, because a missing or broken
  * WorkBuddy install must never affect the rest of the app.
  */
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { currentEnvironment, type WorkBuddyEnvironment } from "./paths.ts";
 import { disableProviderIfPresent, ensureProvider, type ProviderHost } from "./provider.ts";
 import { localModelSources, type LocalEntryBridge, type LocalModelSource } from "./sources.ts";
+import { acquireWorkBuddyToken, type AcquiredToken } from "./token.ts";
 import type { WorkBuddyDiscovery, WorkBuddyStatus } from "./types.ts";
 
 export type WorkBuddyServiceOptions = {
@@ -20,7 +23,25 @@ export type WorkBuddyServiceOptions = {
   environment?: WorkBuddyEnvironment;
   sources?: LocalModelSource[];
   log?: (event: Record<string, unknown>) => void;
+  /**
+   * Token acquisition for a row that has none yet. The default attaches to the
+   * desktop app over the DevTools protocol; tests inject a stub.
+   */
+  acquireToken?: (environment: WorkBuddyEnvironment) => Promise<AcquiredToken>;
+  /** Off makes the entry stop at "needs a key" without touching the app. */
+  autoToken?: boolean;
+  /**
+   * App data directory. When given, the entry remembers when the stored token
+   * expires — the token itself is never written here, only its expiry, which is
+   * what decides that the next launch should harvest a fresh one.
+   */
+  dataDir?: string;
 };
+
+/** Re-harvest once the stored token is this close to expiring. */
+const TOKEN_REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000;
+
+type EntryState = { expiresAt?: number; acquiredAt?: number };
 
 export type WorkBuddyService = {
   /** Detect, start the gateway, register the provider row. Safe to call twice. */
@@ -60,6 +81,39 @@ export function createWorkBuddyService(options: WorkBuddyServiceOptions): WorkBu
   const environment = options.environment ?? currentEnvironment();
   const log = options.log ?? (() => {});
   const runtimes = new Map<string, SourceRuntime>();
+  const tokenAttempted = new Set<string>();
+  const autoToken = options.autoToken ?? process.env.PI_DESKTOP_WORKBUDDY_AUTO_TOKEN !== "0";
+  const stateFile = options.dataDir ? join(options.dataDir, "workbuddy-entry.json") : undefined;
+
+  function readState(): EntryState {
+    if (!stateFile) return {};
+    try {
+      const parsed = JSON.parse(readFileSync(stateFile, "utf8")) as unknown;
+      return parsed && typeof parsed === "object" ? (parsed as EntryState) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function writeState(state: EntryState): void {
+    if (!stateFile) return;
+    try {
+      writeFileSync(stateFile, JSON.stringify(state, null, 2), "utf8");
+    } catch (error) {
+      log({ event: "workbuddy_state_write_failed", message: String(error) });
+    }
+  }
+
+  /** Whether the stored token is missing or close enough to expiry to replace. */
+  function tokenNeedsRefresh(): boolean {
+    const { expiresAt } = readState();
+    if (typeof expiresAt !== "number") return false;
+    return expiresAt - Date.now() < TOKEN_REFRESH_MARGIN_MS;
+  }
+  const acquireToken =
+    options.acquireToken ??
+    ((environment: WorkBuddyEnvironment) =>
+      acquireWorkBuddyToken({ environment, log }));
 
   async function register(
     source: LocalModelSource,
@@ -76,20 +130,43 @@ export function createWorkBuddyService(options: WorkBuddyServiceOptions): WorkBu
       models: discovery.models,
       enabled: true,
     });
+    let hasSecret = result.provider.hasSecret === true;
+    let tokenNote: string | undefined;
+    // A row with no key is the one moment the entry may touch the desktop app:
+    // harvest the token it is already using, once per process. The user has
+    // already signed in there, so this is the difference between "installed" and
+    // "usable" without asking them to paste anything.
+    const wantsToken = !hasSecret || tokenNeedsRefresh();
+    if (wantsToken && autoToken && discovery.installation.loggedIn && !tokenAttempted.has(source.id)) {
+      tokenAttempted.add(source.id);
+      try {
+        const token = await acquireToken(environment);
+        await host.call("providers.setSecret", { id: result.provider.id, secretValue: token.accessToken });
+        writeState({ expiresAt: token.expiresAt, acquiredAt: Date.now() });
+        hasSecret = true;
+        tokenNote = `token acquired (${token.source}), expires ${new Date(token.expiresAt).toISOString()}`;
+        log({ event: "workbuddy_token_stored", providerId: result.provider.id, source: token.source });
+      } catch (error) {
+        tokenNote = `token acquisition failed: ${(error as Error).message}`;
+        log({ event: "workbuddy_token_failed", message: (error as Error).message });
+      }
+    }
     return {
-      // The row exists either way; `hasSecret` is what separates "paste the
-      // token once" from "works now".
-      state: result.provider.hasSecret ? "ready" : "needs-credential",
+      // The row exists either way; `hasSecret` is what separates "enrolled" from
+      // "works now".
+      state: hasSecret ? "ready" : "needs-credential",
       providerId: result.provider.id,
       baseUrl: bridge.baseUrl,
       modelCount: discovery.models.length,
       endpoint: "bridge",
       installation: discovery.installation,
-      detail: result.created
-        ? `created provider row ${result.provider.id}`
-        : result.changed
-          ? `updated provider row ${result.provider.id}`
-          : undefined,
+      detail:
+        tokenNote ??
+        (result.created
+          ? `created provider row ${result.provider.id}`
+          : result.changed
+            ? `updated provider row ${result.provider.id}`
+            : undefined),
     };
   }
 

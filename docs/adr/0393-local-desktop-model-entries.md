@@ -26,7 +26,8 @@ Three existing surfaces were considered and each leaves part of the job undone:
   pi-ai is not the place to grow one vendor's exceptions.
 - **Reading the desktop app's stored session.** The app seals its token with its
   own key material, tied to its own version. Extracting it would be a
-  credential-circumvention path that breaks on every app update.
+  credential-circumvention path that breaks on every app update — the renderer
+  already sends the token the app itself uses, so it is read from there instead.
 
 ## Decision
 
@@ -43,21 +44,30 @@ Three existing surfaces were considered and each leaves part of the job undone:
    always streaming upstream, splitting a long system prompt into a system head
    plus a user reference message, and a fixed request-shape ladder on `11128`.
 4. `/v1/models` answers without a credential, so the account's models reach the
-   picker before the user has supplied anything. Chat requires a bearer token,
-   and that token **is** the provider's own API key: the user pastes the vendor
-   access token once into the ordinary provider dialog, the Host stores it in its
-   secret store, and the gateway forwards it upstream per request. The gateway
-   stores, caches, and logs no credential.
-5. The row is marked with `vendorKey` = the source id (`workbuddy`) so the next
+   picker before anything is stored. Chat requires a bearer token, and that token
+   **is** the provider's own API key: the Host keeps it in its secret store and
+   the gateway forwards it upstream per request. The gateway stores, caches, and
+   logs no credential.
+5. The token is **acquired from the app itself**, not typed in. The entry
+   attaches to the running desktop app over the Chrome DevTools protocol,
+   hooks the renderer's `fetch` / `XMLHttpRequest` / storage, and reads the
+   `Authorization` header the app already sends; JWTs are split by `typ`
+   (`Bearer` is the access token, `Offline` the refresh token). An app with no
+   debugging port is restarted with one, and **handed back afterwards exactly as
+   it was found** — the port is closed (the app is left closed if it was closed
+   before), because an open DevTools port is full control of the app. The app's
+   sealed token file is never parsed. The expiry the token states is remembered
+   (never the token) so the next launch knows when to harvest again.
+6. The row is marked with `vendorKey` = the source id (`workbuddy`) so the next
    launch finds the same row instead of adding a second one. A launch where
    neither the endpoint nor the model ids changed writes nothing.
-6. Absence is normal. A machine without the app produces no row at all; a row
+7. Absence is normal. A machine without the app produces no row at all; a row
    whose app was uninstalled is switched off (`enabled = false`) rather than
    deleted, so the stored key survives a reinstall.
-7. Sources are a registry (`LocalModelSource`): detection plus a gateway factory
+8. Sources are a registry (`LocalModelSource`): detection plus a gateway factory
    per vendor. Adding another desktop app is a new module and one registry entry,
    with no change to the service, the row registration, or Settings.
-8. Nothing here is an IPC channel or a renderer surface. The entry needs no new
+9. Nothing here is an IPC channel or a renderer surface. The entry needs no new
    UI: it is a provider row, and its "needs a key" state is the state every other
    provider already shows.
 
@@ -66,9 +76,16 @@ Three existing surfaces were considered and each leaves part of the job undone:
 - Installing the desktop app makes an entry appear on the next launch, with the
   account's chat models and their stated context/output limits. Removing the app
   parks the entry instead of erroring.
-- One manual step remains where the vendor seals its token: the user pastes the
-  access token once, exactly as they would for any other API-key provider. The
-  entry cannot and does not extract it from the app's own store.
+- The first launch that finds the app signed in restarts it once, behind a
+  loopback debugging port, for a few seconds. That is a visible side effect on
+  another application, taken deliberately: it is the only supported way to obtain
+  a token the vendor seals, and it replaces an otherwise permanent "paste a token"
+  step. A machine whose app is mid-conversation loses no stored data, but the
+  running window is restarted.
+- The harvested token is a real credential: it lives in the Host secret store and
+  is forwarded per request. It expires on the vendor's schedule (weeks, observed),
+  and the remembered expiry is what triggers re-harvesting rather than a failing
+  request.
 - The listener is a local HTTP server inside the main process. It binds loopback
   with an ephemeral port, requires a bearer token for chat, and is closed on quit
   by the shutdown sequence. Another local process that knows the port can read the
