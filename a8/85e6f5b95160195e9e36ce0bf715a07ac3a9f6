@@ -1,0 +1,16 @@
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 320-321
+services/autotest/ui/src/views/RequirementUpload.vue
+  h_201ed4c689ac8b 4,71-118,186-197,207-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a885e6f5b95160195e9e36ce0bf715a07ac3a9f6",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
