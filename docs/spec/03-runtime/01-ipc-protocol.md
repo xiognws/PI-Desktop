@@ -1649,6 +1649,11 @@ skill directory name for `SKILL.md` (not a staging folder such as
 listed. Folded YAML `description: >` / `|` blocks flatten into the catalog
 one-liner.
 
+Archived skills live in `<skills root>/.archive/` and the scan skips that
+directory, so an archived document is in no list, in no prompt and not loadable
+through `Skill`. It is not gone: the id, the bytes and every sibling resource
+are intact (ADR 0395).
+
 - `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
 - `skills.active({ projectPath? })` → the effective runtime list
 - `skills.create(skill)` — writes one skill document. `skill.createdBy` is
@@ -1712,17 +1717,35 @@ one-liner.
   `skill: null` for an unknown id — the page may be acting on a row another
   window already deleted.
 - `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
-  → `{ report }` — maintenance over the user library (ADR 0387). `report.entries`
-  carries `state` (`keep` / `stale` / `archive`), `reason` (`idle` / `pinned` /
-  `not-agent-authored`) and the idle-day numbers; `archived` names what the pass
-  switched off. The idle-day rule only applies to documents the agent wrote: a
-  skill without a recorded agent origin is `keep` with
-  `reason: "not-agent-authored"` however idle it is, and is never reported as
-  stale or archivable (ADR 0394). Idle days are counted from the last load or
-  from the document's own timestamp when nothing ever loaded it. **`dryRun`
-  defaults to true**, so a stray call reports and changes nothing. Archiving
-  writes the same activation flag as `skills.setEnabled` — it never deletes a
-  document, and one toggle brings the skill back.
+  → `{ report }` — maintenance over the user library (ADR 0387, ADR 0395).
+  `report.entries` carries `state` (`keep` / `stale` / `archive`), `reason`
+  (`idle` / `pinned` / `not-agent-authored`) and the idle-day numbers;
+  `archived` names the skills this call actually moved. The idle-day rule only
+  applies to documents the agent wrote: a skill without a recorded agent origin
+  is `keep` with `reason: "not-agent-authored"` however idle it is, and is never
+  reported as stale or archivable (ADR 0394). Idle days are counted from the last
+  load or from the document's own timestamp when nothing ever loaded it.
+  **`dryRun` defaults to true**, so a stray call reports and changes nothing.
+  Archiving **moves** the document: `<id>.md` becomes `.archive/<id>.md` and a
+  package `<id>/` moves whole to `.archive/<id>/`, resources included. Nothing is
+  deleted and nothing is rewritten, and `skills.restore` is the way back. A
+  linked skill (`mode: "link"`) and a document whose archived twin already
+  exists are left where they are and are not reported in `archived`.
+- `skills.restore({ id, level?, projectPath? })` → `{ skill }` — move one
+  archived skill back out of `.archive/` to where the pass took it from, and
+  switch it on. The restore also moves the document's timestamp to now, so the
+  next automatic pass does not take it out again immediately. `SKILL_INVALID`
+  when the id is not in the archive or when the destination is already occupied;
+  nothing is ever overwritten.
+
+The maintenance pass also runs on its own, at most once a day: Electron main
+reuses the scheduled runner's tick and calls `skills.curate` with `dryRun: false`
+only while no session is running a turn, only while the `curateAutomatically`
+setting is on (default on), and only when `curatorLastRunAt` in the app settings
+is at least 24h old. A successful pass writes that timestamp and logs one
+`curator.auto_applied` line with the archived and scanned counts; a failed pass
+logs `curator.auto_failed`, leaves the timestamp unwritten and never breaks the
+tick.
 
 Built-in skill activation is global and defaults to enabled. Host stores only
 disabled IDs in `<data>/agent-capabilities/skill-builtins.json`, separately

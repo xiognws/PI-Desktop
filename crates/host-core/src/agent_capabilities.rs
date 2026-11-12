@@ -735,9 +735,20 @@ pub fn sorted_files(dir: &Path, extension: &str) -> Vec<PathBuf> {
 #[cfg(test)]
 pub(crate) mod test_support {
     use std::path::Path;
-    use std::sync::Mutex;
+    use std::sync::{Mutex, MutexGuard};
 
     static AGENTS_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    /// The one lock every test that repoints the global capability root takes.
+    ///
+    /// Exposed as a guard for the async tests that have to hold it across
+    /// awaits instead of around a closure; the promise is the same, and it is
+    /// the only thing that keeps two such tests out of each other's directory.
+    pub fn agents_env_guard() -> MutexGuard<'static, ()> {
+        AGENTS_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+    }
 
     /// Point the global capability root at `dir` for the duration of `f`.
     ///
@@ -746,9 +757,7 @@ pub(crate) mod test_support {
     /// per-module locks would not exclude each other, and two tests would end up
     /// reading each other's directory.
     pub fn with_global_agents<T>(dir: &Path, f: impl FnOnce() -> T) -> T {
-        let _guard = AGENTS_ENV_LOCK
-            .lock()
-            .unwrap_or_else(|error| error.into_inner());
+        let _guard = agents_env_guard();
         // Safety: test-only process env mutation, serialized by the lock above.
         unsafe { std::env::set_var(super::AGENTS_DIR_ENV, dir) };
         let outcome = f();

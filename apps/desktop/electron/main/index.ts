@@ -663,6 +663,7 @@ const {
   lockAbortReason,
   isTurnDispatchable,
   isSessionBusy,
+  isAnySessionBusy,
   isStaleTerminalEvent,
 } = sessionCoordination;
 
@@ -1059,6 +1060,7 @@ registerApplicationStartup({
   modelsDevCatalog,
   plugins,
   isSessionBusy,
+  isAnySessionBusy,
   getHost,
   getMainWindow,
   sendToRenderer,

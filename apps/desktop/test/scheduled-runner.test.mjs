@@ -194,3 +194,63 @@ test("failure of one task does not suppress another due task", async () => {
   assert.deepEqual(executed, ["a", "b"]);
   assert.deepEqual(errors, ["failed"]);
 });
+
+test("the tick also runs housekeeping, and its failure never stops the poll", async () => {
+  const host = {
+    async call() {
+      return { ids: [] };
+    },
+  };
+  let passes = 0;
+  const errors = [];
+  const runner = createScheduledRunner({
+    getHost: () => host,
+    execute: async () => {},
+    report: (error) => errors.push(error.message),
+    maintenance: async () => {
+      passes++;
+      throw new Error("maintenance failed");
+    },
+  });
+  await runner.tick();
+  assert.equal(passes, 1);
+  assert.deepEqual(errors, ["maintenance failed"]);
+  // A failed pass is reported, not fatal: the next tick still polls and still
+  // runs the pass, which is the only way a transient failure recovers.
+  await runner.tick();
+  assert.equal(passes, 2);
+  runner.stop();
+  await runner.tick();
+  assert.equal(passes, 2, "a stopped runner runs no housekeeping");
+});
+
+test("housekeeping holds the poll, so a slow pass cannot overlap itself", async () => {
+  const host = {
+    async call() {
+      return { ids: [] };
+    },
+  };
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let entered = 0;
+  const runner = createScheduledRunner({
+    getHost: () => host,
+    execute: async () => {},
+    report: () => {},
+    maintenance: async () => {
+      entered++;
+      await gate;
+    },
+  });
+  const first = runner.tick();
+  await new Promise((resolve) => setImmediate(resolve));
+  await runner.tick();
+  assert.equal(entered, 1, "a tick that arrives mid-pass does nothing");
+  release();
+  await first;
+  await runner.tick();
+  assert.equal(entered, 2);
+  runner.stop();
+});

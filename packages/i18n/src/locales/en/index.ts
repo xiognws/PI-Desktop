@@ -1260,6 +1260,8 @@ sklm: {
     skillsProjectPath: "Project skills path",
     skillReviewUiTitle: "Self-improvement review",
     skillReviewUiDesc: "Review the skill library after each turn and write durable lessons into it. Off hides the skill review row.",
+    skillCurateAutoTitle: "Archive idle skills automatically",
+    skillCurateAutoDesc: "Run the maintenance pass at most once a day and move skills only the agent wrote, and nobody has opened for months, into .archive. Restoring one brings it back.",
     mcp: "MCP servers",
     mcpGlobalPath: "Global MCP path",
     mcpProjectPath: "Project MCP path",

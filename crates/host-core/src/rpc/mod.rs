@@ -1058,6 +1058,29 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
             "INVALID_PARAMS",
         ));
     }
+    // The automatic curation pass is main's to schedule, but the preference is
+    // part of the settings document: a wrong type there would make every tick
+    // read a different answer, so it is rejected at the write instead.
+    if object
+        .get("curateAutomatically")
+        .is_some_and(|enabled| !enabled.is_boolean())
+    {
+        return Err(rpc_err(
+            1002,
+            "curateAutomatically must be a boolean",
+            "INVALID_PARAMS",
+        ));
+    }
+    if object
+        .get("curatorLastRunAt")
+        .is_some_and(|stamp| !stamp.is_i64() && !stamp.is_u64())
+    {
+        return Err(rpc_err(
+            1002,
+            "curatorLastRunAt must be an epoch-ms integer",
+            "INVALID_PARAMS",
+        ));
+    }
     if let Some(policy) = object.get("networkPolicy").filter(|v| !v.is_null()) {
         let Some(policy) = policy.as_object() else {
             return Err(rpc_err(
@@ -5820,6 +5843,26 @@ async fn handle_request(
                 .map_err(skill_err)?;
             Ok(json!({ "report": report }))
         }
+        "skills.restore" => {
+            // The way back from a curation pass: the document was moved into
+            // `<root>/.archive/`, so undo is the same move in reverse. The host
+            // refuses an id the archive does not hold and a destination that is
+            // already occupied instead of guessing which document was meant.
+            let id = require_id(&params)?;
+            let level = params
+                .get("level")
+                .and_then(Value::as_str)
+                .map(|value| CapabilityLevel::parse(Some(value)))
+                .transpose()
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            let skill = st
+                .user_skills
+                .restore(&id, level, project_path)
+                .map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
         "skills.read" => {
             let id = require_id(&params)?;
             let level = params
@@ -6685,6 +6728,99 @@ mod tests {
             .find(|row| row["id"] == json!(id))
             .unwrap();
         assert_eq!(row["enabled"], json!(true));
+    }
+
+    #[tokio::test]
+    async fn skill_curation_moves_the_document_and_restore_brings_it_back() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project_dir = tempfile::tempdir().unwrap();
+        let project = project_dir.path().to_string_lossy().to_string();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        let created = handle_request(
+            state.clone(),
+            "skills.create",
+            json!({ "skill": {
+                "name": "Idle probe",
+                "description": "d",
+                "body": "# Probe\n",
+                "level": "project",
+                "projectPath": project,
+                "createdBy": "agent",
+            } }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let id = created["skill"]["id"].as_str().unwrap().to_string();
+        let path = created["skill"]["path"].as_str().unwrap().to_string();
+        assert_eq!(created["skill"]["enabled"], json!(true));
+
+        // Two hundred idle days: the one document the pass may retire.
+        let file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.set_times(std::fs::FileTimes::new().set_modified(
+            std::time::SystemTime::now() - std::time::Duration::from_secs(200 * 24 * 3600),
+        ))
+        .unwrap();
+
+        let applied = handle_request(
+            state.clone(),
+            "skills.curate",
+            json!({ "projectPath": project, "dryRun": false }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(applied["report"]["archived"], json!([id.clone()]));
+        let archive = std::path::Path::new(&path)
+            .parent()
+            .unwrap()
+            .join(".archive")
+            .join(format!("{id}.md"));
+        assert!(archive.is_file(), "the document moved into the archive");
+        assert!(!std::path::Path::new(&path).exists());
+
+        let listed = handle_request(
+            state.clone(),
+            "skills.list",
+            json!({ "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert!(listed["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["id"] != json!(id)));
+
+        let restored = handle_request(
+            state.clone(),
+            "skills.restore",
+            json!({ "id": id, "level": "project", "projectPath": project }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(restored["skill"]["id"], json!(id));
+        assert_eq!(restored["skill"]["enabled"], json!(true));
+        assert!(!archive.exists(), "the archive no longer holds it");
+
+        // Nothing left in the archive: a second restore is a clear refusal, not a
+        // silent success that would read as "already done".
+        let missing = handle_request(
+            state,
+            "skills.restore",
+            json!({ "id": id, "level": "project", "projectPath": project }),
+            tx,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(missing.data.unwrap()["errorCode"], json!("SKILL_INVALID"));
+        assert!(missing.message.contains("no archived skill"));
     }
 
     #[tokio::test]

@@ -320,6 +320,18 @@ export function createSessionCoordination({
   }
 
   /**
+   * Whether *any* session is running a turn or still finishing one.
+   *
+   * Unattended work in main — the automatic skill-curation pass — has no session
+   * id to ask `isSessionBusy` about, and it must not move skills out from under a
+   * live turn. Both tables are bounded by concurrency, so this stays two size
+   * checks rather than a session listing.
+   */
+  function isAnySessionBusy(): boolean {
+    return activeTurns.size > 0 || turnFinalizations.size > 0;
+  }
+
+  /**
    * A root terminal event (`agent_end` / `error`) may only change the live turn's
    * state when it carries the identity of the turn that still owns the session.
    * An event with no identity cannot be attributed to any turn, and one naming
@@ -379,6 +391,7 @@ export function createSessionCoordination({
     releaseTurnClaims,
     isTurnDispatchable,
     isSessionBusy,
+    isAnySessionBusy,
     isStaleTerminalEvent,
   };
 }

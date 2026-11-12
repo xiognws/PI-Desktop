@@ -1250,6 +1250,8 @@ sklm: {
     "skillsProjectPath": "Parcours de compétences projet",
     "skillReviewUiTitle": "Révision auto-amélioration",
     "skillReviewUiDesc": "Examine la bibliothèque de compétences après chaque tour et y consigne les leçons durables. Désactivé masque la ligne de révision.",
+    "skillCurateAutoTitle": "Archiver automatiquement les compétences inactives",
+    "skillCurateAutoDesc": "Exécute la maintenance au plus une fois par jour et déplace dans .archive les compétences écrites par l’agent que personne n’a ouvertes depuis des mois. Restaurer en ramène une.",
     "mcp": "Serveurs MCP",
     "mcpGlobalPath": "Chemin MCP global",
     "mcpProjectPath": "Chemin MCP du projet",

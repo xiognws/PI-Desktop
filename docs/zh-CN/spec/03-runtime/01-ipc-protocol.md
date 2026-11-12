@@ -1278,6 +1278,10 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 （不是 `Downloads` 这类暂存目录），再否则用稳定的 `skill-<hash>`，这样非 ASCII
 标题仍会被列入。折叠 YAML `description: >` / `|` 会展平进目录里的一行摘要。
 
+已归档技能存放在 `<skills root>/.archive/`，扫描会完全跳过该目录，因此归档后的文档
+不在任何列表、不进任何提示，也无法通过 `Skill` 加载；但它并没有消失：id、字节内容
+和所有同级资源都保持原样（ADR 0395）。
+
 - `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
 - `skills.active({ projectPath? })` → 当前项目的有效运行时列表
 - `skills.create(skill)`
@@ -1305,10 +1309,24 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
   维护流程唯一的豁免：被固定的技能无论多闲置都归为 `keep`，报告里会带 `pinned` 说明原因。
   未知 id 返回 `skill: null` —— 页面可能正在操作另一个窗口已删掉的行。
 - `skills.curate({ projectPath?, dryRun?, staleAfterDays?, archiveAfterDays? })`
-  → `{ report }` —— 技能库维护（ADR 0387）。`report.entries` 按闲置天数把每个技能
-  分类为 `keep` / `stale` / `archive`（从上次加载算起；从未加载过则算文档自身时间戳），
-  `archived` 列出本次真正关掉的技能。**`dryRun` 默认 true**，误调只报告不改动。
-  归档写的是与 `skills.setEnabled` 同一个激活标记——绝不删除文档，一行开关即可恢复。
+  → `{ report }` —— 技能库维护（ADR 0387、ADR 0395）。`report.entries` 按闲置天数把
+  每个技能分类为 `keep` / `stale` / `archive`（从上次加载算起；从未加载过则算文档
+  自身时间戳），`archived` 列出本次真正移动过的技能。闲置规则只作用于智能体自己写的
+  文档：没有记录为智能体来源的技能始终是 `keep`，原因为 `not-agent-authored`，无论
+  多闲置（ADR 0394）。**`dryRun` 默认 true**，误调只报告不改动。归档是**移动**：
+  `<id>.md` 变成 `.archive/<id>.md`，目录形状的 `<id>/` 连资源整体移到
+  `.archive/<id>/`。不删除、不改写任何内容，`skills.restore` 是回退路径。链接导入的
+  技能（`mode: "link"`）以及归档中已存在同名文档的情况保持原位，不计入 `archived`。
+- `skills.restore({ id, level?, projectPath? })` → `{ skill }` —— 把已归档技能从
+  `.archive/` 移回维护流程取走它的位置，并重新启用。恢复同时把文档时间戳更新为当前
+  时间，避免下一次自动检查立刻再次归档。id 不在归档中、或目标位置已被占用时返回
+  `SKILL_INVALID`；任何情况下都不会覆盖已有文档。
+
+维护流程也会自行运行，每天最多一次：Electron 主进程复用定时任务调度器的 tick，仅在
+没有会话正在运行回合、`curateAutomatically` 设置开启（默认开启）、且应用设置中的
+`curatorLastRunAt` 距今超过 24 小时时，以 `dryRun: false` 调用 `skills.curate`。成功
+的一次会写入该时间戳并输出一行 `curator.auto_applied`（含归档数与扫描数）；失败的一次
+输出 `curator.auto_failed`、不写时间戳，并且绝不影响 tick。
 
 列表包含由 frontmatter 得出的 `name` 和 `description`，不包含正文。只有描述
 进入提示，模型调用 `Skill` 时才读取正文 (D174)。缺失文件会在下一次扫描时

@@ -214,6 +214,7 @@ export function createProviderCatalogRuntime({
       autoCollapseSettledGroups?: unknown;
       autoCollapseThinking?: unknown;
       skillReviewVisible?: unknown;
+      curateAutomatically?: unknown;
     };
     if (
       Object.prototype.hasOwnProperty.call(value, "defaultCommandShell") &&
@@ -244,6 +245,14 @@ export function createProviderCatalogRuntime({
       typeof value.skillReviewVisible !== "boolean"
     ) {
       throw Object.assign(new Error("skillReviewVisible is invalid"), {
+        errorCode: ErrorCodes.INVALID_PARAMS,
+      });
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "curateAutomatically") &&
+      typeof value.curateAutomatically !== "boolean"
+    ) {
+      throw Object.assign(new Error("curateAutomatically is invalid"), {
         errorCode: ErrorCodes.INVALID_PARAMS,
       });
     }

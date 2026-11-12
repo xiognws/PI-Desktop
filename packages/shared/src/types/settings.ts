@@ -241,6 +241,14 @@ export type AppSettings = {
    */
   skillReviewVisible?: boolean;
   /**
+   * Let the app run the skill maintenance pass on its own (ADR 0395). Absent
+   * and true allow it; the pass then runs at most once a day, only while no
+   * session is running a turn, and moves agent-written idle skills into
+   * `<skills>/.archive/`. Off keeps the pass manual: the settings page still
+   * offers its own archive button.
+   */
+  curateAutomatically?: boolean;
+  /**
    * Render inline interactive visualizations in the transcript (ADR
    * `gen-ui-inline-visualization`). Absent and false keep the feature off: the
    * system prompt carries no visualization directory, the

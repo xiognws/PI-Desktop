@@ -2,12 +2,16 @@
 //!
 //! Hermes retires skills with a curator that reads per-skill activity and moves
 //! stale ones to an archive. This is the same idea with one deliberate
-//! difference: **nothing here runs on a timer**. A skill that disappears from the
-//! catalog because a background job fired is indistinguishable, from the user's
-//! side, from a bug or a lost file — there is no "why did this turn off" surface
-//! yet. So the pass reports unless the caller asks it to act, and the one-click
-//! archive in the settings page is the only thing that acts, with the list in
-//! front of the person doing it.
+//! difference: **this module only decides**. It has no clock, no timer and no
+//! filesystem: the caller says when to run and what to do with the answer. That
+//! separation is what makes the pass testable and reviewable, and it is why the
+//! rules below are pure functions.
+//!
+//! Acting on a decision is the registry's job: `UserSkillRegistry::curate`
+//! moves the archivable documents into `<root>/.archive/`, and `restore` moves
+//! them back. Both are recorded rather than silent — `report.archived` names
+//! what moved, and the Electron main process runs the pass at most once a day,
+//! logging `curator.auto_applied` with the counts (ADR 0395).
 //!
 //! The rule itself is small and explainable:
 //!
@@ -137,7 +141,7 @@ pub fn classify(
     (idle_days, state)
 }
 
-/// What a pass found, and — when it was not a dry run — what it turned off.
+/// What a pass found, and — when it was not a dry run — what it moved out.
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurationReport {
@@ -165,9 +169,9 @@ fn document_timestamp_ms(record: &UserSkillRecord) -> i64 {
 /// Report, and optionally archive, the user skills of every level whose
 /// documents are already loaded by the caller.
 ///
-/// The caller owns scanning (and therefore the activation state); this function
-/// only decides and — when `dry_run` is false — asks [`UserSkillRegistry::set_enabled`]
-/// to switch the archivable ones off. Nothing is deleted.
+/// The caller owns scanning (and therefore the activation state) and owns the
+/// move; this function only decides. Nothing is deleted, and a dry run changes
+/// nothing at all.
 pub fn plan(
     records: &[UserSkillRecord],
     usage: &SkillUsageStore,

@@ -1,5 +1,5 @@
 //! Curation behaviour against real documents: what a pass reports, what it
-//! changes, and what it must never do.
+//! moves, and what it must never do.
 
 use super::*;
 use crate::user_skills::curator::{CurationReason, CuratorPolicy};
@@ -28,6 +28,22 @@ fn row(registry: &mut UserSkillRegistry, id: &str) -> UserSkillRecord {
         .into_iter()
         .find(|record| record.id == id)
         .expect("the skill is listed")
+}
+
+fn listed_ids(registry: &mut UserSkillRegistry) -> Vec<String> {
+    registry
+        .list(CapabilityLevel::Global, None)
+        .unwrap()
+        .into_iter()
+        .map(|record| record.id)
+        .collect()
+}
+
+/// The archive of the global library, spelled the way the product spells it.
+fn archive_root() -> PathBuf {
+    capability_dir(CapabilityLevel::Global, None, "skills")
+        .expect("the global library")
+        .join(".archive")
 }
 
 #[test]
@@ -60,19 +76,251 @@ fn an_idle_document_is_reported_before_it_is_archived() {
             row(&mut registry, &created.id).enabled,
             "the document is still enabled after a dry run"
         );
+        assert!(
+            Path::new(&created.path).is_file(),
+            "a dry run moves nothing"
+        );
 
         let applied = registry
             .curate(None, CuratorPolicy::default(), false)
             .unwrap();
         assert_eq!(applied.archived, vec![created.id.clone()]);
-        let archived = row(&mut registry, &created.id);
-        assert!(!archived.enabled, "archiving is the activation flag");
-        // Recoverable: the same toggle brings it back, and nothing was deleted.
-        assert!(Path::new(&archived.path).is_file());
-        registry
-            .set_enabled(&created.id, true, Some(CapabilityLevel::Global), None)
+        // Archived means moved out of the library, not flagged: the document
+        // waits in `<root>/.archive/` and the catalog no longer holds it.
+        let archived = archive_root().join(format!("{}.md", created.id));
+        assert!(archived.is_file(), "the document waits in the archive");
+        assert!(
+            !Path::new(&created.path).exists(),
+            "…and it is no longer in the library"
+        );
+        assert!(listed_ids(&mut registry).is_empty());
+    });
+}
+
+#[test]
+fn archiving_moves_the_document_out_of_every_listing() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let created = registry
+            .create(agent_input("Gone quiet", "global", None))
             .unwrap();
-        assert!(row(&mut registry, &created.id).enabled);
+        let raw = fs::read_to_string(&created.path).unwrap();
+        backdate(Path::new(&created.path), 200);
+
+        let report = registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        assert_eq!(report.archived, vec![created.id.clone()]);
+
+        let archived = archive_root().join(format!("{}.md", created.id));
+        assert_eq!(
+            fs::read_to_string(&archived).unwrap(),
+            raw,
+            "the archived copy is the same bytes, not a rewrite"
+        );
+        // The catalog, `skills.list` and the `Skill` tool all read this one scan,
+        // so a document the scan no longer sees is out of all three.
+        assert!(listed_ids(&mut registry).is_empty());
+        assert!(registry
+            .active_for(None)
+            .unwrap()
+            .iter()
+            .all(|record| record.id != created.id));
+        assert!(
+            registry.read(&created.id, None, None).unwrap().is_none(),
+            "the model can no longer load it"
+        );
+    });
+}
+
+#[test]
+fn restore_puts_the_document_back_and_lists_it_again() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let created = registry
+            .create(agent_input("Comes back", "global", None))
+            .unwrap();
+        let raw = fs::read_to_string(&created.path).unwrap();
+        backdate(Path::new(&created.path), 200);
+        registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        let archived = archive_root().join(format!("{}.md", created.id));
+        assert!(archived.is_file());
+
+        let restored = registry.restore(&created.id, None, None).unwrap();
+        assert_eq!(restored.id, created.id);
+        assert!(restored.enabled, "a restore is a skill you can use");
+        assert_eq!(fs::read_to_string(&restored.path).unwrap(), raw);
+        assert!(!archived.exists(), "the archive no longer holds it");
+        assert_eq!(listed_ids(&mut registry), vec![created.id.clone()]);
+        assert!(registry.read(&created.id, None, None).unwrap().is_some());
+
+        // A restore is evidence of use, so the pass does not take the same
+        // document straight back out — that would make the undo a no-op.
+        let after = registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        assert!(
+            after.archived.is_empty(),
+            "a restored document is not idle any more: {:?}",
+            after.archived
+        );
+
+        // And once it is idle again the pass still owns it: the origin and the id
+        // survived the round trip, so archiving took nothing away from what the
+        // host knew about this skill.
+        backdate(Path::new(&restored.path), 200);
+        let again = registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        assert_eq!(again.archived, vec![created.id.clone()]);
+    });
+}
+
+#[test]
+fn a_directory_skill_is_archived_and_restored_as_a_package() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let created = registry
+            .create(UserSkillInput {
+                shape: Some("dir".into()),
+                ..agent_input("Packaged", "global", None)
+            })
+            .unwrap();
+        registry
+            .write_resource(
+                &created.id,
+                Some(CapabilityLevel::Global),
+                None,
+                "references/notes.md",
+                "a lesson\n",
+            )
+            .unwrap();
+        let package = PathBuf::from(&created.path)
+            .parent()
+            .expect("the package directory")
+            .to_path_buf();
+        assert!(package.join("references/notes.md").is_file());
+        backdate(&package.join("SKILL.md"), 200);
+
+        let report = registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        assert_eq!(report.archived, vec![created.id.clone()]);
+
+        let archived = archive_root().join(&created.id);
+        assert!(archived.join("SKILL.md").is_file(), "the document moved");
+        assert!(
+            archived.join("references/notes.md").is_file(),
+            "resources travel with the document"
+        );
+        assert!(!package.exists(), "no empty directory is left behind");
+        assert!(listed_ids(&mut registry).is_empty());
+
+        let restored = registry.restore(&created.id, None, None).unwrap();
+        assert_eq!(restored.id, created.id);
+        assert!(package.join("references/notes.md").is_file());
+        assert_eq!(listed_ids(&mut registry), vec![created.id.clone()]);
+    });
+}
+
+#[test]
+fn a_scan_does_not_forget_an_archived_skill() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let created = registry
+            .create(agent_input("Remembered", "global", None))
+            .unwrap();
+        registry.set_pinned(&created.id, true, None, None).unwrap();
+
+        // Archive it the way the pass would, then scan the library without it.
+        let archive = archive_root();
+        fs::create_dir_all(&archive).unwrap();
+        let archived = archive.join(format!("{}.md", created.id));
+        fs::rename(&created.path, &archived).unwrap();
+        assert!(listed_ids(&mut registry).is_empty());
+
+        // A pin and an origin are keyed by level+id+project, and the archive keeps
+        // the id: the sweep that clears state for deleted documents must leave
+        // this one alone, or the restore comes back as a stranger the pass would
+        // archive again the same day.
+        assert!(SkillPinStore::new(app.path()).is_pinned(
+            CapabilityLevel::Global,
+            &created.id,
+            None
+        ));
+        assert!(SkillOriginStore::new(app.path()).is_agent_authored(
+            CapabilityLevel::Global,
+            &created.id,
+            None
+        ));
+
+        let restored = registry.restore(&created.id, None, None).unwrap();
+        assert!(restored.pinned, "the pin came back with the document");
+        assert!(restored.enabled);
+    });
+}
+
+#[test]
+fn restoring_an_unknown_id_is_an_error() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        registry.create(input("Present", "global", None)).unwrap();
+
+        let error = registry
+            .restore("never-archived", None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("SKILL_INVALID"), "{error}");
+        assert!(error.contains("no archived skill"), "{error}");
+    });
+}
+
+#[test]
+fn restore_refuses_a_destination_that_is_occupied() {
+    let app = tempdir().unwrap();
+    let agents = tempdir().unwrap();
+    test_support::with_global_agents(agents.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let created = registry
+            .create(agent_input("Contested", "global", None))
+            .unwrap();
+        backdate(Path::new(&created.path), 200);
+        registry
+            .curate(None, CuratorPolicy::default(), false)
+            .unwrap();
+        let archived = archive_root().join(format!("{}.md", created.id));
+        assert!(archived.is_file());
+
+        // Something else took the name while the document was away.
+        let root = capability_dir(CapabilityLevel::Global, None, "skills").unwrap();
+        fs::write(
+            root.join(format!("{}.md", created.id)),
+            "---\nname: Contested\n---\n\nnewer\n",
+        )
+        .unwrap();
+
+        let error = registry
+            .restore(&created.id, None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("SKILL_INVALID"), "{error}");
+        assert!(error.contains("already exists"), "{error}");
+        assert!(
+            archived.is_file(),
+            "the archived copy stays where it was: nothing is overwritten"
+        );
     });
 }
 
@@ -199,6 +447,10 @@ fn a_pin_keeps_an_idle_document_out_of_the_list() {
         assert!(
             row(&mut registry, &created.id).enabled,
             "nothing was switched off"
+        );
+        assert!(
+            Path::new(&created.path).is_file(),
+            "a pinned document is never moved out"
         );
     });
 }

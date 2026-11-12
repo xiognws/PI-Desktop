@@ -1250,6 +1250,8 @@ sklm: {
     "skillsProjectPath": "Projektkompetenzpfad",
     "skillReviewUiTitle": "Selbstverbesserung",
     "skillReviewUiDesc": "Prüft nach jedem Turn die Skill-Bibliothek und schreibt dauerhafte Lektionen hinein. Ausgeblendet verbirgt die Skill-Review-Zeile.",
+    "skillCurateAutoTitle": "Ungenutzte Skills automatisch archivieren",
+    "skillCurateAutoDesc": "Führt höchstens einmal pro Tag den Wartungslauf aus und verschiebt vom Agenten geschriebene Skills, die lange niemand geöffnet hat, nach .archive. Wiederherstellen holt einen zurück.",
     "mcp": "MCP-Server",
     "mcpGlobalPath": "Globaler MCP-Pfad",
     "mcpProjectPath": "Projekt-MCP-Pfad",

@@ -1256,6 +1256,8 @@ sklm: {
     skillsProjectPath: "Proje becerileri yolu",
     skillReviewUiTitle: "Kendini geliştirme incelemesi",
     skillReviewUiDesc: "Her turdan sonra beceri kitaplığını inceleyip kalıcı dersleri yazar. Kapalıyken beceri inceleme satırı görünmez.",
+    skillCurateAutoTitle: "Boşta kalan becerileri otomatik arşivle",
+    skillCurateAutoDesc: "Bakım geçişini günde en fazla bir kez çalıştırır ve aylardır kimsenin açmadığı, ajanın yazdığı becerileri .archive içine taşır. Geri yüklemek birini geri getirir.",
     mcp: "MCP sunucuları",
     mcpGlobalPath: "Genel MCP yolu",
     mcpProjectPath: "Proje MCP yolu",

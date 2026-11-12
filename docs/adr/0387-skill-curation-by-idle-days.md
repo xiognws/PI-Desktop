@@ -1,6 +1,9 @@
 # ADR 0387: Skill curation by idle days
 
-- Status: Accepted
+- Status: Accepted; superseded in part by
+  [ADR 0395](0395-skill-archive-by-move-and-daily-pass.md) — properties 2 and 3
+  below (archiving is a flag, nothing runs on a timer) no longer describe the
+  product. The idle-day rule, the dry-run default and the classifier still do.
 - Date: 2026-11-09
 - Related: [ADR 0377](0377-skill-learning-in-core.md), [ADR 0379](0379-skill-authoring-is-a-core-tool.md), [ADR 0371](0371-memory-store.md)
 
@@ -39,12 +42,19 @@ Three properties are deliberate:
 2. **Archiving is deactivation, never deletion.** The pass writes the same
    activation flag the row's toggle writes, so one click in the settings page
    brings the skill back. Nothing on disk is touched.
+   *(Superseded by ADR 0395: archiving now moves the document into
+   `<skills root>/.archive/`, and `skills.restore` moves it back. Deactivation
+   freed no prompt space, which was the point of the pass.)*
 3. **Nothing runs on a timer.** Curation happens when somebody opens the skills
    page (a dry run) and clicks the archive button. A skill that vanishes from the
    catalog because a background timer fired is indistinguishable, from the user's
    side, from a bug or a lost file, and this app has no "why did this turn off"
    surface to explain it — so the pass has one caller: the page in front of the
    person making the decision.
+   *(Superseded by ADR 0395: Electron main now runs the pass at most once a day,
+   while the app is idle and only when `curateAutomatically` is on, and logs
+   `curator.auto_applied` with the counts. The concern above is answered by the
+   log line and by the restore path, not by withholding the call.)*
 
 ## Consequences
 
