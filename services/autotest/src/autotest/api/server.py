@@ -754,13 +754,16 @@ async def run_script(project_id: str, script_id: str, background: bool = False):
         ).start()
         return {"status": "started", "script_id": script_id, "project_id": project_id}
 
+    # 交互运行的超时按「一个人愿意等」来定，而不是按脚本该多快。实测同一份
+    # 50 行骨架在这台机器上 pytest 启动耗时可从 2 秒跳到 60 秒（磁盘/杀软抖动），
+    # 30 秒的上限会把正常脚本报成「脚本执行超时」。后台执行仍是 300 秒。
     return await asyncio.to_thread(
         execute_script,
         db_path,
         project_id,
         row,
         project_dir=safe_project_dir(project_id),
-        timeout_s=30.0,
+        timeout_s=180.0,
     )
 
 
