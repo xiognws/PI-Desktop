@@ -82,6 +82,9 @@ export function useComposerSubmit({
     // arrives where the user put it instead of trailing the text.
     const inlineContent = serializeInlineComposerFileReferences(rawText, activeFileReferences);
     const serializedContent = serializeComposerFileReferences(rawText, activeFileReferences);
+    // What the model actually receives. Only `/learn` replaces it, and only
+    // after the gates below have had their say.
+    let promptText = inlineContent;
     // A follow-up that was queued during the turn has already left the editor,
     // so the steer shortcut would otherwise find no draft and do nothing. With
     // the composer empty it sends the first waiting row now instead, which is
@@ -128,6 +131,10 @@ export function useComposerSubmit({
         });
         return;
       }
+      // `/learn` sends a prompt of the composer's own making instead of the
+      // typed line: the same send, draft-clear and history path, one reworded
+      // payload, so nothing about the existing command dispatch moves.
+      if (dispatch.action === "learn") promptText = dispatch.prompt;
       if (dispatch.action === "dispatch") {
         const command = dispatch.command;
         const commandBody = dispatch.body;
@@ -197,9 +204,9 @@ export function useComposerSubmit({
     const accepted = await submitWithLatestDraftRestore(
       submittedDraftKey,
       () => steering
-        ? steerPrompt(inlineContent, submittedDraft)
+        ? steerPrompt(promptText, submittedDraft)
         : sendPrompt(
-            inlineContent,
+            promptText,
             submittedDraft,
             activeSessionId ?? undefined,
             captureAcceptedSession,

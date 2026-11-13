@@ -7,7 +7,7 @@ import {
   type SkillCurationReport,
   type UserSkillRecord,
 } from "@pi-workspace/shared";
-import { api, type MemoryRecord } from "../../lib/api";
+import { api, type MemoryKind, type MemoryRecord } from "../../lib/api";
 import { capabilityQuery, deriveProjectOverrides, type CapabilityOverride } from "../../lib/capability-scope";
 import { useAppStore } from "../../stores/app-store";
 import { useHostCollection } from "../../hooks/use-host-collection";
@@ -55,8 +55,15 @@ import { ImportToggleButton } from "../../features/settings/import-workbench";
 
 import { SettingsRow, SettingsCard } from "../../features/settings/primitives";
 import { SettingsToggle, TooltipButton } from "../ui";
-import { buildLearningMap, type LearningMemory } from "../../lib/learning-map";
-import { LearningMapCanvas } from "./LearningMapCanvas";
+import { buildLearningMap, learningNodeDetail } from "../../lib/learning-map";
+import type { LearningMemory, LearningNodeDetail, LearningSkill } from "../../lib/learning-map";
+import {
+  LearningMapCanvas,
+  LearningNodePanel,
+  type LearningMapLabels,
+  type LearningNodePanelLabels,
+} from "./LearningMapCanvas";
+import { MEMORY_KIND_LABEL_KEY } from "./MemoryList";
 import {
   curationById,
   skillIdleBadge,
@@ -65,6 +72,14 @@ import {
 } from "../../lib/skill-usage";
 import { archivedSkillRows, type ArchivedSkillRow } from "../../lib/skill-archive";
 const GLOBAL_SKILLS_PATH = "~/.agents/skills";
+
+/**
+ * The id of the map's detail card.
+ *
+ * A node names it with `aria-controls`, which only works if both ends agree on
+ * one value — and only the page knows whether the card is on screen.
+ */
+const MAP_DETAIL_ID = "learning-map-detail";
 
 /**
  * Memories read for the map. It draws at most two dozen nodes, so this is a
@@ -78,7 +93,9 @@ const LEARNING_MAP_MEMORY_LIMIT = 100;
  *
  * A `preference` is the person and everything else is the agent's own note — the
  * two colours the map drew when the data came from two lists. The label is the
- * title; the body joins it so the vocabulary overlap sees the whole memory.
+ * title; the body joins it so the vocabulary overlap sees the whole memory. The
+ * separate `title` / `body` / `kind` fields are for the detail card, which has to
+ * say more than the picture can.
  */
 function learningMapMemory(memory: MemoryRecord): LearningMemory {
   const title = memory.title.trim();
@@ -87,6 +104,29 @@ function learningMapMemory(memory: MemoryRecord): LearningMemory {
     id: memory.id,
     text: !body || body === title ? title : `${title}: ${body}`,
     target: memory.kind === "preference" ? "user" : "memory",
+    kind: memory.kind,
+    title,
+    body,
+    useCount: memory.useCount,
+  };
+}
+
+/**
+ * One skill as a map node input.
+ *
+ * The level rides along because the id does not say which library holds the
+ * document, and a removal from the map's card has to name its scope the same way
+ * the row menu does.
+ */
+function learningMapSkill(skill: UserSkillRecord, level: AgentCapabilityLevel): LearningSkill {
+  return {
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+    enabled: skill.enabled,
+    useCount: skill.useCount,
+    level,
+    pinned: skill.pinned,
   };
 }
 
@@ -235,6 +275,13 @@ export function AgentSkillsPage() {
    * colours without a second table to read them from.
    */
   const [mapMemories, setMapMemories] = useState<LearningMemory[]>([]);
+  /**
+   * The drawn node whose detail card is open, and whether its removal is in
+   * flight. The card is inline, not a modal: it sits beside the picture it
+   * describes, and closing it leaves the person exactly where they were.
+   */
+  const [mapNode, setMapNode] = useState<string | null>(null);
+  const [mapRemoving, setMapRemoving] = useState(false);
   const [curating, setCurating] = useState(false);
   const refreshCuration = useCallback(async () => {
     try {
@@ -638,24 +685,110 @@ export function AgentSkillsPage() {
     ? curation.entries.filter((entry) => entry.state === "archive").length
     : 0;
 
-  /** Curation entries by skill id, so a row can say how idle it is. */
+  /**
+   * The records the map draws — and the only source its detail card reads, so a
+   * card can never describe a record the picture is not showing.
+   */
+  const learningMapSkills = useMemo(
+    () =>
+      [
+        ...visible.global.map((row) => learningMapSkill(row, "global")),
+        ...visible.project.map((row) => learningMapSkill(row, "project")),
+      ]
+        // A skill that is switched off is not part of what the agent can
+        // currently use, so it is not drawn as an active node.
+        .filter((row) => row.enabled !== false),
+    [visible.global, visible.project],
+  );
+
   /** The map the card draws: skills that are on, plus every memory entry. */
   const learningMap = useMemo(
-    () =>
-      buildLearningMap(
-        [...visible.global, ...visible.project]
-          .filter((row) => row.enabled !== false)
-          .map((row) => ({
-            id: row.id,
-            name: row.name,
-            description: row.description,
-            enabled: row.enabled,
-            useCount: row.useCount,
-          })),
-        mapMemories,
-      ),
-    [visible.global, visible.project, mapMemories],
+    () => buildLearningMap(learningMapSkills, mapMemories),
+    [learningMapSkills, mapMemories],
   );
+
+  /** What the open card shows; `null` when the record behind it is gone. */
+  const mapDetail = useMemo(
+    () => (mapNode ? learningNodeDetail(mapNode, learningMapSkills, mapMemories) : null),
+    [mapNode, learningMapSkills, mapMemories],
+  );
+
+  /**
+   * A selection that stops being drawn must close: a deleted skill, a switched-off
+   * one, or a memory the tidy pass retired. Leaving the card open would describe
+   * a node the reader can no longer see.
+   */
+  useEffect(() => {
+    if (!mapNode) return;
+    if (learningMap.nodes.some((node) => node.id === mapNode)) return;
+    setMapNode(null);
+  }, [learningMap, mapNode]);
+
+  /**
+   * Remove the record behind one node.
+   *
+   * Both branches call what the owning list already calls: a skill goes through
+   * `skills.remove` — the same document delete the row menu arms twice — and a
+   * memory through `memory.forget`, the call the memory page uses. The map then
+   * repaints from a fresh read rather than trying to guess the new shape.
+   */
+  const removeMapNode = async (detail: LearningNodeDetail) => {
+    setMapRemoving(true);
+    try {
+      if (detail.kind === "skill") {
+        await api.removeUserSkill(
+          detail.id,
+          capabilityQuery(detail.level ?? "global", selectedProjectPath),
+        );
+        await load();
+        await refreshCuration();
+        showToast(t("settings.capabilityDeleted", { name: detail.name }), { variant: "success" });
+      } else {
+        await api.forgetMemory({ id: detail.id });
+        setMapMemories((current) => current.filter((memory) => memory.id !== detail.id));
+        showToast(t("settings.learningMapMemoryDeleted", { title: detail.title }), {
+          variant: "success",
+        });
+      }
+      setMapNode(null);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      setMapRemoving(false);
+    }
+  };
+
+  const mapLabels: LearningMapLabels = {
+    skills: t("settings.learningMapSkills"),
+    memories: t("settings.learningMapMemory"),
+    edge: (weight) => t("settings.learningMapEdge", { weight }),
+    node: (name) => t("settings.learningMapNodeOpen", { name }),
+  };
+
+  const mapDetailLabels: LearningNodePanelLabels = {
+    close: t("settings.learningMapDetailClose"),
+    skill: t("settings.learningMapDetailSkill"),
+    memory: t("settings.learningMapMemory"),
+    user: t("settings.learningMapUser"),
+    level: t("settings.learningMapDetailLevel"),
+    global: t("settings.capabilityFilterGlobal"),
+    project: t("settings.capabilityFilterProject"),
+    disabled: t("settings.learningMapDetailDisabled"),
+    pinned: t("settings.skillPinned"),
+    used: (count) => t("settings.skillUsageUsed", { count }),
+    neverUsed: t("settings.skillUsageNever"),
+    removeSkill: t("settings.learningMapDetailRemoveSkill"),
+    removeMemory: t("settings.learningMapDetailRemoveMemory"),
+    // The same two-click wording every destructive row on this page uses.
+    confirm: t("settings.capabilityRemoveConfirm"),
+    cancel: t("settings.learningMapDetailCancel"),
+    skillHint: t("settings.learningMapDetailSkillHint"),
+    memoryHint: t("settings.learningMapDetailMemoryHint"),
+    memoryKind: (kind) => {
+      const key = MEMORY_KIND_LABEL_KEY[kind as MemoryKind];
+      return key ? t(key) : kind;
+    },
+  };
 
   const curationRows = useMemo(() => curationById(curation?.entries), [curation]);
 
@@ -1130,15 +1263,24 @@ export function AgentSkillsPage() {
           </div>
         </SettingsRow>
         {learningMap.nodes.length > 0 ? (
-          <div className="learning-map-body">
+          <div className={`learning-map-body${mapDetail ? " has-detail" : ""}`}>
             <LearningMapCanvas
               map={learningMap}
-              labels={{
-                skills: t("settings.learningMapSkills"),
-                memories: t("settings.learningMapMemory"),
-                edge: (weight) => t("settings.learningMapEdge", { weight }),
-              }}
+              labels={mapLabels}
+              selectedId={mapNode}
+              onSelect={setMapNode}
+              detailId={MAP_DETAIL_ID}
             />
+            {mapDetail ? (
+              <LearningNodePanel
+                id={MAP_DETAIL_ID}
+                detail={mapDetail}
+                labels={mapDetailLabels}
+                busy={mapRemoving}
+                onRemove={(detail) => void removeMapNode(detail)}
+                onClose={() => setMapNode(null)}
+              />
+            ) : null}
           </div>
         ) : null}
       </SettingsCard>

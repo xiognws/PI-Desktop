@@ -1,6 +1,7 @@
 import type { ComposerCommand } from "@pi-workspace/shared";
 
 import type { ComposerCommandResolution } from "../../../hooks/use-composer-autocomplete";
+import { learnPromptFor } from "./learn-command";
 
 /**
  * Slash submission dispatch for the composer (issue #795).
@@ -35,9 +36,15 @@ export function parseSlashSubmission(content: string): SlashSubmission | null {
  * `blocked` is the fail-closed branch: the command source could not be read, so
  * the composer cannot prove `/compact` is not a builtin and shows an error
  * instead of handing the text to the model.
+ *
+ * `learn` is `/learn`: the composer's own command, which becomes an agent prompt
+ * rather than a dispatch. It is claimed only when the command source does not
+ * own the name, so a user template that happens to be called `learn` keeps
+ * travelling as prompt text exactly as before.
  */
 export type SlashDispatch =
   | { action: "dispatch"; command: ComposerCommand & { id: string }; body: string }
+  | { action: "learn"; prompt: string }
   | { action: "prompt" }
   | { action: "blocked"; error: Error };
 
@@ -56,7 +63,10 @@ export function resolveSlashDispatch(
   if (resolution.status === "unavailable") {
     return { action: "blocked", error: resolution.error };
   }
-  if (resolution.status === "unknown") return { action: "prompt" };
+  if (resolution.status === "unknown") {
+    const prompt = learnPromptFor(submission.name, submission.body);
+    return prompt ? { action: "learn", prompt } : { action: "prompt" };
+  }
   const { command } = resolution;
   const { id } = command;
   if (command.kind === "template" || !id) return { action: "prompt" };

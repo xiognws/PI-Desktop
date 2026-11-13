@@ -45,6 +45,7 @@ export * from "./public-network.js";
 export * from "./network-policy.js";
 export * from "./skill-catalog.js";
 export * from "./skill-catalog-builtin.js";
+export * from "./skill-authoring.js";
 export * from "./model-config-import.js";
 export * from "./theme.js";
 export * from "./thinking-levels.js";

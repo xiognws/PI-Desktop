@@ -85,7 +85,13 @@ test("composer renders atomic inline chips and serializes paths on send", () => 
   );
   assert.match(
     composer,
-    /sendPrompt\(\s*inlineContent,\s*submittedDraft,\s*activeSessionId \?\? undefined,\s*captureAcceptedSession,\s*\)/,
+    // The send carries the variable seeded from the inline-serialized draft;
+    // only `/learn` re-points it at a prompt of the composer's own making.
+    /let promptText = inlineContent;/,
+  );
+  assert.match(
+    composer,
+    /sendPrompt\(\s*promptText,\s*submittedDraft,\s*activeSessionId \?\? undefined,\s*captureAcceptedSession,\s*\)/,
   );
   assert.match(composer, /serializeInlineComposerFileReferences\(/);
   assert.match(composer, /current\.filter\(/);

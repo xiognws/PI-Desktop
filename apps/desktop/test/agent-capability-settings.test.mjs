@@ -572,3 +572,90 @@ test("the learning map draws skills and memories from the one store", () => {
   // so it is not drawn as an active node.
   assert.match(skills, /\.filter\(\(row\) => row\.enabled !== false\)/);
 });
+
+test("a map node opens what it is, and removing it goes through the page's own paths", () => {
+  const canvas = read("../src/components/settings/LearningMapCanvas.tsx");
+  const mapStyles = read("../src/components/settings/learning-map.css");
+
+  // Selection is page state: the canvas is told what is open, it never decides.
+  assert.match(skills, /const \[mapNode, setMapNode\] = useState<string \| null>\(null\)/);
+  assert.match(skills, /const MAP_DETAIL_ID = "learning-map-detail"/);
+  assert.match(skills, /selectedId=\{mapNode\}/);
+  assert.match(skills, /onSelect=\{setMapNode\}/);
+  assert.match(skills, /detailId=\{MAP_DETAIL_ID\}/);
+  assert.match(skills, /<LearningNodePanel/);
+  assert.match(skills, /learning-map-body\$\{mapDetail \? " has-detail" : ""\}/);
+
+  // The card is built from the same records the picture is, so a record that is
+  // gone resolves to nothing and the card closes instead of going stale.
+  assert.match(skills, /learningNodeDetail\(mapNode, learningMapSkills, mapMemories\)/);
+  assert.match(skills, /learningMap\.nodes\.some\(\(node\) => node\.id === mapNode\)/);
+
+  // A skill leaves through the document delete the row menu already arms twice,
+  // with the level the node was drawn from; a memory through the call the
+  // memory page uses. Neither invents a new host route.
+  assert.match(skills, /api\.removeUserSkill\(\s*\n?\s*detail\.id,/);
+  assert.match(skills, /capabilityQuery\(detail\.level \?\? "global", selectedProjectPath\)/);
+  assert.match(skills, /api\.forgetMemory\(\{ id: detail\.id \}\)/);
+  // Both repaint the map afterwards — skills from a fresh read, memories by
+  // dropping the entry that was just removed.
+  assert.match(skills, /await load\(\);\s*\n\s*await refreshCuration\(\);/);
+  assert.match(
+    skills,
+    /setMapMemories\(\(current\) => current\.filter\(\(memory\) => memory\.id !== detail\.id\)\)/,
+  );
+
+  // Focusable, named, keyboard-activatable, and it says whether it is open.
+  assert.match(canvas, /role: "button"/);
+  assert.match(canvas, /tabIndex: 0/);
+  assert.match(canvas, /"aria-label": labels\.node\(node\.label\)/);
+  assert.match(canvas, /"aria-expanded": node\.id === selectedId/);
+  assert.match(canvas, /"aria-controls": node\.id === selectedId \? detailId : undefined/);
+  assert.match(canvas, /key === "Enter" \|\| key === " " \|\| key === "Spacebar"/);
+  assert.match(canvas, /nextLearningNodeId\(map, nodeId, 1\)/);
+  assert.match(canvas, /nextLearningNodeId\(map, nodeId, -1\)/);
+  // Both ends dismiss: Escape on a node clears the selection, Escape inside the
+  // card closes it, and the card is a focus target of its own.
+  assert.match(canvas, /key !== "Escape"/);
+  assert.match(canvas, /tabIndex=\{-1\}/);
+  assert.match(canvas, /nodeRefs\.current\.get\(previous\)\?\.focus\(\)/);
+
+  // Removal arms first and warns what the second click does, like every other
+  // destructive action on the page.
+  assert.match(canvas, /useArmedDelete\(\)/);
+  assert.match(canvas, /if \(armed !== "remove"\)/);
+  assert.match(canvas, /disabled=\{!canRemove\}/);
+
+  // The hit shape is transparent, not absent: five SVG units is not a target.
+  assert.match(
+    mapStyles,
+    /\.learning-map-canvas \.learning-map-node \.learning-map-hit\s*\{[\s\S]*?fill:\s*transparent/,
+  );
+  assert.match(canvas, /import "\.\/learning-map\.css"/);
+});
+
+test("every string the map's card shows exists in every catalog", async () => {
+  // `catalogs.test.mjs` compares locales against English; this pins the keys the
+  // card asks for, because a missing one renders as the raw key in the UI.
+  const { catalogs, flattenCatalog } = await import("@pi-workspace/i18n");
+  const keys = [
+    "settings.learningMapNodeOpen",
+    "settings.learningMapDetailClose",
+    "settings.learningMapDetailSkill",
+    "settings.learningMapDetailLevel",
+    "settings.learningMapDetailDisabled",
+    "settings.learningMapDetailRemoveSkill",
+    "settings.learningMapDetailRemoveMemory",
+    "settings.learningMapDetailSkillHint",
+    "settings.learningMapDetailMemoryHint",
+    "settings.learningMapDetailCancel",
+    "settings.learningMapMemoryDeleted",
+  ];
+  for (const [id, catalog] of Object.entries(catalogs)) {
+    const flat = flattenCatalog(catalog);
+    for (const key of keys) {
+      assert.equal(typeof flat[key], "string", `${id} ${key}`);
+      assert.ok(flat[key].trim(), `${id} ${key} must not be blank`);
+    }
+  }
+});
