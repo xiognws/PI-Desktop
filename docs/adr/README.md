@@ -425,3 +425,4 @@ Each ADR includes:
 | 0394 | [The maintenance pass touches only skills the agent wrote](0394-curator-touches-only-agent-skills.md) | Accepted (extends ADR 0387) |
 | 0395 | [Archive by moving, and run the pass at most once a day](0395-skill-archive-by-move-and-daily-pass.md) | Accepted (supersedes part of ADR 0387) |
 | 0396 | [Preinstalled plugins are the user's to remove](0396-preinstalled-plugins-are-removable.md) | Accepted (supersedes ADR 0241 §4) |
+| 0397 | [Run the WorkBuddy gateway as an in-app provider](0396-in-app-provider-gateway.md) | Accepted for implementation (amends ADR 0259; the plugin stays bundled, default-disabled) |

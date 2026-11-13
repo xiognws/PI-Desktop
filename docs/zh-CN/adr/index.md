@@ -320,6 +320,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0340 | [插件可访问任意会话（新增 .all 权限）](/adr/0340-plugin-session-all-scope) | 已接受（修订 ADR 0200、ADR 0323；D680） |
 | 0344 | [电脑操作默认授权整个桌面，“停止”就是边界](/adr/0344-computer-use-whole-desktop-grant) | 已接受（D682；修订 ADR 0342 第 4、6 条） |
 | 0384 | [扩展件在 agent sidecar 中运行](/zh-CN/adr/0384-widget-packages-run-in-the-agent-sidecar) | 已实现（候选）（D691；见规格 07-plugins/19） |
+| 0396 | [WorkBuddy 网关作为内置提供商在应用内运行](/adr/0396-in-app-provider-gateway) | 已接受实施（修订 ADR 0259；插件仍随包发布，但默认停用） |
 
 ## 什么时候看 ADR
 

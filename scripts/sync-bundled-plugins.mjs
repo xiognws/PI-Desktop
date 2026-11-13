@@ -27,6 +27,8 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 
+import { readDefaultDisabledIds, withDefaultDisabled } from "./bundled-plugins-defaults.mjs";
+
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TARGET = join(REPO, "apps", "desktop", "resources", "plugins");
 const OFFICIAL_CATALOG = "https://plugins.aiuo.net/catalog.json";
@@ -99,6 +101,16 @@ function excludedPluginIds() {
   }
 }
 const EXCLUDED = excludedPluginIds();
+
+/**
+ * Plugin ids this build ships with the plugin switched off.
+ *
+ * Declared in `scripts/bundled-plugins-default-disabled.json` and stamped onto
+ * the expanded manifest: host-core reads `enabledByDefault` when it creates the
+ * row and keeps the user's own choice afterwards, so this decides the first
+ * boot only.
+ */
+const DEFAULT_DISABLED = new Set(readDefaultDisabledIds(REPO));
 
 function compareVersions(left, right) {
   const parse = (value) => {
@@ -305,7 +317,26 @@ await Promise.all(
           await writeFile(path, entry.data);
           writtenPaths.push(relative);
         }
-        results.push({ ...item, ok: true, source, files: writtenPaths.length, stripped, paths: writtenPaths });
+        // The product's own answer for a plugin that must not start by itself.
+        // Stamped after the package is expanded, because the manifest host-core
+        // reconciles against on every launch is the expanded copy, not the
+        // package the catalog serves.
+        const stamped = withDefaultDisabled(manifest, DEFAULT_DISABLED);
+        if (stamped.changed) {
+          await writeFile(
+            join(dest, "manifest.json"),
+            `${JSON.stringify(stamped.manifest, null, 2)}\n`,
+          );
+        }
+        results.push({
+          ...item,
+          ok: true,
+          source,
+          files: writtenPaths.length,
+          stripped,
+          defaultDisabled: stamped.changed,
+          paths: writtenPaths,
+        });
       } catch (error) {
         results.push({ ...item, ok: false, error: error.message });
       }
@@ -342,6 +373,7 @@ await writeFile(
       catalogGeneratedAt: catalog.generatedAt ?? null,
       packageBase: BASE,
       testFilesStripped: [...written, ...reused].reduce((sum, item) => sum + (item.stripped ?? 0), 0),
+      defaultDisabled: [...DEFAULT_DISABLED].sort(),
       plugins: written
         .map((item) => ({ id: item.id, version: item.version, files: item.files }))
         .sort((a, b) => a.id.localeCompare(b.id)),
@@ -368,5 +400,9 @@ for (const item of failed) {
 }
 for (const item of missing) {
   console.log(`  MISSING ${item.id}@${item.version}: ${item.files.length} file(s), e.g. ${item.files.slice(0, 3).join(", ")}`);
+}
+const stamped = [...written, ...reused].filter((item) => item.defaultDisabled);
+if (stamped.length) {
+  console.log(`disabled by default: ${stamped.map((item) => item.id).join(", ")}`);
 }
 if (failed.length || missing.length) process.exitCode = 1;

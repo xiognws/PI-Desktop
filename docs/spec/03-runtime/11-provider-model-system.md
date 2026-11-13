@@ -174,7 +174,7 @@ wire APIs, and non-Claude ids served over the Anthropic protocol are unchanged
 > and the OpenAI-compatible path stays open for unpublished models.
 
 The bundled catalog is a default, not a fixed list: `<data>/components/models.dev/api.json`
-replaces it when present (ADR 0396 § component overlays). That is how a
+replaces it when present (ADR 0397 § component overlays). That is how a
 deployment points the app at a private gateway's model metadata without
 rebuilding — deleting the file restores the shipped catalog.
 
@@ -549,6 +549,135 @@ not prove whether a code was consumed, so no expiry claim is made.
 
 This uses the existing repository dependency-patch mechanism; OAuth endpoints,
 PKCE, credential ownership, IPC and storage schemas are unchanged.
+
+## 8b. Built-in (in-app) providers
+
+A built-in provider serves its models from a gateway the desktop application
+itself runs, so the provider exists before the first turn and needs no endpoint
+typed by the user. WorkBuddy is the first one; the seam, not the vendor, is what
+this section fixes.
+
+### 8b.1 The descriptor seam
+
+```text
+apps/desktop/electron/main/providers/
+  types.ts            InAppProvider: id, label, defaultPort, healthPath,
+                      openaiBasePath, product, creditsPath?
+  in-app-providers.ts supervisor: start, readiness, port, stop, row registration
+  workbuddy/          the gateway, copied from the plugin's MIT bridge
+```
+
+`product` is the vendor path segment the gateway's routes carry, not a display
+name. `creditsPath` is optional: a provider without it has no credit surface at
+all. Adding provider N is one descriptor, one module and one registry line —
+the row lifecycle, settings validation and the credit read are shared.
+
+Session resolution, model metadata, transport and secrets are unchanged: an
+in-app provider is an ordinary `openai_compatible` row (ADR 0012, §16) whose
+endpoint the application owns.
+
+### 8b.2 Lifecycle
+
+1. At boot, after settings load and before any session can select a provider,
+   the supervisor reads `inAppProvider.<id>.enabled` and
+   `inAppProvider.<id>.port`.
+2. Enabled: it starts the gateway on that loopback port and probes
+   `GET /healthz` until it answers. Only an answering probe makes the provider
+   `ready`; the row is registered either way.
+3. Disabled: no gateway process, and the row is reported disabled.
+4. A port another process already holds makes the bind fail. That is a
+   reported state — the row stays disabled and carries the reason — not a crash
+   and not a silent fallback to another port.
+5. Stop happens during shutdown, before host RPC closes, so no gateway outlives
+   the application.
+
+The row registration is an idempotent upsert performed on every boot: create the
+row when it is absent, update the fields the application owns when it is
+present. Fields the user owns — the secret, the model choice, bindings, custom
+headers — are never rewritten, so an upgrade does not reset a session's model.
+
+### 8b.3 Reserved ownership
+
+An in-app provider's row carries the reserved `owner_plugin_id`
+`builtin:workbuddy`. The `builtin:` prefix belongs to the application and is not
+a plugin namespace, so a manifest cannot claim it; plugin-declared rows keep
+their own shape (plugin id, row id `plugin:<pluginId>:<declaredId>`,
+`12-provider-config-schema.md` and ADR 0259), and this section does not change
+them.
+
+While the gateway is on, the row cannot be deleted from the UI; the supported
+"off" state is disabling it, which also stops the gateway. A row the
+application recreates on the next launch is worse than a row the user cannot
+remove.
+
+### 8b.4 Endpoints
+
+- Base URL: `http://127.0.0.1:<port>/workbuddy/v1`, derived from the port
+  setting. The vendor path segment is part of the route, which is exactly the
+  value a user had to guess before this decision (ADR 0397).
+- `GET /healthz` is the readiness probe.
+- `GET {base}/models` is the model list. It is the provider's own answer:
+  nothing in the application narrows or extends it into a closed allowlist.
+- `GET /{product}/v1/credits` exists only for a descriptor that carries
+  `creditsPath`.
+
+### 8b.5 Credit read
+
+The credits route reads the two billing endpoints the plugin's core already
+read: an enterprise account in the CN region answers with a single cycle quota
+(`/v2/billing/meter/get-enterprise-user-usage`); every other account answers
+with a package list (`/v2/billing/meter/get-user-resource`). A response whose
+quota or usage field is not recognised is an error. It is never folded to `0`:
+a plausible wrong number is how an empty package list stayed invisible for a
+whole release (the bridge's issue #31), and a hidden upstream bug is worse than
+a visible failure.
+
+Main exposes `pi-desktop/in-app-providers/credits` with `{ id, refresh? }`. The
+answer is cached for 30 s and the upstream read times out at 10 s; a failure
+returns `{ ok: false, reason }` so the UI can show a state instead of a number.
+
+**Visibility is one rule: metered and positive → show, otherwise hide.** No
+indicator appears — no dash, no `0`, no reserved space — when the descriptor has
+no `creditsPath`, when the account is unlimited, or when the remaining total is
+`0`. The indicator is a button in the composer status bar beside the model chip;
+it opens a popover with the total, one row per package (name, remaining, size)
+when more than one package is reported, a relative "updated N minutes ago" line,
+a manual refresh that invalidates the shared cache, and a close affordance. The
+model picker's group header for that provider shows the same total. The
+provider's settings card reuses the same strings and states. There is no
+polling, no spend history and no currency conversion — the number is what the
+billing endpoint reported.
+
+Because the chip hides itself, the reasons live where a person can look for them:
+the settings card shows a state line — no remaining credit, unlimited, sign in
+to the client app again, or credits could not be read — and a request the
+upstream refuses for credit reports the insufficient-credit error on that turn.
+
+### 8b.6 Failure behaviour
+
+| Condition | What the user sees |
+| --- | --- |
+| gateway never became ready | provider disabled with a visible reason; it is not offered as a model source |
+| gateway stopped after readiness | same, on the next read; the model list is never silently emptied |
+| a request refused for credit (402 / hard credit) | the turn's own error, with insufficient-credit copy |
+| credit read failed | an error state in the settings card and in the popover — never a number |
+| provider has no credit surface | nothing; the indicator is absent, not empty-styled |
+
+### 8b.7 Settings keys
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `inAppProvider.workbuddy.enabled` | `true` | start the gateway and keep the provider row |
+| `inAppProvider.workbuddy.port` | `18765` | loopback port the gateway binds |
+
+### 8b.8 The bundled plugin is default-disabled
+
+`community.workbuddy-connect` stays in the bundled plugin set, but arrives
+switched off: two gateways cannot both bind the loopback port, and a second copy
+answering `/healthz` would look to the supervisor like its own gateway. The
+default is a manifest field (`enabledByDefault: false`) stamped by the bundling
+step, and host-core keeps the state a user already chose — an existing install
+that enabled and configured the plugin is not switched off by an upgrade.
 
 ## 9. Model catalog service
 
