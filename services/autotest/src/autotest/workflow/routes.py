@@ -18,6 +18,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from autotest.knowledge import extract
 from autotest.workflow import analysis as analysis_service
 from autotest.workflow import cases as case_service
 from autotest.workflow import execution as execution_service
@@ -173,6 +174,14 @@ def _read_requirement_text(project_id: str, ref: str) -> str:
     for candidate in candidates:
         if candidate.is_file():
             data = candidate.read_bytes()
+            # .docx/.pdf/.xlsx 是二进制容器，必须先抽文本；直接 decode 只会拿到
+            # ZIP 里的一段乱码（实测 649 KB 的 docx 解出 62 万字符、0 个标题、
+            # 于是 prd-parse 恒定「解析出 0 个功能点」）。
+            if extract.is_supported(candidate.name):
+                try:
+                    return extract.extract_text(candidate.name, data).text
+                except extract.UnsupportedDocument as problem:
+                    raise HTTPException(status_code=400, detail=str(problem)) from problem
             for encoding in ("utf-8", "utf-8-sig", "gb18030"):
                 try:
                     return data.decode(encoding)

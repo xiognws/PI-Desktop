@@ -124,6 +124,10 @@ def _docx_to_text(raw: bytes) -> str:
         if not text:
             continue
         style = (paragraph.style.name or "").lower() if paragraph.style else ""
+        # 目录页（style 以 toc 开头）是标题的副本，留着会让解析把每个目录行
+        # 当成一个小节，正文反而被切碎。
+        if style.startswith("toc"):
+            continue
         if style.startswith("heading"):
             level = "".join(ch for ch in style if ch.isdigit()) or "1"
             parts.append("#" * int(level) + " " + text)
