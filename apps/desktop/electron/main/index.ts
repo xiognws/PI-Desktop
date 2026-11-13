@@ -45,6 +45,7 @@ import {
   ModelsDevCatalog,
   catalogModelConfigFor,
 } from "./models-dev-catalog";
+import { userComponentPath } from "./user-components.ts";
 import { VendorOAuth } from "./oauth";
 import { AppUpdaterController } from "./updater";
 import {
@@ -289,9 +290,14 @@ const updater = new AppUpdaterController({
  * resolved request auth.
  */
 const modelsDevCatalog = new ModelsDevCatalog({
-  catalogPath: app.isPackaged
-    ? join(process.resourcesPath, "models.dev", "api.json")
-    : join(app.getAppPath(), "resources", "models.dev", "api.json"),
+  // A catalog the user put in their data directory wins: shipping a catalog is
+  // how a first launch knows about models, not a claim about which gateway the
+  // user actually has (ADR 0396 § components).
+  catalogPath:
+    userComponentPath(dataDir, "models.dev", "api.json") ??
+    (app.isPackaged
+      ? join(process.resourcesPath, "models.dev", "api.json")
+      : join(app.getAppPath(), "resources", "models.dev", "api.json")),
 });
 
 const vendorOAuth = new VendorOAuth({

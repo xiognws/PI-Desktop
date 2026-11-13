@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { dataDirFromEnv, userComponentPath } from "./user-components.ts";
 
 const HANDBOOK_PATTERN = /^Pi-Workspace-.*\.md$/i;
 
@@ -29,9 +30,14 @@ function moduleDirectory(moduleUrl: string): string {
 export function resolveManualPath(
   moduleUrl: string = import.meta.url,
   resourcesPath: string = process.resourcesPath || "",
+  env: NodeJS.ProcessEnv = process.env,
 ): string | null {
+  // A handbook the user provided wins over the shipped one: the shipped file is
+  // a starting point, not the edition they want to read in-app.
   const moduleDir = moduleDirectory(moduleUrl);
+  const userRoot = userComponentPath(dataDirFromEnv(env), "manual");
   const roots = [
+    ...(userRoot ? [userRoot] : []),
     join(resourcesPath, "manual"),
     join(moduleDir, "../../resources/manual"),
     join(moduleDir, "../../../resources/manual"),

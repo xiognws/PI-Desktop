@@ -123,3 +123,35 @@ filesystem one.
   build no longer ships is dropped, because there is no image left to reconcile.
 - Disabling stays the right action for "less surface, same installation".
   Removing now exists for "I do not want this at all".
+
+## Component overlays: the same rule one level down
+
+The image also ships data that is not a plugin: `resources/gen-ui` (the inline
+visualization kit), `resources/models.dev` (the model catalog) and
+`resources/manual` (the handbook). They are defaults in exactly the way the
+plugin set is, and the user may want a different one — a catalog for a private
+gateway, a kit with their own components, a handbook they annotated.
+
+`<data>/components/<name>/` overrides them, whole-cloth:
+
+```text
+<data>/components/gen-ui/            the user's kit (needs visualize.css)
+<data>/components/models.dev/api.json
+<data>/components/manual/Pi-Workspace-<anything>.md
+```
+
+| Component | "present" means | fallback |
+| --- | --- | --- |
+| `gen-ui` | `visualize.css` exists | `<resources>/gen-ui` |
+| `models.dev` | `api.json` exists | `<resources>/models.dev/api.json` |
+| `manual` | a `Pi-Workspace-*.md` exists | `<resources>/manual` |
+
+Nothing is copied and nothing is written by the application: the user drops files
+in, deletes them to roll back, and every file they did not provide still comes
+from the image. A partial `gen-ui` is not treated as present — a kit whose CSS
+and markup disagree is worse than the shipped one.
+
+Skills are deliberately *not* on this list: the skill library is already owned by
+the user (`~/.agents/skills`, plus project-level skills), so there is no shipped
+copy to override.
+
