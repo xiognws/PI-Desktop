@@ -165,7 +165,10 @@ function gateLabel(id: string) {
             <Code2 class="w-5 h-5 text-accent" />
             <span class="font-medium text-fg text-sm">{{ s.name }}</span>
           </div>
-          <p class="text-xs text-muted mb-2">关联用例：{{ s.case_id || '未关联' }}</p>
+          <p class="text-xs mb-2" :class="s.case_missing ? 'text-warn' : 'text-muted'">
+            关联用例：{{ s.case_id || '未关联' }}
+            <span v-if="s.case_missing">（已被删除 —— 脚本还能跑，但结果对不回任何一条需求；重新设计用例后请确认是否重出脚本）</span>
+          </p>
           <div class="flex items-center justify-between">
             <span class="text-xs px-2 py-0.5 rounded"
               :class="s.status === '就绪' ? 'bg-success-soft text-success' : 'bg-warn-soft text-warn'">

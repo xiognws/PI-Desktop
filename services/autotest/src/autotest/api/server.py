@@ -623,9 +623,16 @@ async def list_scripts(project_id: str):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT id, case_id, name, language, status, filepath, created_at, updated_at FROM scripts ORDER BY updated_at DESC").fetchall()
+    # 用例被删掉之后脚本还留在库里（脚本是可执行产物，可能已经被人补过断言，
+    # 不能连带删除）。这里把"关联用例已不存在"标出来，否则界面上看不出来，
+    # 执行结果也没法对回任何一条需求。
+    case_ids = {row[0] for row in conn.execute("SELECT id FROM test_cases").fetchall()}
     conn.close()
 
     scripts = [dict(row) for row in rows]
+    for s in scripts:
+        script_case = str(s.get("case_id") or "")
+        s["case_missing"] = bool(script_case) and script_case not in case_ids
     # 浏览器端 monaco-vscode-api 不允许访问真实磁盘 file:// 路径，
     # 使用统一虚拟根 file:///workspace/scripts，文件内容由编辑器 didOpen 提供给 LSP
     virtual_workspace_uri = "file:///workspace/scripts"
@@ -633,7 +640,12 @@ async def list_scripts(project_id: str):
         s["file_uri"] = f"{virtual_workspace_uri}/{s['name']}"
         s["workspace_uri"] = virtual_workspace_uri
 
-    return {"scripts": scripts, "total": len(scripts), "workspace_uri": virtual_workspace_uri}
+    return {
+        "scripts": scripts,
+        "total": len(scripts),
+        "orphan_total": sum(1 for s in scripts if s["case_missing"]),
+        "workspace_uri": virtual_workspace_uri,
+    }
 
 
 @app.post("/api/projects/{project_id}/scripts")

@@ -408,6 +408,11 @@ onBeforeUnmount(() => {
         <FileCode class="w-4 h-4 text-accent" />
         {{ currentScript?.name || '加载中...' }}
       </div>
+      <span
+        v-if="currentScript?.case_missing"
+        class="text-xs px-2 py-0.5 rounded border border-warn text-warn"
+        title="生成这条脚本的用例已经被删除（例如资料缺口导致跳过用例）；重新设计用例后请确认是否重新生成脚本"
+      >关联用例已删除</span>
       <div class="flex items-center gap-1.5 text-xs text-muted ml-2">
         <Loader2 class="w-3 h-3 animate-spin" v-if="!lspConnected" />
         <span class="w-2 h-2 rounded-full" :class="lspConnected ? 'bg-green-500' : 'bg-gray-300'"></span>
@@ -470,7 +475,12 @@ onBeforeUnmount(() => {
               :class="s.id === scriptId ? 'bg-accent-soft text-accent' : 'text-fg-3 hover:bg-surface-3'"
             >
               <FileCode class="w-3 h-3" />
-              {{ s.name }}
+              <span class="truncate">{{ s.name }}</span>
+              <span
+                v-if="s.case_missing"
+                class="ml-auto shrink-0 px-1 rounded border border-warn text-warn"
+                title="关联用例已被删除：脚本仍可执行，但结果无法对回任何一条需求"
+              >孤儿</span>
             </button>
           </div>
         </div>
