@@ -155,6 +155,12 @@ async function createSkill(host: SkillManageHost, params: RawParams) {
     if (/already exists/i.test(detail)) {
       return refused(`${detail} Patch that skill instead of creating a second one.`, "SKILL_EXISTS");
     }
+    // An over-long description is also the model's to fix: the catalog shows 60
+    // characters, and a refusal it cannot read as retryable would end the turn
+    // with the skill unwritten.
+    if (/SKILL_INVALID/.test(detail) && /description/i.test(detail)) {
+      return refused(detail, "SKILL_DESCRIPTION_TOO_LONG");
+    }
     return text(`The skill was not created: ${detail}`, { errorCode: "SKILL_CREATE_FAILED" }, true);
   }
 }
