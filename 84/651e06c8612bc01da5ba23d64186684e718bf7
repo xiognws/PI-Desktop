@@ -1,0 +1,70 @@
+apps/desktop/electron/main/host-process.ts
+  h_201ed4c689ac8b 18-22,57,59-61,130-131,144-145,148-155
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 193-196
+apps/desktop/electron/main/ipc/plugin-ipc.ts
+  h_201ed4c689ac8b 407-432
+apps/desktop/electron/main/plugin-paths.ts
+  h_201ed4c689ac8b 1-142
+apps/desktop/src/features/plugins/InstalledPluginsPanel.tsx
+  h_201ed4c689ac8b 39-41,272-296,305-339
+apps/desktop/src/features/plugins/usePluginsPage.ts
+  h_201ed4c689ac8b 473-504,858-860
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 1444-1450
+apps/desktop/test/bundled-plugins.test.mjs
+  h_201ed4c689ac8b 188-195
+apps/desktop/test/plugin-paths.test.mjs
+  h_201ed4c689ac8b 1-148
+crates/host-core/src/plugins.rs
+  h_201ed4c689ac8b 26
+crates/host-core/src/plugins/install.rs
+  h_201ed4c689ac8b 105,141-144
+crates/host-core/src/plugins/preinstalled.rs
+  h_201ed4c689ac8b 1-560
+crates/host-core/src/plugins/registry.rs
+  h_201ed4c689ac8b 7,10-21,50-53,60,62-68,148-156,269-273,275-281
+crates/host-core/src/plugins/tests.rs
+  h_201ed4c689ac8b 283,1188,1212,1214-1217,1219,1230,1237,1261-1268,1272,1277-1278,1280,1297,1320,1330-1333,1335-1343,1367,1384,1387,1394,1411,1426,1436-1556
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 5410-5433
+docs/adr/0396-preinstalled-plugins-are-removable.md
+  h_201ed4c689ac8b 1-125
+docs/adr/README.md
+  h_201ed4c689ac8b 427
+docs/spec/07-plugins/05-plugin-lifecycle.md
+  h_201ed4c689ac8b 207-208,225-240
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 2407-2409
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 2427-2429
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 2407-2409
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 2407-2409
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 2423-2425
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 2379-2381
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 2423-2425
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 2408-2410
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 2408-2410
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 374-376
+packages/shared/src/types/plugins.ts
+  h_201ed4c689ac8b 330-344
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "84651e06c8612bc01da5ba23d64186684e718bf7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

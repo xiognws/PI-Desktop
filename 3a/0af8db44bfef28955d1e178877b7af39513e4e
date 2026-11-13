@@ -1,0 +1,26 @@
+apps/desktop/electron/main/gen-ui-kit.ts
+  h_201ed4c689ac8b 3,5-6,92-96
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 48,293-300
+apps/desktop/electron/main/manual-path.ts
+  h_201ed4c689ac8b 4,33,35-36,38,40
+apps/desktop/electron/main/user-components.ts
+  h_201ed4c689ac8b 1-71
+apps/desktop/test/user-components.test.mjs
+  h_201ed4c689ac8b 1-81
+docs/adr/0396-preinstalled-plugins-are-removable.md
+  h_201ed4c689ac8b 126-157
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 176-180
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3a0af8db44bfef28955d1e178877b7af39513e4e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
