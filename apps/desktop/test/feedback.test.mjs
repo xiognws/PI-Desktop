@@ -1,4 +1,4 @@
-import { readSettingsSource, readMainSource } from "./helpers/source-contracts.mjs";
+import { readSettingsSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -9,24 +9,16 @@ const [
   bugTemplate,
   featureTemplate,
   configTemplate,
-  protocolSource,
-  mainSource,
   apiSource,
   settingsSource,
   settingsSearchSource,
-  enSource,
-  zhSource,
 ] = await Promise.all([
   read("../../../.github/ISSUE_TEMPLATE/bug_report.yml"),
   read("../../../.github/ISSUE_TEMPLATE/feature_request.yml"),
   read("../../../.github/ISSUE_TEMPLATE/config.yml"),
-  read("../../../packages/shared/src/protocol.ts"),
-  readMainSource(),
   read("../src/lib/api.ts"),
   readSettingsSource(),
   read("../src/lib/settings-search.ts"),
-  read("../../../packages/i18n/src/locales/en/index.ts"),
-  read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
 ]);
 
 function requiredField(source, id) {
@@ -63,19 +55,16 @@ test("feature request form requires a problem and a proposal", () => {
   assert.match(featureTemplate, /labels:\s*\[["']enhancement["']\]/);
 });
 
-test("Settings Info exposes a Main-owned GitHub feedback action", () => {
-  assert.match(protocolSource, /appOpenFeedback:\s*"pi-desktop\/app\/openFeedback"/);
-  assert.match(mainSource, /IPC\.invoke\.appOpenFeedback/);
-  assert.match(mainSource, /buildBugReportUrl\(/);
-  assert.match(mainSource, /assertFeedbackIssueUrl\(/);
-  assert.match(mainSource, /await safeOpenExternal\(url\)/);
-  assert.match(apiSource, /openFeedback:\s*\(\)\s*=>\s*invoke\(IPC\.invoke\.appOpenFeedback\)/);
-  assert.match(settingsSource, /t\("settings\.feedback"\)/);
-  assert.match(settingsSource, /api\.openFeedback\(\)/);
-  assert.match(settingsSearchSource, /"settings\.feedback"/);
-  for (const source of [enSource, zhSource]) {
-    assert.match(source, /feedback:/);
-    assert.match(source, /feedbackDesc:/);
-    assert.match(source, /openFeedback:/);
-  }
+test("the Info page points at nothing outside this build", () => {
+  // Distribution surface: the panel must not name the build's internals or open
+  // an external destination, so the report-a-problem and handbook rows are gone
+  // by design. Nothing in the renderer may reach the Main-owned handler either,
+  // so the renderer API losses the two calls that reached it.
+  assert.doesNotMatch(settingsSource, /api\.openFeedback\(\)/);
+  assert.doesNotMatch(settingsSource, /api\.openManual\(\)/);
+  assert.doesNotMatch(settingsSource, /settings-about-hero-meta/);
+  assert.doesNotMatch(settingsSource, /github\.com/i);
+  assert.doesNotMatch(apiSource, /openFeedback:/);
+  assert.doesNotMatch(apiSource, /openManual:/);
+  assert.doesNotMatch(settingsSearchSource, /"settings\.feedback"/);
 });

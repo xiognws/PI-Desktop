@@ -85,7 +85,6 @@ test("the row explanations survive the move into the tooltip", () => {
     "settings.permissionModeDesc",
     "settings.modeDesc",
     "settings.enterToSendDesc",
-    "settings.feedbackDesc",
   ]) {
     assert.match(
       settingsPage,

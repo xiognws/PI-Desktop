@@ -1049,16 +1049,6 @@
   line-height: var(--leading-body);
 }
 
-.settings-about-hero-meta {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
-  color: var(--ds-text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: var(--leading-body);
-}
-
 /*
   App-update card: icon + title + description on the left, actions on the
   right, live status (progress bar, error, readiness) beneath.

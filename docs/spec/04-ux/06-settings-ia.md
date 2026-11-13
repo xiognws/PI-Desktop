@@ -859,13 +859,19 @@ system while preserving their different data ownership:
   for inspection does not restore it.
 
 ### Info
-- app/host/protocol versions + open logs
-- **Report a problem** row: one action opens the GitHub bug issue form in
-  the system browser. Electron Main owns the URL (`pi-desktop/app/openFeedback`),
-  prefills app version, OS, and environment from Main-owned version info, and
-  never accepts a renderer-supplied destination (D313 / ADR 0157)
-- Updates row with the current delivery state and one applicable action:
-  Check for updates, View release, or Restart to update
+- Application name and version + open logs. The panel shows no internal
+  protocol or host version and no build-time environment line
+- No outbound destination: the panel carries no report-a-problem action, no
+  handbook entry, and no release link. A distribution build must not identify
+  the project it derives from, so every affordance that opened an external
+  repository, an external changelog, or the shipped build handbook was removed
+  rather than hidden
+- The update card renders in development builds only (`import.meta.env.DEV`):
+  named version, one applicable action — Check for updates, View release, or
+  Restart to update — the release-notes modal, and the update-preference row.
+  A shipped build renders no update card, because the release ships without a
+  reachable update feed and the card's release-notes and View release actions
+  surfaced another product's changelog and release page
 - **Developer** card:
   - developer mode is off unless the optional persisted
     `AppSettings.developerMode` value is `true`
@@ -876,15 +882,15 @@ system while preserving their different data ownership:
   - disabling developer mode closes an open console and disables or removes
     every entry point; Settings search indexes the card, switch, and console
     action
-- The Updates row always exposes a Release notes action. It opens a modal
-  containing the complete shipped stable changelog in newest-first order,
-  localized to the product language and marking the current and available
-  versions when present
-- When an update is available, downloading, or downloaded and Main attached
-  localized product notes, the Updates row shows a compact "What's new"
-  list under the status text (same notes as the ambient banner; D164). The
-  full-history modal remains available when the app is up to date or update
-  checks are disabled in development
+- In development builds the Updates row also exposes a Release notes action.
+  It opens a modal containing the complete shipped stable changelog in
+  newest-first order, localized to the product language and marking the
+  current and available versions when present
+- In development builds, when an update is available, downloading, or
+  downloaded and Main attached localized product notes, the Updates row shows a
+  compact "What's new" list under the status text (same notes as the ambient
+  banner; D164). The full-history modal remains available when the app is up to
+  date or update checks are disabled in development
 - Dismissing an update applies to that version across restarts. In-app
   dismissal cancels an active download and prevents install-on-quit; discovery
   continues, and a newer version clears the dismissal and resumes automatic
@@ -992,8 +998,10 @@ system while preserving their different data ownership:
 25. Toggling one capability leaves every other row interactive, does not
     replace the list with skeletons, and restores the previous switch position
     if the host rejects the change
-26. Info exposes a Report a problem action that opens the GitHub bug form
-    with version and OS filled in; Settings search indexes the row
+26. Info shows the application name and version, the logs action, and the
+    Developer card; it exposes no report-a-problem, handbook, or release-link
+    action, shows no protocol/host line, and Settings search finds none of the
+    removed rows
 27. The Skills page Market view browses public-HTTPS catalogs, previews
     the assembled document, and installs only through `skills.create`; oversized
     expanded documents are refused and source badges follow `sourceId`

@@ -147,6 +147,14 @@ const REMOVED_EXPLANATORY_KEYS = [
   "settings.configSync.errorTitle",
   "settings.remoteHosts.title",
   "settings.remoteHosts.statusOnline",
+  // The Info panel exposes no external destination: the report-a-problem and
+  // handbook rows are gone from every locale, not hidden.
+  "settings.manual",
+  "settings.manualDesc",
+  "settings.openManual",
+  "settings.feedback",
+  "settings.feedbackDesc",
+  "settings.openFeedback",
 ];
 
 test("removed explanatory copy stays removed", () => {

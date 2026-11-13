@@ -13799,27 +13799,23 @@ are withdrawn with ADR 0165.
 - **Milestone**: M5
 - **Status**: Unit-covered (host-core `tools` tests)
 
-#### E2E-176: Settings Info opens a prefilled GitHub bug form
+#### E2E-176: Settings Info exposes no external destination
 
-- **Preconditions**: Settings can be opened; the machine can launch a system
-  browser.
-- **Steps**: 1) Open Settings → Info. 2) Confirm the Application row shows the
-  current app version. 3) Search settings for the Report a problem label.
-  4) Activate Open GitHub.
-- **Expected**: The row is indexed by Settings search and stays on Info. The
-  action calls `pi-desktop/app/openFeedback` with no URL from the renderer.
-  Main opens `https://github.com/xiognws/Pi-Workspace/issues/new` with
-  `template=bug_report.yml` and prefills `app-version`, `os`, and
-  `environment`. The GitHub bug form still requires description, reproduction
-  steps, expected, actual, version, and OS; blank issues remain disabled.
-- **Specs linked**: `04-ux/06-settings-ia.md`, `03-runtime/01-ipc-protocol.md`,
-  `06-delivery/03-ai-development-workflow.md`, `08-meta/decisions-log.md`
-  (D313), ADR 0157
+- **Preconditions**: Settings can be opened in a packaged build.
+- **Steps**: 1) Open Settings → Info. 2) Read the panel top to bottom. 3) Search
+  settings for the report-a-problem, handbook, and release labels.
+- **Expected**: The panel shows the application name and version, the logs
+  action, and the Developer card, and nothing else. It renders no protocol/host
+  line, no report-a-problem row, no handbook row, and no update card, so no
+  action can open an external repository, an external changelog, or the shipped
+  build handbook. Settings search returns no hit for those removed rows while
+  keeping the Info destination itself.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `08-meta/decisions-log.md`
 - **Acceptance**: H (diagnostics), Quality
 - **Milestone**: M6+
-- **Status**: Unit/source-contract covered (`github-feedback.test.ts`,
-  `feedback.test.mjs`); rendered desktop journey remains pending
-  (run only in a capable environment when this surface changes)
+- **Status**: Source-contract covered (`feedback.test.mjs`); rendered desktop
+  journey remains pending (run only in a capable environment when this surface
+  changes)
 
 #### E2E-177: Switching a long running session keeps the newest prompt in view
 

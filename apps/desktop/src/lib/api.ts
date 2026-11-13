@@ -836,7 +836,6 @@ export const api = {
   updatesInstall: () => invoke(IPC.invoke.updatesInstall),
   updatesOpenReleases: () => invoke(IPC.invoke.updatesOpenReleases),
   updatesDismiss: () => invoke(IPC.invoke.updatesDismiss),
-  openFeedback: () => invoke(IPC.invoke.appOpenFeedback),
   listNotifications: (input?: { unreadOnly?: boolean; limit?: number }) =>
     invoke<NotificationListResult>(IPC.invoke.notificationList, input ?? {}),
   markNotificationRead: (id: string) =>
@@ -1855,7 +1854,6 @@ export const api = {
     invoke(IPC.invoke.commandPaletteExecute, commandId),
   openLogs: () => invoke(IPC.invoke.logOpenFolder),
   /** Open the handbook this build shipped with (About panel). */
-  openManual: () => invoke<{ ok: boolean; path: string }>(IPC.invoke.manualOpen),
   /** What the next launch would play as its boot animation (D679). */
   startupAnimationStatus: () =>
     invoke<StartupAnimationStatus>(IPC.invoke.startupAnimationStatus),
