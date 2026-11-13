@@ -1,0 +1,56 @@
+apps/desktop/electron/main/ipc/manual-ipc.ts
+  h_201ed4c689ac8b 11-19
+apps/desktop/src/features/settings/SettingsPage.tsx
+  h_201ed4c689ac8b 686-696
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 1843-1844
+apps/desktop/src/lib/settings-search.ts
+  h_201ed4c689ac8b 310
+apps/desktop/test/feedback.test.mjs
+  h_201ed4c689ac8b 62-64,70-74
+apps/desktop/test/manual-handbook.test.mjs
+  h_201ed4c689ac8b 7,60-81
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 864-873,1006-1010
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 13807-13813
+docs/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 8584-8587
+docs/zh-CN/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 343-347,432-434
+docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 7580
+docs/zh-CN/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 5977-5978
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1927-1929
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1947-1949
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1927-1929
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1927-1929
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1943-1945
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1903-1905
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1943-1945
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1928-1930
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1928-1930
+packages/i18n/test/user-facing-copy.test.mjs
+  h_201ed4c689ac8b 150-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "03a23a38b1f337f0e6bd83d944f48d0451a1510e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
