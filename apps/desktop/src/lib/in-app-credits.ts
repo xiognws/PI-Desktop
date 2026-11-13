@@ -151,16 +151,43 @@ function subscribeSurfaces(listener: () => void): () => void {
   return () => surfaceListeners.delete(listener);
 }
 
+/** A gateway registers its provider row a few seconds after launch. */
+const SURFACE_RETRY_MS = 3_000;
+const SURFACE_RETRY_LIMIT = 12;
+let surfaceRetries = 0;
+let surfaceRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleSurfaceRetry(): void {
+  if (surfaceRetryTimer !== null || surfaceRetries >= SURFACE_RETRY_LIMIT) return;
+  surfaceRetries += 1;
+  surfaceRetryTimer = setTimeout(() => {
+    surfaceRetryTimer = null;
+    loadSurfaces(true);
+  }, SURFACE_RETRY_MS);
+}
+
 function loadSurfaces(force: boolean): void {
   if (!force && surfaces) return;
   if (surfacesInflight) return;
   surfacesInflight = api
     .inAppProviders()
     .then((response) => response.providers ?? [])
-    .catch(() => [] as InAppProviderSurface[])
+    .catch(() => null)
     .then((providers) => {
+      if (providers === null) {
+        // A failed read is not an answer: keep whatever we had and try again.
+        scheduleSurfaceRetry();
+        return [] as InAppProviderSurface[];
+      }
       surfaces = providers;
       for (const listener of surfaceListeners) listener();
+      // `providerId` is null until the gateway has registered its row, so an
+      // early read is not the final answer either.
+      if (providers.some((provider) => provider.providerId === null)) {
+        scheduleSurfaceRetry();
+      } else {
+        surfaceRetries = 0;
+      }
       return providers;
     })
     .finally(() => {
