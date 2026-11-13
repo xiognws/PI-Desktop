@@ -1284,7 +1284,12 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 
 - `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
 - `skills.active({ projectPath? })` → 当前项目的有效运行时列表
-- `skills.create(skill)`
+- `skills.create(skill)` —— `skill.description` 就是系统提示里技能目录展示的那一行，
+  每一轮都要为它付 token，因此超过 **60 字符** 的描述会被以 `SKILL_INVALID`
+  （错误码 1016）拒绝，而不是被截断：拒绝信息会给出上限，并说明目录正是从这里截断。
+  `skills.update` 传入的描述同样受此限制。`skills.update` **未传**描述时保留文档
+  原有内容，因此从导入或旧版本带来的超长描述仍然可以被打补丁；`skills.import` 完全
+  不受此限制（第三方包的 frontmatter 不是调用方该改写的东西）。
 - `skills.import({ path, level, projectPath? })` — 将一个源文件物理复制到选定的
   `.agents/skills` 目录
 - `skills.update({ id, ...skill })`

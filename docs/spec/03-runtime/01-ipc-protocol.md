@@ -1665,7 +1665,16 @@ are intact (ADR 0395).
   rather than failing the call, so one broken document cannot hide the archive;
   archived rows report `enabled: false`, which is what "out of the catalog" means.
 - `skills.active({ projectPath? })` → the effective runtime list
-- `skills.create(skill)` — writes one skill document. `skill.createdBy` is
+- `skills.create(skill)` — writes one skill document. `skill.description` is the
+  line the system-prompt catalog shows and is paid for on every turn, so a
+  description longer than **60 characters** is refused with `SKILL_INVALID`
+  (code 1016) rather than clipped: the refusal names the limit and says the
+  catalog truncates there. The same limit applies to a description supplied to
+  `skills.update`. An *absent* description on `skills.update` keeps whatever the
+  document already says, so a skill carrying a longer description from an
+  import or an older release stays patchable; `skills.import` is not held to the
+  limit at all (a third-party package's frontmatter is not the author's to
+  rewrite). `skill.createdBy` is
   `"agent"` when the agent wrote it (`skill_manage` always sends it); the host
   records that as an origin in `<data>/agent-capabilities/skill-origins.json` and
   it is what lets the maintenance pass manage the document at all (ADR 0394).

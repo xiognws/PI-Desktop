@@ -565,3 +565,115 @@ fn absorb_refuses_itself_and_cross_scope_merges() {
         assert!(cross.contains("across scopes"), "{cross}");
     });
 }
+
+/// A description past the width the catalog renders, as one written before the
+/// limit existed or imported from a package that never heard of it.
+fn too_long_description() -> String {
+    "Use when a deployment must be repeated across every environment. x".to_string()
+}
+
+#[test]
+fn create_refuses_a_description_the_catalog_would_truncate() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        let mut payload = input("Deploy", "global", None);
+        let long = too_long_description();
+        assert!(
+            long.chars().count() > 60,
+            "fixture must exceed the catalog width: {}",
+            long.chars().count()
+        );
+        payload.description = Some(long.clone());
+
+        let error = registry.create(payload).unwrap_err().to_string();
+        assert!(error.contains("SKILL_INVALID"), "{error}");
+        assert!(
+            error.contains("60 characters"),
+            "the refusal must name the limit: {error}"
+        );
+        assert!(
+            error.contains("truncated"),
+            "and why it exists: the catalog cuts there: {error}"
+        );
+        // Refused, not clipped: nothing was written under a shortened version.
+        assert!(registry
+            .list(CapabilityLevel::Global, None)
+            .unwrap()
+            .is_empty());
+    });
+}
+
+#[test]
+fn create_accepts_a_description_of_exactly_the_catalog_width() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        let mut registry = UserSkillRegistry::new(app.path());
+        // 60 characters: the last width the catalog renders in full.
+        let exact = "Use when a deployment must be repeated across envs. 12345678";
+        assert_eq!(exact.chars().count(), 60, "fixture is exactly the limit");
+        let mut payload = input("Deploy", "global", None);
+        payload.description = Some(exact.into());
+
+        let record = registry.create(payload).unwrap();
+        assert_eq!(record.description.as_deref(), Some(exact));
+    });
+}
+
+#[test]
+fn update_refuses_a_long_description_but_leaves_a_legacy_one_patchable() {
+    let home = tempdir().unwrap();
+    let app = tempdir().unwrap();
+    test_support::with_global_agents(home.path(), || {
+        // A document that predates the rule — imported from a third-party
+        // package, or written when any length was accepted.
+        let legacy = too_long_description();
+        let directory = home.path().join("skills");
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(
+            directory.join("legacy.md"),
+            format!("---\nname: Legacy\ndescription: {legacy}\n---\n\nOld body.\n"),
+        )
+        .unwrap();
+
+        let mut registry = UserSkillRegistry::new(app.path());
+        let before = registry
+            .list(CapabilityLevel::Global, None)
+            .unwrap()
+            .into_iter()
+            .find(|record| record.id == "legacy")
+            .expect("the scan picks up the document");
+        assert_eq!(before.description.as_deref(), Some(legacy.as_str()));
+
+        // A patch that does not mention the description is not the description's
+        // business, so it still goes through.
+        let patch = UserSkillInput {
+            level: Some("global".into()),
+            body: Some("New body.\n".into()),
+            ..Default::default()
+        };
+        let updated = registry
+            .update("legacy", patch)
+            .unwrap()
+            .expect("the skill is still there");
+        assert_eq!(
+            updated.description.as_deref(),
+            Some(legacy.as_str()),
+            "an untouched description is carried over verbatim, not clipped"
+        );
+        let (_, body) = registry.read("legacy", None, None).unwrap().unwrap();
+        assert_eq!(body.trim(), "New body.");
+
+        // Supplying a replacement is a description write, and is held to the cap.
+        let replace = UserSkillInput {
+            level: Some("global".into()),
+            description: Some(too_long_description()),
+            ..Default::default()
+        };
+        let error = registry.update("legacy", replace).unwrap_err().to_string();
+        assert!(error.contains("SKILL_INVALID"), "{error}");
+        assert!(error.contains("60 characters"), "{error}");
+    });
+}

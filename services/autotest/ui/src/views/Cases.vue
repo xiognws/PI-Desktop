@@ -539,6 +539,9 @@ watch(viewMode, (val) => {
             共 {{ cases.length }} 条<template v-if="activeFilterCount">（筛选后 {{ visibleCases.length }} 条）</template>
           </span>
           <span v-if="selectedIds.length > 0" class="text-sm text-blue-600">已选 {{ selectedIds.length }} 条</span>
+          <span class="text-xs text-gray-400" title="写用例的依据来自「知识库」：先把项目资料分解入库，Agent 检索到的就是那些原文">
+            依据「知识库」中已入库的项目资料
+          </span>
         </div>
         <div class="flex items-center gap-2">
           <!-- 视图切换 -->

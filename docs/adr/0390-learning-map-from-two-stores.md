@@ -6,6 +6,13 @@ Amended: the map still draws skills and memories together, but its memory half n
 reads `memory.list` — the flat entry store this ADR read through `memory.entries`
 was retired and its table dropped (ADR 0393, schema v31). See
 [0393](0393-structured-memory-is-the-store.md).
+Amended: nodes are activatable. A node opens a card beside the map that says what
+it is — a skill's description, level, load count and pin state, or a memory's kind,
+title, body and recall count — and that card can remove the one record behind it,
+through the call the owning list already makes (`skills.remove` for a document,
+`memory.forget` for an entry) after a two-click arm. Resolving a node back to its
+record stays pure (`learningNodeDetail`), so the picture's rules are still tested
+without a DOM.
 
 ## Context
 
@@ -47,13 +54,18 @@ entirely in the renderer from data the app already holds.
 
 ## Consequences
 
-- The map is a summary, not an inspector: nodes are not clickable in this version,
-  and the labels are truncated. Detail stays in the two lists below it.
+- The map is a picture and an index: a node is focusable, says whether it is open,
+  and opens a card with what it is; the labels are still truncated. The card can
+  remove the record behind it and nothing else — no editing, no merging, no second
+  write path. What it removes is what the owning list removes, so a skill leaves
+  through `skills.remove` rather than the archive move the maintenance pass uses.
 - Token overlap is a heuristic. Two unrelated skills that share a domain word
   ("windows") will be linked; a genuinely related pair that words things
   differently will not. The threshold is a single constant with a test, so
   judgement can be adjusted without touching the component.
 - Reading memory entries is best-effort: if the host call fails, the card draws
   the skills alone instead of failing the page.
-- Nothing here writes. The map adds no state, no RPC beyond the read-only
-  `memory.entries`, and no migration.
+- A drawn id carries the record id only, so a global and a project skill with the
+  same slug collapse onto one node, and the card resolves it to the global
+  document. The picture was already combining them; the removal makes the
+  ambiguity visible rather than introducing it.

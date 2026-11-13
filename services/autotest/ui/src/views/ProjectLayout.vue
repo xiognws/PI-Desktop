@@ -179,7 +179,7 @@ function backToHome() {
             { path: 'approvals', name: '待审批' },
             { path: 'bugs', name: '缺陷' },
             { path: 'knowledge', name: '知识库' },
-            { path: 'requirements', name: '需求' },
+            { path: 'requirements', name: '项目资料' },
             { path: 'cases', name: '用例' },
             { path: 'scripts', name: '脚本' },
             { path: 'reports', name: '报告' },
