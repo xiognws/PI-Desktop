@@ -116,6 +116,35 @@ def _persist_designed_cases(conn: sqlite3.Connection, module: str, cases: list[d
     return ids
 
 
+def _drop_stale_ungrounded(
+    conn: sqlite3.Connection, module: str, keep_titles: set[str]
+) -> int:
+    """删掉「因为没依据被跳过」而留在库里的旧用例。
+
+    只动 evidence 里 grounding=none 的行：有依据的用例、人工写的用例都不碰。
+    """
+    removed = 0
+    rows = conn.execute(
+        "SELECT id, title, evidence FROM test_cases WHERE COALESCE(module_id, '') = ?",
+        (module,),
+    ).fetchall()
+    for row in rows:
+        title = str(row["title"])
+        if title in keep_titles:
+            continue
+        raw = row["evidence"]
+        if not raw:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(parsed, dict) and parsed.get("grounding") == "none":
+            conn.execute("DELETE FROM test_cases WHERE id = ?", (row["id"],))
+            removed += 1
+    return removed
+
+
 def _case_evidence_text(case: dict) -> str:
     """用例的依据落库：JSON（doc/quote/numbers + grounding 等级）。
 
@@ -231,6 +260,8 @@ class CaseDesignIn(BaseModel):
     types: list[str] | None = None
     template: str = "standard"
     prd_result: dict | None = None
+    # 没有知识库依据的用例默认不生成（只进"待补资料"清单）；需要占位时显式传 false。
+    skip_ungrounded: bool = True
 
 
 class CaseReviewIn(BaseModel):
@@ -351,11 +382,21 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         # 不给原因的话，界面只能含糊地说"去入库吧"，用户根本不知道该补什么。
         reasons = grounding.diagnose(conn, project_id, function_points)
         result = case_service.design_cases(
-            prd_result, body.types, body.template, evidence=evidence, reasons=reasons
+            prd_result,
+            body.types,
+            body.template,
+            evidence=evidence,
+            reasons=reasons,
+            skip_ungrounded=body.skip_ungrounded,
         )
         # 设计的用例要落进项目的 test_cases：用例页、执行状态回写、脚本关联都读那张
         # 表。只把它留在 workflow_steps 的 payload 里，界面上就永远是「0 条用例」。
-        case_ids = _persist_designed_cases(conn, str(run.get("module") or ""), result["cases"])
+        module = str(run.get("module") or "")
+        case_ids = _persist_designed_cases(conn, module, result["cases"])
+        # 之前生成过、这次因为"没依据"被跳过的空壳要从用例库里清掉，
+        # 否则它们会一直挂在列表里，看着像已经覆盖了那个功能点。
+        removed = _drop_stale_ungrounded(conn, module, set(case_ids))
+        result["stats"]["removed_stale"] = removed
         result["case_ids"] = case_ids
         store.append_step(
             conn,
@@ -365,8 +406,12 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
             summary=(
                 f"生成 {result['stats']['total']} 条用例"
                 f"（有依据 {result['stats']['grounding']['strong']} 条"
-                f"，仅条款 {result['stats']['grounding']['weak']} 条"
-                f"，无依据 {result['stats']['grounding']['none']} 条）"
+                f"，仅条款 {result['stats']['grounding']['weak']} 条）"
+                + (
+                    f"，跳过 {result['stats']['skipped']} 条无依据用例待补资料"
+                    if result["stats"].get("skipped")
+                    else ""
+                )
             ),
             payload=result,
         )
@@ -379,6 +424,9 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         "by_type": result["stats"]["by_type"],
         "grounding": result["stats"]["grounding"],
         "reasons": result["stats"].get("reasons") or {},
+        "uncovered": result["stats"].get("uncovered") or [],
+        "skipped": result["stats"].get("skipped") or 0,
+        "removed_stale": result["stats"].get("removed_stale") or 0,
         "preview": result["cases"][:5],
         "stats": result["stats"],
         "stage": run.get("stage"),

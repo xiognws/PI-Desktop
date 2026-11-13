@@ -54,6 +54,14 @@ def _start_run(client) -> tuple[str, str]:
     parsed = client.post(
         f"/api/projects/{project_id}/workflow/prd-parse", json={"text": SAMPLE, "module": "座舱"}
     ).json()
+    # 无依据的用例不再生成，先让知识库里有这条需求原文
+    client.post(
+        f"/api/projects/{project_id}/knowledge/documents/text",
+        json={
+            "title": "座舱 HMI 需求.docx",
+            "content": "主页应展示导航、音乐、电话三个卡片。",
+        },
+    )
     return project_id, parsed["data"]["run_id"]
 
 

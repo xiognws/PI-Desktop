@@ -170,13 +170,14 @@ def _grounded_case(
     }
 
 
-def _reason_counts(cases: list[dict]) -> dict[str, int]:
-    """按"为什么没依据"分组计数，报告与界面据此提示该补什么。"""
+def _reason_counts(
+    uncovered: dict[str, dict], reasons: dict[str, str] | None = None
+) -> dict[str, int]:
+    """按"为什么没依据"分组计数（按被跳过的用例条数），界面据此提示该补什么。"""
     counts: dict[str, int] = {}
-    for case in cases:
-        if case.get("grounding") == "none":
-            key = str(case.get("basis_reason") or "no_clause")
-            counts[key] = counts.get(key, 0) + 1
+    for name, entry in uncovered.items():
+        key = str(entry.get("reason") or (reasons or {}).get(name) or "no_clause")
+        counts[key] = counts.get(key, 0) + len(entry.get("case_types") or ["功能"])
     return counts
 
 
@@ -186,6 +187,7 @@ def design_cases(
     template: str = "standard",
     evidence: dict[str, list[dict]] | None = None,
     reasons: dict[str, str] | None = None,
+    skip_ungrounded: bool = True,
 ) -> dict:
     """按功能点 × 测试类型生成用例。
 
@@ -193,6 +195,9 @@ def design_cases(
     具体步骤，否则退回模板并把 grounding 标成 weak / none。
     `reasons`：功能点名 → 为什么没有依据（grounding.diagnose 的结论），
     会跟着用例落库，界面上能直接说"资料这一节没正文"而不是让人猜。
+    `skip_ungrounded`：没有依据时**不生成**这条用例，只把它记进待补资料清单
+    （默认如此）。生成一堆"进入 X 入口执行正常操作"的空壳，只会让用例库变成
+    噪音，也让人误以为已经覆盖了这个功能点。
     `template` 目前只接受 "standard"；保留参数是为了后续加"精简/详细"两档时
     不动调用方签名。
     """
@@ -203,6 +208,7 @@ def design_cases(
 
     cases: list[dict] = []
     levels = {"strong": 0, "weak": 0, "none": 0}
+    uncovered: dict[str, dict] = {}
 
     for point in function_points:
         name = str(point.get("name") or "").strip()
@@ -222,6 +228,19 @@ def design_cases(
                 expected = grounded["expected"]
             else:
                 level = "weak" if point_evidence else "none"
+                if level == "none" and skip_ungrounded:
+                    reason_key = reason_map.get(name) or "no_clause"
+                    levels["none"] += 1
+                    entry = uncovered.setdefault(
+                        name,
+                        {
+                            "function_point": name,
+                            "reason": reason_key,
+                            "case_types": [],
+                        },
+                    )
+                    entry["case_types"].append(case_type)
+                    continue
                 precondition = f"“{name}”对应功能已可用，测试环境就绪"
                 steps = [str(step).format(name=name) for step in spec["steps"]]
                 expected = [str(item).format(name=name) for item in spec["expected"]]
@@ -270,6 +289,9 @@ def design_cases(
             "types": chosen_types,
             "template": template,
             "grounding": levels,
-            "reasons": _reason_counts(cases),
+            "reasons": _reason_counts(uncovered, reasons=reason_map),
+            "skipped": sum(len(item["case_types"]) for item in uncovered.values()),
+            "uncovered": list(uncovered.values()),
+            "generate_all": not skip_ungrounded,
         },
     }

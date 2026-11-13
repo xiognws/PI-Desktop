@@ -96,13 +96,26 @@ def test_grounded_cases_carry_the_real_threshold():
     assert "超出原文阈值 120A" in joined
 
 
-def test_cases_without_evidence_stay_templated_and_say_so():
-    result = case_service.design_cases({"function_points": [{"name": "冷门功能"}]}, types=["功能"])
+def test_cases_without_evidence_are_skipped_not_templated():
+    """没有依据的用例不再生成空壳，只进"待补资料"清单。"""
+    result = case_service.design_cases(
+        {"function_points": [{"name": "冷门功能"}]}, types=["功能", "异常"]
+    )
+    assert result["cases"] == []
+    assert result["stats"]["total"] == 0
+    assert result["stats"]["skipped"] == 2
+    assert result["stats"]["uncovered"][0]["function_point"] == "冷门功能"
+    assert result["stats"]["uncovered"][0]["case_types"] == ["功能", "异常"]
+
+
+def test_explicit_generate_all_keeps_the_old_templated_behaviour():
+    """需要占位时可以显式关掉跳过（skip_ungrounded=False），行为回到模板。"""
+    result = case_service.design_cases(
+        {"function_points": [{"name": "冷门功能"}]}, types=["功能"], skip_ungrounded=False
+    )
     case = result["cases"][0]
     assert case["grounding"] == "none"
-    assert case["evidence"] is None
     assert "进入“冷门功能”入口" in case["steps"][0]
-    assert result["stats"]["grounding"]["none"] == 1
 
 
 # ------------------------------------------------------------- 端到端 ----
@@ -148,13 +161,17 @@ def test_case_design_pulls_evidence_from_the_knowledge_base(client):
     assert stored["evidence"]["quote"]
 
 
-def test_case_design_without_knowledge_reports_no_basis(client):
+def test_case_design_without_knowledge_generates_nothing_and_lists_gaps(client):
+    """知识库为空时不再生成模板空壳：0 条用例 + 待补资料清单。"""
     project_id, run_id = _start_run(client)
     designed = client.post(
         f"/api/projects/{project_id}/workflow/case-design", json={"run_id": run_id}
     ).json()
-    assert designed["data"]["grounding"]["none"] >= 1
-    assert designed["data"]["grounding"]["strong"] == 0
+    assert designed["data"]["case_total"] == 0
+    assert designed["data"]["skipped"] >= 1
+    assert designed["data"]["uncovered"], designed
+    assert designed["data"]["uncovered"][0]["reason"] in {"no_hit", "empty_source", "no_clause"}
+    assert client.get(f"/api/projects/{project_id}/cases").json()["total"] == 0
 
 
 def test_figure_caption_is_not_read_as_a_threshold():
@@ -205,18 +222,28 @@ def test_ungrounded_cases_report_why(client):
     designed = client.post(
         f"/api/projects/{project_id}/workflow/case-design", json={"run_id": run_id}
     ).json()
-    assert designed["data"]["grounding"]["none"] >= 1
-    assert designed["data"]["reasons"].get("no_hit", 0) >= 1
+    entry = designed["data"]["uncovered"][0]
+    assert entry["function_point"] == "陌生功能"
+    assert entry["reason"] in {"no_hit", "no_clause", "empty_source"}
+    assert designed["data"]["reasons"].get(entry["reason"], 0) >= 1
 
-    conn = sqlite3.connect(server.get_project_db(project_id))
-    conn.row_factory = sqlite3.Row
-    row = conn.execute(
-        "SELECT evidence FROM test_cases WHERE COALESCE(evidence, '') != '' LIMIT 1"
-    ).fetchone()
-    conn.close()
-    stored = json.loads(row["evidence"])
-    assert stored["grounding"] == "none"
-    assert stored["reason"] in {"no_hit", "no_clause", "empty_source"}
+
+def test_stale_ungrounded_cases_are_removed_when_they_get_skipped(client):
+    """先按占位模式生成过、后来又因为没依据被跳过：旧空壳要从用例库清掉。"""
+    project_id, run_id = _project_with_points(client, ["陌生功能"])
+
+    placeholder = client.post(
+        f"/api/projects/{project_id}/workflow/case-design",
+        json={"run_id": run_id, "skip_ungrounded": False},
+    ).json()
+    assert placeholder["data"]["case_total"] >= 1
+
+    skipped = client.post(
+        f"/api/projects/{project_id}/workflow/case-design", json={"run_id": run_id}
+    ).json()
+    assert skipped["data"]["case_total"] == 0
+    assert skipped["data"]["removed_stale"] >= 1
+    assert client.get(f"/api/projects/{project_id}/cases").json()["total"] == 0
 
 
 def test_empty_chunk_is_reported_as_empty_source(client):

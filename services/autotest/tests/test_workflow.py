@@ -91,7 +91,10 @@ def test_design_cases_shape_and_limit():
             {"name": f"功能{i}", "priority": "中"} for i in range(60)
         ]
     }
-    result = case_service.design_cases(prd_result, ["功能", "异常", "边界"])
+    # 这两个用例测的是模板生成本身（没有知识库依据），所以显式关掉"跳过无依据"
+    result = case_service.design_cases(
+        prd_result, ["功能", "异常", "边界"], skip_ungrounded=False
+    )
     assert result["stats"]["total"] <= 200
     assert result["stats"]["by_type"] == {"功能": 60, "异常": 60, "边界": 60}
     case = result["cases"][0]
@@ -101,7 +104,9 @@ def test_design_cases_shape_and_limit():
 
 
 def test_design_cases_defaults_to_functional_and_negative():
-    result = case_service.design_cases({"function_points": [{"name": "登录", "priority": "高"}]})
+    result = case_service.design_cases(
+        {"function_points": [{"name": "登录", "priority": "高"}]}, skip_ungrounded=False
+    )
     assert [case["case_type"] for case in result["cases"]] == ["功能", "异常"]
 
 
@@ -129,6 +134,18 @@ def test_api_prd_parse_then_case_design(client):
     assert body["ok"] is True
     assert body["data"]["function_point_total"] == 4
     run_id = body["data"]["run_id"]
+
+    # 无依据的用例现在不生成，所以先让知识库里有这几条需求原文
+    client.post(
+        f"/api/projects/{project['id']}/knowledge/documents/text",
+        json={
+            "title": "深蓝S7 座舱HMI 需求.docx",
+            "content": """主页应展示导航、音乐、电话三个卡片。
+支持语音唤醒，唤醒词必须可配置。
+空调面板应支持双区温度独立调节。
+禁止在行车中打开视频应用。""",
+        },
+    )
 
     designed = client.post(
         f"/api/projects/{project['id']}/workflow/case-design",

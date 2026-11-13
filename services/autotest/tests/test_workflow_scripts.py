@@ -113,6 +113,15 @@ def test_script_author_and_log_analyze_over_http(client, tmp_path):
 
     parsed = client.post(f"/api/projects/{project_id}/workflow/prd-parse", json={"text": SAMPLE, "module": "座舱"}).json()
     run_id = parsed["data"]["run_id"]
+    # 无依据的用例不再生成，先让知识库里有这两条需求原文
+    client.post(
+        f"/api/projects/{project_id}/knowledge/documents/text",
+        json={
+            "title": "座舱 HMI 需求.docx",
+            "content": """主页应展示导航、音乐、电话三个卡片。
+支持语音唤醒，唤醒词必须可配置。""",
+        },
+    )
     client.post(f"/api/projects/{project_id}/workflow/case-design", json={"run_id": run_id, "types": ["功能"]})
 
     authored = client.post(f"/api/projects/{project_id}/workflow/script-author", json={"run_id": run_id}).json()
@@ -146,6 +155,15 @@ def test_case_design_lands_in_the_case_table_and_scripts_link_to_it(client):
             f"/api/projects/{project_id}/workflow/prd-parse",
             json={"text": SAMPLE, "module": "座舱"},
         ).json()["data"]["run_id"]
+    )
+
+    client.post(
+        f"/api/projects/{project_id}/knowledge/documents/text",
+        json={
+            "title": "座舱 HMI 需求.docx",
+            "content": """主页应展示导航、音乐、电话三个卡片。
+支持语音唤醒，唤醒词必须可配置。""",
+        },
     )
 
     designed = client.post(

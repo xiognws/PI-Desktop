@@ -50,8 +50,16 @@ const scriptCount = ref(0)
 const reference = ref('')
 
 const busy = ref('')
+// ③ 跳过哪些用例、为什么：这是"待补资料"清单，随设计结果一起显示。
+const designGaps = ref<{ function_point: string; reason: string; case_types: string[] }[]>([])
 const message = ref('')
 const error = ref('')
+
+const GAP_REASONS: Record<string, string> = {
+  no_hit: '知识库没提到这个功能点，需要补一份对应资料',
+  empty_source: '资料这一节只有标题、没有正文（多为表格/图片），要补原文',
+  no_clause: '命中的条款没有可判定内容（没有阈值，也没有"应/必须"）',
+}
 
 const STEPS = [
   { key: 'ingest', title: '① 资料入库', hint: '把上传的项目资料切分进知识库', to: 'requirements', tool: '' },
@@ -204,6 +212,7 @@ async function runStage(key: string) {
         method: 'POST',
         body: JSON.stringify({ run_id: runId.value }),
       })
+      designGaps.value = body.data?.uncovered || []
       message.value = body.summary || '用例已生成'
     } else if (key === 'review') {
       const body = await api('/workflow/case-review', {
@@ -340,6 +349,15 @@ onMounted(refresh)
             </div>
             <div v-if="step.key === 'design'" class="text-xs text-muted mt-1">
               用例库共 <span class="text-fg">{{ caseCount }}</span> 条
+            </div>
+            <div v-if="step.key === 'design' && designGaps.length" class="mt-2 text-xs">
+              <div class="text-warn mb-1">待补资料（这些功能点没有原文依据，未生成用例）：</div>
+              <ul class="space-y-0.5">
+                <li v-for="gap in designGaps" :key="gap.function_point" class="text-muted">
+                  · <span class="text-fg-2">{{ gap.function_point }}</span>
+                  <span class="text-muted-2">（{{ GAP_REASONS[gap.reason] || gap.reason }}）</span>
+                </li>
+              </ul>
             </div>
             <div v-if="step.key === 'author'" class="text-xs text-muted mt-1">
               脚本库共 <span class="text-fg">{{ scriptCount }}</span> 个
