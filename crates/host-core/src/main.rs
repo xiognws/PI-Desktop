@@ -12,6 +12,7 @@ mod file_resources;
 mod keyboard;
 mod mcp_servers;
 mod memory;
+mod mode_runs;
 mod network_policy;
 mod network_proxy;
 mod notifications;

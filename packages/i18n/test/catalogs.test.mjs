@@ -110,50 +110,70 @@ test("creation-phase delegation copy is catalog-backed", () => {
 test("settings rail labels stay concise and parallel across locales", () => {
   const chinese = flattenCatalog(zhCN);
   const keys = [
-    "general",
-    "ai",
+    "appearance",
+    "chat",
     "shortcuts",
-    "instructions",
+    "behavior",
     "models",
+    "instructions",
     "skills",
     "mcp",
     "subagents",
+    "modes",
+    "memory",
     "projects",
+    "system",
     "info",
   ].map((key) => `settings.nav.${key}`);
 
   assert.deepEqual(
     keys.map((key) => english[key]),
     [
-      "General",
-      "AI",
+      "Appearance",
+      "Conversation",
       "Shortcuts",
-      "Instructions",
+      "Behavior",
       "Models",
+      "Instructions",
       "Skills",
       "MCP",
       "Subagents",
+      "Modes",
+      "Memory",
       "Projects",
+      "System",
       "Info",
     ],
   );
   assert.deepEqual(
     keys.map((key) => chinese[key]),
     [
-      "常规",
-      "AI",
+      "外观",
+      "对话",
       "快捷键",
-      "指令",
+      "行为",
       "模型",
+      "指令",
       "技能",
       "MCP",
       "子智能体",
+      "模式",
+      "记忆",
       "项目",
+      "系统",
       "信息",
     ],
   );
-  assert.equal(english["settings.nav.import"], undefined);
-  assert.equal(chinese["settings.nav.import"], undefined);
+  for (const [id, catalog] of Object.entries(catalogs)) {
+    const flat = flattenCatalog(catalog);
+    for (const key of keys) {
+      assert.equal(typeof flat[key], "string", `${id} ${key}`);
+      assert.ok(flat[key].trim(), `${id} ${key} must not be blank`);
+    }
+    for (const retired of ["general", "ai", "import"]) {
+      assert.equal(flat[`settings.nav.${retired}`], undefined, `${id} ${retired}`);
+    }
+  }
   assert.equal(english["settings.import"], undefined);
   assert.equal(chinese["settings.import"], undefined);
   assert.equal(english["settings.groupPreferences"], "Preferences");

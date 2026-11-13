@@ -1,4 +1,4 @@
-# 04. 数据存储（架构 v28）
+# 04. 数据存储（架构 v33）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -272,9 +272,10 @@ CREATE TABLE kv (
 
 #### Renderer 侧边栏首选项 (D093)
 
-侧边栏组织是非权威的呈现状态存储
-渲染器 localStorage 键下的尽力而为
-`pi.desktop.sidebarPreferences`：
+Sidebar organization remains non-authoritative presentation state. Main keeps
+an atomic `sidebar-preferences.json` backup in the selected app data root;
+`pi.desktop.sidebarPreferences` in renderer localStorage supplies first paint.
+See [sidebar layout recovery](/adr/sidebar-layout-recovery).
 
 ```ts
 type SidebarPreferences = {
@@ -304,9 +305,16 @@ type SidebarPreferences = {
   拖动项目标题或在该标题上使用键盘箭头会为可见的规范化路径写入连续顺序值。
   缺失或无效值回落到稳定路径顺序；置顶和归档优先级仍在手动顺序之前应用。
   会话 `manual`/`order` 仍是兼容性字段，侧边栏不会公开会话手动重排。
-- 缺失、格式错误或不可写的首选项回退到空元数据，
-  `recent`，存档隐藏，以及主机选择的项目。偏好失败
-  永远不会阻止主机操作。
+- Restore the application backup before bootstrap persists the selected Project.
+  Without a backup, migrate a valid legacy cache, including an explicitly empty
+  tab list. Only if neither copy is valid, recover registered Projects from
+  `projects.list`. Existing valid layouts never reopen intentionally closed tabs.
+- An unreadable backup must not be replaced with empty startup state; a failed
+  catalog read must not persist an empty recovery result. Writes are limited to
+  2 MiB, flushed and atomically renamed through dedicated trusted-Main-frame IPC.
+  Project/Session/Workspace authority remains with Rust. Offline storage
+  relocation remaps internal retained paths and Project metadata keys while
+  preserving external Projects and display labels.
 - 记录从不包含转录内容、工具参数、提供商
   配置或秘密。清除它仅更改显示。
 - `openProjectPaths` 保留侧边栏选项卡。选定的工作空间仍然存在
@@ -1234,7 +1242,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 - JSON 列在热路径上盲读（按原样发送到渲染器）；
   任何过滤或求和的内容都是按规则提升的列。
 
-## 7. 版本控制、v7 重置和 v8 到 v28 迁移
+## 7. 版本控制、v7 重置和 v8 到 v33 迁移
 
 - `PRAGMA user_version` 保留模式权限；未来的结构性变化
   再次添加有序的 Rust 迁移 fns，每个都在一个事务中，并带有一个
@@ -1245,7 +1253,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   旧文件中的会话、提供程序和设置不会保留；
   存档仍保留以供手动恢复。所有 v7 之前的迁移代码
   （v1 `settings.sqlite` 导入，v2→v6 链）被删除。
-- 全新安装直接运行完整的 v28 DDL。
+- 全新安装直接运行完整的 v33 DDL。
 - **架构 v15 是增量的。** 它增加 `turn_queue` 表及其两个索引（D386 / ADR 0213），使 Host
   拥有的回合队列在重启后存活；不改动任何已有行，迁移前保留 `pi.sqlite.v14.bak`。
 - **架构 v16 是增量的。** 它增加会话协作 link 和投递表、生命周期索引，以及可为空的
@@ -1267,10 +1275,23 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 - **架构 v27 是增量的。** 它增加 `sessions.fast_mode`（ADR 0334），即会话的 `/fast`
   开关，所有已有会话默认为 `0`。fork 会复制该值；定时任务运行和委托子会话从 `0` 开始。
   迁移前保留 v26 备份。
-- **架构 v28 是增量的。** 它增加持久化记忆库（ADR 0371）：`memories` 表、其 FTS5
+- **架构 v28 合并项目路径。** 它把原生文件系统解析认定为同一本地目录的大小写/
+  分隔符写法合并（见上文项目路径一节）。迁移前保留 v27 备份。
+- **架构 v29 是增量的。** 它增加分级模式运行（ADR `mode-definitions`）：
+  `mode_snapshots`、`mode_runs`、`mode_gate_results` 与
+  `sessions.mode_snapshot_hash`。迁移前保留 v28 备份。
+- **架构 v30 是增量的。** 它增加持久化记忆库（ADR 0371）：`memories` 表、其 FTS5
   关键词索引，以及支撑召回、列表和固定的索引。它同时重新确认
   `sessions.fast_mode`：合并前记忆分支盖下的 27 号库带着记忆表却没有该列，两种
-  形态在此收敛。迁移前保留 v27 备份。
+  形态在此收敛。迁移前保留 v29 备份。该步号是 v30 而非最初发布的 v28：上游占用了
+  v28 与 v29 而 fork 持有 v28..31，fork 自己的步号让位，上游号不动。
+- **架构 v31 修复已存回复文本。** 它剥掉严格中继在回复正文里回显的
+  `<thinking>` 占位符（ADR 0378，#1945）。因为会改写行，迁移前保留 v30 备份。
+- **架构 v32 用 `trigram` 分词器重建记忆关键词索引**，让召回能命中中文子串而不只是
+  完整短语。只读取 `memories`。迁移前保留 v31 备份。
+- **架构 v33 退役扁平记忆条目表**（ADR 0393）：条目在同一事务内导入 `memories` 并
+  删除 `memory_entries`，迁移前保留 v32 备份。版本号不代表形态，因此每次打开都会
+  先收敛 fast_mode 列、模式运行表与项目路径写法，再提供服务。
 - **架构 v7 首先到达 v8，然后使用受保护的路径。** v7→v8
   迁移之后是相同的受保护的 v8→v15 迁移；架构-v9 和
   schema-v10 数据库采用相同的受保护路径并接收精确的可读数据
@@ -1512,3 +1533,24 @@ can poll a freshly created session. It exists because a client cannot derive the
 number from a transcript it renders: that window is bounded, and the total is
 defined as the whole session. Turns the user deleted are deleted with their rows,
 which is what the ledger itself reports.
+### 末尾压缩检查点读取（#2163）
+
+有界末尾页包含最后一条消息之后追加的压缩记录，重新打开或重启后立即返回
+最新检查点和上下文估算。历史中间页只保留生效的检查点及页内记录，不读取全链。
+
+
+## User-defined mode runs (schema 29)
+
+ADR `mode-definitions` adds one v28-to-v29 migration. It backs up the existing
+database before adding `mode_snapshots`, `mode_runs`, `mode_gate_results` and
+`sessions.mode_snapshot_hash`. Existing sessions and Plan approvals are retained.
+Mode ids remain in `sessions.mode`; `chat` still normalizes to `plan`.
+
+A run references an immutable definition snapshot, its current stage, revision,
+claim, permission origin, budgets, token usage and completed-round count.
+Gate results record the stage, action, outcome and bounded evidence. At most
+one open run exists per session. Restart clears in-flight claims and pauses
+those runs without replaying work. Deleting a session cascades its run records.
+
+Host-started turns evaluate Auto as Accept edits. A run's original snapshot
+remains authoritative even when its source file changes.

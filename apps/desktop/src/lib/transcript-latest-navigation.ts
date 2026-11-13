@@ -153,6 +153,9 @@ export function createTranscriptLatestNavigation(port: ScrollPort) {
   };
   return {
     start, cancel, landed, settle,
+    // Upstream's newer call sites ask whether a trip owns the viewport at all;
+    // a trip exists exactly while `current` is set, whatever its phase is.
+    isActive: () => current !== undefined,
     // A completed trip must not keep scrollToBottom blocked: the reveal that
     // follows a pane hide lands on the newest turn instead of a stale offset.
     phase: () => phase,

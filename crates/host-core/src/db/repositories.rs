@@ -147,6 +147,7 @@ impl Database {
                 tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
                 tx.execute_batch(crate::session_collaboration::SCHEMA)?;
                 tx.execute_batch(WORKTREE_DDL)?;
+                tx.execute_batch(super::MODE_RUNS_SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
             }
@@ -215,19 +216,18 @@ impl Database {
             }
             // Versions whose steps live in the chained `if migrated_version ==`
             // pass below. They must not fall through to `other`, which reports a
-            // *newer* database: a v26/v27/v28 file is older and upgradable, and
-            // silently refusing it would lock a user out of their transcript.
+            // *newer* database: an older, upgradable file would be refused and
+            // the user locked out of their transcript.
             //
             // v26 is the lossless tool-image envelope, a version stamp with no
             // table changes. A database can also already sit at 26 because the
             // memory branch stamped it there before the two lines merged, which
-            // is equivalent: MEMORIES_DDL is IF NOT EXISTS, so the migration
-            // chain below is safe for either flavour. v27 is the session Fast
-            // mode switch, or the memory store when the file came from a
-            // pre-merge memory build; v28 converges both. v29 is the reply-text
-            // repair, v30 rebuilds the memory keyword index, and v31 retires the
-            // flat entry list.
-            26..=30 => {}
+            // is equivalent: MEMORIES_DDL is IF NOT EXISTS. v27 is the session
+            // Fast mode switch. v28 reconciles project path spellings and v29
+            // adds staged mode runs, both upstream. The fork's own steps follow
+            // at v30..v33: the memory store, the reply-text repair, the trigram
+            // keyword index, and the retirement of the flat entry list.
+            26..=32 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -292,32 +292,44 @@ impl Database {
             migrate_v26_to_v27(&conn, path)?;
             migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         }
-        // The memory store is the step after the v26 Fast mode switch, so a v26
-        // database walks both migrations in the same launch.
+        // Project paths, reconciled by filesystem identity rather than by a
+        // platform-wide lowercase guess (upstream v28).
         if migrated_version == 27 {
-            migrate_v27_to_v28(&conn, path)?;
+            super::project_path_migration::migrate(&conn, path, 27)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        }
+        // Staged mode runs: snapshots, the run state machine, gate results
+        // (upstream v29).
+        if migrated_version == 28 {
+            super::mode_runs_migration::migrate(&conn, path)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        }
+        // The memory store is the fork's first step after the two upstream ones,
+        // so a database that stops at v29 walks all of them in the same launch.
+        if migrated_version == 29 {
+            migrate_v29_to_v30(&conn, path)?;
             migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         }
         // Repairs stored reply text that carried the replayed reasoning
         // placeholder (ADR 0378, #1945). A text repair rather than a schema
         // change, but it rewrites rows, so it keeps the usual backup and bump.
-        if migrated_version == 28 {
-            super::migrations::migrate_v28_to_v29(&conn, path)?;
+        if migrated_version == 30 {
+            super::migrations::migrate_v30_to_v31(&conn, path)?;
             migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         }
         // Rebuilds the memory keyword index on the trigram tokenizer, so recall
         // answers a substring of a Chinese memory instead of only its exact
         // phrase. `memories` is read, never rewritten.
-        if migrated_version == 29 {
-            super::migrations::migrate_v29_to_v30(&conn, path)?;
+        if migrated_version == 31 {
+            super::migrations::migrate_v31_to_v32(&conn, path)?;
             migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         }
         // The flat entry list retires (ADR 0393). The entries are imported into
         // `memories` and the table is dropped in the same transaction, so a
         // database that still holds entries keeps them as structured memories
         // and nothing reads the retired shape afterwards.
-        if migrated_version == 30 {
-            super::migrate_v30_to_v31(&conn, path)?;
+        if migrated_version == 32 {
+            super::migrate_v32_to_v33(&conn, path)?;
         }
         // A stamp is not proof of shape. The memory branch stamped v28/v29 with
         // the memory tables but no `sessions.fast_mode`, while the merged line put
@@ -416,7 +428,10 @@ impl Database {
             }
             return Ok(id);
         }
-        upsert_project_row(&self.conn, path, touch)?
+        let target = canonical_project_path(path)
+            .ok_or_else(|| anyhow!("project path must not be blank"))?;
+        super::project_path_migration::reconcile_project_paths(&self.conn, Some(&target))?;
+        upsert_project_row(&self.conn, &target, touch)?
             .ok_or_else(|| anyhow!("project path must not be blank"))
     }
 
@@ -449,6 +464,7 @@ impl Database {
     }
 
     pub fn list_projects(&self) -> Result<Vec<ProjectRecord>> {
+        super::project_path_migration::reconcile_project_paths(&self.conn, None)?;
         let mut stmt = self.conn.prepare_cached(
             "SELECT id, path, name, pinned, created_at, last_opened_at
          FROM projects
@@ -470,7 +486,8 @@ impl Database {
     /// Session ids attached to a project row, including sessions already
     /// marked deleted. Callers delete each session so its transcript files follow.
     pub fn project_session_ids(&self, path: &str) -> Result<Vec<String>> {
-        let path = canonical_project_path(path)
+        let path = self
+            .stored_project_path(path)?
             .ok_or_else(|| anyhow!("project path must not be blank"))?;
         let mut stmt = self.conn.prepare_cached(
             "SELECT s.id FROM sessions s
@@ -484,7 +501,8 @@ impl Database {
     /// Delete a project row by canonical path. Returns whether a row existed so
     /// callers can report an idempotent removal.
     pub fn delete_project(&self, path: &str) -> Result<bool> {
-        let path = canonical_project_path(path)
+        let path = self
+            .stored_project_path(path)?
             .ok_or_else(|| anyhow!("project path must not be blank"))?;
         let deleted = self
             .conn

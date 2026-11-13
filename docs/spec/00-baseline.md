@@ -2,6 +2,9 @@
 
 > [Pasted directory references](../adr/composer-pasted-directory-references.md) add
 > folder cards and lazy dir prompt context without copying trees or granting access.
+> [Pasted local file references](../adr/composer-local-file-references.md) extend
+> native clipboard paste to live file paths and byte sizes, with metadata-only
+> dispatch and unchanged tool permissions.
 
 
 - Baseline Version: `0.4.22`
@@ -178,7 +181,7 @@
 37. Secrets backend: **safeStorage primary + encrypted file fallback**
 38. Workspace ignore: **denylist + defaults + `.pi-desktopignore`**
 39. Tool result limits: **per-tool budgets (128KB / 4000 lines search, 96KB / 4000 lines shell); `truncated` only when a result is cut short**
-40. Settings directory: **General / AI / Shortcuts / Instructions / Models / Skills / MCP / Subagents / Project archive / Info**;
+40. Settings directory: **Appearance / Conversation / Shortcuts / Behavior / Models / Instructions / Skills / MCP / Subagents / Modes / Memory / Project archive / System / Info** — one destination owns one subject (D684);
     external model, skill, and MCP scans live in their owning pages; session
     import is plugin-owned;
     the project archive owns durable project discovery, archive, restore, and

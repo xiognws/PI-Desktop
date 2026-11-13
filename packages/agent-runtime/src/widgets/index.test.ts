@@ -1,5 +1,5 @@
 /**
- * D691 contract: a widget package is loaded, driven and contained by the
+ * D699 contract: a widget package is loaded, driven and contained by the
  * sidecar registry — never by the window.
  *
  * What these tests pin down, because each one is a way the client could break:
@@ -84,7 +84,7 @@ function writePackage(options: PackageOptions): WidgetSummary {
 
 const PING_ENTRY = "export default (api) => { api.action('ping', () => 'pong'); };";
 
-describe("widget registry (D691)", () => {
+describe("widget registry (D699)", () => {
   it("loads a package entry and invokes the action it registered", async () => {
     const call = vi.fn(async () => ({ ok: true }));
     const registry = new WidgetRegistry({ call });
@@ -202,7 +202,7 @@ describe("widget registry (D691)", () => {
   });
 });
 
-describe("widget agent tool (D691)", () => {
+describe("widget agent tool (D699)", () => {
   it("lists what the model may call and invokes one action", async () => {
     const registry = new WidgetRegistry({ call: async () => null });
     await registry.sync([writePackage({ id: "demo", entry: PING_ENTRY })]);

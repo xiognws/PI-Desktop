@@ -1,5 +1,7 @@
 import { clipboard } from "electron";
+import { registerSidebarPreferencesIpc } from "./sidebar-preferences-ipc";
 import { readComposerClipboardDirectories } from "../composer-clipboard-directories";
+import { referenceComposerFiles } from "../composer-file-references";
 import { BrowserWindow, dialog, shell, type OpenDialogOptions } from "electron";
 import { dirname } from "node:path";
 import { homedir } from "node:os";
@@ -20,7 +22,7 @@ import {
   loadComposerTemplates,
   type ComposerTemplate,
 } from "@pi-workspace/agent-runtime";
-import { remoteWorkspaceForFiles } from "../remote/workspace-file-scope";
+import { remoteWorkspaceForFiles, sessionForFiles } from "../remote/workspace-file-scope";
 import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
 import { cloneGitRepository } from "../git-clone";
 import {
@@ -135,6 +137,7 @@ export function registerWorkspaceIpc({
     });
   };
   const assertMainWindowSender = registrar.assertMainWindowSender;
+  registerSidebarPreferencesIpc({ registrar, dataDir });
   let composerPickerActive = false;
   let projectPickerActive = false;
 
@@ -594,8 +597,9 @@ export function registerWorkspaceIpc({
     IPC.invoke.composerImportFiles,
     async (
       event,
-      input: { sessionId?: unknown; token?: unknown } = {},
+      input: { sessionId?: unknown; token?: unknown; reference?: unknown } = {},
     ) => {
+      assertMainWindowSender(event);
       if (!host) throw new Error("host unavailable");
       const sessionId =
         typeof input.sessionId === "string" ? input.sessionId.trim() : "";
@@ -604,8 +608,8 @@ export function registerWorkspaceIpc({
           errorCode: ErrorCodes.INVALID_ARGUMENT,
         });
       }
-      const session = (await host.call("session.get", { id: sessionId })) as {
-        session?: unknown;
+      const session = (await host.call("session.get", { id: sessionId, messageLimit: 1 })) as {
+        session?: { projectPath?: string; remoteWorkspace?: unknown };
       };
       if (!session.session) {
         throw Object.assign(new Error("session not found"), {
@@ -613,6 +617,10 @@ export function registerWorkspaceIpc({
         });
       }
       const paths = consumeComposerPickerSelection(input.token, event.sender.id);
+      if (input.reference === true) {
+        if (!session.session.projectPath || session.session.remoteWorkspace) throw new Error("local file references require a local project");
+        return { files: await referenceComposerFiles(dataDir, sessionId, session.session.projectPath, paths) };
+      }
       return {
         files: await importComposerFiles(
           dataDir,
@@ -654,7 +662,7 @@ handleWithEvent(
           errorCode: ErrorCodes.INVALID_ARGUMENT,
         });
       }
-      const session = (await host.call("session.get", { id: sessionId })) as {
+      const session = (await host.call("session.get", { id: sessionId, messageLimit: 1 })) as {
         session?: unknown;
       };
       if (!session.session) {
@@ -674,7 +682,7 @@ handleWithEvent(
     },
   );
 
-  const remoteFileWorkspace = (sessionId?: string) => remoteWorkspaceForFiles(getHost, sessionId);
+  const remoteFileWorkspace = (sessionId?: string) => remoteWorkspaceForFiles(getHost, sessionId, getSidecar);
   const readRemoteFiles = (remote: RemoteWorkspace, operation: WorkspaceFilesRequest["operation"], ref?: string, mimeType?: string) => {
     const boot = getActiveRemoteHostsBoot();
     if (!boot) throw new Error("remote hosts unavailable");
@@ -828,9 +836,7 @@ handleWithEvent(
     let worktree: string | undefined;
     let parent: string | undefined;
     if (sessionId) {
-      const { session } = await owner.call<{ session?: { projectPath?: string; worktree?: unknown } }>(
-        "session.get", { id: sessionId, messageLimit: 1 },
-      );
+      const session = await sessionForFiles(getHost, sessionId, getSidecar);
       const projectPath = session?.projectPath?.trim();
       if (session?.worktree) {
         // Chat references and source reads must see the same files as the
@@ -916,7 +922,7 @@ handleWithEvent(
     sessionId: string | undefined,
   ): Promise<string | null> => {
     const id = String(sessionId ?? "").trim();
-    if (!id || !host) return null;
+    if (!id || id.startsWith("native-pi:") || !host) return null;
     try {
       const result = await host.call<{ path: string }>("session.getScratchPath", {
         sessionId: id,
@@ -998,8 +1004,18 @@ handleWithEvent(
     },
   );
 
-  handle(IPC.invoke.fsReveal, async (input: { path?: string; sessionId?: string } = {}) => {
+  handleWithEvent(IPC.invoke.fsReveal, async (event, input: { path?: string; sessionId?: string; directory?: boolean } = {}) => {
+    if (input.directory === true) assertMainWindowSender(event);
     const remote = await remoteFileWorkspace(input.sessionId);
+    if (input.directory === true) {
+      if (remote || !input.sessionId || typeof input.path !== "string" || !isAbsolute(input.path)) {
+        throw new Error("A local session and an absolute directory path are required");
+      }
+      const directory = await realpath(input.path);
+      if (!(await stat(directory)).isDirectory()) throw new Error("Path is not a directory");
+      shell.showItemInFolder(stripWinLongPrefix(directory));
+      return { ok: true };
+    }
     if (remote && !(await isLocalStoredFile(String(input.path ?? "")))) throw Object.assign(new Error("remote paths cannot be revealed on this computer"), { errorCode: ErrorCodes.INVALID_ARGUMENT });
     const requested = String(input.path ?? "").trim();
     let workspaceRoot: string | null = null;
@@ -1078,7 +1094,7 @@ handleWithEvent(
   handle(
     IPC.invoke.fsResolveRef,
     async (
-      input: { ref?: string; sessionId?: string } = {},
+      input: { ref?: string; sessionId?: string; allowDirectory?: boolean } = {},
     ): Promise<FsChatRefResolveResult> => {
       const rawRef = String(input.ref ?? "").trim();
       if (!rawRef) return { match: null };
@@ -1114,10 +1130,16 @@ handleWithEvent(
       };
       if (await isChatRefOutsideRoots(ref, roots)) {
         // An exact absolute path outside the managed roots opens when it names
-        // an existing regular file (ADR 0339).
+        // an existing regular file (ADR 0339). Directories outside the roots
+        // stay unreachable: the remote transport has no allowDirectory flag
+        // either, so local and remote keep the same file-only contract there.
         return resolveExternalChatRef(ref);
       }
-      return { match: await resolveChatFileRef(ref, roots) };
+      return {
+        match: await resolveChatFileRef(ref, roots, {
+          allowDirectory: input.allowDirectory === true,
+        }),
+      };
     },
   );
 

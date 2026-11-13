@@ -2,7 +2,7 @@
  * The Tools page (D681): a sidebar destination under 产物文件/Artifacts that
  * lists the tool packages this build ships, with one enable switch each. The
  * same page also carries the capability packages scanned from the user's data
- * folder (D691), above the tool packages.
+ * folder (D699), above the tool packages.
  *
  * Source contracts only. The scan and the enabled set live in host-core
  * (`crates/host-core/src/tool_packages.rs`, covered by Rust tests) and the IPC
@@ -33,7 +33,7 @@ const LOCALES = ["en", "de", "es", "fr", "ko", "pt-BR", "tr", "zh-CN", "zh-TW"];
 
 test("tools is an app-shell page next to artifacts", () => {
   assert.match(appState, /\| "tools"/);
-  // Capability packages share this page (D691); there is no second route.
+  // Capability packages share this page (D699); there is no second route.
   assert.doesNotMatch(appState, /\| "capabilities"/);
   assert.match(appShell, /pages\/ToolsPage/);
   assert.match(appShell, /page === "tools" \? \([\s\S]{0,90}<ToolsPage \/>/);
@@ -122,7 +122,7 @@ test("every locale speaks the tools page", () => {
       "empty",
       "broken",
       "risk",
-      // The header entry that opens the capability packages (D691).
+      // The header entry that opens the capability packages (D699).
       "widgetEntry",
       "widgetEntryHint",
     ]) {

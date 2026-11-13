@@ -121,7 +121,7 @@ fn migration_is_idempotent() {
     let repaired = text_of(db.conn(), "echoed");
     // A second pass over already-repaired text changes nothing.
     let tx = db.conn().unchecked_transaction().unwrap();
-    migrate_v28_to_v29_tx(&tx).unwrap();
+    migrate_v30_to_v31_tx(&tx).unwrap();
     tx.commit().unwrap();
     assert_eq!(text_of(db.conn(), "echoed"), repaired);
 }

@@ -1,5 +1,5 @@
 /**
- * Widget packages (D691).
+ * Widget packages (D699).
  *
  * A widget package is a directory under `<userData>/widgets/<id>/`
  * holding a `widget.json` manifest and one entry module. Unlike a plugin or

@@ -1,4 +1,4 @@
-# Example widget package (D691)
+# Example widget package (D699)
 
 A widget package is a folder with a `widget.json` manifest and one entry
 module. Pi-Workspace loads it from `<userData>/widgets/<folder>/` — not

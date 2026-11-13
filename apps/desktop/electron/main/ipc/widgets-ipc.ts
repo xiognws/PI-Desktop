@@ -1,5 +1,5 @@
 /**
- * `widgets.*` IPC bridge (D691).
+ * `widgets.*` IPC bridge (D699).
  *
  * Two back ends, deliberately split by ownership: the host-core side scans
  * the data directory and owns trust/enabled state, while loading and running

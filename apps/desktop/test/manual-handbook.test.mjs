@@ -69,12 +69,14 @@ test("the Info panel hands the handbook to the system viewer", () => {
   const protocol = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts"), "utf8");
   assert.match(protocol, /manualOpen: "pi-desktop\/manual\/open"/);
 
-  const settingsPage = readFileSync(
-    join(desktopRoot, "src/features/settings/SettingsPage.tsx"),
+  // The Info rows live in their own destination file since the D684 split; the
+  // shell no longer holds any card of its own.
+  const infoPage = readFileSync(
+    join(desktopRoot, "src/features/settings/pages/AboutSettings.tsx"),
     "utf8",
   );
-  assert.match(settingsPage, /t\("settings\.manual"\)/, "the Info panel offers the handbook");
-  assert.match(settingsPage, /api\.openManual\(\)/, "the row opens it with the system viewer");
+  assert.match(infoPage, /t\("settings\.manual"\)/, "the Info panel offers the handbook");
+  assert.match(infoPage, /api\.openManual\(\)/, "the row opens it with the system viewer");
 
   const api = readFileSync(join(desktopRoot, "src/lib/api.ts"), "utf8");
   assert.match(api, /openManual: \(\) => invoke<\{ ok: boolean; path: string \}>\(IPC\.invoke\.manualOpen\)/);

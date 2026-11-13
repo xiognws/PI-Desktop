@@ -1,9 +1,18 @@
 import { readdir, readFile } from "node:fs/promises";
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const desktopSourceRoot = fileURLToPath(new URL("../../src/", import.meta.url));
+
+/**
+ * The path a fixture chunk is introduced by. Always POSIX: the tests search for
+ * `/* features/settings/pages/X.tsx *\/` markers, while `path.relative` uses
+ * backslashes on Windows — the marker has to read the same on every platform.
+ */
+function markerPath(path) {
+  return relative(desktopSourceRoot, path).split(sep).join("/");
+}
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -26,7 +35,7 @@ async function readDomainSource(facadeRelativePath, domainRelativePath) {
   const chunks = await Promise.all(
     paths.map(async (path) => {
       const source = await readFile(path, "utf8");
-      return `\n/* ${relative(desktopSourceRoot, path)} */\n${source}`;
+      return `\n/* ${markerPath(path)} */\n${source}`;
     }),
   );
   return chunks.join("\n");
@@ -46,7 +55,7 @@ function readDomainSourceSync(facadeRelativePath, domainRelativePath) {
   const facade = join(desktopSourceRoot, facadeRelativePath);
   const domainRoot = join(desktopSourceRoot, domainRelativePath);
   return [facade, ...sourceFilesSync(domainRoot)]
-    .map((path) => `\n/* ${relative(desktopSourceRoot, path)} */\n${readFileSync(path, "utf8")}`)
+    .map((path) => `\n/* ${markerPath(path)} */\n${readFileSync(path, "utf8")}`)
     .join("\n");
 }
 

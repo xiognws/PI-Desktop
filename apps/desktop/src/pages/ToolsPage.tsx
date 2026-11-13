@@ -15,7 +15,7 @@ import { api } from "../lib/api";
 import "../features/tools/tools.css";
 
 /**
- * Tools: one page for both kinds of package this build can run (D681, D691).
+ * Tools: one page for both kinds of package this build can run (D681, D699).
  *
  * Tool packages are directories under `resources/tools` with a `tool.json`
  * manifest; widget packages are directories the *user* drops into
@@ -252,7 +252,7 @@ export function ToolsPage() {
 }
 
 /**
- * Widget packages found under `<userData>/widgets` (D691).
+ * Widget packages found under `<userData>/widgets` (D699).
  *
  * Nothing is rendered when the scan found nothing: this section exists because
  * the user put those folders there, not because the build promises a feature.

@@ -1,5 +1,5 @@
 /**
- * `widgets.*` IPC bridge (D691).
+ * `widgets.*` IPC bridge (D699).
  *
  * The renderer may not read the filesystem or start package code, so both back
  * ends sit behind one channel set: host-core owns "may this package run"

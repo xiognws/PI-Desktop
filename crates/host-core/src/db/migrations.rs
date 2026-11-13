@@ -782,57 +782,50 @@ fn converge_fast_mode_and_memories_tx(tx: &rusqlite::Transaction<'_>) -> Result<
     Ok(())
 }
 
-/// Schema v28 adds the durable memory store (ADR 0371): the `memories` table,
+/// Schema v30 adds the durable memory store (ADR 0371): the `memories` table,
 /// its keyword index and the indexes that back recall and listing. It follows
 /// v27, the per-session Fast mode switch (ADR 0334), and re-asserts that v27
 /// column: a database stamped 27 by the pre-merge memory build carries the
 /// memory tables without it, and both flavours must converge here.
-pub(crate) fn migrate_v27_to_v28_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+///
+/// The number is v30 rather than the v28 this step shipped as, because
+/// upstream took v28 (project-path reconciliation) and v29 (staged mode runs)
+/// while the fork held v28..31. Fork-owned steps renumber; upstream's do not.
+pub(crate) fn migrate_v29_to_v30_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
     converge_fast_mode_and_memories_tx(tx)?;
-    tx.pragma_update(None, "user_version", 28i64)?;
+    tx.pragma_update(None, "user_version", 30i64)?;
     Ok(())
 }
 
 /// Repair a database whose stamp is already the newest one but whose shape is
 /// not.
 ///
-/// The version chain cannot see this case: a stamp of 28 or 29 skips every step,
+/// The version chain cannot see this case: a stamp at or above a step skips it,
 /// so a database written by the pre-merge memory build — memory tables present,
 /// `sessions.fast_mode` absent — opened by the merged line fails on the first
-/// query that names the column. The convergence is additive and idempotent, so
-/// it runs on every open instead of behind a version gate.
+/// query that names the column. The same holds for a database stamped 31 by the
+/// fork's own numbering before upstream's v27..v29 steps existed. The
+/// convergence is additive and idempotent, so it runs on every open instead of
+/// behind a version gate.
 pub(crate) fn converge_current_shape(conn: &Connection) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
     converge_fast_mode_and_memories_tx(&tx)?;
+    // v29's shape: staged mode runs. A database stamped past v29 by the fork's
+    // own v28..v31 numbering never walked that step, so re-assert it here.
+    super::mode_runs_migration::ensure_schema(&tx)?;
     tx.commit()?;
-    Ok(())
-}
-
-pub(crate) fn migrate_v27_to_v28(conn: &Connection, path: &Path) -> Result<()> {
-    let backup = create_migration_backup(conn, path, 27)?;
-    let tx = conn.unchecked_transaction()?;
-    migrate_v27_to_v28_tx(&tx)?;
-    tx.commit().with_context(|| {
-        format!(
-            "commit schema v27 to v28 memory migration; backup {} remains",
-            backup.display()
-        )
-    })?;
-    Ok(())
-}
-
-/// Schema v30 moves the structured-memory keyword index to the `trigram`
-/// tokenizer.
-///
-/// `unicode61` reads a whole Chinese phrase as one token, so a Chinese memory was
-/// findable only by typing the phrase exactly — in practice recall worked in
-/// English only. The index is a copy of the memory text, so the step drops it,
-/// recreates it with the new tokenizer and re-indexes every row: `memories` is
-/// only read, no user text is rewritten, and a second run converges on the same
-/// index.
-pub(crate) fn migrate_v29_to_v30_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
-    crate::memory::rebuild_memories_fts(tx)?;
-    tx.pragma_update(None, "user_version", 30i64)?;
+    // v28's step is a data reconciliation, not a table change: replaying it on
+    // an already-reconciled database finds no groups and writes nothing. A
+    // database that has no `projects` table yet (a fixture, or a file this
+    // build created before any project existed) has nothing to reconcile.
+    let has_projects: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'projects')",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_projects {
+        super::project_path_migration::reconcile_project_paths(conn, None)?;
+    }
     Ok(())
 }
 
@@ -842,16 +835,44 @@ pub(crate) fn migrate_v29_to_v30(conn: &Connection, path: &Path) -> Result<()> {
     migrate_v29_to_v30_tx(&tx)?;
     tx.commit().with_context(|| {
         format!(
-            "commit schema v29 to v30 memory index rebuild; backup {} remains",
+            "commit schema v29 to v30 memory migration; backup {} remains",
             backup.display()
         )
     })?;
     Ok(())
 }
 
-#[path = "migrations_v29_repair.rs"]
-mod v29_repair;
-pub(crate) use v29_repair::*;
+/// Schema v32 moves the structured-memory keyword index to the `trigram`
+/// tokenizer.
+///
+/// `unicode61` reads a whole Chinese phrase as one token, so a Chinese memory was
+/// findable only by typing the phrase exactly — in practice recall worked in
+/// English only. The index is a copy of the memory text, so the step drops it,
+/// recreates it with the new tokenizer and re-indexes every row: `memories` is
+/// only read, no user text is rewritten, and a second run converges on the same
+/// index.
+pub(crate) fn migrate_v31_to_v32_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    crate::memory::rebuild_memories_fts(tx)?;
+    tx.pragma_update(None, "user_version", 32i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v31_to_v32(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 31)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v31_to_v32_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v31 to v32 memory index rebuild; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
+#[path = "migrations_v31_repair.rs"]
+mod v31_repair;
+pub(crate) use v31_repair::*;
 
 #[cfg(test)]
 #[path = "migrations_test.rs"]

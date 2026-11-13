@@ -33,6 +33,7 @@ import { ComposerAutocomplete } from "./ComposerAutocomplete";
 import { AskToolCard } from "./AskToolCard";
 import { PlanApprovalBar } from "./PlanApprovalBar";
 import { TaskDock } from "./TaskDock";
+import { ModeRunStatusBar } from "../features/modes/ModeRunStatusBar";
 import {
   COMPOSER_MAX_VISIBLE_ROWS,
   COMPOSER_MIN_HEIGHT_PX,
@@ -129,8 +130,9 @@ export function Composer({
         providerModels,
         providers,
         sessionCompactions,
+        activeSessionSummary,
       ),
-    [liveMessages, providerModels, providers, sessionCompactions],
+    [liveMessages, providerModels, providers, sessionCompactions, activeSessionSummary],
   );
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const showToast = useAppStore((s) => s.showToast);
@@ -320,10 +322,9 @@ export function Composer({
   const mode: Mode = activeSession
     ? activeSession.mode
     : (draftConfiguration?.mode ?? settings?.defaultMode ?? "agent");
+  // Only the builtin Plan negotiates a proposal; Goal runs as a staged mode.
   const planningLive =
-    isRunning &&
-    planningState === "planning" &&
-    (mode === "plan" || mode === "goal");
+    isRunning && planningState === "planning" && mode === "plan";
   // Permission mode (D115/D132): inherited sessions still resolve through the
   // global setting, but the composer presents only the effective mode.
   const globalPermissionMode: PermissionMode =
@@ -474,6 +475,7 @@ export function Composer({
     cursor,
     composing,
     enabled: !inputBlocked && localToolsAllowed,
+    agentsEnabled: mode === "agent",
     referenceSessionId,
     fileReferencesRef,
     applyEditorDraft,
@@ -522,6 +524,7 @@ export function Composer({
             header, so the gate now covers both the way it already covered the
             todo dock. */}
         {activeSessionId && localToolsAllowed ? <TaskDock sessionId={activeSessionId} /> : null}
+        {activeSessionId ? <ModeRunStatusBar sessionId={activeSessionId} /> : null}
         {planCheckpoint?.status === "pending" ? (
           <PlanApprovalBar proposal={planCheckpoint} />
         ) : null}
@@ -565,6 +568,8 @@ export function Composer({
           ) : null}
           <ComposerInput
             imagePreview={draft.imagePreview}
+            directoryReferences={activeFileReferences.filter((reference) => reference.kind === "directory")}
+            onRemoveDirectory={draft.removeDirectoryReference}
             inputRef={ref}
             value={value}
             placeholderText={placeholderText}

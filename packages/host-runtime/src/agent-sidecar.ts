@@ -50,6 +50,10 @@ export type VendorAuthResolver = (input: {
 // session, so it cannot reach a credential the session was not launched with.
 const HOST_PROXY_ALLOWED = new Set([
   "tools.execute",
+  "backgroundJobs.capabilities",
+  "backgroundJobs.list",
+  "backgroundJobs.wait",
+  "backgroundJobs.stop",
   "tools.fileBatchCapabilities",
   "tools.fileBatchRegister",
   "tools.fileBatchSeal",
@@ -80,7 +84,7 @@ const HOST_PROXY_ALLOWED = new Set([
   "memory.recall",
   "memory.update",
   "memory.forget",
-  // Capability packages (D691) reach the host through the same proxy, so the
+  // Capability packages (D699) reach the host through the same proxy, so the
   // read-only memory surface they advertise has to be reachable: a package that
   // calls memory.list with the host permission otherwise fails with
   // "host method not allowed from sidecar" and looks broken in the UI.

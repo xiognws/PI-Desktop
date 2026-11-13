@@ -1,13 +1,13 @@
 # ADR: Capability packages run in the agent sidecar
 
 - Status: Implemented candidate
-- Related: D691, D687 (tool packages), ADR 0214, ADR 0215, spec 07-plugins/16, spec 07-plugins/19
+- Related: D699, D695 (tool packages), ADR 0214, ADR 0215, spec 07-plugins/16, spec 07-plugins/19
 
 ## Context
 
 Users want to extend the product with code they write themselves and can hand to
 someone else. The two existing extension surfaces do not fit that shape. A tool
-package (D687) is declarative metadata plus assets shipped in the same image — no
+package (D695) is declarative metadata plus assets shipped in the same image — no
 runtime, nothing that runs. A trusted extension (ADR 0214) is a hook inside the
 agent process: it registers tools, commands, providers and event handlers, and it
 is granted because the *plugin* asked for `agent.extension`, which means the

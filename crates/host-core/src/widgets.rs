@@ -1,4 +1,4 @@
-//! Widget packages (D691).
+//! Widget packages (D699).
 //!
 //! A widget package is a directory under `<data>/widgets/<dir>/` with a
 //! `widget.json` manifest and an entry module. The user drops the folder in

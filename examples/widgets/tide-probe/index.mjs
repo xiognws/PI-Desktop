@@ -1,5 +1,5 @@
 /**
- * Example widget package (D691).
+ * Example widget package (D699).
  *
  * Copy this folder into `<userData>/widgets/`, accept its digest on the
  * Widgets page, then invoke `now` from the agent's `Widget` tool

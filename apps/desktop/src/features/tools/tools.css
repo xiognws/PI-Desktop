@@ -238,7 +238,7 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Widget packages live inside the tools page (D691). The section reuses
+ * Widget packages live inside the tools page (D699). The section reuses
  * .tools-card so a widget package and a tool package read as one kind of
  * object; only what is unique to a widget gets its own rule. Widgets
  * come first because a scanned folder is the only thing here the user

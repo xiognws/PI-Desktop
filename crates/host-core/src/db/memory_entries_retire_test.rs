@@ -1,8 +1,8 @@
-//! Regression coverage for the v30 -> v31 retirement of the flat entry list.
+//! Regression coverage for the v32 -> v33 retirement of the flat entry list.
 
 use rusqlite::Connection;
 
-use super::{migrate_v30_to_v31, migrate_v30_to_v31_tx};
+use super::{migrate_v32_to_v33, migrate_v32_to_v33_tx};
 use crate::db::{Database, SCHEMA_VERSION};
 use std::path::Path;
 
@@ -30,8 +30,8 @@ fn version(conn: &Connection) -> i64 {
         .unwrap_or(-1)
 }
 
-/// A database that was current at v30 and still holds two entry lists.
-fn v30_database_with_entries(path: &Path) {
+/// A database that was current at v32 and still holds two entry lists.
+fn v32_database_with_entries(path: &Path) {
     let db = Database::open(path).expect("open a current database");
     db.conn()
         .execute_batch(RETIRED_TABLE_DDL)
@@ -42,7 +42,7 @@ fn v30_database_with_entries(path: &Path) {
                ('memory', 0, 'cache root\nD:/PiWorkspace/cache holds scratch files', 1),
                ('memory', 1, 'project uses pnpm workspaces', 1),
                ('user',   0, 'prefers terse Chinese replies', 1);
-             PRAGMA user_version = 30;",
+             PRAGMA user_version = 32;",
         )
         .expect("seed the retired lists");
 }
@@ -51,7 +51,7 @@ fn v30_database_with_entries(path: &Path) {
 fn entries_are_imported_into_the_store_before_the_table_goes() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("pi.sqlite");
-    v30_database_with_entries(&path);
+    v32_database_with_entries(&path);
 
     let db = Database::open(&path).expect("upgrade to the current version");
     assert_eq!(version(db.conn()), SCHEMA_VERSION);
@@ -104,13 +104,13 @@ fn a_fresh_database_has_neither_retired_table() {
 fn the_step_is_idempotent_and_never_duplicates_a_memory() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("pi.sqlite");
-    v30_database_with_entries(&path);
+    v32_database_with_entries(&path);
     let db = Database::open(&path).expect("upgrade to the current version");
     let before = db.list_memories(&Default::default()).expect("list").1;
 
     // A second pass over a database that no longer has the table changes nothing.
     let tx = db.conn().unchecked_transaction().expect("transaction");
-    migrate_v30_to_v31_tx(&tx).expect("re-run the step");
+    migrate_v32_to_v33_tx(&tx).expect("re-run the step");
     tx.commit().expect("commit");
     assert_eq!(
         db.list_memories(&Default::default()).expect("list").1,
@@ -140,7 +140,7 @@ fn an_entry_already_in_the_store_is_not_copied_twice() {
         .execute_batch(
             "INSERT INTO memory_entries(target, ordinal, content, updated_at)
                VALUES ('memory', 0, 'project uses pnpm workspaces', 1);
-             PRAGMA user_version = 30;",
+             PRAGMA user_version = 32;",
         )
         .expect("seed the retired list");
     drop(db);
@@ -156,15 +156,15 @@ fn an_entry_already_in_the_store_is_not_copied_twice() {
 fn the_backup_is_written_before_the_rows_move() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("pi.sqlite");
-    v30_database_with_entries(&path);
+    v32_database_with_entries(&path);
     let conn = Connection::open(&path).expect("open");
-    migrate_v30_to_v31(&conn, &path).expect("run the step with a backup");
-    assert_eq!(version(&conn), 31);
+    migrate_v32_to_v33(&conn, &path).expect("run the step with a backup");
+    assert_eq!(version(&conn), 33);
     let backups: Vec<_> = std::fs::read_dir(dir.path())
         .expect("list the directory")
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().to_string_lossy().to_string())
-        .filter(|name| name.contains("v30") || name.contains("backup"))
+        .filter(|name| name.contains("v32") || name.contains("backup"))
         .collect();
     assert!(
         !backups.is_empty(),

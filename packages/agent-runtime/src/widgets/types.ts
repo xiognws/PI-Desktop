@@ -1,5 +1,5 @@
 /**
- * Widget packages, sidecar half (D691).
+ * Widget packages, sidecar half (D699).
  *
  * The host discovers packages and owns trust; this process is the only place
  * package code ever runs. Everything here therefore assumes the code is
@@ -16,7 +16,7 @@ import type {
   WidgetSummary,
 } from "@pi-workspace/shared";
 
-/** What a package may ask the host to do (D691 §host bridge). */
+/** What a package may ask the host to do (D699 §host bridge). */
 export type WidgetHostCall = {
   /** Host-core RPC method, e.g. `memory.recall`. Refused without `host`. */
   method: string;

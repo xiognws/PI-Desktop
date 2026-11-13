@@ -37,8 +37,8 @@
     "electron-updater": "^6.8.9"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.4.0",
-    "@earendil-works/pi-mcp": "1.4.0",
+    "@earendil-works/pi-ai": "1.5.0",
+    "@earendil-works/pi-mcp": "1.5.0",
     "@pi-workspace/agent-host": "workspace:*",
     "@pi-workspace/computer-use": "workspace:*",
     "@pi-workspace/agent-runtime": "workspace:*",
@@ -97,7 +97,11 @@
       "!**/node_modules/**/*.{test,spec}.{js,cjs,mjs}",
       "!**/node_modules/node-addon-api/tools/**",
       "!**/node_modules/node-addon-api/*.{c,gyp,gypi,h,js,json}",
-      "!**/node_modules/node-addon-api/README.md"
+      "!**/node_modules/node-addon-api/README.md",
+      "!**/node_modules/koffi/{doc,vendor}/**",
+      "!**/node_modules/@picovoice/pvrecorder-node/{src/**,copy.js,jest.config.js,tsconfig.json}",
+      "!**/node_modules/@picovoice/pvrecorder-node/lib/!(${os}*|raspberry-pi)/**",
+      "!**/node_modules/@picovoice/pvrecorder-node/[!${os}]ib/raspberry-pi/**"
     ],
     "electronLanguages": [
       "en-US",

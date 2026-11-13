@@ -1,5 +1,5 @@
 /**
- * Widget package runner (D691).
+ * Widget package runner (D699).
  *
  * Loads one entry module per enabled, readable package and keeps the
  * implementations its `register` calls produced. Loading is per process, not per

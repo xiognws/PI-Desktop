@@ -6,6 +6,12 @@
 
 This log freezes previously open questions into concrete decisions.
 
+> **Decision ids are one space across the two lines.** Upstream and this fork
+> both allocate ids sequentially, so a sync can hand the same number to two
+> different decisions. Fork-owned ids move; upstream ids never do — in the
+> 2026-11-13 upstream sync the fork's D685–D692 became D693–D700, and their
+> references moved with them.
+
 ## A. High-priority architecture decisions
 
 | ID | Topic | Decision | Rationale |
@@ -340,10 +346,10 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D676 | A completed turn the reader followed ends at its prompt | **Amend the stream-completion rule: when a turn completes while the transcript is visible and still following the stream, the renderer scrolls that turn's newest user message to 16px below the titlebar band the transcript reserves at its top (smooth unless reduced motion), releases follow mode, and shows jump-to-latest. Nothing moves when the prompt is already in view, the reply failed or was aborted, the pane is hidden or in a reading window, a disclosure position is held, or a new run starts before the move. Renderer only; no setting, IPC, or persistence change.** | Issue #1889: after a long reply the reader sat at its last line and had to scroll back up to find where it began. |
 | D677 | DeepSeek reasoning replay uses one field per row and never covers real reasoning | **Amend ADR 0256 decision 3: the pi-ai fill pass takes the reasoning field from the newest assistant row that has real reasoning, normalizes every assistant row to that single field (moving real reasoning from another field name, deleting the others), and fills the placeholder only on rows with no reasoning. History rebuild and the thinking panel drop a leading echo of the placeholder (`withoutReasoningReplayPlaceholder`); stored text is not rewritten. No schema, IPC, or setting change.** | Issue #1945: rebuilt rows are stamped `reasoning_content` while a relay streams `reasoning_text`; the fill pass picked `reasoning_content` and wrote the placeholder over the live row's real reasoning, the model echoed it as its own thinking (13.6% of assistant rows in affected sessions), and the echo was persisted and replayed. |
 | D678 | Radial context menu rebuilt and moved to General | **The opt-in transcript radial menu gets at-rest icon-and-label sectors (the hover-only hub label is gone), one filled highlight for the active sector with no focus rectangle, a recessed hub carrying the click-point dot, a 248 px disc with hairline separators and the composer shadow, and shared motion tokens for hover and reveal. A right-press started while the ring is open runs the sector it is released on; releasing in the hub dismisses without running; the release trailing the opening right-click is inert. The settings card moves from the AI tab to General after Sidebar and the settings-search index follows. Action vocabulary, per-direction defaults, `AppSettings.radialMenu`, persistence, and IPC are unchanged.** | The icon-only ring could not be read without hovering every sector, the sector fill and button background painted two highlights over one target, and the ring's switch sat in the AI tab although the surface is a transcript-interaction preference. |
-| D686 | Cloud sync and Remote Hosts leave Settings | **Remove the `sync` and `remoteHosts` destinations from the Settings index: their rail rows, pages, search-keyword indexes, the packaged/development visibility rules they carried, their renderer components and feature modules, their styles, and the tests that pinned them are gone. The host-side configuration-sync service, the remote-host/SSH service, the IPC/RPC contracts, the `configSync.*` / `remoteHosts.*` locale strings, and the Create project dialog's remote source stay. See `04-ux/06-settings-ia.md`, `00-baseline.md`, and `06-delivery/04-e2e-test-plan.md`.** | Both surfaces are unused in this deployment; unreachable pages, Experimental badges, and dead styles only widened the settings directory and kept a maintenance surface alive. |
-| D687 | Bundled tool packages get their own page | **Add a Tools destination below Artifacts in the app-shell rail: the build's `resources/tools/<id>/tool.json` packages, rendered as one card each with name, version, description, declared tools and risk levels, and one enable switch. host-core scans the directory (`crates/host-core/src/tool_packages.rs`) and persists the enabled set in `<data>/tools/state.json`; `toolPackages.list` / `toolPackages.setEnabled` are the only surface, and a package that cannot be read keeps its row with the reason. See `04-ux/01-ui-ia.md` §3.4.1 and `03-runtime/04-data-storage.md` §2.** | Tool packages ship inside the image and need a visible, switchable roster without a plugin install/update/permission model; a separate declarative manifest keeps the marketplace surface out of it. |
-| D688 | The newest prompt stays readable while its answer scrolls | **A single-line strip at the transcript's top edge repeats the newest prompt the user sent once that row's bottom edge has passed the scrollport's top edge, and disappears as soon as any part of the row is visible again. It collapses whitespace, cuts on a word boundary, names the attachment count for an attachment-only prompt, never pins an agent-to-agent delivery, and yields the top edge to an open Find bar. Clicking it scrolls the row back into view. See `04-ux/09-interaction-patterns.md` §2.6.** | The reference client pins its human bubble to the top of the thread; a long answer otherwise pushes the question out of sight and the user has to scroll back to remember what they asked. |
-| D689 | Each session totals its tokens in the status bar | **The status bar gains a session token total, summed over every turn the session has run. The number comes from the host's turn ledger through a new `session.usageTotals` RPC rather than from the rendered transcript, whose window is bounded; the bar polls it on session switch, while a turn streams, and when one ends. The breakdown (input / output / cache read / cache write / reasoning / turns) lives in the item's tooltip, and the item can be hidden from the status bar menu like every other one. See `03-runtime/04-data-storage.md` (usage ledger).** | "How much has this conversation cost me" is a whole-session question; every existing token reading on the bar described one request or one context window. |
+| D694 | Cloud sync and Remote Hosts leave Settings | **Remove the `sync` and `remoteHosts` destinations from the Settings index: their rail rows, pages, search-keyword indexes, the packaged/development visibility rules they carried, their renderer components and feature modules, their styles, and the tests that pinned them are gone. The host-side configuration-sync service, the remote-host/SSH service, the IPC/RPC contracts, the `configSync.*` / `remoteHosts.*` locale strings, and the Create project dialog's remote source stay. See `04-ux/06-settings-ia.md`, `00-baseline.md`, and `06-delivery/04-e2e-test-plan.md`.** | Both surfaces are unused in this deployment; unreachable pages, Experimental badges, and dead styles only widened the settings directory and kept a maintenance surface alive. |
+| D695 | Bundled tool packages get their own page | **Add a Tools destination below Artifacts in the app-shell rail: the build's `resources/tools/<id>/tool.json` packages, rendered as one card each with name, version, description, declared tools and risk levels, and one enable switch. host-core scans the directory (`crates/host-core/src/tool_packages.rs`) and persists the enabled set in `<data>/tools/state.json`; `toolPackages.list` / `toolPackages.setEnabled` are the only surface, and a package that cannot be read keeps its row with the reason. See `04-ux/01-ui-ia.md` §3.4.1 and `03-runtime/04-data-storage.md` §2.** | Tool packages ship inside the image and need a visible, switchable roster without a plugin install/update/permission model; a separate declarative manifest keeps the marketplace surface out of it. |
+| D696 | The newest prompt stays readable while its answer scrolls | **A single-line strip at the transcript's top edge repeats the newest prompt the user sent once that row's bottom edge has passed the scrollport's top edge, and disappears as soon as any part of the row is visible again. It collapses whitespace, cuts on a word boundary, names the attachment count for an attachment-only prompt, never pins an agent-to-agent delivery, and yields the top edge to an open Find bar. Clicking it scrolls the row back into view. See `04-ux/09-interaction-patterns.md` §2.6.** | The reference client pins its human bubble to the top of the thread; a long answer otherwise pushes the question out of sight and the user has to scroll back to remember what they asked. |
+| D697 | Each session totals its tokens in the status bar | **The status bar gains a session token total, summed over every turn the session has run. The number comes from the host's turn ledger through a new `session.usageTotals` RPC rather than from the rendered transcript, whose window is bounded; the bar polls it on session switch, while a turn streams, and when one ends. The breakdown (input / output / cache read / cache write / reasoning / turns) lives in the item's tooltip, and the item can be hidden from the status bar menu like every other one. See `03-runtime/04-data-storage.md` (usage ledger).** | "How much has this conversation cost me" is a whole-session question; every existing token reading on the bar described one request or one context window. |
 
 
 ## M0. Model catalog decisions
@@ -464,6 +470,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 |---|---|---|---|
 | D143 | Settings directory rail icons | **The five settings destinations use fixed Lucide glyphs: Basics=`SlidersHorizontal`, Model configuration=`Bot`, Import=`Download`, Project archive=`Archive`, Info=`Info`. Refresh/rotate glyphs are not used on this rail.** | Prior mapping reused Settings/RefreshCcw/RotateCw, which read as generic gear/reload rather than the destination semantics; monochrome Lucide keeps the compact directory scannable. |
 | D166 | Settings directory split into AI and Shortcuts destinations | **The Settings rail grows from five to seven destinations in order: Basics (`SlidersHorizontal`), 全局 AI/AI (`Sparkles`, new), Shortcuts (`Keyboard`, new), Model configuration (`Bot`), Import (`Download`), Project archive (`Archive`), Info (`Info`). Permissions and Context management move from Basics to the new AI destination; Keyboard shortcuts moves from Basics to the new Shortcuts destination; Developer moves from Basics to Info. Basics keeps only Appearance and Defaults. This supersedes the five-destination count/order of D133 and the five-icon set of D143 (adding `Sparkles` and `Keyboard`) without changing any setting's semantics, the full-page shell, or rail metrics.** | Basics accumulated six unrelated cards, burying global AI behavior (permission mode, context compaction) and shortcut configuration alongside look-and-feel; splitting them gives each concern a scannable home while keeping provider/connection config separate in Model configuration. |
+| D684 | One settings destination owns one subject | **Amend D143 / D166 / D678 and see ADR 0345: the Settings directory is fifteen destinations in order — Appearance (`Palette`), Conversation (`MessageSquare`), Shortcuts (`Keyboard`), Voice (`Mic`), Behavior (`SlidersHorizontal`), Models (`Bot`), Instructions (`FileText`), Skills (`BookOpen`), MCP (`Server`), Subagents (`Sparkles`), Projects (`Archive`), System (`Monitor`), Cloud sync (`CloudDownload`), Remote Hosts (`Globe`), Info (`Info`) — in the four existing clusters. `general` and `ai` are retired: General's appearance rows become Appearance (cards Interface / Sidebar / Radial context menu / Startup) and its machine rows become System (Network / Storage / Power / Close behavior); the AI Defaults catch-all splits into Conversation (Display / Input & links) and Behavior (Session defaults / Execution / Computer use). Both retired ids stay resolvable to their successor and appear in neither the rail nor search. A card may carry one visible caption line and a destination one subtitle line; each page repeats its rail glyph at page scale on an accent-tinted fill, and the selected rail row takes an accent-tinted pill with an accent glyph. No persisted field, IPC, host protocol, or storage schema change — only which page renders which row. See E2E-SETTINGS-one-destination-one-subject and E2E-SETTINGS-retired-destination-ids-resolve.** | Two destinations had become landing places rather than subjects: General mixed theme and type with proxies, disk maintenance, sleep blockers and the close button, and the AI Defaults card had grown to thirteen rows spanning transcript presentation, composer input and run behavior. A reader could not predict which page held a setting, and with every explanation behind a help mark the only way to find one was to hover the whole page. Reordering cards cannot repair a page that owns two subjects. |
+| D685 | Composer model picker: text rail and segmented reasoning | **Amend D458: the reasoning control in the combined Composer model menu is a segmented track with a raised pill under the selected level, placed in the menu footer, instead of a rail with track dots. The native range input, its column geometry, latest-wins commits and keyboard ownership are unchanged. The model list uses a text-only source rail with one sliding marker; Escape clears a typed search before closing the menu. Renderer only. See `04-ux/08-component-spec.md` and E2E-050.** | The dot rail and colored source tiles read heavy next to compact model rows; a segmented pill and a text rail match the rest of the menu chrome. |
 
 ## R. Decision rules going forward
 
@@ -8354,9 +8362,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `docs/implementation/computer-use-evidence.md` for what the run proved and
   what it did not.
 
-## 2026-11-03 — Prompt enhancement ships with the application image (D685)
+## 2026-11-03 — Prompt enhancement ships with the application image (D693)
 
-- D685 tracks the released `pi.prompt-enhancement` plugin (1.3.0, byte-identical
+- D693 tracks the released `pi.prompt-enhancement` plugin (1.3.0, byte-identical
   to the marketplace package) in `apps/desktop/resources/plugins` and
   un-ignores that path, so every build this repository produces ships the
   Composer enhancement action as a bundled plugin (ADR 0378).
@@ -8375,8 +8383,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   the image's plugin directory and reports every manifest accepted (`rows: 3`,
   `bundled: 3`, `broken: 0`). See `04-ux/12-prompt-enhancement.md`,
   `04-ux/06-settings-ia.md`, `03-runtime/04-data-storage.md`, and ADR 0378.
-
-## 2026-11-04 — Cloud sync and Remote Hosts leave Settings (D686)
+## 2026-11-04 — Cloud sync and Remote Hosts leave Settings (D694)
 
 - D686 removes the two Settings destinations. `src/lib/settings-search.ts` no
   longer declares `sync` or `remoteHosts`, so the rail, the search index, and
@@ -8401,8 +8408,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   remote-bound project is still created through the dialog). E2E scenario
   E2E-REMOTE-HOST-settings-compact-inventory is removed with the surface, and
   E2E-REMOTE-HOST-ssh-password-authentication is retired.
-
-## 2026-11-04 — Bundled tool packages get their own page (D687)
+## 2026-11-04 — Bundled tool packages get their own page (D695)
 
 - The Tools destination lists the tool packages this build ships, next to
   Artifacts in the app-shell rail. A package is a directory under
@@ -8427,8 +8433,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `apps/desktop/test/tool-packages-ipc.test.mjs` (channel registration and
   parameter narrowing), and `apps/desktop/test/tools-page.test.mjs` (page union,
   rail order, global search, host-only access, all nine locale catalogs).
-
-## 2026-11-04 — The newest prompt stays readable while its answer scrolls (D688)
+## 2026-11-04 — The newest prompt stays readable while its answer scrolls (D696)
 
 - The reference client keeps the human bubble at the top of the thread while its
   turn is on screen: the bubble is grouped with the turn and sticks. The
@@ -8454,8 +8459,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   pins, the delivery exclusion, preview collapsing and truncation, the geometry
   boundary, selector escaping, the rendered strip (including the attachment-only
   case), the transcript wiring, and the two new keys in all nine catalogs.
-
-## 2026-11-04 — Each session totals its tokens in the status bar (D689)
+## 2026-11-04 — Each session totals its tokens in the status bar (D697)
 
 - The status bar's token readings described one request: `上下文` is the newest
   turn's context occupancy, `缓存` its cache share. Nothing answered "how much has
@@ -8480,8 +8484,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   session's turns excluded, a turn with no usage document still counted, unknown
   session empty) and `apps/desktop/test/session-usage-totals.test.mjs` (bucket
   arithmetic, compaction, the host-ledger wiring, the menu entry, nine catalogs).
-
-## 2026-11-04 — The product is Pi-Workspace, and storage identifiers are frozen separately (D690)
+## 2026-11-04 — The product is Pi-Workspace, and storage identifiers are frozen separately (D698)
 
 - The display name is `Pi-Workspace` (`APP_NAME`), the application ID is
   `net.aiuo.pi-workspace`, the npm scope is `@pi-workspace/*`, and the release
@@ -8508,10 +8511,74 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   spellings), `apps/desktop/test/development-profile.test.mjs` (profile names and
   the order identity is established in), and
   `apps/desktop/test/frozen-identifiers.test.mjs` (the frozen set above).
+## 2026-11-05 — One settings destination owns one subject (D684)
 
-## 2026-11-09 — Widget packages are user folders that run in the agent sidecar (D691)
+- Two Settings destinations had stopped being subjects and become landing
+  places. General carried theme, language and type next to the outbound proxy,
+  the application data directory, sleep blockers and the window's close button.
+  The AI destination's **Defaults** card had grown to thirteen rows: the default
+  operating mode and the command shell sat between the transcript display mode,
+  the thinking toggles, the context ring's leading figure, Enter-to-send and the
+  paste threshold. Those are three subjects — how it looks, how a transcript
+  reads, what a run does — in two pages.
+- The rule now is one destination per subject, and the split follows it rather
+  than reordering cards: **Appearance** (Interface, Sidebar, Radial context
+  menu, Startup), **Conversation** (Display, Input & links), **Behavior**
+  (Session defaults, Execution, Computer use), **System** (Network, Storage,
+  Power, and on Windows/Linux Close behavior). Fifteen destinations in the four
+  existing clusters; Subagents takes the `Sparkles` glyph the retired AI
+  destination released, so no two rows share an icon.
+- Permission mode moved in with the default operating mode and the command
+  shell instead of keeping a card of its own. They are one question asked three
+  ways — what a new conversation starts with — and a one-row card was part of
+  what made the old page read as a pile.
+- Nothing about the settings themselves changed: no persisted field, IPC
+  message, host protocol or storage schema. A profile written before the split
+  reads back identically; only the page that renders each row is different.
+  `general` and `ai` resolve to Appearance and Behavior
+  (`resolveSettingsTab`), so a stored selection, a native menu, a capture scene
+  or an older deep link cannot open a blank pane, and neither id appears in the
+  rail or in settings search.
+- Two presentation rules were added because the IA alone does not make a page
+  legible. A destination may declare one subtitle line under its title, and a
+  card may carry one visible caption line under its heading — the first visible
+  explanatory copy since D601 moved row explanations behind a help mark. The
+  distinction is scope: a caption orients a whole group, a row's explanation
+  still belongs behind its question mark, and copy that needs a second sentence
+  stays there too. The capability, model and project workbenches already open
+  with their own description and declare no subtitle, so no page says its
+  purpose twice.
+- The page header now repeats the rail's glyph at page scale on an
+  accent-tinted fill, and the selected rail row takes an accent-tinted pill
+  with an accent glyph. With fifteen rows in four clusters, "where am I" has to
+  survive a glance; the fills stay inside the in-flow surface rule (D297) since
+  they are tone, not a stroke.
+- Prose that routed a reader to a destination that no longer exists was fixed
+  in every catalog: the proxy and network-policy messages now say
+  Settings → System → Network. The live specs follow
+  (`04-ux/06-settings-ia.md`, `00-baseline.md` §40, `04-ux/01-ui-ia.md`,
+  `04-ux/08-component-spec.md`, `03-runtime/04-data-storage.md`,
+  `03-runtime/computer-use.md`). Earlier decision entries keep their original
+  wording: they record what was decided then.
+- The renderer shell is now a router. Each destination is a module under
+  `features/settings/pages/`, which keeps `SettingsPage.tsx` from growing a
+  fifth subject and leaves the settings source contract intact, since it reads
+  the facade plus everything under `features/settings`.
+## 2026-11-06 — Composer model picker: text rail and segmented reasoning (D685)
 
-- The Tools page keeps its list of bundled tool packages (D687) and gains an
+- The two-pane model picker shipped with monogram tiles in its source rail and
+  the dot-rail reasoning slider. Both read heavy next to the compact rows.
+- The rail is now text only, with one 2px marker that slides between sources;
+  the model pane slides in from the direction of the move, and the current
+  row's check is drawn rather than filled.
+- The reasoning control becomes a segmented track in the menu footer with a
+  raised pill under the selected level. The native range still owns
+  keyboard, drag and accessibility, and the column geometry contract of D458
+  holds: pill, label and native stop share one center for every stop count.
+- Escape clears a typed search first; a second Escape closes the menu.
+## 2026-11-09 — Widget packages are user folders that run in the agent sidecar (D699)
+
+- The Tools page keeps its list of bundled tool packages (D695) and gains an
   entry button that opens the widget section. An *widget package* is a folder
   under `<userData>/widgets/` with `widget.json`
   (`schemaVersion`, `apiVersion`, `id`, `name`, `version`, `description`,
@@ -8556,7 +8623,6 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   (page union, route, entry button, trust and digest wiring, all nine locales),
   and `apps/desktop/test/tools-page.test.mjs` (entry button keys in every
   catalog). See ADR 0384 and spec 07-plugins/19.
-
 ## 2026-11-10 — The voice feature is removed (ADR 0387)
 
 - Dictation, Live Voice and the host speech capability are deleted, not hidden:
@@ -8576,8 +8642,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   reader, no writer, no migration. See ADR 0387 for the alternatives considered
   (hiding the entries was rejected: it keeps a native dependency and ~100 tests
   alive for a surface nobody opens).
-
-## 2026-11-13 — Distribution builds expose no upstream identity (D692)
+## 2026-11-13 — Distribution builds expose no upstream identity (D700)
 
 - The Settings → Info panel is the first surface an outside reader opens, so it
   no longer names the build's internals or points at another project: the

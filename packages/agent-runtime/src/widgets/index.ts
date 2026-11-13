@@ -1,5 +1,5 @@
 /**
- * Sidecar-side widget registry (D691).
+ * Sidecar-side widget registry (D699).
  *
  * One instance per sidecar process. It loads packages once, answers
  * `widget.*` RPCs, and relays a package's host wishes through the existing
@@ -96,7 +96,7 @@ export class WidgetRegistry {
   }
 
   /**
-   * The `Widget` agent tool (D691 §agent side).
+   * The `Widget` agent tool (D699 §agent side).
    *
    * Packages are listed and driven from the same surface the user sees, so the
    * model can reach a package the user installed without the client having to

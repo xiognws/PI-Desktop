@@ -6,7 +6,7 @@ use super::*;
 /// converge both flavours instead of assuming 27 always means the Fast mode
 /// switch.
 #[test]
-fn the_v27_to_v28_migration_adds_the_missing_fast_mode_column() {
+fn the_v29_to_v30_migration_adds_the_missing_fast_mode_column() {
     let conn = Connection::open_in_memory().unwrap();
     conn.execute_batch(
         "CREATE TABLE sessions (id TEXT PRIMARY KEY);
@@ -14,7 +14,7 @@ fn the_v27_to_v28_migration_adds_the_missing_fast_mode_column() {
     )
     .unwrap();
     let tx = conn.unchecked_transaction().unwrap();
-    super::migrations::migrate_v27_to_v28_tx(&tx).unwrap();
+    super::migrations::migrate_v29_to_v30_tx(&tx).unwrap();
     tx.commit().unwrap();
     let has_fast_mode: bool = conn
         .query_row(
@@ -23,7 +23,7 @@ fn the_v27_to_v28_migration_adds_the_missing_fast_mode_column() {
             |row| row.get(0),
         )
         .unwrap();
-    assert!(has_fast_mode, "v27 -> v28 must add sessions.fast_mode");
+    assert!(has_fast_mode, "v29 -> v30 must add sessions.fast_mode");
     let memories: i64 = conn
         .query_row("SELECT count(*) FROM memories", [], |row| row.get(0))
         .unwrap();
@@ -31,9 +31,9 @@ fn the_v27_to_v28_migration_adds_the_missing_fast_mode_column() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    // This test runs the v27 -> v28 step alone, so the version stops at 28; the
+    // This test runs the v29 -> v30 step alone, so the version stops at 30; the
     // full `Database::open` chain continues to the latest version.
-    assert_eq!(version, 28);
+    assert_eq!(version, 30);
 }
 
 /// Regression: a profile written by the pre-merge memory build carries the

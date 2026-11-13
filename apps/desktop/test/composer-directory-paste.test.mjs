@@ -49,9 +49,10 @@ function harness(native, { files = [], text = "", items = [], paused, sourceSess
       getDroppedFilePath: () => null,
       readClipboardDirectories: async () => { nativeReads.push(true); if (paused) await paused; return native; },
       recordClipboardPaste: async () => {},
-      importFiles: async (session, token) => {
+      importFiles: async (session, token, reference) => {
         imported.push({ session, token });
-        return { files: [{ path: "/synthetic/scratch/notes.txt", name: "notes.txt", kind: "file" }] };
+        assert.equal(reference, true);
+        return { files: [{ path: "/synthetic/original/notes.txt", name: "notes.txt", kind: "file", size: 67108865, localReference: "selection-id" }] };
       },
       pasteFiles: async (_session, payload) => {
         transfers.push(payload);
@@ -88,7 +89,8 @@ test("paste uses native directory paths even when Chromium exposes no File", asy
   assert.equal(run.drafts.length, 1);
   assert.equal(run.drafts[0].references[0].kind, "directory");
   assert.equal(run.drafts[0].references[0].path, folder.path);
-  assert.equal(run.drafts[0].text, "before \ue001after");
+  assert.equal(run.drafts[0].text, "before after");
+  assert.equal(run.drafts[0].references[0].token, undefined);
   assert.equal(run.imported.length, 0);
   assert.equal(run.transfers.length, 0);
   assert.deepEqual(run.errors, []);
@@ -99,6 +101,7 @@ test("mixed native folders and files preserve their order and use the existing i
   await run.paste();
   assert.equal(run.drafts.length, 1);
   assert.deepEqual(Array.from(run.drafts[0].references, reference => reference.kind), ["directory", "file"]);
+  assert.equal(run.drafts[0].text, "before \ue001after");
   assert.deepEqual(run.imported, [{ session: "source", token: "native-selection" }]);
 });
 
@@ -123,7 +126,7 @@ test("directory paste preserves edits made while native metadata is pending", as
   run.edit("newer edits remain");
   resume();
   await pending;
-  assert.equal(run.drafts[0].text, "newer e\ue001dits remain");
+  assert.equal(run.drafts[0].text, "newer edits remain");
 });
 
 test("native directory paste never reads browser directory bytes", async () => {
@@ -141,6 +144,18 @@ test("ordinary native files keep their existing byte attachment flow", async () 
   assert.equal(run.drafts[0].references[0].kind, "file");
   assert.equal(run.transfers.length, 1);
   assert.equal(new TextDecoder().decode(run.transfers[0][0].data), "notes");
+});
+
+test("native large-file paste keeps original path and size without reading browser bytes", async () => {
+  const file = new File([], "notes.txt", { type: "text/plain" });
+  file.arrayBuffer = () => assert.fail("disk file contents must not cross IPC");
+  const run = harness({ items: [{ kind: "file", name: "notes.txt" }], token: "selection" }, { files: [file] });
+  await run.paste();
+  assert.equal(run.drafts[0].references[0].path, "/synthetic/original/notes.txt");
+  assert.equal(run.drafts[0].references[0].size, 67108865);
+  assert.equal(run.drafts[0].references[0].localReference, "selection-id");
+  assert.equal(run.writes[0].snapshot.fileReferences[0].size, 67108865);
+  assert.deepEqual(run.transfers, []);
 });
 
 for (const navigate of ["switchSession", "switchProject"]) {
@@ -171,4 +186,14 @@ test("Word text plus a generated image keeps text paste without a native file re
   assert.deepEqual(run.errors, []);
   assert.deepEqual(run.nativeReads, []);
   assert.deepEqual(run.textInsertions, ["Copied text from Word"]);
+});
+
+test("screenshot-only paste transfers image bytes without waiting for native directory discovery", async () => {
+  const image = new File(["screenshot bytes"], "image.png", { type: "image/png" });
+  const run = harness(null, { files: [image] });
+  await run.paste();
+  assert.deepEqual(run.errors, []);
+  assert.deepEqual(run.nativeReads, []);
+  assert.equal(run.transfers.length, 1);
+  assert.equal(new TextDecoder().decode(run.transfers[0][0].data), "screenshot bytes");
 });

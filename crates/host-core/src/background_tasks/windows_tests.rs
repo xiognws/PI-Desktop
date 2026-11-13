@@ -142,6 +142,8 @@ async fn wait_for_exit(pid: u32) -> bool {
         if !process_running(pid) {
             return true;
         }
+        // The supervisor shares this Tokio test runtime; yield so it can stop
+        // and reap the process while we observe its exit.
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     false

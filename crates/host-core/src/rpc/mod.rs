@@ -1,9 +1,11 @@
+mod background_jobs;
 mod computer_rpc;
 mod config_sync_rpc;
 mod file_batches;
 mod gen_ui;
 mod memory_rpc;
 mod memory_tool;
+mod modes_rpc;
 mod plugin_reviews_rpc;
 mod remote_tools;
 mod review_actions_rpc;
@@ -13,6 +15,9 @@ mod scheduled_tools;
 mod todos;
 mod window_corner_rpc;
 mod worktree_rpc;
+
+#[cfg(test)]
+mod session_mode_create_tests;
 
 #[cfg(test)]
 mod plugin_reviews_rpc_tests;
@@ -627,7 +632,7 @@ where
     }
 }
 
-/// One required, non-empty string parameter (D691 capability RPCs).
+/// One required, non-empty string parameter (D699 capability RPCs).
 fn capability_id_param(params: &Value) -> Result<String, JsonRpcError> {
     let id = params
         .get("id")
@@ -1208,6 +1213,9 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
                 ));
             }
         }
+    }
+    if let Err(message) = crate::mode_runs::validate_goal_budget_setting(value) {
+        return Err(rpc_err(1002, message, "INVALID_PARAMS"));
     }
     if let Some(infinite_retry) = object.get("infiniteProviderRetry") {
         if !infinite_retry.is_boolean() {
@@ -2012,12 +2020,20 @@ async fn handle_request(
         return memory_rpc::handle(state, method, params).await;
     }
 
+    if method.starts_with("backgroundJobs.") {
+        return background_jobs::handle(state, method, params).await;
+    }
+
     if method.starts_with("tools.fileBatch") {
         return file_batches::handle(state, method, params).await;
     }
 
     if method.starts_with("computer.") {
         return computer_rpc::handle(state, method, params).await;
+    }
+
+    if method.starts_with("modes.") {
+        return modes_rpc::handle(state, &tx, method, params).await;
     }
 
     match method {
@@ -2293,9 +2309,12 @@ async fn handle_request(
                 .get("path")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
-            let path = crate::db::canonical_project_path(path)
-                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            let path = st
+                .db
+                .stored_project_path(path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             if crate::scheduled::project::has_running_tasks(&st.db, &path)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
             {
@@ -2810,7 +2829,7 @@ async fn handle_request(
             } else {
                 None
             };
-            let session = sessions::create_session_with_options(
+            let session = sessions::create_session_with_mode_snapshot(
                 &st.db,
                 sessions::SessionCreateOptions {
                     title: params
@@ -2837,8 +2856,9 @@ async fn handle_request(
                     permission_mode,
                     fast_mode,
                 },
+                params.get("modeSnapshot"),
             )
-            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            .map_err(modes_rpc::error)?;
             let Some(project) = isolated_project else {
                 let session = remote_tools::decorate_session(
                     &st.db,
@@ -3004,7 +3024,8 @@ async fn handle_request(
             let thinking_level = thinking_level_param(&params)?;
             let fast_mode = fast_mode_param(&params)?;
             let st = state.lock().await;
-            let session = sessions::configure_session_with_fast_mode(
+            let prepared = modes_rpc::prepare_configure(&st, id, mode, &params)?;
+            let session = sessions::configure_session_with_mode_snapshot(
                 &st.db,
                 id,
                 mode,
@@ -3013,6 +3034,7 @@ async fn handle_request(
                 thinking_level.as_deref(),
                 params.get("permissionMode").and_then(|v| v.as_str()),
                 fast_mode,
+                prepared.snapshot_hash(),
             )
             .map_err(|e| {
                 let message = e.to_string();
@@ -3023,11 +3045,16 @@ async fn handle_request(
                 }
             })?
             .ok_or_else(|| rpc_err(1007, "session not found", "NOT_FOUND"))?;
+            let paused_run = modes_rpc::finish_configure(&st, prepared)?;
             let session = remote_tools::decorate_session(
                 &st.db,
                 serde_json::to_value(session)
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?,
             )?;
+            drop(st);
+            if let Some(run) = paused_run {
+                modes_rpc::notify(&tx, &run).await;
+            }
             Ok(json!({ "session": session }))
         }
         "session.delete" => {
@@ -3780,6 +3807,17 @@ async fn handle_request(
             Ok(json!({ "hits": hits }))
         }
 
+        "session.usageCost" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            sessions::session_usage_cost(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
+        }
+
         "stats.getTokenUsageHistory" => {
             let bucket = params
                 .get("bucket")
@@ -3838,7 +3876,7 @@ async fn handle_request(
             Ok(json!({ "packages": packages }))
         }
 
-        // Capability packages (D691): the user drops a folder under
+        // Capability packages (D699): the user drops a folder under
         // <data>/widgets and the host owns discovery, trust and the enabled
         // set. Execution happens in the agent sidecar, never here.
         "widgets.list" => {
@@ -3943,6 +3981,7 @@ async fn handle_request(
                 .unwrap_or(plans::KIND_PLAN);
             let kind = plans::normalize_kind(kind)
                 .ok_or_else(|| rpc_err(1002, "kind must be 'plan' or 'goal'", "INVALID_PARAMS"))?;
+            modes_rpc::reject_goal_activation(kind)?;
             let st = state.lock().await;
             let planning_state = {
                 let crate::state::AppState { db, plans, .. } = &*st;
@@ -3999,6 +4038,7 @@ async fn handle_request(
                 .unwrap_or(plans::KIND_PLAN);
             let kind = plans::normalize_kind(kind)
                 .ok_or_else(|| rpc_err(1002, "kind must be 'plan' or 'goal'", "INVALID_PARAMS"))?;
+            modes_rpc::reject_goal_activation(kind)?;
             let proposal = {
                 let guard = state.lock().await;
                 let st = &*guard;
@@ -4353,15 +4393,21 @@ async fn handle_request(
                 None
             };
 
-            let durable_mode = {
+            // Authorization follows the Host's own record of the session's
+            // mode, run stage and snapshot (ADR mode-definitions), never the
+            // mode the sidecar reports.
+            let authorization = {
                 let st = state.lock().await;
                 if st.shutting_down {
                     return Err(rpc_err(1001, "host is shutting down", "HOST_SHUTTING_DOWN"));
                 }
-                sessions::session_mode(&st.db, &p.session_id)
+                let authorization = crate::mode_runs::authorization(&st.db, &p.session_id)
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
-                    .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?
+                    .ok_or_else(|| rpc_err(1007, "session not found", "SESSION_NOT_FOUND"))?;
+                modes_rpc::verify_gate_call(&st, &p, remote_workspace.is_some())?;
+                authorization
             };
+            let durable_mode = authorization.mode.clone();
 
             // Register before permission evaluation so tools.abort can cancel
             // an approval wait even when the tool does not own a process.
@@ -4446,6 +4492,7 @@ async fn handle_request(
                         }
                         _ => effective_pm,
                     };
+                    let effective_pm = authorization.cap_permission_mode(effective_pm);
                     // Resolve the tool root from the persisted session instead of
                     // the mutable global workspace. This keeps background turns
                     // isolated when the renderer switches between project tabs.
@@ -4487,7 +4534,7 @@ async fn handle_request(
                             PermissionEvaluationParams {
                                 session_id: &p.session_id,
                                 tool_name: &p.tool_name,
-                                mode: &durable_mode,
+                                mode: authorization.permission_mode(),
                                 permission_mode: &effective_pm,
                                 session_grants: &st.session_grants,
                                 declared_risk: p.declared_risk.as_deref(),
@@ -4504,7 +4551,7 @@ async fn handle_request(
                     if auto.is_none()
                         && contained_write_auto_allowed(
                             remote_workspace.is_some(),
-                            &durable_mode,
+                            authorization.permission_mode(),
                             &contained_roots,
                             &p.tool_name,
                             &p.args,
@@ -4656,7 +4703,7 @@ async fn handle_request(
                     );
                     let error_code = if cancelled {
                         "TOOL_ABORTED"
-                    } else if sessions::is_contract_mode(&durable_mode)
+                    } else if sessions::is_contract_mode(authorization.permission_mode())
                         && !PermissionManager::plan_mode_allows(&p.tool_name)
                     {
                         match p.tool_name.as_str() {
@@ -4960,7 +5007,7 @@ async fn handle_request(
                         &tx,
                         &p,
                         tools::desktop_dispatch_timeout_ms(p.timeout_ms),
-                        &durable_mode,
+                        authorization.plugin_mode(),
                     )
                     .await
                 } else if scheduled_tools::recognizes(&p.tool_name) {
@@ -5110,6 +5157,7 @@ async fn handle_request(
             .await;
             clear_bash_cancellation(&state, &p).await;
             clear_tool_cancellation(&state, &p).await;
+            modes_rpc::record_gate_call(&state, &p, &outcome).await;
             outcome
         }
 
@@ -5180,7 +5228,7 @@ async fn handle_request(
                 })
                 .filter(|items: &Vec<String>| !items.is_empty());
             let st = state.lock().await;
-            let Some(mode) = sessions::session_mode(&st.db, session_id)
+            let Some(authorization) = crate::mode_runs::authorization(&st.db, session_id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
             else {
                 return Err(rpc_err(1007, "session not found", "SESSION_NOT_FOUND"));
@@ -5205,6 +5253,7 @@ async fn handle_request(
                         })
                 })
                 .unwrap_or_else(|| "ask".into());
+            let effective_pm = authorization.cap_permission_mode(effective_pm);
             let args = params.get("args").cloned().unwrap_or_else(|| json!({}));
             let workspace_path = resolve_tool_workspace_for_call(&st, session_id, &args)?;
             let external_path_permission =
@@ -5227,7 +5276,7 @@ async fn handle_request(
                 .evaluate_auto_with_permission_mode_and_risk_and_path(PermissionEvaluationParams {
                     session_id,
                     tool_name,
-                    mode: &mode,
+                    mode: authorization.permission_mode(),
                     permission_mode: &effective_pm,
                     session_grants: &st.session_grants,
                     declared_risk,
@@ -8604,6 +8653,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn session_usage_cost_rpc_requires_a_session_and_sums_its_ledger() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let session_id = {
+            let st = state.lock().await;
+            let session = sessions::create_session(&st.db, None, None, None, None, None).unwrap();
+            let turn = sessions::begin_turn(&st.db, &session.id, None, None).unwrap();
+            let usage = json!({"operationId": "op", "usageOrigin": "pi", "providerId": "p",
+                "inputTokens": 3, "outputTokens": 1, "totalTokens": 4, "costStatus": "estimated",
+                "cost": {"input": 0.01, "output": 0.02, "cacheRead": 0, "cacheWrite": 0, "total": 0.03}});
+            sessions::record_usage(&st.db, &session.id, &turn, &usage).unwrap();
+            session.id
+        };
+        for params in [json!({}), json!({ "sessionId": "" })] {
+            let error = handle_request(state.clone(), "session.usageCost", params, tx.clone())
+                .await
+                .unwrap_err();
+            assert_eq!(error.code, 1002);
+            assert_eq!(error.data.unwrap()["errorCode"], "INVALID_PARAMS");
+        }
+        let summary = handle_request(
+            state.clone(),
+            "session.usageCost",
+            json!({ "sessionId": session_id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(summary["requestCount"], 1);
+        assert_eq!(summary["providers"][0]["providerId"], "p");
+        assert_eq!(summary["providers"][0]["total"], 0.03);
+        assert_eq!(summary["providers"][0]["reportedRequests"], 0);
+    }
+
+    #[tokio::test]
     async fn plugin_usage_rpc_serves_read_only_fact_rows() {
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
@@ -9220,6 +9307,31 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(retry_settings["infiniteProviderRetry"], true);
+
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "goalBudget": { "maxTurns": 40, "maxTokens": null } }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let goal_settings = handle_request(state.clone(), "settings.get", json!({}), tx.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            goal_settings["goalBudget"],
+            json!({ "maxTurns": 40, "maxTokens": null })
+        );
+        let invalid_goal = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "goalBudget": { "maxTurns": 0, "maxTokens": null } }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(invalid_goal.data.unwrap()["errorCode"], "INVALID_PARAMS");
 
         handle_request(
             state.clone(),

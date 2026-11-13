@@ -1,5 +1,5 @@
 /**
- * Widget packages inside the Tools page (D691).
+ * Widget packages inside the Tools page (D699).
  *
  * A widget package is a folder the user dropped into
  * `<userData>/widgets`; it is listed on the same page as the tool

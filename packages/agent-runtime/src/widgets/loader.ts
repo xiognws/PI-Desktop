@@ -1,5 +1,5 @@
 /**
- * Entry loader for widget packages (D691).
+ * Entry loader for widget packages (D699).
  *
  * Mirrors the trusted-extension loader: jiti, no module cache, no native
  * resolution, so a package written as ESM or CJS loads the same way in a

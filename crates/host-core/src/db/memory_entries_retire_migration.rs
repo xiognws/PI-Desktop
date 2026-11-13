@@ -1,7 +1,7 @@
 //! Retire the flat entry list (ADR 0393): import it into the store, then drop
 //! the tables.
 //!
-//! Schema v28 created `memories` and v30 rebuilt its keyword index; the agent's
+//! Schema v30 created `memories` and v32 rebuilt its keyword index; the agent's
 //! tool was pointed at the store the same release, so the two-column list
 //! (`target`, `ordinal`, `content`) stopped receiving rows. What is left in it is
 //! what earlier builds wrote, part of it already copied in by the startup import
@@ -24,7 +24,7 @@
 
 use super::*;
 
-pub(crate) fn migrate_v30_to_v31_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+pub(crate) fn migrate_v32_to_v33_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
     // A stamp is not proof of shape: converge the store before importing into
     // it, so the import cannot fail on a fixture whose tables were dropped
     // without resetting `user_version`.
@@ -43,7 +43,7 @@ pub(crate) fn migrate_v30_to_v31_tx(tx: &rusqlite::Transaction<'_>) -> Result<()
         "DROP TABLE IF EXISTS memory_entries;
          DROP TABLE IF EXISTS memory_proposals;",
     )?;
-    tx.pragma_update(None, "user_version", 31i64)?;
+    tx.pragma_update(None, "user_version", 33i64)?;
     Ok(())
 }
 
@@ -60,13 +60,13 @@ fn table_exists(conn: &Connection, name: &str) -> Result<bool> {
 /// Backed up before the transaction like every step that rewrites rows: the
 /// entries are copied first, but a copy is not the original, and this is the last
 /// release where a wrong migration can still be undone from the file.
-pub(crate) fn migrate_v30_to_v31(conn: &Connection, path: &Path) -> Result<()> {
-    let backup = create_migration_backup(conn, path, 30)?;
+pub(crate) fn migrate_v32_to_v33(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 32)?;
     let tx = conn.unchecked_transaction()?;
-    migrate_v30_to_v31_tx(&tx)?;
+    migrate_v32_to_v33_tx(&tx)?;
     tx.commit().with_context(|| {
         format!(
-            "commit schema v30 to v31 memory-entry retirement; backup {} remains",
+            "commit schema v32 to v33 memory-entry retirement; backup {} remains",
             backup.display()
         )
     })?;
