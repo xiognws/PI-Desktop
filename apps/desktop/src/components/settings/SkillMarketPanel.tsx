@@ -15,6 +15,7 @@ import {
   type SkillMarketSource,
 } from "@pi-workspace/shared";
 import { api } from "../../lib/api";
+import { CATALOG_DESCRIPTION_CHARS, catalogLine } from "../../lib/skill-description";
 import { useAppStore } from "../../stores/app-store";
 import {
   IconBookOpen,
@@ -372,18 +373,24 @@ export function SkillMarketPanel({
         setDocumentTooLarge(true);
         return;
       }
+      // A marketplace description is third-party text and may exceed what the
+      // catalog will show; install with the catalog line and say so afterwards.
+      const line = catalogLine(assembled.description ?? "");
       const created = await api.createUserSkill({
         id: installFor.id,
         name: assembled.name,
-        description: assembled.description,
+        description: line.text,
         body: assembled.body,
         level: "global",
         scope: GLOBAL_SCOPE,
         enabled: true,
       });
-      showToast(t("settings.sklm.installSuccess", { name: assembled.name }), {
-        variant: "success",
-      });
+      showToast(
+        line.shortened
+          ? t("settings.sklm.installShortened", { name: assembled.name, limit: CATALOG_DESCRIPTION_CHARS })
+          : t("settings.sklm.installSuccess", { name: assembled.name }),
+        { variant: "success" },
+      );
       onInstalled(created.skill?.id ?? installFor.id);
       setInstallFor(null);
     } catch (error) {
