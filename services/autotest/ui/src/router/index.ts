@@ -31,6 +31,12 @@ const router = createRouter({
           component: () => import('@/views/Overview.vue'),
         },
         {
+          // 流水线是「按使用顺序」的主入口：资料 → 知识库 → 用例 → 脚本 → 执行 → 报告
+          path: 'pipeline',
+          name: 'Pipeline',
+          component: () => import('@/views/Pipeline.vue'),
+        },
+        {
           path: 'runs',
           name: 'Runs',
           component: () => import('@/views/Runs.vue'),

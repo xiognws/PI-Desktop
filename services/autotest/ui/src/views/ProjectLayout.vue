@@ -175,6 +175,7 @@ function backToHome() {
         <router-link
           v-for="nav in [
             { path: 'overview', name: '概览' },
+            { path: 'pipeline', name: '流水线' },
             { path: 'runs', name: '运行记录' },
             { path: 'executions', name: '执行' },
             { path: 'approvals', name: '待审批' },
