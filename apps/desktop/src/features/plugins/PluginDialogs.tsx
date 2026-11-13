@@ -45,6 +45,12 @@ export function PluginDialogs({
   creating,
   setTemplatePick,
   createFromTemplate,
+  pluginDirsOpen,
+  setPluginDirsOpen,
+  pluginDirs,
+  addPluginDir,
+  removePluginDir,
+  revealPluginDir,
 }: PluginsPageModel) {
   return (
     <>
@@ -258,6 +264,74 @@ export function PluginDialogs({
                 {creating
                   ? t("plugins.newFromTemplateCreating")
                   : t("plugins.newFromTemplateCreate")}
+              </Button>
+            </div>
+          </div>
+        </div>,
+      )
+        : null}
+      {pluginDirsOpen
+        ? pluginModalPortal(
+        <div className="plugins-modal-backdrop" role="presentation">
+          <div
+            className="plugins-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("plugins.pluginDirsTitle")}
+          >
+            <header className="plugins-modal-head">
+              <span className="plugins-modal-icon" aria-hidden>
+                <IconSparkles size={17} />
+              </span>
+              <div>
+                <h2 className="plugins-modal-title">{t("plugins.pluginDirsTitle")}</h2>
+                <p className="plugins-modal-subtitle">{t("plugins.pluginDirsHint")}</p>
+              </div>
+            </header>
+
+            <div className="plugins-modal-body">
+              {pluginDirs.length ? (
+                <ul className="plugins-dir-list">
+                  {pluginDirs.map((dir) => (
+                    <li key={dir.path} className="plugins-dir-row">
+                      <div className="plugins-dir-copy">
+                        <code className="plugins-dir-path">{dir.path}</code>
+                        {dir.counted ? null : (
+                          <span className="plugins-dir-missing">
+                            {t("plugins.pluginDirsMissing")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="plugins-dir-actions">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void revealPluginDir(dir.path)}
+                        >
+                          {t("plugins.pluginDirsOpen")}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void removePluginDir(dir.path)}
+                        >
+                          {t("plugins.pluginDirsRemove")}
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="plugins-modal-lede">{t("plugins.pluginDirsEmpty")}</p>
+              )}
+            </div>
+
+            <div className="plugins-modal-actions">
+              <Button variant="secondary" onClick={() => setPluginDirsOpen(false)}>
+                {t("plugins.pluginDirsClose")}
+              </Button>
+              <Button variant="primary" onClick={() => void addPluginDir()}>
+                {t("plugins.pluginDirsAdd")}
               </Button>
             </div>
           </div>

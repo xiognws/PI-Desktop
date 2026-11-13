@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 import { getModuleDirectory } from "./module-path.ts";
 
 /**
@@ -107,6 +107,74 @@ export function parsePluginPaths(raw: string): PluginPaths {
 /** The settings file for one installation's data directory. */
 export function pluginPathsFile(dataDir: string): string {
   return join(dataDir, PLUGIN_PATHS_FILE);
+}
+
+/** One directory as the settings page shows it. */
+export type PluginDirectoryEntry = {
+  path: string;
+  /** Whether the directory is on disk right now. */
+  exists: boolean;
+  /** Whether the host will actually scan it (it only scans what exists). */
+  counted: boolean;
+};
+
+/**
+ * Round-trip the file so the page and the host agree on one list.
+ *
+ * Written as data, not as the in-memory value: a hand-edited file with an entry
+ * the parser drops must stop being listed, or the page would keep offering a
+ * directory that does nothing.
+ */
+export function writePluginPaths(dataDir: string, dirs: readonly string[]): PluginPaths {
+  const parsed = parsePluginPaths(JSON.stringify({ extraDirs: [...dirs] }));
+  const file = pluginPathsFile(dataDir);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+  return parsed;
+}
+
+/** Appending a directory that is already listed keeps the first position. */
+export function addExtraDir(dirs: readonly string[], dir: string): string[] {
+  const trimmed = dir.trim();
+  if (!trimmed || dirs.includes(trimmed)) return [...dirs];
+  return [...dirs, trimmed].slice(0, MAX_EXTRA_DIRS);
+}
+
+export function removeExtraDir(dirs: readonly string[], dir: string): string[] {
+  return dirs.filter((entry) => entry !== dir);
+}
+
+/** The configured list, with the state each entry is in on disk. */
+export function listPluginDirectories(dataDir: string): PluginDirectoryEntry[] {
+  const parsed = parsePluginPaths(
+    existsSync(pluginPathsFile(dataDir))
+      ? readFileSync(pluginPathsFile(dataDir), "utf8")
+      : "{}",
+  );
+  return parsed.extraDirs.map((path) => {
+    const exists = existsSync(path);
+    return { path, exists, counted: exists };
+  });
+}
+
+/**
+ * True when `target` is `dir` itself or lives inside it.
+ *
+ * Separator-agnostic on purpose: a path the renderer shows is a string the user
+ * copied, and Windows accepts both separators. Trailing separators are trimmed
+ * so `D:\plugins\` covers `D:\plugins\x` but not `D:\plugins-old`.
+ */
+export function isInsideDirectory(dir: string, target: string): boolean {
+  // Normalise both sides first: the two separators mean the same thing on
+  // Windows, and a user copying a path out of Explorer gets backslashes while a
+  // plugin's own manifest uses forward slashes.
+  const normalize = (value: string) =>
+    String(value ?? "").trim().replace(/\\/g, "/").replace(/\/+$/, "");
+  const root = normalize(dir);
+  const path = normalize(target);
+  if (!root || !path) return false;
+  if (path === root) return true;
+  return path.startsWith(`${root}/`);
 }
 
 /**

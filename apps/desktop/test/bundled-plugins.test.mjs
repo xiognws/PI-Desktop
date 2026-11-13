@@ -194,3 +194,18 @@ test("bundled plugins are packaged and located at runtime", () => {
   const pluginPathsSource = read("electron/main/plugin-paths.ts");
   assert.match(pluginPathsSource, /join\(resources, "plugins"\)/);
 });
+
+test("the plugin directories the user adds are wired end to end", () => {
+  const pluginIpcSource = read("electron/main/ipc/plugin-ipc.ts");
+  const pageSource = read("src/features/plugins/usePluginsPage.ts");
+  const apiSource = read("src/lib/api.ts");
+
+  // The host rescans on demand, so a directory added in settings takes effect
+  // without a restart (ADR 0396).
+  assert.match(pluginIpcSource, /plugins\.syncExtraDirs/);
+  assert.match(pluginIpcSource, /writePluginPaths\(dataDir/);
+  assert.match(pluginIpcSource, /IPC\.invoke\.pluginDirsAdd/);
+  assert.match(pluginIpcSource, /IPC\.invoke\.pluginDirsRemove/);
+  assert.match(apiSource, /addPluginDirectory/);
+  assert.match(pageSource, /key: "pluginDirs"/);
+});

@@ -5431,6 +5431,22 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "plugin": plugin }))
         }
+        // Re-scan the directories the user pointed at, without restarting the
+        // host: adding or removing one is a settings action, not a migration.
+        "plugins.syncExtraDirs" => {
+            let dirs: Vec<PathBuf> = params
+                .get("dirs")
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+                .unwrap_or_default()
+                .into_iter()
+                .map(PathBuf::from)
+                .collect();
+            let mut st = state.lock().await;
+            st.plugins
+                .sync_extra(&dirs)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "plugins": st.plugins.list() }))
+        }
         "plugins.getPermissions" => {
             let id = params
                 .get("id")

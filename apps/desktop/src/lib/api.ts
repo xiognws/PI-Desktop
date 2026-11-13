@@ -1446,6 +1446,23 @@ export const api = {
     ),
   restorePreinstalledPlugin: (id: string) =>
     invoke(IPC.invoke.pluginRestorePreinstalled, id),
+  /** Directories the user points the host at (ADR 0396). */
+  pluginDirectories: () =>
+    invoke<{ dirs: { path: string; exists: boolean; counted: boolean }[] }>(
+      IPC.invoke.pluginDirsList,
+    ),
+  addPluginDirectory: () =>
+    invoke<{
+      canceled?: boolean;
+      dirs: { path: string; exists: boolean; counted: boolean }[];
+    }>(IPC.invoke.pluginDirsAdd),
+  removePluginDirectory: (path: string) =>
+    invoke<{ dirs: { path: string; exists: boolean; counted: boolean }[] }>(
+      IPC.invoke.pluginDirsRemove,
+      path,
+    ),
+  revealPluginDirectory: (path: string) =>
+    invoke<{ ok: boolean; error?: string }>(IPC.invoke.pluginDirsReveal, path),
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   getPluginSettings: (id: string) =>

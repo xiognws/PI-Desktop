@@ -132,6 +132,9 @@ export function InstalledPluginsPanel({
                               {plugin.source === "dev" ? (
                                 <span className="plugins-tag">{t("plugins.tagLocal")}</span>
                               ) : null}
+                              {plugin.source === "external" ? (
+                                <span className="plugins-tag">{t("plugins.tagExternal")}</span>
+                              ) : null}
                               {plugin.bundled ? (
                                 <span className="plugins-tag">{t("plugins.tagBundled")}</span>
                               ) : null}

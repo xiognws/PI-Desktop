@@ -464,6 +464,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   registerPluginIpc({
     registrar,
     getHost,
+    dataDir,
     plugins,
     agentExtensions,
     browserHost,

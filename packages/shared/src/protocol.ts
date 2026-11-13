@@ -372,6 +372,14 @@ export const IPC = {
     /** Preinstalled plugins the user removed, and the way back. */
     pluginPreinstalledRemoved: "pi-desktop/plugin/preinstalledRemoved",
     pluginRestorePreinstalled: "pi-desktop/plugin/restorePreinstalled",
+    /**
+     * Directories the user points the host at (ADR 0396). Discovery is the
+     * host's job, so the list travels as data and the host rescans on demand.
+     */
+    pluginDirsList: "pi-desktop/plugin/dirs/list",
+    pluginDirsAdd: "pi-desktop/plugin/dirs/add",
+    pluginDirsRemove: "pi-desktop/plugin/dirs/remove",
+    pluginDirsReveal: "pi-desktop/plugin/dirs/reveal",
     pluginSetAutoUpdate: "pi-desktop/plugin/setAutoUpdate",
     pluginSettingsGet: "pi-desktop/plugin/settings/get",
     pluginSettingsSet: "pi-desktop/plugin/settings/set",
