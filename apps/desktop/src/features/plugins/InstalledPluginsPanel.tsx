@@ -36,6 +36,9 @@ export function InstalledPluginsPanel({
   run,
   refreshPlugins,
   reloadPlugin,
+  removedPreinstalled,
+  refreshRemovedPreinstalled,
+  restorePreinstalled,
   setSettingsPlugin,
   servicesByPlugin,
   reviewSummaries,
@@ -128,6 +131,9 @@ export function InstalledPluginsPanel({
                               ) : null}
                               {plugin.source === "dev" ? (
                                 <span className="plugins-tag">{t("plugins.tagLocal")}</span>
+                              ) : null}
+                              {plugin.source === "external" ? (
+                                <span className="plugins-tag">{t("plugins.tagExternal")}</span>
                               ) : null}
                               {plugin.bundled ? (
                                 <span className="plugins-tag">{t("plugins.tagBundled")}</span>
@@ -266,31 +272,31 @@ export function InstalledPluginsPanel({
                                       ? t("plugins.disableAutoUpdate")
                                       : t("plugins.enableAutoUpdate")}
                                   </button>
-                                  {/* A bundled plugin belongs to the
-                                      application: the host refuses the
-                                      removal, so the action is not offered
-                                      (ADR 0104, ADR 0241). */}
-                                  {plugin.bundled ? null : (
-                                    <>
-                                      <div className="plugins-menu-sep" />
-                                      <button
-                                        type="button"
-                                        role="menuitem"
-                                        className="danger"
-                                        onClick={() => {
-                                          setRowMenu(null);
-                                          void run(async () => {
-                                            await api.uninstallPlugin(plugin.id);
-                                            await refreshPlugins();
-                                          });
-                                        }}
-                                      >
-                                        <IconTrash size={14} />
-                                        {t("plugins.uninstall")}
-                                      </button>
-                                    </>
-                                  )}
-                            </AnchoredMenu>
+                                  {/* A preinstalled plugin belongs to the
+                                      image, but not to the point of being
+                                      unremovable: the host records the removal
+                                      so an update cannot seed it back, and the
+                                      section below offers it again. */}
+                                  <>
+                                    <div className="plugins-menu-sep" />
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="danger"
+                                      onClick={() => {
+                                        setRowMenu(null);
+                                        void run(async () => {
+                                          await api.uninstallPlugin(plugin.id);
+                                          await refreshPlugins();
+                                          await refreshRemovedPreinstalled();
+                                        });
+                                      }}
+                                    >
+                                      <IconTrash size={14} />
+                                      {t("plugins.uninstall")}
+                                    </button>
+                                  </>
+                                </AnchoredMenu>
                           </div>
                         </article>
                       );
@@ -299,6 +305,41 @@ export function InstalledPluginsPanel({
                 </section>
               ))
             )}
+            {removedPreinstalled.length ? (
+              <section className="plugins-group" aria-label={t("plugins.removedPreinstalled")}>
+                <h3 className="plugins-group-label">{t("plugins.removedPreinstalled")}</h3>
+                <div className="plugins-list" role="list">
+                  {removedPreinstalled.map((row) => (
+                    <article key={row.id} role="listitem" className="plugins-row off">
+                      <div className="plugins-row-head">
+                        <span className="plugins-glyph" aria-hidden>
+                          <IconPlug size={15} />
+                        </span>
+                        <div className="plugins-row-title">
+                          <span className="plugins-row-name">{row.id}</span>
+                          <span className="plugins-tag">{t("plugins.tagBundled")}</span>
+                        </div>
+                      </div>
+                      <div className="plugins-row-copy">
+                        <div className="plugins-row-meta">
+                          <span className="plugins-row-id">v{row.version}</span>
+                        </div>
+                        <p className="plugins-row-error">{t("plugins.removedPreinstalledHint")}</p>
+                      </div>
+                      <div className="plugins-row-controls">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void restorePreinstalled(row.id)}
+                        >
+                          {t("plugins.restorePreinstalled")}
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </div>
 );
 }

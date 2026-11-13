@@ -1439,6 +1439,42 @@ export const api = {
   enablePlugin: (id: string) => invoke(IPC.invoke.pluginEnable, id),
   disablePlugin: (id: string) => invoke(IPC.invoke.pluginDisable, id),
   uninstallPlugin: (id: string) => invoke(IPC.invoke.pluginUninstall, id),
+  /** Preinstalled plugins the user removed; the page offers them back. */
+  preinstalledPluginsRemoved: () =>
+    invoke<{ removed: { id: string; version: string }[] }>(
+      IPC.invoke.pluginPreinstalledRemoved,
+    ),
+  restorePreinstalledPlugin: (id: string) =>
+    invoke(IPC.invoke.pluginRestorePreinstalled, id),
+  /** Directories the user points the host at (ADR 0396). */
+  pluginDirectories: () =>
+    invoke<{ dirs: { path: string; exists: boolean; counted: boolean }[] }>(
+      IPC.invoke.pluginDirsList,
+    ),
+  addPluginDirectory: () =>
+    invoke<{
+      canceled?: boolean;
+      dirs: { path: string; exists: boolean; counted: boolean }[];
+    }>(IPC.invoke.pluginDirsAdd),
+  removePluginDirectory: (path: string) =>
+    invoke<{ dirs: { path: string; exists: boolean; counted: boolean }[] }>(
+      IPC.invoke.pluginDirsRemove,
+      path,
+    ),
+  revealPluginDirectory: (path: string) =>
+    invoke<{ ok: boolean; error?: string }>(IPC.invoke.pluginDirsReveal, path),
+  /** Data components the user may override (ADR 0396 § component overlays). */
+  listComponents: () =>
+    invoke<{
+      components: { name: string; userDir: string; overridden: boolean; present: boolean }[];
+    }>(IPC.invoke.componentList),
+  openComponentDir: (name: string) =>
+    invoke<{ ok: boolean; path: string }>(IPC.invoke.componentOpen, name),
+  resetComponent: (name: string) =>
+    invoke<{
+      parked: string | null;
+      components: { name: string; userDir: string; overridden: boolean; present: boolean }[];
+    }>(IPC.invoke.componentReset, name),
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   getPluginSettings: (id: string) =>

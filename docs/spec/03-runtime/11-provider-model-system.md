@@ -173,6 +173,11 @@ wire APIs, and non-Claude ids served over the Anthropic protocol are unchanged
 > adapters, OAuth identities and wire transport remain available through pi-ai,
 > and the OpenAI-compatible path stays open for unpublished models.
 
+The bundled catalog is a default, not a fixed list: `<data>/components/models.dev/api.json`
+replaces it when present (ADR 0396 § component overlays). That is how a
+deployment points the app at a private gateway's model metadata without
+rebuilding — deleting the file restores the shipped catalog.
+
 ### Tier A — always exposed in UI
 - OpenAI
 - Anthropic

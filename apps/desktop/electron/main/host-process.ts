@@ -15,6 +15,11 @@ import { redactValue } from "./logger";
 import { getModuleDirectory } from "./module-path";
 import { localTimestamp } from "./log-timestamp.ts";
 import { pythonEnv, resolvePythonRuntime, USER_SITE_DIR } from "./python-runtime.ts";
+import {
+  PATH_DELIMITER,
+  resolveExtraPluginDirs,
+  resolvePreinstalledPluginsDirs,
+} from "./plugin-paths.ts";
 
 export type {
   HostNotificationHandler,
@@ -49,23 +54,12 @@ export function resolveHostBinary(): string {
 }
 
 /**
- * Directory holding the plugins this build ships, or null when it ships none.
+ * Directories this build ships plugins in, in scan order (possibly empty).
  *
- * Mirrors `resolveBuiltinSkillPath`: electron-builder copies
- * `resources/plugins` to `<resources>/plugins`, and a source checkout reaches
- * the same tree relatively.
+ * Resolved in `plugin-paths.ts`, which also owns the directories the user
+ * pointed the host at; the host treats what it finds in these as
+ * *preinstalled* — shipped, but the user's to remove, update, or replace.
  */
-function resolveBuiltinPluginsDir(): string | null {
-  const candidates = [
-    join(process.resourcesPath || "", "plugins"),
-    join(getModuleDirectory(import.meta.url), "../../resources/plugins"),
-    join(getModuleDirectory(import.meta.url), "../../../resources/plugins"),
-  ];
-  for (const candidate of candidates) {
-    if (candidate && existsSync(candidate)) return candidate;
-  }
-  return null;
-}
 
 /**
  * Name the two boot refusals the desktop phrases for the user (D380): a data
@@ -133,7 +127,8 @@ function resolveBuiltinToolsDir(): string | null {
  */
 export class HostProcess extends RuntimeHostProcess {
   constructor(dataDir: string, onStderr?: StderrHandler) {
-    const builtinPlugins = resolveBuiltinPluginsDir();
+    const preinstalledPlugins = resolvePreinstalledPluginsDirs();
+    const extraPlugins = resolveExtraPluginDirs(dataDir);
     const builtinTools = resolveBuiltinToolsDir();
     // Every Bash/Core tool command inherits host-core's environment, so the
     // Python path is set here rather than per call: the runtime is a property of
@@ -146,11 +141,18 @@ export class HostProcess extends RuntimeHostProcess {
       binaryPath: resolveHostBinary(),
       dataDir,
       // Only Electron knows whether this build runs from `resources/` or a
-      // source checkout, so it resolves the bundled-plugin directory and
-      // host-core simply reconciles its registry against it (ADR 0105).
+      // source checkout, so it resolves the plugin directories and host-core
+      // simply reconciles its registry against them (ADR 0105, ADR 0396).
       env: {
         PI_DESKTOP_ELECTRON_PID: String(process.pid),
-        ...(builtinPlugins ? { PI_DESKTOP_BUILTIN_PLUGINS_DIR: builtinPlugins } : {}),
+        ...(preinstalledPlugins.length
+          ? { PI_DESKTOP_PREINSTALLED_DIRS: preinstalledPlugins.join(PATH_DELIMITER) }
+          : {}),
+        // The user's own directories: read in place, never copied, never
+        // deleted. Empty means the settings page has not been used.
+        ...(extraPlugins.length
+          ? { PI_DESKTOP_EXTRA_PLUGIN_DIRS: extraPlugins.join(PATH_DELIMITER) }
+          : {}),
         // Same split for the bundled tool packages (D681): the host scans the
         // directory, Electron only says where it is.
         ...(builtinTools ? { PI_DESKTOP_BUILTIN_TOOLS_DIR: builtinTools } : {}),

@@ -45,6 +45,7 @@ import {
   ModelsDevCatalog,
   catalogModelConfigFor,
 } from "./models-dev-catalog";
+import { userComponentPath } from "./user-components.ts";
 import { VendorOAuth } from "./oauth";
 import { AppUpdaterController } from "./updater";
 import {
@@ -190,6 +191,10 @@ const dataDir = storage.preferences.roots.data;
 // it as a parameter, and a profile split across two directories is the
 // divergence D236 closes.
 process.env.PI_DESKTOP_DATA_DIR = dataDir;
+// host-core records which build seeded the preinstalled plugins, and the child
+// process cannot ask Electron for it. Set here rather than inside the host
+// wrapper so the value is in place before anything spawns it.
+process.env.PI_DESKTOP_APP_VERSION = app.getVersion();
 
 // Agent extensions (D387/D388, ADR 0214): plugins contribute the modules,
 // the sidecar loads them; this bridge carries commands, diagnostics, and
@@ -285,9 +290,14 @@ const updater = new AppUpdaterController({
  * resolved request auth.
  */
 const modelsDevCatalog = new ModelsDevCatalog({
-  catalogPath: app.isPackaged
-    ? join(process.resourcesPath, "models.dev", "api.json")
-    : join(app.getAppPath(), "resources", "models.dev", "api.json"),
+  // A catalog the user put in their data directory wins: shipping a catalog is
+  // how a first launch knows about models, not a claim about which gateway the
+  // user actually has (ADR 0396 § components).
+  catalogPath:
+    userComponentPath(dataDir, "models.dev", "api.json") ??
+    (app.isPackaged
+      ? join(process.resourcesPath, "models.dev", "api.json")
+      : join(app.getAppPath(), "resources", "models.dev", "api.json")),
 });
 
 const vendorOAuth = new VendorOAuth({

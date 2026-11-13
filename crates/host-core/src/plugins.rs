@@ -23,6 +23,7 @@ mod manifest;
 pub mod marketplace;
 mod model;
 mod permissions;
+pub(crate) mod preinstalled;
 pub(crate) mod progress;
 mod provider_validation;
 mod providers;

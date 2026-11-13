@@ -1,4 +1,4 @@
-import { dialog } from "electron";
+import { dialog, shell } from "electron";
 import { IPC, type ActivationScope } from "@pi-workspace/shared";
 import { isTemplateName, scaffold } from "@pi-workspace/plugin-devkit";
 import type { AgentExtensionBridge } from "../agent-extensions";
@@ -6,6 +6,13 @@ import type { BrowserHost } from "../browser-host";
 import type { HostProcess } from "../host-process";
 import { BROWSER_PLUGIN_ID } from "../browser-host";
 import type { Logger } from "../logger";
+import {
+  addExtraDir,
+  isInsideDirectory,
+  listPluginDirectories,
+  removeExtraDir,
+  writePluginPaths,
+} from "../plugin-paths.ts";
 import {
   readDevPluginDeclaration,
   widenedFsScope,
@@ -18,6 +25,8 @@ import type { IpcRegistrar } from "./types";
 export type PluginIpcDependencies = {
   registrar: IpcRegistrar;
   getHost: () => HostProcess | null;
+  /** Data directory: where `plugin-paths.json` lives. */
+  dataDir: string;
   plugins: PluginRuntime;
   agentExtensions: AgentExtensionBridge;
   browserHost: BrowserHost;
@@ -40,6 +49,7 @@ export function registerPluginIpc({
   rememberPluginScopes,
   sendToRenderer,
   logger,
+  dataDir,
 }: PluginIpcDependencies): void {
   let host: HostProcess | null = null;
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
@@ -48,6 +58,81 @@ export function registerPluginIpc({
       return fn(...args);
     });
   };
+
+  /**
+   * Bring the loaded runtime in step with what the host now scans.
+   *
+   * The host owns discovery — adding or removing a directory rewrites its
+   * registry — while this process owns execution. So after a settings change:
+   * load what is enabled and newly registered, and unload whatever lived in a
+   * directory that just left the list. Never touch a plugin from anywhere else.
+   */
+  const reconcileExternalPlugins = async (removedDirs: string[] = []) => {
+    if (!host) return;
+    const listed = await host.call<{ plugins: any[] }>("plugins.list");
+    const external = (listed.plugins ?? []).filter((p) => p.source === "external");
+    const ids = new Set(external.map((p) => p.id));
+    for (const plugin of external) {
+      if (!plugin.enabled || !plugin.path) continue;
+      if (plugins.listLoaded().some((loaded) => loaded.manifest.id === plugin.id)) continue;
+      try {
+        await plugins.loadFromPath(plugin.path, plugin.permissions ?? []);
+      } catch (error) {
+        logger.app("plugin", "error", "external plugin load failed", {
+          pluginId: plugin.id,
+          data: String(error),
+        });
+      }
+    }
+    for (const loaded of plugins.listLoaded()) {
+      const stillThere = ids.has(loaded.manifest.id);
+      const insideRemoved = removedDirs.some((dir) => isInsideDirectory(dir, loaded.path));
+      if (!stillThere && insideRemoved) await plugins.unload(loaded.manifest.id);
+    }
+  };
+
+  /** Register the directories the user pointed the host at. */
+  handle(IPC.invoke.pluginDirsList, async () => ({
+    dirs: listPluginDirectories(dataDir),
+  }));
+
+  handle(IPC.invoke.pluginDirsAdd, async () => {
+    if (!host) throw new Error("host unavailable");
+    const picked = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    if (picked.canceled || !picked.filePaths[0]) {
+      return { canceled: true, dirs: listPluginDirectories(dataDir) };
+    }
+    const current = listPluginDirectories(dataDir).map((entry) => entry.path);
+    const written = writePluginPaths(dataDir, addExtraDir(current, picked.filePaths[0]));
+    await host.call("plugins.syncExtraDirs", { dirs: written.extraDirs });
+    await reconcileExternalPlugins();
+    logger.app("plugin", "info", "plugin directory added", {
+      data: { path: picked.filePaths[0], count: written.extraDirs.length },
+    });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "install" });
+    return { canceled: false, dirs: listPluginDirectories(dataDir) };
+  });
+
+  handle(IPC.invoke.pluginDirsRemove, async (path: string) => {
+    if (!host) throw new Error("host unavailable");
+    const removed = String(path ?? "").trim();
+    const current = listPluginDirectories(dataDir).map((entry) => entry.path);
+    const written = writePluginPaths(dataDir, removeExtraDir(current, removed));
+    await host.call("plugins.syncExtraDirs", { dirs: written.extraDirs });
+    await reconcileExternalPlugins([removed]);
+    logger.app("plugin", "info", "plugin directory removed", {
+      data: { path: removed, count: written.extraDirs.length },
+    });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "directories" });
+    return { dirs: listPluginDirectories(dataDir) };
+  });
+
+  handle(IPC.invoke.pluginDirsReveal, async (path: string) => {
+    const target = String(path ?? "").trim();
+    if (!target) throw new Error("INVALID_PARAMS: path required");
+    const error = await shell.openPath(target);
+    return { ok: error === "", error };
+  });
 
   /**
    * Register a development plugin folder, load it with the permissions the user
@@ -401,6 +486,32 @@ export function registerPluginIpc({
     logger.app("plugin", "info", "plugin uninstalled", { pluginId: id });
     const res = await host.call("plugins.uninstall", { id });
     sendToRenderer(IPC.event.pluginChanged,{ reason: "uninstall", pluginId: id });
+    return res;
+  });
+
+  /** Preinstalled ids the user removed, so the page can offer them back. */
+  handle(IPC.invoke.pluginPreinstalledRemoved, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call<{ removed: { id: string; version: string }[] }>(
+      "plugins.preinstalledRemoved",
+    );
+  });
+
+  /**
+   * Undo a removal. The host clears the record and rebuilds the row from the
+   * shipped manifest, so what comes back is the image's current version rather
+   * than whatever was removed.
+   */
+  handle(IPC.invoke.pluginRestorePreinstalled, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call<{ plugin: any }>("plugins.restorePreinstalled", { id });
+    if (res.plugin?.path) {
+      await plugins.loadFromPath(res.plugin.path, res.plugin.permissions ?? [], {
+        development: false,
+      });
+    }
+    logger.app("plugin", "info", "preinstalled plugin restored", { pluginId: id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "install", pluginId: id });
     return res;
   });
 

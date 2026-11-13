@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { GEN_UI_SCHEME } from "@pi-workspace/shared";
-import { getModuleDirectory } from "./module-path";
+import { getModuleDirectory } from "./module-path.ts";
+import { dataDirFromEnv, userComponentPath } from "./user-components.ts";
 
 /**
  * The visualize kit around a model-written fragment (ADR
@@ -88,7 +89,11 @@ export function genUiAssetFileFromUrl(url: string): string | null {
 }
 
 /** electron-builder copies `resources/gen-ui` to `<resources>/gen-ui`. */
-export function resolveGenUiKitDir(): string | null {
+export function resolveGenUiKitDir(env: NodeJS.ProcessEnv = process.env): string | null {
+  // The user's own kit wins when it is complete enough to load: a kit is CSS,
+  // markup and a vendor manifest together, so half of one is not a kit.
+  const userKit = userComponentPath(dataDirFromEnv(env), "gen-ui", "visualize.css");
+  if (userKit) return dirname(userKit);
   const moduleDir = getModuleDirectory(import.meta.url);
   const candidates = [
     join(process.resourcesPath || "", "gen-ui"),

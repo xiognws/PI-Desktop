@@ -102,7 +102,7 @@ impl PluginManager {
                     .map(|p| p.scope.clone())
                     .unwrap_or_default(),
                 source: opts.source.clone(),
-                bundled: self.bundled_ids.contains(&manifest.id),
+                bundled: self.preinstalled_ids.contains(&manifest.id),
                 status: if opts.enable {
                     "ready".into()
                 } else {
@@ -138,6 +138,10 @@ impl PluginManager {
                 i18n: manifest.i18n.clone(),
             };
             let plugin = self.upsert_summary(summary)?;
+            // Installing over a preinstalled id is the user's decision, and the
+            // record is the only thing that keeps a later launch from reading
+            // the row as untouched and replacing it with the image's copy.
+            self.mark_preinstalled_modified(&plugin.id, &plugin.version);
             Ok(InstallResult {
                 plugin,
                 upgraded,

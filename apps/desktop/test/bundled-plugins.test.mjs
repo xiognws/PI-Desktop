@@ -185,8 +185,27 @@ test("bundled plugins are packaged and located at runtime", () => {
     "resources/plugins must be copied outside the asar",
   );
   // host-core cannot know whether it runs from resources/ or a checkout, so
-  // Electron resolves the directory and hands it over.
-  assert.match(hostProcessSource, /function resolveBuiltinPluginsDir\(\)/);
-  assert.match(hostProcessSource, /PI_DESKTOP_BUILTIN_PLUGINS_DIR/);
-  assert.match(hostProcessSource, /join\(process\.resourcesPath \|\| "", "plugins"\)/);
+  // Electron resolves the directories and hands them over (ADR 0396).
+  assert.match(hostProcessSource, /import \{[\s\S]*resolvePreinstalledPluginsDirs[\s\S]*\} from "\.\/plugin-paths\.ts"/);
+  assert.match(hostProcessSource, /PI_DESKTOP_PREINSTALLED_DIRS/);
+  // The directories the user pointed at travel the same way, and are a list for
+  // the same reason: naming one is a deliberate act, not a build decision.
+  assert.match(hostProcessSource, /PI_DESKTOP_EXTRA_PLUGIN_DIRS/);
+  const pluginPathsSource = read("electron/main/plugin-paths.ts");
+  assert.match(pluginPathsSource, /join\(resources, "plugins"\)/);
+});
+
+test("the plugin directories the user adds are wired end to end", () => {
+  const pluginIpcSource = read("electron/main/ipc/plugin-ipc.ts");
+  const pageSource = read("src/features/plugins/usePluginsPage.ts");
+  const apiSource = read("src/lib/api.ts");
+
+  // The host rescans on demand, so a directory added in settings takes effect
+  // without a restart (ADR 0396).
+  assert.match(pluginIpcSource, /plugins\.syncExtraDirs/);
+  assert.match(pluginIpcSource, /writePluginPaths\(dataDir/);
+  assert.match(pluginIpcSource, /IPC\.invoke\.pluginDirsAdd/);
+  assert.match(pluginIpcSource, /IPC\.invoke\.pluginDirsRemove/);
+  assert.match(apiSource, /addPluginDirectory/);
+  assert.match(pageSource, /key: "pluginDirs"/);
 });

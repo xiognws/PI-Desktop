@@ -2402,3 +2402,50 @@
   }
 }
 
+
+/* Plugin directories (ADR 0396): the user's own plugin folders. */
+.plugins-dir-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plugins-dir-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.plugins-dir-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plugins-dir-path {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plugins-dir-missing {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.plugins-dir-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}

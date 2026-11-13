@@ -470,6 +470,77 @@ export function usePluginsPage() {
     }
   };
 
+  /**
+   * Preinstalled plugins this user removed.
+   *
+   * The host keeps the decision, so the page can offer the ones that are gone
+   * instead of them silently disappearing from the product. Fetched alongside
+   * the installed list and refreshed after a removal.
+   */
+  const [removedPreinstalled, setRemovedPreinstalled] = useState<
+    { id: string; version: string }[]
+  >([]);
+  const refreshRemovedPreinstalled = async () => {
+    try {
+      const res = await api.preinstalledPluginsRemoved();
+      setRemovedPreinstalled(res.removed ?? []);
+    } catch {
+      setRemovedPreinstalled([]);
+    }
+  };
+  const restorePreinstalled = (id: string) =>
+    run(async () => {
+      await api.restorePreinstalledPlugin(id);
+      await refreshPlugins();
+      await refreshRemovedPreinstalled();
+    });
+
+  useEffect(() => {
+    void refreshRemovedPreinstalled();
+    // Mount only: the list changes through the actions on this page, which
+    // refresh it themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Directories the user points the host at (ADR 0396).
+   *
+   * The host rescans on every change, so the dialog only has to show the list
+   * it gets back — no local bookkeeping of what "should" be scanned.
+   */
+  const [pluginDirsOpen, setPluginDirsOpen] = useState(false);
+  const [pluginDirs, setPluginDirs] = useState<
+    { path: string; exists: boolean; counted: boolean }[]
+  >([]);
+  const refreshPluginDirs = async () => {
+    try {
+      const res = await api.pluginDirectories();
+      setPluginDirs(res.dirs ?? []);
+    } catch {
+      setPluginDirs([]);
+    }
+  };
+  const openPluginDirs = () => {
+    void refreshPluginDirs();
+    setPluginDirsOpen(true);
+  };
+  const addPluginDir = () =>
+    run(async () => {
+      const res = await api.addPluginDirectory();
+      setPluginDirs(res.dirs ?? []);
+      await refreshPlugins();
+    });
+  const removePluginDir = (path: string) =>
+    run(async () => {
+      const res = await api.removePluginDirectory(path);
+      setPluginDirs(res.dirs ?? []);
+      await refreshPlugins();
+    });
+  const revealPluginDir = (path: string) =>
+    run(async () => {
+      await api.revealPluginDirectory(path);
+    });
+
   const loadDev = () =>
     run(async () => {
       const result = await api.loadDevPlugin();
@@ -740,6 +811,7 @@ export function usePluginsPage() {
     { key: "installPackage", run: installPackage },
     { key: "loadDev", run: loadDev },
     { key: "importExtension", run: importExtension },
+    { key: "pluginDirs", run: async () => openPluginDirs() },
     {
       key: "newFromTemplate",
       run: async () => {
@@ -823,6 +895,15 @@ export function usePluginsPage() {
     activeVersion,
     run,
     loadDev,
+    pluginDirsOpen,
+    setPluginDirsOpen,
+    pluginDirs,
+    addPluginDir,
+    removePluginDir,
+    revealPluginDir,
+    removedPreinstalled,
+    refreshRemovedPreinstalled,
+    restorePreinstalled,
     importExtension,
     reloadPlugin,
     installPackage,

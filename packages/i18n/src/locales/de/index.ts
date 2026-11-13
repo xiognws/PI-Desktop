@@ -991,6 +991,25 @@ export const de = {
     "dismiss": "Verwerfen"
   },
   "settings": {
+
+    "components": {
+      "title": "Datengruppen",
+      "description": "Visualisierungs-Kit, Modellkatalog und Handbuch werden mitgeliefert. Eine Kopie hier gewinnt; löschen stellt die mitgelieferte wieder her.",
+      "name": {
+        "gen-ui": "Visualisierungs-Kit",
+        "models.dev": "Modellkatalog",
+        "manual": "Handbuch"
+      },
+      "hint": {
+        "gen-ui": "Das ganze Kit hier ablegen, Stylesheet eingeschlossen (visualize.css).",
+        "models.dev": "Hier eine api.json ablegen, um die Modelle deines eigenen Gateways zu beschreiben. Ein Neustart aktiviert sie.",
+        "manual": "Eine Pi-Workspace-<beliebig>.md hier ablegen; sie ersetzt das mitgelieferte Handbuch."
+      },
+      "overridden": "Überschrieben",
+      "shipped": "Mitgeliefert",
+      "open": "Ordner öffnen",
+      "reset": "Mitgelieferte wiederherstellen"
+    },
     scheduledTasks: "Geplante Aufgaben",
     scheduledTasksDesc: "Wenn deaktiviert, werden geplante Aufgaben ausgeblendet und keine neuen Ausführungen gestartet. Vorhandene Aufgaben und der Verlauf bleiben erhalten.",
     storage: {
@@ -2400,6 +2419,19 @@ sklm: {
     "groupDisabled": "Deaktiviert",
     "tagLocal": "Lokal",
     "tagBundled": "Mitgeliefert",
+    pluginDirs: "Plugin-Verzeichnisse…",
+    pluginDirsTitle: "Plugin-Verzeichnisse",
+    pluginDirsHint: "Ein Verzeichnis, auf das du zeigst, wird an Ort und Stelle gelesen: Plugins darin gewinnen gegen die mitgelieferte Kopie.",
+    pluginDirsEmpty: "Noch keine Verzeichnisse. Füge eines hinzu, um Plugins aus einem selbst verwalteten Ordner auszuführen.",
+    pluginDirsAdd: "Verzeichnis hinzufügen",
+    pluginDirsRemove: "Entfernen",
+    pluginDirsOpen: "Ordner öffnen",
+    pluginDirsMissing: "Dieser Ordner ist gerade nicht vorhanden",
+    pluginDirsClose: "Schließen",
+    tagExternal: "Eigener Ordner",
+    "removedPreinstalled": "Entfernte mitgelieferte Plugins",
+    "removedPreinstalledHint": "Es bleibt entfernt, bis du es hier wiederherstellst.",
+    "restorePreinstalled": "Wiederherstellen",
     "rowActions": "Aktionen für {{name}}",
     "details": "Details",
     "capabilitiesTitle": "Funktionen",

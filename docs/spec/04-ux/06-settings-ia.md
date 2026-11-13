@@ -91,6 +91,18 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   Failure explains that the original profile remains active, then returns to it;
   settings exposes the error and permits retry. A disconnected selected volume
   blocks startup with a recovery explanation instead of silently using empty data.
+- **Data components** lists the three shipped data defaults the user may replace
+  (`gen-ui`, `models.dev`, `manual`), one row each. A row shows the directory the
+  user's copy lives in, a badge for whether that copy is the one in effect
+  (*Overridden* / *Shipped*), and two actions: **Open folder** (creates the
+  directory when missing, then hands it to the file manager) and **Restore
+  shipped** (only while a copy exists). A directory that is present but
+  incomplete — a kit without `visualize.css`, a manual without a handbook — reads
+  as *Shipped*, because that is what the app resolves. Restoring renames the
+  directory to `<name>.disabled-<timestamp>` instead of deleting it, so the
+  user's files survive and the action is reversible; the row then reads
+  *Shipped* again. This operation is local to the machine and to this
+  installation, and the catalog row notes that `models.dev` is read at startup.
 - **Clear cache** shows a size and requires an inline confirmation describing the
   retained durable data before clearing and restarting. **Delete old backups** is
   separate, lists original paths and warns users to check their plugins and old
