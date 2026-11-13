@@ -151,25 +151,44 @@ function subscribeSurfaces(listener: () => void): () => void {
   return () => surfaceListeners.delete(listener);
 }
 
+function loadSurfaces(force: boolean): void {
+  if (!force && surfaces) return;
+  if (surfacesInflight) return;
+  surfacesInflight = api
+    .inAppProviders()
+    .then((response) => response.providers ?? [])
+    .catch(() => [] as InAppProviderSurface[])
+    .then((providers) => {
+      surfaces = providers;
+      for (const listener of surfaceListeners) listener();
+      return providers;
+    })
+    .finally(() => {
+      surfacesInflight = null;
+    });
+}
+
 /** Every in-app provider Main knows about, read once per app run. */
 export function useInAppProviderSurfaces(): InAppProviderSurface[] {
   const current = useSyncExternalStore(subscribeSurfaces, () => surfaces ?? NO_SURFACES);
   useEffect(() => {
-    if (surfaces) return;
-    surfacesInflight ??= api
-      .inAppProviders()
-      .then((response) => response.providers ?? [])
-      .catch(() => [])
-      .then((providers) => {
-        surfaces = providers;
-        for (const listener of surfaceListeners) listener();
-        return providers;
-      })
-      .finally(() => {
-        surfacesInflight = null;
-      });
+    loadSurfaces(false);
   }, []);
   return current;
+}
+
+/**
+ * Forget the cached surface list so the next render re-reads it.
+ *
+ * The list is read once per app run, but a gateway registers its provider row
+ * a few seconds after launch — a cache taken before that registration would
+ * report `providerId: null` for the rest of the session and the chip would
+ * never appear.
+ */
+export function refreshInAppProviderSurfaces(): void {
+  surfaces = null;
+  for (const listener of surfaceListeners) listener();
+  loadSurfaces(true);
 }
 
 /** Credits data for the composer chip of the session's provider. */

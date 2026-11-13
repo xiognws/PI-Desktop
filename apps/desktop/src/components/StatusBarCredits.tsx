@@ -7,6 +7,7 @@ import {
   inAppProviderSurfaceFor,
   useInAppProviderCredits,
   useInAppProviderSurfaces,
+  refreshInAppProviderSurfaces,
   type CreditsFailureReason,
   type InAppProviderCredits,
   type InAppProviderSurface,
@@ -165,7 +166,26 @@ export function StatusBarCredits() {
       }),
     [session, draftConfiguration, settings, providers, recentModels, activeSessionId],
   );
+  // A gateway registers its provider row after launch; re-read the surfaces
+  // when the provider list grows so the chip is not stuck on a stale null.
+  const providerCount = useAppStore((state) => state.providers.length);
+  useEffect(() => {
+    refreshInAppProviderSurfaces();
+  }, [providerCount]);
   const surface = inAppProviderSurfaceFor(surfaces, binding.providerId);
+
+  // The gateway registers its row after the window has already loaded its
+  // provider list, so the model picker would keep hiding the new provider until
+  // the next launch. One refresh once the row exists closes that gap.
+  const refreshProviders = useAppStore((state) => state.refreshProviders);
+  const surfaceProviderId = surface?.providerId ?? null;
+  const surfaceProviderKnown = useAppStore((state) =>
+    surfaceProviderId ? state.providers.some((provider) => provider.id === surfaceProviderId) : true,
+  );
+  useEffect(() => {
+    if (surfaceProviderId && !surfaceProviderKnown) void refreshProviders();
+  }, [surfaceProviderId, surfaceProviderKnown, refreshProviders]);
+
   const { result, pending, refresh } = useInAppProviderCredits(surface?.id ?? null);
 
   return (
