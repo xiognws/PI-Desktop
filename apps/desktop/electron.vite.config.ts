@@ -3,6 +3,7 @@ import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import type { Plugin } from "vite";
+import type { OutputChunk } from "rollup";
 
 // Dev needs 'unsafe-eval' for vite HMR tooling; production must not ship it.
 function tightenCsp(): Plugin {
@@ -35,7 +36,8 @@ function inlinePreloadChunks(): Plugin {
     enforce: "post",
     generateBundle(_options, bundle) {
       const shared = Object.values(bundle).filter(
-        (item) => item.type === "chunk" && !item.isEntry && item.code.includes("exports."),
+        (item): item is OutputChunk =>
+          item.type === "chunk" && !item.isEntry && item.code.includes("exports."),
       );
       if (shared.length === 0) return;
       for (const chunk of shared) {
