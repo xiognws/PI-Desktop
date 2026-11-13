@@ -3,13 +3,13 @@
 - Status: Accepted for implementation
 - Date: 2026-11-09
 - Supersedes: ADR 0385
-- Related: ADR 0384 (push-first work deliveries), ADR 0062 / ADR 0089
+- Related: ADR 0398 (push-first work deliveries), ADR 0062 / ADR 0089
   (in-session delegation presentation), ADR 0237 (session orchestrator),
   ADR 0239 (collaboration ledger)
 
 ## Context
 
-ADR 0384 lets a supervising session continue when a worker settles, so a single
+ADR 0398 lets a supervising session continue when a worker settles, so a single
 conversation can now start several durable worker sessions and collect them.
 What the supervisor's own transcript cannot do is show that work.
 

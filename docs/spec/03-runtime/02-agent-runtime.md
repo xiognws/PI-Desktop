@@ -1497,7 +1497,7 @@ does not automatically trigger another callback. This path does not restore
 the withdrawn `A2A` or `Peer` tools and does not change `Task`, `TaskWait`,
 `TaskList`, or `TaskStop` semantics.
 
-In the bundled build (ADR 0384) the vendored plugin sends
+In the bundled build (ADR 0398) the vendored plugin sends
 `notifyOnCompletion: true` for `spawn` and for a `send` that is not
 `kind: "message"`, so a supervising session receives the worker's completion
 and continues on its own; the host queues it through the existing durable turn

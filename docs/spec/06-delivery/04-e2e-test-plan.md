@@ -11657,7 +11657,7 @@ This test plan spec is accepted when:
   contains General, AI, Shortcuts, Instructions, Models, Skills, MCP,
   Subagents, Projects, and Info in builds with developer mode on;
   plugin-contributed destinations follow the core groups. There is no Import
-  destination and no Voice destination (ADR 0387).
+  destination and no Voice destination (ADR 0399).
 - Resize between 800px, 1200px, and 1600px widths; the content cards fill the
   available right pane at each size without changing the rail or introducing
   horizontal scrolling.

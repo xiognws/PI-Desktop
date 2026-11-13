@@ -1,4 +1,4 @@
-# ADR 0384: Vendor Session Orchestrator with push-first work deliveries
+# ADR 0398: Vendor Session Orchestrator with push-first work deliveries
 
 - Status: Accepted for implementation
 - Date: 2026-11-09

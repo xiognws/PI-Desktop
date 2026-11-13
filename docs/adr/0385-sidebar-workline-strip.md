@@ -3,13 +3,13 @@
 - Status: **Withdrawn** — superseded by ADR 0386
 - Date: 2026-11-09
 - Withdrawn: 2026-11-09 (a separate sidebar strip was the wrong place)
-- Related: ADR 0384 (push-first work deliveries), ADR 0213 (host turn queue),
+- Related: ADR 0398 (push-first work deliveries), ADR 0213 (host turn queue),
   ADR 0239 (collaboration ledger), ADR 0107 (task notifications),
   `lib/sidebar-project-runs.ts` (per-project run counts)
 
 ## Context
 
-ADR 0384 made a supervising session continue on its own when a worker settled,
+ADR 0398 made a supervising session continue on its own when a worker settled,
 so the user no longer has to re-prompt it. What remained is that the user could
 not see the work while it ran:
 

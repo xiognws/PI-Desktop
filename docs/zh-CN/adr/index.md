@@ -321,6 +321,8 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0344 | [电脑操作默认授权整个桌面，“停止”就是边界](/adr/0344-computer-use-whole-desktop-grant) | 已接受（D682；修订 ADR 0342 第 4、6 条） |
 | 0384 | [扩展件在 agent sidecar 中运行](/zh-CN/adr/0384-widget-packages-run-in-the-agent-sidecar) | 已实现（候选）（D699；见规格 07-plugins/19） |
 | 0397 | [WorkBuddy 网关作为内置提供商在应用内运行](/adr/0397-in-app-provider-gateway) | 已接受实施（修订 ADR 0259；插件仍随包发布，但默认停用） |
+| 0398 | [随包内置 Session Orchestrator，交付走 push-first](/adr/0398-vendored-session-orchestrator-push-delivery) | 已接受实施 |
+| 0399 | [桌面端移除语音功能](/adr/0399-remove-voice-feature) | 已接受（取代 0281、0291、0313–0316 的产品面） |
 ## 什么时候看 ADR
 
 - 规格告诉你系统应该怎样工作。

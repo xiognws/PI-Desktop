@@ -8623,7 +8623,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   (page union, route, entry button, trust and digest wiring, all nine locales),
   and `apps/desktop/test/tools-page.test.mjs` (entry button keys in every
   catalog). See ADR 0384 and spec 07-plugins/19.
-## 2026-11-10 — The voice feature is removed (ADR 0387)
+## 2026-11-10 — The voice feature is removed (ADR 0399)
 
 - Dictation, Live Voice and the host speech capability are deleted, not hidden:
   `packages/voice-runtime`, `electron/main/live-voice/**`, the recorder and
@@ -8639,7 +8639,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `03-runtime/live-work-session.md` (plus zh-CN copies) are deleted; the IPC
   tables, plugin API page, settings IA and E2E plan lose their voice sections.
 - Persisted `speech` / `liveVoice` / `voice` settings keys become inert: no
-  reader, no writer, no migration. See ADR 0387 for the alternatives considered
+  reader, no writer, no migration. See ADR 0399 for the alternatives considered
   (hiding the entries was rejected: it keeps a native dependency and ~100 tests
   alive for a surface nobody opens).
 ## 2026-11-13 — Distribution builds expose no upstream identity (D700)

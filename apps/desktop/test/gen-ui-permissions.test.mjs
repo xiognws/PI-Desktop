@@ -57,6 +57,6 @@ test("visualization frames get no permission from the default-session handlers",
   assert.equal(request("clipboard-sanitized-write", { requestingUrl: trustedUrl, isMainFrame: true }), true);
   assert.equal(handlers.check(contents, "clipboard-sanitized-write", "http://localhost:5173", {}), true);
   // Media for the app itself is no longer gated by a call lease: the voice
-  // feature is gone (ADR 0387), so the platform default applies.
+  // feature is gone (ADR 0399), so the platform default applies.
   assert.equal(request("media", { requestingUrl: trustedUrl, isMainFrame: true, mediaTypes: ["audio"] }), true);
 });

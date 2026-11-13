@@ -1090,7 +1090,7 @@ app.on("web-contents-created", (_event, contents) => {
 
 // Visualization frames get no permission at all (ADR gen-ui-inline-visualization);
 // every other requester keeps the platform default. The microphone feature that
-// used to own this handler is gone (ADR 0387), the gen-UI denial is not.
+// used to own this handler is gone (ADR 0399), the gen-UI denial is not.
 void app.whenReady().then(() => {
   installGenUiPermissionHandlers({ targetSession: session.defaultSession });
 });

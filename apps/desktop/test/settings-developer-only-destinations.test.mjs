@@ -152,7 +152,7 @@ test("settings routes, global search, and composer use build visibility", () => 
   assert.match(settingsPage, /setSettingsTab\(DEFAULT_SETTINGS_TAB\)/);
   assert.doesNotMatch(settingsPage, /setSettingsTab\("general"\)/);
   assert.match(searchDialog, /includeDevelopmentOnly: import\.meta\.env\.DEV/);
-  // The composer has no voice affordance left (ADR 0387).
+  // The composer has no voice affordance left (ADR 0399).
   assert.doesNotMatch(composer, /useVoiceInput|VoiceOverlay|voiceEnabled|VoiceMicButton/);
   assert.doesNotMatch(
     composerToolbar,

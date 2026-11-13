@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 /**
- * Vendored Session Orchestrator delivery defaults (ADR 0384).
+ * Vendored Session Orchestrator delivery defaults (ADR 0398).
  *
  * A supervising session only continues on its own when the host is told to send
  * a completion message. Upstream 0.7.1 left that opt-in, so the bundled patch

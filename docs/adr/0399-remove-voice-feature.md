@@ -1,4 +1,4 @@
-# 0387 — The voice feature is removed from the desktop app
+# 0399 — The voice feature is removed from the desktop app
 
 - **Status:** Accepted
 - **Date:** 2026-11-10

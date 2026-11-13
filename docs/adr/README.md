@@ -432,3 +432,5 @@ Each ADR includes:
 | 0395 | [Archive by moving, and run the pass at most once a day](0395-skill-archive-by-move-and-daily-pass.md) | Accepted (supersedes part of ADR 0387) |
 | 0396 | [Preinstalled plugins are the user's to remove](0396-preinstalled-plugins-are-removable.md) | Accepted (supersedes ADR 0241 §4) |
 | 0397 | [Run the WorkBuddy gateway as an in-app provider](0397-in-app-provider-gateway.md) | Accepted for implementation (amends ADR 0259; the plugin stays bundled, default-disabled) |
+| 0398 | [Vendor Session Orchestrator with push-first work deliveries](0398-vendored-session-orchestrator-push-delivery.md) | Accepted for implementation |
+| 0399 | [The voice feature is removed from the desktop app](0399-remove-voice-feature.md) | Accepted (supersedes the product surface of ADR 0281, 0291, 0313–0316) |

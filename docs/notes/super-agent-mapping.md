@@ -58,7 +58,7 @@ default path:
 
 | Change | Status | Why |
 | --- | --- | --- |
-| Vendor `pi.session-orchestrator` and default work deliveries to a completion callback (ADR 0384) | shipped, idle | Only matters when a supervisor starts *cross-session* workers; the default delegation path never calls it |
+| Vendor `pi.session-orchestrator` and default work deliveries to a completion callback (ADR 0398) | shipped, idle | Only matters when a supervisor starts *cross-session* workers; the default delegation path never calls it |
 | A sidebar strip listing cross-session worklines (ADR 0385) | **withdrawn** | A permanent sidebar region answered in the wrong place what the transcript can answer at the spawn; it also duplicated `subagent-topology.ts` and `TaskDock` |
 | Render a `SessionTask` spawn as a delegation card (ADR 0386) | shipped, idle | Fires only for `toolName === sessiontask`; the built-in `Task` row is untouched |
 
@@ -70,7 +70,7 @@ model → Task ×2 (in-process delegates, same turn)
 ui    → 主 Agent / 正在协调 2 个委派任务  + one card per delegate
 ```
 
-Nothing in that path touches `SessionTask`, so ADR 0384/0386 stay dormant.
+Nothing in that path touches `SessionTask`, so ADR 0398/0386 stay dormant.
 
 ## If the other shape is ever wanted
 

@@ -214,7 +214,7 @@ test("settings destinations own one subject each", () => {
   // Behavior keeps the Settings picker control: a native <select> popup is
   // platform-drawn and cannot carry the shared menu surface or its check mark.
   assert.doesNotMatch(behaviorSource, /<select/);
-  // The voice feature is gone (ADR 0387): no destination, no speech IPC.
+  // The voice feature is gone (ADR 0399): no destination, no speech IPC.
   assert.doesNotMatch(behaviorSource, /VoiceSettingsCard|VoiceSettingsSection|voice-settings/);
   assert.doesNotMatch(settingsPageSource, /tab === "voice"/);
   assert.doesNotMatch(settingsSearchSource, /liveVoice\.|settings\.speech/);

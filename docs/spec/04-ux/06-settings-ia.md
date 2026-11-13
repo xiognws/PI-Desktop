@@ -398,7 +398,7 @@ Card order is **Session defaults → Execution → Computer use**.
   session; the transcript shows where each compaction happened and the context
   usage inspector shows whether a checkpoint is installed.
 The voice feature (dictation, Live Voice and the host speech capability) is
-removed from the product (ADR 0387), so there is no Voice destination, no
+removed from the product (ADR 0399), so there is no Voice destination, no
 `speech/*` IPC and no speech bindings to configure. Persisted `speech` /
 `liveVoice` / `voice` keys are inert.
 
@@ -1021,7 +1021,7 @@ system while preserving their different data ownership:
   rows, pages, and settings-search indexes are gone, while the Host-side
   configuration-sync and remote-host services, their IPC/RPC contracts, and the
   Create project dialog's remote source remain. Voice has no destination either
-  (ADR 0387).
+  (ADR 0399).
 
 ## 4. Acceptance
 

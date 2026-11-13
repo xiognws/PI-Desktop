@@ -2,7 +2,7 @@
 
 This directory is the actual plugin PI-Desktop loads and packages. It is
 tracked in git so the app can carry one local behavior patch without waiting
-for an upstream release (ADR 0384).
+for an upstream release (ADR 0398).
 
 ## Source and distribution provenance
 

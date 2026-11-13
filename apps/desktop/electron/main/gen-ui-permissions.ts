@@ -19,7 +19,7 @@ export function isGenUiPermissionRequester(...urls: ReadonlyArray<string | undef
  * frame, and leave every other requester on the platform default.
  *
  * Main keeps this policy even though the microphone feature that used to own
- * this handler is gone (ADR 0387): installing a handler replaces the platform
+ * this handler is gone (ADR 0399): installing a handler replaces the platform
  * default for the whole session, so the "deny gen-UI, allow the rest" split is
  * what keeps both the model-written frames powerless and the app's own APIs
  * working.
