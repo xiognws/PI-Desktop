@@ -123,7 +123,7 @@ export function registerPluginIpc({
     logger.app("plugin", "info", "plugin directory removed", {
       data: { path: removed, count: written.extraDirs.length },
     });
-    sendToRenderer(IPC.event.pluginChanged, { reason: "uninstall" });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "directories" });
     return { dirs: listPluginDirectories(dataDir) };
   });
 
