@@ -330,7 +330,6 @@ export const tr = {
     downloading: "Güncelleme indiriliyor… %{{percent}}",
     downloaded: "{{version}} sürümü kuruluma hazır.",
     restart: "Güncellemek için yeniden başlat",
-    viewRelease: "Sürümü görüntüle",
     whatsNew: "Yenilikler",
     releaseNotes: "Sürüm notları",
     closeReleaseNotes: "Sürüm notlarını kapat",

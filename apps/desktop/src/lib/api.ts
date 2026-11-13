@@ -834,7 +834,6 @@ export const api = {
   updatesCheck: () => invoke<UpdateState>(IPC.invoke.updatesCheck),
   updatesDownload: () => invoke<UpdateState>(IPC.invoke.updatesDownload),
   updatesInstall: () => invoke(IPC.invoke.updatesInstall),
-  updatesOpenReleases: () => invoke(IPC.invoke.updatesOpenReleases),
   updatesDismiss: () => invoke(IPC.invoke.updatesDismiss),
   listNotifications: (input?: { unreadOnly?: boolean; limit?: number }) =>
     invoke<NotificationListResult>(IPC.invoke.notificationList, input ?? {}),

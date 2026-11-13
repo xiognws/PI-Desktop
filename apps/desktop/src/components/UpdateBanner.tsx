@@ -4,7 +4,7 @@ import type { UpdateState } from "@pi-workspace/shared";
 import { api } from "../lib/api";
 import { useUpdateState } from "../hooks/use-update-state";
 import { Button, TooltipButton } from "./ui";
-import { IconClose, IconCloudDown, IconExternal } from "./icons";
+import { IconClose, IconCloudDown } from "./icons";
 
 const shownManualReminderVersions = new Set<string>();
 
@@ -102,18 +102,6 @@ export function UpdateBanner() {
               onClick={() => void api.updatesInstall().catch(() => undefined)}
             >
               {t("updates.restart")}
-            </Button>
-          )}
-          {update.status === "available" && update.mode === "manual" && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() =>
-                void api.updatesOpenReleases().catch(() => undefined)
-              }
-            >
-              <IconExternal className="size-3.5" />
-              {t("updates.viewRelease")}
             </Button>
           )}
         </div>

@@ -12,6 +12,7 @@ const [
   apiSource,
   settingsSource,
   settingsSearchSource,
+  mainIpcSource,
 ] = await Promise.all([
   read("../../../.github/ISSUE_TEMPLATE/bug_report.yml"),
   read("../../../.github/ISSUE_TEMPLATE/feature_request.yml"),
@@ -19,6 +20,7 @@ const [
   read("../src/lib/api.ts"),
   readSettingsSource(),
   read("../src/lib/settings-search.ts"),
+  read("../electron/main/ipc/app-ipc.ts"),
 ]);
 
 function requiredField(source, id) {
@@ -67,4 +69,8 @@ test("the Info page points at nothing outside this build", () => {
   assert.doesNotMatch(apiSource, /openFeedback:/);
   assert.doesNotMatch(apiSource, /openManual:/);
   assert.doesNotMatch(settingsSearchSource, /"settings\.feedback"/);
+  // The Main-owned URL builder is gone too: nothing in the shipped bundles can
+  // assemble an external issue link any more.
+  assert.doesNotMatch(mainIpcSource, /appOpenFeedback/);
+  assert.doesNotMatch(mainIpcSource, /buildBugReportUrl|assertFeedbackIssueUrl/);
 });

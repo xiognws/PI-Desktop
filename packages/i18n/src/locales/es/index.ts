@@ -321,7 +321,6 @@ export const es = {
     "downloading": "Descargando actualización... {{percent}}%",
     "downloaded": "La versión {{version}} está lista para instalarse.",
     "restart": "Reiniciar para actualizar",
-    "viewRelease": "Ver versión",
     "whatsNew": "Novedades",
     "releaseNotes": "Notas de la versión",
     "closeReleaseNotes": "Cerrar notas de la versión",

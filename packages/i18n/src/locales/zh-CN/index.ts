@@ -323,7 +323,6 @@ export const zhCN = {
     downloading: "正在下载更新… {{percent}}%",
     downloaded: "新版本 {{version}} 已就绪，可安装。",
     restart: "重启以更新",
-    viewRelease: "查看发布页",
     whatsNew: "更新内容",
     releaseNotes: "发版日志",
     closeReleaseNotes: "关闭发版日志",

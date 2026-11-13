@@ -330,7 +330,6 @@ export const ko = {
     downloading: "업데이트 다운로드 중… {{percent}}%",
     downloaded: "버전 {{version}}을(를) 설치할 준비가 되었습니다.",
     restart: "다시 시작하여 업데이트",
-    viewRelease: "릴리스 보기",
     whatsNew: "새로운 기능",
     releaseNotes: "릴리스 노트",
     closeReleaseNotes: "릴리스 노트 닫기",

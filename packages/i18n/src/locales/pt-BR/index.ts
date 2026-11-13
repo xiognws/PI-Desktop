@@ -320,7 +320,6 @@ export const ptBR = {
     downloading: "Baixando atualização… {{percent}}%",
     downloaded: "A versão {{version}} está pronta para ser instalada.",
     restart: "Reiniciar para atualizar",
-    viewRelease: "Ver versão",
     whatsNew: "Novidades",
     releaseNotes: "Notas da versão",
     closeReleaseNotes: "Fechar notas da versão",

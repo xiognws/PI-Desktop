@@ -3,11 +3,12 @@ import type { UpdateMode, UpdatePreference } from "@pi-workspace/shared";
 export type WindowsDistribution = "installed" | "zip" | "portable";
 
 /**
- * This build is distributed inside the company intranet, where `github.com` is
- * unreachable. An update check there can only time out and leave a spinner in
- * the UI, so the whole update path stays off until a release ships with an
- * internal update feed. Flip this to `true` (and point `app-update.yml` /
- * `build.publish` at that feed) to bring the updater back.
+ * This build ships no update feed at all: `build.publish` and the packaged
+ * `app-update.yml` are gone, so `electron-updater` has nothing to resolve and
+ * every check would only time out (github.com is unreachable from the intranet
+ * this build is distributed in). The whole update path therefore stays off.
+ * Bringing it back means adding a feed to `build.publish` and flipping this
+ * flag — nothing else reads it.
  */
 const PUBLIC_UPDATE_FEED_REACHABLE = false;
 

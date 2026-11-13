@@ -321,7 +321,6 @@ export const fr = {
     "downloading": "Téléchargement de la mise à jour… {{percent}}%",
     "downloaded": "La version {{version}} est prête à être installée.",
     "restart": "Redémarrer pour mettre à jour",
-    "viewRelease": "Afficher la version",
     "whatsNew": "Quoi de neuf",
     "releaseNotes": "Notes de version",
     "closeReleaseNotes": "Fermer les notes de version",

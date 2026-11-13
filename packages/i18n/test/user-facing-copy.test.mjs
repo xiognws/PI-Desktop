@@ -155,6 +155,9 @@ const REMOVED_EXPLANATORY_KEYS = [
   "settings.feedback",
   "settings.feedbackDesc",
   "settings.openFeedback",
+  // The update card is development-only and ships no feed, so the release-link
+  // action (and its copy) is gone rather than hidden.
+  "updates.viewRelease",
 ];
 
 test("removed explanatory copy stays removed", () => {

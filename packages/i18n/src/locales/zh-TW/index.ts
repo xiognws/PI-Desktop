@@ -323,7 +323,6 @@ export const zhTW = {
     downloading: "正在下載更新… {{percent}}%",
     downloaded: "新版本 {{version}} 已就緒，可安裝。",
     restart: "重啟以更新",
-    viewRelease: "檢視釋出頁",
     whatsNew: "更新內容",
     releaseNotes: "發版日誌",
     closeReleaseNotes: "關閉發版日誌",

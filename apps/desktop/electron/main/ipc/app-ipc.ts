@@ -8,8 +8,6 @@ import {
   ErrorCodes,
   IPC,
   PROTOCOL_VERSION,
-  assertFeedbackIssueUrl,
-  buildBugReportUrl,
 } from "@pi-workspace/shared";
 import { globalInstructionPath } from "@pi-workspace/agent-runtime";
 import type { HostProcess } from "../host-process";
@@ -21,7 +19,6 @@ export type AppIpcDependencies = {
   getHost: () => HostProcess | null;
   getPluginLauncherWindow: () => BrowserWindow | null;
   togglePluginLauncher: () => Promise<void>;
-  safeOpenExternal: (url: unknown) => Promise<void>;
   updater: AppUpdaterController;
 };
 
@@ -31,7 +28,6 @@ export function registerAppIpc({
   getHost,
   getPluginLauncherWindow,
   togglePluginLauncher,
-  safeOpenExternal,
   updater,
 }: AppIpcDependencies): void {
   const { handle, handleWithEvent } = registrar;
@@ -48,26 +44,6 @@ export function registerAppIpc({
       window.hide();
     }
     return { visible: false };
-  });
-
-  handle(IPC.invoke.appOpenFeedback, async () => {
-    const host = getHost();
-    const hostVersion = host
-      ? await host
-          .call<{ version: string }>("app.getVersion")
-          .then((info) => info.version)
-          .catch(() => undefined)
-      : undefined;
-    const url = buildBugReportUrl({
-      version: APP_VERSION,
-      platform: process.platform,
-      arch: process.arch,
-      protocolVersion: PROTOCOL_VERSION,
-      hostVersion,
-    });
-    assertFeedbackIssueUrl(url);
-    await safeOpenExternal(url);
-    return { ok: true };
   });
 
   handle(IPC.invoke.appGetVersion, async () => {
@@ -229,10 +205,6 @@ export function registerAppIpc({
   handle(IPC.invoke.updatesDownload, async () => updater.download());
   handle(IPC.invoke.updatesInstall, async () => {
     updater.install();
-    return { ok: true };
-  });
-  handle(IPC.invoke.updatesOpenReleases, async () => {
-    await updater.openReleases();
     return { ok: true };
   });
   handle(IPC.invoke.updatesDismiss, async () => {

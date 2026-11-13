@@ -328,7 +328,6 @@ export const en = {
     downloading: "Downloading update… {{percent}}%",
     downloaded: "Version {{version}} is ready to install.",
     restart: "Restart to update",
-    viewRelease: "View release",
     whatsNew: "What's new",
     releaseNotes: "Release notes",
     closeReleaseNotes: "Close release notes",

@@ -54,7 +54,7 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "CompanyName", "vastsa"
+      VALUE "CompanyName", "Pi-Workspace"
       VALUE "FileDescription", "Pi-Workspace host core"
       VALUE "FileVersion", "{version}"
       VALUE "InternalName", "pi-desktop-host-core"
