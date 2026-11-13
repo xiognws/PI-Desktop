@@ -33,7 +33,7 @@
 - [ ] 已独立判断**根因门槛**（真实且在范围内的问题；改动真正从根上消掉该失败路径；diff 是最小一致修复；方案与基线、安全和架构兼容）。
 - [ ] 未把完整性缺口（规格、额外测试、i18n、e2e 文档、风格、命名）当作合入阻塞项，**除非**它们是证明根因修复所必需的。
 - [ ] 若根因门槛成立：已先合入该 pull request 并保留贡献者提交；落地阻塞仅在作者工作之上追加了最小提交。
-- [ ] 仅在该 pull request 进入 `main` 之后，才用新的 R4 请求分支和工作树开始后续完善。
+- [ ] 仅在该 pull request 进入 `main` 之后，才在本地 `main` 上开始后续完善。
 - [ ] 若根因门槛不成立或存在危害阻塞：未合入该 pull request，未以「方向没问题」通过，并已用评论记录证据。未悄悄重做该想法。
 - [ ] 除非用户明确要求，否则未合入草稿 pull request。
 - [ ] 评论使用该 pull request 的原文语言。
@@ -48,14 +48,11 @@
 
 在为新请求编辑任何文件之前：
 
-- [ ] 识别并保留现有的未提交工作。
-- [ ] 获取 `origin/main`，并且本地 `main` 快进
-  工作树是干净的。
-- [ ] 专用的 `<type>/<short-description>` 请求分支和工作树是
-  从更新的 `main` 提交创建。
-- [ ] 请求工作树在安全的情况下复用主工作区的宿主工具链、兼容依赖树、包存储、缓存和忽略的本地配置；不为 E2E 安装单独环境。
-- [ ] 只有可变、不兼容或并发敏感的环境状态保留在工作树本地并被忽略。
-- [ ] 在执行开始之前，当前分支不是 `main`。
+- [ ] 识别并保留现有的未提交工作（包括别的会话的）。
+- [ ] 已 `fetch origin/main`，本地 `main` 落后则快进（有未推送提交则整合）。
+- [ ] 未创建任务分支与工作树，改动就在本检出的本地 `main` 上进行。
+- [ ] 复用本检出的宿主工具链、依赖树、包存储、缓存和被忽略的本地配置；不为 E2E 另装环境。
+- [ ] 暂存一律用显式路径，只提交本请求碰过的路径。
 
 ---
 
@@ -120,34 +117,27 @@
 
 在将请求标记为完成之前：
 
-- [ ] 请求分支被推送到远程。
-- [ ] 打开或更新 PR 前，`origin/main` 已是请求 head 的祖先（`pnpm check:pr-base`）。不得打开落后于 `origin/main` 的 PR。
+- [ ] 已把验证过的提交推送到 `main`，且 `git ls-remote --heads origin main` 与之一致。
+- [ ] 若推送前 `origin/main` 前进，已在最终提交上复跑受影响的套件并记录。
 - [ ] PR/MR 以 `main` 为目标，并且仅包含请求的逻辑更改。
 - [ ] PR 描述列出了受影响的规格和 e2e 场景。
 - [ ] 公关自我审查清单已完成。
 - [ ] 要求远程检查（含 PR-base 门）和审查通过。
-- [ ] 请求工作树在合并后被删除。
-- [ ] 合并请求分支在本地删除 (`git branch -d`)。
-- [ ] 合并后删除远程请求分支。
+- [ ] 提交已在 `origin/main` 上的本地分支已删除。
 - [ ] 包括适用时的问题参考（例如 `Refs #12` 或
   `Closes #12`）。
 
 ---
 
-## 6. 1 合并清理清单
+## 6. 1 合并清理清单## 6.1 推送后清单
 
-请求分支集成到`main`后立即运行，是否
-合并通过 PR/MR 远程发生或在主结帐中本地发生：
+推送之后立即运行：
 
-- [ ] 预期的合并提交已验证是否存在于 `main` 中。
-- [ ] 请求工作树是干净的 - 没有未提交或未跟踪的请求文件
-  留下来。
-- [ ] `git worktree remove <worktree-path>` 成功，无需强制。
-- [ ] `git branch -d <type>/<short-description>` 成功（没有 `-D` 后备）
-  未合并的分支）。
-- [ ] `git worktree prune` 使 `git worktree list` 不再有陈旧条目
-  这个请求。
-- [ ] 没有删除其他代理的工作树或分支。
+- [ ] 推送的提交已在远程 `main` 上（`git ls-remote --heads origin main` 与
+  `git rev-parse HEAD` 一致）。
+- [ ] `git status --short` 里只剩别人的工作：本请求没有留下未提交内容。
+- [ ] 提交已在 `origin/main` 上的本地分支已删除；没有动别的会话的分支或工作树。
+- [ ] 若要求交付后启动，已从本 `main` 检出和其开发环境构建并启动。
 
 ---
 
@@ -181,7 +171,7 @@
 
 | # | 门 | 来源 |
 |---|---|---|
-| 1 | 请求从最新的 `main` 创建的分支和工作树；在安全的情况下重复使用主要环境 | [R4 — 请求分支 + 工作树 + 合并门](/zh-CN/spec/06-delivery/03-ai-development-workflow#r4-—-请求分支-工作树-合并门) |
+| 1 | 改动在已与 `origin/main` 同步的本地 `main` 上完成；复用宿主环境 | [R4 — 直接在 `main` 上交付](/zh-CN/spec/06-delivery/03-ai-development-workflow#r4-—-直接在-main-上交付) |
 | 2 | Code/doc 实施计划的变更 | [开发循环]的第 4 步(03-ai-development-workflow.md#2-development-loop) |
 | 3 | 所有受影响的规格均已更新 | [R1 — 规格同步](/zh-CN/spec/06-delivery/03-ai-development-workflow#r1-—-规格优先-规格同步) |
 | 4 | 记录 E2E 场景（或确认不需要） | [R3 — E2E 覆盖文档](/zh-CN/spec/06-delivery/03-ai-development-workflow#r3-—-e2e-覆盖文档) |
@@ -189,8 +179,8 @@
 | 6 | 通过常规消息提交的更改 | [R2 — 每次更改提交](/zh-CN/spec/06-delivery/03-ai-development-workflow#r2-—-每次更改提交) |
 | 7 | 如果里程碑交付完成，则更新董事会 | 开发循环的第 9 步 |
 | 8 | 提交中没有秘密或本地数据 | [§4.4 永不提交](/zh-CN/spec/06-delivery/03-ai-development-workflow#_4-4-永不提交) |
-| 9 | PR/MR 合并为 `main`；请求删除工作树和分支 | [R4 — 请求分支 + 工作树 + 合并门](/zh-CN/spec/06-delivery/03-ai-development-workflow#r4-—-请求分支-工作树-合并门) |
-| 10 | 磁盘上没有留下合并的工作树； `git worktree list` 没有该请求的过时条目 | [§6.1 合并清理清单](#_6-1-合并清理清单) |
+| 9 | 已授权的交付完成：验证过的提交在 `origin/main` 上，未创建任务分支/工作树，残留本地分支已删 | [R4 — 直接在 `main` 上交付](/zh-CN/spec/06-delivery/03-ai-development-workflow#r4-—-直接在-main-上交付) |
+| 10 | `git ls-remote --heads origin main` 与推送的提交一致，检出里没有本请求的残留 | [§6.1 推送后清单](#_6-1-推送后清单) |
 | 11 | 若链接了 GitHub issue：实现前已核实；以其原文语言评论；结论明确时已关闭 | [R5 — 先核实链接的 GitHub issue](/zh-CN/spec/06-delivery/03-ai-development-workflow#r5-—-先核实链接的-github-issue-再回复并关闭) |
 | 12 | 若链接了 GitHub pull request：已审查根因门槛；仅在真正修好且改动最小时合入；后续完善在合入之后；未因细枝末节丢掉贡献者工作 | [R6 — 链接 PR 必须根治问题且改动最小才可合入](/zh-CN/spec/06-delivery/03-ai-development-workflow#r6-—-链接-pr-必须根治问题且改动最小才可合入) |
 

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-11-08.1
+Policy-Sync: 2026-11-13.1
 
 Instructions for Claude Code CLI and Claude Cowork on Pi-Workspace.
 
@@ -34,61 +34,61 @@ Reply to the user in the language they used (Chinese request → Chinese answer,
 
 Every `.ps1` containing non-ASCII text (Chinese comments, literals) must be **UTF-8 with BOM**. Windows PowerShell 5.1 decodes a BOM-less script with the system ANSI code page (936/GBK) before parsing, so non-ASCII bytes become garbage and surface as misleading syntax errors far from the cause; PowerShell 7 and editors hide it. Pure-ASCII scripts need no BOM; UTF-16 is never acceptable. Never "fix" this with `-Encoding ASCII` (it yields `?`). Data files written for other tools are the opposite case: UTF-8 **without** BOM. Gate: `pnpm check:powershell-encoding`; details: `plugins/repo-conventions/skills/powershell-encoding.md`.
 
-### Worktree isolation
+### Work directly on `main`
 
 Every request uses:
 
 ```text
-1 request = 1 branch + 1 dedicated worktree
+1 request = 1 working session on local `main`, pushed straight to `origin/main`
 ```
 
-- Never develop on `main` or in the primary checkout.
-- Never merge unvalidated task code into local `main`.
-- Never reuse, modify, or delete another agent's branch or worktree.
-- Never discard unrelated work in the primary checkout.
-- Resolve conflicts only inside your own task worktree.
+- Never create a task branch or worktree.
+- Never rewrite history already on `origin/main` (no force-push; fix forward).
+- Never revert, stash, or discard work in the checkout you did not write —
+  stage by explicit path, commit only the paths the request touched.
+- Never delete or reset another session's branch or worktree.
 
-Create the worktree from current remote `main`:
+Start from current remote `main`:
 
 ```bash
 git fetch origin main
-git worktree add \
-  -b <type>/<short-description> \
-  <worktree-path> \
-  origin/main
-cd <worktree-path>
+git merge --ff-only origin/main   # unpushed local commits: rebase or merge instead
 ```
-
-Suggested worktree path: `../Pi-Workspace-worktrees/<short-description>`.
-
-Branch names: `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `chore/...`.
 
 ### Delivery order (code-bearing changes)
 
 ```text
-1. branch + worktree from origin/main
-2. implement in the worktree
+1. fetch origin/main; fast-forward local main
+2. implement on local main
 3. targeted static/unit/integration checks
-4. review the full diff
-5. commit
-6. fetch + rebase/refresh against latest origin/main (private branch)
-7. resolve conflicts in the worktree
-8. task-candidate E2E in the same worktree
-9. push branch
-10. hand the branch back — no pull request by default
-11. PR integration validation (only when a PR was requested)
-12. merge into remote main through repository gates
-13. synchronize local main
-14. remove your worktree and merged local branch
+4. review the full diff (git status --short, git diff)
+5. commit on local main (explicit paths)
+6. fetch origin/main again; integrate if it moved
+7. re-run the affected checks on the final commit
+8. git push origin main
+9. verify the remote tip equals the pushed commit (git ls-remote --heads origin main)
 ```
 
-Do **not** insert `merge task → local main` between refresh and task-candidate E2E. The task branch itself is the local integration candidate after incorporating latest `origin/main`. Do not open or update a PR that is behind `origin/main`. Run `pnpm check:pr-base` before opening or updating a PR.
+A validation result is valid only for the commit that actually ran. If
+`origin/main` moved before the push, the earlier result does not carry over —
+run the affected checks again. E2E runs in the same checkout against local
+`main`, reusing the host development environment.
 
 ### No pull request unless asked
 
-Pushing the request branch ends the default delivery; opening a pull request is a separate decision that belongs to the user. Push and report the branch — do **not** open a PR/MR, convert a draft, or comment on an existing PR merely because delivery finished. Open, update, convert, or close a pull request only when the user asks for that exact action in the current task; "continue", "finish it", "push it", or a checklist that lists `push` alone is not that request. When a PR was requested, the `origin/main` base rule above applies unchanged. Without a PR the PR integration gate is not run — record that in the delivery report.
+Delivery ends at `git push origin main`; opening a pull request is a separate
+decision that belongs to the user. Push and report — do **not** open a PR/MR,
+convert a draft, or comment on an existing PR merely because delivery
+finished. Open, update, convert, or close a pull request only when the user
+asks for that exact action in the current task; "continue", "finish it", "push
+it", or a checklist that lists `push` alone is not that request. Contributor
+pull requests are still reviewed under `AGENTS.md` § 15.
 
-Remove a branch and its worktree **as soon as it is used up**: once it is merged into remote `main` (or its commits reached `main` through another lane), absorbed into another request branch, or abandoned. Confirm the commits exist on `origin` before deleting, never delete uncommitted work or a worktree another agent is using, and keep the primary checkout as the only long-lived working copy.
+Delete a local branch **as soon as it is used up**: once its commits are on
+remote `main`, when it was absorbed elsewhere, or when the work is abandoned.
+Confirm the commits exist on `origin` before deleting, never delete
+uncommitted work or a branch/worktree another session is using, and keep the
+primary checkout as the only long-lived working copy.
 
 Record E2E evidence:
 
@@ -280,7 +280,7 @@ Run only checks that match the affected surface. Prefer the narrower authoritati
 | Architecture budgets | see `scripts/check-architecture.mjs` |
 | E2E | `pnpm test:e2e` and targeted `pnpm test:e2e:*` scripts |
 
-E2E exists to validate **executable integration state** (latest applicable `main` + task changes), not merely the branch name `main`. Run required E2E on the task candidate after refreshing against latest `origin/main`.
+E2E exists to validate **executable state** (latest applicable `main` + task changes), not merely the branch name `main`. Run required E2E on the commit you are about to push, after integrating latest `origin/main`.
 
 Docs-only changes: review rendered Markdown and `git diff --check`; no runtime tests required.
 
@@ -290,7 +290,7 @@ Docs-only changes: review rendered Markdown and `git diff --check`; no runtime t
 
 Before editing:
 
-1. Confirm you are (or will create) a dedicated worktree — not the primary checkout, not `main`.
+1. Confirm local `main` is up to date with `origin/main` and that you are working in this checkout.
 2. Identify observable behavior, persistence, protocol, security, and architecture impact.
 3. Read the relevant spec/ADR and list the validation you will run.
 4. For a linked issue, verify the claim against current code first. For a linked PR, preserve a sound direction; do not force-push contributor branches.

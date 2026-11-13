@@ -57,15 +57,34 @@ const claude = claudeRaw ? normalize(claudeRaw) : "";
 /** @type {{ id: string, anyOf: string[] }[]} */
 const REQUIRED_ANCHORS = [
   {
-    id: "worktree-isolation",
-    anyOf: ["1 request = 1 branch + 1 dedicated worktree"],
+    id: "main-line-delivery",
+    anyOf: ["1 request = 1 working session on local `main`"],
   },
   {
-    id: "never-develop-on-main",
+    id: "no-task-branch",
     anyOf: [
-      "never develop on `main`",
-      "never develop directly on `main`",
-      "develop directly on `main`",
+      "do not create a task branch and do not create a worktree",
+      "never create a task branch or worktree",
+      "do not create a task branch",
+      "never create a task branch",
+    ],
+  },
+  {
+    id: "push-verified-commit",
+    anyOf: ["verify the remote tip equals the pushed commit"],
+  },
+  {
+    id: "no-published-history-rewrite",
+    anyOf: [
+      "never rewrite history that is already on `origin/main`",
+      "never rewrite history already on `origin/main`",
+    ],
+  },
+  {
+    id: "stage-explicit-paths",
+    anyOf: [
+      "commit only the paths this request actually changed",
+      "commit only the paths the request touched",
     ],
   },
   {
@@ -86,18 +105,6 @@ const REQUIRED_ANCHORS = [
   {
     id: "main-thin-orchestrator",
     anyOf: ["electron main must remain a thin orchestrator", "electron main stays a thin orchestrator"],
-  },
-  {
-    id: "no-local-main-before-e2e",
-    anyOf: ["merge task → local main"],
-  },
-  {
-    id: "pr-contains-latest-main",
-    anyOf: ["do not open or update a PR that is behind `origin/main`"],
-  },
-  {
-    id: "task-candidate-e2e",
-    anyOf: ["task-candidate e2e"],
   },
   {
     id: "host-e2e-environment",

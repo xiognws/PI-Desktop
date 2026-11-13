@@ -829,7 +829,8 @@ startup, and build or CI behavior that affects application execution.
 Documentation-only changes are exempt when they do not alter executable
 behavior.
 
-Run the selected suites from the request worktree after `pnpm check:pr-base`
+Run the selected suites on the commit you are about to push, after integrating
+`origin/main`
 passes. An E2E run on a branch that is behind `origin/main` is exploratory and
 does not satisfy this gate. Do not merge the task into local `main` to create
 the candidate.
