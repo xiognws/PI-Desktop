@@ -1,0 +1,26 @@
+apps/desktop/electron/main/remote/pi-host-release.ts
+  h_201ed4c689ac8b 85-97,100,105
+apps/desktop/electron/main/remote/ssh-bootstrap.ts
+  h_201ed4c689ac8b 35,69-74,140,302-310,312
+apps/desktop/test/remote-host-artifact-transfer.test.mjs
+  h_201ed4c689ac8b 15,69-71
+apps/desktop/test/remote-host-bootstrap-script.test.mjs
+  h_201ed4c689ac8b 23
+apps/desktop/test/remote-host-pi-host-release.test.mjs
+  h_201ed4c689ac8b 18,30-31,40-42,72-73,140-147
+apps/desktop/test/remote-host-realign.test.mjs
+  h_201ed4c689ac8b 271-273
+apps/desktop/test/remote-host-ssh-bootstrap.test.mjs
+  h_201ed4c689ac8b 19-20,76,202,352-369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "00ce13a79934a829ae4889484e22166752fd4b34",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
