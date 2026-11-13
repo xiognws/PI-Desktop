@@ -20,6 +20,39 @@ function tightenCsp(): Plugin {
   };
 }
 
+// A sandboxed preload can only require `electron` and a small builtin subset -
+// it does no file resolution at all. Rollup, given more than one preload entry,
+// hoists whatever they share (the IPC map) into `chunks/*.cjs`, and the window
+// then loads with `Unable to load preload script: module not found`, which
+// leaves `window.piDesktop` undefined and every caller failing. Fold those
+// shared chunks back into each entry that requires them: the chunk is
+// self-contained CommonJS (`exports.X = ...`), so an IIFE over a local
+// `exports` object is enough, and no entry keeps a file it cannot load.
+function inlinePreloadChunks(): Plugin {
+  return {
+    name: "pi-inline-preload-chunks",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      const shared = Object.values(bundle).filter(
+        (item) => item.type === "chunk" && !item.isEntry && item.code.includes("exports."),
+      );
+      if (shared.length === 0) return;
+      for (const chunk of shared) {
+        const fileName = chunk.fileName.split("/").pop() ?? chunk.fileName;
+        const pattern = new RegExp(`require\\(\\s*[\"'][^\"']*${fileName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\"']\\s*\\)`, "g");
+        const inlined = `(() => { const exports = {}; ${chunk.code}\nreturn exports; })()`;
+        for (const entry of Object.values(bundle)) {
+          if (entry.type !== "chunk" || entry === chunk) continue;
+          if (!pattern.test(entry.code)) continue;
+          entry.code = entry.code.replace(pattern, () => inlined);
+        }
+        delete bundle[chunk.fileName];
+      }
+    },
+  };
+}
+
 // Electron 43 ships a Chromium that always supports woff2, but KaTeX's
 // stylesheet lists woff and truetype fallbacks for every face. Dropping those
 // src entries lets Rollup tree-shake ~0.8 MB of .woff/.ttf assets it would
@@ -87,6 +120,7 @@ export default defineConfig({
     // sandboxed renderer without Node module resolution.
     build: {
       rollupOptions: {
+        plugins: [inlinePreloadChunks()],
         input: {
           index: resolve(__dirname, "electron/preload/index.ts"),
           "plugin-panel": resolve(__dirname, "electron/preload/plugin-panel.ts"),
