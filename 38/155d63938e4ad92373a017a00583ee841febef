@@ -1,0 +1,26 @@
+services/autotest/src/autotest/api/knowledge_routes.py
+  h_201ed4c689ac8b 288,300,331
+services/autotest/src/autotest/knowledge/extract.py
+  h_201ed4c689ac8b 30,32-35,43-47,153-185,203-204
+services/autotest/tests/test_prd_parse_documents.py
+  h_201ed4c689ac8b 118-139
+services/autotest/ui/src/views/Cases.vue
+  h_201ed4c689ac8b 542-544
+services/autotest/ui/src/views/ProjectLayout.vue
+  h_201ed4c689ac8b 182
+services/autotest/ui/src/views/RequirementUpload.vue
+  h_201ed4c689ac8b 24-47,55,140,151,171-174,181,186,191,204,219,224,230,238,242,252-261,265,270
+services/autotest/ui/src/views/Runs.vue
+  h_201ed4c689ac8b 270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "38155d63938e4ad92373a017a00583ee841febef",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
