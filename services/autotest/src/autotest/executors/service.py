@@ -63,6 +63,34 @@ def _field(row: Mapping[str, Any], key: str, default: Any = None) -> Any:
     return default if value is None else value
 
 
+def _test_counts_from_step(event: Mapping[str, Any]) -> dict[str, int] | None:
+    """从 step.end 的 detail.counts 取 pytest 的用例计数。
+
+    执行器写的是 ``{"passed": 2, "failed": 1, "skipped": 3}``（pytest 汇总行的
+    用词），执行行要的是 pass/fail/skip —— 在这里归一，避免两套词在库里混着。
+    """
+    detail = event.get("detail") or {}
+    raw = detail.get("counts") or {}
+    if not isinstance(raw, Mapping):
+        return None
+    mapping = {"pass": "pass", "passed": "pass", "fail": "fail", "failed": "fail",
+               "skip": "skip", "skipped": "skip"}
+    counts = {"pass": 0, "fail": 0, "skip": 0}
+    seen = False
+    for key, value in raw.items():
+        target = mapping.get(str(key))
+        if target is None:
+            continue
+        try:
+            counts[target] += int(value)
+        except (TypeError, ValueError):
+            continue
+        seen = True
+    if not seen or sum(counts.values()) == 0:
+        return None
+    return counts
+
+
 def execute_script(
     db_path: Path,
     project_id: str,
@@ -116,6 +144,9 @@ def execute_script(
     status = "pass"
     counts = {"pass": 0, "fail": 0, "skip": 0}
     failure: str | None = None
+    # 一个脚本里可以有很多条 pytest 用例：执行行上的 total 要按用例算，
+    # 否则「6 passed」的脚本和执行 1 条用例的脚本在报表里都等于 1。
+    measured: dict[str, int] | None = None
     try:
         for event in executor.run(request):
             stored = log.append(event)
@@ -127,6 +158,10 @@ def execute_script(
                 if case_status in ("fail", "error"):
                     status = "error" if case_status == "error" else "fail"
                     failure = stored.get("failure")
+            elif stored["type"] == "step.end":
+                counted = _test_counts_from_step(stored)
+                if counted:
+                    measured = counted
     except Exception as error:  # noqa: BLE001 - a run must never take the server down
         status = "error"
         failure = f"{type(error).__name__}: {error}"
@@ -136,6 +171,11 @@ def execute_script(
         counts["fail"] += 1
     finally:
         RUNNING.pop(_run_key(project_id, execution_id), None)
+
+    # pytest 数出来的是真实用例数，优先用它；脚本根本没跑 pytest（普通 python
+    # 脚本）时退回「一个脚本 = 一条结果」的老口径。
+    if measured and not token.cancelled:
+        counts = measured
 
     if token.cancelled:
         # A cancelled case is not a regression: keep it out of the failure count
@@ -196,9 +236,11 @@ def execute_script(
     with _conn(db_path) as conn:
         conn.execute(
             "UPDATE executions SET status = ?, finished_at = CURRENT_TIMESTAMP, "
-            "passed = ?, failed = ?, running = 0, replay_hits = ?, model_calls = ? WHERE id = ?",
+            "total = ?, passed = ?, failed = ?, running = 0, replay_hits = ?, model_calls = ? "
+            "WHERE id = ?",
             (
                 finished_status,
+                counts["pass"] + counts["fail"] + counts["skip"],
                 # 行上只记「通过/失败」两栏，skip 在结论里等同通过（骨架用例就是 skip），
                 # 否则运行记录会显示「已完成 通过 0/1」，和 run 汇总的 2/2 自相矛盾。
                 counts["pass"] + counts["skip"],
@@ -223,6 +265,9 @@ def execute_script(
         # 请求方（脚本编辑器、插件）拿到英文枚举会各自再翻一遍，翻法还会不一致，
         # 所以这里把同一份中文标签一并给出。
         "status": status,
+        # 用例级计数（pytest 数出来的）：调用方拿它汇总，不必再去猜一行执行等于几条用例。
+        "counts": dict(counts),
+        "total": counts["pass"] + counts["fail"] + counts["skip"],
         "status_label": case_result_text,
         "failure": failure,
         "duration_ms": round(duration_ms, 1),

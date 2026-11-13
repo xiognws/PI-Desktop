@@ -533,7 +533,7 @@ def _run_batch_thread(
             run_id,
             "autotest_run",
             status=step_status,
-            summary=f"跑完 {stats['total']} 个脚本，通过 {stats['pass']}",
+            summary=f"跑完 {stats['scripts']} 个脚本、{stats['total']} 条用例，通过 {stats['pass']}",
         )
         store.append_step(
             conn,
@@ -541,7 +541,10 @@ def _run_batch_thread(
             tool="autotest_run_result",
             stage="executed",
             status=step_status,
-            summary=f"{stats['pass']}/{stats['total']} 通过，失败 {stats['fail']}，异常 {stats['error']}",
+            summary=(
+                f"{stats['pass']}/{stats['total'] - stats.get('skip', 0)} 通过"
+                f"（{stats.get('skip', 0)} 条骨架跳过），失败 {stats['fail']}，异常 {stats['error']}"
+            ),
             payload=payload,
         )
         store.touch_run(conn, run_id, stage="executed")
