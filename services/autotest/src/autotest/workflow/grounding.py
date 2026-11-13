@@ -80,19 +80,19 @@ def extract_numbers(text: str) -> list[dict]:
 def best_sentence(content: str, name: str) -> str:
     """从切片里挑一句最像"这个功能点的要求"的原文；挑不到返回空串。
 
-    打分规则：含功能点名 +3，含带单位数值 +2，提到 应/必须/不得 等约束词 +1，
-    过短的句子不给分（"见下表"这种没有信息量）。
+    打分规则：含功能点名（含 2 字滑窗）+3，含带单位数值 +3，提到 应/必须/不得
+    等约束词 +1；排查口气、图题、超长句扣分。低于 3 分视为没有可用条款。
     """
     tokens = _tokens(name)
     best = ""
-    best_score = 0
+    best_key = (0, False)
     for match in _SENTENCE.finditer(content or ""):
         sentence = match.group(0).strip(" \t\r\n|")
         if len(sentence) < 8:
             continue
         score = 0
         if any(token in sentence for token in tokens):
-            score += 2
+            score += 3
         if extract_numbers(sentence):
             # 带阈值/参数的条款才是能写出具体用例的那种，权重给最高
             score += 3
@@ -109,9 +109,11 @@ def best_sentence(content: str, name: str) -> str:
         # 图题/表题（"Figure 4 xxx"/"图 3 xxx"）是标签不是要求
         if sentence.strip().lower().startswith(("figure", "fig.", "table", "图", "表")):
             score -= 3
-        if score > best_score:
-            best, best_score = sentence, score
-    if best_score < 3:
+        # 同分时优先"带数值"的那句：能写出具体阈值，比只提到功能点有用。
+        key = (score, bool(extract_numbers(sentence)))
+        if key > best_key:
+            best, best_key = sentence, key
+    if best_key[0] < 3:
         return ""
     return best[:MAX_QUOTE_CHARS]
 
@@ -130,6 +132,54 @@ def _document_name(conn: sqlite3.Connection, record: dict) -> str:
         if row is not None and row[0]:
             return str(row[0])
     return str(record.get("title") or reference or "项目资料")
+
+
+REASON_LABELS = {
+    "ok": "有依据",
+    "empty_source": "资料里这一节没有正文（切片只有标题）",
+    "no_clause": "命中的条款里没有可判定的内容",
+    "no_hit": "知识库里没有提到这个功能点",
+}
+
+
+def diagnose(
+    conn: sqlite3.Connection,
+    project_id: str,
+    function_points: list[dict],
+    *,
+    limit: int = 8,
+) -> dict[str, str]:
+    """给每个功能点判定"为什么没有依据"，好让界面说人话而不是让人去猜。
+
+    三种落空原因要分开：知识库根本没提到（该补资料）、提到了但切片正文是空的
+    （入库时没抓到正文，要重新入库或补原文）、命中的条款里没有可判定内容
+    （只能写成弱依据）。
+    """
+    reasons: dict[str, str] = {}
+    for point in function_points:
+        name = str(point.get("name") or "").strip()
+        if not name:
+            continue
+        records = knowledge_store.search_records(conn, project_id, query=name, limit=limit)
+        if not records:
+            from autotest.workflow import store as workflow_store
+
+            records = workflow_store.search_knowledge(conn, project_id, name, "", "", limit)
+        if not records:
+            reasons[name] = "no_hit"
+            continue
+        bodies = [str(record.get("content") or record.get("excerpt") or "") for record in records]
+        tokens = _tokens(name)
+        # 只看"真的提到这个功能点"的切片：目录页那种几百字的无关切片不该算数。
+        relevant = [body for body in bodies if any(token in body for token in tokens)]
+        if relevant and all(len(body.strip()) < 8 for body in relevant):
+            reasons[name] = "empty_source"
+            continue
+        if any(best_sentence(body, name) for body in (relevant or bodies)):
+            reasons[name] = "ok"
+        else:
+            reasons[name] = "no_clause"
+    return reasons
 
 
 def collect(

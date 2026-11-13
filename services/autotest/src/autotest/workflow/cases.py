@@ -170,22 +170,36 @@ def _grounded_case(
     }
 
 
+def _reason_counts(cases: list[dict]) -> dict[str, int]:
+    """按"为什么没依据"分组计数，报告与界面据此提示该补什么。"""
+    counts: dict[str, int] = {}
+    for case in cases:
+        if case.get("grounding") == "none":
+            key = str(case.get("basis_reason") or "no_clause")
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
 def design_cases(
     prd_result: dict,
     types: list[str] | None = None,
     template: str = "standard",
     evidence: dict[str, list[dict]] | None = None,
+    reasons: dict[str, str] | None = None,
 ) -> dict:
     """按功能点 × 测试类型生成用例。
 
     `evidence`：功能点名 → 依据列表（来自 grounding.collect）。给了且含数值时写
     具体步骤，否则退回模板并把 grounding 标成 weak / none。
+    `reasons`：功能点名 → 为什么没有依据（grounding.diagnose 的结论），
+    会跟着用例落库，界面上能直接说"资料这一节没正文"而不是让人猜。
     `template` 目前只接受 "standard"；保留参数是为了后续加"精简/详细"两档时
     不动调用方签名。
     """
     function_points = prd_result.get("function_points") or []
     chosen_types = _normalize_types(types)
     grounded_map = evidence or {}
+    reason_map = reasons or {}
 
     cases: list[dict] = []
     levels = {"strong": 0, "weak": 0, "none": 0}
@@ -216,6 +230,7 @@ def design_cases(
                     precondition = f"《{point_evidence[0].get('doc') or '项目资料'}》：{point_evidence[0].get('quote')}"
 
             levels[level] += 1
+            reason = "ok" if level != "none" else (reason_map.get(name) or "no_clause")
             primary = point_evidence[0] if point_evidence else None
             cases.append(
                 {
@@ -227,6 +242,7 @@ def design_cases(
                     "steps": steps,
                     "expected": expected,
                     "grounding": level,
+                    "basis_reason": reason,
                     "evidence": (
                         {
                             "doc": primary.get("doc"),
@@ -254,5 +270,6 @@ def design_cases(
             "types": chosen_types,
             "template": template,
             "grounding": levels,
+            "reasons": _reason_counts(cases),
         },
     }

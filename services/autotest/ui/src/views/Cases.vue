@@ -349,6 +349,12 @@ function toggleSelect(id: number) {
 // 详情抽屉
 const drawerOpen = ref(false)
 
+const BASIS_REASONS: Record<string, string> = {
+  no_hit: '知识库里没有提到这个功能点 —— 需要补一份对应资料，否则只能人工写。',
+  empty_source: '资料里这一节没有正文（切片只有标题）—— 重新入库或补原文后再生成。',
+  no_clause: '命中的条款里没有可判定的内容（既没有阈值，也没有"应/必须"这类约束）。',
+}
+
 /** 用例的依据（doc/quote/numbers + grounding 等级）：后端以 JSON 文本存在 evidence 列。 */
 const caseEvidence = computed(() => {
   const raw = (selectedCase.value as any)?.evidence
@@ -827,8 +833,13 @@ watch(viewMode, (val) => {
                 原文参数：{{ caseEvidence.evidence.numbers.join('、') }}
               </div>
             </div>
-            <div v-else class="text-xs text-muted-2">
-              这条用例是按功能点名套模板生成的，去「项目资料」把相关资料分解入库后重新生成，会带上原文条款与阈值。
+            <div v-else class="text-xs text-muted-2 space-y-1">
+              <div>
+                {{ BASIS_REASONS[(caseEvidence as any)?.reason || ''] || '这条用例是按功能点名套模板生成的。' }}
+              </div>
+              <div class="text-muted-2">
+                处理办法：补对应资料 → 「项目资料」里分解入库 → 回流水线重跑 ③ 设计用例。
+              </div>
             </div>
           </div>
 

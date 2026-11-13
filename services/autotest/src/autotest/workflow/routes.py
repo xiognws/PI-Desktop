@@ -124,10 +124,14 @@ def _case_evidence_text(case: dict) -> str:
     """
     payload = {
         "grounding": str(case.get("grounding") or "none"),
+        "reason": str(case.get("basis_reason") or ""),
         "evidence": case.get("evidence"),
     }
     if not payload["evidence"]:
-        return json.dumps({"grounding": payload["grounding"], "evidence": None}, ensure_ascii=False)
+        return json.dumps(
+            {"grounding": payload["grounding"], "reason": payload["reason"], "evidence": None},
+            ensure_ascii=False,
+        )
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -341,9 +345,13 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
             raise HTTPException(status_code=409, detail="还没有 PRD 解析结果，先调用 prd-parse")
         # 先从知识库给每个功能点找依据：有条款原文就写具体的步骤与阈值，
         # 没有就退回模板并标 ungrounded（界面能看出哪些用例还没底）。
-        evidence = grounding.collect(conn, project_id, prd_result.get("function_points") or [])
+        function_points = prd_result.get("function_points") or []
+        evidence = grounding.collect(conn, project_id, function_points)
+        # 无依据也分几种：资料里没这一节、切片正文为空、条款没有可判定内容。
+        # 不给原因的话，界面只能含糊地说"去入库吧"，用户根本不知道该补什么。
+        reasons = grounding.diagnose(conn, project_id, function_points)
         result = case_service.design_cases(
-            prd_result, body.types, body.template, evidence=evidence
+            prd_result, body.types, body.template, evidence=evidence, reasons=reasons
         )
         # 设计的用例要落进项目的 test_cases：用例页、执行状态回写、脚本关联都读那张
         # 表。只把它留在 workflow_steps 的 payload 里，界面上就永远是「0 条用例」。
@@ -356,7 +364,9 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
             stage="designed",
             summary=(
                 f"生成 {result['stats']['total']} 条用例"
-                f"（有依据 {result['stats']['grounding']['strong']} 条）"
+                f"（有依据 {result['stats']['grounding']['strong']} 条"
+                f"，仅条款 {result['stats']['grounding']['weak']} 条"
+                f"，无依据 {result['stats']['grounding']['none']} 条）"
             ),
             payload=result,
         )
@@ -368,6 +378,7 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         "case_total": result["stats"]["total"],
         "by_type": result["stats"]["by_type"],
         "grounding": result["stats"]["grounding"],
+        "reasons": result["stats"].get("reasons") or {},
         "preview": result["cases"][:5],
         "stats": result["stats"],
         "stage": run.get("stage"),

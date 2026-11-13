@@ -165,3 +165,75 @@ def test_figure_caption_is_not_read_as_a_threshold():
     assert grounding.extract_numbers("Figure 4AFE均衡电路") == []
     sentence = grounding.best_sentence("Figure 4AFE均衡电路\n均衡电流应限制在 4A 以内。", "均衡")
     assert "4A 以内" in sentence
+
+
+# ------------------------------------------------------- 为什么没有依据 ----
+
+def test_clause_without_numbers_is_weak_not_none():
+    """「KL15和特定帧唤醒是或的关系」是真条款，只是没有阈值：算弱依据，不算没依据。"""
+    evidence = {
+        "唤醒机制": [
+            {
+                "doc": "CPM低软开发需求V1.1_20260530.docx",
+                "quote": "KL15和特定帧唤醒是或的关系。",
+                "numbers": [],
+            }
+        ]
+    }
+    result = case_service.design_cases(
+        {"function_points": [{"name": "唤醒机制"}]}, types=["功能"], evidence=evidence
+    )
+    case = result["cases"][0]
+    assert case["grounding"] == "weak"
+    assert "KL15" in case["precondition"]
+
+
+def _project_with_points(client, points: list[str]) -> tuple[str, str]:
+    lines = ["# 模块"] + [f"## {name}\n\n{name}相关要求见下文。" for name in points]
+    project_id = client.post("/api/projects", json={"name": "诊断项目", "type": "ECU"}).json()["id"]
+    parsed = client.post(
+        f"/api/projects/{project_id}/workflow/prd-parse",
+        json={"text": "\n\n".join(lines) + "\n", "module": "模块"},
+    ).json()
+    return project_id, parsed["data"]["run_id"]
+
+
+def test_ungrounded_cases_report_why(client):
+    """无依据要分清三种原因：知识库里没有、切片正文为空、条款没有可判定内容。"""
+    project_id, run_id = _project_with_points(client, ["陌生功能"])
+
+    designed = client.post(
+        f"/api/projects/{project_id}/workflow/case-design", json={"run_id": run_id}
+    ).json()
+    assert designed["data"]["grounding"]["none"] >= 1
+    assert designed["data"]["reasons"].get("no_hit", 0) >= 1
+
+    conn = sqlite3.connect(server.get_project_db(project_id))
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT evidence FROM test_cases WHERE COALESCE(evidence, '') != '' LIMIT 1"
+    ).fetchone()
+    conn.close()
+    stored = json.loads(row["evidence"])
+    assert stored["grounding"] == "none"
+    assert stored["reason"] in {"no_hit", "no_clause", "empty_source"}
+
+
+def test_empty_chunk_is_reported_as_empty_source(client):
+    """切片只有标题（正文没入库）时要报 empty_source，而不是含糊地说"去补资料"。"""
+    project_id, run_id = _project_with_points(client, ["诊断功能"])
+    # 直接写一条只有标题的切片：真实场景里这是 docx 该节只有图片/表格导致正文为空
+    conn = sqlite3.connect(server.get_project_db(project_id))
+    conn.execute(
+        "INSERT INTO knowledge_records (project_id, module, record_type, title, content, tags,"
+        " source_ref, created_at) VALUES (?, '', 'doc_chunk', '诊断功能', '诊断功能', '',"
+        " 'doc:doc_empty#1', '2026-01-01 00:00:00')",
+        (project_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    designed = client.post(
+        f"/api/projects/{project_id}/workflow/case-design", json={"run_id": run_id}
+    ).json()
+    assert designed["data"]["reasons"].get("empty_source", 0) >= 1
