@@ -1,0 +1,16 @@
+apps/desktop/test/model-cache.test.mjs
+  h_201ed4c689ac8b 18
+apps/desktop/test/settings-dialog-overlay.test.mjs
+  h_201ed4c689ac8b 80-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "31ade07f69099665dccca573574c67d07f92bcf7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

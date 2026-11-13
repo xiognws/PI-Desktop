@@ -1,0 +1,14 @@
+apps/desktop/electron/main/ipc/plugin-ipc.ts
+  h_201ed4c689ac8b 126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7dcd9527a5fb90fb0faf2095cd36ba4aca917a0c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

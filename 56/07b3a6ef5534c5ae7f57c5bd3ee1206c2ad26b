@@ -1,0 +1,54 @@
+apps/desktop/electron/main/ipc/plugin-ipc.ts
+  h_201ed4c689ac8b 1,9-15,28-29,52,62-136
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 467
+apps/desktop/electron/main/plugin-paths.ts
+  h_201ed4c689ac8b 1-2,112-179
+apps/desktop/src/features/plugins/InstalledPluginsPanel.tsx
+  h_201ed4c689ac8b 135-137
+apps/desktop/src/features/plugins/PluginDialogs.tsx
+  h_201ed4c689ac8b 48-53,271-338
+apps/desktop/src/features/plugins/usePluginsPage.ts
+  h_201ed4c689ac8b 505-543,814,898-903
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 1449-1465
+apps/desktop/src/styles/plugins.css
+  h_201ed4c689ac8b 2405-2451
+apps/desktop/test/bundled-plugins.test.mjs
+  h_201ed4c689ac8b 197-211
+apps/desktop/test/plugin-paths.test.mjs
+  h_201ed4c689ac8b 9-11,14,17,154-214
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 5434-5449
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 2403-2412
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 2423-2432
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 2403-2412
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 2403-2412
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 2419-2428
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 2375-2384
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 2419-2428
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 2404-2413
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 2404-2413
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 375-382
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5607b3a6ef5534c5ae7f57c5bd3ee1206c2ad26b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
