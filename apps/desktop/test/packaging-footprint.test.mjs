@@ -191,6 +191,12 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   // sidecar.js loads in packaged installs (issue #507). Contract tests live
   // in agent-runtime-bundle-package.test.mjs.
   assert.deepEqual(packageJson.build.extraResources, [
+    // The in-app provider gateways (WorkBuddy) run as child processes from a
+    // plain resource directory; a bundled entry cannot be spawned.
+    {
+      from: "resources/in-app-providers",
+      to: "in-app-providers",
+    },
     {
       from: "build/icon.png",
       to: "tray-icon.png",
@@ -242,6 +248,11 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
     {
       from: "../../services/autotest/src",
       to: "autotest/src",
+    },
+    // The per-stage prompts are versioned files the runner reads at run time.
+    {
+      from: "../../services/autotest/prompts",
+      to: "autotest/prompts",
     },
     {
       from: "../../services/autotest/ui-shell",
