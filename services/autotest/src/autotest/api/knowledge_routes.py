@@ -285,7 +285,7 @@ class FromSpecsIn(BaseModel):
 
 @router.post("/documents/from-specs")
 def import_from_specs(project_id: str, body: FromSpecsIn) -> dict:
-    """把项目 `specs/` 里已上传的需求文档一次性切分入库。
+    """把项目 `specs/` 里已上传的项目资料一次性切分入库。
 
     这些文件本来就在项目目录里，不再复制一份，`stored_path` 直接指向原路径；
     内容相同的重复导入按 sha256 跳过。
@@ -297,7 +297,7 @@ def import_from_specs(project_id: str, body: FromSpecsIn) -> dict:
     failed: list[dict] = []
 
     if not specs_dir.is_dir():
-        return {"ok": True, "summary": "specs 目录不存在", "data": {"imported": [], "skipped": [], "failed": []}}
+        return {"ok": True, "summary": "还没有上传项目资料", "data": {"imported": [], "skipped": [], "failed": []}}
 
     for path in sorted(specs_dir.iterdir()):
         if not path.is_file() or not is_supported(path.name):
@@ -328,7 +328,7 @@ def import_from_specs(project_id: str, body: FromSpecsIn) -> dict:
 
     return {
         "ok": True,
-        "summary": f"specs 入库：新增 {len(imported)}，跳过 {len(skipped)}，失败 {len(failed)}",
+        "summary": f"资料入库：新增 {len(imported)}，跳过 {len(skipped)}，失败 {len(failed)}",
         "data": {"imported": imported, "skipped": skipped, "failed": failed},
     }
 

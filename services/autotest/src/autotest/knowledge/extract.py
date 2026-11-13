@@ -27,8 +27,12 @@ TEXT_SUFFIXES = {
 HTML_SUFFIXES = {".html", ".htm", ".xhtml"}
 PDF_SUFFIXES = {".pdf"}
 DOCX_SUFFIXES = {".docx"}  # .doc 是旧二进制格式，python-docx 读不了
+XLSX_SUFFIXES = {".xlsx"}  # .xls 是旧二进制格式，openpyxl 读不了
 
-SUPPORTED_SUFFIXES = TEXT_SUFFIXES | HTML_SUFFIXES | PDF_SUFFIXES | DOCX_SUFFIXES
+SUPPORTED_SUFFIXES = (
+    TEXT_SUFFIXES | HTML_SUFFIXES | PDF_SUFFIXES | DOCX_SUFFIXES | XLSX_SUFFIXES
+)
+MAX_XLSX_ROWS = 4000
 
 _ENCODINGS = ("utf-8", "utf-8-sig", "gb18030")
 
@@ -36,6 +40,11 @@ _PDF_HINT = (
     "缺少 pdfplumber，无法读取 PDF。请在打包机/开发机执行："
     "pip install --target services/autotest/.deps pdfplumber"
 )
+_XLSX_HINT = (
+    "缺少 openpyxl，无法读取 Excel。请执行："
+    "pip install --target services/autotest/.deps openpyxl"
+)
+
 _DOCX_HINT = (
     "缺少 python-docx，无法读取 .docx。请执行："
     "pip install --target services/autotest/.deps python-docx"
@@ -141,6 +150,39 @@ def _docx_to_text(raw: bytes) -> str:
     return "\n\n".join(parts)
 
 
+def _xlsx_to_text(raw: bytes) -> str:
+    """把工作簿读成「每张表一节、每行一条」的文本。
+
+    规格书常用 Excel 写成一张张指标表，公式结果比公式本身有用，所以用
+    `data_only`；只读模式省内存，行数上限防止几十万行的表把上下文吃光。
+    """
+    try:
+        import io
+
+        import openpyxl
+    except ImportError as exc:  # pragma: no cover - 依赖缺失路径
+        raise UnsupportedDocument(_XLSX_HINT) from exc
+
+    workbook = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+    parts: list[str] = []
+    try:
+        for sheet in workbook.worksheets:
+            parts.append(f"# {sheet.title}")
+            emitted = 0
+            for row in sheet.iter_rows(values_only=True):
+                cells = ["" if cell is None else str(cell).strip() for cell in row]
+                if not any(cells):
+                    continue
+                parts.append("| " + " | ".join(cells) + " |")
+                emitted += 1
+                if emitted >= MAX_XLSX_ROWS:
+                    parts.append(f"[该表超过 {MAX_XLSX_ROWS} 行，已截断]")
+                    break
+    finally:
+        workbook.close()
+    return "\n\n".join(parts)
+
+
 def extract_text(filename: str, raw: bytes) -> ExtractedText:
     """把文件字节读成纯文本，附带格式标签与是否截断。"""
     suffix = Path(filename).suffix.lower()
@@ -158,6 +200,8 @@ def extract_text(filename: str, raw: bytes) -> ExtractedText:
         text, fmt = _pdf_to_text(raw), "pdf"
     elif suffix in DOCX_SUFFIXES:
         text, fmt = _docx_to_text(raw), "docx"
+    elif suffix in XLSX_SUFFIXES:
+        text, fmt = _xlsx_to_text(raw), "xlsx"
     else:
         text = _decode(raw)
         fmt = "json" if suffix in {".json", ".jsonl"} else "text"

@@ -115,3 +115,25 @@ def test_requirement_text_is_readable_for_docx(client, project_id, uploaded_docx
     assert extracted.format == "docx"
     assert "电源模块" in extracted.text
     assert not extracted.text.startswith("PK")
+
+
+def test_xlsx_sheet_becomes_rows_of_text():
+    """Excel 规格表也要能读：一张表一节、一行一条。"""
+    from autotest.knowledge import extract
+
+    openpyxl = pytest.importorskip("openpyxl")
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "指标"
+    sheet.append(["指标", "要求"])
+    sheet.append(["静态电流", "应小于 100uA"])
+    sheet.append([None, None])
+    sheet.append(["唤醒时间", "必须小于 200ms"])
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    extracted = extract.extract_text("指标表.xlsx", buffer.getvalue())
+    assert extracted.format == "xlsx"
+    assert "# 指标" in extracted.text
+    assert "| 静态电流 | 应小于 100uA |" in extracted.text
+    assert "| 唤醒时间 | 必须小于 200ms |" in extracted.text

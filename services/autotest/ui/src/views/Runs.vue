@@ -267,7 +267,7 @@ onMounted(loadRuns)
 
             <div class="flex items-center gap-6 text-sm text-gray-600 mb-3">
               <span>当前阶段 {{ run.stage || '—' }}</span>
-              <span v-if="run.requirement_ref" class="truncate">需求 {{ run.requirement_ref }}</span>
+              <span v-if="run.requirement_ref" class="truncate">资料 {{ run.requirement_ref }}</span>
             </div>
 
             <div class="flex items-center gap-3">
