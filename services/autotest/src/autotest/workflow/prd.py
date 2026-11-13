@@ -26,6 +26,9 @@ MAX_ITEMS_PER_GROUP = 60
 
 _HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _NUMBERED_HEADING = re.compile(r"^(?:第[一二三四五六七八九十百]+[章节部分]|[一二三四五六七八九十]+、|\d+\.\d*)\s*(.+)$")
+# 标题里的章节编号（`1.1` / `1.1.` / `1、`）：功能点名要拿来检索知识库，带着编号
+# 就永远命不中正文 —— 真实 PRD 的标题几乎都带编号，会把整份文档判成"无依据"。
+_LEADING_NUMBER = re.compile(r"^\s*\d+(?:\.\d+)*\s*[.、)．]?\s*")
 _LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)、]|\(\d+\))\s+(.+)$")
 _REQUIREMENT = re.compile(r"(应|必须|需要|支持|能够|可以|允许|提供|禁止|不得|保证)")
 
@@ -81,6 +84,7 @@ def _split_sections(lines: list[str]) -> list[_Section]:
             if current.body or current.title:
                 sections.append(current)
             title = (heading.group(2) if heading else numbered.group(1)).strip()
+            title = _LEADING_NUMBER.sub("", title).strip() or title
             level = len(heading.group(1)) if heading else 0
             current = _Section(title=title, body=[], level=level)
         else:

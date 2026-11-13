@@ -38,6 +38,7 @@ import {
   StatusBarSpeed,
   StatusBarTokens,
 } from "./StatusBarUsage";
+import { StatusBarCredits } from "./StatusBarCredits";
 import { StatusBarMenu, type StatusBarMenuEntry } from "./StatusBarMenu";
 import {
   setStatusBarHidden,
@@ -306,6 +307,7 @@ export function Sidebar({
     { id: "scheduled", label: t("statusBar.scheduled") },
     { id: "timer", label: t("statusBar.running") },
     { id: "pending", label: t("statusBar.pending") },
+    { id: "credits", label: t("statusBar.creditsUnit") },
   ];
   const setPage = useAppStore((s) => s.setPage);
   const navBack = useAppStore((s) => s.navBack);
@@ -2870,6 +2872,7 @@ export function Sidebar({
               </span>
             ) : null}
             {statusBarPrefs.hidden.includes("context") ? null : <StatusBarMetrics />}
+            {statusBarPrefs.hidden.includes("credits") ? null : <StatusBarCredits />}
             {statusBarPrefs.hidden.includes("tokens") ? null : <StatusBarTokens />}
             {statusBarPrefs.hidden.includes("speed") ? null : <StatusBarSpeed />}
             {statusBarPrefs.hidden.includes("cache") ? null : <StatusBarCache />}

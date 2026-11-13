@@ -542,3 +542,102 @@
 .composer-plus-sep {
   height: 6px;
 }
+
+/* In-app provider balance: a chip that only exists while the account is
+   metered and has credit left (see creditsVisibility). */
+.statusbar-credits {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+}
+
+.statusbar-credits-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.statusbar-credits-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent, currentColor);
+}
+
+.statusbar-credits-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.statusbar-credits-unit {
+  color: var(--muted-foreground, inherit);
+}
+
+.statusbar-credits-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 60;
+  min-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 10px;
+  background: var(--card, Canvas);
+  color: var(--foreground, CanvasText);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+}
+
+.statusbar-credits-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted-foreground, inherit);
+}
+
+.statusbar-credits-refresh {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.statusbar-credits-refresh:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.statusbar-credits-total {
+  margin-top: 6px;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusbar-credits-accounts {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.statusbar-credits-accounts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusbar-credits-updated {
+  margin-top: 6px;
+  color: var(--muted-foreground, inherit);
+}

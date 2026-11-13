@@ -28,6 +28,10 @@ test("extraResources 把服务源码、托管页、e2e runner 与依赖打进 au
   const byTo = new Map(entries.map((entry) => [entry.to, entry.from]));
 
   assert.equal(byTo.get("autotest/src"), "../../services/autotest/src");
+  // 固定提示词是运行时读的文件（`prompts/` 在 `src/` 之外），漏打包会让装出来的
+  // 版本直接退化成"没有规则"的生成 —— 开发机上永远看不到。目录存在性一起断言。
+  assert.equal(byTo.get("autotest/prompts"), "../../services/autotest/prompts");
+  assert.ok(existsSync(join(SERVICE, "prompts", "case-design.md")));
   assert.equal(byTo.get("autotest/ui-shell"), "../../services/autotest/ui-shell");
   assert.equal(byTo.get("autotest/runner"), "../../services/autotest/runner");
   // `.deps` 是本机 `pip install --target` 的产物，不进 git；这里只要求配置存在，

@@ -170,6 +170,57 @@ def _grounded_case(
     }
 
 
+def _clause_case(name: str, case_type: str, evidence: list[dict]) -> dict:
+    """有条款、但条款里没有数值：按条款原文写步骤，不套模板空话。
+
+    以前这种用例直接退回 `_TEMPLATES`，于是"有依据"的用例里出现
+    "结果与预期一致"这种无法判定的句子 —— 依据在这，用例却没把依据用上。
+    这里只做一件事：把条款原文变成可执行的动作与可判定的观察点，绝不编造阈值。
+    """
+    primary = evidence[0] if evidence else {}
+    doc = str(primary.get("doc") or "项目资料")
+    quote = str(primary.get("quote") or "").strip() or f"《{doc}》中关于“{name}”的条款"
+    basis = f"《{doc}》：{quote}"
+
+    if case_type == "异常":
+        steps = [
+            f"按{basis}确认“{name}”的约束条件",
+            f"构造违反该约束的输入，执行“{name}”",
+            "观察系统提示、拦截动作与后续状态",
+        ]
+        expected = [f"违反约束的输入被拦截或给出提示（依据{basis}）", "系统可继续操作"]
+    elif case_type == "边界":
+        steps = [
+            f"按{basis}确定“{name}”的取值或状态边界",
+            "在边界两侧各执行一次“{name}”",
+            "分别记录两次的实际结果与提示",
+        ]
+        expected = [f"边界两侧的行为符合{basis}"]
+    elif case_type == "接口":
+        steps = [
+            f"按{basis}构造“{name}”的合法请求",
+            "校验返回码、字段与业务码",
+            "构造缺省或越界参数的请求，验证校验逻辑",
+        ]
+        expected = [f"合法请求的响应符合{basis}", "非法请求被拒绝"]
+    elif case_type == "兼容":
+        steps = [
+            f"在目标机型/版本上按{basis}配置“{name}”",
+            "执行条款描述的主流程",
+            "检查布局、交互与响应表现",
+        ]
+        expected = [f"各机型上的表现一致且符合{basis}"]
+    else:  # 功能
+        steps = [
+            f"按{basis}准备环境与前置条件",
+            f"对“{name}”执行条款描述的操作",
+            "逐条核对界面/状态是否与条款一致",
+        ]
+        expected = [f"满足{basis}", "同一操作可重复执行，结果一致"]
+
+    return {"precondition": basis, "steps": steps, "expected": expected}
+
+
 def _reason_counts(
     uncovered: dict[str, dict], reasons: dict[str, str] | None = None
 ) -> dict[str, int]:
@@ -241,12 +292,16 @@ def design_cases(
                     )
                     entry["case_types"].append(case_type)
                     continue
-                precondition = f"“{name}”对应功能已可用，测试环境就绪"
-                steps = [str(step).format(name=name) for step in spec["steps"]]
-                expected = [str(item).format(name=name) for item in spec["expected"]]
                 if level == "weak":
-                    # 有条款但没数值：把原文挂上，至少知道依据在哪
-                    precondition = f"《{point_evidence[0].get('doc') or '项目资料'}》：{point_evidence[0].get('quote')}"
+                    # 有条款但没数值：按条款原文写，退回模板就等于把依据丢了
+                    clause = _clause_case(name, case_type, point_evidence)
+                    precondition = clause["precondition"]
+                    steps = clause["steps"]
+                    expected = clause["expected"]
+                else:
+                    precondition = f"“{name}”对应功能已可用，测试环境就绪"
+                    steps = [str(step).format(name=name) for step in spec["steps"]]
+                    expected = [str(item).format(name=name) for item in spec["expected"]]
 
             levels[level] += 1
             reason = "ok" if level != "none" else (reason_map.get(name) or "no_clause")

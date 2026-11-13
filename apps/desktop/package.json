@@ -119,6 +119,10 @@
     ],
     "extraResources": [
       {
+        "from": "resources/in-app-providers",
+        "to": "in-app-providers"
+      },
+      {
         "from": "build/icon.png",
         "to": "tray-icon.png"
       },
@@ -157,6 +161,10 @@
       {
         "from": "../../services/autotest/src",
         "to": "autotest/src"
+      },
+      {
+        "from": "../../services/autotest/prompts",
+        "to": "autotest/prompts"
       },
       {
         "from": "../../services/autotest/ui-shell",

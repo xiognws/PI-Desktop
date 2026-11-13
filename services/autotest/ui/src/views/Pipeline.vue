@@ -52,6 +52,8 @@ const reference = ref('')
 const busy = ref('')
 // ③ 跳过哪些用例、为什么：这是"待补资料"清单，随设计结果一起显示。
 const designGaps = ref<{ function_point: string; reason: string; case_types: string[] }[]>([])
+// 这一页的产出按哪一版固定提示词规则生成：规则在 services/autotest/prompts/ 里，改规则要升版本。
+const promptRefs = ref<{ stage: string; ref: string }[]>([])
 const message = ref('')
 const error = ref('')
 
@@ -267,7 +269,22 @@ function dotClass(key: string): string {
   return 'text-accent'
 }
 
-onMounted(refresh)
+async function loadPrompts() {
+  try {
+    const body = await api('/workflow/prompts')
+    promptRefs.value = (body.data?.prompts || []).map((item: { stage: string; ref: string }) => ({
+      stage: item.stage,
+      ref: item.ref,
+    }))
+  } catch {
+    promptRefs.value = []
+  }
+}
+
+onMounted(async () => {
+  await refresh()
+  await loadPrompts()
+})
 </script>
 
 <template>
@@ -397,6 +414,9 @@ onMounted(refresh)
 
       <p class="text-xs text-muted-2 mt-5">
         「生成脚本」产出的是 pytest 骨架（每条用例一个文件、断言待补）；已补完断言的脚本执行时会得到真实的通过/失败。
+      </p>
+      <p v-if="promptRefs.length" class="text-xs text-muted-2 mt-2">
+        规则版本：{{ promptRefs.map((item) => item.ref).join(' · ') }}
       </p>
     </div>
   </div>

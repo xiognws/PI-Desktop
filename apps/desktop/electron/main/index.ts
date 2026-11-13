@@ -59,6 +59,7 @@ import { hasSingleInstanceLock, isDevelopmentBuild } from "./installation";
 import { getStorageBootstrap } from "./storage/bootstrap";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import { registerIpcHandlers } from "./ipc/register";
+import { createInAppProviderSupervisor } from "./providers/ipc";
 import { installGenUiPermissionHandlers } from "./gen-ui-permissions";
 import { AutotestService } from "../autotest/service";
 import { recoverAutotestWorkbench } from "../autotest/prompt";
@@ -222,6 +223,14 @@ const logger = new Logger(
   isDevelopmentBuild ? "debug" : "info",
   { mirrorConsole: isDevelopmentBuild },
 );
+
+/**
+ * In-app model providers (WorkBuddy and any future one): the app owns their
+ * loopback gateway, the provider row pointing at it and its loopback key. Built
+ * once here — after `logger`, which it logs through — so the IPC surface and the
+ * boot sequence share one supervisor.
+ */
+const inAppProviders = createInAppProviderSupervisor({ getHost, logger });
 installMainProcessErrorHandlers({
   emit: (record) => {
     logger.app("runtime", "error", record.message, {
@@ -958,6 +967,7 @@ function registerIpc() {
     ipcMain,
     getMainWindow,
     getHost,
+    inAppProviders,
     publishComputerGrant,
     getSidecar,
     getAgentHostBridge: () => mainState.agentHostBridge,
@@ -1095,6 +1105,9 @@ const autotestService = new AutotestService({
 });
 void app.whenReady().then(() => autotestService.start());
 app.once("will-quit", () => void autotestService.stop());
+// The in-app gateways hold loopback ports; a quit that leaves them listening
+// would make the next launch look like a port conflict.
+app.once("will-quit", () => void inAppProviders.stop());
 
 // 工作台 → 主窗口的「加入上下文」。校验在这里做，真正的插入交给 renderer：
 // composer 的草稿只存在于渲染层，main 不去猜它长什么样。
@@ -1214,6 +1227,7 @@ registerApplicationStartup({
   prewarmPluginLauncher,
   registerIpc,
   bootBackends,
+  startInAppProviders: () => inAppProviders.start(),
   planUiProbe,
   applyApplicationMenuSettings,
   applyDeveloperMode,

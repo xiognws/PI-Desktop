@@ -111,6 +111,11 @@ export type StartupDependencies = {
   prewarmPluginLauncher: () => void;
   registerIpc: () => IpcInvoker;
   bootBackends: () => Promise<void>;
+  /**
+   * Bring up the in-app model providers (`electron/main/providers`). Called
+   * after the host answers; failures are that provider's, never the app's.
+   */
+  startInAppProviders: () => Promise<void>;
   planUiProbe: { install: () => void };
   applyApplicationMenuSettings: (settings?: {
     language?: unknown;
@@ -181,6 +186,7 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       prewarmPluginLauncher,
       registerIpc,
       bootBackends,
+      startInAppProviders,
       planUiProbe,
       applyApplicationMenuSettings,
       applyDeveloperMode,
@@ -344,6 +350,17 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       });
     }
     if (!bootError) planUiProbe.install();
+    // In-app model providers own a loopback gateway and the provider row that
+    // points at it, so they start once the host can answer. The window has
+    // already painted and nothing waits on this: a provider that cannot come up
+    // logs one line and stays out of the way.
+    if (!bootError) {
+      void startInAppProviders().catch((error: unknown) => {
+        logger.app("provider", "warn", "in-app provider startup failed", {
+          data: String(error),
+        });
+      });
+    }
     const curatorMaintenance = createCuratorMaintenance({
       getHost,
       isBusy: isAnySessionBusy,
