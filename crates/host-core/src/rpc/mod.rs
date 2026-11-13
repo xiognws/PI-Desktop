@@ -6884,6 +6884,55 @@ mod tests {
         assert!(missing.message.contains("no archived skill"));
     }
 
+    /// A description is prompt space, and the catalog shows 60 characters of it
+    /// on every turn. The boundary has to refuse a longer one as a caller error —
+    /// `SKILL_INVALID` (1016), not an internal fault a UI would report as a bug —
+    /// and it must refuse rather than clip, so the author is the one who decides
+    /// what the sentence says.
+    #[tokio::test]
+    async fn skill_create_refuses_a_description_the_catalog_would_truncate() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project_dir = tempfile::tempdir().unwrap();
+        let project = project_dir.path().to_string_lossy().to_string();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        let refused = handle_request(
+            state.clone(),
+            "skills.create",
+            json!({ "skill": {
+                "name": "Deploy",
+                "description": "Use when a deployment must be repeated across every environment. x",
+                "body": "# Deploy\n",
+                "level": "project",
+                "projectPath": project,
+            } }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(refused.code, 1016);
+        assert_eq!(refused.data.unwrap()["errorCode"], json!("SKILL_INVALID"));
+        assert!(
+            refused.message.contains("60 characters"),
+            "the refusal names the limit: {}",
+            refused.message
+        );
+
+        // Refused before any write: the library is exactly as it was.
+        let listed = handle_request(
+            state,
+            "skills.list",
+            json!({ "level": "project", "projectPath": project }),
+            tx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(listed["skills"], json!([]));
+    }
+
     #[tokio::test]
     async fn builtin_skill_activation_rpc_round_trips() {
         let data_dir = tempfile::tempdir().unwrap();
