@@ -124,10 +124,10 @@ async function runGate(s: any) {
 
 function gateClass(id: string) {
   const state = gateOf(id).state
-  if (state === 'ok') return 'bg-green-50 text-green-600'
-  if (state === 'fail') return 'bg-red-50 text-red-600'
-  if (state === 'checking' || state === 'gating') return 'bg-blue-50 text-blue-600'
-  return 'bg-gray-100 text-gray-500'
+  if (state === 'ok') return 'bg-success-soft text-success'
+  if (state === 'fail') return 'bg-danger-soft text-danger'
+  if (state === 'checking' || state === 'gating') return 'bg-accent-soft text-accent'
+  return 'bg-surface-3 text-muted'
 }
 
 function gateLabel(id: string) {
@@ -142,68 +142,68 @@ function gateLabel(id: string) {
 
 <template>
   <div class="flex-1 flex flex-col overflow-hidden">
-    <div class="bg-white border-b border-gray-200 px-6 py-3">
+    <div class="bg-surface border-b border-line px-6 py-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <h2 class="text-base font-medium text-gray-900">测试脚本</h2>
-          <span class="text-sm text-gray-400">共 {{ scripts.length }} 个</span>
+          <h2 class="text-base font-medium text-fg">测试脚本</h2>
+          <span class="text-sm text-muted-2">共 {{ scripts.length }} 个</span>
         </div>
-        <button @click="createScript" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button @click="createScript" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2">
           <Plus class="w-4 h-4" />
           新建脚本
         </button>
       </div>
     </div>
 
-    <p v-if="message" class="px-6 py-2 text-xs text-green-600 bg-green-50 border-b border-green-100">{{ message }}</p>
-    <p v-if="error" class="px-6 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{{ error }}</p>
+    <p v-if="message" class="px-6 py-2 text-xs text-success bg-success-soft border-b border-green-100">{{ message }}</p>
+    <p v-if="error" class="px-6 py-2 text-xs text-danger bg-danger-soft border-b border-danger-line">{{ error }}</p>
 
-    <div class="flex-1 overflow-auto bg-white">
+    <div class="flex-1 overflow-auto bg-surface">
       <div class="p-6 grid grid-cols-3 gap-4">
-        <div v-for="s in scripts" :key="s.id" class="bg-gray-50 rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+        <div v-for="s in scripts" :key="s.id" class="bg-surface-2 rounded-lg border border-line p-5 hover:shadow-md transition-shadow">
           <div class="flex items-center gap-2 mb-3">
-            <Code2 class="w-5 h-5 text-blue-600" />
-            <span class="font-medium text-gray-900 text-sm">{{ s.name }}</span>
+            <Code2 class="w-5 h-5 text-accent" />
+            <span class="font-medium text-fg text-sm">{{ s.name }}</span>
           </div>
-          <p class="text-xs text-gray-500 mb-2">关联用例：{{ s.case_id || '未关联' }}</p>
+          <p class="text-xs text-muted mb-2">关联用例：{{ s.case_id || '未关联' }}</p>
           <div class="flex items-center justify-between">
             <span class="text-xs px-2 py-0.5 rounded"
-              :class="s.status === '就绪' ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'">
+              :class="s.status === '就绪' ? 'bg-success-soft text-success' : 'bg-warn-soft text-warn'">
               {{ s.status }}
             </span>
             <span class="text-xs px-2 py-0.5 rounded" :class="gateClass(s.id)">{{ gateLabel(s.id) }}</span>
-            <span class="text-xs text-gray-400">{{ s.language }}</span>
+            <span class="text-xs text-muted-2">{{ s.language }}</span>
           </div>
           <p v-if="gateOf(s.id).detail" class="mt-2 text-xs leading-relaxed"
-            :class="gateOf(s.id).state === 'fail' ? 'text-red-600' : 'text-gray-500'">
+            :class="gateOf(s.id).state === 'fail' ? 'text-danger' : 'text-muted'">
             {{ gateOf(s.id).detail }}
           </p>
           <div class="mt-4 flex gap-2">
-            <button @click="openEdit(s)" class="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded hover:bg-gray-100">编辑</button>
+            <button @click="openEdit(s)" class="flex-1 px-3 py-1.5 text-xs border border-line rounded hover:bg-surface-3">编辑</button>
             <button
               :disabled="gateOf(s.id).state === 'checking' || gateOf(s.id).state === 'gating'"
               @click="checkScript(s)"
-              class="px-3 py-1.5 text-xs border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-50">
+              class="px-3 py-1.5 text-xs border border-line rounded hover:bg-surface-3 disabled:opacity-50">
               校验
             </button>
             <button
               :disabled="gateOf(s.id).state === 'checking' || gateOf(s.id).state === 'gating'"
               @click="runGate(s)"
-              class="px-3 py-1.5 text-xs border border-gray-200 rounded hover:bg-gray-100 disabled:opacity-50">
+              class="px-3 py-1.5 text-xs border border-line rounded hover:bg-surface-3 disabled:opacity-50">
               过门禁
             </button>
             <button
               :disabled="runningIds.includes(s.id) || gateOf(s.id).state === 'fail'"
               :title="gateOf(s.id).state === 'fail' ? '门禁未过，先修脚本再过门禁' : ''"
               @click="runScript(s)"
-              class="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1">
+              class="flex-1 px-3 py-1.5 text-xs bg-accent-solid text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1">
               <Play class="w-3 h-3" />
               {{ runningIds.includes(s.id) ? '执行中…' : '运行' }}
             </button>
           </div>
         </div>
 
-        <div v-if="scripts.length === 0" class="col-span-3 text-center py-12 text-gray-400 text-sm">
+        <div v-if="scripts.length === 0" class="col-span-3 text-center py-12 text-muted-2 text-sm">
           暂无测试脚本，点击右上角"新建脚本"创建
         </div>
       </div>

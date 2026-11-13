@@ -59,18 +59,18 @@ function needsReport(run: Run) {
 }
 
 function statusClass(status?: string) {
-  if (status === 'running') return 'bg-blue-50 text-blue-600'
-  if (status === 'waiting_human') return 'bg-yellow-50 text-yellow-600'
-  if (status === 'done') return 'bg-green-50 text-green-600'
-  if (status === 'failed') return 'bg-red-50 text-red-600'
-  return 'bg-gray-100 text-gray-500'
+  if (status === 'running') return 'bg-accent-soft text-accent'
+  if (status === 'waiting_human') return 'bg-warn-soft text-warn'
+  if (status === 'done') return 'bg-success-soft text-success'
+  if (status === 'failed') return 'bg-danger-soft text-danger'
+  return 'bg-surface-3 text-muted'
 }
 function stepClass(status?: string) {
-  if (status === 'ok') return 'bg-green-50 text-green-600'
-  if (status === 'warning') return 'bg-yellow-50 text-yellow-600'
-  if (status === 'failed') return 'bg-red-50 text-red-600'
-  if (status === 'running') return 'bg-blue-50 text-blue-600'
-  return 'bg-gray-100 text-gray-500'
+  if (status === 'ok') return 'bg-success-soft text-success'
+  if (status === 'warning') return 'bg-warn-soft text-warn'
+  if (status === 'failed') return 'bg-danger-soft text-danger'
+  if (status === 'running') return 'bg-accent-soft text-accent'
+  return 'bg-surface-3 text-muted'
 }
 function shortTime(value?: string) {
   return value ? value.replace('T', ' ').slice(5, 16) : ''
@@ -229,50 +229,50 @@ onMounted(loadRuns)
 
 <template>
   <div class="flex-1 flex flex-col overflow-hidden">
-    <div class="bg-white border-b border-gray-200 px-6 py-3">
+    <div class="bg-surface border-b border-line px-6 py-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <h2 class="text-base font-medium text-gray-900">运行记录</h2>
-          <span class="text-sm text-gray-400">共 {{ runs.length }} 次</span>
+          <h2 class="text-base font-medium text-fg">运行记录</h2>
+          <span class="text-sm text-muted-2">共 {{ runs.length }} 次</span>
         </div>
         <div class="flex items-center gap-3">
-          <span v-if="message" class="text-xs text-gray-500">{{ message }}</span>
-          <button class="p-1.5 text-gray-500 hover:text-gray-800" :disabled="loading" @click="loadRuns">
+          <span v-if="message" class="text-xs text-muted">{{ message }}</span>
+          <button class="p-1.5 text-muted hover:text-fg" :disabled="loading" @click="loadRuns">
             <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
           </button>
         </div>
       </div>
     </div>
 
-    <div class="flex-1 overflow-auto bg-white">
+    <div class="flex-1 overflow-auto bg-surface">
       <div class="p-6 space-y-4">
-        <div v-for="run in runs" :key="run.id" class="bg-gray-50 rounded-lg border border-gray-200">
+        <div v-for="run in runs" :key="run.id" class="bg-surface-2 rounded-lg border border-line">
           <div class="p-5">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2 min-w-0">
-                <PlayCircle class="w-5 h-5 text-blue-600 flex-shrink-0" />
-                <span class="font-medium text-gray-900 font-mono">{{ run.id }}</span>
+                <PlayCircle class="w-5 h-5 text-accent flex-shrink-0" />
+                <span class="font-medium text-fg font-mono">{{ run.id }}</span>
                 <span class="text-xs px-2 py-0.5 rounded" :class="statusClass(run.status)">{{ statusLabel(run.status) }}</span>
-                <span class="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-600">{{ run.module || '未标模块' }}</span>
+                <span class="text-xs px-2 py-0.5 rounded bg-surface border border-line text-fg-3">{{ run.module || '未标模块' }}</span>
                 <!-- 跑完了但还没出报告时，run 的状态会一直是 running（生命周期如此）。
                      不给提示的话，人只会觉得它卡住了。 -->
                 <span
                   v-if="needsReport(run)"
-                  class="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200"
+                  class="text-xs px-2 py-0.5 rounded bg-warn-soft text-amber-700 border border-amber-200"
                   title="执行已完成，但流水线要到生成报告才算收尾"
                 >已执行 · 待出报告</span>
               </div>
-              <span class="text-xs text-gray-400 flex-shrink-0">{{ shortTime(run.created_at) }}</span>
+              <span class="text-xs text-muted-2 flex-shrink-0">{{ shortTime(run.created_at) }}</span>
             </div>
 
-            <div class="flex items-center gap-6 text-sm text-gray-600 mb-3">
+            <div class="flex items-center gap-6 text-sm text-fg-3 mb-3">
               <span>当前阶段 {{ run.stage || '—' }}</span>
               <span v-if="run.requirement_ref" class="truncate">资料 {{ run.requirement_ref }}</span>
             </div>
 
             <div class="flex items-center gap-3">
               <button
-                class="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                class="flex items-center gap-1 text-sm text-accent hover:underline"
                 @click="toggle(run.id)"
               >
                 <ChevronDown v-if="expandedId === run.id" class="w-4 h-4" />
@@ -280,7 +280,7 @@ onMounted(loadRuns)
                 {{ expandedId === run.id ? '收起详情' : '查看步骤' }}
               </button>
               <button
-                class="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600"
+                class="flex items-center gap-1 text-sm text-fg-3 hover:text-accent"
                 @click="openReport(run.id)"
               >
                 <FileText class="w-4 h-4" />
@@ -288,7 +288,7 @@ onMounted(loadRuns)
               </button>
               <!-- 跑起来 / 出报告：以前只能靠 Agent 会话触发，这里是同一个后端的入口 -->
               <button
-                class="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 disabled:opacity-50"
+                class="flex items-center gap-1 text-sm text-fg-3 hover:text-accent disabled:opacity-50"
                 :disabled="busyAction === `execute:${run.id}`"
                 @click="startExecution(run.id)"
               >
@@ -296,7 +296,7 @@ onMounted(loadRuns)
                 {{ busyAction === `execute:${run.id}` ? '投递中…' : '执行用例' }}
               </button>
               <button
-                class="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600 disabled:opacity-50"
+                class="flex items-center gap-1 text-sm text-fg-3 hover:text-accent disabled:opacity-50"
                 :disabled="busyAction === `report:${run.id}`"
                 @click="generateReport(run.id)"
               >
@@ -305,7 +305,7 @@ onMounted(loadRuns)
               </button>
               <router-link
                 :to="`/project/${projectId}/executions`"
-                class="text-sm text-gray-500 hover:text-blue-600"
+                class="text-sm text-muted hover:text-accent"
               >
                 执行记录 →
               </router-link>
@@ -313,22 +313,22 @@ onMounted(loadRuns)
           </div>
 
           <!-- 展开：待审批 + 步骤 -->
-          <div v-if="expandedId === run.id" class="border-t border-gray-200 bg-white rounded-b-lg px-5 py-4 space-y-3">
+          <div v-if="expandedId === run.id" class="border-t border-line bg-surface rounded-b-lg px-5 py-4 space-y-3">
             <div
               v-for="item in detail?.pending || []"
               :key="item.id"
-              class="border border-yellow-200 bg-yellow-50/60 rounded-lg p-3"
+              class="border border-warn-line bg-warn-soft/60 rounded-lg p-3"
             >
-              <div class="text-xs text-yellow-700 font-medium">待审批 · {{ item.stage || '' }}</div>
-              <div class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">{{ item.prompt || '是否继续？' }}</div>
+              <div class="text-xs text-warn font-medium">待审批 · {{ item.stage || '' }}</div>
+              <div class="mt-1 text-sm text-fg whitespace-pre-wrap">{{ item.prompt || '是否继续？' }}</div>
               <div class="mt-2 flex items-center gap-2">
                 <button
                   v-for="opt in (item.options && item.options.length ? item.options : ['approve', 'reject'])"
                   :key="opt"
                   class="px-3 py-1.5 text-xs rounded-lg border"
                   :class="opt === 'reject'
-                    ? 'border-gray-300 text-gray-700 hover:border-red-400 hover:text-red-600'
-                    : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'"
+                    ? 'border-line-strong text-fg-2 hover:border-red-400 hover:text-danger'
+                    : 'bg-accent-solid border-blue-600 text-white hover:bg-blue-700'"
                   @click="decide(item.id, opt)"
                 >
                   {{ opt === 'approve' ? '通过' : opt === 'reject' ? '驳回' : opt }}
@@ -336,22 +336,22 @@ onMounted(loadRuns)
               </div>
             </div>
 
-            <div class="rounded-lg border border-gray-200 divide-y divide-gray-100">
+            <div class="rounded-lg border border-line divide-y divide-line-soft">
               <div v-for="step in detail?.steps || []" :key="step.id" class="px-3 py-2 flex items-start gap-3">
-                <span class="w-5 text-xs text-gray-400 pt-0.5">{{ step.seq }}</span>
-                <span class="w-36 text-xs font-mono text-gray-700 truncate">{{ step.tool }}</span>
+                <span class="w-5 text-xs text-muted-2 pt-0.5">{{ step.seq }}</span>
+                <span class="w-36 text-xs font-mono text-fg-2 truncate">{{ step.tool }}</span>
                 <span class="text-xs px-2 py-0.5 rounded flex-shrink-0" :class="stepClass(step.status)">
                   {{ STEP_LABELS[step.status] || step.status }}
                 </span>
-                <span class="flex-1 text-xs text-gray-600">{{ step.summary || '' }}</span>
-                <span class="text-xs text-gray-400 flex-shrink-0">{{ shortTime(step.started_at) }}</span>
+                <span class="flex-1 text-xs text-fg-3">{{ step.summary || '' }}</span>
+                <span class="text-xs text-muted-2 flex-shrink-0">{{ shortTime(step.started_at) }}</span>
               </div>
-              <div v-if="!(detail?.steps || []).length" class="px-3 py-8 text-center text-xs text-gray-400">还没有步骤</div>
+              <div v-if="!(detail?.steps || []).length" class="px-3 py-8 text-center text-xs text-muted-2">还没有步骤</div>
             </div>
           </div>
         </div>
 
-        <div v-if="!runs.length" class="text-center py-12 text-gray-400 text-sm">
+        <div v-if="!runs.length" class="text-center py-12 text-muted-2 text-sm">
           暂无运行记录，在 Pi 客户端里让 Agent 跑一条工作流
         </div>
       </div>
@@ -359,12 +359,12 @@ onMounted(loadRuns)
 
     <!-- 报告弹层 -->
     <div v-if="report" class="fixed inset-0 bg-black/30 flex items-center justify-center z-40" @click.self="report = null">
-      <div class="w-[720px] max-h-[80vh] bg-white rounded-lg shadow-lg flex flex-col">
-        <div class="h-11 px-4 flex items-center justify-between border-b border-gray-100">
-          <span class="text-sm font-medium text-gray-900">{{ report.name }}</span>
-          <button class="text-gray-400 hover:text-gray-800" @click="report = null">关闭</button>
+      <div class="w-[720px] max-h-[80vh] bg-surface rounded-lg shadow-lg flex flex-col">
+        <div class="h-11 px-4 flex items-center justify-between border-b border-line-soft">
+          <span class="text-sm font-medium text-fg">{{ report.name }}</span>
+          <button class="text-muted-2 hover:text-fg" @click="report = null">关闭</button>
         </div>
-        <pre class="flex-1 overflow-auto p-4 text-xs leading-relaxed whitespace-pre-wrap text-gray-800">{{ report.markdown }}</pre>
+        <pre class="flex-1 overflow-auto p-4 text-xs leading-relaxed whitespace-pre-wrap text-fg">{{ report.markdown }}</pre>
       </div>
     </div>
   </div>

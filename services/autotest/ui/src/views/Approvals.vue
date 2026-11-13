@@ -34,8 +34,8 @@ function optionLabel(option: string) {
 
 function optionClass(option: string) {
   return option === 'reject'
-    ? 'border-gray-300 text-gray-700 hover:border-red-400 hover:text-red-600'
-    : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
+    ? 'border-line-strong text-fg-2 hover:border-red-400 hover:text-danger'
+    : 'bg-accent-solid border-blue-600 text-white hover:bg-blue-700'
 }
 
 async function load(quiet = false) {
@@ -90,42 +90,42 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flex-1 flex flex-col overflow-hidden">
-    <div class="bg-white border-b border-gray-200 px-6 py-3">
+    <div class="bg-surface border-b border-line px-6 py-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <h2 class="text-base font-medium text-gray-900">待审批</h2>
-          <span class="text-sm text-gray-400">
+          <h2 class="text-base font-medium text-fg">待审批</h2>
+          <span class="text-sm text-muted-2">
             {{ count ? `${count} 条等你确认` : '没有待办' }}
           </span>
         </div>
         <div class="flex items-center gap-3">
-          <span v-if="message" class="text-xs text-gray-500">{{ message }}</span>
-          <button class="p-1.5 text-gray-500 hover:text-gray-800" :disabled="loading" @click="load()">
+          <span v-if="message" class="text-xs text-muted">{{ message }}</span>
+          <button class="p-1.5 text-muted hover:text-fg" :disabled="loading" @click="load()">
             <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
           </button>
         </div>
       </div>
     </div>
 
-    <p v-if="error" class="px-6 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">{{ error }}</p>
+    <p v-if="error" class="px-6 py-2 text-xs text-danger bg-danger-soft border-b border-danger-line">{{ error }}</p>
 
-    <div class="flex-1 overflow-auto bg-white">
+    <div class="flex-1 overflow-auto bg-surface">
       <div class="p-6 space-y-4 max-w-4xl">
         <div
           v-for="item in decisions"
           :key="item.id"
-          class="border border-yellow-200 bg-yellow-50/50 rounded-lg p-5"
+          class="border border-warn-line bg-warn-soft/50 rounded-lg p-5"
         >
-          <div class="flex items-center gap-2 text-xs text-yellow-700 mb-2">
+          <div class="flex items-center gap-2 text-xs text-warn mb-2">
             <span class="font-medium">人工卡点 · {{ item.stage || '未标阶段' }}</span>
-            <span class="font-mono text-gray-500">{{ item.run_id }}</span>
-            <span v-if="item.module" class="px-2 py-0.5 rounded bg-white border border-yellow-200 text-gray-600">
+            <span class="font-mono text-muted">{{ item.run_id }}</span>
+            <span v-if="item.module" class="px-2 py-0.5 rounded bg-surface border border-warn-line text-fg-3">
               {{ item.module }}
             </span>
-            <span class="ml-auto text-gray-400">{{ item.created_at || '' }}</span>
+            <span class="ml-auto text-muted-2">{{ item.created_at || '' }}</span>
           </div>
 
-          <div class="text-sm text-gray-800 whitespace-pre-wrap mb-3">
+          <div class="text-sm text-fg whitespace-pre-wrap mb-3">
             {{ item.prompt || '是否继续？' }}
           </div>
 
@@ -146,14 +146,14 @@ onBeforeUnmount(() => {
             </button>
             <router-link
               :to="`/project/${projectId}/runs?run=${item.run_id}`"
-              class="ml-auto text-xs text-gray-500 hover:text-blue-600"
+              class="ml-auto text-xs text-muted hover:text-accent"
             >
               查看这个 run 的步骤 →
             </router-link>
           </div>
         </div>
 
-        <div v-if="!decisions.length" class="text-center py-16 text-sm text-gray-400">
+        <div v-if="!decisions.length" class="text-center py-16 text-sm text-muted-2">
           没有待审批的卡点。等 Agent 跑到需要人确认的步骤时，这里会出现一条。
         </div>
       </div>

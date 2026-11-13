@@ -256,15 +256,15 @@ onMounted(async () => {
   <div class="flex-1 flex flex-col overflow-auto p-6">
     <div class="flex items-start justify-between mb-6">
       <div>
-        <h2 class="text-lg font-medium text-gray-900">知识库</h2>
-        <p class="text-sm text-gray-500 mt-1">导入文档后按段落切分，Agent 出用例前先查这里；报告也会归档进来</p>
+        <h2 class="text-lg font-medium text-fg">知识库</h2>
+        <p class="text-sm text-muted mt-1">导入文档后按段落切分，Agent 出用例前先查这里；报告也会归档进来</p>
       </div>
       <div class="flex items-center gap-2">
-        <input v-model="uploadModule" class="h-8 w-24 px-2 text-xs border border-gray-200 rounded-lg" placeholder="模块" />
-        <input v-model="uploadTags" class="h-8 w-24 px-2 text-xs border border-gray-200 rounded-lg" placeholder="标签" />
+        <input v-model="uploadModule" class="h-8 w-24 px-2 text-xs border border-line rounded-lg" placeholder="模块" />
+        <input v-model="uploadTags" class="h-8 w-24 px-2 text-xs border border-line rounded-lg" placeholder="标签" />
         <input ref="fileInput" type="file" multiple class="hidden" @change="upload(($event.target as HTMLInputElement).files)" />
         <button
-          class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
+          class="flex items-center gap-2 px-4 py-2 bg-accent-solid text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
           :disabled="busy"
           @click="fileInput?.click()"
         >
@@ -277,43 +277,43 @@ onMounted(async () => {
     <!-- 检索 -->
     <div class="max-w-6xl">
       <div class="relative mb-2 max-w-xl">
-        <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-2" />
         <input
           v-model="kw"
           type="text"
           placeholder="搜索历史经验、用例、修复方案，如 DTC / 0x22"
-          class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="w-full pl-9 pr-3 py-2 border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           @keydown.enter="searchKnowledge"
         />
       </div>
       <div class="flex items-center gap-2 mb-6">
-        <input v-model="kwModule" class="h-8 w-36 px-2 text-xs border border-gray-200 rounded-lg" placeholder="限定模块（可选）" />
-        <input v-model="kwTags" class="h-8 w-36 px-2 text-xs border border-gray-200 rounded-lg" placeholder="限定标签（可选）" />
+        <input v-model="kwModule" class="h-8 w-36 px-2 text-xs border border-line rounded-lg" placeholder="限定模块（可选）" />
+        <input v-model="kwTags" class="h-8 w-36 px-2 text-xs border border-line rounded-lg" placeholder="限定标签（可选）" />
         <button
-          class="h-8 px-4 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+          class="h-8 px-4 text-xs rounded-lg bg-accent-solid text-white hover:bg-blue-700 disabled:opacity-60"
           :disabled="busy"
           @click="searchKnowledge"
         >检索</button>
-        <span v-if="status" class="text-xs text-gray-500">{{ status }}</span>
+        <span v-if="status" class="text-xs text-muted">{{ status }}</span>
       </div>
 
       <!-- 检索结果 -->
       <div v-if="hits.length" class="space-y-4 mb-8">
         <div class="flex items-center gap-2">
-          <h3 class="text-sm font-medium text-gray-900">检索结果</h3>
-          <span class="text-xs text-gray-400">{{ hits.length }} 条</span>
+          <h3 class="text-sm font-medium text-fg">检索结果</h3>
+          <span class="text-xs text-muted-2">{{ hits.length }} 条</span>
         </div>
-        <div v-for="(hit, idx) in hits" :key="idx" class="bg-white rounded-lg border border-gray-200 p-5 hover:border-blue-300">
+        <div v-for="(hit, idx) in hits" :key="idx" class="bg-surface rounded-lg border border-line p-5 hover:border-accent-line">
           <div class="flex items-center gap-2 mb-2">
             <Lightbulb class="w-4 h-4 text-yellow-500" />
-            <span class="font-medium text-gray-900">{{ hit.title || hit.source_ref || '未命名段落' }}</span>
-            <span v-if="hit.module" class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600">{{ hit.module }}</span>
-            <span v-if="hit.score === null || hit.score === undefined" class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500">模糊匹配</span>
-            <button class="ml-auto text-xs text-blue-600 hover:underline" @click="insertHit(hit)">加入上下文</button>
-            <button class="text-xs text-gray-500 hover:underline" @click="copyHit(hit)">复制</button>
+            <span class="font-medium text-fg">{{ hit.title || hit.source_ref || '未命名段落' }}</span>
+            <span v-if="hit.module" class="text-xs px-2 py-0.5 rounded bg-accent-soft text-accent">{{ hit.module }}</span>
+            <span v-if="hit.score === null || hit.score === undefined" class="text-xs px-2 py-0.5 rounded bg-surface-3 text-muted">模糊匹配</span>
+            <button class="ml-auto text-xs text-accent hover:underline" @click="insertHit(hit)">加入上下文</button>
+            <button class="text-xs text-muted hover:underline" @click="copyHit(hit)">复制</button>
           </div>
-          <p class="text-sm text-gray-600 mb-3 leading-relaxed">{{ hit.excerpt || '' }}</p>
-          <div class="flex items-center justify-between text-xs text-gray-400">
+          <p class="text-sm text-fg-3 mb-3 leading-relaxed">{{ hit.excerpt || '' }}</p>
+          <div class="flex items-center justify-between text-xs text-muted-2">
             <span>{{ hit.source_ref || '' }}</span>
             <span v-if="hit.score !== null && hit.score !== undefined">相关度 {{ Number(hit.score).toFixed(3) }}</span>
           </div>
@@ -322,72 +322,72 @@ onMounted(async () => {
 
       <!-- 文档库 -->
       <div class="flex items-center gap-2 mb-3">
-        <h3 class="text-sm font-medium text-gray-900">文档库</h3>
-        <span class="text-xs text-gray-400">
+        <h3 class="text-sm font-medium text-fg">文档库</h3>
+        <span class="text-xs text-muted-2">
           {{ visibleDocs.length }} 篇<span v-if="kwModule">（{{ kwModule }}）</span>
           <span v-if="stats"> · 共 {{ stats.total.chunks }} 段</span>
         </span>
         <button
           v-if="checkedIds.length"
-          class="ml-auto text-xs text-red-600 hover:underline"
+          class="ml-auto text-xs text-danger hover:underline"
           @click="removeChecked()"
         >删除选中 {{ checkedIds.length }}</button>
-        <button class="p-1 text-gray-400 hover:text-gray-700" :class="checkedIds.length ? '' : 'ml-auto'" @click="loadDocs"><RefreshCw class="w-3.5 h-3.5" /></button>
+        <button class="p-1 text-muted-2 hover:text-fg-2" :class="checkedIds.length ? '' : 'ml-auto'" @click="loadDocs"><RefreshCw class="w-3.5 h-3.5" /></button>
       </div>
 
       <!-- 模块分组：点一下只筛文档库，不影响上面的检索条件 -->
       <div v-if="stats && stats.modules.length" class="flex flex-wrap items-center gap-2 mb-3">
         <button
           class="text-xs px-2 py-1 rounded border"
-          :class="!kwModule ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600'"
+          :class="!kwModule ? 'bg-accent-soft border-accent-line text-accent' : 'bg-surface border-line text-fg-3'"
           @click="kwModule = ''"
         >全部 {{ stats.total.docs }}</button>
         <button
           v-for="m in stats.modules"
           :key="m.module"
           class="text-xs px-2 py-1 rounded border"
-          :class="kwModule === m.module ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200 text-gray-600'"
+          :class="kwModule === m.module ? 'bg-accent-soft border-accent-line text-accent' : 'bg-surface border-line text-fg-3'"
           @click="kwModule = kwModule === m.module ? '' : m.module"
-        >{{ m.module }} {{ m.docs }}<span class="ml-1 text-gray-400">{{ m.chunks }} 段</span></button>
+        >{{ m.module }} {{ m.docs }}<span class="ml-1 text-muted-2">{{ m.chunks }} 段</span></button>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
-        <div v-for="doc in visibleDocs" :key="doc.doc_id" class="bg-white rounded-lg border border-gray-200 p-4 flex items-start gap-3">
+        <div v-for="doc in visibleDocs" :key="doc.doc_id" class="bg-surface rounded-lg border border-line p-4 flex items-start gap-3">
           <input
             type="checkbox"
             class="mt-1"
             :checked="checkedIds.includes(doc.doc_id)"
             @change="toggleCheck(doc.doc_id)"
           />
-          <FileText class="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+          <FileText class="w-5 h-5 text-muted-2 flex-shrink-0 mt-0.5" />
           <div class="min-w-0 flex-1">
-            <div class="font-medium text-gray-900 truncate">{{ doc.filename || doc.doc_id }}</div>
+            <div class="font-medium text-fg truncate">{{ doc.filename || doc.doc_id }}</div>
 
-            <div v-if="editingId !== doc.doc_id" class="text-xs text-gray-400 mt-1">
+            <div v-if="editingId !== doc.doc_id" class="text-xs text-muted-2 mt-1">
               {{ moduleOf(doc) }} · {{ doc.chunk_count ?? 0 }} 段 · {{ shortTime(doc.created_at) }}
-              <span v-if="doc.tags" class="text-gray-500"> · {{ doc.tags }}</span>
+              <span v-if="doc.tags" class="text-muted"> · {{ doc.tags }}</span>
             </div>
             <div v-else class="mt-2 space-y-2">
-              <input v-model="editModule" class="w-full h-7 px-2 text-xs border border-gray-200 rounded" placeholder="模块（留空 = 未分组）" />
-              <input v-model="editTags" class="w-full h-7 px-2 text-xs border border-gray-200 rounded" placeholder="标签，逗号分隔" />
+              <input v-model="editModule" class="w-full h-7 px-2 text-xs border border-line rounded" placeholder="模块（留空 = 未分组）" />
+              <input v-model="editTags" class="w-full h-7 px-2 text-xs border border-line rounded" placeholder="标签，逗号分隔" />
             </div>
 
             <div class="flex items-center gap-3 mt-2">
-              <button class="text-xs text-blue-600 hover:underline" @click="previewChunks(doc, 0)">查看切分</button>
+              <button class="text-xs text-accent hover:underline" @click="previewChunks(doc, 0)">查看切分</button>
               <template v-if="editingId === doc.doc_id">
-                <button class="text-xs text-blue-600 hover:underline" @click="saveEdit(doc)">保存</button>
-                <button class="text-xs text-gray-400 hover:text-gray-700" @click="editingId = ''">取消</button>
+                <button class="text-xs text-accent hover:underline" @click="saveEdit(doc)">保存</button>
+                <button class="text-xs text-muted-2 hover:text-fg-2" @click="editingId = ''">取消</button>
               </template>
-              <button v-else class="text-xs text-gray-500 hover:underline" @click="startEdit(doc)">改模块</button>
-              <button class="text-xs text-gray-400 hover:text-red-600" @click="removeDoc(doc)">删除</button>
+              <button v-else class="text-xs text-muted hover:underline" @click="startEdit(doc)">改模块</button>
+              <button class="text-xs text-muted-2 hover:text-danger" @click="removeDoc(doc)">删除</button>
             </div>
           </div>
         </div>
-        <div v-if="!visibleDocs.length" class="col-span-2 text-center py-12 text-sm text-gray-400 bg-white rounded-lg border border-gray-200">
+        <div v-if="!visibleDocs.length" class="col-span-2 text-center py-12 text-sm text-muted-2 bg-surface rounded-lg border border-line">
           还没有文档，点右上「导入文件」
         </div>
       </div>
-      <div v-if="visibleDocs.length" class="mt-2 flex items-center gap-2 text-xs text-gray-500">
+      <div v-if="visibleDocs.length" class="mt-2 flex items-center gap-2 text-xs text-muted">
         <input type="checkbox" :checked="allChecked" @change="toggleAll()" />
         <span>全选本页 {{ visibleDocs.length }} 篇</span>
       </div>
@@ -395,31 +395,31 @@ onMounted(async () => {
 
     <!-- 切分预览 -->
     <div v-if="chunkDoc" class="fixed inset-0 bg-black/30 flex items-center justify-center z-40" @click.self="chunkDoc = null">
-      <div class="w-[760px] max-h-[80vh] bg-white rounded-lg shadow-lg flex flex-col">
-        <div class="h-11 px-4 flex items-center justify-between border-b border-gray-100">
-          <span class="text-sm font-medium text-gray-900">
+      <div class="w-[760px] max-h-[80vh] bg-surface rounded-lg shadow-lg flex flex-col">
+        <div class="h-11 px-4 flex items-center justify-between border-b border-line-soft">
+          <span class="text-sm font-medium text-fg">
             {{ chunkDoc.doc.filename || chunkDoc.doc.doc_id }} · {{ chunkDoc.total }} 段
           </span>
-          <button class="text-gray-400 hover:text-gray-800" @click="chunkDoc = null">关闭</button>
+          <button class="text-muted-2 hover:text-fg" @click="chunkDoc = null">关闭</button>
         </div>
         <div class="flex-1 overflow-auto px-4 py-3 space-y-2">
-          <div v-for="(chunk, idx) in chunkDoc.chunks" :key="idx" class="border border-gray-100 rounded">
-            <div class="px-3 py-1.5 bg-gray-50 text-xs text-gray-700 flex items-center gap-2">
+          <div v-for="(chunk, idx) in chunkDoc.chunks" :key="idx" class="border border-line-soft rounded">
+            <div class="px-3 py-1.5 bg-surface-2 text-xs text-fg-2 flex items-center gap-2">
               <span class="truncate">{{ chunk.title || '未命名段落' }}</span>
-              <span class="ml-auto text-gray-400">{{ chunk.chars || 0 }} 字符</span>
+              <span class="ml-auto text-muted-2">{{ chunk.chars || 0 }} 字符</span>
             </div>
-            <div class="px-3 py-2 text-xs text-gray-600 whitespace-pre-wrap">{{ chunk.excerpt }}</div>
+            <div class="px-3 py-2 text-xs text-fg-3 whitespace-pre-wrap">{{ chunk.excerpt }}</div>
           </div>
         </div>
-        <div class="h-11 px-4 flex items-center justify-center gap-3 border-t border-gray-100 text-xs text-gray-600">
+        <div class="h-11 px-4 flex items-center justify-center gap-3 border-t border-line-soft text-xs text-fg-3">
           <button
-            class="px-2 py-1 border border-gray-200 rounded disabled:opacity-40"
+            class="px-2 py-1 border border-line rounded disabled:opacity-40"
             :disabled="chunkOffset <= 0"
             @click="previewChunks(chunkDoc.doc, Math.max(0, chunkOffset - CHUNK_PAGE))"
           >上一页</button>
           <span>{{ chunkOffset + 1 }} - {{ Math.min(chunkOffset + CHUNK_PAGE, chunkDoc.total) }} / {{ chunkDoc.total }}</span>
           <button
-            class="px-2 py-1 border border-gray-200 rounded disabled:opacity-40"
+            class="px-2 py-1 border border-line rounded disabled:opacity-40"
             :disabled="chunkOffset + CHUNK_PAGE >= chunkDoc.total"
             @click="previewChunks(chunkDoc.doc, chunkOffset + CHUNK_PAGE)"
           >下一页</button>

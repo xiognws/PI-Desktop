@@ -6,7 +6,45 @@
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* 极淡天空蓝 */
+/*
+ * 语义色板：浅色就是原来那套（页面外观不变），深色是另一套。
+ * 组件里只写 bg-surface / text-fg / border-line 这类语义类，不再写 bg-white、
+ * text-gray-900 —— 否则每加一处深色都要去改几百处硬编码。
+ * `@theme inline` 让工具类引用 var()，所以切 .dark 只换变量，不重新生成样式。
+ */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-line);
+}
+
+/* 极淡天空蓝（沿用原有品牌色） */
 :root {
   --color-blue-50: #fbfdff;
   --color-blue-100: #f6faff;
@@ -18,10 +56,79 @@
   --color-blue-700: #619fdf;
   --color-blue-800: #5184b8;
   --color-blue-900: #44688f;
+
+  color-scheme: light;
+
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --surface-3: #f3f4f6;
+  --surface-4: #e5e7eb;
+
+  --fg: #111827;
+  --fg-2: #374151;
+  --fg-3: #4b5563;
+  --muted: #6b7280;
+  --muted-2: #9ca3af;
+
+  --line: #e5e7eb;
+  --line-soft: #f3f4f6;
+  --line-strong: #d1d5db;
+
+  --accent: #619fdf;
+  --accent-solid: #7ab8f5;
+  --accent-soft: #f6faff;
+  --accent-line: #dceeff;
+
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --danger-line: #fee2e2;
+  --success: #16a34a;
+  --success-soft: #f0fdf4;
+  --success-line: #dcfce7;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --warn-line: #fef3c7;
 }
 
+.dark {
+  color-scheme: dark;
+
+  --surface: #15171c;
+  --surface-2: #1b1e24;
+  --surface-3: #23272f;
+  --surface-4: #2c313a;
+
+  --fg: #e6e8eb;
+  --fg-2: #c8ccd2;
+  --fg-3: #b2b7bf;
+  --muted: #9aa1aa;
+  --muted-2: #7d848d;
+
+  --line: #2a2f37;
+  --line-soft: #23272f;
+  --line-strong: #3a4048;
+
+  --accent: #7fb9f7;
+  --accent-solid: #2c6da8;
+  --accent-soft: #17222f;
+  --accent-line: #2b5478;
+
+  --danger: #f87171;
+  --danger-soft: #2a1a1c;
+  --danger-line: #4a2b2f;
+  --success: #4ade80;
+  --success-soft: #15241a;
+  --success-line: #24422e;
+  --warn: #facc15;
+  --warn-soft: #262012;
+  --warn-line: #453a17;
+}
+
+html,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: #ffffff;
+  /* 深色切换的一瞬间先铺底色：只给根元素上色，不给每个组件加过渡 */
+  background: var(--surface-2);
+  color: var(--fg);
 }
