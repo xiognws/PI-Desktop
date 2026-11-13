@@ -1,0 +1,92 @@
+apps/desktop/electron.vite.config.ts
+  h_201ed4c689ac8b 82-88
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 114-118,189,353-363
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 61,220-227,947,1085-1087,1207
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 29-30,57-58,110,341
+apps/desktop/electron/main/providers/credits.ts
+  h_201ed4c689ac8b 1-179
+apps/desktop/electron/main/providers/gateway-process.ts
+  h_201ed4c689ac8b 1-175
+apps/desktop/electron/main/providers/in-app-providers.ts
+  h_201ed4c689ac8b 1-365
+apps/desktop/electron/main/providers/ipc.ts
+  h_201ed4c689ac8b 1-83
+apps/desktop/electron/main/providers/types.ts
+  h_201ed4c689ac8b 1-72
+apps/desktop/electron/main/providers/workbuddy/core.cjs
+  h_201ed4c689ac8b 1-2637
+apps/desktop/electron/main/providers/workbuddy/dashboard.cjs
+  h_201ed4c689ac8b 1-114
+apps/desktop/electron/main/providers/workbuddy/gateway.cjs
+  h_201ed4c689ac8b 1-96
+apps/desktop/electron/main/providers/workbuddy/home.cjs
+  h_201ed4c689ac8b 1-8
+apps/desktop/electron/main/providers/workbuddy/index.ts
+  h_201ed4c689ac8b 1-30
+apps/desktop/electron/main/providers/workbuddy/server.cjs
+  h_201ed4c689ac8b 1-291
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 8,834-846
+apps/desktop/src/lib/in-app-credits-visibility.ts
+  h_201ed4c689ac8b 1-37
+apps/desktop/src/lib/in-app-credits.ts
+  h_201ed4c689ac8b 1-175
+apps/desktop/src/lib/in-app-provider-channels.ts
+  h_201ed4c689ac8b 1-11
+apps/desktop/test/bundled-plugin-default-disabled.test.mjs
+  h_201ed4c689ac8b 1-123
+apps/desktop/test/in-app-providers.test.mjs
+  h_201ed4c689ac8b 1-243
+docs/adr/0396-in-app-provider-gateway.md
+  h_201ed4c689ac8b 1-160
+docs/adr/README.md
+  h_201ed4c689ac8b 427
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 548-676
+docs/spec/03-runtime/12-provider-config-schema.md
+  h_201ed4c689ac8b 339-345
+docs/zh-CN/adr/index.md
+  h_201ed4c689ac8b 323
+docs/zh-CN/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 439-543
+docs/zh-CN/spec/03-runtime/12-provider-config-schema.md
+  h_201ed4c689ac8b 124-128
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 106-120,1176-1180
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 104-118,1186-1190
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 106-120,1176-1180
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 106-120,1176-1180
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 106-120,1182-1186
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 106-120,1160-1164
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 106-120,1182-1186
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 106-120,1173-1177
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 106-120,1173-1177
+scripts/bundled-plugins-default-disabled.json
+  h_201ed4c689ac8b 1-5
+scripts/bundled-plugins-defaults.mjs
+  h_201ed4c689ac8b 1-67
+scripts/sync-bundled-plugins.mjs
+  h_201ed4c689ac8b 30-31,105-114,320-339,376,404-407
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "22efa744bee081cb91502f7c29a62e72eba855a0",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
