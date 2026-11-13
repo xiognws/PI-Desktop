@@ -35,6 +35,7 @@ def run_scripts(
     """
     results: list[dict] = []
     counts = {"pass": 0, "fail": 0, "error": 0, "cancelled": 0}
+    tests = {"pass": 0, "fail": 0, "skip": 0}
     started = 0.0
 
     for script in scripts[:MAX_RESULTS]:
@@ -47,6 +48,14 @@ def run_scripts(
         )
         status = str(response.get("status") or "error")
         counts[status if status in counts else "error"] += 1
+        measured = response.get("counts") or {}
+        if measured:
+            for key in ("pass", "fail", "skip"):
+                tests[key] += int(measured.get(key) or 0)
+        elif status == "pass":
+            tests["pass"] += 1
+        elif status in ("fail", "error"):
+            tests["fail"] += 1
         duration = float(response.get("duration_ms") or 0.0)
         started += duration
         results.append(
@@ -67,11 +76,15 @@ def run_scripts(
     return {
         "results": results,
         "stats": {
-            "total": len(results),
-            "pass": counts["pass"],
-            "fail": counts["fail"],
+            # total / pass / fail 按 pytest 用例数算；scripts 保留脚本条数，
+            # 报告里两行都写清楚，免得「36 条用例」和「36 个脚本」被当成同一件事。
+            "total": tests["pass"] + tests["fail"] + tests["skip"],
+            "pass": tests["pass"],
+            "skip": tests["skip"],
+            "fail": tests["fail"],
             "error": counts["error"],
             "cancelled": counts["cancelled"],
+            "scripts": len(results),
             "duration_ms": round(started, 1),
         },
     }

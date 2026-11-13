@@ -111,6 +111,88 @@ def test_invalid_event_is_refused(tmp_path):
 
 
 # --------------------------------------------------------- python native ----
+# ------------------------------------------------------ 用例级计数 ----
+
+
+def test_execution_row_counts_pytest_cases_not_one_per_script(tmp_path):
+    """一个脚本里 3 条 pytest 用例 → 执行行总数记 3，而不是 1。
+
+    否则「6 passed」的脚本和执行 1 条用例的脚本在报表里都等于 1，
+    通过率就变成按脚本算的数字，和 pytest 真正跑了多少条断言无关。
+    """
+    project_dir, db_path = make_project(tmp_path)
+    script = project_dir / "many.py"
+    body = [
+        "def test_a():",
+        "    assert True",
+        "",
+        "def test_b():",
+        "    assert True",
+        "",
+        "import pytest",
+        "",
+        "def test_c():",
+        "    pytest.skip('骨架')",
+        "",
+    ]
+    script.write_text("\n".join(body), encoding="utf-8")
+
+    result = execute_script(db_path, "proj_test", script_row(script), project_dir=project_dir)
+
+    assert result["status"] == "pass"
+    assert result["counts"] == {"pass": 2, "fail": 0, "skip": 1}
+    assert result["total"] == 3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM executions WHERE id = ?", (result["execution_id"],)
+        ).fetchone()
+    assert row["total"] == 3
+    # skip 在行上算通过（骨架天然 skip），所以 2 通过 + 1 跳过 = 3
+    assert row["passed"] == 3
+    assert row["failed"] == 0
+
+
+def test_failing_pytest_case_counts_as_one_failure_among_many(tmp_path):
+    project_dir, db_path = make_project(tmp_path)
+    script = project_dir / "mixed.py"
+    body = [
+        "def test_ok():",
+        "    assert True",
+        "",
+        "def test_bad():",
+        "    assert 1 == 2",
+        "",
+    ]
+    script.write_text("\n".join(body), encoding="utf-8")
+
+    result = execute_script(db_path, "proj_test", script_row(script), project_dir=project_dir)
+
+    assert result["status"] == "fail"
+    assert result["counts"] == {"pass": 1, "fail": 1, "skip": 0}
+    assert result["total"] == 2
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM executions WHERE id = ?", (result["execution_id"],)
+        ).fetchone()
+    assert (row["total"], row["passed"], row["failed"]) == (2, 1, 1)
+
+
+def test_plain_python_script_still_counts_as_one_result(tmp_path):
+    """不是 pytest 的脚本没有用例汇总行，退回「一个脚本 = 一条结果」。"""
+    project_dir, db_path = make_project(tmp_path)
+    script = project_dir / "plain.py"
+    script.write_text("print('done')\n", encoding="utf-8")
+
+    result = execute_script(db_path, "proj_test", script_row(script), project_dir=project_dir)
+
+    assert result["counts"] == {"pass": 1, "fail": 0, "skip": 0}
+    assert result["total"] == 1
+
+
 
 
 def test_python_script_passes_and_keeps_legacy_fields(tmp_path):

@@ -33,10 +33,15 @@ def build_report(
     stats = payload.get("stats") or {}
     total = int(stats.get("total") or 0)
     passed = int(stats.get("pass") or 0)
+    skipped = int(stats.get("skip") or 0)
     failed = int(stats.get("fail") or 0)
     errored = int(stats.get("error") or 0)
     cancelled = int(stats.get("cancelled") or 0)
-    pass_rate = f"{(passed / total * 100):.1f}%" if total else "0.0%"
+    scripts = int(stats.get("scripts") or 0)
+    # 通过率按「真的跑了断言的用例」算：跳过的是还没写断言的骨架脚本，
+    # 把它们算进分母会让 100% 看起来像验证通过，算进分子更糟。
+    asserted = max(total - skipped, 0)
+    pass_rate = f"{(passed / asserted * 100):.1f}%" if asserted else "—（全部跳过）"
 
     lines: list[str] = []
     lines.append(f"# 测试报告 {run_id}")
@@ -44,18 +49,25 @@ def build_report(
     lines.append(f"- 模块：{module or '未标注'}")
     lines.append(f"- 需求来源：{requirement or '未关联'}")
     lines.append(f"- 设计用例数：{cases_total}")
-    lines.append(f"- 执行脚本数：{total}")
+    lines.append(f"- 执行脚本数：{scripts or total}")
+    lines.append(f"- 执行用例数：{total - skipped}（另有 {skipped} 条骨架跳过，未计通过）")
     lines.append(f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append("")
     lines.append("## 结果汇总")
     lines.append("")
-    lines.append("| 总数 | 通过 | 失败 | 异常 | 取消 | 通过率 | 总耗时 |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
-    lines.append(f"| {total} | {passed} | {failed} | {errored} | {cancelled} | {pass_rate} | {stats.get('duration_ms', 0)} ms |")
+    lines.append("| 总数 | 通过 | 跳过 | 失败 | 异常 | 取消 | 通过率 | 总耗时 |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+    lines.append(
+        f"| {total} | {passed} | {skipped} | {failed} | {errored} | {cancelled} "
+        f"| {pass_rate} | {stats.get('duration_ms', 0)} ms |"
+    )
     lines.append("")
 
     if total != cases_total:
-        lines.append(f"> 注意：设计用例 {cases_total} 条，实际执行 {total} 个脚本；差额来自未生成脚本的用例或人工筛选。")
+        lines.append(
+            f"> 注意：设计用例 {cases_total} 条，实际执行 {total - skipped} 条"
+            f"（{scripts or total} 个脚本）；差额来自未生成脚本的用例或人工筛选。"
+        )
         lines.append("")
 
     bug_list = bugs or []
@@ -108,10 +120,14 @@ def build_report(
     lines.append("")
     if total == 0:
         lines.append("本批次没有执行任何脚本，报告不含有效结论。")
+    elif asserted == 0:
+        lines.append(f"本次执行的 {skipped} 条用例全部是尚未补断言的骨架，不能据此判定功能通过。")
     elif failed == 0 and errored == 0:
-        lines.append(f"通过率 {pass_rate}，未发现失败或异常。")
+        lines.append(f"通过率 {pass_rate}（{passed}/{asserted}），未发现失败或异常。")
     else:
-        lines.append(f"通过率 {pass_rate}，存在 {failed + errored} 个失败/异常用例，见上方失败明细。")
+        lines.append(
+            f"通过率 {pass_rate}（{passed}/{asserted}），存在 {failed + errored} 个失败/异常用例，见上方失败明细。"
+        )
 
     markdown = "\n".join(lines) + "\n"
     return {
@@ -119,9 +135,11 @@ def build_report(
         "counts": {
             "total": total,
             "passed": passed,
+            "skipped": skipped,
             "failed": failed,
             "errored": errored,
             "cancelled": cancelled,
+            "scripts": scripts or total,
             "bugs": len(bug_list),
         },
         "pass_rate": pass_rate,
