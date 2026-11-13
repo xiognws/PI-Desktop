@@ -599,6 +599,8 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         scripts_dir = (server.WORKSPACE / project_id / "scripts").resolve()
         scripts_dir.mkdir(parents=True, exist_ok=True)
         authored = script_service.author_scripts(cases, body.sdk)
+        # 脚本规则同样要可判定：骨架写成 assert True 或忘记 skip，执行器一跑就是绿的
+        script_judgement = consistency.check_scripts(authored["scripts"])
 
         created: list[dict] = []
         for item in authored["scripts"]:
@@ -630,11 +632,20 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             body.run_id,
             tool="autotest_script_author",
             stage="authored",
-            summary=f"生成 {len(created)} 个 pytest 骨架",
+            status="ok" if script_judgement["ok"] else "warning",
+            summary=(
+                f"生成 {len(created)} 个 pytest 骨架"
+                + (
+                    f"，不符合提示词规则 {len(script_judgement['issues'])} 处"
+                    if not script_judgement["ok"]
+                    else ""
+                )
+            ),
             payload={
                 "scripts": created,
                 "stats": authored["stats"],
                 "prompt": _prompt_marker("script-author"),
+                "consistency": script_judgement,
             },
         )
         store.touch_run(conn, body.run_id, stage="authored")
@@ -645,6 +656,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "scripts": created[:10],
         "stats": authored["stats"],
         "prompt": _prompt_marker("script-author"),
+        "consistency": script_judgement,
     }
     return _envelope(f"生成 {len(created)} 个 pytest 骨架，已落 scripts 表", data, body.run_id)
 

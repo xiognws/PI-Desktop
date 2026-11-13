@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import re
+
 CASE_TYPES = ("功能", "异常", "边界", "接口", "兼容")
 TYPE_SUFFIX = {
     "功能": "主流程",
@@ -83,6 +85,51 @@ def check_case(case: dict) -> list[dict]:
             add("steps", "grounding=strong 时步骤/预期必须出现原文数值")
 
     return issues
+
+
+def check_scripts(scripts: list[dict]) -> dict:
+    """`prompts/script-author.md` 的硬规则落到生成的脚本文本上。
+
+    这一层要防的是"假通过"：骨架写成 `assert True` 或者干脆不 skip，
+    pytest 一跑就是绿的，报告里却什么都没验证。脚本是唯一会被执行器直接跑的产物，
+    规则必须可判定。
+    """
+    issues: list[dict] = []
+    for item in scripts:
+        name = str(item.get("name") or "")
+        content = str(item.get("content") or "")
+
+        def add(field: str, problem: str) -> None:
+            issues.append({"script": name, "field": field, "problem": problem})
+
+        slug = name[:-3] if name.endswith(".py") else name
+        if not re.fullmatch(r"case_[0-9a-f]{8}\.py", name):
+            add("name", "文件名应为 case_<8 位短哈希>.py")
+        if f"def test_{slug}(" not in content:
+            add("function", f"缺少函数 def test_{slug}()")
+        if 'if __name__ == "__main__":' not in content:
+            add("standalone", "缺少 __main__ 入口，无法直接 python 执行")
+        if "生成方式：" not in content:
+            add("header", "文件头未写明生成方式")
+        if "STEPS =" not in content or "EXPECTED =" not in content:
+            add("constants", "步骤/预期未作为常量写进脚本，脚本无法脱离用例库自查")
+        if "assert True" in content or re.search(r"assert\s+1\s*==\s*1", content):
+            add("tautology", "出现恒真断言，等于伪装通过")
+        # 骨架必须显式跳过；补全后的脚本才允许有真实断言
+        if "pytest.skip(" not in content:
+            assertions = re.findall(r"^\s+assert\s+(?!True\b)", content, flags=re.MULTILINE)
+            if not assertions:
+                add("skeleton", "既没有 pytest.skip 也没有真实断言")
+
+    by_field: dict[str, int] = {}
+    for issue in issues:
+        by_field[issue["field"]] = by_field.get(issue["field"], 0) + 1
+    return {
+        "ok": not issues,
+        "checked": len(scripts),
+        "issues": issues[:20],
+        "by_field": by_field,
+    }
 
 
 def check_cases(cases: list[dict]) -> dict:

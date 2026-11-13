@@ -17,7 +17,7 @@ description: 在 Autotest 工作台上跑一条测试流水线（PRD 解析 → 
 | 需求解析 | `prompts/prd-parse.md` | `autotest.prd-parse@1.0.0` |
 | 用例设计 | `prompts/case-design.md` | `autotest.case-design@1.0.0` |
 | 用例评审 | `prompts/case-review.md` | `autotest.case-review@1.0.0` |
-| 脚本生成 | `prompts/script-author.md` | `autotest.script-author@1.0.0` |
+| 脚本生成 | `prompts/script-author.md` | `autotest.script-author@1.1.0` |
 | 日志分析 | `prompts/log-analyze.md` | `autotest.log-analyze@1.0.0` |
 | 测试报告 | `prompts/report.md` | `autotest.report@1.0.0` |
 

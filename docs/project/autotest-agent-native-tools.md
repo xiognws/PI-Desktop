@@ -496,7 +496,7 @@ services/autotest/prompts/
   prd-parse.md       autotest.prd-parse@1.0.0
   case-design.md     autotest.case-design@1.0.0
   case-review.md     autotest.case-review@1.0.0
-  script-author.md   autotest.script-author@1.0.0
+  script-author.md   autotest.script-author@1.1.0
   log-analyze.md     autotest.log-analyze@1.0.0
   report.md          autotest.report@1.0.0
 ```

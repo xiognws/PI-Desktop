@@ -103,7 +103,9 @@ def test_script_author_and_review_carry_prompt_ref(client: TestClient) -> None:
     authored = client.post(
         f"/api/projects/{pid}/workflow/script-author", json={"run_id": run_id, "sdk": "pytest"}
     ).json()
-    assert authored["data"]["prompt"]["ref"] == "autotest.script-author@1.0.0"
+    assert authored["data"]["prompt"]["ref"] == "autotest.script-author@1.1.0"
+    # 脚本规则同样可判定：骨架必须 skip、文件名/函数名/常量齐备
+    assert authored["data"]["consistency"]["ok"] is True, authored["data"]["consistency"]
 
 
 def test_log_analyze_carries_prompt_ref(client: TestClient) -> None:
