@@ -1,0 +1,14 @@
+apps/desktop/electron.vite.config.ts
+  h_201ed4c689ac8b 6,38-40,42-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f872df018b5b38e2c6304400a70cc2ac08cd93bd",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
