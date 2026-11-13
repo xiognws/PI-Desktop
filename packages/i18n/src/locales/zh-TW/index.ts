@@ -996,6 +996,25 @@ export const zhTW = {
     dismiss: "關閉",
   },
   settings: {
+
+    components: {
+      title: "資料組件",
+      description: "視覺化套件、模型目錄與使用手冊隨應用程式分發。你放在這裡的副本優先生效，刪掉即恢復隨包那一份。",
+      name: {
+        "gen-ui": "視覺化套件",
+        "models.dev": "模型目錄",
+        manual: "使用手冊",
+      },
+      hint: {
+        "gen-ui": "把整組套件放進來（必須包含 visualize.css）。",
+        "models.dev": "在這裡放 api.json，用來描述你自己閘道的模型；重新啟動後生效。",
+        manual: "放一份 Pi-Workspace-<任意>.md，開啟手冊時用你這一份。",
+      },
+      overridden: "已被覆蓋",
+      shipped: "隨包版本",
+      open: "開啟資料夾",
+      reset: "恢復隨包版本",
+    },
     storage: {
       unavailableHint: "儲存目錄暫時無法使用。請重新連接磁碟後啟動；應用程式不會建立空白資料或切換到其他目錄。",
       browserSource: "瀏覽器資料來源",

@@ -3790,3 +3790,23 @@
 .sklm-page-jump::placeholder {
   color: var(--ds-text-muted);
 }
+
+/* Data components: a path plus three controls on one settings row. */
+.settings-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* A row carrying several controls at once (data components) may wrap instead of
+   squeezing two labels into the 240px control column. */
+.settings-row:has(> .settings-row-control > .settings-row-controls) {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.settings-row:has(> .settings-row-control > .settings-row-controls) > .settings-row-control {
+  max-width: none;
+}

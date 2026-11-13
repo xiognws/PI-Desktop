@@ -14,6 +14,7 @@ import { registerToolPackagesIpc } from "./tool-packages-ipc";
 import { registerWidgetsIpc } from "./widgets-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerManualIpc } from "./manual-ipc";
+import { registerComponentsIpc } from "./components-ipc.ts";
 import { registerStartupAnimationIpc } from "./startup-animation-ipc";
 import { registerMarketIpc } from "./market-ipc";
 import { registerMcpIpc } from "./mcp-ipc";
@@ -556,6 +557,9 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
 
   registerManualIpc({ registrar, stripWinLongPrefix });
+
+  // Data components the user may override (ADR 0396 § component overlays).
+  registerComponentsIpc({ registrar, dataDir, logger });
 
   registerStartupAnimationIpc({ registrar, dataDir, stripWinLongPrefix });
 

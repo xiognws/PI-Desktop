@@ -990,6 +990,25 @@ export const ptBR = {
     dismiss: "Dispensar"
   },
   settings: {
+
+    components: {
+      title: "Componentes de dados",
+      description: "O kit de visualização, o catálogo de modelos e o manual vêm com o aplicativo. Uma cópia sua aqui vence; apagá-la restaura a distribuída.",
+      name: {
+        "gen-ui": "Kit de visualização",
+        "models.dev": "Catálogo de modelos",
+        manual: "Manual",
+      },
+      hint: {
+        "gen-ui": "Coloque o kit completo aqui, incluindo a folha de estilo (visualize.css).",
+        "models.dev": "Coloque aqui um api.json descrevendo os modelos do seu próprio gateway. Reiniciar aplica.",
+        manual: "Coloque aqui um Pi-Workspace-<qualquer>.md; ele abre no lugar do manual distribuído.",
+      },
+      overridden: "Substituído",
+      shipped: "Distribuído",
+      open: "Abrir pasta",
+      reset: "Restaurar o distribuído",
+    },
     storage: {
       unavailableHint: "O diretório de armazenamento está indisponível no momento. Reconecte a unidade antes de iniciar; o aplicativo não criará dados vazios nem mudará para outro diretório.",
       browserSource: "Origem dos dados do navegador",

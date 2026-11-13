@@ -1000,6 +1000,25 @@ export const tr = {
     dismiss: "Kapat",
   },
   settings: {
+
+    components: {
+      title: "Veri bileşenleri",
+      description: "Görselleştirme kiti, model kataloğu ve el kitabı uygulamayla birlikte gelir. Buraya koyduğun kopya önceliklidir; silmek gelen kopyayı geri getirir.",
+      name: {
+        "gen-ui": "Görselleştirme kiti",
+        "models.dev": "Model kataloğu",
+        manual: "El kitabı",
+      },
+      hint: {
+        "gen-ui": "Stil sayfası dahil kitin tamamını buraya koy (visualize.css).",
+        "models.dev": "Kendi ağ geçidinin modellerini tanımlayan bir api.json'u buraya koy. Yeniden başlatınca uygulanır.",
+        manual: "Buraya Pi-Workspace-<herhangi>.md koy; gelen el kitabı yerine o açılır.",
+      },
+      overridden: "Geçersiz kılındı",
+      shipped: "Gelen sürüm",
+      open: "Klasörü aç",
+      reset: "Gelen sürümü geri yükle",
+    },
     storage: {
       unavailableHint: "Depolama dizini şu anda kullanılamıyor. Başlatmadan önce sürücüyü yeniden bağlayın; uygulama boş veri oluşturmaz veya başka bir dizine geçmez.",
       browserSource: "Tarayıcı verisi kaynağı",

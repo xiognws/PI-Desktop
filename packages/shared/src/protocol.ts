@@ -380,6 +380,13 @@ export const IPC = {
     pluginDirsAdd: "pi-desktop/plugin/dirs/add",
     pluginDirsRemove: "pi-desktop/plugin/dirs/remove",
     pluginDirsReveal: "pi-desktop/plugin/dirs/reveal",
+    /**
+     * Data components the user may override — gen-ui, models.dev, manual
+     * (ADR 0396 § component overlays). The page asks; Main resolves.
+     */
+    componentList: "pi-desktop/components/list",
+    componentOpen: "pi-desktop/components/open",
+    componentReset: "pi-desktop/components/reset",
     pluginSetAutoUpdate: "pi-desktop/plugin/setAutoUpdate",
     pluginSettingsGet: "pi-desktop/plugin/settings/get",
     pluginSettingsSet: "pi-desktop/plugin/settings/set",

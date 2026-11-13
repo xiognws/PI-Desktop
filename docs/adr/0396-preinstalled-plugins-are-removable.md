@@ -151,6 +151,20 @@ in, deletes them to roll back, and every file they did not provide still comes
 from the image. A partial `gen-ui` is not treated as present — a kit whose CSS
 and markup disagree is worse than the shipped one.
 
+Settings → General → **Data components** is the discoverable half of the rule:
+one row per component showing its path, whether the user's copy is the one in
+effect, and two actions. *Open folder* creates the directory if it is missing and
+hands it to the file manager, because "drop a file here" is not advice a user can
+act on without a folder. *Restore shipped* renames the directory to
+`<name>.disabled-<timestamp>` beside itself rather than deleting it: overriding
+was reversible, so rolling back must be too, and a handbook or catalog is the
+user's own writing. Incomplete directories are reported as not overridden here
+exactly as they are when resolving, so the badge never claims a copy is in effect
+when the code is ignoring it.
+
+`models.dev` is read once at startup; the other two are re-read when opened, so
+the row's own hint says a restart applies the catalog.
+
 Skills are deliberately *not* on this list: the skill library is already owned by
 the user (`~/.agents/skills`, plus project-level skills), so there is no shipped
 copy to override.

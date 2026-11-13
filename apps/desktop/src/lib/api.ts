@@ -1463,6 +1463,18 @@ export const api = {
     ),
   revealPluginDirectory: (path: string) =>
     invoke<{ ok: boolean; error?: string }>(IPC.invoke.pluginDirsReveal, path),
+  /** Data components the user may override (ADR 0396 § component overlays). */
+  listComponents: () =>
+    invoke<{
+      components: { name: string; userDir: string; overridden: boolean; present: boolean }[];
+    }>(IPC.invoke.componentList),
+  openComponentDir: (name: string) =>
+    invoke<{ ok: boolean; path: string }>(IPC.invoke.componentOpen, name),
+  resetComponent: (name: string) =>
+    invoke<{
+      parked: string | null;
+      components: { name: string; userDir: string; overridden: boolean; present: boolean }[];
+    }>(IPC.invoke.componentReset, name),
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   getPluginSettings: (id: string) =>

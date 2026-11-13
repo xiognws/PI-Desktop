@@ -996,6 +996,25 @@ export const zhCN = {
     dismiss: "关闭",
   },
   settings: {
+
+    components: {
+      title: "数据组件",
+      description: "可视化套件、模型目录和使用手册随应用分发。你放在这里的副本优先生效，删掉即恢复随包那份。",
+      name: {
+        "gen-ui": "可视化套件",
+        "models.dev": "模型目录",
+        manual: "使用手册",
+      },
+      hint: {
+        "gen-ui": "把整套套件放进来（必须含 visualize.css）。",
+        "models.dev": "在这里放 api.json，用来描述你自己网关的模型；重启后生效。",
+        manual: "放一份 Pi-Workspace-<任意>.md，打开手册时用你的这份。",
+      },
+      overridden: "已被覆盖",
+      shipped: "随包版本",
+      open: "打开文件夹",
+      reset: "恢复随包版本",
+    },
     storage: {
       unavailableHint: "保存目录暂时不可用。请重新连接磁盘后启动；应用不会创建空白数据或切换到其他目录。",
       browserSource: "浏览器数据来源",

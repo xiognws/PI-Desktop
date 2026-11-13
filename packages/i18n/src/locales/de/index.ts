@@ -991,6 +991,25 @@ export const de = {
     "dismiss": "Verwerfen"
   },
   "settings": {
+
+    "components": {
+      "title": "Datengruppen",
+      "description": "Visualisierungs-Kit, Modellkatalog und Handbuch werden mitgeliefert. Eine Kopie hier gewinnt; löschen stellt die mitgelieferte wieder her.",
+      "name": {
+        "gen-ui": "Visualisierungs-Kit",
+        "models.dev": "Modellkatalog",
+        "manual": "Handbuch"
+      },
+      "hint": {
+        "gen-ui": "Das ganze Kit hier ablegen, Stylesheet eingeschlossen (visualize.css).",
+        "models.dev": "Hier eine api.json ablegen, um die Modelle deines eigenen Gateways zu beschreiben. Ein Neustart aktiviert sie.",
+        "manual": "Eine Pi-Workspace-<beliebig>.md hier ablegen; sie ersetzt das mitgelieferte Handbuch."
+      },
+      "overridden": "Überschrieben",
+      "shipped": "Mitgeliefert",
+      "open": "Ordner öffnen",
+      "reset": "Mitgelieferte wiederherstellen"
+    },
     scheduledTasks: "Geplante Aufgaben",
     scheduledTasksDesc: "Wenn deaktiviert, werden geplante Aufgaben ausgeblendet und keine neuen Ausführungen gestartet. Vorhandene Aufgaben und der Verlauf bleiben erhalten.",
     storage: {

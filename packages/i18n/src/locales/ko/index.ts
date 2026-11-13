@@ -1000,6 +1000,25 @@ export const ko = {
     dismiss: "닫기",
   },
   settings: {
+
+    components: {
+      title: "데이터 구성 요소",
+      description: "시각화 키트, 모델 카탈로그, 사용 설명서는 앱과 함께 제공됩니다. 여기에 둔 사본이 우선하며, 지우면 제공된 사본으로 돌아갑니다.",
+      name: {
+        "gen-ui": "시각화 키트",
+        "models.dev": "모델 카탈로그",
+        manual: "사용 설명서",
+      },
+      hint: {
+        "gen-ui": "스타일시트(visualize.css)를 포함한 전체 키트를 여기에 두세요.",
+        "models.dev": "자체 게이트웨이의 모델을 설명하는 api.json을 여기에 두세요. 재시작하면 적용됩니다.",
+        manual: "여기에 Pi-Workspace-<아무 이름>.md를 두면 제공된 설명서 대신 열립니다.",
+      },
+      overridden: "재정의됨",
+      shipped: "제공됨",
+      open: "폴더 열기",
+      reset: "제공된 사본 복원",
+    },
     storage: {
       unavailableHint: "저장 폴더를 현재 사용할 수 없습니다. 드라이브를 다시 연결한 후 시작하세요. 앱은 빈 데이터를 생성하거나 다른 폴더로 전환하지 않습니다.",
       browserSource: "브라우저 데이터 원본",

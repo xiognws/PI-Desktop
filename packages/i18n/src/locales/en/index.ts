@@ -1003,6 +1003,25 @@ export const en = {
     dismiss: "Dismiss",
   },
   settings: {
+
+    components: {
+      title: "Data components",
+      description: "The visualization kit, the model catalog and the handbook ship with the app. A copy you put here wins, and deleting it restores the shipped one.",
+      name: {
+        "gen-ui": "Visualization kit",
+        "models.dev": "Model catalog",
+        manual: "Handbook",
+      },
+      hint: {
+        "gen-ui": "Drop the whole kit here, stylesheet included (visualize.css).",
+        "models.dev": "Paste an api.json here to describe your own gateway's models. A restart applies it.",
+        manual: "Put your Pi-Workspace-<anything>.md here; it opens instead of the shipped handbook.",
+      },
+      overridden: "Overridden",
+      shipped: "Shipped",
+      open: "Open folder",
+      reset: "Restore shipped",
+    },
     storage: {
       unavailableHint: "The storage directory is currently unavailable. Reconnect the drive before starting; the app will not create empty data or switch to another directory.",
       browserSource: "Browser data source",

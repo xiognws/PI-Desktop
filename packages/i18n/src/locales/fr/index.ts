@@ -991,6 +991,25 @@ export const fr = {
     "dismiss": "Ignorer"
   },
   "settings": {
+
+    "components": {
+      "title": "Composants de données",
+      "description": "Le kit de visualisation, le catalogue de modèles et le manuel sont fournis avec l'application. Une copie placée ici l'emporte ; la supprimer rétablit celle fournie.",
+      "name": {
+        "gen-ui": "Kit de visualisation",
+        "models.dev": "Catalogue de modèles",
+        "manual": "Manuel"
+      },
+      "hint": {
+        "gen-ui": "Placez le kit complet ici, feuille de style incluse (visualize.css).",
+        "models.dev": "Déposez ici un api.json décrivant les modèles de votre propre passerelle. Un redémarrage l'applique.",
+        "manual": "Placez ici un Pi-Workspace-<peu importe>.md ; il s'ouvre à la place du manuel fourni."
+      },
+      "overridden": "Remplacé",
+      "shipped": "Fourni",
+      "open": "Ouvrir le dossier",
+      "reset": "Rétablir celui fourni"
+    },
     scheduledTasks: "Tâches planifiées",
     scheduledTasksDesc: "Désactiver masque les tâches planifiées et empêche de nouvelles exécutions. Les tâches existantes et leur historique sont conservés.",
     storage: {
