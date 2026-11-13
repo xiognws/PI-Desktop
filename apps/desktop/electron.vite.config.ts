@@ -3,7 +3,7 @@ import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import type { Plugin } from "vite";
-import type { OutputChunk } from "rollup";
+import { inlinePreloadChunks } from "./electron/vite/inline-preload-chunks";
 
 // Dev needs 'unsafe-eval' for vite HMR tooling; production must not ship it.
 function tightenCsp(): Plugin {
@@ -17,40 +17,6 @@ function tightenCsp(): Plugin {
           /connect-src [^;]*;/,
           "connect-src 'self';",
         );
-    },
-  };
-}
-
-// A sandboxed preload can only require `electron` and a small builtin subset -
-// it does no file resolution at all. Rollup, given more than one preload entry,
-// hoists whatever they share (the IPC map) into `chunks/*.cjs`, and the window
-// then loads with `Unable to load preload script: module not found`, which
-// leaves `window.piDesktop` undefined and every caller failing. Fold those
-// shared chunks back into each entry that requires them: the chunk is
-// self-contained CommonJS (`exports.X = ...`), so an IIFE over a local
-// `exports` object is enough, and no entry keeps a file it cannot load.
-function inlinePreloadChunks(): Plugin {
-  return {
-    name: "pi-inline-preload-chunks",
-    apply: "build",
-    enforce: "post",
-    generateBundle(_options, bundle) {
-      const shared = Object.values(bundle).filter(
-        (item): item is OutputChunk =>
-          item.type === "chunk" && !item.isEntry && item.code.includes("exports."),
-      );
-      if (shared.length === 0) return;
-      for (const chunk of shared) {
-        const fileName = chunk.fileName.split("/").pop() ?? chunk.fileName;
-        const pattern = new RegExp(`require\\(\\s*[\"'][^\"']*${fileName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\"']\\s*\\)`, "g");
-        const inlined = `(() => { const exports = {}; ${chunk.code}\nreturn exports; })()`;
-        for (const entry of Object.values(bundle)) {
-          if (entry.type !== "chunk" || entry === chunk) continue;
-          if (!pattern.test(entry.code)) continue;
-          entry.code = entry.code.replace(pattern, () => inlined);
-        }
-        delete bundle[chunk.fileName];
-      }
     },
   };
 }
