@@ -2,7 +2,6 @@
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -10,6 +9,7 @@ import { ErrorCodes } from "@pi-workspace/shared";
 import { shellQuote } from "./pi-host-bootstrap-script.js";
 import { checksumMatches, normalizeChecksum } from "./pi-host-release.js";
 import type { SshTransport } from "./ssh-transport.js";
+import { runtimeTmpDir } from "../runtime-tmp";
 
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 export type UploadedSshArtifact = { path: string; cleanup(): Promise<void> };
@@ -35,7 +35,7 @@ export async function uploadSshArtifact(
   const url = new URL(input.url);
   if (url.protocol !== "https:" || url.username || url.password) throw failure();
   input.signal?.throwIfAborted();
-  const localDir = await mkdtemp(join(tmpdir(), "pi-host-artifact-"));
+  const localDir = await mkdtemp(join(runtimeTmpDir(), "pi-host-artifact-"));
   let remoteDir: string | undefined;
   const cleanup = async () => {
     if (!remoteDir) return;

@@ -145,8 +145,8 @@ fn refusal(status: u16, payload: &[u8]) -> anyhow::Error {
 /// file and the status is read from `--write-out`, so an error answer still
 /// yields the platform's error envelope instead of a curl diagnostic.
 fn post_json(url: &str, body: &str) -> Result<(u16, Vec<u8>)> {
-    let body_path = super::install::download_scratch_path();
-    let response_path = super::install::download_scratch_path();
+    let body_path = super::install::download_scratch_path()?;
+    let response_path = super::install::download_scratch_path()?;
     fs::write(&body_path, body).with_context(|| format!("write resolve body for {url}"))?;
 
     let mut args: Vec<String> = vec![

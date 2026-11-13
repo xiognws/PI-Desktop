@@ -24,6 +24,7 @@ mod plugin_usage;
 mod plugins;
 mod providers;
 mod review;
+mod runtime_tmp;
 mod rpc;
 mod scheduled;
 mod scratch;

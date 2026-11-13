@@ -24,9 +24,9 @@
  * helper when there is no tty *and* a display to blame.
  */
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ErrorCodes } from "@pi-workspace/shared";
+import { runtimeTmpDir } from "../runtime-tmp";
 
 /** Environment variable naming the file the helper reads the secret from. */
 export const ASKPASS_SECRET_ENV = "PI_SSH_ASKPASS_SECRET";
@@ -117,7 +117,7 @@ export async function createSshAskpass(
   // `mkdtemp` already creates the directory `0700`; the explicit chmod
   // documents that the secret's confidentiality rests on this mode rather than
   // on the inherited umask.
-  const dir = await mkdtemp(join(options.dir ?? tmpdir(), "pi-ssh-askpass-"));
+  const dir = await mkdtemp(join(options.dir ?? runtimeTmpDir(), "pi-ssh-askpass-"));
   await chmod(dir, 0o700);
   const secretPath = join(dir, "secret");
   const helperPath = join(dir, "askpass.sh");

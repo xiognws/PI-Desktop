@@ -691,18 +691,10 @@ pub(crate) fn decode_windows_code_page(bytes: &[u8], code_page: u32) -> Option<S
 /// Unique scratch path for one guarded download.
 ///
 /// curl writes the body to a file so stdout can carry only the effective URL;
-/// mixing them would corrupt a binary package.
-pub(crate) fn download_scratch_path() -> PathBuf {
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let seq = COUNTER.fetch_add(1, AtomicOrdering::Relaxed);
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    std::env::temp_dir().join(format!(
-        "pi-desktop-download-{}-{seq}-{nanos}.bin",
-        std::process::id()
-    ))
+/// mixing them would corrupt a binary package. The file lives under
+/// `<data_dir>/tmp` like every other runtime temp file (AGENTS.md §8).
+pub(crate) fn download_scratch_path() -> Result<PathBuf> {
+    crate::runtime_tmp::scratch_path("download", ".bin")
 }
 
 /// Fetch a URL, optionally holding every redirect hop inside the package host
@@ -742,7 +734,7 @@ pub(crate) fn download_url_observed(
     }
 
     // Prefer curl for robust HTTPS support on developer and CI machines.
-    let scratch = download_scratch_path();
+    let scratch = download_scratch_path()?;
     let max_filesize = MAX_PACKAGE_BYTES.to_string();
     let mut args: Vec<String> = vec![
         "--silent".into(),

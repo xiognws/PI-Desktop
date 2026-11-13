@@ -108,6 +108,8 @@ pub struct AppState {
 
 impl AppState {
     pub fn open(data_dir: &std::path::Path) -> Result<Self> {
+        // Every scratch file this process writes goes under `<data_dir>/tmp`.
+        crate::runtime_tmp::install_root(data_dir);
         let db = Database::open_in_dir(data_dir)?;
         crate::scheduled::automation::recover(&db)?;
         // Replies that were still streaming when the previous process ended

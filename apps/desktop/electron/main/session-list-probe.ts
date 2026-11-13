@@ -35,7 +35,7 @@ export async function runSessionListProbe({
   const profile = await realpath(dataDir);
   if (
     !basename(profile).startsWith("pi-desktop-boot-") ||
-    dirname(profile) !== await realpath(tmpdir())
+    dirname(profile) !== await realpath(tmpdir()) // runtime-temp-allow: comparison only, no file is written here
   ) {
     throw new Error("session-list probe requires its own temporary boot profile");
   }

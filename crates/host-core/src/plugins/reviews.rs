@@ -591,7 +591,7 @@ fn center_refusal(url: &str, status: u16, payload: &[u8]) -> anyhow::Error {
 /// Redirects are never followed: the request already targets the trusted
 /// origin, and `3xx` answers become refusals.
 fn get_json(url: &str) -> Result<(u16, Vec<u8>)> {
-    let response_path = super::install::download_scratch_path();
+    let response_path = super::install::download_scratch_path()?;
     let mut args: Vec<String> = vec![
         "--silent".into(),
         "--show-error".into(),

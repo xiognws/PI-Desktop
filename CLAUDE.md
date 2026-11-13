@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-11-13.1
+Policy-Sync: 2026-11-13.2
 
 Instructions for Claude Code CLI and Claude Cowork on Pi-Workspace.
 
@@ -34,6 +34,16 @@ Reply to the user in the language they used (Chinese request → Chinese answer,
 
 Every `.ps1` containing non-ASCII text (Chinese comments, literals) must be **UTF-8 with BOM**. Windows PowerShell 5.1 decodes a BOM-less script with the system ANSI code page (936/GBK) before parsing, so non-ASCII bytes become garbage and surface as misleading syntax errors far from the cause; PowerShell 7 and editors hide it. Pure-ASCII scripts need no BOM; UTF-16 is never acceptable. Never "fix" this with `-Encoding ASCII` (it yields `?`). Data files written for other tools are the opposite case: UTF-8 **without** BOM. Gate: `pnpm check:powershell-encoding`; details: `plugins/repo-conventions/skills/powershell-encoding.md`.
 
+### Runtime temporary files
+
+Everything the running app writes to disk for its own purposes — download
+scratch files, npm/ssh handoffs, extracted payloads, helper scripts handed to
+external tools — lives under `<dataDir>/tmp`, not the system temp directory. Use
+the side's helper (`runtime_tmp_dir`/`download_scratch_path` in host-core,
+`runtimeTmpDir`/`mkRuntimeTempDir` in Electron main) instead of calling
+`temp_dir()`/`tmpdir()`; create lazily, delete after use, and clean up leftovers
+on the next start. Test fixtures may still use the platform temp directory.
+Gate: `pnpm check:runtime-temp`.
 ### Work directly on `main`
 
 Every request uses:

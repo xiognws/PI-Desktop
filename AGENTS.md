@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-11-13.1
+Policy-Sync: 2026-11-13.2
 
 Mandatory rules for AI coding agents working in Pi-Workspace.
 
@@ -476,6 +476,36 @@ Keep persistence, schema, migration, repository, domain logic, and
 filesystem responsibilities separated when they represent distinct
 concerns. Do not create abstraction layers without a real
 responsibility boundary.
+
+### Runtime temporary files live under the data directory
+
+Anything this application writes to disk while it runs — a download scratch file,
+an npm or ssh handoff, an extracted payload, a wrapper script handed to an
+external tool — goes under `<dataDir>/tmp`, created on demand. The system temp
+directory is not ours: it accumulates leftovers the user never asked for, it is
+outside the data folder the app's own cleanup, backup, relocation and support
+paths know about, and on Windows several of those tool handoffs are visible in
+`%TEMP%` long after the process exits.
+
+```text
+<dataDir>/tmp/<purpose>-<pid>-<counter>.<ext>
+```
+
+- One helper per side owns the path: `runtime_tmp_dir` / `download_scratch_path`
+  in host-core, `runtimeTmpDir` / `mkRuntimeTempDir` in Electron main. Do not
+  call `std::env::temp_dir()` or `os.tmpdir()` from product code again.
+- Create the directory lazily and reuse it; uniqueness comes from the file or
+  subdirectory name, not from a per-call directory.
+- Delete what you create, and treat "already gone" as success — a temp file that
+  outlives a crash is cleaned up by the next start, not by a user.
+- Test fixtures are the exception: `tempfile::TempDir` and `mkdtemp` in tests may
+  use the platform temp directory, because a test run leaves nothing behind.
+- `%TEMP%`-style paths are still correct when an *external* program requires the
+  file to be reachable from its own sandbox; say why in a comment when that is
+  the reason.
+
+Enforced by `pnpm check:runtime-temp` (`scripts/check-runtime-temp-paths.mjs`).
+
 
 ---
 
