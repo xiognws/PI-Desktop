@@ -115,6 +115,10 @@
     ],
     "extraResources": [
       {
+        "from": "resources/in-app-providers",
+        "to": "in-app-providers"
+      },
+      {
         "from": "build/icon.png",
         "to": "tray-icon.png"
       },

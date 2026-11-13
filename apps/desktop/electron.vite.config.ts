@@ -79,13 +79,6 @@ export default defineConfig({
           // Forked per plugin by PluginRuntime (ADR 0008); must stay a
           // standalone entry so utilityProcess can point at a real file.
           "plugin-host-process": resolve(__dirname, "electron/main/plugin-host-process.mjs"),
-          // One loopback gateway per in-app provider, forked by the supervisor
-          // in `electron/main/providers`. Same rule as the plugin host: it must
-          // be a real file a utilityProcess can point at.
-          "workbuddy-gateway": resolve(
-            __dirname,
-            "electron/main/providers/workbuddy/gateway.cjs",
-          ),
         },
       },
     },

@@ -5,8 +5,8 @@
  * renderer may not import Main implementation modules; `test/in-app-providers`
  * asserts the two lists stay identical.
  */
+import { app } from "electron";
 import { join } from "node:path";
-import { getModuleDirectory } from "../module-path";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { IpcRegistrar } from "../ipc/types";
@@ -24,6 +24,21 @@ export type InAppProviderSupervisorDeps = {
   /** Overrides the built gateway entry; tests never use this. */
   entry?: string;
 };
+
+/**
+ * Where a gateway entry lives.
+ *
+ * The gateway is vendored CommonJS that is forked, never imported: bundling it
+ * into the main bundle would make Rollup resolve its `node:` requires as an
+ * external namespace chunk and fail the build. It ships as a resource instead —
+ * `resources/in-app-providers/<id>/gateway.cjs` in development, the same tree
+ * under `process.resourcesPath` once packaged.
+ */
+export function inAppGatewayEntry(providerId: string): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, "in-app-providers", providerId, "gateway.cjs")
+    : join(app.getAppPath(), "resources", "in-app-providers", providerId, "gateway.cjs");
+}
 
 /**
  * Build the supervisor Main owns for the lifetime of the app.
@@ -47,7 +62,7 @@ export function createInAppProviderSupervisor({
       return await host.call<T>(method, params);
     },
     startGateway: createGatewayStarter({
-      entry: entry ?? join(getModuleDirectory(import.meta.url), "workbuddy-gateway.js"),
+      entry: entry ?? inAppGatewayEntry("workbuddy"),
       log,
     }),
     readSettings: async () => {
