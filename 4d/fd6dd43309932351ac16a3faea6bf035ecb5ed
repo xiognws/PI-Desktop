@@ -1,0 +1,14 @@
+crates/host-core/build.rs
+  h_201ed4c689ac8b 24-28,32,104,126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4dfd6dd43309932351ac16a3faea6bf035ecb5ed",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
