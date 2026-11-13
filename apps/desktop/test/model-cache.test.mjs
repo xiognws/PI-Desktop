@@ -15,7 +15,7 @@ test("saved provider discovery persists models in the host catalog", () => {
   assert.match(mainSource, /"providers\.listModels"/);
   assert.match(mainSource, /"providers\.cacheModels"/);
   assert.match(mainSource, /new ModelsDevCatalog\(\{/);
-  assert.match(mainSource, /catalogPath: app\.isPackaged/);
+  assert.match(mainSource, /catalogPath:[\s\S]{0,240}app\.isPackaged/);
   assert.match(mainSource, /join\(process\.resourcesPath, "models\.dev", "api\.json"\)/);
   assert.match(mainSource, /join\(app\.getAppPath\(\), "resources", "models\.dev", "api\.json"\)/);
   assert.match(mainSource, /modelsDevCatalog\.loadLocal\(\)/);
