@@ -1840,6 +1840,8 @@ export const api = {
             | { state: "failed"; error: string; reason?: "npm-unavailable" };
         }
     >(IPC.invoke.pluginImportExtension),
+  /** Hand the shipped handbook to the viewer this machine already uses. */
+  openManual: () => invoke<{ ok: boolean; path: string }>(IPC.invoke.manualOpen),
   runExtensionCommand: (input: { sessionId: string; name: string; args: string }) =>
     invoke<{ ok: boolean }>(IPC.invoke.extensionsCommandRun, input),
   respondExtensionPrompt: (response: TrustedExtensionUiPromptResponse) =>

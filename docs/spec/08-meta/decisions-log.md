@@ -8581,8 +8581,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 - The Settings → Info panel is the first surface an outside reader opens, so it
   no longer names the build's internals or points at another project: the
-  `protocol … · host …` line, the report-a-problem row, and the handbook row
-  are removed together with their copy in all nine catalogs.
+  `protocol … · host …` line and the report-a-problem row are removed together
+  with their copy in all nine catalogs. The handbook row stays: it hands the
+  shipped external-edition manual to the viewer the machine already uses, so
+  users keep getting the guide with each release without an extra download.
 - The Main-owned feedback channel (`pi-desktop/app/openFeedback`) and its URL
   builders are gone, not merely unwired, so neither bundle can assemble an
   issue link. D313 is superseded and ADR 0157 is withdrawn as a shipped

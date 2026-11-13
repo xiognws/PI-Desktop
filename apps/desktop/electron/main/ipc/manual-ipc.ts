@@ -8,7 +8,15 @@ export type ManualIpcDependencies = {
   stripWinLongPrefix: (path: string) => string;
 };
 
-/** Register the About panel's handbook entry point. */
+/**
+ * Register the Info panel's handbook entry point.
+ *
+ * The document is handed to whatever the operating system uses to display
+ * Markdown, so the reader is the user's own viewer rather than something this
+ * app renders. A fresh Windows install often has no Markdown handler, so a
+ * failed hand-off degrades to selecting the file in Explorer instead of
+ * erroring.
+ */
 export function registerManualIpc({ registrar, stripWinLongPrefix }: ManualIpcDependencies): void {
   registrar.handle(IPC.invoke.manualOpen, async () => {
     const manual = resolveManualPath();
@@ -17,9 +25,6 @@ export function registerManualIpc({ registrar, stripWinLongPrefix }: ManualIpcDe
     }
     const openError = await shell.openPath(stripWinLongPrefix(manual));
     if (openError) {
-      // A fresh Windows install often has no Markdown handler. Selecting the
-      // file in Explorer still lands the user on the handbook, so the entry
-      // point degrades instead of failing.
       shell.showItemInFolder(stripWinLongPrefix(manual));
     }
     return { ok: true, path: manual };

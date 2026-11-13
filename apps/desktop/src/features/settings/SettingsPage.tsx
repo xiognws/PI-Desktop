@@ -683,6 +683,17 @@ export function SettingsPage() {
                 />
               )}
               <SettingsCard>
+                <SettingsRow
+                  title={t("settings.manual")}
+                  description={t("settings.manualDesc")}
+                >
+                  <Button
+                    variant="secondary"
+                    onClick={() => void api.openManual().catch(() => undefined)}
+                  >
+                    {t("settings.openManual")}
+                  </Button>
+                </SettingsRow>
                 <SettingsRow title={t("settings.logs")}>
                   <Button variant="secondary" onClick={() => void api.openLogs()}>
                     {t("settings.openLogs")}

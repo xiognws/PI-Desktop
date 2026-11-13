@@ -13804,12 +13804,13 @@ are withdrawn with ADR 0165.
 - **Preconditions**: Settings can be opened in a packaged build.
 - **Steps**: 1) Open Settings → Info. 2) Read the panel top to bottom. 3) Search
   settings for the report-a-problem, handbook, and release labels.
-- **Expected**: The panel shows the application name and version, the logs
-  action, and the Developer card, and nothing else. It renders no protocol/host
-  line, no report-a-problem row, no handbook row, and no update card, so no
-  action can open an external repository, an external changelog, or the shipped
-  build handbook. Settings search returns no hit for those removed rows while
-  keeping the Info destination itself.
+- **Expected**: The panel shows the application name and version, the handbook
+  action, the logs action, and the Developer card, and nothing else. Opening the
+  handbook hands the shipped document to the viewer this machine already uses;
+  nothing renders the manual inside the window. The panel shows no protocol/host
+  line, no report-a-problem row, and no update card, so no action can open an
+  external repository or an external changelog. Settings search returns no hit
+  for the removed rows while keeping the Info destination itself.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `08-meta/decisions-log.md`
 - **Acceptance**: H (diagnostics), Quality
 - **Milestone**: M6+

@@ -861,11 +861,16 @@ system while preserving their different data ownership:
 ### Info
 - Application name and version + open logs. The panel shows no internal
   protocol or host version and no build-time environment line
-- No outbound destination: the panel carries no report-a-problem action, no
-  handbook entry, and no release link. A distribution build must not identify
-  the project it derives from, so every affordance that opened an external
-  repository, an external changelog, or the shipped build handbook was removed
-  rather than hidden
+- No outbound destination: the panel carries no report-a-problem action and no
+  release link. A distribution build must not identify the project it derives
+  from, so every affordance that opened an external repository or an external
+  changelog was removed rather than hidden
+- **Handbook** row: one action hands the handbook shipped with this version to
+  the viewer the machine already uses for Markdown. The reader is never
+  in-app, and a machine with no Markdown handler falls back to selecting the
+  staged file in Explorer instead of failing. The document itself is the
+  external-edition manual: install, interface, data location, settings tour and
+  troubleshooting — no build, packaging, or architecture content
 - The update card renders in development builds only (`import.meta.env.DEV`):
   named version, one applicable action — Check for updates, View release, or
   Restart to update — the release-notes modal, and the update-preference row.
@@ -998,10 +1003,11 @@ system while preserving their different data ownership:
 25. Toggling one capability leaves every other row interactive, does not
     replace the list with skeletons, and restores the previous switch position
     if the host rejects the change
-26. Info shows the application name and version, the logs action, and the
-    Developer card; it exposes no report-a-problem, handbook, or release-link
-    action, shows no protocol/host line, and Settings search finds none of the
-    removed rows
+26. Info shows the application name and version, the handbook action, the logs
+    action, and the Developer card; the handbook opens with the system viewer
+    rather than inside the window, the panel exposes no report-a-problem or
+    release-link action, shows no protocol/host line, and Settings search finds
+    none of the removed rows
 27. The Skills page Market view browses public-HTTPS catalogs, previews
     the assembled document, and installs only through `skills.create`; oversized
     expanded documents are refused and source badges follow `sourceId`

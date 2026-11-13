@@ -147,11 +147,8 @@ const REMOVED_EXPLANATORY_KEYS = [
   "settings.configSync.errorTitle",
   "settings.remoteHosts.title",
   "settings.remoteHosts.statusOnline",
-  // The Info panel exposes no external destination: the report-a-problem and
-  // handbook rows are gone from every locale, not hidden.
-  "settings.manual",
-  "settings.manualDesc",
-  "settings.openManual",
+  // The Info panel exposes no external destination: the report-a-problem row
+  // is gone from every locale, not hidden.
   "settings.feedback",
   "settings.feedbackDesc",
   "settings.openFeedback",

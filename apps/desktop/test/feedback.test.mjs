@@ -59,16 +59,19 @@ test("feature request form requires a problem and a proposal", () => {
 
 test("the Info page points at nothing outside this build", () => {
   // Distribution surface: the panel must not name the build's internals or open
-  // an external destination, so the report-a-problem and handbook rows are gone
-  // by design. Nothing in the renderer may reach the Main-owned handler either,
-  // so the renderer API losses the two calls that reached it.
+  // an external destination. The report-a-problem row and its Main-owned URL
+  // builder are gone; the handbook row survives because it opens a document
+  // this build ships, with the viewer the machine already has.
   assert.doesNotMatch(settingsSource, /api\.openFeedback\(\)/);
-  assert.doesNotMatch(settingsSource, /api\.openManual\(\)/);
   assert.doesNotMatch(settingsSource, /settings-about-hero-meta/);
   assert.doesNotMatch(settingsSource, /github\.com/i);
   assert.doesNotMatch(apiSource, /openFeedback:/);
-  assert.doesNotMatch(apiSource, /openManual:/);
   assert.doesNotMatch(settingsSearchSource, /"settings\.feedback"/);
+  // The handbook row is back: it opens a document this build ships, with the
+  // viewer the machine already has. Nothing here can reach an external issue
+  // form.
+  assert.match(settingsSource, /api\.openManual\(\)/);
+  assert.doesNotMatch(settingsSource, /shell\.openPath|github\.com/i);
   // The Main-owned URL builder is gone too: nothing in the shipped bundles can
   // assemble an external issue link any more.
   assert.doesNotMatch(mainIpcSource, /appOpenFeedback/);
