@@ -1,0 +1,64 @@
+apps/desktop/src/features/chat/composer/hooks/useComposerCompletions.ts
+  h_201ed4c689ac8b 22-23,31-35,94,153-172,174-175,204-216,234
+apps/desktop/src/features/chat/composer/hooks/useComposerSubmit.ts
+  h_201ed4c689ac8b 85-87,134-137,207,209
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 496-498,1357-1367
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 495-497,1337-1347
+apps/desktop/src/features/chat/composer/learn-command.ts
+  h_201ed4c689ac8b 1-148
+apps/desktop/test/composer-file-reference-display.test.mjs
+  h_201ed4c689ac8b 88-94
+apps/desktop/src/components/settings/learning-map.css
+  h_201ed4c689ac8b 1-136
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 503-505,1367-1377
+docs/adr/0390-learning-map-from-two-stores.md
+  h_201ed4c689ac8b 9-15,57-61,68-71
+apps/desktop/test/composer-send-state.test.mjs
+  h_201ed4c689ac8b 290
+apps/desktop/src/components/settings/AgentSkillsPage.tsx
+  h_201ed4c689ac8b 10,58-66,76-83,96-98,107-129,278-284,688-703,706-707,710-792,1266,1269-1272,1274-1283
+apps/desktop/test/agent-capability-settings.test.mjs
+  h_201ed4c689ac8b 575-661
+apps/desktop/src/lib/learning-map.ts
+  h_201ed4c689ac8b 46-51,57,60-67,183,226-352
+packages/shared/src/index.ts
+  h_201ed4c689ac8b 48
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 498-500,1354-1364
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 505-507,1363-1373
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 496-498,1357-1367
+apps/desktop/src/components/settings/LearningMapCanvas.tsx
+  h_201ed4c689ac8b 9-13,16-17,20-22,25-26,29-67,71,73-81,84-91,93-175,182,189-192,195,200-206,216-230,232,235,237,240-255,257,264,266-267,272-393,402
+apps/desktop/test/learning-map.test.mjs
+  h_201ed4c689ac8b 3-6,10-13,15,112-428
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 505-507,1363-1373
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 498-500,1354-1364
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 496-498,1357-1367
+apps/desktop/test/learn-command.test.mjs
+  h_201ed4c689ac8b 1-253
+packages/agent-runtime/src/skill-authoring.ts
+  h_201ed4c689ac8b 5-7,10-13
+apps/desktop/src/features/chat/composer/slash-dispatch.ts
+  h_201ed4c689ac8b 4,39-43,47,66-69
+packages/shared/src/skill-authoring.ts
+  h_201ed4c689ac8b 1-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "39d629e690915c1cc176c2aad02f449c6b167a70",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
