@@ -165,11 +165,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-auto bg-white">
+  <div class="flex-1 flex flex-col overflow-auto bg-surface">
     <div class="p-6">
       <div class="mb-6">
-        <h2 class="text-lg font-medium text-gray-900">项目资料</h2>
-        <p class="text-sm text-gray-500 mt-1">
+        <h2 class="text-lg font-medium text-fg">项目资料</h2>
+        <p class="text-sm text-muted mt-1">
           上传需求文档、接口说明、协议表等资料 → 分解入库「知识库」→ 写用例时按知识库检索原文作为依据
         </p>
       </div>
@@ -177,21 +177,21 @@ onMounted(load)
       <!-- 步骤条 -->
       <div class="flex items-center gap-2 mb-6">
         <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-blue-600 text-white">1</div>
-          <span class="text-sm text-gray-900">上传项目资料</span>
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-accent-solid text-white">1</div>
+          <span class="text-sm text-fg">上传项目资料</span>
         </div>
-        <ChevronRight class="w-4 h-4 text-gray-300" />
+        <ChevronRight class="w-4 h-4 text-muted-2" />
         <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-gray-200 text-gray-500">2</div>
-          <span class="text-sm text-gray-400">分解入库知识库</span>
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-surface-4 text-muted">2</div>
+          <span class="text-sm text-muted-2">分解入库知识库</span>
         </div>
-        <ChevronRight class="w-4 h-4 text-gray-300" />
+        <ChevronRight class="w-4 h-4 text-muted-2" />
         <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-gray-200 text-gray-500">3</div>
-          <span class="text-sm text-gray-400">按知识库写用例</span>
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-surface-4 text-muted">3</div>
+          <span class="text-sm text-muted-2">按知识库写用例</span>
         </div>
         <button
-          class="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+          class="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2"
           @click="load"
         >
           <RefreshCw class="w-4 h-4" />
@@ -200,40 +200,40 @@ onMounted(load)
       </div>
 
       <!-- 上传区 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-8">
+      <div class="bg-surface rounded-lg border border-line p-8">
         <input ref="fileInput" type="file" class="hidden" multiple accept=".pdf,.docx,.xlsx,.md,.txt" @change="onPick" />
         <div
           class="border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer"
-          :class="dragging ? 'border-blue-500 bg-blue-50/40' : 'border-gray-300 hover:border-blue-400'"
+          :class="dragging ? 'border-blue-500 bg-accent-soft/40' : 'border-line-strong hover:border-blue-400'"
           @click="fileInput?.click()"
           @dragover.prevent="dragging = true"
           @dragleave.prevent="dragging = false"
           @drop.prevent="onDrop"
         >
-          <Upload class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p class="text-sm text-gray-600 mb-2">
+          <Upload class="w-12 h-12 text-muted-2 mx-auto mb-4" />
+          <p class="text-sm text-fg-3 mb-2">
             {{ uploading
               ? `上传中 ${progress.done}/${progress.total}…`
               : '点击或拖拽文件到此处上传（可一次选/拖多个）' }}
           </p>
-          <p class="text-xs text-gray-400">支持 PDF / Word(.docx) / Excel(.xlsx) / Markdown / 纯文本，多个文件会逐个上传</p>
+          <p class="text-xs text-muted-2">支持 PDF / Word(.docx) / Excel(.xlsx) / Markdown / 纯文本，多个文件会逐个上传</p>
         </div>
         <div class="mt-3 flex items-center gap-4 text-sm">
-          <span v-if="message" class="text-green-600">{{ message }}</span>
-          <span v-if="error" class="text-red-600">{{ error }}</span>
-          <span class="text-xs text-gray-400 ml-auto">上传只是归档原文；执行下面第 2 步才会分解进知识库</span>
+          <span v-if="message" class="text-success">{{ message }}</span>
+          <span v-if="error" class="text-danger">{{ error }}</span>
+          <span class="text-xs text-muted-2 ml-auto">上传只是归档原文；执行下面第 2 步才会分解进知识库</span>
         </div>
       </div>
 
       <!-- 已上传 -->
       <div class="flex items-center gap-2 mt-6 mb-3">
-        <h3 class="text-sm font-medium text-gray-900">已上传资料</h3>
-        <span class="text-xs text-gray-400">{{ requirements.length }} 个文件</span>
-        <span v-if="archiveResult" class="text-xs text-gray-500">
+        <h3 class="text-sm font-medium text-fg">已上传资料</h3>
+        <span class="text-xs text-muted-2">{{ requirements.length }} 个文件</span>
+        <span v-if="archiveResult" class="text-xs text-muted">
           入库 {{ archiveResult.imported }} · 跳过 {{ archiveResult.skipped }} · 失败 {{ archiveResult.failed }}
         </span>
         <button
-          class="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          class="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2 disabled:opacity-50"
           :disabled="archiving || !requirements.length"
           title="把这些资料切分进项目知识库；Agent 写用例时检索的就是知识库"
           @click="archiveToKnowledge"
@@ -243,30 +243,30 @@ onMounted(load)
         </button>
       </div>
       <div class="space-y-3">
-        <div v-for="item in requirements" :key="item.id" class="bg-gray-50 rounded-lg border border-gray-200 p-4 flex items-center gap-3">
-          <FileText class="w-5 h-5 text-gray-400" />
+        <div v-for="item in requirements" :key="item.id" class="bg-surface-2 rounded-lg border border-line p-4 flex items-center gap-3">
+          <FileText class="w-5 h-5 text-muted-2" />
           <div class="min-w-0 flex-1">
-            <div class="font-medium text-gray-900 truncate">{{ item.filename }}</div>
-            <div class="text-xs text-gray-400 mt-1">{{ sizeText(item.size) }} · {{ item.created_at }}</div>
+            <div class="font-medium text-fg truncate">{{ item.filename }}</div>
+            <div class="text-xs text-muted-2 mt-1">{{ sizeText(item.size) }} · {{ item.created_at }}</div>
           </div>
           <span
             v-if="archivedChunks(item.filename) !== null"
-            class="text-xs px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700"
+            class="text-xs px-2 py-0.5 rounded bg-accent-soft border border-accent-line text-accent"
             :title="`已切分为 ${archivedChunks(item.filename)} 块进入知识库`"
           >已入库 {{ archivedChunks(item.filename) }} 块</span>
           <span
             v-else
-            class="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-500"
+            class="text-xs px-2 py-0.5 rounded bg-surface border border-line text-muted"
             title="还没分解入库：点右上「分解入库知识库」后，写用例才能检索到这份资料"
           >未入库</span>
-          <span class="text-xs px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-600">{{ item.status }}</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-surface border border-line text-fg-3">{{ item.status }}</span>
           <button
-            class="p-1 text-gray-400 hover:text-red-600"
+            class="p-1 text-muted-2 hover:text-danger"
             title="删除这份资料"
             @click="removeRequirement(item)"
           ><Trash2 class="w-4 h-4" /></button>
         </div>
-        <div v-if="!requirements.length" class="text-center py-10 text-sm text-gray-400 bg-gray-50 rounded-lg border border-gray-200">
+        <div v-if="!requirements.length" class="text-center py-10 text-sm text-muted-2 bg-surface-2 rounded-lg border border-line">
           还没有上传项目资料
         </div>
       </div>

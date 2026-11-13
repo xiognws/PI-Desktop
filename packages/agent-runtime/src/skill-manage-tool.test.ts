@@ -113,6 +113,25 @@ describe("skill_manage: create", () => {
     expect(text).toContain("Patch that skill instead");
     expect(result.details).toMatchObject({ errorCode: "SKILL_EXISTS" });
   });
+
+  it("reports an over-long description so the model can shorten it and retry", async () => {
+    const host = fakeHost({
+      createError:
+        "SKILL_INVALID: description is 84 characters; the skill catalog shows 60 and is paid for on every turn, so anything longer is truncated there. Shorten it to one sentence of at most 60 characters.",
+    });
+    const { text, result } = await run(host, { action: "create", name: "long", description: "x".repeat(84) });
+    // Not a failure: the same turn can fix it. A hard error ends the attempt.
+    expect(result.isError).toBeFalsy();
+    expect(result.details).toMatchObject({ errorCode: "SKILL_DESCRIPTION_TOO_LONG" });
+    expect(text).toContain("60");
+  });
+
+  it("keeps a genuine create failure a failure", async () => {
+    const host = fakeHost({ createError: "permission denied writing ~/.agents/skills/locked/SKILL.md" });
+    const { result } = await run(host, { action: "create", name: "locked" });
+    expect(result.isError).toBe(true);
+    expect(result.details).toMatchObject({ errorCode: "SKILL_CREATE_FAILED" });
+  });
 });
 
 describe("skill_manage: patch", () => {

@@ -527,9 +527,15 @@ export function AgentSkillsPage() {
     if (!editor) return;
     const { draft, editing, level } = editor;
     const projectPath = level === "project" ? selectedProjectPath ?? undefined : undefined;
+    const description = draft.description.trim();
+    // Re-send the description only when the person actually changed it. A
+    // document written before the catalog limit may carry a longer one, and
+    // sending it back unchanged would be refused for an edit that never touched
+    // it — the host keeps the stored value when the field is absent.
+    const descriptionChanged = !editing || description !== (editing.description ?? "").trim();
     const payload = {
       name: draft.name.trim(),
-      description: draft.description.trim(),
+      ...(descriptionChanged ? { description } : {}),
       body: draft.body,
       enabled: draft.enabled,
       scope: draft.scope,

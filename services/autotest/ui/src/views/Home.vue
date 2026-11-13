@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ThemeSwitch from '@/components/theme-switch.vue'
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -157,47 +158,48 @@ function enterProject(id: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-surface-2">
     <!-- 顶部栏 -->
-    <header class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+    <header class="h-14 bg-surface border-b border-line flex items-center justify-between px-6">
       <div class="flex items-center gap-2">
-        <Cpu class="w-5 h-5 text-blue-600" />
-        <span class="font-semibold text-gray-900">自动化测试平台</span>
+        <Cpu class="w-5 h-5 text-accent" />
+        <span class="font-semibold text-fg">自动化测试平台</span>
       </div>
       <div class="flex items-center gap-4">
-        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm">测</div>
+        <ThemeSwitch />
+        <div class="w-8 h-8 rounded-full bg-accent-solid text-white flex items-center justify-center text-sm">测</div>
       </div>
     </header>
 
     <div class="max-w-7xl mx-auto p-8">
       <!-- 页面标题 -->
       <div class="mb-8">
-        <h1 class="text-2xl font-semibold text-gray-900">我的测试工作台</h1>
-        <p class="text-sm text-gray-500 mt-1">ECU / 座舱自动化测试 · 用例、脚本、执行与报告</p>
+        <h1 class="text-2xl font-semibold text-fg">我的测试工作台</h1>
+        <p class="text-sm text-muted mt-1">ECU / 座舱自动化测试 · 用例、脚本、执行与报告</p>
       </div>
 
       <!-- 统计卡片 -->
       <div class="grid grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-lg border border-gray-200 p-5">
+        <div class="bg-surface rounded-lg border border-line p-5">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-gray-500">项目数</span>
-            <FileText class="w-4 h-4 text-blue-600" />
+            <span class="text-sm text-muted">项目数</span>
+            <FileText class="w-4 h-4 text-accent" />
           </div>
-          <div class="text-2xl font-semibold text-gray-900">{{ stats.totalProjects }}</div>
+          <div class="text-2xl font-semibold text-fg">{{ stats.totalProjects }}</div>
         </div>
-        <div class="bg-white rounded-lg border border-gray-200 p-5">
+        <div class="bg-surface rounded-lg border border-line p-5">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-gray-500">测试用例</span>
-            <ListChecks class="w-4 h-4 text-green-600" />
+            <span class="text-sm text-muted">测试用例</span>
+            <ListChecks class="w-4 h-4 text-success" />
           </div>
-          <div class="text-2xl font-semibold text-gray-900">{{ stats.totalCases }}</div>
+          <div class="text-2xl font-semibold text-fg">{{ stats.totalCases }}</div>
         </div>
-        <div class="bg-white rounded-lg border border-gray-200 p-5">
+        <div class="bg-surface rounded-lg border border-line p-5">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-gray-500">执行次数</span>
+            <span class="text-sm text-muted">执行次数</span>
             <PlayCircle class="w-4 h-4 text-orange-600" />
           </div>
-          <div class="text-2xl font-semibold text-gray-900">{{ stats.totalExecutions }}</div>
+          <div class="text-2xl font-semibold text-fg">{{ stats.totalExecutions }}</div>
         </div>
       </div>
 
@@ -205,8 +207,8 @@ function enterProject(id: string) {
         <!-- 项目列表 -->
         <div class="col-span-2">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-base font-medium text-gray-900">我的项目</h2>
-            <button @click="createDialogOpen = true" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <h2 class="text-base font-medium text-fg">我的项目</h2>
+            <button @click="createDialogOpen = true" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-accent-solid text-white rounded-lg hover:bg-blue-700">
               <Plus class="w-4 h-4" />
               新建项目
             </button>
@@ -217,7 +219,7 @@ function enterProject(id: string) {
               v-for="p in projects"
               :key="p.id"
               @click="enterProject(p.id)"
-              class="bg-white rounded-lg border border-gray-200 p-5 cursor-pointer hover:shadow-md transition-shadow"
+              class="bg-surface rounded-lg border border-line p-5 cursor-pointer hover:shadow-md transition-shadow"
             >
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-3">
@@ -225,25 +227,25 @@ function enterProject(id: string) {
                     <Cpu class="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 class="font-medium text-gray-900">{{ p.name }}</h3>
-                    <p class="text-xs text-gray-500">{{ p.description }}</p>
+                    <h3 class="font-medium text-fg">{{ p.name }}</h3>
+                    <p class="text-xs text-muted">{{ p.description }}</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-3">
-                  <span class="text-xs text-gray-400">{{ p.last_active }}</span>
+                  <span class="text-xs text-muted-2">{{ p.last_active }}</span>
                   <button
-                    class="p-1 text-gray-400 hover:text-blue-600"
+                    class="p-1 text-muted-2 hover:text-accent"
                     title="重命名"
                     @click.stop="openRename(p)"
                   ><Pencil class="w-4 h-4" /></button>
                   <button
-                    class="p-1 text-gray-400 hover:text-red-600"
+                    class="p-1 text-muted-2 hover:text-danger"
                     title="删除项目（移入回收目录）"
                     @click.stop="openDelete(p)"
                   ><Trash2 class="w-4 h-4" /></button>
                 </div>
               </div>
-              <div class="flex items-center gap-6 text-sm text-gray-500 pl-13">
+              <div class="flex items-center gap-6 text-sm text-muted pl-13">
                 <span>{{ p.type }}</span>
                 <span>{{ p.case_count }} 用例</span>
                 <span>{{ p.execution_count }} 次执行</span>
@@ -252,33 +254,33 @@ function enterProject(id: string) {
           </div>
         </div>
       </div>
-      <div v-if="inlineMessage" class="mt-3 text-xs text-gray-600">{{ inlineMessage }}</div>
+      <div v-if="inlineMessage" class="mt-3 text-xs text-fg-3">{{ inlineMessage }}</div>
 
       <!-- 重命名对话框 -->
       <div v-if="renameTarget" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-96">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">重命名项目</h3>
-          <input v-model="renameName" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-          <p class="text-xs text-gray-400 mt-2">项目 id（{{ renameTarget.id }}）不变，只改显示名。</p>
+        <div class="bg-surface rounded-lg p-6 w-96">
+          <h3 class="text-lg font-medium text-fg mb-4">重命名项目</h3>
+          <input v-model="renameName" type="text" class="w-full px-3 py-2 border border-line rounded-lg text-sm" />
+          <p class="text-xs text-muted-2 mt-2">项目 id（{{ renameTarget.id }}）不变，只改显示名。</p>
           <div class="flex gap-3 mt-6">
-            <button @click="renameTarget = null" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">取消</button>
-            <button @click="submitRename" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">保存</button>
+            <button @click="renameTarget = null" class="flex-1 px-4 py-2 border border-line rounded-lg text-sm hover:bg-surface-2">取消</button>
+            <button @click="submitRename" class="flex-1 px-4 py-2 bg-accent-solid text-white rounded-lg text-sm hover:bg-blue-700">保存</button>
           </div>
         </div>
       </div>
 
       <!-- 删除确认 -->
       <div v-if="deleteTarget" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-[420px]">
-          <h3 class="text-lg font-medium text-gray-900 mb-2">删除「{{ deleteTarget.name }}」？</h3>
-          <p class="text-sm text-gray-600 mb-3">
+        <div class="bg-surface rounded-lg p-6 w-[420px]">
+          <h3 class="text-lg font-medium text-fg mb-2">删除「{{ deleteTarget.name }}」？</h3>
+          <p class="text-sm text-fg-3 mb-3">
             项目里的需求、用例、脚本、执行记录和报告都会一起移出列表。目录不会被真正删除，
             而是移到 workspace 的 <code class="text-xs">.trash/</code> 下，需要时可以捡回来。
           </p>
-          <label class="block text-sm text-gray-700 mb-1">输入项目 id 确认：<code class="text-xs">{{ deleteTarget.id }}</code></label>
-          <input v-model="deleteConfirmText" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" :placeholder="deleteTarget.id" />
+          <label class="block text-sm text-fg-2 mb-1">输入项目 id 确认：<code class="text-xs">{{ deleteTarget.id }}</code></label>
+          <input v-model="deleteConfirmText" type="text" class="w-full px-3 py-2 border border-line rounded-lg text-sm" :placeholder="deleteTarget.id" />
           <div class="flex gap-3 mt-6">
-            <button @click="deleteTarget = null" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">取消</button>
+            <button @click="deleteTarget = null" class="flex-1 px-4 py-2 border border-line rounded-lg text-sm hover:bg-surface-2">取消</button>
             <button
               :disabled="deleteConfirmText.trim() !== deleteTarget.id"
               class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -290,28 +292,28 @@ function enterProject(id: string) {
 
       <!-- 新建项目对话框 -->
       <div v-if="createDialogOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-96">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">新建项目</h3>
+        <div class="bg-surface rounded-lg p-6 w-96">
+          <h3 class="text-lg font-medium text-fg mb-4">新建项目</h3>
           <div class="space-y-4">
             <div>
-              <label class="block text-sm text-gray-700 mb-1">项目名称</label>
-              <input v-model="newProject.name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="比如：长安深蓝 S7 ECU 测试" />
+              <label class="block text-sm text-fg-2 mb-1">项目名称</label>
+              <input v-model="newProject.name" type="text" class="w-full px-3 py-2 border border-line rounded-lg text-sm" placeholder="比如：长安深蓝 S7 ECU 测试" />
             </div>
             <div>
-              <label class="block text-sm text-gray-700 mb-1">项目描述</label>
-              <textarea v-model="newProject.description" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" rows="3" placeholder="简单描述一下这个项目..."></textarea>
+              <label class="block text-sm text-fg-2 mb-1">项目描述</label>
+              <textarea v-model="newProject.description" class="w-full px-3 py-2 border border-line rounded-lg text-sm" rows="3" placeholder="简单描述一下这个项目..."></textarea>
             </div>
             <div>
-              <label class="block text-sm text-gray-700 mb-1">项目类型</label>
-              <select v-model="newProject.type" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+              <label class="block text-sm text-fg-2 mb-1">项目类型</label>
+              <select v-model="newProject.type" class="w-full px-3 py-2 border border-line rounded-lg text-sm">
                 <option value="ECU">ECU 动力域</option>
                 <option value="座舱">座舱域</option>
               </select>
             </div>
           </div>
           <div class="flex gap-3 mt-6">
-            <button @click="createDialogOpen = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">取消</button>
-            <button @click="createProject" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">创建</button>
+            <button @click="createDialogOpen = false" class="flex-1 px-4 py-2 border border-line rounded-lg text-sm hover:bg-surface-2">取消</button>
+            <button @click="createProject" class="flex-1 px-4 py-2 bg-accent-solid text-white rounded-lg text-sm hover:bg-blue-700">创建</button>
           </div>
         </div>
       </div>

@@ -33,7 +33,7 @@ const html = computed(() => {
 .md-body {
   font-size: 13px;
   line-height: 1.7;
-  color: #1f2937;
+  color: var(--fg-2);
   word-break: break-word;
 }
 .md-body :deep(h1),
@@ -41,7 +41,7 @@ const html = computed(() => {
 .md-body :deep(h3),
 .md-body :deep(h4) {
   font-weight: 600;
-  color: #111827;
+  color: var(--fg);
   margin: 1.2em 0 0.5em;
   line-height: 1.35;
 }
@@ -56,15 +56,15 @@ const html = computed(() => {
 .md-body :deep(li) { margin: 0.2em 0; }
 .md-body :deep(li > input[type='checkbox']) { margin-right: 0.4em; }
 .md-body :deep(code) {
-  background: #f3f4f6;
+  background: var(--surface-3);
   border-radius: 4px;
   padding: 0.1em 0.35em;
   font-size: 0.92em;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .md-body :deep(pre) {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.7em 0.9em;
   overflow-x: auto;
@@ -72,9 +72,9 @@ const html = computed(() => {
 }
 .md-body :deep(pre code) { background: transparent; padding: 0; font-size: 0.9em; }
 .md-body :deep(blockquote) {
-  border-left: 3px solid #d1d5db;
+  border-left: 3px solid var(--line-strong);
   padding-left: 0.8em;
-  color: #4b5563;
+  color: var(--fg-3);
   margin: 0.7em 0;
 }
 .md-body :deep(table) {
@@ -87,13 +87,13 @@ const html = computed(() => {
 }
 .md-body :deep(th),
 .md-body :deep(td) {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line);
   padding: 0.35em 0.6em;
   text-align: left;
   vertical-align: top;
 }
-.md-body :deep(th) { background: #f9fafb; font-weight: 600; }
-.md-body :deep(a) { color: #2563eb; text-decoration: underline; }
-.md-body :deep(hr) { border: 0; border-top: 1px solid #e5e7eb; margin: 1.2em 0; }
+.md-body :deep(th) { background: var(--surface-2); font-weight: 600; }
+.md-body :deep(a) { color: var(--accent); text-decoration: underline; }
+.md-body :deep(hr) { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
 .md-body :deep(img) { max-width: 100%; }
 </style>

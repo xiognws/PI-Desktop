@@ -21,11 +21,15 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
 
-    #[cfg(windows)]
+    // A `.res` is an MS COFF object. The MSVC linker reads it; `ld` (used by the
+    // GNU toolchain) rejects it as "file format not recognized", which fails the
+    // whole link. Only attach the resource when the target links with MSVC — a
+    // GNU developer build gets no version block, which is cosmetic.
+    #[cfg(all(windows, target_env = "msvc"))]
     embed_version_resource();
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, target_env = "msvc"))]
 fn embed_version_resource() {
     let version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.0.0".to_owned());
     let mut parts = version
@@ -97,7 +101,7 @@ END
 }
 
 /// Locate the Windows SDK resource compiler, preferring the newest SDK.
-#[cfg(windows)]
+#[cfg(all(windows, target_env = "msvc"))]
 fn find_resource_compiler() -> Option<PathBuf> {
     let mut candidates = Vec::new();
     for base in [
@@ -119,7 +123,7 @@ fn find_resource_compiler() -> Option<PathBuf> {
     candidates.pop().or_else(|| find_on_path("rc.exe"))
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, target_env = "msvc"))]
 fn find_on_path(name: &str) -> Option<PathBuf> {
     let path = env::var_os("PATH")?;
     env::split_paths(&path)

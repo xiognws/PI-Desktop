@@ -376,9 +376,9 @@ function failureView(): { type: string; line?: number; message: string } | null 
 
 function resultTone(): string {
   const status = runResult.value?.status_label || runResult.value?.status
-  if (status === '通过') return 'bg-green-50 text-green-700 border-green-200'
-  if (status === '失败' || status === '异常') return 'bg-red-50 text-red-700 border-red-200'
-  return 'bg-gray-50 text-gray-600 border-gray-200'
+  if (status === '通过') return 'bg-success-soft text-success border-success-line'
+  if (status === '失败' || status === '异常') return 'bg-danger-soft text-danger border-danger-line'
+  return 'bg-surface-2 text-fg-3 border-line'
 }
 
 onMounted(async () => {
@@ -397,25 +397,25 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col bg-white overflow-hidden">
-    <div class="h-11 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-3">
-      <button @click="router.push(`/project/${projectId}/scripts`)" class="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
+  <div class="flex-1 flex flex-col bg-surface overflow-hidden">
+    <div class="h-11 bg-surface-3 border-b border-line flex items-center px-4 gap-3">
+      <button @click="router.push(`/project/${projectId}/scripts`)" class="flex items-center gap-1.5 text-sm text-fg-3 hover:text-fg">
         <ArrowLeft class="w-4 h-4" />
         返回
       </button>
       <div class="w-px h-4 bg-gray-300"></div>
-      <div class="flex items-center gap-2 text-sm text-gray-700">
-        <FileCode class="w-4 h-4 text-blue-600" />
+      <div class="flex items-center gap-2 text-sm text-fg-2">
+        <FileCode class="w-4 h-4 text-accent" />
         {{ currentScript?.name || '加载中...' }}
       </div>
-      <div class="flex items-center gap-1.5 text-xs text-gray-500 ml-2">
+      <div class="flex items-center gap-1.5 text-xs text-muted ml-2">
         <Loader2 class="w-3 h-3 animate-spin" v-if="!lspConnected" />
         <span class="w-2 h-2 rounded-full" :class="lspConnected ? 'bg-green-500' : 'bg-gray-300'"></span>
         {{ statusText }}
       </div>
       <div class="ml-auto flex items-center gap-2">
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-200"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line-strong rounded hover:bg-surface-4"
           :disabled="gating"
           @click="runGate"
         >
@@ -424,14 +424,14 @@ onBeforeUnmount(() => {
           校验
         </button>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-200"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line-strong rounded hover:bg-surface-4"
           @click="insertTemplate"
         >
           <Braces class="w-4 h-4" />
           模板
         </button>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-200"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line-strong rounded hover:bg-surface-4"
           :disabled="saving"
           @click="saveNow"
         >
@@ -441,7 +441,7 @@ onBeforeUnmount(() => {
           <span v-if="dirty" class="w-1.5 h-1.5 rounded-full bg-amber-500" title="有未保存改动"></span>
         </button>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-accent-solid text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="running || blockRun"
           :title="blockRun ? '静态闸门未通过，先修问题再运行' : '运行这条脚本'"
           @click="runScript"
@@ -454,11 +454,11 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="flex-1 flex overflow-hidden">
-      <div class="w-56 bg-gray-50 border-r border-gray-200 flex flex-col">
-        <div class="px-4 py-2 text-xs font-medium text-gray-500 border-b border-gray-200">资源管理器</div>
+      <div class="w-56 bg-surface-2 border-r border-line flex flex-col">
+        <div class="px-4 py-2 text-xs font-medium text-muted border-b border-line">资源管理器</div>
         <div class="flex-1 overflow-auto p-2">
-          <div class="flex items-center gap-2 px-2 py-1 text-xs text-gray-600 mb-1">
-            <FolderOpen class="w-3.5 h-3.5 text-gray-400" />
+          <div class="flex items-center gap-2 px-2 py-1 text-xs text-fg-3 mb-1">
+            <FolderOpen class="w-3.5 h-3.5 text-muted-2" />
             scripts/
           </div>
           <div class="ml-4 space-y-0.5">
@@ -467,7 +467,7 @@ onBeforeUnmount(() => {
               :key="s.id"
               @click="switchScript(s.id)"
               class="w-full flex items-center gap-1.5 px-2 py-1 rounded text-xs text-left transition-colors"
-              :class="s.id === scriptId ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'"
+              :class="s.id === scriptId ? 'bg-accent-soft text-accent' : 'text-fg-3 hover:bg-surface-3'"
             >
               <FileCode class="w-3 h-3" />
               {{ s.name }}
@@ -480,16 +480,16 @@ onBeforeUnmount(() => {
         <div ref="editorContainer" class="flex-1 min-w-0"></div>
         <div v-if="showOutput" class="h-56 bg-gray-900 border-t border-gray-700 flex flex-col">
           <div class="flex items-center gap-2 px-3 py-1 bg-gray-800">
-            <span class="text-xs text-gray-300 font-medium">运行结果</span>
+            <span class="text-xs text-muted-2 font-medium">运行结果</span>
             <span
               v-if="runResult"
               class="text-xs px-2 py-0.5 rounded border"
               :class="resultTone()"
             >{{ runResult.status_label || runResult.status || (runResult.success ? '通过' : '失败') }}</span>
-            <span v-if="runResult?.duration_ms != null" class="text-xs text-gray-400">{{ Math.round(runResult.duration_ms) }} ms</span>
-            <span v-if="runResult?.returncode != null" class="text-xs text-gray-400">exit {{ runResult.returncode }}</span>
-            <span v-if="runResult?.execution_id" class="text-xs text-gray-500">#{{ runResult.execution_id }}</span>
-            <button @click="showOutput = false" class="ml-auto text-gray-400 hover:text-white text-xs">关闭</button>
+            <span v-if="runResult?.duration_ms != null" class="text-xs text-muted-2">{{ Math.round(runResult.duration_ms) }} ms</span>
+            <span v-if="runResult?.returncode != null" class="text-xs text-muted-2">exit {{ runResult.returncode }}</span>
+            <span v-if="runResult?.execution_id" class="text-xs text-muted">#{{ runResult.execution_id }}</span>
+            <button @click="showOutput = false" class="ml-auto text-muted-2 hover:text-white text-xs">关闭</button>
           </div>
           <div v-if="failureView()" class="px-3 py-2 text-xs text-red-300 border-b border-gray-700">
             失败原因：<span class="font-mono">{{ failureView()!.type }}</span>
@@ -498,14 +498,14 @@ onBeforeUnmount(() => {
           </div>
           <pre class="flex-1 overflow-auto p-3 text-xs text-green-400 font-mono">{{ runOutput || '（还没有输出）' }}</pre>
         </div>
-        <div v-if="gateChecked" class="border-t border-gray-200 bg-white px-3 py-2">
-          <div class="flex items-center gap-2 text-xs font-medium" :class="gateFailures.length ? 'text-red-600' : 'text-green-600'">
+        <div v-if="gateChecked" class="border-t border-line bg-surface px-3 py-2">
+          <div class="flex items-center gap-2 text-xs font-medium" :class="gateFailures.length ? 'text-danger' : 'text-success'">
             <XCircle v-if="gateFailures.length" class="w-3.5 h-3.5" />
             <CheckCircle2 v-else class="w-3.5 h-3.5" />
             静态闸门{{ gateFailures.length ? `：${gateFailures.length} 项未通过` : '：通过' }}
           </div>
           <ul v-if="gateFailures.length" class="mt-1 space-y-0.5">
-            <li v-for="(f, i) in gateFailures" :key="i" class="text-xs text-red-600">· {{ f }}</li>
+            <li v-for="(f, i) in gateFailures" :key="i" class="text-xs text-danger">· {{ f }}</li>
           </ul>
         </div>
       </div>

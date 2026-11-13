@@ -99,14 +99,14 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 9000;
-  background: #f59e0b;
-  color: #1f2937;
+  background: var(--warn);
+  color: var(--fg-2);
   text-align: center;
   padding: 6px 12px;
   font-size: 13px;
 }
 .bt-banner-btn {
-  background: #1f2937;
+  background: var(--fg-2);
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -137,15 +137,15 @@ onBeforeUnmount(() => {
 }
 .bt-card h2 {
   margin: 0 0 8px;
-  color: #0f172a;
+  color: var(--fg);
 }
 .bt-card p {
-  color: #64748b;
+  color: var(--muted);
   font-size: 14px;
   margin: 0 0 20px;
 }
 .bt-btn {
-  background: #2563eb;
+  background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
 }
 .bt-err {
   margin-top: 14px !important;
-  color: #dc2626 !important;
+  color: var(--danger) !important;
   font-size: 12px !important;
 }
 </style>

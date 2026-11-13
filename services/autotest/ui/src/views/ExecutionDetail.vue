@@ -163,12 +163,12 @@ const durationText = computed(() => {
 const isRunning = computed(() => execution.value?.status === '执行中')
 
 const tone = (status: string) => {
-  if (status === 'pass' || status === '已完成') return 'bg-green-50 text-green-600'
+  if (status === 'pass' || status === '已完成') return 'bg-success-soft text-success'
   if (status === 'fail' || status === '失败' || status === 'error' || status === '异常')
-    return 'bg-red-50 text-red-600'
-  if (status === 'cancelled' || status === '已取消') return 'bg-amber-50 text-amber-600'
-  if (status === 'skip') return 'bg-gray-100 text-gray-500'
-  return 'bg-blue-50 text-blue-600'
+    return 'bg-danger-soft text-danger'
+  if (status === 'cancelled' || status === '已取消') return 'bg-warn-soft text-warn'
+  if (status === 'skip') return 'bg-surface-3 text-muted'
+  return 'bg-accent-soft text-accent'
 }
 
 const icon = (status: string) => {
@@ -220,13 +220,13 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex-1 flex flex-col overflow-auto p-6">
     <div class="max-w-5xl mx-auto w-full">
-      <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div class="bg-surface rounded-lg border border-line p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
           <div>
-            <h2 class="text-lg font-medium text-gray-900">
+            <h2 class="text-lg font-medium text-fg">
               {{ execution?.name ?? `执行 #${executionId}` }}
             </h2>
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-sm text-muted mt-1">
               {{ execution?.started_at ?? '' }}
               <span v-if="durationText"> · 耗时 {{ durationText }}</span>
               <span v-if="execution?.executor"> · {{ execution.executor }}</span>
@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
             </span>
             <button
               v-if="isRunning"
-              class="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+              class="text-xs px-3 py-1 rounded border border-danger-line text-danger hover:bg-danger-soft disabled:opacity-50"
               :disabled="cancelling"
               @click="cancelRun"
             >
@@ -248,33 +248,33 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="flex items-center gap-6 text-sm">
-          <span class="text-green-600 flex items-center gap-1"><CheckCircle class="w-4 h-4" /> 通过 {{ counts.pass }}</span>
-          <span class="text-red-600 flex items-center gap-1"><XCircle class="w-4 h-4" /> 失败 {{ counts.fail }}</span>
-          <span class="text-gray-500 flex items-center gap-1"><Clock class="w-4 h-4" /> 跳过 {{ counts.skip }}</span>
-          <span v-if="runEnd" class="text-gray-400 text-xs">replay 命中 {{ runEnd.replayHit ? '是' : '否' }} · 模型调用 {{ runEnd.modelCalls ?? 0 }}</span>
+          <span class="text-success flex items-center gap-1"><CheckCircle class="w-4 h-4" /> 通过 {{ counts.pass }}</span>
+          <span class="text-danger flex items-center gap-1"><XCircle class="w-4 h-4" /> 失败 {{ counts.fail }}</span>
+          <span class="text-muted flex items-center gap-1"><Clock class="w-4 h-4" /> 跳过 {{ counts.skip }}</span>
+          <span v-if="runEnd" class="text-muted-2 text-xs">replay 命中 {{ runEnd.replayHit ? '是' : '否' }} · 模型调用 {{ runEnd.modelCalls ?? 0 }}</span>
         </div>
 
-        <div v-if="error" class="mt-4 text-sm text-red-600">{{ error }}</div>
+        <div v-if="error" class="mt-4 text-sm text-danger">{{ error }}</div>
       </div>
 
-      <div class="bg-white rounded-lg border border-gray-200">
-        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="text-base font-medium text-gray-900">执行步骤</h3>
+      <div class="bg-surface rounded-lg border border-line">
+        <div class="px-6 py-4 border-b border-line flex items-center justify-between">
+          <h3 class="text-base font-medium text-fg">执行步骤</h3>
           <div class="flex items-center gap-3">
-            <span class="text-xs text-gray-400">{{ events.length }} 条事件</span>
+            <span class="text-xs text-muted-2">{{ events.length }} 条事件</span>
             <button
               class="text-xs px-2 py-1 rounded border"
-              :class="onlyFailed ? 'border-red-300 text-red-600 bg-red-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+              :class="onlyFailed ? 'border-red-300 text-danger bg-danger-soft' : 'border-line text-fg-3 hover:bg-surface-2'"
               @click="onlyFailed = !onlyFailed"
             >
               只看失败
             </button>
           </div>
         </div>
-        <div v-if="visibleSteps.length === 0" class="px-6 py-10 text-center text-sm text-gray-400">
+        <div v-if="visibleSteps.length === 0" class="px-6 py-10 text-center text-sm text-muted-2">
           {{ steps.length ? '这次执行没有失败步骤' : '这次执行还没有步骤事件' }}
         </div>
-        <div class="divide-y divide-gray-100">
+        <div class="divide-y divide-line-soft">
           <div v-for="s in visibleSteps" :key="s.id" class="p-5">
             <div
               class="flex items-center justify-between mb-2 cursor-pointer select-none"
@@ -282,49 +282,49 @@ onBeforeUnmount(() => {
             >
               <div class="flex items-center gap-3">
                 <component :is="icon(s.status)" class="w-5 h-5" :class="tone(s.status).split(' ')[1]" />
-                <span class="font-medium text-gray-900">{{ s.label }}</span>
+                <span class="font-medium text-fg">{{ s.label }}</span>
                 <span class="text-xs px-2 py-0.5 rounded" :class="tone(s.status)">
                   {{ s.status }}
                 </span>
-                <span v-if="s.detail && isCollapsed(s.id)" class="text-xs text-gray-400">
+                <span v-if="s.detail && isCollapsed(s.id)" class="text-xs text-muted-2">
                   {{ detailLines(s.detail).length }} 行 · 点击展开
                 </span>
               </div>
-              <span class="text-xs text-gray-400">
+              <span class="text-xs text-muted-2">
                 {{ s.durationMs != null ? `${(s.durationMs / 1000).toFixed(2)}s` : '' }}
               </span>
             </div>
             <div
               v-if="s.detail && !isCollapsed(s.id)"
-              class="ml-8 mt-2 rounded-lg border border-gray-200 overflow-hidden"
+              class="ml-8 mt-2 rounded-lg border border-line overflow-hidden"
             >
               <div
                 v-for="(line, index) in detailLines(s.detail)"
                 :key="index"
                 class="px-3 py-0.5 font-mono text-xs whitespace-pre-wrap"
-                :class="line.bad ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-600'"
+                :class="line.bad ? 'bg-danger-soft text-danger font-medium' : 'text-fg-3'"
               >{{ line.text || ' ' }}</div>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="artifacts.length" class="bg-white rounded-lg border border-gray-200 mt-6 p-5">
-        <h3 class="text-base font-medium text-gray-900 mb-3">产物</h3>
+      <div v-if="artifacts.length" class="bg-surface rounded-lg border border-line mt-6 p-5">
+        <h3 class="text-base font-medium text-fg mb-3">产物</h3>
         <div class="grid grid-cols-3 gap-3">
-          <div v-for="a in artifacts" :key="a.path" class="border border-gray-200 rounded-lg overflow-hidden">
+          <div v-for="a in artifacts" :key="a.path" class="border border-line rounded-lg overflow-hidden">
             <a v-if="isImage(a.path)" :href="fileUrl(a.path)" target="_blank" rel="noreferrer" class="block">
-              <img :src="fileUrl(a.path)" :alt="a.path" class="w-full h-32 object-cover bg-gray-50" />
+              <img :src="fileUrl(a.path)" :alt="a.path" class="w-full h-32 object-cover bg-surface-2" />
             </a>
-            <div v-else class="h-32 flex items-center justify-center bg-gray-50">
-              <FileText class="w-6 h-6 text-gray-300" />
+            <div v-else class="h-32 flex items-center justify-center bg-surface-2">
+              <FileText class="w-6 h-6 text-muted-2" />
             </div>
-            <div class="px-2 py-1.5 border-t border-gray-100">
+            <div class="px-2 py-1.5 border-t border-line-soft">
               <div class="flex items-center gap-1">
-                <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{{ a.kind }}</span>
-                <span class="text-xs text-gray-600 truncate">{{ a.path?.split(/[\\/]/).pop() }}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-surface-3 text-muted">{{ a.kind }}</span>
+                <span class="text-xs text-fg-3 truncate">{{ a.path?.split(/[\\/]/).pop() }}</span>
               </div>
-              <a :href="fileUrl(a.path)" target="_blank" rel="noreferrer" class="text-xs text-blue-600 hover:underline">
+              <a :href="fileUrl(a.path)" target="_blank" rel="noreferrer" class="text-xs text-accent hover:underline">
                 {{ isImage(a.path) ? '打开原图' : '下载' }}
               </a>
             </div>
@@ -334,7 +334,7 @@ onBeforeUnmount(() => {
 
       <div v-if="failure"
         class="border rounded-lg mt-6 p-5 text-sm whitespace-pre-wrap"
-        :class="execution?.status === '已取消' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-red-50 border-red-200 text-red-700'">
+        :class="execution?.status === '已取消' ? 'bg-warn-soft border-amber-200 text-amber-700' : 'bg-danger-soft border-danger-line text-danger'">
         {{ execution?.status === '已取消' ? '结束原因' : '失败原因' }}：{{ failure }}
       </div>
     </div>

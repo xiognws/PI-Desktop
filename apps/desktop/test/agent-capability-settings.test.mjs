@@ -659,3 +659,25 @@ test("every string the map's card shows exists in every catalog", async () => {
     }
   }
 });
+
+// A document written before the catalog limit may carry a description longer
+// than 60 characters - and saving the body of such a skill must not be refused
+// for a field nobody touched. The editor therefore drops the description from
+// the payload when it is unchanged, letting the host keep the stored value.
+test("the skill editor only sends a description it changed", () => {
+  assert.match(
+    skills,
+    /const descriptionChanged = !editing \|\| description !== \(editing\.description \?\? ""\)\.trim\(\);/,
+    "the payload needs to know whether the description was edited",
+  );
+  assert.match(
+    skills,
+    /\.\.\.\(descriptionChanged \? \{ description \} : \{\}\)/,
+    "an unchanged description must be omitted, not re-sent",
+  );
+  assert.doesNotMatch(
+    skills,
+    /^\s*description: draft\.description\.trim\(\),$/m,
+    "sending it unconditionally is what made editing a legacy skill fail",
+  );
+});
