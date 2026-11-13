@@ -44,8 +44,8 @@ change or starting follow-up:
 - [ ] If the root-cause bar holds: the pull request was merged first,
   preserving the contributor's commits; landing blockers received only
   smallest-on-top commits.
-- [ ] Follow-up started only after the pull request was in `main`, using a
-  new R4 request branch and worktree.
+- [ ] Follow-up started only after the pull request was in `main`, on local
+  `main`.
 - [ ] If the root-cause bar fails or a harm blocker exists: the pull
   request was not merged, was not approved as "direction is fine", and a
   comment recorded the evidence. The idea was not silently reimplemented.
@@ -63,20 +63,20 @@ See [R6 — Land a linked pull request only when it fixes the root cause with a 
 
 Before editing any file for a new request:
 
-- [ ] Existing uncommitted work is identified and preserved.
-- [ ] `origin/main` is fetched and local `main` is fast-forwarded when its
-  worktree is clean.
-- [ ] A dedicated `<type>/<short-description>` request branch and worktree are
-  created from that updated `main` commit.
-- [ ] The request worktree reuses the primary checkout's host toolchains,
-  compatible dependency tree, package stores, caches, and ignored local
-  configuration where safe; no separate environment is installed for E2E.
-- [ ] Only mutable, incompatible, or concurrency-sensitive environment state
-  stays worktree-local and ignored.
-- [ ] The current branch is not `main` before implementation begins.
-- [ ] Delivery scope is recorded: a commit request stays on the request
-  branch; a push request includes PR-based remote `main` integration after
-  `pnpm check:pr-base`. Explicit branch-only or draft-only limits are honored.
+- [ ] Existing uncommitted work — this session's and anyone else's — is
+  identified and preserved.
+- [ ] `origin/main` is fetched and local `main` is fast-forwarded (or unpushed
+  local commits are integrated).
+- [ ] No task branch and no worktree were created; work happens on local `main`
+  in this checkout.
+- [ ] The checkout's host toolchains, dependency tree, package stores, caches,
+  and ignored local configuration are reused; no separate environment is
+  installed for E2E.
+- [ ] Staging will use explicit paths, and only paths this request touched will
+  be committed.
+- [ ] Delivery scope is recorded: a commit request stops at the local commit; a
+  push request integrates latest `origin/main`, validates the final commit, and
+  pushes `main`. Explicit narrower limits are honored.
 
 ---
 
@@ -159,49 +159,38 @@ After implementation (or alongside it):
 Before marking requested integration complete, apply the R4 delivery scope;
 explicit branch-only or draft-only requests retain their narrower scope:
 
-- [ ] Before a PR/MR is opened or updated, `origin/main` is an ancestor of the
-  request head (`pnpm check:pr-base`). A PR behind `origin/main` is not opened.
+- [ ] Before the push, `origin/main` is integrated into the commit being pushed
+  and the affected checks ran on that commit.
 - [ ] For a code-bearing change: the relevant E2E gate ran against a candidate
   that contains latest `origin/main` before the branch push and PR/MR creation,
   or before a commit-only delivery was declared complete, or its `NOT RUN`
   limitation is recorded with reason, alternative validation, and remaining risk.
 - [ ] Commit-only delivery did not publish remotely without separate
   authorization.
-- [ ] For authorized remote delivery: the request branch was pushed, its PR/MR
-  targeted `main` with only this task's changes, and the description documented
-  impacted specs, E2E scenarios, and validation.
-- [ ] For authorized remote delivery: PR self-review, required checks (including
-  the PR-base ancestry gate), and reviews passed; the PR/MR merged into remote
-  `main` using a permitted strategy; local `main` was synchronized with the
-  landed change; when the landed executable content differs from the commit the
-  gate ran on, the affected suites were rerun and recorded.
-- [ ] No direct push to `main`, force-push, discarded unrelated work, or bypassed
-  gate was inferred from the delivery request. Genuine blockers were reported.
-- [ ] Request worktree is removed after merge.
-- [ ] Merged request branch is deleted locally (`git branch -d`).
-- [ ] Any remotely published request branch is deleted after merge.
+- [ ] For authorized delivery: the validated commit was pushed to `main`, and
+  `git ls-remote --heads origin main` matches it.
+- [ ] When `origin/main` moved between validation and the push, the affected
+  suites were rerun on the final commit and recorded.
+- [ ] No force-push, no rewriting of published history, no discarded unrelated
+  work, no bypassed gate. Genuine blockers were reported.
+- [ ] Local branches whose commits are already on `origin/main` were deleted.
 - [ ] Issue reference is included when applicable (e.g. `Refs #12` or
   `Closes #12`).
 
 ---
 
-## 6.1 Merge Cleanup Checklist
+## 6.1 Post-push Checklist
 
-Run immediately after the request branch is integrated into `main`, whether the
-merge happened remotely via PR/MR or locally in the primary checkout:
+Run immediately after the push:
 
-- [ ] Expected commits are verified present in local `main`, and remote `main`
-  when remote delivery was requested.
-- [ ] The request worktree is clean — no uncommitted or untracked request files
-  remain.
-- [ ] `git worktree remove <worktree-path>` succeeded without forcing.
-- [ ] `git branch -d <type>/<short-description>` succeeded (no `-D` fallback on
-  an unmerged branch).
-- [ ] `git worktree prune` leaves `git worktree list` free of stale entries for
-  this request.
-- [ ] No other agent's worktree or branch was removed.
-- [ ] If launch was requested after delivery, the app was built and started
-  from the integrated `main` checkout and its development environment.
+- [ ] The pushed commit is present on remote `main`
+  (`git ls-remote --heads origin main` matches `git rev-parse HEAD`).
+- [ ] `git status --short` shows only work that belongs to someone else — this
+  request left nothing uncommitted behind.
+- [ ] Local branches whose commits already reached `origin/main` are deleted;
+  none of another session's branches or worktrees was touched.
+- [ ] If launch was requested after delivery, the app was built and started from
+  this `main` checkout and its development environment.
 
 ---
 
@@ -238,16 +227,16 @@ user's delivery scope:
 
 | # | Gate | Source |
 |---|---|---|
-| 1 | Request branch and worktree created from an up-to-date `origin/main`; primary environment reused where safe | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |
+| 1 | Change implemented on local `main` that was up to date with `origin/main`; host environment reused | [R4 — Direct delivery on `main`](03-ai-development-workflow.md#r4--direct-delivery-on-main) |
 | 2 | Code/doc implements the planned change | Step 4 of [development loop](03-ai-development-workflow.md#2-development-loop) |
 | 3 | All impacted specs updated | [R1 — Spec-sync](03-ai-development-workflow.md#r1--spec-first--spec-sync) |
 | 4 | E2E scenarios documented (or confirmed not needed) | [R3 — E2E coverage doc](03-ai-development-workflow.md#r3--e2e-coverage-doc) |
-| 5 | Targeted local checks follow the existing risk standard; for a code-bearing change the relevant E2E gate passed on a candidate that contains latest `origin/main` (`pnpm check:pr-base`) before the branch push, the PR/MR, or a commit-only completion (or its `NOT RUN` limitation is recorded); after the remote merge the affected suites were rerun when the landed executable content changed; required tests need no separate user request | Steps 7, 10, and 11 of development loop |
+| 5 | Targeted local checks follow the existing risk standard; for a code-bearing change the relevant E2E gate passed on the commit that was pushed — a commit containing latest `origin/main` — or its `NOT RUN` limitation is recorded; the affected suites were rerun when `origin/main` moved before the push; required tests need no separate user request | Steps 7, 10, and 11 of development loop |
 | 6 | Change committed with conventional message | [R2 — Commit-per-change](03-ai-development-workflow.md#r2--commit-per-change) |
 | 7 | BOARD updated if milestone deliverable completed | Step 9 of development loop |
 | 8 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
-| 9 | Requested local/remote `main` integration completed under R4; expected commits verified and merged worktree/branch removed; any requested launch uses integrated `main` | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |
-| 10 | No merged worktree left on disk; `git worktree list` has no stale entry for this request | [§6.1 Merge Cleanup Checklist](#61-merge-cleanup-checklist) |
+| 9 | Authorized delivery completed: the validated commit is on `origin/main`, no task branch or worktree was created, stale local branches were deleted, and any requested launch uses this `main` checkout | [R4 — Direct delivery on `main`](03-ai-development-workflow.md#r4--direct-delivery-on-main) |
+| 10 | `git ls-remote --heads origin main` matches the pushed commit and the checkout is clean of this request's leftovers | [§6.1 Post-push Checklist](#61-post-push-checklist) |
 | 11 | If a GitHub issue was linked: verified before work; commented in the issue language; closed when conclusive | [R5 — Verify linked GitHub issues](03-ai-development-workflow.md#r5--verify-linked-github-issues-before-work-then-reply-and-close) |
 | 12 | If a GitHub pull request was linked: root-cause bar reviewed; merged only when it actually fixes the problem with a minimal diff; follow-up after merge; contributor work not discarded for nits | [R6 — Land a linked pull request only when it fixes the root cause with a minimal diff](03-ai-development-workflow.md#r6--land-a-linked-pull-request-only-when-it-fixes-the-root-cause-with-a-minimal-diff) |
 

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-11-08.1
+Policy-Sync: 2026-11-13.1
 
 Mandatory rules for AI coding agents working in Pi-Workspace.
 
@@ -76,8 +76,8 @@ workflow. Domain specifications remain authoritative for product
 behavior, architecture, protocol contracts, persistence semantics,
 security boundaries, and acceptance criteria.
 
-If a delivery document conflicts with the branch / worktree / integration
-/ E2E workflow defined in this file:
+If a delivery document conflicts with the main-line / integration / E2E
+workflow defined in this file:
 
 1. do not silently choose one
 2. treat the conflict as documentation drift
@@ -85,8 +85,8 @@ If a delivery document conflicts with the branch / worktree / integration
 4. update the conflicting document as part of the same change when
    authorized
 
-In particular, do not merge task code into local `main` merely because
-an older document describes local-main E2E integration.
+In particular, do not create a task branch or worktree merely because an
+older document describes a per-task branch flow.
 
 ### File encoding: PowerShell scripts
 
@@ -212,163 +212,115 @@ or security boundary requires an ADR.
 
 ---
 
-## 5. Multi-Agent Isolation Is Mandatory
+## 5. Work Directly on `main`
 
-Assume multiple agents work concurrently.
-
-Every development request uses:
+Deliver every change on the main line.
 
 ```text
-1 request = 1 branch + 1 dedicated worktree
+1 request = 1 working session on local `main`, pushed straight to `origin/main`
 ```
 
-The primary checkout and local `main` are coordination surfaces, not
-development workspaces.
-
-### Never
-
-* develop directly on `main`
-* develop in the primary checkout
-* merge unvalidated task code into local `main`
-* use local `main` as a temporary integration branch
-* reuse another task's worktree
-* modify another agent's branch
-* delete another agent's branch or worktree
-* reset or discard unrelated work
-* include unrelated changes in your task
-* depend on uncommitted work from another worktree
+Do not create a task branch, and do not create a worktree. The primary
+checkout is the development workspace; local `main` is where a request is
+implemented, validated, committed, and pushed.
 
 ### Start from current `main`
 
 ```bash
 git fetch origin main
-
-git worktree add \
-  -b <type>/<short-description> \
-  <worktree-path> \
-  origin/main
-
-cd <worktree-path>
+git merge --ff-only origin/main   # fast-forward; never rewrite what origin has
 ```
 
-All implementation, targeted validation, conflict resolution, and
-task-candidate E2E happen inside the task's dedicated worktree.
+If local `main` already carries unpushed commits from an earlier request,
+keep them and integrate the new `origin/main` rebase or merge. Only commits
+that are not on `origin` may be rewritten.
 
-### E2E environment reuse
+### Work in a shared checkout
 
-Task-candidate E2E runs from the dedicated request worktree but reuses the
-host development environment already provisioned in the primary checkout.
-Reuse the host Node/pnpm toolchain, compatible `node_modules`, Electron,
-Rust/Cargo targets, package-manager stores, build caches, and ignored local
-configuration by reference or link when needed.
+Other sessions and the user may be editing this same checkout.
 
-Do not run `pnpm install`, `npm install`, or create a second dependency or
-runtime environment solely to execute E2E. Keep only mutable test state
-(temporary profiles, data directories, sockets, ports, logs, and artifacts)
-isolated to the request worktree or its scratch directory. Install or rebuild
-dependencies only when the host environment is missing or incompatible, and
-record that reason. Clean CI and release runners may install from lockfiles.
-
-### Before candidate validation
-
-Refresh the task against the latest remote `main`.
-
-For a private branch that has not been pushed or shared:
-
-```bash
-git fetch origin main
-git rebase origin/main
-```
-
-If the branch has already been shared and rewriting history would be
-unsafe, do not force-push merely to rebase. Use a non-destructive
-integration strategy or rely on the PR integration candidate per § 16.
-
-Resolve conflicts inside your own worktree. Never resolve task conflicts
-by modifying the primary checkout.
-
-### Before opening or updating a PR
-
-The request head must contain the latest `origin/main`. `origin/main`
-must be an ancestor of that head:
-
-```bash
-git fetch origin main
-git merge-base --is-ancestor origin/main HEAD
-pnpm check:pr-base
-```
-
-If that fails, refresh in the task worktree (`git rebase origin/main` on
-a private branch; a non-destructive merge when rewriting history would
-be unsafe), then re-run the check. Do not open or update a PR that is
-behind `origin/main`.
+* Stage files by explicit path. `git add .` and `git add -A` stay forbidden
+  (§ 17).
+* Read `git status --short` and `git diff` before committing, and commit only
+  the paths this request actually changed.
+* Never revert, stash, or discard a hunk you did not write. If an unrelated
+  change is in the way, leave it alone and report it.
+* Never delete or reset another session's branch or worktree.
 
 ### Fixed delivery order
 
 ```text
-1. create dedicated branch + worktree from current origin/main
-2. implement in the request worktree
+1. git fetch origin main; fast-forward local main
+2. implement on local main
 3. run targeted static/unit/integration checks
-4. review the task diff
-5. commit the task
-6. refresh the task branch against latest origin/main (`pnpm check:pr-base`)
-7. resolve conflicts inside the task worktree
-8. run required task-candidate E2E in the task worktree
-9. push the request branch
-10. hand the branch back — no pull request by default
-11. validate the PR integration candidate (only when a PR was requested)
-12. merge into remote main through repository gates
-13. synchronize local main
-14. remove the worktree and merged local branch
+4. review the diff (`git status --short`, `git diff`)
+5. commit on local main (explicit paths)
+6. git fetch origin main again; integrate if it moved
+7. re-run the affected checks on the final commit
+8. git push origin main
+9. verify the remote tip equals the pushed commit (`git ls-remote --heads origin main`)
 ```
 
-Do not insert `merge task → local main` between steps 6 and 8. The task
-branch itself becomes the local integration candidate by incorporating
-the latest `origin/main`. Do not open or update a PR that is behind
-`origin/main`.
+A validation result is valid only for the commit that actually ran. If
+`origin/main` moved between step 3 and step 8, run the affected checks again
+after integrating — the earlier result does not carry over.
 
-A task-candidate E2E result is valid only when its tested commit and
-base revision are known. The PR integration gate then protects against
-`main` changing between local candidate validation and final merge.
+### E2E runs against the commit about to be pushed
 
-### Do not open a pull request unless asked
+Task E2E runs in the same checkout, against local `main` that includes the
+request's commits and the latest `origin/main`, and reuses the host
+development environment already provisioned there (Node/pnpm toolchain,
+`node_modules`, Electron, Rust targets, package-manager stores, build
+caches, ignored local configuration).
 
-Pushing the request branch is the end of the default delivery. Opening a
-pull request is a separate, explicit decision that belongs to the user:
+Do not run `pnpm install`, `npm install`, or create a second dependency or
+runtime environment solely to execute E2E. Keep mutable test state
+(temporary profiles, data directories, sockets, ports, logs, artifacts) out
+of the tracked tree. Install or rebuild dependencies only when the host
+environment is missing or incompatible, and record that reason.
 
-* `git push` the request branch and report it — do not open a PR/MR, do
-  not mark a draft ready, and do not comment on an existing PR merely
-  because delivery finished.
-* Open, update, convert, or close a pull request only when the user asks
-  for that exact action in the current task.
+Record with the result:
+
+```text
+Commit tested:
+Base main:
+E2E suites:
+Result:
+Environment:
+```
+
+### Do not open a pull request
+
+Delivery ends at `git push origin main`. Opening a pull request is a
+separate, explicit decision that belongs to the user:
+
+* Push `main` and report it — do not open a PR/MR, convert a draft, or
+  comment on an existing PR merely because delivery finished.
+* Open, update, convert, or close a pull request only when the user asks for
+  that exact action in the current task.
 * "Continue", "finish it", "push it", or a delivery checklist that lists
   `push` alone does not authorize a pull request.
-* When a PR was requested, everything in "Before opening or updating a
-  PR" above applies unchanged.
-* Without a PR, the branch stays available for the user to review, and
-  the PR integration gate is not run. State that in the delivery report.
+* Incoming contributor pull requests are still reviewed under § 15.
 
-### Remove a branch as soon as it is used up
+### Keep the branch list short
 
-A request branch and its worktree are working objects, not an archive. Remove
-them as soon as they stop being needed, in the same session that finished the
-work when possible:
+A local branch for work that already landed is an archive entry nobody
+reads. When a request lands:
 
-* the branch is merged into remote `main` (or its commits already reached
-  `main` through another lane) — remove the worktree and the local branch
-  immediately;
-* its work was absorbed by a rebase or merge into another request branch —
-  remove the absorbed one;
-* the work is abandoned or superseded — record why in the delivery report, then
-  remove it.
+* its commits are on `origin/main` — delete the local branch that carried
+  them;
+* a leftover worktree from an earlier branch-based request — remove it once
+  its commits are on `origin`;
+* abandoned work — record why in the delivery report, then remove it.
 
 Before removing anything, confirm the commits exist on `origin`
 (`git ls-remote --heads origin`) or are explicitly abandoned. Never delete
-uncommitted work, and never remove a worktree another agent is using.
+uncommitted work, and never remove a branch or worktree another session is
+using.
 
-Keep the primary checkout as the only long-lived working copy. Every leftover
-worktree carries its own build output, dependency links and plugin store, so a
-machine that never cleans up accumulates duplicated trees and stale `dist/`
+Keep the primary checkout as the only long-lived working copy. Every extra
+worktree carries its own build output, dependency links and plugin store, so
+a machine that never cleans up accumulates duplicated trees and stale `dist/`
 directories, and "which checkout is current" becomes unanswerable.
 
 ---
@@ -859,7 +811,7 @@ Landing blockers:
 * relevant test failure
 * required E2E failure
 * merge conflict
-* PR head does not contain the latest `origin/main`
+* PR branch does not contain the latest `origin/main`
 * data corruption risk
 * security violation
 * secret leakage
@@ -870,40 +822,28 @@ Landing blockers:
 
 A sound idea does not override a failing landing gate.
 
-### Two validation stages
+### One validation stage, at the push
 
 ```text
-Task Candidate Validation
-        ↓
-PR Integration Validation
+validate the commit → push it to `main`
 ```
 
-Task Candidate Validation runs in the request worktree after the
-request branch incorporates the latest available `origin/main`.
+Our own work has no second stage: the commit that passes validation is the
+commit that gets pushed, and step 6–7 of § 5 re-runs the affected checks if
+`origin/main` moved in between. A contributor pull request is validated by
+reviewing the code that will land (§ 15), not by building a separate
+integration candidate unless the user asks for one.
 
-PR Integration Validation verifies the actual code that is about to
-land, using:
-
-* GitHub PR merge ref
-* merge queue candidate
-* equivalent synthetic merge commit
-* another trusted integration candidate produced from current target
-  `main`
-
-Do not require the task to be merged into local `main` to perform E2E.
-
-A PR head commit and an integration candidate are equivalent only when
-they produce the same executable tree against the relevant target
-`main`. If `main` changed after task-candidate validation, the old
-local result remains useful evidence but does not by itself prove the
-new integration candidate.
+A validation result applies only to the commit that actually ran. If `main`
+changed afterwards, the old local result remains useful evidence but does not
+by itself prove the new commit.
 
 ---
 
-## 16. E2E Validates Integration Candidates, Not Branch Names
+## 16. E2E Validates the Commit, Not a Branch Name
 
-E2E validates executable integration state. It does **not** validate
-whether Git reports the current branch name as `main`.
+E2E validates executable state. It does not validate what Git reports as the
+current branch.
 
 The invariant:
 
@@ -917,41 +857,41 @@ not:
 current branch name == main
 ```
 
-### 16.1 Task-candidate E2E
+### 16.1 The commit under test
 
-Every code-bearing change runs relevant E2E suites against a candidate
+Every code-bearing change runs the relevant E2E suites against local `main`
 that contains:
 
 1. the request's commits
-2. the latest `origin/main` incorporated at candidate preparation
+2. the latest `origin/main` integrated at candidate preparation
 3. all conflict resolutions required to combine them
 
 Normally:
 
 ```bash
 git fetch origin main
-git rebase origin/main
+git merge --ff-only origin/main   # or rebase the unpushed local commits
 ```
 
-then E2E from the same task worktree.
-
-Record:
+then E2E from the same checkout, and record:
 
 ```text
-Task candidate:
+Commit tested:
 Base main:
 E2E suites:
 Result:
 Environment:
 ```
 
-An E2E result applies only to the commit that actually ran. Do not
-modify local `main` to create this candidate.
+An E2E result applies only to the commit that actually ran.
 
-### 16.2 PR integration E2E
+### 16.2 Contributor pull requests
 
-The final landing decision uses PR integration E2E, run against the
-integration candidate defined above.
+When a contributor PR is under review, validate the commit that will land —
+the PR merge ref, a merge-queue candidate, an equivalent synthetic merge
+commit, or another trusted integration candidate produced from current
+target `main`. Do not require the work to be merged into local `main` to
+perform it.
 
 ---
 
@@ -977,7 +917,8 @@ command.
 
 ### Commit rules
 
-* Commit only when the user asks.
+* Commit only when the user asks, or when the request is to deliver the
+  change to `main` (§ 5).
 * Stage files by explicit path, then re-run `git status` to confirm
   what is staged.
 * Message format: subject + blank line + body. Single-line commits are
@@ -990,8 +931,11 @@ command.
   requests it.
 * Related issue goes as a trailer after a blank line: `fixes #N` or
   `closes #N`.
-* Do not force-push. If a rebase conflict lands in a file not touched
-  by this task, stop and hand back to the user.
+* Never rewrite history that is already on `origin/main`: no force-push,
+  no rebase or amend of pushed commits. Fix forward with a new commit.
+  Unpushed local commits on `main` may be amended or rebased.
+* If an integration conflict lands in a file this request did not touch,
+  stop and hand back to the user.
 
 ---
 
