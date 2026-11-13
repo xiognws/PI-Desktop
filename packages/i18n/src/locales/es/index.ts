@@ -2954,14 +2954,14 @@ sklm: {
     enableDesc:
       "Enabling it lets the agent start operating your computer on its own, without asking which window. It does not ask for a system permission yet.",
     scopeNote:
-      "The agent works in one window at a time and may switch windows itself. It can never target PI-Desktop's own windows, a password field, or a credential app, and Stop ends the run.",
+      "The agent works in one window at a time and may switch windows itself. It can never target Pi-Workspace's own windows, a password field, or a credential app, and Stop ends the run.",
     platform: "This platform",
     platformUnsupported: "No backend on this platform",
     platformUnknown: "Checking this platform…",
     requestPermission: "Solicitar permiso de accesibilidad",
     requestingPermission: "Solicitando accesibilidad…",
-    permissionPending: "Activa la accesibilidad para PI-Desktop en Ajustes del Sistema y vuelve aquí para actualizar el estado.",
-    backendPermissionMissing: "PI-Desktop está autorizado, pero su backend de control nativo no. Revisa la firma de la aplicación y los permisos del backend; el control sigue bloqueado.",
+    permissionPending: "Activa la accesibilidad para Pi-Workspace en Ajustes del Sistema y vuelve aquí para actualizar el estado.",
+    backendPermissionMissing: "Pi-Workspace está autorizado, pero su backend de control nativo no. Revisa la firma de la aplicación y los permisos del backend; el control sigue bloqueado.",
     permissionRequestFailed: "No se pudo solicitar accesibilidad o abrir Ajustes del Sistema. Inténtalo de nuevo. ({{code}})",
     permission: {
       granted: "Accessibility granted",

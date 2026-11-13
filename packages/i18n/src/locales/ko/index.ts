@@ -2993,14 +2993,14 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     enableDesc:
       "Enabling it lets the agent start operating your computer on its own, without asking which window. It does not ask for a system permission yet.",
     scopeNote:
-      "The agent works in one window at a time and may switch windows itself. It can never target PI-Desktop's own windows, a password field, or a credential app, and Stop ends the run.",
+      "The agent works in one window at a time and may switch windows itself. It can never target Pi-Workspace's own windows, a password field, or a credential app, and Stop ends the run.",
     platform: "This platform",
     platformUnsupported: "No backend on this platform",
     platformUnknown: "Checking this platform…",
     requestPermission: "손쉬운 사용 권한 요청",
     requestingPermission: "손쉬운 사용 권한 요청 중…",
-    permissionPending: "시스템 설정에서 PI-Desktop의 손쉬운 사용 권한을 켠 다음 돌아오면 상태가 갱신됩니다.",
-    backendPermissionMissing: "PI-Desktop은 승인되었지만 기본 제어 백엔드에는 권한이 없습니다. 설치된 앱의 서명과 백엔드 권한을 확인하세요. 컴퓨터 제어는 계속 차단됩니다.",
+    permissionPending: "시스템 설정에서 Pi-Workspace의 손쉬운 사용 권한을 켠 다음 돌아오면 상태가 갱신됩니다.",
+    backendPermissionMissing: "Pi-Workspace은 승인되었지만 기본 제어 백엔드에는 권한이 없습니다. 설치된 앱의 서명과 백엔드 권한을 확인하세요. 컴퓨터 제어는 계속 차단됩니다.",
     permissionRequestFailed: "손쉬운 사용 권한을 요청하거나 시스템 설정을 열 수 없습니다. 다시 시도하세요. ({{code}})",
     permission: {
       granted: "Accessibility granted",

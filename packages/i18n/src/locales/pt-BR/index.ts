@@ -2930,14 +2930,14 @@ export const ptBR = {
     enableDesc:
       "Enabling it lets the agent start operating your computer on its own, without asking which window. It does not ask for a system permission yet.",
     scopeNote:
-      "The agent works in one window at a time and may switch windows itself. It can never target PI-Desktop's own windows, a password field, or a credential app, and Stop ends the run.",
+      "The agent works in one window at a time and may switch windows itself. It can never target Pi-Workspace's own windows, a password field, or a credential app, and Stop ends the run.",
     platform: "This platform",
     platformUnsupported: "No backend on this platform",
     platformUnknown: "Checking this platform…",
     requestPermission: "Solicitar permissão de acessibilidade",
     requestingPermission: "Solicitando acessibilidade…",
-    permissionPending: "Ative a acessibilidade para o PI-Desktop nos Ajustes do Sistema e volte aqui para atualizar o status.",
-    backendPermissionMissing: "O PI-Desktop está autorizado, mas seu backend de controle nativo não. Verifique a assinatura do aplicativo e as permissões do backend; o controle continua bloqueado.",
+    permissionPending: "Ative a acessibilidade para o Pi-Workspace nos Ajustes do Sistema e volte aqui para atualizar o status.",
+    backendPermissionMissing: "O Pi-Workspace está autorizado, mas seu backend de controle nativo não. Verifique a assinatura do aplicativo e as permissões do backend; o controle continua bloqueado.",
     permissionRequestFailed: "Não foi possível solicitar acessibilidade ou abrir os Ajustes do Sistema. Tente novamente. ({{code}})",
     permission: {
       granted: "Accessibility granted",

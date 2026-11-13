@@ -2954,14 +2954,14 @@ sklm: {
     enableDesc:
       "Enabling it lets the agent start operating your computer on its own, without asking which window. It does not ask for a system permission yet.",
     scopeNote:
-      "The agent works in one window at a time and may switch windows itself. It can never target PI-Desktop's own windows, a password field, or a credential app, and Stop ends the run.",
+      "The agent works in one window at a time and may switch windows itself. It can never target Pi-Workspace's own windows, a password field, or a credential app, and Stop ends the run.",
     platform: "This platform",
     platformUnsupported: "No backend on this platform",
     platformUnknown: "Checking this platform…",
     requestPermission: "Zugriff auf Bedienungshilfen anfordern",
     requestingPermission: "Zugriff wird angefordert…",
-    permissionPending: "Aktiviere PI-Desktop unter Bedienungshilfen in den Systemeinstellungen. Kehre dann zurück, um den Status zu aktualisieren.",
-    backendPermissionMissing: "PI-Desktop ist autorisiert, das native Steuerungs-Backend jedoch nicht. Prüfe App-Signatur und Backend-Berechtigungen; die Computersteuerung bleibt gesperrt.",
+    permissionPending: "Aktiviere Pi-Workspace unter Bedienungshilfen in den Systemeinstellungen. Kehre dann zurück, um den Status zu aktualisieren.",
+    backendPermissionMissing: "Pi-Workspace ist autorisiert, das native Steuerungs-Backend jedoch nicht. Prüfe App-Signatur und Backend-Berechtigungen; die Computersteuerung bleibt gesperrt.",
     permissionRequestFailed: "Bedienungshilfen konnten nicht angefordert oder Systemeinstellungen nicht geöffnet werden. Versuche es erneut. ({{code}})",
     permission: {
       granted: "Accessibility granted",

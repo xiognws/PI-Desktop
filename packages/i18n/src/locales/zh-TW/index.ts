@@ -2954,14 +2954,14 @@ sklm: {
     enable: "啟用電腦操作",
     enableDesc: "啟用後，Agent 可以自行開始操作你的電腦，不再詢問具體視窗。打開開關本身不會立刻申請系統權限。",
     scopeNote:
-      "Agent 每次只操作一個視窗，並可自行切換視窗。它永遠不會操作 PI-Desktop 自己的視窗、密碼輸入框或憑證類應用程式；「停止」會結束整次執行。",
+      "Agent 每次只操作一個視窗，並可自行切換視窗。它永遠不會操作 Pi-Workspace 自己的視窗、密碼輸入框或憑證類應用程式；「停止」會結束整次執行。",
     platform: "目前平台",
     platformUnsupported: "本平台暫無後端",
     platformUnknown: "正在检查目前平台……",
     requestPermission: "申請輔助使用權限",
     requestingPermission: "正在申請輔助使用權限……",
-    permissionPending: "請在系統設定中開啟 PI-Desktop 的輔助使用權限，返回此處後會自動更新狀態。",
-    backendPermissionMissing: "PI-Desktop 已獲授權，但原生操作後端尚未取得權限。請檢查安裝版本的簽章與後端權限；電腦操作仍被阻擋。",
+    permissionPending: "請在系統設定中開啟 Pi-Workspace 的輔助使用權限，返回此處後會自動更新狀態。",
+    backendPermissionMissing: "Pi-Workspace 已獲授權，但原生操作後端尚未取得權限。請檢查安裝版本的簽章與後端權限；電腦操作仍被阻擋。",
     permissionRequestFailed: "申請輔助使用權限或開啟系統設定失敗，請重試。（{{code}}）",
     permission: {
       granted: "已取得輔助使用權限",

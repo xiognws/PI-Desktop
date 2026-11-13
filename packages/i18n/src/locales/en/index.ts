@@ -3002,14 +3002,14 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     enableDesc:
       "Enabling it lets the agent start operating your computer on its own, without asking which window. It does not ask for a system permission yet.",
     scopeNote:
-      "The agent works in one window at a time and may switch windows itself. It can never target PI-Desktop's own windows, a password field, or a credential app, and Stop ends the run.",
+      "The agent works in one window at a time and may switch windows itself. It can never target Pi-Workspace's own windows, a password field, or a credential app, and Stop ends the run.",
     platform: "This platform",
     platformUnsupported: "No backend on this platform",
     platformUnknown: "Checking this platform…",
     requestPermission: "Request Accessibility permission",
     requestingPermission: "Requesting Accessibility…",
-    permissionPending: "Enable Accessibility for PI-Desktop in System Settings, then return here to refresh the status.",
-    backendPermissionMissing: "PI-Desktop is authorized, but its native-control backend is not. Check the installed app’s signature and backend permissions; computer control remains blocked.",
+    permissionPending: "Enable Accessibility for Pi-Workspace in System Settings, then return here to refresh the status.",
+    backendPermissionMissing: "Pi-Workspace is authorized, but its native-control backend is not. Check the installed app’s signature and backend permissions; computer control remains blocked.",
     permissionRequestFailed: "Could not request Accessibility or open System Settings. Try again. ({{code}})",
     permission: {
       granted: "Accessibility granted",
