@@ -1018,13 +1018,15 @@ async def upload_requirement(project_id: str, file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # 记录一条需求（后续分析由桌面端 Agent 读取该文件完成）
+    # 记录一条需求（后续分析由桌面端 Agent 读取该文件完成）。
+    # 同名重新上传 = 覆盖：文件名就是这份需求的唯一标识，先删旧行再插，
+    # 否则列表里会出现两条同名需求，删掉其中一条另一条还留着。
     db_path = get_project_db(project_id)
     if db_path.exists():
         conn = sqlite3.connect(db_path)
+        conn.execute("DELETE FROM requirements WHERE filename = ?", (file.filename,))
         conn.execute(
-            "INSERT OR REPLACE INTO requirements (id, filename, filepath, size, status) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO requirements (id, filename, filepath, size, status) VALUES (?, ?, ?, ?, ?)",
             (f"req_{uuid.uuid4().hex[:8]}", file.filename, str(file_path), len(content), "已上传"),
         )
         conn.commit()

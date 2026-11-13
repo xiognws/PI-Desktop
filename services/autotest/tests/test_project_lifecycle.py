@@ -122,3 +122,20 @@ def test_requirement_delete_rejects_path_traversal(client, project_id):
         response = client.delete(f"/api/projects/{project_id}/requirements/{name}")
         assert response.status_code in (400, 404), name
     assert outside.is_file()
+
+
+def test_same_filename_upload_overwrites_instead_of_duplicating(client, project_id):
+    """同名重新上传只留一条记录。
+
+    文件名就是需求的身份：重传一次却在列表里多出一行，删掉其中一行另一行还在，
+    用户没法判断到底哪条是真的。
+    """
+    assert _upload(client, project_id, name="重复.md", content="第一版\n").status_code == 200
+    assert _upload(client, project_id, name="重复.md", content="第二版\n").status_code == 200
+
+    listed = client.get(f"/api/projects/{project_id}/requirements").json()["requirements"]
+    assert [item["filename"] for item in listed] == ["重复.md"]
+
+    body = client.delete(f"/api/projects/{project_id}/requirements/重复.md").json()
+    assert body["records_removed"] == 1
+    assert client.get(f"/api/projects/{project_id}/requirements").json()["requirements"] == []

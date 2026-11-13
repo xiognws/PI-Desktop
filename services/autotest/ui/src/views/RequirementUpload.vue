@@ -33,39 +33,53 @@ async function load() {
   }
 }
 
-async function send(file: File) {
+// 一次可以传多份：拖进来或选中的文件逐个上传，一份失败不影响其余，
+// 最后给一条「成功 N 份 / 失败 M 份」并把失败文件名列出来。
+const progress = ref({ done: 0, total: 0 })
+
+async function send(files: File[]) {
+  if (!files.length) return
   uploading.value = true
   message.value = ''
   error.value = ''
-  try {
-    const body = new FormData()
-    body.append('file', file)
-    const response = await fetch(`/api/projects/${projectId}/requirements/upload`, {
-      method: 'POST',
-      body,
-    })
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
-    message.value = `${file.name} 已上传`
-    await load()
-  } catch (problem) {
-    error.value = String((problem as Error).message ?? problem)
-  } finally {
-    uploading.value = false
+  progress.value = { done: 0, total: files.length }
+
+  const failed: string[] = []
+  for (const file of files) {
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const response = await fetch(`/api/projects/${projectId}/requirements/upload`, {
+        method: 'POST',
+        body,
+      })
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+    } catch (problem) {
+      failed.push(`${file.name}：${String((problem as Error).message ?? problem)}`)
+    } finally {
+      progress.value = { done: progress.value.done + 1, total: files.length }
+    }
   }
+
+  const uploaded = files.length - failed.length
+  if (uploaded) message.value = `${uploaded} 份已上传`
+  if (failed.length) error.value = `${failed.length} 份失败 — ${failed.join('；')}`
+  await load()
+  uploading.value = false
 }
 
 async function onPick(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  await send(file)
+  const files = Array.from(input.files ?? [])
+  if (!files.length) return
+  await send(files)
   if (fileInput.value) fileInput.value.value = ''
 }
 
 async function onDrop(event: DragEvent) {
   dragging.value = false
-  const file = event.dataTransfer?.files?.[0]
-  if (file) await send(file)
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  if (files.length) await send(files)
 }
 
 // 删除单份需求：只删这份文件和它的记录，不动同目录下其它需求。
@@ -159,7 +173,7 @@ onMounted(load)
 
       <!-- 上传区 -->
       <div class="bg-white rounded-lg border border-gray-200 p-8">
-        <input ref="fileInput" type="file" class="hidden" accept=".pdf,.doc,.docx,.md,.txt" @change="onPick" />
+        <input ref="fileInput" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.md,.txt" @change="onPick" />
         <div
           class="border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer"
           :class="dragging ? 'border-blue-500 bg-blue-50/40' : 'border-gray-300 hover:border-blue-400'"
@@ -169,8 +183,12 @@ onMounted(load)
           @drop.prevent="onDrop"
         >
           <Upload class="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p class="text-sm text-gray-600 mb-2">{{ uploading ? '上传中…' : '点击或拖拽文件到此处上传' }}</p>
-          <p class="text-xs text-gray-400">支持 PDF / Word / Markdown / 纯文本</p>
+          <p class="text-sm text-gray-600 mb-2">
+            {{ uploading
+              ? `上传中 ${progress.done}/${progress.total}…`
+              : '点击或拖拽文件到此处上传（可一次选/拖多个）' }}
+          </p>
+          <p class="text-xs text-gray-400">支持 PDF / Word / Markdown / 纯文本，多个文件会逐个上传</p>
         </div>
         <div class="mt-3 flex items-center gap-4 text-sm">
           <span v-if="message" class="text-green-600">{{ message }}</span>
