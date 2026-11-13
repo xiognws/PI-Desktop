@@ -18,9 +18,9 @@ export { normalizeChangelogVersion, resolveChangelogLocale } from "./changelog-r
  * the same versions and bullet counts so in-app "what's new" can follow the
  * active UI locale without a network fetch or renderer-supplied feed URL.
  *
- * Update this file before cutting a release tag. GitHub release bodies may
- * still be auto-generated for the web; they are not the in-app source.
- * Stable product versions only — omit pre-releases.
+ * The entries describe this product's own releases; the catalog holds no
+ * inherited history. Add an entry here before cutting a release. Stable
+ * versions only — omit pre-releases.
  */
 
 export type ChangelogLocale = "en" | "zh-CN" | "zh-TW" | "tr" | "de" | "es" | "fr" | "ko" | "pt-BR";
