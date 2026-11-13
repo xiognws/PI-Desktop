@@ -1,0 +1,24 @@
+docs/adr/0157-main-owned-github-issue-feedback.md
+  h_201ed4c689ac8b 3-4
+docs/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 394
+docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 7732
+docs/zh-CN/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 395
+packages/shared/src/github-repo.ts
+  h_201ed4c689ac8b 1-6
+packages/shared/src/index.ts
+  h_201ed4c689ac8b 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "132d789252d0abfb8fedfc5d62f114b2500519df",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
