@@ -20,12 +20,10 @@ const {
 const read = (rel) => readFileSync(join(here, rel), "utf8");
 const desktopServicesSource = readMainModuleSync("services/desktop-services.ts");
 const windowSource = readMainModuleSync("bootstrap/window.ts");
-const appIpcSource = readMainModuleSync("ipc/app-ipc.ts");
 const mainIndexSource = readMainModuleSync("index.ts");
 const runtimeSource = read("../electron/main/plugin-runtime.ts");
 const viewHostSource = read("../electron/main/plugin-view-host.ts");
 const browserSource = read("../electron/main/browser-view.ts");
-const updaterSource = read("../electron/main/updater.ts");
 
 test("parseAllowedExternalUrl permits http, https, and mailto", () => {
   assert.equal(
@@ -116,7 +114,6 @@ test("main, plugins, preview, and updater share the allowlist before openExterna
     /window\.webContents\.setWindowOpenHandler\(\(\{ url \}\) => \{\s*void safeOpenExternal\(url\)\.catch/,
   );
   assert.match(mainIndexSource, /openExternal: async \(url\) => \{\s*await safeOpenExternal\(url\);/);
-  assert.match(appIpcSource, /assertFeedbackIssueUrl\(url\);\s*await safeOpenExternal\(url\);/);
   assert.doesNotMatch(
     windowSource,
     /setWindowOpenHandler\(\(\{ url \}\) => \{\s*void shell\.openExternal\(url\)/,
@@ -144,5 +141,4 @@ test("main, plugins, preview, and updater share the allowlist before openExterna
     /openExternal\(\): void \{[\s\S]*void shell\.openExternal\(url\);/,
   );
 
-  assert.match(updaterSource, /parseAllowedExternalUrl\(RELEASES_URL\)/);
 });

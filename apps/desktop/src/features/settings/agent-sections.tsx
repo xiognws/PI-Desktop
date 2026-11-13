@@ -137,15 +137,6 @@ export function UpdatesRow({
         {t("updates.restart")}
       </Button>
     );
-  } else if (update?.status === "available" && update.mode === "manual") {
-    action = (
-      <Button
-        variant="secondary"
-        onClick={() => void api.updatesOpenReleases().catch(() => undefined)}
-      >
-        {t("updates.viewRelease")}
-      </Button>
-    );
   } else {
     // A failed check flips the primary action into an explicit retry; while a
     // check or download runs the button stays visible but inert.

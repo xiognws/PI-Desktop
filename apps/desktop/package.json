@@ -4,10 +4,9 @@
   "desktopName": "pi-workspace.desktop",
   "private": true,
   "description": "Pi-Workspace Electron application",
-  "homepage": "https://github.com/xiognws/PI-Desktop",
   "author": {
-    "name": "vastsa",
-    "email": "hhxk666@gmail.com"
+    "name": "Pi-Workspace",
+    "email": "pi-workspace@localhost"
   },
   "main": "./out/main/index.js",
   "type": "module",
@@ -87,13 +86,6 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "xiognws",
-        "repo": "PI-Desktop"
-      }
-    ],
     "extraMetadata": {
       "piDistribution": "installed"
     },
@@ -262,10 +254,6 @@
       ],
       "icon": "build/icon.ico",
       "extraResources": [
-        {
-          "from": "resources/app-update.yml",
-          "to": "app-update.yml"
-        },
         {
           "from": "../../target/release/pi-desktop-host-core.exe",
           "to": "bin/pi-desktop-host-core.exe"

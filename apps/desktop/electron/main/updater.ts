@@ -1,10 +1,12 @@
 /**
- * App auto-update via electron-updater against GitHub Releases.
+ * App auto-update via electron-updater.
  *
- * The feed (latest*.yml + installers) is attached to each GitHub Release by
- * .github/workflows/release.yml. Discovery always tracks the latest stable
- * release (`allowPrerelease = false`) so RC installs still graduate to newer
- * stables. Delivery mode per install:
+ * This build ships no feed and no release page: `build.publish` and the
+ * packaged `app-update.yml` are gone, so `resolveUpdateMode` reports
+ * "disabled" and nothing below can reach the network. The machinery stays for a
+ * future internal feed (add it to `build.publish`, flip the flag in
+ * `update-policy.ts`) and for the install/cache paths the tests still cover.
+ * Delivery mode per install, once a feed exists:
  *  - Windows NSIS / Linux AppImage / packaged macOS → full in-app flow: silent
  *    background download, "restart to update" prompt, install-on-quit fallback.
  *  - Windows ZIP / legacy portable (`piDistribution = "zip"` or
@@ -20,7 +22,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { app, shell } from "electron";
+import { app } from "electron";
 import electronUpdaterPkg from "electron-updater";
 import type { AppUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
 import {
@@ -30,7 +32,6 @@ import {
   type UpdateState,
 } from "@pi-workspace/shared";
 import type { Logger } from "./logger";
-import { parseAllowedExternalUrl } from "./safe-open-external";
 import {
   defaultUpdateCacheBasePath,
   relocateUpdateCacheBasePath,
@@ -73,7 +74,6 @@ function createRelocatedUpdater(
   return platform === "win32" ? new RelocatedNsisUpdater(baseCachePath) : null;
 }
 
-export const RELEASES_URL = "https://github.com/xiognws/PI-Desktop/releases/latest";
 
 const AUTO_CHECK_INITIAL_DELAY_MS = 15_000;
 const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -273,7 +273,6 @@ export class AppUpdaterController {
       manualReminder: false,
       status: "idle",
       currentVersion: options.currentVersion,
-      releasesUrl: RELEASES_URL,
     };
     if (mode !== "disabled") this.attachListeners();
   }
@@ -696,12 +695,6 @@ export class AppUpdaterController {
   reclaimRelocatedUpdateCache(): Promise<void> {
     if (this.state.mode === "disabled") return Promise.resolve();
     return this.cacheMaintenance.reclaimLegacyCache();
-  }
-
-  async openReleases(): Promise<void> {
-    const url = parseAllowedExternalUrl(RELEASES_URL);
-    if (!url) throw new Error("DISALLOWED_EXTERNAL_URL");
-    await shell.openExternal(url);
   }
 
   /**

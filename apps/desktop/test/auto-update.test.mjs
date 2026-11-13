@@ -25,7 +25,6 @@ const [
   stylesSource,
   pkgSource,
   buildReleaseSource,
-  releaseWorkflowSource,
   enSource,
   zhSource,
   changelogSource,
@@ -45,7 +44,6 @@ const [
   loadStyles(),
   read("../package.json"),
   read("../../../scripts/build-desktop-release.mjs"),
-  read("../../../.github/workflows/release.yml"),
   read("../../../packages/i18n/src/locales/en/index.ts"),
   read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
   read("../../../packages/shared/src/changelog.ts"),
@@ -59,7 +57,6 @@ test("update IPC channels are declared and whitelisted for the preload bridge", 
     "updatesCheck",
     "updatesDownload",
     "updatesInstall",
-    "updatesOpenReleases",
     "updatesDismiss",
     "updatesState",
   ]) {
@@ -68,6 +65,11 @@ test("update IPC channels are declared and whitelisted for the preload bridge", 
   // The whitelist derives from the IPC map, so declaring is allowing.
   assert.match(protocolSource, /\.\.\.Object\.values\(IPC\.invoke\)/);
   assert.match(protocolSource, /\.\.\.Object\.values\(IPC\.event\)/);
+  // This distribution ships no external destination: the release-page channel
+  // and the feedback channel are gone, not merely unwired.
+  assert.doesNotMatch(protocolSource, /updatesOpenReleases/);
+  assert.doesNotMatch(protocolSource, /appOpenFeedback/);
+  assert.doesNotMatch(typesSource, /releasesUrl/);
   assert.match(typesSource, /export type UpdateState = \{/);
   assert.match(
     typesSource,
@@ -82,7 +84,6 @@ test("main process registers update handlers and the auto-check lifecycle", () =
     "IPC.invoke.updatesCheck",
     "IPC.invoke.updatesDownload",
     "IPC.invoke.updatesInstall",
-    "IPC.invoke.updatesOpenReleases",
     "IPC.invoke.updatesDismiss",
   ]) {
     assert.ok(mainSource.includes(channel), channel);
@@ -139,11 +140,8 @@ test("updater gates delivery mode by platform and delivery policy", () => {
     /state\.status === "downloaded"[\s\S]*return this\.state/,
   );
   assert.match(updaterSource, /autoUpdater\.on\("error"/);
-  assert.match(
-    updaterSource,
-    /github\.com\/xiognws\/PI-Desktop\/releases/,
-    "releases fallback URL",
-  );
+  // No release-page fallback: the shipped build carries no external URL at all.
+  assert.doesNotMatch(updaterSource, /github\.com/);
   assert.match(
     updaterSource,
     /formatChangelogNotes/,
@@ -181,7 +179,7 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(bannerSource, /api\.updatesDismiss\(\)/);
   assert.match(apiSource, /onUpdateState:/);
   assert.match(bannerSource, /updates\.restart/);
-  assert.match(bannerSource, /updates\.viewRelease/);
+  assert.doesNotMatch(bannerSource, /updatesOpenReleases|viewRelease/);
   assert.match(bannerSource, /updates\.whatsNew/);
   assert.match(bannerSource, /releaseNotes/);
   assert.match(bannerSource, /availableVersion}:\$\{update\.status/);
@@ -253,41 +251,24 @@ test("check-for-updates is reachable from the application menu", () => {
   }
 });
 
-test("packaging publishes an electron-updater feed for GitHub Releases", async () => {
+test("packaging ships no update feed and never names the upstream repository", async () => {
   const pkg = JSON.parse(pkgSource);
   assert.ok(pkg.dependencies["electron-updater"], "electron-updater dependency");
-  assert.equal(pkg.build.publish[0].provider, "github");
-  assert.equal(pkg.build.publish[0].owner, "xiognws");
-  assert.equal(pkg.build.publish[0].repo, "PI-Desktop");
-  const windowsUpdateConfigResource = pkg.build.win.extraResources.find(
-    ({ from }) => from === "resources/app-update.yml",
+  // No feed: electron-builder writes no app-update.yml, so an update check can
+  // only time out — and the packaged metadata carries no repository identity.
+  assert.equal(pkg.build.publish, undefined, "no publish feed");
+  assert.equal(pkg.homepage, undefined, "no repository homepage in packaged metadata");
+  assert.ok(
+    !pkg.build.win.extraResources.some((entry) => /app-update\.yml$/.test(entry.from)),
+    "no packaged updater config",
   );
-  assert.deepEqual(windowsUpdateConfigResource, {
-    from: "resources/app-update.yml",
-    to: "app-update.yml",
-  }, "Windows packages carry the updater config needed by manual ZIP checks");
-  const updateConfig = Object.fromEntries(
-    (await read("../resources/app-update.yml"))
-      .trim()
-      .split(/\r?\n/)
-      .map((line) => {
-        const separator = line.indexOf(":");
-        return [
-          line.slice(0, separator),
-          line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, ""),
-        ];
-      }),
+  await assert.rejects(
+    () => read("../resources/app-update.yml"),
+    "the committed updater config is gone",
   );
-  assert.deepEqual(updateConfig, {
-    provider: pkg.build.publish[0].provider,
-    owner: pkg.build.publish[0].owner,
-    repo: pkg.build.publish[0].repo,
-    updaterCacheDirName: `${pkg.name.replaceAll("/", "")}-updater`,
-  });
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
-  // electron-builder must never self-publish (implicit tag publishing would
-  // fail on the missing token and race the softprops release step).
+  // electron-builder must never self-publish on its own.
   for (const script of ["dist:mac", "dist:win", "dist:linux"]) {
     assert.match(
       pkg.scripts[script],
@@ -298,12 +279,7 @@ test("packaging publishes an electron-updater feed for GitHub Releases", async (
   assert.match(pkg.scripts.dist, /build-desktop-release\.mjs/);
   assert.equal(pkg.build.linux.executableName, "pi-workspace");
   const linuxTargets = pkg.build.linux.target.map((entry) => entry.target);
-  assert.deepEqual(
-    linuxTargets,
-    ["AppImage", "deb", "rpm"],
-    "Linux release targets",
-  );
-  // Scoped package name is not a valid deb/rpm package or file name.
+  assert.deepEqual(linuxTargets, ["AppImage", "deb", "rpm"], "Linux release targets");
   assert.equal(pkg.build.deb.packageName, "pi-workspace");
   assert.equal(pkg.build.rpm.packageName, "pi-workspace");
   assert.ok(!pkg.build.deb.artifactName.includes("${name}"), "deb artifactName");
@@ -317,15 +293,11 @@ test("packaging publishes an electron-updater feed for GitHub Releases", async (
     ["--rpm-rpmbuild-define", "_build_id_links none"],
     "rpm build-id configuration",
   );
-  // GitHub asset URLs mangle spaces; keep Windows artifact names space-free.
   assert.equal(pkg.build.nsis.artifactName, "Pi-Workspace-Setup-${version}.${ext}");
   const winTargets = pkg.build.win.target.map((entry) => entry.target);
   assert.deepEqual(winTargets, ["nsis", "zip", "portable"], "Windows release targets");
-  assert.equal(pkg.build.portable.artifactName, "Pi-Workspace-Portable-${version}.${ext}", "portable artifact name");
-  assert.equal(
-    pkg.build.win.artifactName,
-    "Pi-Workspace-Portable-${version}.${ext}",
-  );
+  assert.equal(pkg.build.portable.artifactName, "Pi-Workspace-Portable-${version}.${ext}");
+  assert.equal(pkg.build.win.artifactName, "Pi-Workspace-Portable-${version}.${ext}");
   assert.equal(pkg.build.extraMetadata.piDistribution, "installed");
   assert.match(pkg.scripts["dist:win"], /build-desktop-release\.mjs win/);
   assert.match(buildReleaseSource, /"--win",\s*"nsis"/);
@@ -340,12 +312,6 @@ test("packaging publishes an electron-updater feed for GitHub Releases", async (
     /shell:\s*process\.platform === "win32"/,
     "Windows must launch the pnpm.cmd shim through a shell",
   );
-  // The upload step must carry every updater feed, and the release publishes
-  // all platforms unfiltered (D126/D285).
-  assert.match(releaseWorkflowSource, /release\/\*\.zip/);
-  assert.match(releaseWorkflowSource, /release\/\*\.rpm/);
-  assert.match(releaseWorkflowSource, /release\/latest\*\.yml/);
-  assert.match(releaseWorkflowSource, /files: dist\/\*/);
 });
 
 test("shared shipped-locale changelog is the in-app notes source of truth", () => {
@@ -353,7 +319,7 @@ test("shared shipped-locale changelog is the in-app notes source of truth", () =
   assert.match(changelogSource, /formatChangelogNotes/);
   assert.match(changelogSource, /"zh-CN"/);
   assert.match(changelogSource, /"zh-TW"/);
-  assert.match(englishChangelogSource, /version: "0\.2\.7"/);
+  assert.match(englishChangelogSource, /version: "0\.21\.0"/);
   assert.match(
     mainSource,
     /getLocale:\s*\(\)\s*=>\s*(?:updaterLocale|mainState\.updaterLocale)/,

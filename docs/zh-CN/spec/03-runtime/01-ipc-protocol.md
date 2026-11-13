@@ -1852,17 +1852,11 @@ speech/synthesize({ sessionId?, text, voice?, format? }) -> { path, mimeType, da
 
 宿主语音独立于聊天。绑定在 `AppSettings.speech`。音频字节不进入渲染器。见 `20-speech.md`。
 
-### app/openFeedback（D313）
+### app/openFeedback（已撤除，D313）
 
-```ts
-app/openFeedback() -> { ok: true }
-```
-
-Electron Main 构造固定的 GitHub bug 表单 URL
-（`https://github.com/xiognws/Pi-Workspace/issues/new?template=bug_report.yml`），
-并用 `shell.openExternal` 打开。查询字段 `app-version`、`os` 和 `environment`
-由主进程版本信息填充。渲染器不能提供 URL。离开该 origin 或模板的构造会被拒绝。
-此通道不进入 host-core，也不改变 host RPC 协议版本。
+不存在问题反馈通道。信息页不暴露任何对外目标，渲染器无法构造或打开 issue URL，
+支撑该设计的 URL 构造器随通道一并删除。该接口从未进入 host-core，
+也从未改变 host RPC 协议版本。
 
 ## 13d. 本地 MCP 控制 API（D370）
 

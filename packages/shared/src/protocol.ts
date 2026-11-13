@@ -98,7 +98,6 @@ export const IPC = {
     storageClearCache: "pi-desktop/storage/clearCache",
     storageRemoveBackup: "pi-desktop/storage/removeBackup",
     appGetVersion: "pi-desktop/app/getVersion",
-    appOpenFeedback: "pi-desktop/app/openFeedback",
     appHealth: "pi-desktop/app/health",
     appGetOnboarding: "pi-desktop/app/getOnboarding",
     appDismissOnboarding: "pi-desktop/app/dismissOnboarding",
@@ -114,7 +113,6 @@ export const IPC = {
     updatesCheck: "pi-desktop/updates/check",
     updatesDownload: "pi-desktop/updates/download",
     updatesInstall: "pi-desktop/updates/install",
-    updatesOpenReleases: "pi-desktop/updates/openReleases",
     /** Persist the user's decision to stop nudging about one version (#1317). */
     updatesDismiss: "pi-desktop/updates/dismiss",
     notificationList: "pi-desktop/notification/list",

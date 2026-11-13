@@ -8576,3 +8576,34 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   reader, no writer, no migration. See ADR 0387 for the alternatives considered
   (hiding the entries was rejected: it keeps a native dependency and ~100 tests
   alive for a surface nobody opens).
+
+## 2026-11-13 — Distribution builds expose no upstream identity (D692)
+
+- The Settings → Info panel is the first surface an outside reader opens, so it
+  no longer names the build's internals or points at another project: the
+  `protocol … · host …` line and the report-a-problem row are removed together
+  with their copy in all nine catalogs. The handbook row stays: it hands the
+  shipped external-edition manual to the viewer the machine already uses, so
+  users keep getting the guide with each release without an extra download.
+- The Main-owned feedback channel (`pi-desktop/app/openFeedback`) and its URL
+  builders are gone, not merely unwired, so neither bundle can assemble an
+  issue link. D313 is superseded and ADR 0157 is withdrawn as a shipped
+  surface; the repository's own issue templates stay for this repo.
+- The build ships no update feed: `build.publish` and the packaged
+  `app-update.yml` are removed, `pi-desktop/updates/openReleases` and the
+  release-page action are gone, and the update card renders in development
+  builds only. A release without a feed could only report a timeout, and its
+  release-notes modal showed another product's changelog.
+- Packaged metadata carries the product name instead of the upstream author
+  (`package.json` author/homepage, host-core's Windows version resource), while
+  the product name, `appId`, storage identifiers, and the host binary name stay
+  frozen until the separate rename decision.
+- The GitHub release pipeline is gone with the feed it produced: there is no
+  tag-triggered workflow and no published artifact to name, so the remote-host
+  bootstrap resolves no download URL (an internal mirror can still set
+  `PI_HOST_ARTIFACT_BASE_URL`) and delivery is local packaging only.
+- Not changed: host RPC protocol, storage schema, IPC transport semantics, and
+  the LICENSE / third-party notices, which stay in the tree for compliance.
+- Guards: `feedback.test.mjs`, `auto-update.test.mjs`, and
+  `user-facing-copy.test.mjs` assert the removals, so the rows, channels, and
+  copy cannot come back silently.

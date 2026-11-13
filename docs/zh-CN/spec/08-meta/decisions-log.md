@@ -5970,3 +5970,23 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   `apps/desktop/test/tools-page.test.mjs`（各语言目录里的入口文案键）。见 ADR 0384 与
   规格 07-plugins/19。
 
+
+## 2026-11-13 —— 对外分发的构建不暴露上游身份（D692）
+
+- 设置 → 信息页是外部读者第一眼看到的界面，因此不再暴露构建内部信息、也不指向其他项目：
+  `protocol … · host …` 行与问题反馈行连同 9 个语言目录里的对应文案一并删除。手册行保留：
+  它把随包对外版手册交给这台机器上已有的阅读软件打开，用户随版本就能拿到说明书，不必另外下载。
+- 主进程拥有的反馈通道（`pi-desktop/app/openFeedback`）及其 URL 构造器不是简单断线而是删除，
+  两个 bundle 都无法再拼出 issue 链接。D313 被取代，ADR 0157 作为随包界面被撤销；
+  仓库自己的 issue 模板仍然保留，供本仓库使用。
+- 构建不再带更新源：`build.publish` 与随包 `app-update.yml` 删除，
+  `pi-desktop/updates/openReleases` 与「查看版本」操作删除，更新卡只在开发构建渲染。
+  没有源的发布只会上报超时，其发行说明弹窗还会露出另一个产品的变更日志。
+- 打包元数据改用产品名而不是上游作者（`package.json` 的 author/homepage、
+  host-core 的 Windows 版本资源）；产品名、`appId`、存储标识与 host 二进制名在下一次改名决策前
+  保持冻结。
+- 随更新源一并删除 GitHub 发布流水线：不再有 tag 触发的 workflow，也不存在可供命名的发布产物，
+  因此远程主机引导不再解析下载地址（内网镜像仍可设置 `PI_HOST_ARTIFACT_BASE_URL`），交付形态只有本地打包。
+- 未改动：host RPC 协议、存储 schema、IPC 传输语义，以及 LICENSE / 第三方声明（合规需要，保留在仓库内）。
+- 守卫：`feedback.test.mjs`、`auto-update.test.mjs`、`user-facing-copy.test.mjs` 断言这些删除，
+  防止行、通道与文案被悄悄加回来。

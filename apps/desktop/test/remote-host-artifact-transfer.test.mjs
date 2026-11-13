@@ -12,7 +12,7 @@ const { createSshBootstrap } = await import("../electron/main/remote/ssh-bootstr
 const { createSystemSshTransport } = await import("../electron/main/remote/ssh-transport.ts");
 const bytes = Buffer.from([0, 255, 10, 13, 42, 0, 123]);
 const digest = createHash("sha256").update(bytes).digest("hex");
-const url = "https://github.com/example/release/artifact.tar.gz";
+const url = "https://artifacts.example.internal/pi-host/v1.0.0/artifact.tar.gz";
 const remoteDir = "/home/test/.pi-desktop/pi-host/.upload.ABC123";
 function transferFixture(overrides = {}) {
   const commands = [], uploads = [];
@@ -66,7 +66,9 @@ test("already cancelled transfer does not fetch or create remote state", async (
 function bootstrapFixture(step = "download-failed") {
   const scripts = [], uploads = [], paired = [];
   let cleanups = 0, disposed = 0, forwarded = 0;
-  const bootstrap = createSshBootstrap({ version: "1.0.0", fetchChecksum: async () => digest,
+  const bootstrap = createSshBootstrap({ version: "1.0.0",
+    artifactBaseUrl: "https://artifacts.example.internal/pi-host",
+    fetchChecksum: async () => digest,
     reservePort: async () => 40000,
     buildTransport: () => ({
       exec: async () => ({ stdout: "Linux\nx86_64\n", stderr: "", code: 0 }),

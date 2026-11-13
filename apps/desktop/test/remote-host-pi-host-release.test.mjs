@@ -15,6 +15,7 @@ const {
   parseChecksumFile,
   parseUnameOutput,
   piHostArtifactName,
+  PI_HOST_ARTIFACT_BASE_URL,
   piHostArtifactUrls,
   piHostBundleDir,
   platformFromUname,
@@ -26,7 +27,8 @@ const {
 const VERSION = "0.15.1-beta.5";
 const LINUX_X64 = { platform: "linux", arch: "x64" };
 const ARTIFACT_NAME = "pi-host-0.15.1-beta.5-linux-x64.tar.gz";
-const RELEASE_BASE = "https://github.com/xiognws/Pi-Workspace/releases/download/v0.15.1-beta.5";
+const FEED_BASE = "https://artifacts.example.internal/pi-host";
+const RELEASE_BASE = `${FEED_BASE}/v0.15.1-beta.5`;
 /** 64 hex characters, so it passes `normalizeChecksum`. */
 const DIGEST = "0123456789abcdef".repeat(4);
 /** Same length as {@link DIGEST}, one nibble different: a tampered download. */
@@ -35,9 +37,9 @@ const TAMPERED = `${DIGEST.slice(0, -1)}${DIGEST.endsWith("f") ? "e" : "f"}`;
 test("artifact name and URLs follow the release tag layout the desktop pins", () => {
   assert.equal(piHostBundleDir(VERSION, LINUX_X64), "pi-host-0.15.1-beta.5-linux-x64");
   assert.equal(piHostArtifactName(VERSION, LINUX_X64), ARTIFACT_NAME);
-  const urls = piHostArtifactUrls(VERSION, LINUX_X64);
-  // Both files are uploaded to the same v-tagged release by `release.yml`, so
-  // the desktop can derive them without an API call.
+  const urls = piHostArtifactUrls(FEED_BASE, VERSION, LINUX_X64);
+  // Both files live under the same version directory, so the desktop derives
+  // them from the feed base without an API call.
   assert.equal(urls.tarball, `${RELEASE_BASE}/${ARTIFACT_NAME}`);
   assert.equal(urls.checksum, `${RELEASE_BASE}/${ARTIFACT_NAME}.sha256`);
 });
@@ -67,7 +69,8 @@ test("resolveTarget refuses a platform or architecture the release cannot serve"
 test("isPublishedTarget matches the release matrix's Linux architectures", () => {
   assert.equal(targetKey(LINUX_X64), "linux-x64");
   assert.equal(isPublishedTarget(LINUX_X64), true);
-  // The desktop matrix publishes Linux x64 and arm64, and release.yml's
+  // The artifact feed (when one is configured) serves Linux x64 and arm64, and
+  // build's
   // pi-host-bundle job builds one bundle per lane.
   assert.equal(isPublishedTarget({ platform: "linux", arch: "arm64" }), true);
   // Publishing parity: a 404 halfway through a download is what this guard
@@ -133,4 +136,12 @@ test("versionsMatch requires the same release, tolerating a v prefix on either s
   assert.equal(versionsMatch("", ""), false);
   assert.equal(versionsMatch("", "0.15.1"), false);
   assert.equal(versionsMatch("v", ""), false);
+});
+
+test("this build publishes no artifact feed, so provisioning refuses early", () => {
+  // Local builds only: there is no repository and no mirror to download from.
+  assert.equal(PI_HOST_ARTIFACT_BASE_URL, null);
+  // A trailing slash on the configured base must not double up in the URL.
+  const urls = piHostArtifactUrls(`${FEED_BASE}/`, VERSION, LINUX_X64);
+  assert.equal(urls.tarball, `${RELEASE_BASE}/${ARTIFACT_NAME}`);
 });

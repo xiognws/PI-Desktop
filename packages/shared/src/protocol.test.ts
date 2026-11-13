@@ -71,8 +71,6 @@ describe("Plan protocol contracts", () => {
     ]) {
       expect(IPC_WHITELIST.has(channel)).toBe(true);
     }
-    expect(IPC.invoke.appOpenFeedback).toBe("pi-desktop/app/openFeedback");
-    expect(IPC_WHITELIST.has(IPC.invoke.appOpenFeedback)).toBe(true);
     expect(IPC.invoke.fsOpen).toBe("pi-desktop/fs/open");
     expect(IPC_WHITELIST.has(IPC.invoke.fsOpen)).toBe(true);
     expect(IPC.invoke.workspaceReviewOpenFile).toBe("pi-desktop/workspace/review/openFile");

@@ -16,7 +16,8 @@ const { sshHostRecord, sshMetadataOf, transportOf } = await import(
 
 const VERSION = "0.15.1-beta.5";
 const ARTIFACT_NAME = `pi-host-${VERSION}-linux-x64.tar.gz`;
-const ARTIFACT_URL = `https://github.com/xiognws/Pi-Workspace/releases/download/v${VERSION}/${ARTIFACT_NAME}`;
+const FEED_BASE = "https://artifacts.example.internal/pi-host";
+const ARTIFACT_URL = `${FEED_BASE}/v${VERSION}/${ARTIFACT_NAME}`;
 const DIGEST = "0123456789abcdef".repeat(4);
 const RESERVED_PORT = 49_152;
 
@@ -72,6 +73,7 @@ function harness({ transport = fakeTransport(), checksum, ports = [RESERVED_PORT
   let portIndex = 0;
   const bootstrap = createSshBootstrap({
     version: VERSION,
+    artifactBaseUrl: FEED_BASE,
     buildTransport: (target) => {
       built.push(target);
       return transport;
@@ -197,7 +199,7 @@ test("an arm64 Linux remote installs the published arm64 bundle", async () => {
 
   assert.equal(
     fetched[0],
-    `https://github.com/xiognws/Pi-Workspace/releases/download/v${VERSION}/${arm64Artifact}.sha256`,
+    `${FEED_BASE}/v${VERSION}/${arm64Artifact}.sha256`,
   );
   assert.equal(outcome.ssh.version, VERSION);
   const upload = transport.calls.uploads[0];
@@ -346,4 +348,22 @@ test("SSH identity metadata remains optional for legacy records and rejects malf
   assert.equal(sshMetadataOf(record(ssh)).hostId, undefined);
   assert.equal(sshMetadataOf(record({ ...ssh, hostId: "enrolled" })).hostId, "enrolled");
   for (const hostId of ["", "x\n", 42, "x".repeat(257)]) assert.equal(sshMetadataOf(record({ ...ssh, hostId })), null);
+});
+
+test("without an artifact feed the bootstrap refuses before any download", async () => {
+  const transport = fakeTransport();
+  const bootstrap = createSshBootstrap({
+    version: VERSION,
+    artifactBaseUrl: null,
+    buildTransport: () => transport,
+    fetchChecksum: async () => {
+      throw new Error("no download may be attempted");
+    },
+    reservePort: async () => RESERVED_PORT,
+    exchangePairing: async () => "dt_secret",
+  });
+
+  const error = await catchError(() => bootstrap.bootstrap(request()));
+  assert.equal(error.errorCode, "HOST_BOOTSTRAP_FAILED");
+  assert.match(String(error.message), /publishes no pi-host bundle/);
 });

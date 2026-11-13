@@ -113,7 +113,9 @@ shared changelog sources, or the check scripts change. `check:release-docs` is
 deliberately not in CI because release branches must pass it with the stable
 version explicitly supplied for a prerelease preview.
 
-`.github/workflows/release.yml` builds on a `v*.*.*` tag. A `verify` job first
+This repository publishes no releases: builds are cut locally with
+`pnpm --filter @pi-workspace/desktop dist:win` and distributed by hand, so the
+former tag-driven `release.yml` pipeline is gone. A `verify` job first
 repeats the `ci.yml` checks (a tag push does not trigger `ci.yml`), and the
 build matrix waits for it. Each platform runner then
 validates the tag against `apps/desktop/package.json` before packaging, then

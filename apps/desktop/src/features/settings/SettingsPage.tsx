@@ -660,24 +660,29 @@ export function SettingsPage() {
                 <div className="settings-about-hero-name">
                   {version?.name || "Pi-Workspace"}
                 </div>
-                <div className="settings-about-hero-version">
-                  {t("settings.aboutVersion", { version: version?.version ?? "" })}
-                </div>
-                <div className="settings-about-hero-meta">
-                  protocol {version?.protocolVersion} · host {version?.hostVersion}
-                </div>
+                {version?.version ? (
+                  <div className="settings-about-hero-version">
+                    {t("settings.aboutVersion", { version: version.version })}
+                  </div>
+                ) : null}
               </div>
-              <UpdatesRow
-                currentVersion={version?.version}
-                settings={settings ?? null}
-                saveSettings={saveSettings}
-              />
+              {/*
+                Distribution surface: this panel is what an outside reader sees
+                first, so it must not name the build's internals or point at an
+                external project. The update card is therefore a development-only
+                affordance — the shipped build has no reachable feed, and its
+                "release notes" action led to the upstream repository. The
+                handbook and feedback rows are gone for the same reason: both
+                opened content that identifies where this build came from.
+              */}
+              {includeDevelopmentOnly && (
+                <UpdatesRow
+                  currentVersion={version?.version}
+                  settings={settings ?? null}
+                  saveSettings={saveSettings}
+                />
+              )}
               <SettingsCard>
-                <SettingsRow title={t("settings.logs")}>
-                  <Button variant="secondary" onClick={() => void api.openLogs()}>
-                    {t("settings.openLogs")}
-                  </Button>
-                </SettingsRow>
                 <SettingsRow
                   title={t("settings.manual")}
                   description={t("settings.manualDesc")}
@@ -689,15 +694,9 @@ export function SettingsPage() {
                     {t("settings.openManual")}
                   </Button>
                 </SettingsRow>
-                <SettingsRow
-                  title={t("settings.feedback")}
-                  description={t("settings.feedbackDesc")}
-                >
-                  <Button
-                    variant="secondary"
-                    onClick={() => void api.openFeedback().catch(() => undefined)}
-                  >
-                    {t("settings.openFeedback")}
+                <SettingsRow title={t("settings.logs")}>
+                  <Button variant="secondary" onClick={() => void api.openLogs()}>
+                    {t("settings.openLogs")}
                   </Button>
                 </SettingsRow>
               </SettingsCard>

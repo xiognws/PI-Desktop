@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { readMainModuleSync } from "./helpers/source-contracts.mjs";
 import { resolveManualPath } from "../electron/main/manual-path.ts";
 
 const desktopRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -55,4 +56,26 @@ test("every screenshot the staged handbook links is staged beside it", () => {
   for (const link of links) {
     assert.ok(existsSync(join(stagedDir, link)), `staged handbook links a missing image: ${link}`);
   }
+});
+
+test("the Info panel hands the handbook to the system viewer", () => {
+  const manualIpc = readMainModuleSync("ipc/manual-ipc.ts");
+  // The reader is whatever this machine uses for Markdown; the app renders no
+  // manual of its own. A missing handler degrades to selecting the file.
+  assert.match(manualIpc, /shell\.openPath\(stripWinLongPrefix\(manual\)\)/);
+  assert.match(manualIpc, /shell\.showItemInFolder\(stripWinLongPrefix\(manual\)\)/);
+  assert.match(manualIpc, /IPC\.invoke\.manualOpen/);
+
+  const protocol = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts"), "utf8");
+  assert.match(protocol, /manualOpen: "pi-desktop\/manual\/open"/);
+
+  const settingsPage = readFileSync(
+    join(desktopRoot, "src/features/settings/SettingsPage.tsx"),
+    "utf8",
+  );
+  assert.match(settingsPage, /t\("settings\.manual"\)/, "the Info panel offers the handbook");
+  assert.match(settingsPage, /api\.openManual\(\)/, "the row opens it with the system viewer");
+
+  const api = readFileSync(join(desktopRoot, "src/lib/api.ts"), "utf8");
+  assert.match(api, /openManual: \(\) => invoke<\{ ok: boolean; path: string \}>\(IPC\.invoke\.manualOpen\)/);
 });

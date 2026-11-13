@@ -83,7 +83,6 @@ export type UpdateState = {
    * dismissed across restarts until a newer version is detected (#1317).
    */
   dismissed?: boolean;
-  releasesUrl: string;
 };
 
 export type OnboardingState = {

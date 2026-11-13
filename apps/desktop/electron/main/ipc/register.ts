@@ -266,7 +266,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     getPluginLauncherWindow,
     togglePluginLauncher,
-    safeOpenExternal,
     updater,
   });
   registerStorageIpc({ registrar, getMainWindow, restart: dependencies.restartForStorage });

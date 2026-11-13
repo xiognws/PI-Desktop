@@ -5,6 +5,12 @@
 > macOS signing/notarization remains the detailed qualification lane below.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
 
+> **Delivery model (local builds only).** This repository publishes no GitHub
+> release and runs no tag pipeline: artifacts are built on the delivery machine
+> with the local lanes below and handed over directly. macOS signing and
+> notarization therefore stay documentation for a platform this delivery does
+> not ship, and CI lanes exist only to validate changes.
+
 ## 1. Build lanes
 
 | Lane | Command | Signing | Use |

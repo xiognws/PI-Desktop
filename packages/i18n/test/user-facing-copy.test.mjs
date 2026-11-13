@@ -147,6 +147,14 @@ const REMOVED_EXPLANATORY_KEYS = [
   "settings.configSync.errorTitle",
   "settings.remoteHosts.title",
   "settings.remoteHosts.statusOnline",
+  // The Info panel exposes no external destination: the report-a-problem row
+  // is gone from every locale, not hidden.
+  "settings.feedback",
+  "settings.feedbackDesc",
+  "settings.openFeedback",
+  // The update card is development-only and ships no feed, so the release-link
+  // action (and its copy) is gone rather than hidden.
+  "updates.viewRelease",
 ];
 
 test("removed explanatory copy stays removed", () => {

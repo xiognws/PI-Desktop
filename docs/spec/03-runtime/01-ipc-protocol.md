@@ -2502,19 +2502,12 @@ attachments. Electron main resolves the provider/model and credentials, so the
 renderer never receives a secret. Empty drafts, slash-command drafts, missing
 models, and provider failures return the common `Result` error envelope.
 
-### app/openFeedback (D313)
+### app/openFeedback (withdrawn, D313)
 
-```ts
-app/openFeedback() -> { ok: true }
-```
-
-Electron Main builds a fixed GitHub bug-form URL
-(`https://github.com/xiognws/Pi-Workspace/issues/new?template=bug_report.yml`)
-and opens it with `shell.openExternal`. Query fields `app-version`, `os`, and
-`environment` are filled from Main-owned version info. The renderer cannot
-supply a URL. Construction that leaves that origin or template is rejected.
-This channel does not cross into host-core and does not change the host RPC
-protocol version.
+No feedback channel exists. The Info panel exposes no external destination, so
+nothing in the renderer can build or open an issue URL, and the URL builders
+that backed the withdrawn design are gone with the channel. This surface never
+crossed into host-core and never changed the host RPC protocol version.
 
 ## 13d. Local MCP control API (D370)
 
