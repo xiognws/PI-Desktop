@@ -1,0 +1,40 @@
+apps/desktop/electron/main/update-policy.ts
+  h_201ed4c689ac8b 6-11
+apps/desktop/electron/main/updater.ts
+  h_201ed4c689ac8b 2,4-9,25
+apps/desktop/package.json
+  h_201ed4c689ac8b 8-9
+apps/desktop/src/components/UpdateBanner.tsx
+  h_201ed4c689ac8b 7
+apps/desktop/test/auto-update.test.mjs
+  h_201ed4c689ac8b 70-74,145-146,184,256,259-265,267-269,273,284,301-302
+apps/desktop/test/feedback.test.mjs
+  h_201ed4c689ac8b 15,23,72-75
+crates/host-core/build.rs
+  h_201ed4c689ac8b 57
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 2496,2498-2501
+docs/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 8579-8603
+docs/zh-CN/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1850,1852-1854
+docs/zh-CN/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 5973-5989
+packages/i18n/test/user-facing-copy.test.mjs
+  h_201ed4c689ac8b 158-160
+packages/shared/src/github-repo.ts
+  h_201ed4c689ac8b 1-7
+packages/shared/src/index.ts
+  h_201ed4c689ac8b 62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "afeff858581d380d17acf11c7ec2d60091ad8d8d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
