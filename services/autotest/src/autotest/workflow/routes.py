@@ -22,6 +22,7 @@ from autotest.knowledge import extract
 from autotest.workflow import analysis as analysis_service
 from autotest.workflow import cases as case_service
 from autotest.workflow import execution as execution_service
+from autotest.workflow import grounding
 from autotest.workflow import prd as prd_service
 from autotest.workflow import report as report_service
 from autotest.workflow import review as review_service
@@ -58,6 +59,11 @@ def _persist_designed_cases(conn: sqlite3.Connection, module: str, cases: list[d
     复用调用方已持有的连接：这里再开一条连接到同一个项目库会直接撞上
     「database is locked」（路由在 _project_conn 里已经持有写事务）。
     """
+    # 很早的库没有 evidence 列：按需补上，不重建表（保用户数据）。
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(test_cases)")}
+    if "evidence" not in columns:
+        conn.execute("ALTER TABLE test_cases ADD COLUMN evidence TEXT DEFAULT ''")
+
     ids: dict[str, str] = {}
     for case in cases:
         title = str(case.get("title") or "").strip()
@@ -73,8 +79,8 @@ def _persist_designed_cases(conn: sqlite3.Connection, module: str, cases: list[d
             case_id = str(row["id"] if isinstance(row, sqlite3.Row) else row[0])
             conn.execute(
                 "UPDATE test_cases SET precondition = ?, steps = ?, expected = ?,"
-                " case_type = ?, priority = ?, module_id = ?, updated_at = CURRENT_TIMESTAMP"
-                " WHERE id = ?",
+                " case_type = ?, priority = ?, module_id = ?, evidence = ?,"
+                " updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (
                     str(case.get("precondition") or ""),
                     steps_text,
@@ -82,6 +88,7 @@ def _persist_designed_cases(conn: sqlite3.Connection, module: str, cases: list[d
                     str(case.get("case_type") or "正向"),
                     str(case.get("priority") or "中"),
                     module,
+                    _case_evidence_text(case),
                     case_id,
                 ),
             )
@@ -90,8 +97,8 @@ def _persist_designed_cases(conn: sqlite3.Connection, module: str, cases: list[d
             function_point = str(case.get("function_point") or "").replace('"', "")
             conn.execute(
                 "INSERT INTO test_cases (id, module_id, title, precondition, steps, expected,"
-                " case_type, priority, status, tags, favorite)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, '未执行', ?, 0)",
+                " case_type, priority, status, tags, favorite, evidence)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, '未执行', ?, 0, ?)",
                 (
                     case_id,
                     module,
@@ -102,10 +109,26 @@ def _persist_designed_cases(conn: sqlite3.Connection, module: str, cases: list[d
                     str(case.get("case_type") or "正向"),
                     str(case.get("priority") or "中"),
                     json.dumps([function_point] if function_point else [], ensure_ascii=False),
+                    _case_evidence_text(case),
                 ),
             )
         ids[title] = case_id
     return ids
+
+
+def _case_evidence_text(case: dict) -> str:
+    """用例的依据落库：JSON（doc/quote/numbers + grounding 等级）。
+
+    存成文本而不是拆列：不同来源（资料条款、知识切片、人工补充）字段不一样，
+    拆列会让后面的来源没法扩展。
+    """
+    payload = {
+        "grounding": str(case.get("grounding") or "none"),
+        "evidence": case.get("evidence"),
+    }
+    if not payload["evidence"]:
+        return json.dumps({"grounding": payload["grounding"], "evidence": None}, ensure_ascii=False)
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _failure_reason(text: str, fallback: str) -> str:
@@ -316,7 +339,12 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         prd_result = body.prd_result or store.last_payload(conn, body.run_id, "autotest_prd_parse")
         if not prd_result:
             raise HTTPException(status_code=409, detail="还没有 PRD 解析结果，先调用 prd-parse")
-        result = case_service.design_cases(prd_result, body.types, body.template)
+        # 先从知识库给每个功能点找依据：有条款原文就写具体的步骤与阈值，
+        # 没有就退回模板并标 ungrounded（界面能看出哪些用例还没底）。
+        evidence = grounding.collect(conn, project_id, prd_result.get("function_points") or [])
+        result = case_service.design_cases(
+            prd_result, body.types, body.template, evidence=evidence
+        )
         # 设计的用例要落进项目的 test_cases：用例页、执行状态回写、脚本关联都读那张
         # 表。只把它留在 workflow_steps 的 payload 里，界面上就永远是「0 条用例」。
         case_ids = _persist_designed_cases(conn, str(run.get("module") or ""), result["cases"])
@@ -326,7 +354,10 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
             body.run_id,
             tool="autotest_case_design",
             stage="designed",
-            summary=f"生成 {result['stats']['total']} 条用例",
+            summary=(
+                f"生成 {result['stats']['total']} 条用例"
+                f"（有依据 {result['stats']['grounding']['strong']} 条）"
+            ),
             payload=result,
         )
         store.touch_run(conn, body.run_id, stage="designed")
@@ -336,11 +367,18 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         "run_id": body.run_id,
         "case_total": result["stats"]["total"],
         "by_type": result["stats"]["by_type"],
+        "grounding": result["stats"]["grounding"],
         "preview": result["cases"][:5],
         "stats": result["stats"],
         "stage": run.get("stage"),
     }
-    return _envelope(f"生成 {result['stats']['total']} 条用例（{len(result['stats']['by_type'])} 种类型）", data, body.run_id)
+    levels = result["stats"]["grounding"]
+    return _envelope(
+        f"生成 {result['stats']['total']} 条用例（{len(result['stats']['by_type'])} 种类型）"
+        f"，其中有知识库依据 {levels['strong']} 条、仅条款无参数 {levels['weak']} 条、无依据 {levels['none']} 条",
+        data,
+        body.run_id,
+    )
 
 
 @router.post("/case-review")

@@ -348,6 +348,18 @@ function toggleSelect(id: number) {
 
 // 详情抽屉
 const drawerOpen = ref(false)
+
+/** 用例的依据（doc/quote/numbers + grounding 等级）：后端以 JSON 文本存在 evidence 列。 */
+const caseEvidence = computed(() => {
+  const raw = (selectedCase.value as any)?.evidence
+  if (!raw) return null
+  if (typeof raw === 'object') return raw as { grounding?: string; evidence?: any }
+  try {
+    return JSON.parse(raw) as { grounding?: string; evidence?: any }
+  } catch {
+    return null
+  }
+})
 const selectedCase = ref<any>(null)
 
 // 这条用例的历次执行。`execution_cases` 只记「脚本带 case_id 的执行」，所以空
@@ -790,6 +802,33 @@ watch(viewMode, (val) => {
               <div v-if="!scriptsForCase(selectedCase).length" class="text-sm text-muted-2">
                 还没有脚本。让 Agent 跑一次 script-author，或在「脚本」页新建。
               </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-fg mb-2">
+              依据
+              <span
+                v-if="caseEvidence"
+                class="text-xs font-normal ml-1 px-1.5 py-0.5 rounded"
+                :class="caseEvidence.grounding === 'strong'
+                  ? 'bg-success-soft text-success border border-success-line'
+                  : caseEvidence.grounding === 'weak'
+                    ? 'bg-warn-soft text-warn border border-warn-line'
+                    : 'bg-surface-3 text-muted border border-line'"
+              >{{ caseEvidence.grounding === 'strong' ? '有原文与参数' : caseEvidence.grounding === 'weak' ? '仅条款原文' : '无依据（模板）' }}</span>
+            </h4>
+            <div v-if="caseEvidence?.evidence" class="text-sm text-fg-2 space-y-1">
+              <div class="text-xs text-muted">《{{ caseEvidence.evidence.doc }}》</div>
+              <div class="text-xs bg-surface-2 border border-line rounded p-2 leading-relaxed">
+                {{ caseEvidence.evidence.quote }}
+              </div>
+              <div v-if="caseEvidence.evidence.numbers?.length" class="text-xs text-muted">
+                原文参数：{{ caseEvidence.evidence.numbers.join('、') }}
+              </div>
+            </div>
+            <div v-else class="text-xs text-muted-2">
+              这条用例是按功能点名套模板生成的，去「项目资料」把相关资料分解入库后重新生成，会带上原文条款与阈值。
             </div>
           </div>
 
