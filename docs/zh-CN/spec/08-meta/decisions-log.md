@@ -5985,6 +5985,8 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - 打包元数据改用产品名而不是上游作者（`package.json` 的 author/homepage、
   host-core 的 Windows 版本资源）；产品名、`appId`、存储标识与 host 二进制名在下一次改名决策前
   保持冻结。
+- 随更新源一并删除 GitHub 发布流水线：不再有 tag 触发的 workflow，也不存在可供命名的发布产物，
+  因此远程主机引导不再解析下载地址（内网镜像仍可设置 `PI_HOST_ARTIFACT_BASE_URL`），交付形态只有本地打包。
 - 未改动：host RPC 协议、存储 schema、IPC 传输语义，以及 LICENSE / 第三方声明（合规需要，保留在仓库内）。
 - 守卫：`feedback.test.mjs`、`auto-update.test.mjs`、`user-facing-copy.test.mjs` 断言这些删除，
   防止行、通道与文案被悄悄加回来。

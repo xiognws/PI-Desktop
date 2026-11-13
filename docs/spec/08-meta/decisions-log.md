@@ -8598,6 +8598,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   (`package.json` author/homepage, host-core's Windows version resource), while
   the product name, `appId`, storage identifiers, and the host binary name stay
   frozen until the separate rename decision.
+- The GitHub release pipeline is gone with the feed it produced: there is no
+  tag-triggered workflow and no published artifact to name, so the remote-host
+  bootstrap resolves no download URL (an internal mirror can still set
+  `PI_HOST_ARTIFACT_BASE_URL`) and delivery is local packaging only.
 - Not changed: host RPC protocol, storage schema, IPC transport semantics, and
   the LICENSE / third-party notices, which stay in the tree for compliance.
 - Guards: `feedback.test.mjs`, `auto-update.test.mjs`, and

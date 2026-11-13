@@ -268,6 +268,9 @@ function bootFor(dir, fixture, { capabilities, router } = {}) {
     }),
     sshBootstrap: {
       buildTransport: () => fixture.bootstrap(),
+      // Local builds publish nothing; the fixture stands in for an artifact
+      // mirror so the realignment path keeps its coverage.
+      artifactBaseUrl: "https://artifacts.example.internal/pi-host",
       fetchChecksum: async () => `${"a".repeat(64)}  pi-host-${DESKTOP_VERSION}-linux-x64.tar.gz`,
       reservePort: async () => (port += 1),
       exchangePairing: async () => "realigned-device-token",

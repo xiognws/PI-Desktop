@@ -25,7 +25,9 @@
  * `node scripts/check-release-docs.mjs x.y.z` against the stable version being
  * previewed. Use --skip-docs-check only for a deliberate non-release bump.
  *
- * Pushing the tag triggers .github/workflows/release.yml, which builds the
+ * This repository builds locally; a pushed tag publishes nothing. The bump,
+ * commit, and tag are only a version bookmark, kept for local packaging. The
+ * former workflow that consumed it (building the
  * macOS / Windows / Linux installers and publishes them to a GitHub Release:
  *
  *   git push origin <branch> v<version>

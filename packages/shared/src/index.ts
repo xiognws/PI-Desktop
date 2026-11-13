@@ -60,7 +60,6 @@ export * from "./provider-presets.js";
 export * from "./provider-endpoint.js";
 export * from "./provider-sync.js";
 export * from "./model-catalog.js";
-export * from "./github-repo.js";
 export * from "./network-proxy.js";
 export * from "./attachment-limits.js";
 export * from "./attachment-formats.js";

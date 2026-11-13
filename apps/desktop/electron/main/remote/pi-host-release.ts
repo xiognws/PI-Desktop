@@ -9,8 +9,6 @@
  * remote machine. Everything here is pure so the URL, target, and checksum
  * rules stay testable without a network or an SSH connection.
  */
-import { GITHUB_REPO } from "@pi-workspace/shared";
-
 /** Platforms the bootstrap can classify from `uname -s`. */
 export type PiHostPlatform = "linux" | "darwin";
 /** Architectures the bootstrap can classify from `uname -m`. */
@@ -84,15 +82,27 @@ export function piHostArtifactName(version: string, target: PiHostTarget): strin
 }
 
 /**
- * Release asset URLs. `release.yml` uploads both files to the `v<version>` tag,
- * so the desktop and the bootstrap script derive them without an API call.
+ * Base URL the remote-host bootstrap downloads `pi-host` bundles from.
+ *
+ * This product is built and used locally: no release artifacts are published
+ * anywhere, so there is no feed to name and provisioning a remote host fails
+ * with a clear error instead of reaching for a repository. An internal artifact
+ * mirror sets this to its base URL (assets laid out as `<base>/v<version>/<file>`)
+ * and the bootstrap works unchanged.
+ */
+export const PI_HOST_ARTIFACT_BASE_URL: string | null = null;
+
+/**
+ * Asset URLs for one bundled release line, derived from the feed base so the
+ * desktop and the bootstrap script agree without an API call.
  */
 export function piHostArtifactUrls(
+  baseUrl: string,
   version: string,
   target: PiHostTarget,
 ): { tarball: string; checksum: string } {
   const name = piHostArtifactName(version, target);
-  const base = `https://github.com/${GITHUB_REPO}/releases/download/v${version}`;
+  const base = `${baseUrl.replace(/\/+$/, "")}/v${version}`;
   return { tarball: `${base}/${name}`, checksum: `${base}/${name}.sha256` };
 }
 

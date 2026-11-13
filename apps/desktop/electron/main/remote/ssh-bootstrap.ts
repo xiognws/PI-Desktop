@@ -32,6 +32,7 @@ import {
   isPublishedTarget,
   parseChecksumFile,
   piHostArtifactName,
+  PI_HOST_ARTIFACT_BASE_URL,
   piHostArtifactUrls,
   piHostBundleDir,
   resolveTarget,
@@ -65,6 +66,12 @@ export type SshBootstrapStep =
 export type SshBootstrapDeps = {
   /** Release version the desktop runs; the bundle must exist for this tag. */
   version: string;
+  /**
+   * Where `pi-host` assets are published (`<base>/v<version>/<file>`). Defaults
+   * to the shipped constant, which is `null`: this build publishes nothing, so
+   * a remote host cannot be provisioned and the caller gets a typed failure.
+   */
+  artifactBaseUrl?: string | null;
   /** Build the SSH transport for one target. Defaults to the system `ssh`. */
   buildTransport?: (target: SshTarget) => SshTransport;
   /** Read the published `.sha256` text. Defaults to an HTTPS GET. */
@@ -130,7 +137,7 @@ function fail(message: string, errorCode: string, data?: Record<string, unknown>
 const REMOTE_STEP_MESSAGES: Record<string, string> = {
   "missing-node": "the remote machine has no Node.js; pi-host needs Node.js 22 or newer",
   "node-too-old": "the remote Node.js is too old; pi-host needs Node.js 22 or newer",
-  "download-failed": "the remote machine could not download the pi-host bundle from GitHub",
+  "download-failed": "the remote machine could not download the pi-host bundle",
   "checksum-mismatch": "the downloaded pi-host bundle did not match the published SHA-256",
   "missing-tar": "the remote machine has no tar",
   "install-failed": "the remote pi-host install.sh failed",
@@ -292,8 +299,17 @@ export function createSshBootstrap(deps: SshBootstrapDeps): SshBootstrap {
         }
 
         // 2. Resolve the artifact and the digest the release published for it.
+        const artifactBaseUrl =
+          deps.artifactBaseUrl === undefined ? PI_HOST_ARTIFACT_BASE_URL : deps.artifactBaseUrl;
+        if (!artifactBaseUrl) {
+          throw fail(
+            "this build publishes no pi-host bundle, so a remote host cannot be provisioned",
+            ErrorCodes.HOST_BOOTSTRAP_FAILED,
+            { target: targetKey(remoteTarget) },
+          );
+        }
         mark("resolve-release");
-        const urls = piHostArtifactUrls(deps.version, remoteTarget);
+        const urls = piHostArtifactUrls(artifactBaseUrl, deps.version, remoteTarget);
         const artifactName = piHostArtifactName(deps.version, remoteTarget);
         mark("download-checksum");
         const expectedSha256 = parseChecksumFile(await fetchChecksum(urls.checksum, signal), artifactName);
