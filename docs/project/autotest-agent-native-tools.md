@@ -484,3 +484,41 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 2. **UI 承载**：独立 `BrowserWindow`（P4 接），P2 先用浏览器把页面做到能用。
    plugin panel 被否：固定 46px 胶囊 + `net.domains` 过滤 + 单窗口形态，不适合工作台。
 3. **服务位置**：`services/autotest`，在 P0 就迁（与启动路径重写同一次改动）。
+
+## 13. 固定提示词（2026-11-13）
+
+用例"乱七八糟地生成"的根因不是模型不稳定，而是**规则只存在于代码和会话里**：
+同一份需求两次产出格式不同，改规则也没人能说清哪批产物按哪一版跑出来的。
+现在每个阶段的产出规则落成仓库里的版本化文件：
+
+```text
+services/autotest/prompts/
+  prd-parse.md       autotest.prd-parse@1.0.0
+  case-design.md     autotest.case-design@1.0.0
+  case-review.md     autotest.case-review@1.0.0
+  script-author.md   autotest.script-author@1.0.0
+  log-analyze.md     autotest.log-analyze@1.0.0
+  report.md          autotest.report@1.0.0
+```
+
+- 每份文件带 frontmatter（`id` / `version` / `stage` / `updated` / `outputs`）与
+  「角色 / 输入 / 硬性规则 / 输出契约 / 一致性约束」五段结构。
+- `autotest.prompts` 负责加载与校验：stage 未登记、文件缺失、frontmatter 缺字段、
+  `stage` 与注册表不一致，都直接抛 `PromptError`（不做静默降级）。
+- 每个阶段返回都带 `data.prompt = {id, version, ref, digest, updated}`；
+  `digest` 是正文指纹，用来发现"改了内容忘了升版本"。
+- `GET /api/projects/{project_id}/workflow/prompts` 列出全部阶段的当前版本。
+- 打包：`services/autotest/prompts` → `autotest/prompts`（`extraResources`），
+  漏了它安装版会退化成"没有规则"，由 `autotest-packaging.test.mjs` 断言。
+
+`case-design` 的规则同时可执行化：`autotest.workflow.consistency` 检查标题/后缀/
+类型/优先级枚举、步骤与预期下限、`grounding=strong` 必须出现原文数值、有依据时不许
+出现空话句式。结果随 `case-design` 返回（`data.consistency`）并落进 step payload，
+不合格时 step 状态为 `warning`。
+
+落地时它立刻抓到一处真实缺陷：`weak`（有条款无数值）的用例以前退回模板，预期写的是
+"结果与预期一致"——依据在手却没用上。现已改为按条款原文生成步骤与预期
+（`cases.py::_clause_case`），并有回归测试锁住。
+
+改规则的流程：改 md → 升 `version` → 跑 `tests/test_fixed_prompts.py`（会校验
+磁盘与注册表一致、每份都有硬性规则段）→ 产出里的 `prompt.ref` 自动跟着变。

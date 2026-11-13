@@ -23,6 +23,7 @@ if str(SRC) not in sys.path:
 from autotest.api import server  # noqa: E402
 from autotest.api.server import app  # noqa: E402
 from autotest.workflow import cases as case_service  # noqa: E402
+from autotest.workflow import consistency  # noqa: E402
 from autotest.workflow import grounding  # noqa: E402
 
 
@@ -203,6 +204,38 @@ def test_clause_without_numbers_is_weak_not_none():
     case = result["cases"][0]
     assert case["grounding"] == "weak"
     assert "KL15" in case["precondition"]
+
+
+def test_clause_only_cases_quote_the_clause_instead_of_template_filler():
+    """有条款但没数值时，步骤/预期也要落到条款上，不能退回"结果与预期一致"。
+
+    这是固定提示词 `case-design.md` 的硬性规则 5/7：有依据就不许出现空话。
+    空话用例会让人以为覆盖了，实际执行时没有任何可判定对象。
+    """
+    evidence = {
+        "唤醒机制": [
+            {
+                "doc": "CPM低软开发需求V1.1_20260530.docx",
+                "quote": "KL15和特定帧唤醒是或的关系。",
+                "numbers": [],
+            }
+        ]
+    }
+    result = case_service.design_cases(
+        {"function_points": [{"name": "唤醒机制"}]},
+        types=["功能", "异常"],
+        evidence=evidence,
+    )
+
+    assert [case["grounding"] for case in result["cases"]] == ["weak", "weak"]
+    for case in result["cases"]:
+        joined = " ".join(case["steps"]) + " " + " ".join(case["expected"])
+        assert "KL15和特定帧唤醒是或的关系" in joined
+        assert "结果与预期一致" not in joined
+        assert "执行正常操作" not in joined
+
+    # 规则不是靠自觉：用同一套校验再过一遍
+    assert consistency.check_cases(result["cases"])["ok"] is True
 
 
 def _project_with_points(client, points: list[str]) -> tuple[str, str]:

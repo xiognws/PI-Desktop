@@ -19,8 +19,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from autotest.knowledge import extract
+from autotest.prompts import PromptError
+from autotest.prompts import catalog as prompt_catalog
+from autotest.prompts import load as load_prompt
 from autotest.workflow import analysis as analysis_service
 from autotest.workflow import cases as case_service
+from autotest.workflow import consistency
 from autotest.workflow import execution as execution_service
 from autotest.workflow import grounding
 from autotest.workflow import prd as prd_service
@@ -356,6 +360,7 @@ def prd_parse(project_id: str, body: PrdParseIn) -> dict:
         "risks": result["risks"][:5],
         "stats": result["stats"],
         "stage": run.get("stage"),
+        "prompt": _prompt_marker("prd-parse"),
     }
     return _envelope(f"解析出 {fp_count} 个功能点、{len(result['risks'])} 条风险", data, run_id)
 
@@ -392,6 +397,11 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         # 设计的用例要落进项目的 test_cases：用例页、执行状态回写、脚本关联都读那张
         # 表。只把它留在 workflow_steps 的 payload 里，界面上就永远是「0 条用例」。
         module = str(run.get("module") or "")
+        # 固定提示词的硬性规则在这里落成"可判定的问题"：不合格不静默放过，
+        # 结论跟着 payload 一起落库，评审与 Agent 都能看到。
+        judgement = consistency.check_cases(result["cases"])
+        result["consistency"] = judgement
+        result["prompt"] = _prompt_marker("case-design")
         case_ids = _persist_designed_cases(conn, module, result["cases"])
         # 之前生成过、这次因为"没依据"被跳过的空壳要从用例库里清掉，
         # 否则它们会一直挂在列表里，看着像已经覆盖了那个功能点。
@@ -403,6 +413,7 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
             body.run_id,
             tool="autotest_case_design",
             stage="designed",
+            status="ok" if judgement["ok"] else "warning",
             summary=(
                 f"生成 {result['stats']['total']} 条用例"
                 f"（有依据 {result['stats']['grounding']['strong']} 条"
@@ -410,6 +421,11 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
                 + (
                     f"，跳过 {result['stats']['skipped']} 条无依据用例待补资料"
                     if result["stats"].get("skipped")
+                    else ""
+                )
+                + (
+                    f"，不符合提示词规则 {len(judgement['issues'])} 处"
+                    if not judgement["ok"]
                     else ""
                 )
             ),
@@ -425,6 +441,8 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         "grounding": result["stats"]["grounding"],
         "reasons": result["stats"].get("reasons") or {},
         "uncovered": result["stats"].get("uncovered") or [],
+        "consistency": result.get("consistency"),
+        "prompt": result.get("prompt"),
         "skipped": result["stats"].get("skipped") or 0,
         "removed_stale": result["stats"].get("removed_stale") or 0,
         "preview": result["cases"][:5],
@@ -458,15 +476,35 @@ def case_review(project_id: str, body: CaseReviewIn) -> dict:
             stage="reviewed",
             status="ok" if result["verdict"] == "ok" else "warning",
             summary=f"评审结论 {result['verdict']}，不可测 {len(result['untestable'])} 条",
-            payload=result,
+            payload={**result, "prompt": _prompt_marker("case-review")},
         )
         store.touch_run(conn, body.run_id, stage="reviewed")
 
     return _envelope(
         f"评审结论 {result['verdict']}：不可测 {len(result['untestable'])} 条、重复 {len(result['duplicates'])} 条",
-        {"run_id": body.run_id, **result},
+        {"run_id": body.run_id, **result, "prompt": _prompt_marker("case-review")},
         body.run_id,
     )
+
+
+def _prompt_marker(stage: str) -> dict:
+    """本次产出用的是哪一版固定提示词：`id@version` + 正文指纹。
+
+    读不到就返回 error，而不是让整个阶段失败 —— 但产出里会明确写着"没有按固定
+    提示词跑"，事后可追溯。
+    """
+    try:
+        prompt = load_prompt(stage)
+    except PromptError as problem:
+        return {"stage": stage, "error": str(problem)}
+    return {
+        "stage": stage,
+        "id": prompt.prompt_id,
+        "version": prompt.version,
+        "ref": prompt.ref,
+        "digest": prompt.digest,
+        "updated": prompt.updated,
+    }
 
 
 def _execution_events_text(project_id: str, execution_id: int) -> str:
@@ -529,6 +567,7 @@ def log_analyze(project_id: str, body: LogAnalyzeIn) -> dict:
         "suspects": result["suspects"],
         "suggestions": result["suggestions"],
         "stats": result["stats"],
+        "prompt": _prompt_marker("log-analyze"),
     }
     return _envelope(result["summary"][:160], data, body.run_id or "")
 
@@ -592,7 +631,11 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             tool="autotest_script_author",
             stage="authored",
             summary=f"生成 {len(created)} 个 pytest 骨架",
-            payload={"scripts": created, "stats": authored["stats"]},
+            payload={
+                "scripts": created,
+                "stats": authored["stats"],
+                "prompt": _prompt_marker("script-author"),
+            },
         )
         store.touch_run(conn, body.run_id, stage="authored")
 
@@ -601,6 +644,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "script_total": len(created),
         "scripts": created[:10],
         "stats": authored["stats"],
+        "prompt": _prompt_marker("script-author"),
     }
     return _envelope(f"生成 {len(created)} 个 pytest 骨架，已落 scripts 表", data, body.run_id)
 
@@ -1001,8 +1045,21 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
         "bug_ids": [bug["id"] for bug in bugs],
         "verified_bug_ids": verified_bug_ids,
         "preview": result["markdown"][:400],
+        "prompt": _prompt_marker("report"),
     }
     return _envelope(f"报告已生成：通过率 {result['pass_rate']}", data, run_id)
+
+
+@router.get("/prompts")
+def list_prompts(project_id: str) -> dict:
+    """固定提示词目录：每个阶段当前生效的版本号与正文指纹。
+
+    Agent / 界面用它说明"这次按哪一版规则生成"，也方便确认改动是否已生效。
+    """
+    items = prompt_catalog()
+    return _envelope(
+        f"{len(items)} 份固定提示词", {"prompts": items, "total": len(items)}, ""
+    )
 
 
 @router.post("/runs/{run_id}/pending")

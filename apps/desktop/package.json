@@ -159,6 +159,10 @@
         "to": "autotest/src"
       },
       {
+        "from": "../../services/autotest/prompts",
+        "to": "autotest/prompts"
+      },
+      {
         "from": "../../services/autotest/ui-shell",
         "to": "autotest/ui-shell"
       },

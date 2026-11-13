@@ -8,6 +8,28 @@ description: 在 Autotest 工作台上跑一条测试流水线（PRD 解析 → 
 编排在 Agent 侧完成，没有外部状态机。工具只做确定性动作并落库；顺序、分支、
 什么时候停下来问人，由你按下面的规则决定。
 
+## 固定提示词（不得自创格式）
+
+每个阶段的产出规则固定在 `services/autotest/prompts/`，用 `id@version` 标识：
+
+| 阶段 | 文件 | 当前引用 |
+| --- | --- | --- |
+| 需求解析 | `prompts/prd-parse.md` | `autotest.prd-parse@1.0.0` |
+| 用例设计 | `prompts/case-design.md` | `autotest.case-design@1.0.0` |
+| 用例评审 | `prompts/case-review.md` | `autotest.case-review@1.0.0` |
+| 脚本生成 | `prompts/script-author.md` | `autotest.script-author@1.0.0` |
+| 日志分析 | `prompts/log-analyze.md` | `autotest.log-analyze@1.0.0` |
+| 测试报告 | `prompts/report.md` | `autotest.report@1.0.0` |
+
+规则：
+
+1. 进入某个阶段前先读对应文件，按它的"硬性规则 / 输出契约"产出，不要凭习惯写格式。
+2. 每次调用的返回里都带 `data.prompt.ref` —— 把它当作这一批产物按哪一版规则生成的凭证。
+3. 用例设计返回还带 `data.consistency`（不合格项 + `by_field` 计数）。`ok=false` 时先按
+   明细修用例，不要直接进评审/脚本。
+4. 要改规则就改 md 文件并**升 version**，不要只改代码或只在会话里口头约定。
+5. 想确认线上生效版本：`GET /api/projects/{project_id}/workflow/prompts`。
+
 ## 入口条件
 
 先确认三件事，缺一件就停下来问用户，不要自行假设：
