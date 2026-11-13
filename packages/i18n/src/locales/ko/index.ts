@@ -81,6 +81,11 @@ export const ko = {
     hideResult: "결과 숨기기",
   },
   statusBar: {
+    creditsUnit: "크레딧",
+    creditsTitle: "{{provider}} 크레딧",
+    creditsRefresh: "새로 고침",
+    creditsRefreshing: "새로 고치는 중…",
+    creditsUpdated: "{{time}} 업데이트",
     project: "프로젝트",
     context: "컨텍스트",
     used: "사용",

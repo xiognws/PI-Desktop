@@ -81,6 +81,11 @@ export const tr = {
     hideResult: "Sonucu gizle",
   },
   statusBar: {
+    creditsUnit: "kredi",
+    creditsTitle: "{{provider}} kredisi",
+    creditsRefresh: "Yenile",
+    creditsRefreshing: "Yenileniyor…",
+    creditsUpdated: "{{time}} güncellendi",
     project: "Proje",
     context: "Bağlam",
     used: "kullanılan",

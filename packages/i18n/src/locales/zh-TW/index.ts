@@ -81,6 +81,11 @@ export const zhTW = {
     hideResult: "收起結果",
   },
   statusBar: {
+    creditsUnit: "點數",
+    creditsTitle: "{{provider}} 點數",
+    creditsRefresh: "重新整理",
+    creditsRefreshing: "更新中…",
+    creditsUpdated: "更新於 {{time}}",
     project: "專案",
     context: "上下文",
     used: "已用",

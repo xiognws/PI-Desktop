@@ -81,6 +81,11 @@ export const zhCN = {
     hideResult: "收起结果",
   },
   statusBar: {
+    creditsUnit: "积分",
+    creditsTitle: "{{provider}} 积分",
+    creditsRefresh: "刷新",
+    creditsRefreshing: "刷新中…",
+    creditsUpdated: "更新于 {{time}}",
     project: "项目",
     context: "上下文",
     used: "已用",

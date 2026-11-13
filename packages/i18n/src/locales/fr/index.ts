@@ -81,6 +81,11 @@ export const fr = {
     "hideResult": "Masquer le résultat",
   },
   statusBar: {
+    creditsUnit: "crédits",
+    creditsTitle: "Crédits {{provider}}",
+    creditsRefresh: "Actualiser",
+    creditsRefreshing: "Actualisation…",
+    creditsUpdated: "Mis à jour {{time}}",
     project: "Projet",
     context: "Contexte",
     used: "utilisé",

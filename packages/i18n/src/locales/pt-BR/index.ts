@@ -81,6 +81,11 @@ export const ptBR = {
     hideResult: "Ocultar resultado",
   },
   statusBar: {
+    creditsUnit: "créditos",
+    creditsTitle: "Créditos do {{provider}}",
+    creditsRefresh: "Atualizar",
+    creditsRefreshing: "Atualizando…",
+    creditsUpdated: "Atualizado {{time}}",
     project: "Projeto",
     context: "Contexto",
     used: "usado",
