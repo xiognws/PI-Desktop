@@ -1,0 +1,16 @@
+apps/desktop/electron/main/providers/ipc.ts
+  h_201ed4c689ac8b 8,28-42,65
+apps/desktop/package.json
+  h_201ed4c689ac8b 117-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "77e3125b68547ba98c463c2e65f5c213bc8890c8",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
