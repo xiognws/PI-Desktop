@@ -6,7 +6,7 @@
  *
  *   1. read `inAppProvider.<id>.enabled` / `.port` from settings,
  *   2. start the gateway in its own process on the loopback port,
- *   3. wait for its unauthenticated `/healthz` with a bounded timeout,
+ *   3. wait for its `/healthz` (loopback key required) with a bounded timeout,
  *   4. create or refresh the provider row that points at it, then set its
  *      secret and model bindings.
  *
@@ -108,7 +108,6 @@ export function resolveProviderSettings(
       : provider.defaultPort;
   return { enabled, port };
 }
-
 export function inAppProviderOrigin(port: number): string {
   return `http://127.0.0.1:${port}`;
 }
@@ -182,7 +181,7 @@ export class InAppProviders {
     }));
   }
 
-  /** Remaining credit for the provider row the renderer is showing. */
+  /** Remaining credit for the provider the renderer is showing. */
   async readProviderCredits(
     input: { providerId: string; refresh?: boolean },
   ): Promise<CreditsResult> {
@@ -192,9 +191,19 @@ export class InAppProviders {
     return await this.credits.read(provider.id, { refresh: input.refresh === true });
   }
 
-  private providerForRow(rowId: string): InAppProvider | undefined {
+  /**
+   * Resolve the provider a credits request is about.
+   *
+   * The renderer knows both handles: the descriptor id it renders (`workbuddy`)
+   * and the provider row the gateway registered. Accept either, so a caller
+   * cannot get an "unavailable" balance merely by naming the provider the way
+   * the status list names it.
+   */
+  private providerForRow(requested: string): InAppProvider | undefined {
+    const byDescriptor = this.providers.find((provider) => provider.id === requested);
+    if (byDescriptor) return byDescriptor;
     for (const [id, row] of this.rowIds) {
-      if (row === rowId) return this.providers.find((provider) => provider.id === id);
+      if (row === requested) return this.providers.find((provider) => provider.id === id);
     }
     return undefined;
   }
@@ -269,6 +278,9 @@ export class InAppProviders {
         const response = await request(`${origin}${provider.healthPath}`, {
           signal: controller.signal,
         });
+        // 401 means the gateway is listening and enforcing its loopback key; the
+        // key itself is proven by the model fetch that follows.
+        if (response.status === 401) return true;
         if (response.ok) {
           const body: unknown = await response.json().catch(() => undefined);
           if (body && typeof body === "object" && (body as { ok?: unknown }).ok === true) {

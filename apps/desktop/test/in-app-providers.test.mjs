@@ -53,6 +53,17 @@ function harness({ settings = {}, healthy = true, rows = [], models = ["m-1", "m
       if (!healthy) throw new Error("ECONNREFUSED");
       return { ok: true, json: async () => ({ ok: true, service: "pi-workbuddy-connect" }) };
     }
+    if (String(url).endsWith(WORKBUDDY.creditsPath)) {
+      return {
+        ok: true,
+        json: async () => ({
+          total: 42.5,
+          accounts: [{ name: "enterprise", remain: 42.5, size: 100 }],
+          free: false,
+          fetchedAt: 1_700_000_000_000,
+        }),
+      };
+    }
     const body = { object: "list", data: models.map((id) => ({ id })) };
     return { ok: true, json: async () => body };
   };
@@ -107,6 +118,19 @@ test("a second boot updates the existing row instead of creating another", async
   assert.equal(calls.filter((call) => call.method === "providers.update").length, 1);
   assert.equal(calls.find((call) => call.method === "providers.update").params.id, "row-1");
   assert.equal(calls.filter((call) => call.method === "providers.setSecret").length, 1);
+});
+
+test("credits answer for the descriptor id and for the provider row id", async () => {
+  const { supervisor } = harness();
+  await supervisor.start();
+  const byDescriptor = await supervisor.readProviderCredits({ providerId: "workbuddy", refresh: true });
+  assert.equal(byDescriptor.ok, true, JSON.stringify(byDescriptor));
+  assert.equal(byDescriptor.credits.total, 42.5);
+  const byRow = await supervisor.readProviderCredits({ providerId: "row-1", refresh: true });
+  assert.equal(byRow.ok, true, JSON.stringify(byRow));
+  assert.equal(byRow.credits.accounts[0].remain, 42.5);
+  const unknown = await supervisor.readProviderCredits({ providerId: "nope" });
+  assert.deepEqual(unknown, { ok: false, reason: "unavailable" });
 });
 
 test("a gateway that never becomes healthy writes no provider", async () => {

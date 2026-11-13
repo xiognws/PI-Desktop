@@ -297,6 +297,12 @@ export const IPC = {
     providersSetSecret: "pi-desktop/providers/setSecret",
     providersTest: "pi-desktop/providers/testConnection",
     /**
+     * In-app providers: the gateways the app itself starts. `list` reports the
+     * provider surfaces, `credits` the metered balance of one of them.
+     */
+    inAppProvidersList: "pi-desktop/in-app-providers/list",
+    inAppProvidersCredits: "pi-desktop/in-app-providers/credits",
+    /**
      * Check a TypeSafe key before the Jev settings row keeps it.
      *
      * Jev is not a provider row, so `providersTest` cannot answer this: the

@@ -137,16 +137,23 @@ export function useInAppProviderCredits(providerId: string | null): {
 let surfaces: InAppProviderSurface[] | null = null;
 let surfacesInflight: Promise<InAppProviderSurface[]> | null = null;
 const surfaceListeners = new Set<() => void>();
+/**
+ * Stable empty value.
+ *
+ * `useSyncExternalStore` compares snapshots by identity: returning a fresh
+ * `[]` before the first read arrives makes every render look like a change and
+ * the component re-renders forever.
+ */
+const NO_SURFACES: InAppProviderSurface[] = [];
+
+function subscribeSurfaces(listener: () => void): () => void {
+  surfaceListeners.add(listener);
+  return () => surfaceListeners.delete(listener);
+}
 
 /** Every in-app provider Main knows about, read once per app run. */
 export function useInAppProviderSurfaces(): InAppProviderSurface[] {
-  const current = useSyncExternalStore(
-    (listener) => {
-      surfaceListeners.add(listener);
-      return () => surfaceListeners.delete(listener);
-    },
-    () => surfaces ?? [],
-  );
+  const current = useSyncExternalStore(subscribeSurfaces, () => surfaces ?? NO_SURFACES);
   useEffect(() => {
     if (surfaces) return;
     surfacesInflight ??= api
