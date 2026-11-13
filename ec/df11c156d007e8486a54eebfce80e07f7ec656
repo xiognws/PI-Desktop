@@ -1,0 +1,18 @@
+services/autotest/ui/src/router/index.ts
+  h_201ed4c689ac8b 33-38
+services/autotest/ui/src/views/Pipeline.vue
+  h_201ed4c689ac8b 1-385
+services/autotest/ui/src/views/ProjectLayout.vue
+  h_201ed4c689ac8b 178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ecdf11c156d007e8486a54eebfce80e07f7ec656",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
