@@ -1,0 +1,16 @@
+apps/desktop/electron/preload/autotest.ts
+  h_201ed4c689ac8b 2,10-14,16-18,22
+apps/desktop/test/preload-single-bundle.test.mjs
+  h_201ed4c689ac8b 1-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a49bd505b0a190f8f41b1c1abbdb9467f9a809c7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
