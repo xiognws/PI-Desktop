@@ -1,0 +1,26 @@
+apps/desktop/src/features/settings/SettingsPage.tsx
+  h_201ed4c689ac8b 663-667,669-684
+apps/desktop/test/feedback.test.mjs
+  h_201ed4c689ac8b 1,58-69
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 862-874,885-893,1001-1004
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 13802-13813,13816-13818
+docs/zh-CN/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 342-349,351-363,430-431
+docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 7576,7578-7581,7584
+packages/i18n/test/user-facing-copy.test.mjs
+  h_201ed4c689ac8b 150-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b5787a833118810167e25c7453d0a899f19e3d6b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
