@@ -1,0 +1,36 @@
+apps/desktop/test/auto-update.test.mjs
+  h_201ed4c689ac8b 327
+packages/shared/src/changelog-de.ts
+  h_201ed4c689ac8b 6,8-15
+packages/shared/src/changelog-en.ts
+  h_201ed4c689ac8b 6-15
+packages/shared/src/changelog-es.ts
+  h_201ed4c689ac8b 6,8-15
+packages/shared/src/changelog-fr.ts
+  h_201ed4c689ac8b 6,8-15
+packages/shared/src/changelog-ko.ts
+  h_201ed4c689ac8b 6-15
+packages/shared/src/changelog-pt-BR.ts
+  h_201ed4c689ac8b 6,8-15
+packages/shared/src/changelog-tr.ts
+  h_201ed4c689ac8b 6,8-15
+packages/shared/src/changelog-zh-CN.ts
+  h_201ed4c689ac8b 6-15
+packages/shared/src/changelog-zh-TW.ts
+  h_201ed4c689ac8b 6-15
+packages/shared/src/changelog.test.ts
+  h_201ed4c689ac8b 33-38,45,64-66,69,72
+packages/shared/src/changelog.ts
+  h_201ed4c689ac8b 21-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "68d604070cbaa1acdc0726116e78db4749a9f8e6",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
