@@ -1,0 +1,30 @@
+apps/desktop/electron/main/runtime/curator-runner.ts
+  h_201ed4c689ac8b 2-3,5,7-13,15-17,19-21,23-24,27-30,47,65-107,129-138,140-142
+apps/desktop/test/curator-auto-run.test.mjs
+  h_201ed4c689ac8b 11,30-33,53,74-78,84,91,103,124-128,137-141,150-207
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 6887-6935
+crates/host-core/src/user_skills.rs
+  h_201ed4c689ac8b 31-43,262-280,1395-1397,1753-1755,1758-1761
+crates/host-core/src/user_skills/tests_lifecycle.rs
+  h_201ed4c689ac8b 568-679
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1668-1677
+docs/spec/03-runtime/21-memory-store.md
+  h_201ed4c689ac8b 247-265
+docs/zh-CN/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1287-1292
+docs/zh-CN/spec/03-runtime/21-memory-store.md
+  h_201ed4c689ac8b 216-230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "fc30ed5ee6dbe655683f9648d3cd44b4b6540dae",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

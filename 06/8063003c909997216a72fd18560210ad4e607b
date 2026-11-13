@@ -1,0 +1,36 @@
+apps/desktop/src/components/settings/SkillMarketPanel.tsx
+  h_201ed4c689ac8b 18,376-378,382,388-393
+apps/desktop/src/lib/skill-description.ts
+  h_201ed4c689ac8b 1-49
+apps/desktop/test/skill-description.test.mjs
+  h_201ed4c689ac8b 1-55
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1091,1268-1269
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1101,1278-1279
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1091,1268-1269
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1091,1268-1269
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1098,1274-1275
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1085,1252-1253
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1098,1274-1275
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1093,1265-1266
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1093,1265-1266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "068063003c909997216a72fd18560210ad4e607b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
