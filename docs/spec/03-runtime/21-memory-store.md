@@ -244,10 +244,25 @@ a pinned row.
   explicit `memory.forget`.
 - Removal drops the FTS row in the same transaction, so an expired memory cannot
   be recalled afterwards.
-- The host runs the rules **at most once a day** at startup
-  (`boot_maintenance → daily_memory_tidy`, throttled through
-  `kv['memoryTidy']['lastRunAt']`). Failures are logged and ignored: retention is
-  housekeeping, never a startup blocker.
+- The host runs the rules **at most once a day per entry point**, from two
+  places with their own throttle timestamps (a launch that also crosses a tick
+  boundary can therefore run both; each pass is idempotent and finds nothing the
+  other left behind):
+  - **At startup** (`boot_maintenance → daily_memory_tidy`, throttled through
+    `kv['memoryTidy']['lastRunAt']`). Failures are logged and ignored: retention
+    is housekeeping, never a startup blocker.
+  - **On the maintenance tick** that already carries skill curation
+    (`apps/desktop/electron/main/runtime/curator-runner.ts` →
+    `memory.tidy` RPC, at most once per 24h). A desktop app can stay up for
+    weeks, so a boot-only pass would mean the rule never runs again for that
+    session. The tick shares the curator's three gates — a turn is running,
+    `curateAutomatically: false`, and the last run being younger than 24h — and
+    logs one line per run, `memory.tidy_applied`, with `removed`, `expired` and
+    `overflow`. The two passes on that tick are independent: a failing tidy is
+    logged (`memory.tidy_failed`) and never skips the skill pass, and a failing
+    skill pass never skips the tidy. A failed tidy waits for the next daily
+    tick; a failed skill pass keeps its next-tick retry, which is also when the
+    shared `curatorLastRunAt` setting is written.
 - Automatic extraction after a turn (stage 2c) is **retired**, not pending: it
   needed a provider/model and a per-turn budget decision nobody owned, and the
   agent now writes its own memory while the turn still holds the context (§9.3,

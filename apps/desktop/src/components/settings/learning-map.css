@@ -1,0 +1,136 @@
+/*
+ * The learning map's interactive layer.
+ *
+ * The drawn marks are a few SVG units wide, so the pointer target is a larger
+ * transparent shape behind each one, and the state ring is what says "this pair
+ * is the one you are looking at". Surface, text, radius and type values all come
+ * from the token scales; nothing here hardcodes a colour.
+ */
+
+/* The card sits beside the picture; on a narrow page it wraps underneath. */
+.learning-map-body.has-detail {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* `fill: transparent` (not `none`) is what keeps an invisible shape hit-testable. */
+.learning-map-canvas .learning-map-node .learning-map-hit {
+  fill: transparent;
+  stroke: none;
+}
+
+/* Only a node the component made activatable is a pointer target: the static
+   preview wrapper draws the same marks without a role or a tab stop. */
+.learning-map-canvas .learning-map-node[tabindex] {
+  cursor: pointer;
+  outline: none;
+}
+
+.learning-map-canvas .learning-map-node.is-active .learning-map-node-mark,
+.learning-map-canvas .learning-map-node:focus-visible .learning-map-node-mark {
+  stroke: var(--ds-text-primary);
+  stroke-width: 1.4;
+}
+
+.learning-map-canvas .learning-map-node.is-selected .learning-map-node-mark {
+  stroke: var(--ds-text-primary);
+  stroke-width: 2;
+}
+
+/* The pair under the pointer stands out by dimming the rest of the web, not by
+   redrawing the highlighted lines: weight already means overlap strength. */
+.learning-map-canvas .learning-map-edge.is-active {
+  stroke: var(--ds-text-primary);
+  stroke-opacity: 0.8;
+}
+
+.learning-map-canvas .learning-map-edge.is-dim {
+  stroke-opacity: 0.08;
+}
+
+.learning-map-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-secondary);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.learning-map-detail:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.learning-map-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.learning-map-detail-kind {
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--tracking-wide);
+}
+
+.learning-map-detail-name {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+.learning-map-detail-text {
+  margin: 0;
+  max-height: 9em;
+  overflow-y: auto;
+  color: var(--ds-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.learning-map-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.learning-map-detail-chip {
+  padding: 1px 6px;
+  border-radius: var(--radius-2xs);
+  background: var(--ds-bg-chip);
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+}
+
+.learning-map-detail-hint {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+}
+
+.learning-map-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Compound so the shared `.btn-secondary` colour cannot win on load order. */
+.learning-map-detail .learning-map-detail-remove {
+  color: var(--ds-error);
+}
+
+.learning-map-detail .learning-map-detail-remove.is-armed {
+  border-color: var(--ds-error);
+}

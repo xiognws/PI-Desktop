@@ -28,6 +28,19 @@ const MAX_SKILLS: usize = 128;
 pub const MAX_SKILL_PACKAGE_FILES: usize = 256;
 pub const MAX_SKILL_PACKAGE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_NAME_CHARS: usize = 120;
+/// Characters of a description the system-prompt catalog shows
+/// (`SKILL_DESCRIPTION_INDEX_CHARS` in `packages/agent-runtime/src/plugin-skills-prompt.ts`).
+///
+/// A description is prompt space: the catalog renders one line per skill on
+/// every turn, so this figure is what the model actually reads. A write that
+/// exceeds it is refused rather than clipped — the author is the only one who
+/// can say which half of the sentence mattered, and a silent cut turns a
+/// stated standard into a hidden one.
+const CATALOG_DESCRIPTION_CHARS: usize = 60;
+/// Backstop for a description that never passes a create/update input: an
+/// imported or hand-edited document is clipped here instead of being allowed to
+/// grow without limit. Above `CATALOG_DESCRIPTION_CHARS`, so a legacy long
+/// description survives a scan untouched and stays patchable.
 const MAX_DESCRIPTION_CHARS: usize = 400;
 const SKILL_KIND: &str = "skills";
 /// Where a curated skill's document goes (ADR 0395).
@@ -244,6 +257,25 @@ fn symlink_path(source: &Path, target: &Path) -> Result<()> {
 #[cfg(not(any(unix, windows)))]
 fn symlink_path(_source: &Path, _target: &Path) -> Result<()> {
     bail!("SKILL_INVALID: symlink import is not supported on this platform")
+}
+
+/// Refuse a description the catalog would cut, and say why it matters.
+///
+/// Only a value the caller *supplies* is checked. A description already stored
+/// — imported from a third-party package, or written before this rule — stays
+/// exactly as it is, so an unrelated `patch` (or a name/body/enabled edit) never
+/// starts failing because of a field it did not touch.
+fn check_description(value: &str) -> Result<()> {
+    let chars = value.trim().chars().count();
+    if chars > CATALOG_DESCRIPTION_CHARS {
+        bail!(
+            "SKILL_INVALID: description is {chars} characters; the skill catalog shows \
+             {CATALOG_DESCRIPTION_CHARS} and is paid for on every turn, so anything longer \
+             is truncated there. Shorten it to one sentence of at most \
+             {CATALOG_DESCRIPTION_CHARS} characters."
+        );
+    }
+    Ok(())
 }
 
 fn clip(value: &str, max_chars: usize) -> String {
@@ -1360,6 +1392,9 @@ impl UserSkillRegistry {
             .filter(|value| !value.trim().is_empty())
             .map(str::to_string)
             .unwrap_or_else(|| default_body(&name));
+        if let Some(description) = input.description.as_deref() {
+            check_description(description)?;
+        }
         let description = input
             .description
             .as_deref()
@@ -1715,9 +1750,15 @@ impl UserSkillRegistry {
             .filter(|value| !value.is_empty())
             .or_else(|| front.get("name").cloned())
             .unwrap_or(record.name.clone());
+        // Only a supplied description is validated: an absent one keeps what the
+        // document already says, which is how a legacy long description stays
+        // patchable.
         let description = match input.description.as_deref() {
             Some(value) if value.trim().is_empty() => None,
-            Some(value) => Some(clip(value, MAX_DESCRIPTION_CHARS)),
+            Some(value) => {
+                check_description(value)?;
+                Some(clip(value, MAX_DESCRIPTION_CHARS))
+            }
             None => record.description.clone(),
         };
         let body = input.body.unwrap_or(old_body);

@@ -43,13 +43,28 @@ export type LearningSkill = {
   name?: string;
   description?: string;
   enabled?: boolean;
+  /** How many times the model loaded it. `skills.recordUse` is the writer. */
+  useCount?: number;
+  /** Which library holds the document, so a detail panel can name its scope. */
+  level?: "global" | "project";
+  /** Exempt from the maintenance pass; the user's own "keep this" (ADR 0387). */
+  pinned?: boolean;
 };
 
 /** What the map needs from a memory record. */
 export type LearningMemory = {
   id: string;
+  /** Title and body joined: the text the overlap test reads. */
   text: string;
   target?: "memory" | "user";
+  /** The structured store's kind (`fact`, `preference`, …), when known. */
+  kind?: string;
+  /** The stored title, when the caller has it apart from the joined text. */
+  title?: string;
+  /** The stored body, for the detail panel. */
+  body?: string;
+  /** Recall count on the host. */
+  useCount?: number;
 };
 
 export type LearningMapOptions = {
@@ -165,7 +180,7 @@ export function buildLearningMap(
       id: `skill:${skill.id}`,
       kind: "skill" as const,
       label: shortLabel(skill.name || skill.id),
-      useCount: (skill as { useCount?: number }).useCount,
+      useCount: skill.useCount,
       idle: skill.enabled === false,
       ...inner[index],
     })),
@@ -206,5 +221,132 @@ export function buildLearningMap(
       skillsHidden: Math.max(sortedSkills.length - drawnSkills.length, 0),
       memoriesHidden: Math.max(sortedMemories.length - drawnMemories.length, 0),
     },
+  };
+}
+
+/* ------------------------------------------------------------------------- *
+ * Selection
+ *
+ * A node id is `<kind>:<record id>` so the map can hold both stores in one
+ * list. Everything below turns a click back into the record behind it: the
+ * component never parses a prefix and never guesses which store to ask.
+ * ------------------------------------------------------------------------- */
+
+/** The record a drawn node points at, without the `kind:` prefix. */
+export function parseLearningNodeId(
+  nodeId: string,
+): { kind: "skill" | "memory"; id: string } | null {
+  const at = nodeId.indexOf(":");
+  if (at <= 0) return null;
+  const kind = nodeId.slice(0, at);
+  const id = nodeId.slice(at + 1);
+  if (!id || (kind !== "skill" && kind !== "memory")) return null;
+  return { kind, id };
+}
+
+/**
+ * The key an edge is drawn under.
+ *
+ * Direction is part of it on purpose: the builder emits each pair once, from
+ * the node it visited first, and the same pair in the other direction is a
+ * different line as far as React keys go.
+ */
+export function learningEdgeKey(edge: LearningEdge): string {
+  return `${edge.from}->${edge.to}`;
+}
+
+/** Every edge with one end on this node; empty for no node and for isolates. */
+export function edgesTouching(map: LearningMap, nodeId: string | null): LearningEdge[] {
+  if (!nodeId) return [];
+  return map.edges.filter((edge) => edge.from === nodeId || edge.to === nodeId);
+}
+
+/**
+ * The next node in drawing order, wrapping at both ends.
+ *
+ * Arrow keys walk the map in the order it was drawn, which is the only order a
+ * reader can predict from the picture: skills first, then memories, both by id.
+ */
+export function nextLearningNodeId(
+  map: LearningMap,
+  currentId: string | null,
+  delta: number,
+): string | null {
+  const total = map.nodes.length;
+  if (total === 0) return null;
+  const index = currentId === null ? -1 : map.nodes.findIndex((node) => node.id === currentId);
+  if (index < 0) return map.nodes[delta < 0 ? total - 1 : 0].id;
+  const step = delta < 0 ? -1 : 1;
+  return map.nodes[(index + step + total) % total].id;
+}
+
+/**
+ * What a person sees after activating a node.
+ *
+ * Built from the same records the map was drawn from, so the panel cannot say
+ * something the picture does not contain — and a record that is gone (deleted
+ * while the panel was open) resolves to `null` instead of a stale summary.
+ */
+export type LearningNodeDetail =
+  | {
+      kind: "skill";
+      id: string;
+      name: string;
+      description: string;
+      level?: "global" | "project";
+      useCount?: number;
+      pinned: boolean;
+      enabled: boolean;
+    }
+  | {
+      kind: "memory";
+      id: string;
+      title: string;
+      body: string;
+      /** The structured store's kind; absent on a record that carries none. */
+      memoryKind?: string;
+      target: "memory" | "user";
+      useCount?: number;
+    };
+
+/** The first non-empty line of a text, for the detail panel's title. */
+function firstLine(text: string): string {
+  return (text ?? "").split("\n").map((line) => line.trim()).find(Boolean) ?? "";
+}
+
+/** Resolve one drawn node id against the records it was drawn from. */
+export function learningNodeDetail(
+  nodeId: string,
+  skills: readonly LearningSkill[],
+  memories: readonly LearningMemory[],
+): LearningNodeDetail | null {
+  const parsed = parseLearningNodeId(nodeId);
+  if (!parsed) return null;
+
+  if (parsed.kind === "skill") {
+    const skill = skills.find((row) => row.id === parsed.id);
+    if (!skill) return null;
+    return {
+      kind: "skill",
+      id: skill.id,
+      name: skill.name?.trim() || skill.id,
+      description: skill.description?.trim() ?? "",
+      ...(skill.level ? { level: skill.level } : {}),
+      ...(skill.useCount === undefined ? {} : { useCount: skill.useCount }),
+      pinned: skill.pinned === true,
+      enabled: skill.enabled !== false,
+    };
+  }
+
+  const memory = memories.find((row) => row.id === parsed.id);
+  if (!memory) return null;
+  return {
+    kind: "memory",
+    id: memory.id,
+    title: memory.title?.trim() || firstLine(memory.text),
+    body: memory.body?.trim() ?? "",
+    ...(memory.kind ? { memoryKind: memory.kind } : {}),
+    target: memory.target ?? "memory",
+    ...(memory.useCount === undefined ? {} : { useCount: memory.useCount }),
   };
 }

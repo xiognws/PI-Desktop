@@ -213,10 +213,21 @@ Schema 版本 30 → 31（`db/memory_entries_retire_migration.rs`）终结第二
 - **「从未被召回」才是决定信号**，而不是年龄：Agent 一直在用的记忆不论多旧都会存活，
   而被取代的行作为历史保留，直到显式 `memory.forget`。
 - 移除在同一次事务里删掉 FTS 行，因此过期的记忆之后不可能被召回。
-- 宿主在启动时**每天至多跑一次**这些规则
-  （`boot_maintenance → daily_memory_tidy`，用
-  `kv['memoryTidy']['lastRunAt']` 节流）。失败只记日志并忽略：保留策略是
-  日常维护，永远不是启动阻塞项。
+- 宿主**每个入口每天至多跑一次**这些规则，两个入口各有自己的节流时间戳
+  （一次启动若正好跨过 tick 边界，两者都会跑；每次都是幂等的，不会找到对方留下的东西）：
+  - **启动时**（`boot_maintenance → daily_memory_tidy`，用
+    `kv['memoryTidy']['lastRunAt']` 节流）。失败只记日志并忽略：保留策略是
+    日常维护，永远不是启动阻塞项。
+  - **维护 tick 上**，与技能策展共用同一次调度
+    （`apps/desktop/electron/main/runtime/curator-runner.ts` → `memory.tidy`
+    RPC，24 小时至多一次）。桌面应用可能连续运行数周，只靠启动时跑一次，
+    那个会话里这条规则就再也不会执行。该 tick 沿用策展的三道闸——有轮次正在
+    运行、`curateAutomatically: false`、距上次运行不足 24 小时——并在每次运行后
+    记一行 `memory.tidy_applied`，带 `removed`、`expired`、`overflow`。同一 tick
+    上的两件事互相独立：tidy 失败记 `memory.tidy_failed`，绝不跳过技能策展；
+    技能策展失败也绝不跳过 tidy。失败的 tidy 等下一个每日 tick，失败的技能策展
+    保留自己的「下一个 tick 重试」，共享的 `curatorLastRunAt` 设置也是在策展成功
+    时才写入。
 - 一轮之后的自动抽取（阶段 2c）**已废弃**，不是待办：它需要提供方/模型以及
   每轮预算的决定，而这两者都没有归属；现在 Agent 在该轮仍然持有上下文时自己写
   记忆（§9.3，ADR 0380）。

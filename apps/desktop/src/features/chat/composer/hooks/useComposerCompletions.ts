@@ -19,6 +19,8 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from "react";
+import { useTranslation } from "react-i18next";
+import { detectTrigger } from "@pi-workspace/shared";
 import {
   useComposerAutocomplete,
   type AutocompleteItem,
@@ -26,6 +28,11 @@ import {
 import { slotRegistry } from "../../../../plugins/renderer-slots/registry";
 import { useAppStore } from "../../../../stores/app-store";
 import { createFileReference, isImageFilePath, nextChipToken } from "../editor";
+import {
+  applyLearnCompletion,
+  insertLearnRow,
+  learnCompletionRow,
+} from "../learn-command";
 import type { ComposerFileReference } from "../model";
 import { placePluginMark } from "../plugins/plugin-marks";
 import {
@@ -84,6 +91,7 @@ export function useComposerCompletions({
   invalidateComposerTransforms: () => void;
 }) {
   const host = useComposerAutocomplete({ value, cursor, composing, enabled });
+  const { t } = useTranslation();
   const { triggers } = useSyncExternalStore(
     slotRegistry.subscribe,
     slotRegistry.getSnapshot,
@@ -142,9 +150,29 @@ export function useComposerCompletions({
   }, [entry, dismissed, answer, requestKey, plugins]);
 
   const hostItems = host.open ? host.items : NO_ITEMS;
+  // `/learn` is the composer's own command, so the host's list has no entry for
+  // it: the row is merged in here, and only into the first token — a later slash
+  // is a skill reference under the same rule the host menu follows.
+  const learnTrigger =
+    enabled && !composing ? detectTrigger(value, cursor) : null;
+  const learnQuery =
+    host.open && learnTrigger !== null && learnTrigger.tokenStart === 0
+      ? learnTrigger.query
+      : null;
+  const learnRow = useMemo(
+    () => (learnQuery === null ? null : learnCompletionRow(learnQuery, (key) => t(key))),
+    [learnQuery, t],
+  );
+  const hostRows = useMemo(
+    () =>
+      learnRow
+        ? insertLearnRow(hostItems, learnRow)
+        : { items: hostItems, index: -1 },
+    [hostItems, learnRow],
+  );
   const items = useMemo<CompletionItem[]>(
-    () => [...hostItems, ...pluginItems],
-    [hostItems, pluginItems],
+    () => [...hostRows.items, ...pluginItems],
+    [hostRows.items, pluginItems],
   );
 
   // A new query restarts keyboard navigation at the top hit.
@@ -173,8 +201,19 @@ export function useComposerCompletions({
   };
 
   const acceptCompletion = (index: number) => {
-    if (index >= hostItems.length) {
-      const item = pluginItems[index - hostItems.length];
+    const learnIndex = hostRows.index;
+    if (learnIndex >= 0 && index === learnIndex) {
+      const applied = applyLearnCompletion(value, cursor);
+      if (!applied) return;
+      invalidateComposerTransforms();
+      applyEditorDraft(applied.value, fileReferencesRef.current, applied.cursor);
+      return;
+    }
+    // The row shifted the host's indices by one; everything below addresses the
+    // host's own list, so undo the shift first.
+    const hostIndex = learnIndex >= 0 && index > learnIndex ? index - 1 : index;
+    if (hostIndex >= hostItems.length) {
+      const item = pluginItems[hostIndex - hostItems.length];
       if (!item || !match) return;
       invalidateComposerTransforms();
       const text = value.slice(0, match.tokenStart) + value.slice(match.tokenEnd);
@@ -192,7 +231,7 @@ export function useComposerCompletions({
       );
       return;
     }
-    const result = host.accept(index);
+    const result = host.accept(hostIndex);
     if (!result) return;
     invalidateComposerTransforms();
     // File accept strips the @ token (empty insert) and used to store a
