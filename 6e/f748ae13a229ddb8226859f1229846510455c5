@@ -1,0 +1,14 @@
+scripts/e2e-preinstalled-plugins.mjs
+  h_201ed4c689ac8b 1-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6ef748ae13a229ddb8226859f1229846510455c5",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

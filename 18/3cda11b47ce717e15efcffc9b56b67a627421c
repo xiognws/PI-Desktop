@@ -1,0 +1,52 @@
+apps/desktop/electron/main/ipc/components-ipc.ts
+  h_201ed4c689ac8b 1-67
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 17,561-563
+apps/desktop/electron/main/user-components.ts
+  h_201ed4c689ac8b 1,72-150
+apps/desktop/src/features/settings/DataComponentsSection.tsx
+  h_201ed4c689ac8b 1-108
+apps/desktop/src/features/settings/SettingsPage.tsx
+  h_201ed4c689ac8b 69,499-500
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 1466-1477
+apps/desktop/src/styles/settings.css
+  h_201ed4c689ac8b 3793-3812
+apps/desktop/test/user-components.test.mjs
+  h_201ed4c689ac8b 2,9-11,85-142
+docs/adr/0396-preinstalled-plugins-are-removable.md
+  h_201ed4c689ac8b 154-167
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 94-105
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 994-1012
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1006-1024
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 994-1012
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 994-1012
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1003-1021
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 993-1011
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1003-1021
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 999-1017
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 999-1017
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 383-389
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "183cda11b47ce717e15efcffc9b56b67a627421c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
