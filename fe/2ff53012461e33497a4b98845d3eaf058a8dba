@@ -1,0 +1,18 @@
+apps/desktop/electron.vite.config.ts
+  h_201ed4c689ac8b 6
+apps/desktop/electron/vite/inline-preload-chunks.ts
+  h_201ed4c689ac8b 1-41
+apps/desktop/test/preload-inline-chunks.test.mjs
+  h_201ed4c689ac8b 1-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "fe2ff53012461e33497a4b98845d3eaf058a8dba",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
