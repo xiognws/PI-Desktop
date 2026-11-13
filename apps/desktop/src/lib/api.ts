@@ -5,6 +5,7 @@ type ClipboardDirectoryPaste = {
 };
 import { projectPlanHistory } from "./plan-history";
 import { guardRemoteInvocation } from "./remote-ipc-safety";
+import { IN_APP_PROVIDER_CHANNELS } from "./in-app-provider-channels";
 import { isRemoteSession, safeSessionSummary } from "./remote-session-safety";
 import type {
   ConfigSyncTestInput,
@@ -830,6 +831,19 @@ export const api = {
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
   getOnboarding: () => invoke<OnboardingState>(IPC.invoke.appGetOnboarding),
   dismissOnboarding: () => invoke(IPC.invoke.appDismissOnboarding),
+  /**
+   * In-app providers (`electron/main/providers`). Both channels answer with a
+   * state, never with an exception: a failed credit read is a UI state.
+   */
+  inAppProviders: () =>
+    invoke<{ providers: import("./in-app-credits").InAppProviderSurface[] }>(
+      IN_APP_PROVIDER_CHANNELS.list,
+    ),
+  inAppProviderCredits: (input: { providerId: string; refresh?: boolean }) =>
+    invoke<import("./in-app-credits").CreditsResult>(
+      IN_APP_PROVIDER_CHANNELS.credits,
+      input,
+    ),
   updatesGetState: () => invoke<UpdateState>(IPC.invoke.updatesGetState),
   updatesCheck: () => invoke<UpdateState>(IPC.invoke.updatesCheck),
   updatesDownload: () => invoke<UpdateState>(IPC.invoke.updatesDownload),

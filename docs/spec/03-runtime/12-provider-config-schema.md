@@ -336,6 +336,13 @@ label, and a credential the user entered are kept. Disabling the plugin keeps
 the row and turns it off; uninstalling it, or removing the declaration, deletes
 the row and both credential refs (ADR 0259,
 `07-plugins/02-plugin-manifest-schema.md` §5.4).
+
+A row the application owns for a built-in provider is not a plugin row: it
+carries the reserved `ownerPluginId` `builtin:<provider>` (never a plugin id)
+and is registered by the app on every boot (`11-provider-model-system.md` §8b,
+ADR 0397). It cannot be deleted while its gateway runs; the supported off state
+is disabling it.
+
 ### Copy a provider into an independent draft
 
 Model configuration offers **Copy** on ordinary non-OAuth provider rows. The

@@ -121,6 +121,11 @@
 关闭；卸载插件或移除该声明会删除该行及其两个凭据引用（ADR 0259，
 `07-plugins/02-plugin-manifest-schema.md` §5.4）。
 
+应用为内置提供商拥有的行不是插件行：它带有保留的 `ownerPluginId`
+`builtin:<provider>`（绝不是插件 id），由应用在每次启动时注册
+（`11-provider-model-system.md` §8b，ADR 0397）。网关运行期间该行不可删除；
+受支持的关闭方式是停用它。
+
 `models[].alias` 是可选展示标签（ADR 0192）。`models[].id` 仍是发给提供商的
 身份，别名从不用于提供商或模型解析。host-core 会修剪别名、丢弃空白值，
 并在超过 60 个 Unicode 字符时以 `MODEL_ALIAS_TOO_LONG` 拒绝。
