@@ -5,7 +5,24 @@
 
 from __future__ import annotations
 
+from autotest.workflow.consistency import PLACEHOLDERS
+
 MIN_STEPS = 2
+
+# 预期里只要每条都挂着这些句子，就没有可判定对象：执行的人也不知道该看什么。
+_FILLER = (
+    *PLACEHOLDERS,
+    "按需求描述完成",
+    "按需求执行",
+    "结果与预期一致",
+)
+
+
+def _expected_judgeable(expected: list[str]) -> bool:
+    """至少要有一条预期不靠空话立住 —— 否则执行时无法判定成败。"""
+    return any(
+        not any(phrase in str(item) for phrase in _FILLER) for item in expected if str(item).strip()
+    )
 
 
 def review_cases(cases: list[dict], module: str = "") -> dict:
@@ -25,6 +42,13 @@ def review_cases(cases: list[dict], module: str = "") -> dict:
         else:
             seen[key] = index
 
+        # 没有依据的用例不能算"可测"：它测的是模板句式，不是需求。
+        if str(case.get("grounding") or "") == "none":
+            untestable.append(
+                {"index": index, "title": title, "reason": "无依据（占位用例，资料缺失）"}
+            )
+            continue
+
         steps = [item for item in (case.get("steps") or []) if str(item).strip()]
         expected = [item for item in (case.get("expected") or []) if str(item).strip()]
         if not steps:
@@ -33,6 +57,10 @@ def review_cases(cases: list[dict], module: str = "") -> dict:
             issues.append({"index": index, "title": title, "reason": f"步骤少于 {MIN_STEPS} 条"})
         if not expected:
             untestable.append({"index": index, "title": title, "reason": "缺少预期结果"})
+        elif not _expected_judgeable(expected):
+            untestable.append(
+                {"index": index, "title": title, "reason": "预期不可判定（只有空话）"}
+            )
         if not str(case.get("priority") or "").strip():
             issues.append({"index": index, "title": title, "reason": "缺少优先级"})
 

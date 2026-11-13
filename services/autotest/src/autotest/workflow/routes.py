@@ -469,20 +469,37 @@ def case_review(project_id: str, body: CaseReviewIn) -> dict:
             designed = store.last_payload(conn, body.run_id, "autotest_case_design") or {}
             cases = designed.get("cases") or []
         result = review_service.review_cases(cases, body.module or str(run.get("module") or ""))
+        review_judgement = consistency.check_review(result, cases)
         store.append_step(
             conn,
             body.run_id,
             tool="autotest_case_review",
             stage="reviewed",
-            status="ok" if result["verdict"] == "ok" else "warning",
-            summary=f"评审结论 {result['verdict']}，不可测 {len(result['untestable'])} 条",
-            payload={**result, "prompt": _prompt_marker("case-review")},
+            status="ok" if result["verdict"] == "ok" and review_judgement["ok"] else "warning",
+            summary=(
+                f"评审结论 {result['verdict']}，不可测 {len(result['untestable'])} 条"
+                + (
+                    f"，结论不符合提示词规则 {len(review_judgement['issues'])} 处"
+                    if not review_judgement["ok"]
+                    else ""
+                )
+            ),
+            payload={
+                **result,
+                "prompt": _prompt_marker("case-review"),
+                "consistency": review_judgement,
+            },
         )
         store.touch_run(conn, body.run_id, stage="reviewed")
 
     return _envelope(
         f"评审结论 {result['verdict']}：不可测 {len(result['untestable'])} 条、重复 {len(result['duplicates'])} 条",
-        {"run_id": body.run_id, **result, "prompt": _prompt_marker("case-review")},
+        {
+            "run_id": body.run_id,
+            **result,
+            "prompt": _prompt_marker("case-review"),
+            "consistency": review_judgement,
+        },
         body.run_id,
     )
 
@@ -992,6 +1009,7 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
         first_execution = next(
             (item.get("execution_id") for item in (payload.get("results") or [])), None
         )
+        report_judgement = consistency.check_report(result["markdown"], counts, result["pass_rate"])
         report_id = f"report_{uuid.uuid4().hex[:8]}"
         conn.execute(
             "INSERT INTO reports (id, name, total, passed, failed, pass_rate, execution_id)"
@@ -1011,9 +1029,21 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
             run_id,
             tool="autotest_report",
             stage="reported",
-            status="ok",
-            summary=f"通过率 {result['pass_rate']}，报告 {result['name']}",
-            payload={"report_id": report_id, "path": str(report_path), "counts": counts},
+            status="ok" if report_judgement["ok"] else "warning",
+            summary=(
+                f"通过率 {result['pass_rate']}，报告 {result['name']}"
+                + (
+                    f"，报告不符合提示词规则 {len(report_judgement['issues'])} 处"
+                    if not report_judgement["ok"]
+                    else ""
+                )
+            ),
+            payload={
+                "report_id": report_id,
+                "path": str(report_path),
+                "counts": counts,
+                "consistency": report_judgement,
+            },
         )
         store.touch_run(conn, run_id, stage="reported", status="done")
 
@@ -1058,6 +1088,7 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
         "verified_bug_ids": verified_bug_ids,
         "preview": result["markdown"][:400],
         "prompt": _prompt_marker("report"),
+        "consistency": report_judgement,
     }
     return _envelope(f"报告已生成：通过率 {result['pass_rate']}", data, run_id)
 

@@ -87,6 +87,117 @@ def check_case(case: dict) -> list[dict]:
     return issues
 
 
+def check_review(review: dict, cases: list[dict]) -> dict:
+    """`prompts/case-review.md` 的规则落到评审结论上。
+
+    评审是"用例进脚本前"的最后一道闸。结论为空、条目定位不到、或者把无依据的
+    用例判成可测，都会让不可测的用例一路流到执行阶段。
+    """
+    issues: list[dict] = []
+
+    def add(field: str, problem: str) -> None:
+        issues.append({"field": field, "problem": problem})
+
+    verdict = str(review.get("verdict") or "")
+    untestable = review.get("untestable") or []
+    duplicates = review.get("duplicates") or []
+    if verdict not in ("ok", "needs_fix"):
+        add("verdict", f"verdict {verdict!r} 只能取 ok / needs_fix")
+    if verdict == "needs_fix" and not untestable and not duplicates:
+        add("verdict", "needs_fix 却没有任何明细，等于空结论")
+    if verdict == "ok" and (untestable or duplicates):
+        add("verdict", "有不可测/重复明细却给了 ok")
+
+    for item in [*untestable, *duplicates]:
+        index = item.get("index")
+        if not isinstance(index, int) or not 0 <= index < len(cases):
+            add("index", f"明细里的 index {index!r} 定位不到输入用例")
+
+    ungrounded = [
+        index
+        for index, case in enumerate(cases)
+        if str(case.get("grounding") or "") == "none"
+    ]
+    reported = {item.get("index") for item in untestable}
+    for index in ungrounded:
+        if index not in reported:
+            title = str((cases[index] or {}).get("title") or index)
+            add("grounding", f"无依据用例「{title}」没有被判为不可测")
+
+    by_field: dict[str, int] = {}
+    for issue in issues:
+        by_field[issue["field"]] = by_field.get(issue["field"], 0) + 1
+    return {
+        "ok": not issues,
+        "checked": len(cases),
+        "issues": issues[:20],
+        "by_field": by_field,
+    }
+
+
+REPORT_COLUMNS = ("总数", "通过", "跳过", "失败", "异常", "取消", "通过率", "总耗时")
+
+
+def check_report(markdown: str, counts: dict, pass_rate: str) -> dict:
+    """`prompts/report.md` 的规则落到生成的报告文本上。
+
+    报告是唯一对外交付物，最容易出现"数字和明细对不上但没人发现"。这里不改报告，
+    只把三件必须成立的事校验出来：表头顺序固定、表内数字等于 counts、跳过与通过率
+    的措辞守规矩。
+    """
+    issues: list[dict] = []
+
+    def add(field: str, problem: str) -> None:
+        issues.append({"field": field, "problem": problem})
+
+    text = str(markdown or "")
+    total = int(counts.get("total") or 0)
+    passed = int(counts.get("passed") or 0)
+    skipped = int(counts.get("skipped") or 0)
+    failed = int(counts.get("failed") or 0)
+    errored = int(counts.get("errored") or 0)
+    cancelled = int(counts.get("cancelled") or 0)
+    asserted = max(total - skipped, 0)
+
+    header = "| " + " | ".join(REPORT_COLUMNS) + " |"
+    if header not in text:
+        add("table", "结果汇总表头列顺序不符合报告规则")
+
+    row = re.search(r"^\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|", text, re.MULTILINE)
+    if row is None:
+        add("table", "找不到结果汇总数据行")
+    else:
+        numbers = [int(value) for value in row.groups()]
+        expected = [total, passed, skipped, failed, errored, cancelled]
+        if numbers != expected:
+            add("table", f"表内数字 {numbers} 与执行统计 {expected} 不一致")
+
+    if skipped > 0 and "未计通过" not in text:
+        add("skip", "有跳过用例，但报告没有声明「未计通过」")
+
+    if asserted == 0:
+        if pass_rate != "—（全部跳过）":
+            add("pass_rate", f"全部跳过时通过率应为「—（全部跳过）」，实际 {pass_rate!r}")
+        if "不能据此判定" not in text:
+            add("pass_rate", "全部跳过时没有说明不能据此判定功能通过")
+    else:
+        want = f"{passed / asserted * 100:.1f}%"
+        if pass_rate != want:
+            add("pass_rate", f"通过率应为 {want}（{passed}/{asserted}），实际 {pass_rate!r}")
+        if want not in text:
+            add("pass_rate", "正文里没有写出通过率数字")
+
+    by_field: dict[str, int] = {}
+    for issue in issues:
+        by_field[issue["field"]] = by_field.get(issue["field"], 0) + 1
+    return {
+        "ok": not issues,
+        "checked": 1,
+        "issues": issues[:20],
+        "by_field": by_field,
+    }
+
+
 def check_scripts(scripts: list[dict]) -> dict:
     """`prompts/script-author.md` 的硬规则落到生成的脚本文本上。
 

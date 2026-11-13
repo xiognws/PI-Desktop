@@ -516,9 +516,18 @@ services/autotest/prompts/
 出现空话句式。结果随 `case-design` 返回（`data.consistency`）并落进 step payload，
 不合格时 step 状态为 `warning`。
 
-落地时它立刻抓到一处真实缺陷：`weak`（有条款无数值）的用例以前退回模板，预期写的是
-"结果与预期一致"——依据在手却没用上。现已改为按条款原文生成步骤与预期
-（`cases.py::_clause_case`），并有回归测试锁住。
+同一套做法覆盖到另外三个阶段（各自返回 `data.consistency`，step 状态同样会转 `warning`）：
+
+| 阶段 | 判定函数 | 关键规则 |
+| --- | --- | --- |
+| 脚本生成 | `check_scripts` | 文件名/函数名 `case_<8 位短哈希>`、`STEPS`/`EXPECTED` 常量、`__main__` 入口、禁止恒真断言、无 skip 就必须有真实断言 |
+| 用例评审 | `check_review` | verdict 枚举、`needs_fix` 必须有明细、明细 index 可定位、无依据用例必须计入不可测 |
+| 测试报告 | `check_report` | 结果表列顺序固定、表内数字等于 counts、跳过须声明「未计通过」、全部跳过时不得给数字通过率 |
+
+写规则的过程本身抓到两处实现问题：`weak`（有条款无数值）的用例曾退回模板写
+"结果与预期一致"（现已按条款原文生成，见 `cases.py::_clause_case`，有回归测试锁住）；
+评审曾把 `grounding=none` 的占位用例判成可测（现已计入不可测，并把"预期只有空话"
+也判为不可测）。
 
 改规则的流程：改 md → 升 `version` → 跑 `tests/test_fixed_prompts.py`（会校验
 磁盘与注册表一致、每份都有硬性规则段）→ 产出里的 `prompt.ref` 自动跟着变。
