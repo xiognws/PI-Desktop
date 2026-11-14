@@ -1,0 +1,14 @@
+services/autotest/ui/src/views/ScriptEditor.vue
+  h_201ed4c689ac8b 4,403,407-408,412,414,416-417,419,421-422,424,426,429,434,443,450,457,460
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0ef423a52546fe4cda225a0bcb9ac67a8f660a0d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
