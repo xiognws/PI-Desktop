@@ -1,0 +1,16 @@
+apps/desktop/test/packaging-footprint.test.mjs
+  h_201ed4c689ac8b 194-199,252-256
+apps/desktop/test/transcript-latest-navigation.test.mjs
+  h_201ed4c689ac8b 9-12,16-19,22-26,35,38-40,42-45,47,50,52-56,60,62-65,71,73,75,78,80,84,89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b31a1d0253efa658a99de24dd68f0ea22d13a339",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
