@@ -103,8 +103,11 @@ export function applyReleaseDataRoot(development: boolean): string | null {
   const browsers = join(root, "ms-playwright");
 
   // An explicit PI_DESKTOP_DATA_DIR is the user's own answer: honour it and
-  // only relocate what nothing else pins down.
-  if (!explicitDataDir) {
+  // only relocate what nothing else pins down. An explicit PI_DESKTOP_DATA_ROOT
+  // is the same answer one level up — a root the caller named must not silently
+  // inherit a legacy profile, or a test/probe installation starts life with
+  // someone else's database in it.
+  if (!explicitDataDir && !explicitRoot) {
     adoptDirectory(
       dataDir,
       [
