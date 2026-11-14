@@ -349,14 +349,14 @@ onMounted(async () => {
         <!-- 模块分组：只筛文档库，不动上面的检索条件 -->
         <div v-if="stats && stats.modules.length" class="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2">
           <button
-            class="h-7 rounded-[6px] px-2 text-[12px]"
+            class="h-7 rounded-[4px] px-2 text-[12px]"
             :class="!kwModule ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="kwModule = ''"
           >全部 <span class="num">{{ stats.total.docs }}</span></button>
           <button
             v-for="m in stats.modules"
             :key="m.module"
-            class="h-7 rounded-[6px] px-2 text-[12px]"
+            class="h-7 rounded-[4px] px-2 text-[12px]"
             :class="kwModule === m.module ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="kwModule = kwModule === m.module ? '' : m.module"
           >{{ m.module }} <span class="num text-muted-2">{{ m.docs }} / {{ m.chunks }} 段</span></button>
@@ -434,13 +434,13 @@ onMounted(async () => {
         </div>
         <div class="flex h-11 items-center justify-center gap-3 border-t border-line text-[12px] text-muted">
           <button
-            class="h-7 rounded-[6px] border border-line px-2 text-fg disabled:opacity-40"
+            class="h-7 rounded-[4px] border border-line px-2 text-fg disabled:opacity-40"
             :disabled="chunkOffset <= 0"
             @click="previewChunks(chunkDoc.doc, Math.max(0, chunkOffset - CHUNK_PAGE))"
           >上一页</button>
           <span class="num">{{ chunkOffset + 1 }} - {{ Math.min(chunkOffset + CHUNK_PAGE, chunkDoc.total) }} / {{ chunkDoc.total }}</span>
           <button
-            class="h-7 rounded-[6px] border border-line px-2 text-fg disabled:opacity-40"
+            class="h-7 rounded-[4px] border border-line px-2 text-fg disabled:opacity-40"
             :disabled="chunkOffset + CHUNK_PAGE >= chunkDoc.total"
             @click="previewChunks(chunkDoc.doc, chunkOffset + CHUNK_PAGE)"
           >下一页</button>

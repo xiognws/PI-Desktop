@@ -160,7 +160,7 @@ function enterProject(id: string) {
       </div>
       <div class="flex items-center gap-4">
         <ThemeSwitch />
-        <span class="flex h-7 w-7 items-center justify-center rounded-[6px] bg-surface-3 text-[12px] text-fg">测</span>
+        <span class="flex h-7 w-7 items-center justify-center rounded-[4px] bg-surface-3 text-[12px] text-fg">测</span>
       </div>
     </header>
 

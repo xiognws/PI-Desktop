@@ -655,7 +655,7 @@ watch(viewMode, (val) => {
         <select
           :value="''"
           :disabled="batchBusy"
-          class="h-7 rounded-[6px] border border-line bg-surface px-1 text-[12px] text-fg"
+          class="h-7 rounded-[4px] border border-line bg-surface px-1 text-[12px] text-fg"
           @change="setSelectedPriority(($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''"
         >
           <option value="">改优先级…</option>

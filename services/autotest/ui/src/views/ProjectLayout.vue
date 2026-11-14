@@ -215,7 +215,7 @@ function backToHome() {
             @keyup.enter="submitSearch"
             type="text"
             placeholder="搜索知识库..."
-            class="w-full pl-8 pr-3 py-1 text-xs border border-line rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            class="h-8 w-full rounded-[8px] border border-line bg-surface pl-8 pr-3 text-[12px] text-fg placeholder:text-muted-2 focus:border-accent focus:outline-none"
           />
         </div>
         <!-- 通知：有运行在等人工审批时高亮 -->

@@ -174,12 +174,12 @@ onMounted(loadRuns)
         </div>
         <div class="flex h-9 items-center gap-1 border-b border-line px-4">
           <button
-            class="h-7 rounded-[6px] px-2 text-[12px]"
+            class="h-7 rounded-[4px] px-2 text-[12px]"
             :class="reportView === 'rendered' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="reportView = 'rendered'"
           >阅读</button>
           <button
-            class="h-7 rounded-[6px] px-2 text-[12px]"
+            class="h-7 rounded-[4px] px-2 text-[12px]"
             :class="reportView === 'raw' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="reportView = 'raw'"
           >原文</button>

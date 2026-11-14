@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
           <div class="flex items-center gap-3">
             <span class="num text-[12px] text-muted-2">{{ events.length }} 条事件</span>
             <button
-              class="h-7 rounded-[6px] px-2 text-[12px]"
+              class="h-7 rounded-[4px] px-2 text-[12px]"
               :class="onlyFailed ? 'bg-danger-soft text-danger' : 'text-muted hover:text-fg'"
               @click="onlyFailed = !onlyFailed"
             >只看失败</button>
