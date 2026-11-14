@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PlayCircle, RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,11 +84,12 @@ function openExecution(id: number) {
   router.push({ name: 'ExecutionDetail', params: { projectId, id } })
 }
 
-function statusClass(status: string) {
-  if (status === '执行中') return 'bg-accent-soft text-accent'
-  if (status === '已完成') return 'bg-success-soft text-success'
-  if (status === '已取消') return 'bg-warn-soft text-warn'
-  return 'bg-danger-soft text-danger'
+function statusTone(status: string): 'accent' | 'success' | 'warn' | 'danger' | 'neutral' {
+  if (status === '执行中') return 'accent'
+  if (status === '已完成') return 'success'
+  if (status === '已取消') return 'warn'
+  if (status === '失败') return 'danger'
+  return 'neutral'
 }
 
 async function loadExecutions(quiet = false) {
@@ -126,87 +129,110 @@ onBeforeUnmount(stopPolling)
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden">
-    <div class="bg-surface border-b border-line px-6 py-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base font-medium text-fg">执行记录</h2>
-          <span class="text-sm text-muted-2">共 {{ executions.length }} 次</span>
-          <span v-if="hasRunning" class="text-xs px-2 py-0.5 rounded bg-accent-soft text-accent">实时刷新中</span>
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[1200px] px-8 py-7">
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-[20px] font-medium text-fg">执行</h1>
+          <p class="mt-1 text-[13px] text-muted">
+            每次执行一条记录，点开看逐条用例的结果与日志。
+          </p>
         </div>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-2 pt-1">
           <input
             v-model="query"
-            class="h-7 w-40 px-2 mr-2 text-xs border border-line rounded-lg"
-            placeholder="搜脚本名 / 执行号"
+            class="h-9 w-56 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg placeholder:text-muted-2"
+            placeholder="搜脚本名或执行号"
           />
+          <button
+            class="flex h-9 items-center gap-2 rounded-[8px] border border-line bg-surface px-3 text-[13px] text-fg hover:bg-surface-3 disabled:opacity-40"
+            :disabled="loading"
+            @click="loadExecutions()"
+          >
+            <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" /> 刷新
+          </button>
+        </div>
+      </header>
+
+      <div class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[12px] border border-line bg-surface px-5 py-3">
+        <span class="mono text-[13px] text-fg">{{ executions.length }}<span class="text-muted"> 次执行</span></span>
+        <div class="flex items-center gap-1">
           <button
             v-for="f in FILTERS"
             :key="f.key"
-            class="px-2.5 py-1 text-xs rounded-lg"
-            :class="filter === f.key ? 'bg-accent-solid text-white' : 'text-fg-3 hover:bg-surface-3'"
+            class="h-7 rounded-[8px] px-2 text-[12px] transition-colors"
+            :class="filter === f.key ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="filter = f.key"
-          >
-            {{ f.label }}
-          </button>
-          <button class="p-1.5 ml-2 text-muted hover:text-fg" :disabled="loading" @click="loadExecutions()">
-            <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
-          </button>
+          >{{ f.label }}</button>
         </div>
+        <span v-if="hasRunning" class="text-[12px] text-accent">执行中，自动刷新</span>
       </div>
-    </div>
 
-    <p v-if="error" class="px-6 py-2 text-xs text-danger bg-danger-soft border-b border-danger-line">{{ error }}</p>
+      <p v-if="error" class="mt-3 text-[13px] text-danger">{{ error }}</p>
 
-    <div class="flex-1 overflow-auto bg-surface">
-      <div class="p-6 space-y-4">
-        <div v-for="e in paged" :key="e.id"
-          class="bg-surface-2 rounded-lg border border-line p-5 cursor-pointer hover:border-accent-line"
-          @click="openExecution(e.id)">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <PlayCircle class="w-5 h-5 text-accent" />
-              <span class="font-medium text-fg">{{ e.name }}</span>
-              <span class="text-xs text-muted-2">#{{ e.id }}</span>
-              <span class="text-xs px-2 py-0.5 rounded" :class="statusClass(e.status)">
-                {{ e.status }}
-              </span>
-              <span v-if="e.executor" class="text-xs px-2 py-0.5 rounded bg-surface-3 text-muted">{{ e.executor }}</span>
-              <span v-if="e.channel" class="text-xs px-2 py-0.5 rounded bg-surface-3 text-muted">{{ e.channel }}</span>
-            </div>
-            <span class="text-xs text-muted-2">{{ e.started_at ?? '' }}</span>
-          </div>
-
-          <div class="flex items-center gap-6 text-sm text-fg-3">
-            <span>总共 {{ e.total }} 条</span>
-            <span class="text-success">通过 {{ e.passed }}</span>
-            <span class="text-danger">失败 {{ e.failed }}</span>
-            <span v-if="e.running > 0" class="text-accent">执行中 {{ e.running }}</span>
-            <span v-if="e.finished_at" class="text-muted-2">结束 {{ e.finished_at }}</span>
-          </div>
-
-          <div class="mt-3 h-2 bg-surface-4 rounded-full overflow-hidden">
-            <div class="h-full bg-green-500" :style="{ width: `${percent(e)}%` }"></div>
-          </div>
+      <div class="mt-5 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div
+          class="hidden grid-cols-[64px_1fr_96px_repeat(3,64px)_1fr] gap-4 border-b border-line px-5 py-2 text-[12px] text-muted-2 md:grid"
+        >
+          <span>执行号</span>
+          <span>脚本</span>
+          <span>状态</span>
+          <span class="text-right">总数</span>
+          <span class="text-right">通过</span>
+          <span class="text-right">失败</span>
+          <span>开始</span>
         </div>
 
-        <div v-if="!visible.length" class="text-center py-12 text-muted-2 text-sm">
-          {{ executions.length ? '当前筛选下没有执行记录' : '暂无执行记录：在「运行记录」里点“执行用例”，或在「脚本」页运行单个脚本' }}
-        </div>
+        <button
+          v-for="e in paged"
+          :key="e.id"
+          class="state-bar grid w-full grid-cols-1 items-center gap-4 border-b border-line-soft px-5 py-3 text-left last:border-b-0 hover:bg-surface-2 md:grid-cols-[64px_1fr_96px_repeat(3,64px)_1fr]"
+          :data-tone="statusTone(e.status) === 'accent' ? 'accent' : statusTone(e.status) === 'success' ? 'success' : statusTone(e.status) === 'danger' ? 'danger' : 'neutral'"
+          @click="openExecution(e.id)"
+        >
+          <span class="mono text-[12px] text-muted-2">#{{ e.id }}</span>
 
-        <div v-if="visible.length > PAGE_SIZE" class="flex items-center justify-center gap-3 pt-2 text-xs text-fg-3">
-          <button
-            class="px-2 py-1 border border-line rounded disabled:opacity-40"
-            :disabled="page <= 1"
-            @click="page--"
-          >上一页</button>
-          <span>{{ rangeText }} · 第 {{ page }} / {{ pageCount }} 页</span>
-          <button
-            class="px-2 py-1 border border-line rounded disabled:opacity-40"
-            :disabled="page >= pageCount"
-            @click="page++"
-          >下一页</button>
-        </div>
+          <span class="min-w-0">
+            <span class="mono block truncate text-[13px] text-fg">{{ e.name }}</span>
+            <span class="mt-0.5 block h-[2px] w-full bg-surface-4">
+              <span class="block h-full bg-accent-solid" :style="{ width: `${percent(e)}%` }"></span>
+            </span>
+          </span>
+
+          <Badge :tone="statusTone(e.status)">{{ e.status }}</Badge>
+
+          <span class="mono text-right text-[13px] text-fg">{{ e.total }}</span>
+          <span class="mono text-right text-[13px] text-success">{{ e.passed }}</span>
+          <span class="mono text-right text-[13px]" :class="e.failed ? 'text-danger' : 'text-muted-2'">
+            {{ e.failed }}
+          </span>
+
+          <span class="mono truncate text-[12px] text-muted-2">{{ e.started_at ?? '—' }}</span>
+        </button>
+
+        <EmptyState
+          v-if="!visible.length"
+          class="m-5"
+          :title="executions.length ? '当前筛选下没有记录' : '还没有执行过'"
+          :hint="executions.length ? '换个筛选或清空搜索词' : '到「流水线」第 ⑥ 步执行，或在「脚本」页单跑一个'"
+        />
+      </div>
+
+      <div
+        v-if="visible.length > PAGE_SIZE"
+        class="mt-3 flex items-center justify-center gap-3 text-[12px] text-muted"
+      >
+        <button
+          class="h-8 rounded-[8px] border border-line px-2 text-fg disabled:opacity-40"
+          :disabled="page <= 1"
+          @click="page--"
+        >上一页</button>
+        <span class="mono">{{ rangeText }} · {{ page }} / {{ pageCount }}</span>
+        <button
+          class="h-8 rounded-[8px] border border-line px-2 text-fg disabled:opacity-40"
+          :disabled="page >= pageCount"
+          @click="page++"
+        >下一页</button>
       </div>
     </div>
   </div>

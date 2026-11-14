@@ -25,7 +25,7 @@ const TONE_BAR: Record<string, string> = {
 
 <template>
   <span
-    class="inline-flex items-center gap-1.5 rounded-[4px] border border-line bg-surface-2 px-1.5 py-0.5 text-[12px] leading-4"
+    class="inline-flex items-center gap-1 rounded-[4px] border border-line bg-surface-2 px-1.5 py-0.5 text-[12px] leading-4"
   >
     <span class="h-3 w-[3px] rounded-full" :class="TONE_BAR[tone]"></span>
     <slot>{{ label }}</slot>
