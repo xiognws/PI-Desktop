@@ -14,6 +14,7 @@ import { registerToolPackagesIpc } from "./tool-packages-ipc";
 import { registerWidgetsIpc } from "./widgets-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerManualIpc } from "./manual-ipc";
+import { registerPythonIpc } from "./python-ipc";
 import { registerComponentsIpc } from "./components-ipc.ts";
 import { registerStartupAnimationIpc } from "./startup-animation-ipc";
 import { registerMarketIpc } from "./market-ipc";
@@ -570,6 +571,17 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
 
   registerManualIpc({ registrar, stripWinLongPrefix });
+
+  // Settings → System → Python: which interpreter the app runs.
+  registerPythonIpc({
+    registrar,
+    dataDir,
+    callHost: async (method, params) => {
+      const currentHost = getHost();
+      if (!currentHost) throw new Error("host unavailable");
+      return await currentHost.call(method, params);
+    },
+  });
 
   // Data components the user may override (ADR 0396 § component overlays).
   registerComponentsIpc({ registrar, dataDir, logger });

@@ -14,6 +14,7 @@ import { CloseBehaviorSection } from "../developer-sections";
 import { SettingsCard, SettingsRow } from "../primitives";
 import { StorageSettingsSection } from "../StorageSettingsSection";
 import { DataComponentsSection } from "../DataComponentsSection";
+import { PythonSettingsSection } from "../PythonSettingsSection";
 
 export function SystemSettings({
   settings,
@@ -32,6 +33,8 @@ export function SystemSettings({
       <StorageSettingsSection />
 
       <DataComponentsSection />
+
+      <PythonSettingsSection />
 
       <SettingsCard title={t("settings.power")}>
         <SettingsRow

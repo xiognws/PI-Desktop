@@ -65,7 +65,7 @@ export const LIBRARY_DROP_DIR = "python-site-drop";
 export const LIBRARY_WORKER = "install_libs.py";
 
 /** Where the interpreter we run came from; the UI names this. */
-export type PythonSource = "explicit" | "user-venv" | "system" | "bundled";
+export type PythonSource = "explicit" | "settings" | "user-venv" | "system" | "bundled";
 
 export type PythonRuntime = {
   /** Root of the tree this interpreter came from (its prefix's parent). */
@@ -125,6 +125,8 @@ export type ResolvePythonOptions = {
   canRunTools?: (executable: string) => boolean;
   /** Overrides `PI_PYTHON_STRATEGY`. */
   strategy?: PythonStrategy;
+  /** The interpreter chosen in Settings, when the caller has it at hand. */
+  preferred?: string;
 };
 
 /** Same probe order as `resolveBuiltinSkillPath`: packaged, then a checkout. */
@@ -190,6 +192,24 @@ function pathInterpreterCandidates(
 }
 
 const versionCache = new Map<string, string | undefined>();
+
+/**
+ * Interpreter chosen in Settings, published for callers that build their
+ * environment before settings can be read (the host process environment is one).
+ */
+let preferredPythonPath = "";
+
+export function setPreferredPythonPath(path: string | null | undefined): void {
+  const next = (path ?? "").trim();
+  if (next === preferredPythonPath) return;
+  preferredPythonPath = next;
+  versionCache.clear();
+  capabilityCache.clear();
+}
+
+export function getPreferredPythonPath(): string {
+  return preferredPythonPath;
+}
 
 /** `major.minor` of an interpreter, or undefined when it cannot be asked. */
 export function probePythonVersion(executable: string): string | undefined {
@@ -307,6 +327,26 @@ export function resolvePythonRuntime(
         home: "",
         sitePackages: libraryDirFor(version),
         source: "explicit",
+        version,
+        assetsRoot: bundledAssets?.root ?? "",
+      },
+    };
+  }
+
+  // The interpreter picked in Settings. Honoured as given, even without the
+  // document libraries: it is a decision, and the card that set it says what the
+  // interpreter is missing so the choice stays informed.
+  const preferred = (options.preferred ?? preferredPythonPath).trim();
+  if (strategy !== "bundled" && preferred && existsSync(preferred)) {
+    const version = probe(preferred);
+    return {
+      state: "present",
+      runtime: {
+        root: dirname(dirname(preferred)),
+        executable: preferred,
+        home: "",
+        sitePackages: libraryDirFor(version),
+        source: "settings",
         version,
         assetsRoot: bundledAssets?.root ?? "",
       },

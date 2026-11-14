@@ -16,7 +16,9 @@ import {
   USER_SITE_DIR,
   installDroppedLibraries,
   resolvePythonRuntime,
+  setPreferredPythonPath,
 } from "../python-runtime.ts";
+import { readPythonInterpreterPreference } from "../python-preferences.ts";
 
 export type HostRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -465,6 +467,9 @@ export function createHostRuntime({
 
   assertLinuxGlibcSupported();
   const systemProxyRelayUrl = await ensureSystemProxyRelay();
+  // The tool environment is built inside `HostProcess`, before host-core answers
+  // anything, so the interpreter chosen in settings is read from its mirror here.
+  setPreferredPythonPath(readPythonInterpreterPreference(dataDir));
   const h = new HostProcess(dataDir, (text) => logger.child("host", text));
   wireHost(h);
   runtimeState.host = h;

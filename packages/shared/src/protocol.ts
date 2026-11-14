@@ -501,6 +501,11 @@ export const IPC = {
     logOpenFolder: "pi-desktop/log/openFolder",
     /** Open the shipped user handbook, or reveal it when it has no Markdown handler. */
     manualOpen: "pi-desktop/manual/open",
+    pythonStatus: "pi-desktop/python/status",
+    pythonScan: "pi-desktop/python/scan",
+    pythonChoose: "pi-desktop/python/choose",
+    pythonSetPath: "pi-desktop/python/setPath",
+    pythonCapabilities: "pi-desktop/python/capabilities",
     startupAnimationStatus: "pi-desktop/startupAnimation/status",
     startupAnimationOpenFolder: "pi-desktop/startupAnimation/openFolder",
     devtoolsToggle: "pi-desktop/devtools/toggle",

@@ -5,6 +5,8 @@ import type { IpcRegistrar } from "./types";
 import type { AppSettings } from "@pi-workspace/shared";
 import { currentSystemProxyRelayUrl } from "../network-proxy";
 import { writeStartupAnimationPreferences } from "../window-preferences";
+import { writePythonInterpreterPreference } from "../python-preferences.ts";
+import { setPreferredPythonPath } from "../python-runtime.ts";
 
 export type SettingsIpcDependencies = {
   registrar: IpcRegistrar;
@@ -78,6 +80,14 @@ export function registerSettingsIpc({
       dataDir,
       result as { startupAnimation?: unknown },
     );
+    // Same reason for the interpreter: the next launch builds the tool
+    // environment before host-core can answer, so the choice is mirrored too.
+    if (typeof (validatedSettings as { pythonInterpreterPath?: unknown })
+      .pythonInterpreterPath === "string") {
+      const chosen = (validatedSettings as { pythonInterpreterPath: string }).pythonInterpreterPath;
+      writePythonInterpreterPreference(dataDir, chosen);
+      setPreferredPythonPath(chosen);
+    }
     const updatePreference = (validatedSettings as { updatePreference?: unknown })
       .updatePreference;
     if (updatePreference === "automatic" || updatePreference === "manual") {

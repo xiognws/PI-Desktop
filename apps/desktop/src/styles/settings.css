@@ -3883,3 +3883,59 @@
 .settings-row:has(> .settings-row-control > .settings-row-controls) > .settings-row-control {
   max-width: none;
 }
+
+/* System → Python: the interpreter list. A radio list of buttons rather than a
+   select, because each row has to show a path, a version, where it came from and
+   whether it can actually run the document tools. */
+.python-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.python-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+
+.python-candidate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ds-border-subtle, var(--border));
+  border-radius: var(--radius-sm, 8px);
+  background: var(--ds-tile, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.python-candidate:hover {
+  background: var(--ds-raised, var(--card));
+}
+
+.python-candidate.is-selected {
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px var(--ds-accent);
+}
+
+.python-candidate-path {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs, 11px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.python-candidate-meta {
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs, 11px);
+  white-space: nowrap;
+}

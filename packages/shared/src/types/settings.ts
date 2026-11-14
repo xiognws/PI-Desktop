@@ -88,6 +88,16 @@ export type AppSettings = {
   scheduledTasksEnabled?: boolean;
   /** Configured command shell for the agent Bash protocol tool. */
   defaultCommandShell?: CommandShellId;
+  /**
+   * Interpreter the user picked in Settings → System → Python.
+   *
+   * Empty or absent means "choose for me": the resolver prefers a venv the user
+   * keeps beside the data directory, then a CPython on `PATH` that already has the
+   * document libraries, and only then the tree this build ships. A path here is
+   * honoured as given, even when that interpreter lacks libraries — the user said
+   * which one to run, and the card that set it shows what it is missing.
+   */
+  pythonInterpreterPath?: string;
   /** @deprecated Retained for one-time migration into pi.prompt-enhancement. */
   promptEnhancementCustomTemplate?: boolean;
   /** @deprecated Retained for one-time migration into pi.prompt-enhancement. */

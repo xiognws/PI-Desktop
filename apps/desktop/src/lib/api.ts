@@ -828,6 +828,21 @@ export type MemoryUpdateInput = {
 
 export type MemoryTidyResult = { removed: number; expired: number; overflow: number };
 
+/** Which interpreter the app runs, and where that answer came from. */
+export type PythonStatus = {
+  active: { path: string; version?: string; source: string; sitePackages: string } | null;
+  configured: string;
+  configuredUsable: boolean;
+};
+
+/** One interpreter the scan found on this machine. */
+export type PythonCandidate = {
+  path: string;
+  version?: string;
+  hasLibraries: boolean;
+  source: "configured" | "data-venv" | "launcher" | "path" | "common";
+};
+
 export const api = {
   getVersion: () => invoke<AppVersionInfo>(IPC.invoke.appGetVersion),
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
@@ -1243,6 +1258,17 @@ export const api = {
     }),
   listArtifacts: (filter?: ArtifactListFilter) =>
     invoke<{ artifacts: ArtifactRow[] }>(IPC.invoke.artifactsList, filter ?? {}),
+  /** Settings → System → Python: what runs, what exists, what to store. */
+  pythonStatus: () => invoke<PythonStatus>("pi-desktop/python/status"),
+  pythonScan: () =>
+    invoke<{ candidates: PythonCandidate[]; configured: string }>("pi-desktop/python/scan"),
+  pythonChoose: () => invoke<{ path: string; version?: string }>("pi-desktop/python/choose"),
+  pythonSetPath: (path: string) => invoke<PythonStatus>("pi-desktop/python/setPath", { path }),
+  pythonCapabilities: (path: string) =>
+    invoke<{ path: string; version?: string; hasLibraries: boolean }>(
+      "pi-desktop/python/capabilities",
+      { path },
+    ),
   listToolPackages: () =>
     invoke<{ packages: ToolPackageSummary[] }>(IPC.invoke.toolPackagesList, {}),
   setToolPackageEnabled: (id: string, enabled: boolean) =>
