@@ -349,6 +349,20 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 翻法还不一致；现在两个都给：`status` 保持枚举（脚本/插件按机器值判断），
 `status_label` 给中文（界面直接显示）。新增字段是向后兼容的，不要改 `status` 的取值。
 
+### 8.0.6 变异抽查：断言必须"能失败"
+
+一条断言如果不能失败，就等于没写 —— 它让报告变绿，却不阻挡任何缺陷。`script-author`
+生成断言后会做一次抽查（`workflow/vacuity.py`）：
+
+* 把每条断言的**期望写反**（`assertion_gen.invert`：bool 翻转、number 偏移、contains 换成
+  不存在的标记、raises 改成"不该抛"），驱动输入保持不变 —— 只翻期望才能证明断言的判定力。
+* 变异体写进项目 `scripts/` 目录（文件名 `_mutant_*.py`，这样相对 `_support` 才对得上），
+  一次 pytest 跑完，**跑完即删**。
+* 变异体通过 = 空断言，进 `vacuity.vacuous`；既没通过也没失败（收集错误等）进 `errors`；
+  没有契约的用例进 `skipped`，不参与抽查。
+* 结果随 `script-author` 返回（`data.vacuity`）并落 step payload；有空断言时 step 状态转
+  `warning`，摘要写「变异抽查发现 N 条空断言」。可用 `check_vacuity: false` 关闭。
+
 ### 8.0.5 被测件契约 + 断言生成（把"补断言"变成生成动作）
 
 骨架之所以一直是骨架，是因为流水线不知道**被测件怎么驱动、判定从哪里读**。契约把这件事

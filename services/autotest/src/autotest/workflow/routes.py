@@ -28,6 +28,7 @@ from autotest.workflow import assertion_gen
 from autotest.workflow import consistency
 from autotest.workflow import dut_contract
 from autotest.workflow import script_state
+from autotest.workflow import vacuity
 from autotest.workflow import execution as execution_service
 from autotest.workflow import grounding
 from autotest.workflow import prd as prd_service
@@ -292,6 +293,8 @@ class ScriptAuthorIn(BaseModel):
     # 默认不覆盖"已补断言"的脚本：骨架是模板产物，补完断言的脚本是人的资产。
     # 需要整体重出时显式传 true。
     overwrite: bool = False
+    # 生成完做一次变异抽查：期望写反后仍能通过的断言，等于是空断言，要打回。
+    check_vacuity: bool = True
 
 
 class ExecuteIn(BaseModel):
@@ -708,16 +711,26 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 }
             )
 
+        vacuity_report = (
+            vacuity.check(scripts_dir, cases, contract, sdk=body.sdk)
+            if body.check_vacuity and assertions
+            else {"checked": 0, "vacuous": [], "skipped": [], "errors": []}
+        )
         store.append_step(
             conn,
             body.run_id,
             tool="autotest_script_author",
             stage="authored",
-            status="ok" if script_judgement["ok"] else "warning",
+            status="ok" if script_judgement["ok"] and not vacuity_report["vacuous"] else "warning",
             summary=(
                 f"生成 {len(created)} 个脚本"
                 + (f"（其中 {len(assertions)} 个带契约断言）" if assertions else "")
                 + (f"，保留 {len(preserved)} 个已补断言的脚本" if preserved else "")
+                + (
+                    f"，变异抽查发现 {len(vacuity_report['vacuous'])} 条空断言"
+                    if vacuity_report["vacuous"]
+                    else ""
+                )
                 + (
                     f"，不符合提示词规则 {len(script_judgement['issues'])} 处"
                     if not script_judgement["ok"]
@@ -730,6 +743,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 "preserved": preserved,
                 "prompt": _prompt_marker("script-author"),
                 "consistency": script_judgement,
+                "vacuity": vacuity_report,
             },
         )
         store.touch_run(conn, body.run_id, stage="authored")
@@ -744,6 +758,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "asserted_generated": len(assertions),
         "skeleton_remaining": len(created) - len(assertions) - len(preserved),
         "contract_notes": contract_notes[:20],
+        "vacuity": vacuity_report,
         "prompt": _prompt_marker("script-author"),
         "consistency": script_judgement,
     }

@@ -5,8 +5,8 @@
 1. **数字只能来自条款**（`evidence.numbers`），不写死字面量 —— 条款改了断言跟着改。
 2. **形态只有四种**：`== `（布尔/数值）、`in`（包含）、`pytest.raises`（应被拒绝），
    加上数值容差。不生成"看起来在验"的复合表达式。
-3. **必须能失败**：生成器同时给出 `mutation` 版本（把条款数值挪动一点），
-   由调用方跑一次；变异版还能过，说明这条断言是空的。
+3. **必须能失败**：`Generated.mutation` 是把**期望写反**的版本（`invert`），
+   由 `workflow.vacuity` 跑一次；变异版还能过，说明这条断言是空的。
 """
 
 from __future__ import annotations
@@ -18,10 +18,6 @@ from pathlib import Path
 from autotest.workflow.dut_contract import Entry
 
 PLACEHOLDER = re.compile(r"\{\{number(?::(\d+))?\}\}")
-
-# 变异检查时数值挪动的相对幅度：足够让阈值判定翻转，又不至于把输入挪出量程
-MUTATION_RATIO = 0.2
-
 
 class GenerationError(ValueError):
     """这条用例没法按契约生成断言（缺数值、形态不支持等）。"""
@@ -58,19 +54,6 @@ def _substitute(line: str, numbers: list[str]) -> str:
         return _numeric(numbers[index])
 
     return PLACEHOLDER.sub(replace, line)
-
-
-def _nudged(line: str) -> str:
-    """把行里的数字整体挪动一点，用于变异检查。"""
-
-    def bump(match: re.Match[str]) -> str:
-        value = float(match.group(0))
-        if value == 0:
-            return "1"
-        shifted = value * (1 + MUTATION_RATIO)
-        return f"{shifted:.4f}".rstrip("0").rstrip(".")
-
-    return re.sub(r"\d+\.\d+|\d+", bump, line)
 
 
 def _preamble(driver: str, imports: list[str], factory: str) -> list[str]:
@@ -146,7 +129,50 @@ def generate(
     else:  # 契约解析已挡住，这里只防御
         raise GenerationError(f"不支持的 expect.kind：{kind}")
 
-    return Generated(body=body, mutation=[_nudged(line) for line in body], numbers=numbers)
+    return Generated(body=body, mutation=invert(case, entry, driver=driver, imports=imports), numbers=numbers)
+
+
+def invert(
+    case: dict,
+    entry: Entry,
+    *,
+    driver: str = "",
+    imports: list[str] | None = None,
+) -> list[str]:
+    """生成"期望被写反"的断言块，用来做变异检查（vacuity）。
+
+    只翻转**期望**、不动驱动输入：一条真在验的断言，期望写反之后必须失败；
+    还能通过就说明它压根没在验（例如断言写成了恒真表达式）。
+    """
+    numbers = _numbers(case)
+    prelude = _preamble(driver, list(imports or []), entry.factory)
+    arrange = [f"    {_substitute(line, numbers)}" for line in entry.arrange]
+    observe = entry.observe
+    kind = entry.kind
+    value = entry.value
+    label = entry.function_point
+
+    if kind == "raises":
+        # 反过来的意思：本不该抛异常 —— 若真抛了，这条变异体就会失败
+        return [*prelude, *arrange, f'    assert True, "{label} 的变异体"']
+    if kind == "bool":
+        flipped = "False" if value else "True"
+        return [*prelude, *arrange, f'    assert {observe} is {flipped}, "{label} 的变异体"']
+    if kind == "contains":
+        return [
+            *prelude,
+            *arrange,
+            f'    assert {json_literal(f"{value}_不存在")} in {observe}, "{label} 的变异体"',
+        ]
+    if kind == "number":
+        step = entry.tolerance * 2 if entry.tolerance else max(abs(float(value)) * 0.5, 1.0)
+        shifted = json_literal(float(value) + step)
+        return [
+            *prelude,
+            *arrange,
+            f'    assert abs({observe} - {shifted}) <= {entry.tolerance or 0.0}, "{label} 的变异体"',
+        ]
+    raise GenerationError(f"不支持的 expect.kind：{kind}")
 
 
 def json_literal(value: object) -> str:
