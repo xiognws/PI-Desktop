@@ -42,7 +42,9 @@ function describe(status: PythonRuntimeStatus, configured: string): PythonStatus
       status.state === "present"
         ? {
             path: status.runtime.executable,
-            version: status.runtime.version,
+            // The bundled tree ships no manifest here, so ask the interpreter itself
+            // rather than showing a blank where the version belongs.
+            version: status.runtime.version ?? probePythonVersion(status.runtime.executable),
             source: status.runtime.source,
             sitePackages: status.runtime.sitePackages,
           }
