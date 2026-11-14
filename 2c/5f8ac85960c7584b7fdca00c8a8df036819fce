@@ -1,0 +1,14 @@
+services/autotest/ui/src/views/ExecutionDetail.vue
+  h_201ed4c689ac8b 4-5,167-172,214-229,231-238,240,242-262,265-274,276,278-279,281,284-305,307-311,315-327,329,331-332,334-336,342,344-348
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2c5f8ac85960c7584b7fdca00c8a8df036819fce",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
