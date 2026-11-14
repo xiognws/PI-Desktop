@@ -1,0 +1,16 @@
+services/autotest/ui/src/components/Badge.vue
+  h_201ed4c689ac8b 5,30
+services/autotest/ui/src/views/Cases.vue
+  h_201ed4c689ac8b 4-6,560-567,569-603,605-618,623-703,705-707,709-714,716-732,736-741,745-751
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8bd26ddf9cc69523a522bf619b79a4887423d8f1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
