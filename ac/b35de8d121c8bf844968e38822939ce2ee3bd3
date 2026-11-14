@@ -1,0 +1,38 @@
+apps/desktop/src/components/settings/ModelSelectionPanes.tsx
+  h_201ed4c689ac8b 46,282-291,425-438,722-772,927-931
+apps/desktop/src/lib/model-bulk-limits.ts
+  h_201ed4c689ac8b 1-66
+apps/desktop/src/styles/model-config.css
+  h_201ed4c689ac8b 872-909
+apps/desktop/test/model-bulk-limits.test.mjs
+  h_201ed4c689ac8b 1-87
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 2072-2075
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 2092-2095
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 2072-2075
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 2072-2075
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 2088-2091
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 2048-2051
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 2088-2091
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 2073-2076
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 2073-2076
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "acb35de8d121c8bf844968e38822939ce2ee3bd3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
