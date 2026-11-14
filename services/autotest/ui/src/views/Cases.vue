@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Plus, ListChecks, X, Upload, Download, Trash2, Play, List, Network, Star } from 'lucide-vue-next'
+import { Plus, Star, X } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import 'jsmind/style/jsmind.css'
 import jsMind from 'jsmind'
 
@@ -555,220 +557,198 @@ watch(viewMode, (val) => {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden relative">
-    <div class="bg-surface border-b border-line px-6 py-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base font-medium text-fg">测试用例</h2>
-          <span class="text-sm text-muted-2">
-            共 {{ cases.length }} 条<template v-if="activeFilterCount">（筛选后 {{ visibleCases.length }} 条）</template>
-          </span>
-          <span class="text-xs text-muted-2" title="真断言＝脚本里有可判定的断言；骨架＝自动生成、跑起来只会跳过，不能算验过">
-            真断言 {{ caseStates.asserted }} · 骨架 {{ caseStates.skeleton }} · 无脚本 {{ caseStates.none }}
-          </span>
-          <span v-if="selectedIds.length > 0" class="text-sm text-accent">已选 {{ selectedIds.length }} 条</span>
-          <span class="text-xs text-muted-2" title="写用例的依据来自「知识库」：先把项目资料分解入库，Agent 检索到的就是那些原文">
-            依据「知识库」中已入库的项目资料
-          </span>
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[1200px] px-8 py-7">
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-[20px] font-medium text-fg">用例</h1>
+          <p class="mt-1 text-[13px] text-muted">
+            依据「知识库」里已入库的项目资料生成，每条用例都写清依据的是哪条条款。
+          </p>
         </div>
-        <div class="flex items-center gap-2">
-          <!-- 视图切换 -->
-          <div class="flex items-center border border-line rounded-lg overflow-hidden mr-2">
-            <button @click="viewMode = 'list'"
-              class="p-2"
-              :class="viewMode === 'list' ? 'bg-accent-soft text-accent' : 'text-muted-2 hover:bg-surface-2'">
-              <List class="w-4 h-4" />
-            </button>
-            <button @click="viewMode = 'tree'"
-              class="p-2"
-              :class="viewMode === 'tree' ? 'bg-accent-soft text-accent' : 'text-muted-2 hover:bg-surface-2'">
-              <Network class="w-4 h-4" />
-            </button>
-          </div>
+        <button
+          class="flex h-9 items-center gap-2 rounded-[8px] border border-line bg-surface px-3 text-[13px] text-fg hover:bg-surface-3"
+          @click="createDialogOpen = true"
+        >
+          <Plus class="h-4 w-4" /> 新建用例
+        </button>
+      </header>
 
-          <!-- 批量操作 -->
-          <template v-if="selectedIds.length > 0">
-            <button @click="runSelected" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-success-line text-success rounded-lg hover:bg-success-soft">
-              <Play class="w-4 h-4" />
-              批量执行
-            </button>
-            <button @click="exportSelected" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-accent-line text-accent rounded-lg hover:bg-accent-soft">
-              <Download class="w-4 h-4" />
-              导出选中
-            </button>
-            <select
-              :value="''"
-              :disabled="batchBusy"
-              @change="setSelectedPriority(($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''"
-              class="px-2 py-1.5 text-sm border border-line rounded-lg disabled:opacity-50"
-            >
-              <option value="">批量改优先级…</option>
+      <!-- 计数 + 视图 + 次要操作：一条安静的工具行 -->
+      <div class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[12px] border border-line bg-surface px-5 py-3">
+        <span class="mono text-[13px] text-fg">
+          {{ cases.length }}<span class="text-muted"> 条</span>
+          <span v-if="activeFilterCount" class="text-muted">· 筛后 {{ visibleCases.length }}</span>
+        </span>
+        <span class="mono text-[12px] text-success">真断言 {{ caseStates.asserted }}</span>
+        <span class="mono text-[12px] text-warn">骨架 {{ caseStates.skeleton }}</span>
+        <span class="mono text-[12px] text-muted-2">无脚本 {{ caseStates.none }}</span>
+
+        <div class="ml-auto flex items-center gap-1">
+          <button
+            class="h-8 rounded-[8px] px-2 text-[12px] transition-colors"
+            :class="viewMode === 'list' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
+            @click="viewMode = 'list'"
+          >列表</button>
+          <button
+            class="h-8 rounded-[8px] px-2 text-[12px] transition-colors"
+            :class="viewMode === 'tree' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
+            @click="viewMode = 'tree'"
+          >脑图</button>
+          <span class="mx-1 h-4 w-px bg-line"></span>
+          <button class="h-8 rounded-[8px] px-2 text-[12px] text-muted hover:bg-surface-3 hover:text-fg" @click="filterOpen = !filterOpen">筛选</button>
+          <button class="h-8 rounded-[8px] px-2 text-[12px] text-muted hover:bg-surface-3 hover:text-fg" @click="importOpen = true">导入</button>
+          <button class="h-8 rounded-[8px] px-2 text-[12px] text-muted hover:bg-surface-3 hover:text-fg" @click="exportAll">导出</button>
+        </div>
+      </div>
+
+      <!-- 筛选面板：展开时占据正常流，不再是浮层压住表格 -->
+      <div v-if="filterOpen" class="mt-3 rounded-[12px] border border-line bg-surface px-5 py-4">
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <label class="flex flex-col gap-1">
+            <span class="text-[12px] text-muted-2">模块</span>
+            <select v-model="filters.module" class="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg">
+              <option value="">全部</option>
+              <option v-for="m in moduleOptions" :key="m" :value="m">{{ m }}</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-[12px] text-muted-2">优先级</span>
+            <select v-model="filters.priority" class="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg">
+              <option value="">全部</option>
               <option value="高">高</option>
               <option value="中">中</option>
               <option value="低">低</option>
             </select>
-            <button @click="deleteSelected" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-danger-line text-danger rounded-lg hover:bg-danger-soft">
-              <Trash2 class="w-4 h-4" />
-              批量删除
-            </button>
-          </template>
-          <button @click="importOpen = true" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2">
-            <Upload class="w-4 h-4" />
-            导入
-          </button>
-          <button @click="exportAll" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2">
-            <Download class="w-4 h-4" />
-            导出
-          </button>
-          <button @click="filterOpen = !filterOpen" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2">
-            <ListChecks class="w-4 h-4" />
-            筛选
-          </button>
-
-          <!-- 筛选面板 -->
-          <div v-if="filterOpen" class="absolute right-0 top-full mt-2 w-64 bg-surface border border-line rounded-lg shadow-lg p-4 z-50">
-            <h3 class="text-sm font-medium text-fg mb-3">筛选条件</h3>
-            <div class="space-y-3">
-              <div>
-                <label class="text-xs text-muted">模块</label>
-                <select v-model="filters.module" class="w-full mt-1 px-2 py-1 text-sm border border-line rounded">
-                  <option value="">全部</option>
-                  <option v-for="m in moduleOptions" :key="m" :value="m">{{ m }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="text-xs text-muted">优先级</label>
-                <select v-model="filters.priority" class="w-full mt-1 px-2 py-1 text-sm border border-line rounded">
-                  <option value="">全部</option>
-                  <option value="高">高</option>
-                  <option value="中">中</option>
-                  <option value="低">低</option>
-                </select>
-              </div>
-              <div>
-                <label class="text-xs text-muted">状态</label>
-                <select v-model="filters.status" class="w-full mt-1 px-2 py-1 text-sm border border-line rounded">
-                  <option value="">全部</option>
-                  <option value="已通过">已通过</option>
-                  <option value="未执行">未执行</option>
-                  <option value="失败">失败</option>
-                </select>
-              </div>
-              <div>
-                <label class="text-xs text-muted">类型</label>
-                <select v-model="filters.type" class="w-full mt-1 px-2 py-1 text-sm border border-line rounded">
-                  <option value="">全部</option>
-                  <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
-              </div>
-              <div class="flex gap-2">
-                <button @click="clearFilters" class="flex-1 py-1.5 text-sm border border-line rounded hover:bg-surface-2">
-                  清空
-                </button>
-                <button @click="applyFilters" class="flex-1 py-1.5 text-sm bg-accent-solid text-white rounded hover:bg-blue-700">
-                  应用筛选
-                </button>
-              </div>
-            </div>
-          </div>
-          <button @click="createDialogOpen = true" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2">
-            <Plus class="w-4 h-4" />
-            新建用例
-          </button>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-[12px] text-muted-2">状态</span>
+            <select v-model="filters.status" class="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg">
+              <option value="">全部</option>
+              <option value="已通过">已通过</option>
+              <option value="未执行">未执行</option>
+              <option value="失败">失败</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-[12px] text-muted-2">类型</span>
+            <select v-model="filters.type" class="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg">
+              <option value="">全部</option>
+              <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+          <button class="h-8 rounded-[8px] border border-line px-3 text-[13px] text-fg hover:bg-surface-3" @click="clearFilters">清空</button>
+          <button class="h-8 rounded-[8px] bg-accent-solid px-3 text-[13px] text-white hover:bg-accent" @click="applyFilters">应用筛选</button>
         </div>
       </div>
-    </div>
 
-    <!-- 列表视图 -->
-    <div v-if="viewMode === 'list'" class="flex-1 overflow-auto">
-      <div class="bg-surface min-h-full">
-        <table class="w-full">
-          <thead class="bg-surface-2 border-b border-line">
-            <tr>
-              <th class="w-10 px-4 py-3"></th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">用例名称</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">模块</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">类型</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">标签</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">优先级</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">断言</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">执行状态</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-muted">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-line-soft">
-            <tr v-for="c in visibleCases" :key="c.id" class="hover:bg-surface-2">
-              <td class="px-4 py-3">
-                <input
-                  type="checkbox"
-                  :checked="selectedIds.includes(c.id)"
-                  @change="toggleSelect(c.id)"
-                  class="rounded"
-                />
-              </td>
-              <td class="px-4 py-3">
-                <button
-                  @click.stop="toggleFavorite(c.id)"
-                  class="text-muted-2 hover:text-yellow-500"
-                >
-                  <Star :class="c.favorite ? 'fill-yellow-400 text-yellow-400' : ''" class="w-4 h-4" />
-                </button>
-              </td>
-              <td class="px-4 py-3 text-sm text-fg cursor-pointer" @click="openDetail(c)">{{ c.name }}</td>
-              <td class="px-4 py-3 text-sm text-muted">{{ c.module }}</td>
-              <td class="px-4 py-3">
-                <span class="inline-block px-2 py-0.5 text-xs rounded" :class="typeMap[c.type]">{{ c.type }}</span>
-              </td>
-              <td class="px-4 py-3">
-                <div class="flex flex-wrap gap-1">
-                  <span v-for="tag in c.tags" :key="tag" class="inline-block px-2 py-0.5 text-xs bg-surface-3 text-fg-3 rounded">{{ tag }}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <span class="inline-block px-2 py-0.5 text-xs rounded"
-                  :class="c.priority === '高' ? 'bg-danger-soft text-danger' : c.priority === '中' ? 'bg-warn-soft text-warn' : 'bg-surface-3 text-fg-3'">
-                  {{ c.priority }}
-                </span>
-              </td>
-              <td class="px-4 py-3">
-                <span
-                  v-if="c.script_state === 'asserted'"
-                  class="inline-block px-2 py-0.5 text-xs rounded bg-success-soft text-success"
-                  title="脚本里有可判定的断言，执行结果说明它真的验过"
-                >真断言</span>
-                <span
-                  v-else-if="c.script_state === 'skeleton'"
-                  class="inline-block px-2 py-0.5 text-xs rounded bg-warn-soft text-warn"
-                  title="自动生成的骨架：跑起来只会跳过，绿色不代表验过"
-                >骨架</span>
-                <span v-else class="inline-block px-2 py-0.5 text-xs rounded bg-surface-3 text-fg-3" title="还没有生成对应脚本">无脚本</span>
-              </td>
-              <td class="px-4 py-3">
-                <span class="inline-block px-2 py-0.5 text-xs rounded"
-                  :class="c.status === '已通过' ? 'bg-success-soft text-success' : c.status === '失败' ? 'bg-danger-soft text-danger' : 'bg-surface-3 text-fg-3'">
-                  {{ c.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-sm">
-                <button class="text-accent hover:underline mr-2" @click="openDetail(c)">详情</button>
-                <button
-                  class="text-success hover:underline mr-2 disabled:opacity-50"
-                  :disabled="runningIds.includes(c.id)"
-                  @click="runCase(c.id)">
-                  {{ runningIds.includes(c.id) ? '执行中…' : '执行' }}
-                </button>
-                <button class="text-muted hover:text-accent mr-2" @click="copyCase(c.id)">复制</button>
-                <button class="text-muted hover:text-danger" @click="deleteCase(c.id)">删除</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- 批量条：只有选中时才出现，动作跟在选择后面 -->
+      <div
+        v-if="selectedIds.length > 0"
+        class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[8px] border border-accent-line bg-accent-soft px-4 py-2"
+      >
+        <span class="mono text-[12px] text-accent">已选 {{ selectedIds.length }} 条</span>
+        <button class="text-[12px] text-fg hover:underline" @click="runSelected">批量执行</button>
+        <button class="text-[12px] text-fg hover:underline" @click="exportSelected">导出选中</button>
+        <select
+          :value="''"
+          :disabled="batchBusy"
+          class="h-7 rounded-[6px] border border-line bg-surface px-1 text-[12px] text-fg"
+          @change="setSelectedPriority(($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).value = ''"
+        >
+          <option value="">改优先级…</option>
+          <option value="高">高</option>
+          <option value="中">中</option>
+          <option value="低">低</option>
+        </select>
+        <button class="text-[12px] text-danger hover:underline" @click="deleteSelected">批量删除</button>
+      </div>
+
+      <!-- 列表视图 -->
+      <div v-if="viewMode === 'list'" class="mt-5 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div
+          class="hidden grid-cols-[32px_28px_1fr_120px_84px_1fr_72px_96px_96px_140px] items-center gap-3 border-b border-line px-4 py-2 text-[12px] text-muted-2 lg:grid"
+        >
+          <span></span>
+          <span></span>
+          <span>用例</span>
+          <span>模块</span>
+          <span>类型</span>
+          <span>标签</span>
+          <span>优先级</span>
+          <span>断言</span>
+          <span>状态</span>
+          <span class="text-right">操作</span>
+        </div>
+
+        <div
+          v-for="c in visibleCases"
+          :key="c.id"
+          class="state-bar grid grid-cols-1 items-center gap-3 border-b border-line-soft px-4 py-2 last:border-b-0 hover:bg-surface-2 lg:grid-cols-[32px_28px_1fr_120px_84px_1fr_72px_96px_96px_140px]"
+          :data-tone="c.script_state === 'asserted' ? 'success' : c.script_state === 'skeleton' ? 'warn' : 'neutral'"
+        >
+          <input
+            type="checkbox"
+            :checked="selectedIds.includes(c.id)"
+            class="h-3.5 w-3.5 rounded-[3px]"
+            @change="toggleSelect(c.id)"
+          />
+          <button
+            class="text-muted-2 hover:text-warn"
+            :title="c.favorite ? '取消收藏' : '收藏'"
+            @click.stop="toggleFavorite(c.id)"
+          >
+            <Star :class="c.favorite ? 'fill-warn text-warn' : ''" class="h-3.5 w-3.5" />
+          </button>
+
+          <button class="min-w-0 truncate text-left text-[13px] text-fg hover:text-accent" @click="openDetail(c)">
+            {{ c.name }}
+          </button>
+          <span class="truncate text-[12px] text-muted">{{ c.module }}</span>
+          <span class="text-[12px] text-muted">{{ c.type }}</span>
+          <span class="truncate text-[12px] text-muted-2">{{ c.tags.join(' · ') || '—' }}</span>
+          <span class="text-[12px]" :class="c.priority === '高' ? 'text-danger' : c.priority === '中' ? 'text-warn' : 'text-muted-2'">
+            {{ c.priority }}
+          </span>
+
+          <Badge :tone="c.script_state === 'asserted' ? 'success' : c.script_state === 'skeleton' ? 'warn' : 'neutral'">
+            {{ c.script_state === 'asserted' ? '真断言' : c.script_state === 'skeleton' ? '骨架' : '无脚本' }}
+          </Badge>
+
+          <Badge :tone="c.status === '已通过' ? 'success' : c.status === '失败' ? 'danger' : 'neutral'">
+            {{ c.status }}
+          </Badge>
+
+          <div class="flex items-center justify-end gap-2 text-[12px]">
+            <button class="text-muted hover:text-fg" @click="openDetail(c)">详情</button>
+            <button
+              class="text-muted hover:text-fg disabled:opacity-40"
+              :disabled="runningIds.includes(c.id)"
+              @click="runCase(c.id)"
+            >{{ runningIds.includes(c.id) ? '执行中' : '执行' }}</button>
+            <button class="text-muted hover:text-fg" @click="copyCase(c.id)">复制</button>
+            <button class="text-muted hover:text-danger" @click="deleteCase(c.id)">删除</button>
+          </div>
+        </div>
+
+        <EmptyState
+          v-if="!visibleCases.length"
+          class="m-5"
+          :title="cases.length ? '当前筛选下没有用例' : '还没有用例'"
+          :hint="cases.length ? '清空筛选条件再看看' : '到「流水线」第 ③ 步生成，或点右上角新建'"
+        />
       </div>
     </div>
 
-    <!-- 脑图视图 -->
-    <div v-else class="flex-1 overflow-auto p-6">
-      <div id="jsmind_container" class="bg-surface rounded-lg border border-line" style="width: 100%; height: 600px;"></div>
+    <!-- 脑图视图：用 v-if 而不是 v-else —— 列表视图在另一个容器里，
+         兄弟关系断开后 v-else 会编译不过 -->
+    <div v-if="viewMode === 'tree'" class="mx-auto w-full max-w-[1200px] px-8 pb-8">
+      <div
+        id="jsmind_container"
+        class="h-[600px] w-full overflow-hidden rounded-[12px] border border-line bg-surface"
+      ></div>
     </div>
 
     <!-- 右侧详情抽屉 -->
