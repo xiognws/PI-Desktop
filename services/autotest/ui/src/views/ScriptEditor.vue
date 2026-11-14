@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import Badge from '@/components/Badge.vue'
 import { ArrowLeft, Save, Play, FileCode, FolderOpen, Loader2, ShieldCheck, CheckCircle2, XCircle, Braces } from 'lucide-vue-next'
 import * as vscode from 'vscode'
 import { configureDefaultWorkerFactory } from 'monaco-languageclient/workerFactory'
@@ -399,38 +400,38 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex-1 flex flex-col bg-surface overflow-hidden">
     <div class="h-11 bg-surface-3 border-b border-line flex items-center px-4 gap-3">
-      <button @click="router.push(`/project/${projectId}/scripts`)" class="flex items-center gap-1.5 text-sm text-fg-3 hover:text-fg">
+      <button @click="router.push(`/project/${projectId}/scripts`)" class="flex items-center gap-1.5 text-[13px] text-muted hover:text-fg">
         <ArrowLeft class="w-4 h-4" />
         返回
       </button>
-      <div class="w-px h-4 bg-gray-300"></div>
-      <div class="flex items-center gap-2 text-sm text-fg-2">
+      <span class="h-4 w-px bg-line"></span>
+      <div class="mono flex items-center gap-2 text-[13px] text-fg">
         <FileCode class="w-4 h-4 text-accent" />
         {{ currentScript?.name || '加载中...' }}
       </div>
-      <span
+      <Badge
         v-if="currentScript?.assertion_state === 'skeleton'"
-        class="text-xs px-2 py-0.5 rounded border border-warn text-warn"
+        tone="warn"
         title="自动生成的骨架：执行时只会跳过，绿色不代表验过；补上断言后这里会变成「真断言」"
-      >骨架（未验）</span>
-      <span
+      >骨架（未验）</Badge>
+      <Badge
         v-else-if="currentScript?.assertion_state === 'asserted'"
-        class="text-xs px-2 py-0.5 rounded border border-success text-success"
+        tone="success"
         :title="`${currentScript.assert_count} 条可判定断言`"
-      >真断言 {{ currentScript.assert_count }}</span>
-      <span
+      >真断言 {{ currentScript.assert_count }}</Badge>
+      <Badge
         v-if="currentScript?.case_missing"
-        class="text-xs px-2 py-0.5 rounded border border-warn text-warn"
+        tone="warn"
         title="生成这条脚本的用例已经被删除（例如资料缺口导致跳过用例）；重新设计用例后请确认是否重新生成脚本"
-      >关联用例已删除</span>
+      >关联用例已删除</Badge>
       <div class="flex items-center gap-1.5 text-xs text-muted ml-2">
         <Loader2 class="w-3 h-3 animate-spin" v-if="!lspConnected" />
-        <span class="w-2 h-2 rounded-full" :class="lspConnected ? 'bg-green-500' : 'bg-gray-300'"></span>
+        <span class="h-2 w-2 rounded-[1px]" :class="lspConnected ? 'bg-success' : 'bg-surface-4'"></span>
         {{ statusText }}
       </div>
       <div class="ml-auto flex items-center gap-2">
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line-strong rounded hover:bg-surface-4"
+          class="flex items-center gap-1.5 h-8 rounded-[8px] border border-line px-2.5 text-[13px] text-fg hover:bg-surface-3"
           :disabled="gating"
           @click="runGate"
         >
@@ -439,24 +440,24 @@ onBeforeUnmount(() => {
           校验
         </button>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line-strong rounded hover:bg-surface-4"
+          class="flex items-center gap-1.5 h-8 rounded-[8px] border border-line px-2.5 text-[13px] text-fg hover:bg-surface-3"
           @click="insertTemplate"
         >
           <Braces class="w-4 h-4" />
           模板
         </button>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line-strong rounded hover:bg-surface-4"
+          class="flex items-center gap-1.5 h-8 rounded-[8px] border border-line px-2.5 text-[13px] text-fg hover:bg-surface-3"
           :disabled="saving"
           @click="saveNow"
         >
           <Loader2 v-if="saving" class="w-4 h-4 animate-spin" />
           <Save v-else class="w-4 h-4" />
           保存
-          <span v-if="dirty" class="w-1.5 h-1.5 rounded-full bg-amber-500" title="有未保存改动"></span>
+          <span v-if="dirty" class="h-1.5 w-1.5 rounded-[1px] bg-warn" title="有未保存改动"></span>
         </button>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 bg-accent-solid text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="flex items-center gap-1.5 h-8 rounded-[8px] bg-accent-solid px-2.5 text-[13px] text-white hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="running || blockRun"
           :title="blockRun ? '静态闸门未通过，先修问题再运行' : '运行这条脚本'"
           @click="runScript"
