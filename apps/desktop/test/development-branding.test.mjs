@@ -45,10 +45,15 @@ test("Windows runtime registers the canonical native application identity", () =
   assert.equal(appId, packageJson.build.appId);
   assert.ok(startupSource.includes("app.whenReady()"), "main process readiness hook");
   assert.match(installationSource, /app\.setName\(APP_NAME\)/);
+  // Only the installed build may claim the ID: NSIS owns the Start-menu shortcut
+  // that Windows renders the taskbar button from, and claiming it in an unpacked
+  // or portable tree lets a stale shortcut (an old `Electron.lnk`) decide the
+  // taskbar's name and icon instead of the executable's own.
   assert.match(
     installationSource,
-    /process\.platform === "win32"[\s\S]*app\.setAppUserModelId\(APP_ID\)/,
+    /process\.platform === "win32"[\s\S]*app\.setAppUserModelId\(windowsAumid\)/,
   );
+  assert.match(installationSource, /manifest\.piDistribution === "installed" \? APP_ID : undefined/);
 });
 
 test("Windows packages pin Pi-Workspace executable and shortcut names", () => {

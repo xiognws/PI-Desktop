@@ -935,12 +935,16 @@ background session to alert. In both cases the platform API is best-effort,
 and a shown notification restores/shows and focuses the window before emitting
 `activated`. No permission, scheduled-reminder, or plugin source enters the
 task notification contract. Native delivery is best-effort; the durable
-inbox remains authoritative when the OS suppresses a banner. On Windows,
-Electron Main registers `net.aiuo.pi-workspace` as the process AppUserModelID
-before readiness and before any window is created. The ID matches the NSIS
-package identity so notification attribution, notification settings, taskbar
-grouping, and installed shortcuts resolve to `Pi-Workspace`, never the stock
-Electron host.
+inbox remains authoritative when the OS suppresses a banner. On Windows, an
+**installed** build registers `net.aiuo.pi-workspace` as the process
+AppUserModelID before readiness and before any window is created. The ID matches
+the NSIS package identity so notification attribution, notification settings,
+taskbar grouping, and installed shortcuts resolve to `Pi-Workspace`, never the
+stock Electron host. An unpacked tree and the portable wrapper do not claim the
+ID: they have no shortcut carrying it, so claiming it would let any stale
+shortcut that does (a leftover `Electron.lnk` from a development run, for one)
+decide the taskbar's name and icon. Without it Windows derives the identity from
+the executable, which carries the product name and icon.
 
 Task native objects are retained by durable notification id, with at most one
 live object per id. Replayed `showNative` requests do not create a second

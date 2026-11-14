@@ -113,7 +113,9 @@ test("sidebar terminal outcomes are notification-backed, not lifecycle-backed", 
 });
 
 test("task and interactive native notifications keep separate visibility rules", () => {
-  assert.match(mainSource, /app\.setAppUserModelId\(APP_ID\)/);
+  // The ID is claimed by the installed build only (see installation.ts); the
+  // toast identity follows it, so the assertion is on the call, not the argument.
+  assert.match(mainSource, /app\.setAppUserModelId\(/);
   assert.match(mainSource, /mainWindow\.isFocused\(\)/);
   assert.match(mainSource, /SystemNotification\.isSupported\(\)/);
   assert.match(mainSource, /new SystemNotification/);

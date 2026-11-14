@@ -148,6 +148,85 @@ test("the configured port is honoured over the descriptor default", async () => 
   assert.deepEqual(spawned, [19100]);
 });
 
+test("a port another bridge already owns moves the gateway instead of failing", async () => {
+  // The bundled `community.workbuddy-connect` plugin runs the same bridge on the
+  // descriptor's default port, so this boot's spawn collides. The supervisor must
+  // come up on the next port and rewrite the row there — otherwise the row keeps
+  // pointing at a gateway whose key it does not hold.
+  const calls = [];
+  const spawned = [];
+  const rows = [];
+  const host = async (method, params) => {
+    calls.push({ method, params });
+    if (method === "providers.list") return { providers: rows.map((row) => ({ ...row })) };
+    if (method === "providers.create") {
+      const row = { id: "row-1", vendorKey: params.vendorKey };
+      rows.push(row);
+      return { provider: row };
+    }
+    if (method === "providers.update") {
+      Object.assign(rows[0], params);
+      return { provider: rows[0] };
+    }
+    return {};
+  };
+  const supervisor = new InAppProviders({
+    callHost: host,
+    startGateway: async ({ port }) => {
+      spawned.push(port);
+      if (port === WORKBUDDY.defaultPort) {
+        throw new Error(
+          `listen EADDRINUSE: address already in use 127.0.0.1:${WORKBUDDY.defaultPort}`,
+        );
+      }
+      return { stop: async () => {} };
+    },
+    readSettings: async () => ({}),
+    readApiKey: async () => API_KEY,
+    fetchImpl: async (url) => {
+      if (String(url).endsWith(WORKBUDDY.healthPath)) {
+        return { ok: true, json: async () => ({ ok: true, service: "pi-workbuddy-connect" }) };
+      }
+      return { ok: true, json: async () => ({ object: "list", data: [{ id: "m-1" }] }) };
+    },
+    log: () => {},
+    healthPollMs: 1,
+    healthTimeoutMs: 50,
+  });
+
+  await supervisor.start();
+
+  assert.deepEqual(spawned, [WORKBUDDY.defaultPort, WORKBUDDY.defaultPort + 1]);
+  const created = calls.find((call) => call.method === "providers.create");
+  assert.ok(created, "the row is still created on the port that answered");
+  assert.equal(created.params.baseUrl, `http://127.0.0.1:${WORKBUDDY.defaultPort + 1}/workbuddy/v1`);
+  const status = supervisor.status()[0];
+  assert.equal(status.running, true);
+  assert.equal(status.port, WORKBUDDY.defaultPort + 1);
+});
+
+test("a start failure that is not a busy port is not retried", async () => {
+  const spawned = [];
+  const supervisor = new InAppProviders({
+    callHost: async () => ({}),
+    startGateway: async ({ port }) => {
+      spawned.push(port);
+      throw new Error("spawn bridge/core.cjs ENOENT");
+    },
+    readSettings: async () => ({}),
+    readApiKey: async () => API_KEY,
+    fetchImpl: async () => ({ ok: true, json: async () => ({}) }),
+    log: () => {},
+    healthPollMs: 1,
+    healthTimeoutMs: 5,
+  });
+
+  await supervisor.start();
+
+  assert.deepEqual(spawned, [WORKBUDDY.defaultPort]);
+  assert.equal(supervisor.status()[0].running, false);
+});
+
 test("settings resolve to enabled on the descriptor port when absent", () => {
   assert.deepEqual(resolveProviderSettings(WORKBUDDY, {}), {
     enabled: true,

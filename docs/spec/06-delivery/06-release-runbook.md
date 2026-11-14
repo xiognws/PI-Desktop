@@ -32,10 +32,14 @@ and ICNS resource are development-only Pi-Workspace values, so AppKit shows
 Pi-Workspace in the application menu and uses the canonical icon in the native
 About panel. The runtime also applies `build/icon_1024.png` to the Dock. Stock
 files under `node_modules` are never modified. Windows/Linux development keeps
-the normal electron-vite executable. Windows Main nevertheless registers the
-same `net.aiuo.pi-workspace` AppUserModelID used by the NSIS package before
-Electron readiness, preventing the stock host identity from owning native
-notifications or taskbar groups. The Windows package additionally pins the
+the normal electron-vite executable. The installed Windows package registers the same `net.aiuo.pi-workspace`
+AppUserModelID used by the NSIS package before Electron readiness, preventing the
+stock host identity from owning native notifications or taskbar groups. The
+unpacked (`--dir`) tree and the portable wrapper deliberately do not claim it:
+neither has a shortcut carrying the ID, and Windows then renders the taskbar
+button from whatever stale shortcut does claim it — an old `Electron.lnk` turns a
+packaged build into "Electron" with the stock atom icon. Without the ID the
+executable's own name and icon decide. The Windows package additionally pins the
 `Pi-Workspace` executable and Start menu shortcut names. The launcher sets
 `PI_DESKTOP_DEV=1` so runtime packaging checks keep update delivery disabled
 and preserve developer workspace defaults despite the branded executable name.

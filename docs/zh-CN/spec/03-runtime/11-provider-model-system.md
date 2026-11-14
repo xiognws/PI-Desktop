@@ -532,7 +532,7 @@ Main 暴露 `pi-desktop/in-app-providers/credits`，入参 `{ id, refresh? }`。
 | 键 | 默认值 | 含义 |
 | --- | --- | --- |
 | `inAppProvider.workbuddy.enabled` | `true` | 启动网关并保留提供商行 |
-| `inAppProvider.workbuddy.port` | `18765` | 网关绑定的回环端口 |
+| `inAppProvider.workbuddy.port` | `18765` | 网关优先使用的回环端口；若该端口已被占用（通常是捆绑插件自己的 bridge），网关顺延到下一个空闲端口，并把提供商行改写到实际端口 |
 
 ### 8b.8 捆绑插件默认停用
 

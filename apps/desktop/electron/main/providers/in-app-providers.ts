@@ -231,28 +231,70 @@ export class InAppProviders {
       return;
     }
     const apiKey = await this.readApiKey(provider);
-    const handle = await this.startGateway({ provider, port: settings.port, apiKey });
+    const started = await this.startOnFreePort(provider, settings.port, apiKey);
+    const { handle, port } = started;
     this.handles.set(provider.id, handle);
-    this.ports.set(provider.id, settings.port);
-    if (!(await this.waitForHealth(provider, settings.port))) {
+    this.ports.set(provider.id, port);
+    if (!(await this.waitForHealth(provider, port))) {
       this.log("warn", `[in-app] ${provider.id}: gateway did not become healthy`, {
-        port: settings.port,
+        port,
       });
       await this.forget(provider.id);
       return;
     }
-    const models = await this.fetchModels(provider, settings.port, apiKey);
+    const models = await this.fetchModels(provider, port, apiKey);
     if (models.length === 0) {
       this.log("warn", `[in-app] ${provider.id}: gateway published no models`);
       return;
     }
-    const rowId = await this.upsertProviderRow(provider, settings.port, models, apiKey);
+    const rowId = await this.upsertProviderRow(provider, port, models, apiKey);
     this.rowIds.set(provider.id, rowId);
     this.log("info", `[in-app] ${provider.id}: ready`, {
-      port: settings.port,
+      port,
       providerId: rowId,
       models: models.length,
     });
+  }
+
+  /**
+   * Start the gateway, moving to the next port when the configured one is taken.
+   *
+   * The bundled `community.workbuddy-connect` plugin runs an older copy of the
+   * same bridge and defaults to the same port, and a machine that enabled that
+   * plugin before this supervisor existed boots it first. Failing outright there
+   * left the provider row pointing at a gateway this process does not own — its
+   * key does not open that bridge — so a busy port is retried on the next few
+   * instead. The row is always rewritten from the port that actually answered.
+   */
+  private async startOnFreePort(
+    provider: InAppProvider,
+    port: number,
+    apiKey: string,
+  ): Promise<{ handle: GatewayHandle; port: number }> {
+    let candidate = port;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        const handle = await this.startGateway({ provider, port: candidate, apiKey });
+        if (candidate !== port) {
+          this.log(
+            "warn",
+            `[in-app] ${provider.id}: port ${port} was in use, using ${candidate}`,
+            { port: candidate, requestedPort: port },
+          );
+        }
+        return { handle, port: candidate };
+      } catch (error) {
+        const busy = /EADDRINUSE/.test(describeError(error));
+        if (!busy || candidate >= 65_535) throw error;
+        candidate += 1;
+        if (attempt < 3) {
+          this.log("warn", `[in-app] ${provider.id}: port ${candidate - 1} is in use`, {
+            nextPort: candidate,
+          });
+        }
+      }
+    }
+    throw new Error(`[in-app] ${provider.id}: no free port near ${port}`);
   }
 
   private async forget(providerId: string): Promise<void> {

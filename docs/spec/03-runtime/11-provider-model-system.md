@@ -672,7 +672,7 @@ upstream refuses for credit reports the insufficient-credit error on that turn.
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `inAppProvider.workbuddy.enabled` | `true` | start the gateway and keep the provider row |
-| `inAppProvider.workbuddy.port` | `18765` | loopback port the gateway binds |
+| `inAppProvider.workbuddy.port` | `18765` | loopback port the gateway prefers; a port another process already owns (the bundled plugin's own bridge, typically) moves the gateway to the next free one and the row is rewritten to that port |
 
 ### 8b.8 The bundled plugin is default-disabled
 

@@ -1,4 +1,6 @@
 import { app } from "electron";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { homedir } from "node:os";
 import { APP_ID, APP_NAME } from "@pi-workspace/shared";
 import { adoptLegacyHomeProfile, applyDevelopmentUserData, desktopDataDir } from "./data-paths";
@@ -31,7 +33,33 @@ if (!dataRoot) {
   }
   applyDevelopmentUserData(app, isDevelopmentBuild);
 }
-if (process.platform === "win32") app.setAppUserModelId(APP_ID);
+/**
+ * The Windows AppUserModelID this process may claim, or nothing.
+ *
+ * The ID belongs to the *installed* build: NSIS writes a Start-menu shortcut
+ * that carries it, and Windows renders the taskbar button — name, icon and
+ * grouping — from that shortcut. An unpacked tree or the portable wrapper has no
+ * such shortcut, so claiming the ID there lets any stale shortcut that also
+ * carries it decide the taskbar's face. That is exactly what happened to a
+ * machine whose Start menu still had an `Electron.lnk` from an old development
+ * run: the packaged build showed the Electron atom and the name "Electron".
+ * Without the ID Windows derives the identity from the executable, which already
+ * carries the product name and icon.
+ */
+function windowsAppUserModelId(): string | undefined {
+  if (!app.isPackaged) return undefined;
+  try {
+    const manifest = JSON.parse(
+      readFileSync(join(app.getAppPath(), "package.json"), "utf8"),
+    ) as { piDistribution?: unknown };
+    return manifest.piDistribution === "installed" ? APP_ID : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const windowsAumid = process.platform === "win32" ? windowsAppUserModelId() : undefined;
+if (windowsAumid) app.setAppUserModelId(windowsAumid);
 
 export const singleInstanceRequired = !dataDirWasExplicit;
 export const hasSingleInstanceLock = singleInstanceRequired ? app.requestSingleInstanceLock() : true;
