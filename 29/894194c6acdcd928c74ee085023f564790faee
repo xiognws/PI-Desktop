@@ -1,0 +1,16 @@
+services/autotest/ui/src/views/Overview.vue
+  h_201ed4c689ac8b 4-6,102-105,108-119,130-142,144,146-148,150-155,157-163,165-168,170-174,177-185,190,193-199,202-203,205-218,221-223,225-229,231-239,241-248,253,255-258,260-261
+services/autotest/ui/src/views/Runs.vue
+  h_201ed4c689ac8b 4-6,63-68,70-74,232-237,239-250,253-264,266-269,271-281,283,285,288,290,293-295,298,302,304-305,310,312-313,315,319-329,331,334,336-341,346-350,352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "29894194c6acdcd928c74ee085023f564790faee",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
