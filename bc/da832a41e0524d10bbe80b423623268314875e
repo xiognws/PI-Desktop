@@ -1,0 +1,60 @@
+apps/desktop/electron/main/providers/in-app-providers.ts
+  h_201ed4c689ac8b 67,73-76,133-135,160,182-240,288,299,308,314-315
+apps/desktop/electron/main/providers/ipc.ts
+  h_201ed4c689ac8b 19,89-99
+apps/desktop/src/components/settings/InAppProviderCard.tsx
+  h_201ed4c689ac8b 1-108
+apps/desktop/src/components/settings/ModelConfigPage.tsx
+  h_201ed4c689ac8b 37,419
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 849-853
+apps/desktop/src/lib/in-app-credits.ts
+  h_201ed4c689ac8b 39,45-48
+apps/desktop/src/lib/in-app-provider-channels.ts
+  h_201ed4c689ac8b 11
+apps/desktop/test/bundled-plugin-default-disabled.test.mjs
+  h_201ed4c689ac8b 32-34,36-39,41-42,44-48
+apps/desktop/test/in-app-providers.test.mjs
+  h_201ed4c689ac8b 230-330,439-443,450
+docs/adr/0397-in-app-provider-gateway.md
+  h_201ed4c689ac8b 116-131
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 592-596,679-704
+docs/zh-CN/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 469-471,538,540-557
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1318-1323
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1328-1333
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1318-1323
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1318-1323
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1324-1329
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1302-1307
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1324-1329
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1315-1320
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1315-1320
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 317
+scripts/bundled-plugins-default-disabled.json
+  h_201ed4c689ac8b 3-4
+scripts/bundled-plugins-excluded.json
+  h_201ed4c689ac8b 14,47-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bcda832a41e0524d10bbe80b423623268314875e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
