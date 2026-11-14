@@ -869,6 +869,44 @@
   padding: 9px 8px 4px;
 }
 
+/* One limit draft for every chosen model: a service that publishes no
+   capacities leaves the whole list at the generic default, and this is the
+   control that fixes that in one action instead of one sheet per row. */
+.provider-chosen-bulk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  flex-wrap: wrap;
+  padding: 0 8px 6px;
+}
+
+.provider-chosen-bulk-label {
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+}
+
+.provider-chosen-bulk-select {
+  min-height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-2xs);
+  background: var(--ds-bg-chip);
+  color: var(--ds-text-primary);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  outline: none;
+}
+
+.provider-chosen-bulk-select:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 24%, transparent);
+}
+
+.provider-chosen-bulk-apply {
+  margin-left: auto;
+}
+
 .provider-chosen-title {
   margin: 0;
   color: var(--ds-text-secondary);

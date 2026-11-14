@@ -43,6 +43,7 @@ import {
   MAX_OUTPUT_PRESETS,
   matchPresetIndex,
 } from "../../lib/model-limit-presets";
+import { applyBulkLimits, bulkLimitDraftIsEmpty } from "../../lib/model-bulk-limits";
 import { api } from "../../lib/api";
 import { Badge, Button, Checkbox, Field, HelpIcon, Input, Tooltip, TooltipButton, cx } from "../ui";
 import { IconClose, IconGripVertical, IconHelp, IconPlus, IconRefresh, IconSearch } from "../icons";
@@ -278,6 +279,16 @@ export function ModelSelectionPanes({
   }, []);
   const [modelQuery, setModelQuery] = useState("");
   const [chosenQuery, setChosenQuery] = useState("");
+  /**
+   * One limit draft for the whole list.
+   *
+   * A service that publishes nothing about its models leaves every row at the
+   * generic default, and correcting twenty rows through twenty advanced sheets
+   * is not a workflow. Empty string = leave that field alone, so the two fields
+   * stay independent.
+   */
+  const [bulkContextWindow, setBulkContextWindow] = useState("");
+  const [bulkMaxTokens, setBulkMaxTokens] = useState("");
   const [customModelId, setCustomModelId] = useState("");
   const [customModelName, setCustomModelName] = useState("");
   const [customModelError, setCustomModelError] = useState("");
@@ -410,6 +421,20 @@ export function ModelSelectionPanes({
     setModels((current) =>
       current.map((binding) => (binding.id === id ? { ...binding, ...update } : binding)),
     );
+
+  // The bulk bar writes the same two fields the advanced sheet does, once for
+  // every chosen model. It clears itself afterwards so a later click cannot
+  // re-apply a draft the user has stopped thinking about.
+  const bulkDraft = {
+    contextWindow: bulkContextWindow ? Number(bulkContextWindow) : null,
+    maxTokens: bulkMaxTokens ? Number(bulkMaxTokens) : null,
+  };
+  const applyBulkLimitDraft = () => {
+    if (bulkLimitDraftIsEmpty(bulkDraft)) return;
+    setModels((current) => applyBulkLimits(current, bulkDraft));
+    setBulkContextWindow("");
+    setBulkMaxTokens("");
+  };
 
   /**
    * Ask the host for the model library's record of a just-added hand-typed id
@@ -694,6 +719,57 @@ export function ModelSelectionPanes({
             />
           </div>
         </div>
+        {/* One draft for the whole list. This is the answer to a service that
+            publishes no capacities: without it every row needs its own sheet. */}
+        {models.length > 1 ? (
+          <div className="provider-chosen-bulk">
+            <span className="provider-chosen-bulk-label">
+              {t("settings.bulkLimitsTitle", { count: models.length })}
+            </span>
+            <select
+              className="provider-chosen-bulk-select"
+              aria-label={t("settings.contextWindow")}
+              title={t("settings.contextWindow")}
+              value={bulkContextWindow}
+              disabled={busy}
+              onChange={(event) => setBulkContextWindow(event.target.value)}
+            >
+              <option value="">
+                {t("settings.bulkLimitsKeep", { field: t("settings.contextWindow") })}
+              </option>
+              {CONTEXT_WINDOW_PRESETS.map((preset) => (
+                <option key={preset.label} value={preset.tokens}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="provider-chosen-bulk-select"
+              aria-label={t("settings.maxOutput")}
+              title={t("settings.maxOutput")}
+              value={bulkMaxTokens}
+              disabled={busy}
+              onChange={(event) => setBulkMaxTokens(event.target.value)}
+            >
+              <option value="">
+                {t("settings.bulkLimitsKeep", { field: t("settings.maxOutput") })}
+              </option>
+              {MAX_OUTPUT_PRESETS.map((preset) => (
+                <option key={preset.label} value={preset.tokens}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              className="provider-chosen-bulk-apply"
+              disabled={busy || bulkLimitDraftIsEmpty(bulkDraft)}
+              onClick={applyBulkLimitDraft}
+            >
+              {t("settings.bulkLimitsApply")}
+            </Button>
+          </div>
+        ) : null}
         {autoPicked && models.length > 0 ? (
           <div className="provider-models-summary-hint">{t("settings.modelsAutoPicked")}</div>
         ) : null}
@@ -848,6 +924,11 @@ export function ModelSelectionPanes({
                           {t("settings.contextWindow")}
                           {followsCatalog ? (
                             <HelpIcon label={t("settings.contextWindowCatalogHint")} />
+                          ) : publishedContextWindow === undefined ? (
+                            /* Neither the service nor the catalog stated a
+                               window, so the number below is our fallback, not a
+                               fact about the model. Say so where it is read. */
+                            <HelpIcon label={t("settings.limitUnpublishedHint")} />
                           ) : null}
                         </span>
                         {/* Preset ladder (#202): click writes the token count;
