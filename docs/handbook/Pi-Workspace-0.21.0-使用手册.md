@@ -708,10 +708,15 @@ WorkBuddy 不是"要你手动添加的供应商"，而是**应用自己运行的
 | --- | --- |
 | 应用 | 产品名与版本 |
 | 日志 | `打开日志` → 直接打开日志目录（排障首选）|
-| 使用说明 | `手动更新`：打开这份手册；文案是「当前版本的使用说明，随应用一起更新。」|
+| 使用说明 | `手动更新`：打开这份手册；文案是「当前版本的使用说明，随应用一起更新。」解析顺序见下方 |
 | 开发者 | 开发者模式开关（打开后出现开发者工具等入口）|
 
 > 对外分发的构建不暴露上游身份：信息页只显示产品名、版本、日志与手册，不指向其他项目。
+>
+> **手册优先顺序（隐藏细节）**：`<数据根>\components\manual\` 里的 `Pi-Workspace-*.md` **优先于**随包副本。
+> 也就是说你可以把自己的版本（或公司内部增补版）放进这个目录，点「使用说明」打开的就是你的那份，
+> 而且它**不会被下一次升级覆盖**。同一个机制还作用于 `components\gen-ui`（可视化样式）与 `components\models.dev`（模型目录快照）。
+> 想让随包版本重新生效，把 `components\manual` 删掉即可。
 
 ---
 
@@ -769,19 +774,37 @@ WorkBuddy 不是"要你手动添加的供应商"，而是**应用自己运行的
 
 ```text
 D:\PiWorkspace\
-  data\
-    pi.sqlite            会话、消息、项目、提供商、记忆、模式运行记录…
-    pi.sqlite.vNN.bak    升级前自动留的备份（NN = 升级前的 schema 版本）
-    tmp\                 运行时临时文件（下载、handoff、解包等，全部落在这里）
-    logs\app\            应用日志（lifecycle / provider / plugin / runtime）
-    logs\agent\           Agent 运行时日志
-    logs\host\            本地 host 服务日志
-    plugins\             插件注册表与预置状态
-    widgets\             你的挂件
-    tools\state.json     工具包启用状态
-    sidebar-preferences.json  侧栏布局恢复备份
-  userdata\              Chromium 用户数据（缓存、Local Storage 等）
-  pi\agent\AGENTS.md     全局 Agent 指令
+  components\          用户覆盖组件（优先于随包副本）
+    manual\            你放进去的手册 → 「使用说明」打开的就是它
+    gen-ui\            覆盖可视化样式（visualize.css）
+    models.dev\        覆盖模型目录快照（api.json）
+  data\                应用数据主体
+    pi.sqlite          会话、消息、项目、提供商、记忆、模式运行记录…
+    pi.sqlite-wal/-shm   WAL 与共享内存（三个文件要一起复制备份）
+    pi.sqlite.vNN.bak   升级前按 schema 版本留的备份
+    pi.sqlite.bak-<时间戳>  手动/自动的带时间备份
+    tmp\               运行时临时文件（下载、handoff、解包、脚本）全部落这里
+    logs\app\           应用日志（lifecycle / provider / plugin / runtime）
+    logs\agent\         Agent 运行时日志
+    logs\host\          本地 host 服务日志
+    sessions\           会话附件与派生数据
+    attachments\        输入区附件
+    cache\              可清理缓存
+    plugins\            installed / disabled / backups / cache / data
+    widgets\            你放的挂件（state.json 记录启用集）
+    tools\state.json    工具包启用状态
+    capabilities\ · agent-capabilities\   能力快照与可用工具面
+    autotest\           内置 AutoTest 服务的运行数据
+    python-site\        随包 Python 的 site-packages（第三方依赖落这里）
+    secrets\            受限密钥材料（不写数据库明文）
+    review-changes\     审查面板的改动快照
+    crash-dumps\ · exit-reasons.log · run-marker.json   崩溃与退出诊断
+    sidebar-preferences.json · window-state.json         窗口与侧栏记忆
+  agents\skills\       全局技能目录（= 用户目录下的 ~/.agents/skills）
+  pi\agent\            全局 Agent 状态（auth.json、extensions）
+  userdata\            Chromium 用户数据（缓存、Local Storage 等）
+  legacy\ · docs\       旧版本迁移遗留（docs 下那份旧使用说明不再被打开）
+  ms-playwright\ · pi-diff-view\ · pi-workbuddy-connect\   运行时依赖解包目录
 ```
 
 > 所有运行时临时文件都在 `<数据根>/data/tmp` 下，不会散落到系统临时目录——这也是这一版的硬约束。
@@ -857,7 +880,7 @@ D:\PiWorkspace\
 
 ---
 
-## 15. 隐藏用法集锦（30 条）
+## 15. 隐藏用法集锦（33 条）
 
 1. **`Ctrl+Shift+P` 是能力目录**：内置命令、插件命令、技能、MCP 工具全在一个列表里。
 2. **`/` 是搜索**：打 `/` 再打两个字母，能在插件/技能/MCP 之间按名字筛。
@@ -889,6 +912,9 @@ D:\PiWorkspace\
 28. **命令列表加载失败可以就地重试**：对话框里的「重试启动」比重启整个应用快。
 29. **`Ctrl+W` 已归还给系统**：这一版不再把关闭窗口绑成可配置快捷键，避免和系统关窗打架。
 30. **卡片写 `Ctrl+.` 的双重身份**：空闲时是发送键位的邻居，运行中才是"中止"——中止会等本地操作落定。
+31. **手册可以被你换掉**：`<数据根>\components\manual\` 优先于随包手册，升级不会被覆盖（见 11.14）。
+32. **`components` 还能覆盖另外两样东西**：`gen-ui`（可视化样式）与 `models.dev`（模型目录快照）。
+33. **`data\tmp` 可以放心清空**：里面只有运行时临时文件，清掉不影响会话与设置。
 
 ---
 
