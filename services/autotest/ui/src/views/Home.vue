@@ -2,15 +2,9 @@
 import ThemeSwitch from '@/components/theme-switch.vue'
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  Cpu,
-  Plus,
-  FileText,
-  ListChecks,
-  PlayCircle,
-  Pencil,
-  Trash2,
-} from 'lucide-vue-next'
+import { Plus } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const router = useRouter()
 
@@ -159,161 +153,145 @@ function enterProject(id: string) {
 
 <template>
   <div class="min-h-screen bg-surface-2">
-    <!-- 顶部栏 -->
-    <header class="h-14 bg-surface border-b border-line flex items-center justify-between px-6">
+    <header class="flex h-14 items-center justify-between border-b border-line bg-surface px-6">
       <div class="flex items-center gap-2">
-        <Cpu class="w-5 h-5 text-accent" />
-        <span class="font-semibold text-fg">自动化测试平台</span>
+        <span class="text-[14px] font-medium text-fg">自动化测试平台</span>
+        <span class="text-[12px] text-muted-2">ECU / 座舱</span>
       </div>
       <div class="flex items-center gap-4">
         <ThemeSwitch />
-        <div class="w-8 h-8 rounded-full bg-accent-solid text-white flex items-center justify-center text-sm">测</div>
+        <span class="flex h-7 w-7 items-center justify-center rounded-[6px] bg-surface-3 text-[12px] text-fg">测</span>
       </div>
     </header>
 
-    <div class="max-w-7xl mx-auto p-8">
-      <!-- 页面标题 -->
-      <div class="mb-8">
-        <h1 class="text-2xl font-semibold text-fg">我的测试工作台</h1>
-        <p class="text-sm text-muted mt-1">ECU / 座舱自动化测试 · 用例、脚本、执行与报告</p>
-      </div>
+    <div class="mx-auto max-w-[1000px] px-8 py-9">
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-[24px] font-medium leading-8 text-fg">测试工作台</h1>
+          <p class="mt-1 text-[13px] text-muted">一个项目一条链路：资料 → 知识库 → 用例 → 脚本 → 执行 → 报告。</p>
+        </div>
+        <button
+          class="flex h-9 items-center gap-2 rounded-[8px] bg-accent-solid px-3 text-[13px] text-white hover:bg-accent"
+          @click="createDialogOpen = true"
+        >
+          <Plus class="h-4 w-4" /> 新建项目
+        </button>
+      </header>
 
-      <!-- 统计卡片 -->
-      <div class="grid grid-cols-4 gap-4 mb-8">
-        <div class="bg-surface rounded-lg border border-line p-5">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-muted">项目数</span>
-            <FileText class="w-4 h-4 text-accent" />
-          </div>
-          <div class="text-2xl font-semibold text-fg">{{ stats.totalProjects }}</div>
+      <!-- 读数：三个数并排，用分隔线而不是三张卡片 -->
+      <div class="mt-6 grid grid-cols-3 divide-line rounded-[12px] border border-line bg-surface divide-x">
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">项目</p>
+          <p class="num mt-1 text-[24px] leading-7 text-fg">{{ stats.totalProjects }}</p>
         </div>
-        <div class="bg-surface rounded-lg border border-line p-5">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-muted">测试用例</span>
-            <ListChecks class="w-4 h-4 text-success" />
-          </div>
-          <div class="text-2xl font-semibold text-fg">{{ stats.totalCases }}</div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">用例</p>
+          <p class="num mt-1 text-[24px] leading-7 text-fg">{{ stats.totalCases }}</p>
         </div>
-        <div class="bg-surface rounded-lg border border-line p-5">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-muted">执行次数</span>
-            <PlayCircle class="w-4 h-4 text-orange-600" />
-          </div>
-          <div class="text-2xl font-semibold text-fg">{{ stats.totalExecutions }}</div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">执行次数</p>
+          <p class="num mt-1 text-[24px] leading-7 text-fg">{{ stats.totalExecutions }}</p>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-6">
-        <!-- 项目列表 -->
-        <div class="col-span-2">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-base font-medium text-fg">我的项目</h2>
-            <button @click="createDialogOpen = true" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-accent-solid text-white rounded-lg hover:bg-blue-700">
-              <Plus class="w-4 h-4" />
-              新建项目
-            </button>
-          </div>
+      <h2 class="mt-8 text-[13px] font-medium text-fg">我的项目</h2>
 
-          <div class="space-y-3">
-            <div
-              v-for="p in projects"
-              :key="p.id"
-              @click="enterProject(p.id)"
-              class="bg-surface rounded-lg border border-line p-5 cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-3">
-                  <div :class="['w-10 h-10 rounded-lg flex items-center justify-center text-white', p.color]">
-                    <Cpu class="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 class="font-medium text-fg">{{ p.name }}</h3>
-                    <p class="text-xs text-muted">{{ p.description }}</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <span class="text-xs text-muted-2">{{ p.last_active }}</span>
-                  <button
-                    class="p-1 text-muted-2 hover:text-accent"
-                    title="重命名"
-                    @click.stop="openRename(p)"
-                  ><Pencil class="w-4 h-4" /></button>
-                  <button
-                    class="p-1 text-muted-2 hover:text-danger"
-                    title="删除项目（移入回收目录）"
-                    @click.stop="openDelete(p)"
-                  ><Trash2 class="w-4 h-4" /></button>
-                </div>
-              </div>
-              <div class="flex items-center gap-6 text-sm text-muted pl-13">
-                <span>{{ p.type }}</span>
-                <span>{{ p.case_count }} 用例</span>
-                <span>{{ p.execution_count }} 次执行</span>
-              </div>
-            </div>
+      <div class="mt-3 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <button
+          v-for="p in projects"
+          :key="p.id"
+          class="grid w-full grid-cols-1 items-center gap-3 border-b border-line-soft px-5 py-3 text-left last:border-b-0 hover:bg-surface-2 lg:grid-cols-[1fr_120px_120px_120px_auto]"
+          @click="enterProject(p.id)"
+        >
+          <div class="min-w-0">
+            <p class="truncate text-[14px] text-fg">{{ p.name }}</p>
+            <p class="truncate text-[12px] text-muted">{{ p.description }}</p>
           </div>
-        </div>
+          <Badge tone="neutral">{{ p.type }}</Badge>
+          <span class="num text-[12px] text-muted">{{ p.case_count }} 用例</span>
+          <span class="num text-[12px] text-muted">{{ p.execution_count }} 次执行</span>
+          <span class="flex items-center justify-end gap-3" @click.stop>
+            <span class="num text-[12px] text-muted-2">{{ p.last_active }}</span>
+            <button class="text-[12px] text-muted hover:text-fg" @click="openRename(p)">重命名</button>
+            <button class="text-[12px] text-muted hover:text-danger" @click="openDelete(p)">删除</button>
+          </span>
+        </button>
+
+        <EmptyState
+          v-if="!projects.length"
+          class="m-5"
+          title="还没有项目"
+          hint="点右上「新建项目」，一个项目对应一套资料、用例和脚本"
+        />
       </div>
-      <div v-if="inlineMessage" class="mt-3 text-xs text-fg-3">{{ inlineMessage }}</div>
 
-      <!-- 重命名对话框 -->
-      <div v-if="renameTarget" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-surface rounded-lg p-6 w-96">
-          <h3 class="text-lg font-medium text-fg mb-4">重命名项目</h3>
-          <input v-model="renameName" type="text" class="w-full px-3 py-2 border border-line rounded-lg text-sm" />
-          <p class="text-xs text-muted-2 mt-2">项目 id（{{ renameTarget.id }}）不变，只改显示名。</p>
-          <div class="flex gap-3 mt-6">
-            <button @click="renameTarget = null" class="flex-1 px-4 py-2 border border-line rounded-lg text-sm hover:bg-surface-2">取消</button>
-            <button @click="submitRename" class="flex-1 px-4 py-2 bg-accent-solid text-white rounded-lg text-sm hover:bg-blue-700">保存</button>
+      <p v-if="inlineMessage" class="mt-3 text-[12px] text-muted">{{ inlineMessage }}</p>
+
+      <!-- 重命名 -->
+      <div v-if="renameTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="w-96 rounded-[12px] border border-line bg-surface p-6">
+          <h3 class="text-[15px] font-medium text-fg">重命名项目</h3>
+          <input v-model="renameName" type="text" class="mt-3 h-9 w-full rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg" />
+          <p class="mono mt-2 text-[12px] text-muted-2">项目 id（{{ renameTarget.id }}）不变，只改显示名。</p>
+          <div class="mt-5 flex gap-3">
+            <button class="h-9 flex-1 rounded-[8px] border border-line text-[13px] text-fg hover:bg-surface-3" @click="renameTarget = null">取消</button>
+            <button class="h-9 flex-1 rounded-[8px] bg-accent-solid text-[13px] text-white hover:bg-accent" @click="submitRename">保存</button>
           </div>
         </div>
       </div>
 
       <!-- 删除确认 -->
-      <div v-if="deleteTarget" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-surface rounded-lg p-6 w-[420px]">
-          <h3 class="text-lg font-medium text-fg mb-2">删除「{{ deleteTarget.name }}」？</h3>
-          <p class="text-sm text-fg-3 mb-3">
-            项目里的需求、用例、脚本、执行记录和报告都会一起移出列表。目录不会被真正删除，
-            而是移到 workspace 的 <code class="text-xs">.trash/</code> 下，需要时可以捡回来。
+      <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="w-[440px] rounded-[12px] border border-line bg-surface p-6">
+          <h3 class="text-[15px] font-medium text-fg">删除「{{ deleteTarget.name }}」？</h3>
+          <p class="mt-2 text-[13px] leading-6 text-muted">
+            项目里的需求、用例、脚本、执行记录和报告都会一起移出列表。目录不会被真正删除，而是移到 workspace 的
+            <code class="mono text-[12px]">.trash/</code> 下，需要时可以捡回来。
           </p>
-          <label class="block text-sm text-fg-2 mb-1">输入项目 id 确认：<code class="text-xs">{{ deleteTarget.id }}</code></label>
-          <input v-model="deleteConfirmText" type="text" class="w-full px-3 py-2 border border-line rounded-lg text-sm" :placeholder="deleteTarget.id" />
-          <div class="flex gap-3 mt-6">
-            <button @click="deleteTarget = null" class="flex-1 px-4 py-2 border border-line rounded-lg text-sm hover:bg-surface-2">取消</button>
+          <label class="mono mt-3 block text-[12px] text-muted">
+            输入项目 id 确认：{{ deleteTarget.id }}
+          </label>
+          <input
+            v-model="deleteConfirmText"
+            type="text"
+            class="mono mt-1 h-9 w-full rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg"
+            :placeholder="deleteTarget.id"
+          />
+          <div class="mt-5 flex gap-3">
+            <button class="h-9 flex-1 rounded-[8px] border border-line text-[13px] text-fg hover:bg-surface-3" @click="deleteTarget = null">取消</button>
             <button
               :disabled="deleteConfirmText.trim() !== deleteTarget.id"
-              class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              class="h-9 flex-1 rounded-[8px] bg-danger text-[13px] text-white hover:opacity-90 disabled:opacity-40"
               @click="submitDelete"
             >确认删除</button>
           </div>
         </div>
       </div>
 
-      <!-- 新建项目对话框 -->
-      <div v-if="createDialogOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-surface rounded-lg p-6 w-96">
-          <h3 class="text-lg font-medium text-fg mb-4">新建项目</h3>
-          <div class="space-y-4">
+      <!-- 新建项目 -->
+      <div v-if="createDialogOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="w-96 rounded-[12px] border border-line bg-surface p-6">
+          <h3 class="text-[15px] font-medium text-fg">新建项目</h3>
+          <div class="mt-3 space-y-3">
             <div>
-              <label class="block text-sm text-fg-2 mb-1">项目名称</label>
-              <input v-model="newProject.name" type="text" class="w-full px-3 py-2 border border-line rounded-lg text-sm" placeholder="比如：长安深蓝 S7 ECU 测试" />
+              <label class="block text-[12px] text-muted">项目名称</label>
+              <input v-model="newProject.name" type="text" class="mt-1 h-9 w-full rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg placeholder:text-muted-2" placeholder="比如：深蓝 S7 ECU 测试" />
             </div>
             <div>
-              <label class="block text-sm text-fg-2 mb-1">项目描述</label>
-              <textarea v-model="newProject.description" class="w-full px-3 py-2 border border-line rounded-lg text-sm" rows="3" placeholder="简单描述一下这个项目..."></textarea>
+              <label class="block text-[12px] text-muted">项目描述</label>
+              <textarea v-model="newProject.description" rows="3" class="mt-1 w-full rounded-[8px] border border-line bg-surface px-2 py-1.5 text-[13px] text-fg placeholder:text-muted-2" placeholder="这个项目测什么"></textarea>
             </div>
             <div>
-              <label class="block text-sm text-fg-2 mb-1">项目类型</label>
-              <select v-model="newProject.type" class="w-full px-3 py-2 border border-line rounded-lg text-sm">
+              <label class="block text-[12px] text-muted">项目类型</label>
+              <select v-model="newProject.type" class="mt-1 h-9 w-full rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg">
                 <option value="ECU">ECU 动力域</option>
                 <option value="座舱">座舱域</option>
               </select>
             </div>
           </div>
-          <div class="flex gap-3 mt-6">
-            <button @click="createDialogOpen = false" class="flex-1 px-4 py-2 border border-line rounded-lg text-sm hover:bg-surface-2">取消</button>
-            <button @click="createProject" class="flex-1 px-4 py-2 bg-accent-solid text-white rounded-lg text-sm hover:bg-blue-700">创建</button>
+          <div class="mt-5 flex gap-3">
+            <button class="h-9 flex-1 rounded-[8px] border border-line text-[13px] text-fg hover:bg-surface-3" @click="createDialogOpen = false">取消</button>
+            <button class="h-9 flex-1 rounded-[8px] bg-accent-solid text-[13px] text-white hover:bg-accent" @click="createProject">创建</button>
           </div>
         </div>
       </div>
