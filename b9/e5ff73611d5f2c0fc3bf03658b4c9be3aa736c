@@ -1,0 +1,16 @@
+services/autotest/ui/src/views/RequirementUpload.vue
+  h_201ed4c689ac8b 4-6,170-177,180,183,185-197,200,203-204,210-215,218,225-228,230-234,236-254,256-263
+services/autotest/ui/src/views/Settings.vue
+  h_201ed4c689ac8b 4,87-90,93-105,108-120,123-126,128-130,132-134,136-138,140-144,146-147,149-152,154-162,164-174,176-185,187,190-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b9e5ff73611d5f2c0fc3bf03658b4c9be3aa736c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
