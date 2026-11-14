@@ -1,0 +1,24 @@
+services/autotest/ui/src/components/Badge.vue
+  h_201ed4c689ac8b 1-33
+services/autotest/ui/src/components/EmptyState.vue
+  h_201ed4c689ac8b 1-24
+services/autotest/ui/src/router/index.ts
+  h_201ed4c689ac8b 26
+services/autotest/ui/src/style.css
+  h_201ed4c689ac8b 7-12,133-163
+services/autotest/ui/src/views/Pipeline.vue
+  h_201ed4c689ac8b 11,276-279,281-283,286,289,292,294,298,301,304,306-320,322-323,327-328,330-333,335-344,346-349,351-353,355,357-361,363-377,382-388,390-391,394,396,401-403,407,409,412-413,415-422
+services/autotest/ui/src/views/ProjectLayout.vue
+  h_201ed4c689ac8b 18-53,224,230,234,246,248-271,275,301,312-313,326,338,347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5ff996ccb939a6a5d0c4f445013eba1d44b8bef1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
