@@ -1,0 +1,33 @@
+apps/desktop/electron/main/ipc/python-ipc.ts
+  s_64f9b3c01ed37b::t_c6bdb288e058f5 1-115
+apps/desktop/electron/main/ipc/settings-ipc.ts
+  s_64f9b3c01ed37b::t_ce2d1165bc0d84 8-9,83-90
+apps/desktop/electron/main/python-preferences.ts
+  s_64f9b3c01ed37b::t_12622677f77515 1-45
+apps/desktop/electron/main/runtime/host.ts
+  s_64f9b3c01ed37b::t_90b54e3fb0df40 19,21,470-472
+apps/desktop/electron/test/python-scan.test.mjs
+  s_64f9b3c01ed37b::t_15331e9d4ec73d 1-167
+apps/desktop/src/features/settings/PythonSettingsSection.tsx
+  s_64f9b3c01ed37b::t_10b7b62349dea6 1-164
+apps/desktop/src/lib/api.ts
+  s_64f9b3c01ed37b::t_6e671296480fed 831-845,1261-1271
+packages/shared/src/protocol.ts
+  s_64f9b3c01ed37b::t_6a98d3b40a630b 504-508
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b81dca757cda426e4ea0e9cb500c4037c46bf91f",
+  "prompts": {},
+  "sessions": {
+    "s_64f9b3c01ed37b": {
+      "agent_id": {
+        "tool": "dsh",
+        "id": "session-d790956b-609e-481a-953d-0547f5a7b1a3",
+        "model": "12039"
+      },
+      "human_author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
