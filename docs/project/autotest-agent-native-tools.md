@@ -349,6 +349,39 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 翻法还不一致；现在两个都给：`status` 保持枚举（脚本/插件按机器值判断），
 `status_label` 给中文（界面直接显示）。新增字段是向后兼容的，不要改 `status` 的取值。
 
+### 8.0.5 被测件契约 + 断言生成（把"补断言"变成生成动作）
+
+骨架之所以一直是骨架，是因为流水线不知道**被测件怎么驱动、判定从哪里读**。契约把这件事
+按功能点说清一次，之后 `script-author` 就能按条款数值生成真断言：
+
+```json
+{
+  "driver": "_support/dut_sim.py",
+  "imports": ["AfeSim"],
+  "entries": [{
+    "function_point": "过压保护",
+    "factory": "AfeSim()",
+    "arrange": ["dut.set_cell_voltage(0, {{number}} * 1.02)"],
+    "observe": "dut.read()['faults']['ov']",
+    "expect": {"kind": "bool", "value": true}
+  }]
+}
+```
+
+* 存在项目库里（`dut_contracts` 表，一条 JSON），随项目数据走，不进仓库 —— 不同项目的
+  被测件不一样。读写：`GET/PUT /api/projects/{id}/workflow/dut-contract`。
+* `expect.kind` 只有四种：`bool` / `number`（可带 `tolerance`）/ `contains` / `raises`。
+  坏契约直接 400（缺字段、kind 不认识、功能点重复），**不入库**。
+* `{{number}}` / `{{number:1}}` 从用例的 `evidence.numbers` 取值，并**剥掉单位**
+  （条款写 `3.65V`，写进代码是 `3.65`）。没有数值的用例直接报 `GenerationError`，
+  不会生成"看起来在验"的空断言。
+* 生成的前置固定：`sys.path` 指向驱动所在目录 → `from <driver> import <imports>` →
+  `dut = <factory>`。没有这段，断言调的是不存在的 `dut`，脚本连收集都过不去。
+* `script-author` 返回 `asserted_generated` / `skeleton_remaining` / `contract_notes`
+  （后者列出没接契约的用例与原因 `missing_contract` 或生成错误），摘要写「其中 N 个带契约断言」。
+* 契约怎么写才对：条款是"超过 3.65 V 才置位"，`arrange` 就要驱动**越界值**
+  （`{{number}} * 1.02`），不能把阈值本身喂进去 —— 压线值在严格大于判定下不会触发。
+
 ### 8.0.4 脚本重生成：按名覆盖，且不碰已补断言的脚本
 
 * `script-author` 按**文件名** upsert（`SELECT id FROM scripts WHERE name = ?` → UPDATE），
