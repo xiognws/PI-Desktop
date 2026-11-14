@@ -1,6 +1,6 @@
 import { readMainSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -228,8 +228,12 @@ test("scanModelConfigs keeps the pi native config authoritative when a cc-switch
 // through `pi /login` (auth.json only) never appeared in the Pi group. The scan
 // now pairs auth.json API keys with Pi's cached catalog and fills keys that
 // models.json references through an unresolved environment variable.
-test("scanModelConfigs imports Pi auth-only providers and fills unresolved model keys", async () => {
+test("scanModelConfigs imports Pi auth-only providers and fills unresolved model keys", async (t) => {
   const home = await mkdtemp(join(tmpdir(), "pi-agent-auth-import-"));
+  // A fixture may use the platform temp directory only if the run leaves nothing
+  // behind; this one had been leaving a directory per run behind since it was
+  // written.
+  t.after(() => rm(home, { recursive: true, force: true }));
   const agentDir = join(home, ".pi", "agent");
   await mkdir(agentDir, { recursive: true });
 
