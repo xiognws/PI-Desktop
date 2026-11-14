@@ -1,0 +1,14 @@
+apps/desktop/test/model-config-import.test.mjs
+  h_201ed4c689ac8b 3,231,233-236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e46bb3838e6e9100e3a4c054b1bc7d3333063d3c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
