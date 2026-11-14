@@ -1,0 +1,144 @@
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 114-118,189,353-363
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 62,226-233,970,1108-1110,1230
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 32-33,60-61,115,348
+apps/desktop/electron/main/providers/credits.ts
+  h_201ed4c689ac8b 1-179
+apps/desktop/electron/main/providers/gateway-process.ts
+  h_201ed4c689ac8b 1-175
+apps/desktop/electron/main/providers/in-app-providers.ts
+  h_201ed4c689ac8b 1-377
+apps/desktop/electron/main/providers/ipc.ts
+  h_201ed4c689ac8b 1-98
+apps/desktop/electron/main/providers/types.ts
+  h_201ed4c689ac8b 1-72
+apps/desktop/electron/main/providers/workbuddy/index.ts
+  h_201ed4c689ac8b 1-30
+apps/desktop/electron/test/autotest-packaging.test.mjs
+  h_201ed4c689ac8b 31-34
+apps/desktop/package.json
+  h_201ed4c689ac8b 121-124,165-168
+apps/desktop/resources/in-app-providers/workbuddy/automation.cjs
+  h_201ed4c689ac8b 1-62
+apps/desktop/resources/in-app-providers/workbuddy/core.cjs
+  h_201ed4c689ac8b 1-2637
+apps/desktop/resources/in-app-providers/workbuddy/dashboard-system.cjs
+  h_201ed4c689ac8b 1-52
+apps/desktop/resources/in-app-providers/workbuddy/dashboard.cjs
+  h_201ed4c689ac8b 1-114
+apps/desktop/resources/in-app-providers/workbuddy/gateway.cjs
+  h_201ed4c689ac8b 1-96
+apps/desktop/resources/in-app-providers/workbuddy/home.cjs
+  h_201ed4c689ac8b 1-8
+apps/desktop/resources/in-app-providers/workbuddy/server.cjs
+  h_201ed4c689ac8b 1-291
+apps/desktop/src/components/Sidebar.tsx
+  h_201ed4c689ac8b 41,310,2875
+apps/desktop/src/components/StatusBarCredits.tsx
+  h_201ed4c689ac8b 1-200
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 8,836-848
+apps/desktop/src/lib/in-app-credits-visibility.ts
+  h_201ed4c689ac8b 1-37
+apps/desktop/src/lib/in-app-credits.ts
+  h_201ed4c689ac8b 1-201
+apps/desktop/src/lib/in-app-provider-channels.ts
+  h_201ed4c689ac8b 1-11
+apps/desktop/src/styles/theme-overrides.css
+  h_201ed4c689ac8b 545-643
+apps/desktop/test/bundled-plugin-default-disabled.test.mjs
+  h_201ed4c689ac8b 1-124
+apps/desktop/test/in-app-providers.test.mjs
+  h_201ed4c689ac8b 1-267
+apps/desktop/test/status-bar-credits-render.test.mjs
+  h_201ed4c689ac8b 1-110
+docs/adr/0397-in-app-provider-gateway.md
+  h_201ed4c689ac8b 1-160
+docs/adr/README.md
+  h_201ed4c689ac8b 434
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 487-524
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 181,557-685
+docs/spec/03-runtime/12-provider-config-schema.md
+  h_201ed4c689ac8b 339-345
+docs/zh-CN/adr/index.md
+  h_201ed4c689ac8b 323
+docs/zh-CN/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 439-543
+docs/zh-CN/spec/03-runtime/12-provider-config-schema.md
+  h_201ed4c689ac8b 124-128
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1313-1317
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 82-86,109-123,1323-1327
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1313-1317
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1313-1317
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1319-1323
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1297-1301
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1319-1323
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1310-1314
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 84-88,111-125,1310-1314
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 311-316
+plugins/autotest-shell/skills/autotest-workflow/SKILL.md
+  h_201ed4c689ac8b 11-32
+scripts/bundled-plugins-default-disabled.json
+  h_201ed4c689ac8b 1-5
+scripts/bundled-plugins-defaults.mjs
+  h_201ed4c689ac8b 1-67
+scripts/sync-bundled-plugins.mjs
+  h_201ed4c689ac8b 30-31,105-114,320-339,376,404-407
+services/autotest/prompts/case-design.md
+  h_201ed4c689ac8b 1-69
+services/autotest/prompts/case-review.md
+  h_201ed4c689ac8b 1-46
+services/autotest/prompts/log-analyze.md
+  h_201ed4c689ac8b 1-46
+services/autotest/prompts/prd-parse.md
+  h_201ed4c689ac8b 1-48
+services/autotest/prompts/report.md
+  h_201ed4c689ac8b 1-52
+services/autotest/prompts/script-author.md
+  h_201ed4c689ac8b 1-50
+services/autotest/src/autotest/prompts/__init__.py
+  h_201ed4c689ac8b 1-114
+services/autotest/src/autotest/workflow/cases.py
+  h_201ed4c689ac8b 173-223,296-304
+services/autotest/src/autotest/workflow/consistency.py
+  h_201ed4c689ac8b 1-148
+services/autotest/src/autotest/workflow/prd.py
+  h_201ed4c689ac8b 29-31,87
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 22-24,27,363,400-404,416,426-430,444-445,479,485,490-509,570,602-603,635-649,658-659,1060,1065-1076
+services/autotest/tests/test_case_grounding.py
+  h_201ed4c689ac8b 26,209-240
+services/autotest/tests/test_fixed_prompts.py
+  h_201ed4c689ac8b 1-156
+services/autotest/tests/test_prompt_api.py
+  h_201ed4c689ac8b 1-118
+services/autotest/tests/test_script_rules.py
+  h_201ed4c689ac8b 1-83
+services/autotest/ui/src/views/Pipeline.vue
+  h_201ed4c689ac8b 55-56,272-287,418-420
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "fae15c51b74b8793c1130e2feffb7f3ba5654a62",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
