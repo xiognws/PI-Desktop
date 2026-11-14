@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Activity, AlertTriangle, CheckCircle, ClipboardList, Clock, RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -97,17 +99,24 @@ const openBugs = computed(() => bugs.value.filter((b) => (b.status ?? 'open') !=
 const envItems = computed(() => Object.entries(env.value))
 const envDown = computed(() => envItems.value.filter(([, item]) => !item.ok).length)
 
-function bugClass(severity?: string) {
-  if (severity === 'blocker') return 'bg-danger-soft text-danger'
-  if (severity === 'major') return 'bg-warn-soft text-warn'
-  return 'bg-surface-3 text-fg-3'
+function bugTone(severity?: string): 'danger' | 'warn' | 'neutral' {
+  if (severity === 'blocker') return 'danger'
+  if (severity === 'major') return 'warn'
+  return 'neutral'
 }
 
-function runTone(status: string) {
-  if (status === 'waiting_human') return 'bg-warn-soft text-warn'
-  if (status === 'done') return 'bg-success-soft text-success'
-  if (status === 'failed') return 'bg-danger-soft text-danger'
-  return 'bg-accent-soft text-accent'
+function runTone(status: string): 'warn' | 'success' | 'danger' | 'accent' {
+  if (status === 'waiting_human') return 'warn'
+  if (status === 'done') return 'success'
+  if (status === 'failed') return 'danger'
+  return 'accent'
+}
+
+const RUN_LABEL: Record<string, string> = {
+  waiting_human: '待人工确认',
+  done: '已完成',
+  failed: '失败',
+  running: '进行中',
 }
 
 function shortTime(value?: string) {
@@ -118,113 +127,138 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-auto p-6">
-    <div class="max-w-5xl w-full">
-      <div class="flex items-center justify-between mb-5">
-        <h2 class="text-base font-medium text-fg">概览</h2>
-        <button class="flex items-center gap-1 text-xs text-muted hover:text-fg" :disabled="loading" @click="load">
-          <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" />
-          刷新
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[1100px] px-8 py-7">
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-[20px] font-medium text-fg">概览</h1>
+          <p class="mt-1 text-[13px] text-muted">这个项目现在的状态：多少用例、通过率、还没关的缺陷、卡在等人确认的地方。</p>
+        </div>
+        <button
+          class="flex h-9 items-center gap-2 rounded-[8px] border border-line bg-surface px-3 text-[13px] text-fg hover:bg-surface-3 disabled:opacity-40"
+          :disabled="loading"
+          @click="load"
+        >
+          <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" /> 刷新
         </button>
+      </header>
+
+      <p v-if="error" class="mt-4 rounded-[8px] border border-danger-line bg-danger-soft px-4 py-2 text-[13px] text-danger">
+        {{ error }}
+      </p>
+
+      <!-- 读数行：四个数并排，用分隔线而不是四张卡片 -->
+      <div class="mt-5 grid grid-cols-2 divide-line rounded-[12px] border border-line bg-surface md:grid-cols-4 md:divide-x">
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">用例</p>
+          <p class="num mt-1 text-[26px] leading-8 text-fg">{{ caseStats.case_count }}</p>
+          <p class="num mt-0.5 text-[12px] text-muted-2">脚本 {{ scripts.length }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">通过率</p>
+          <p
+            class="num mt-1 text-[26px] leading-8"
+            :class="!graded.length ? 'text-muted-2' : passRate >= 80 ? 'text-success' : passRate >= 50 ? 'text-warn' : 'text-danger'"
+          >{{ graded.length ? `${passRate}%` : '—' }}</p>
+          <p class="num mt-0.5 text-[12px] text-muted-2">{{ graded.length }} 次执行 · 失败 {{ failedCount }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">未关闭缺陷</p>
+          <p class="num mt-1 text-[26px] leading-8" :class="openBugs.length ? 'text-danger' : 'text-fg'">{{ openBugs.length }}</p>
+          <p class="num mt-0.5 text-[12px] text-muted-2">缺陷单共 {{ bugTotal }}</p>
+        </div>
+        <router-link :to="`/project/${projectId}/approvals`" class="block px-5 py-4 hover:bg-surface-2">
+          <p class="text-[12px] text-muted">待审批</p>
+          <p class="num mt-1 text-[26px] leading-8" :class="pendingTotal ? 'text-warn' : 'text-fg'">{{ pendingTotal }}</p>
+          <p class="mt-0.5 text-[12px] text-accent">去审批 →</p>
+        </router-link>
       </div>
 
-      <p v-if="error" class="mb-4 text-xs text-danger bg-danger-soft border border-danger-line rounded-lg px-3 py-2">{{ error }}</p>
-
-      <div class="grid grid-cols-4 gap-4 mb-6">
-        <div class="bg-surface rounded-lg border border-line p-4">
-          <div class="flex items-center gap-2 text-xs text-muted"><ClipboardList class="w-4 h-4" /> 用例</div>
-          <div class="mt-2 text-2xl font-medium text-fg">{{ caseStats.case_count }}</div>
-          <div class="text-xs text-muted-2 mt-1">脚本 {{ scripts.length }} 个</div>
-        </div>
-        <div class="bg-surface rounded-lg border border-line p-4">
-          <div class="flex items-center gap-2 text-xs text-muted"><Activity class="w-4 h-4" /> 通过率</div>
-          <div class="mt-2 text-2xl font-medium" :class="passRate >= 80 ? 'text-success' : passRate >= 50 ? 'text-warn' : 'text-danger'">
-            {{ graded.length ? `${passRate}%` : '—' }}
+      <div class="mt-5 grid gap-5 md:grid-cols-2">
+        <!-- 趋势：柱高即通过率，方角、贴基线 -->
+        <section class="rounded-[12px] border border-line bg-surface px-5 py-4">
+          <div class="flex items-baseline justify-between">
+            <h2 class="text-[13px] font-medium text-fg">最近执行趋势</h2>
+            <span class="text-[12px] text-muted-2">最近 {{ trend.length }} 次</span>
           </div>
-          <div class="text-xs text-muted-2 mt-1">{{ graded.length }} 次执行 · 失败 {{ failedCount }}</div>
-        </div>
-        <div class="bg-surface rounded-lg border border-line p-4">
-          <div class="flex items-center gap-2 text-xs text-muted"><AlertTriangle class="w-4 h-4" /> 未关闭缺陷</div>
-          <div class="mt-2 text-2xl font-medium" :class="openBugs.length ? 'text-danger' : 'text-fg'">{{ openBugs.length }}</div>
-          <div class="text-xs text-muted-2 mt-1">缺陷单共 {{ bugTotal }} 张</div>
-        </div>
-        <div class="bg-surface rounded-lg border border-line p-4">
-          <div class="flex items-center gap-2 text-xs text-muted"><Clock class="w-4 h-4" /> 待审批</div>
-          <div class="mt-2 text-2xl font-medium" :class="pendingTotal ? 'text-warn' : 'text-fg'">{{ pendingTotal }}</div>
-          <router-link :to="`/project/${projectId}/approvals`" class="text-xs text-accent hover:underline mt-1 inline-block">
-            去审批 →
-          </router-link>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4 mb-6">
-        <div class="bg-surface rounded-lg border border-line p-5">
-          <h3 class="text-sm font-medium text-fg mb-4">最近执行趋势</h3>
-          <div v-if="!trend.length" class="text-sm text-muted-2 py-8 text-center">还没有执行记录</div>
-          <div v-else class="flex items-end gap-2 h-32">
+          <EmptyState v-if="!trend.length" class="mt-4" title="还没有执行记录" hint="到「流水线」第 ⑥ 步执行一次" />
+          <div v-else class="mt-4 flex h-[132px] items-end gap-2">
             <router-link
               v-for="t in trend"
               :key="t.id"
               :to="`/project/${projectId}/executions/${t.id}`"
-              class="flex-1 flex flex-col items-center justify-end gap-1 group"
+              class="group flex flex-1 flex-col items-center justify-end gap-1"
               :title="`#${t.id} ${t.label} · 通过 ${Math.round(t.ratio * 100)}%`"
             >
-              <span class="text-[10px]" :class="t.failed ? 'text-red-500' : 'text-muted-2'">{{ Math.round(t.ratio * 100) }}%</span>
-              <div
-                class="w-full rounded-t"
-                :class="t.failed ? 'bg-red-300 group-hover:bg-red-400' : 'bg-green-400 group-hover:bg-green-500'"
-                :style="{ height: `${Math.max(4, t.ratio * 96)}px` }"
-              ></div>
-              <span class="text-[10px] text-muted-2">#{{ t.id }}</span>
+              <span class="num text-[12px]" :class="t.failed ? 'text-danger' : 'text-fg'">{{ Math.round(t.ratio * 100) }}%</span>
+              <span
+                class="w-full"
+                :class="t.failed ? 'bg-danger' : 'bg-success'"
+                :style="{ height: `${Math.max(3, t.ratio * 84)}px`, opacity: 0.85 }"
+              ></span>
+              <span class="num text-[12px] text-muted-2">#{{ t.id }}</span>
             </router-link>
           </div>
-        </div>
+          <div class="mt-1 h-px w-full bg-line"></div>
+        </section>
 
-        <div class="bg-surface rounded-lg border border-line p-5">
-          <h3 class="text-sm font-medium text-fg mb-4">环境健康</h3>
-          <div class="space-y-2">
-            <div v-for="[key, item] in envItems" :key="key" class="flex items-center gap-2 text-sm">
-              <component :is="item.ok ? CheckCircle : AlertTriangle" class="w-4 h-4" :class="item.ok ? 'text-green-500' : 'text-amber-500'" />
-              <span class="text-fg-2">{{ item.label || key }}</span>
-              <span class="ml-auto text-xs" :class="item.ok ? 'text-success' : 'text-warn'">
+        <!-- 环境：状态是文字，不再用彩色图标 -->
+        <section class="rounded-[12px] border border-line bg-surface px-5 py-4">
+          <div class="flex items-baseline justify-between">
+            <h2 class="text-[13px] font-medium text-fg">环境健康</h2>
+            <span class="text-[12px]" :class="envDown ? 'text-warn' : 'text-muted-2'">
+              {{ envDown ? `${envDown} 项未就绪` : '全部就绪' }}
+            </span>
+          </div>
+          <div v-if="!envItems.length" class="mt-4 text-[13px] text-muted-2">没有环境检查项</div>
+          <ul v-else class="mt-3 divide-y divide-line-soft">
+            <li v-for="[key, item] in envItems" :key="key" class="flex items-center gap-3 py-2">
+              <span class="h-3 w-[3px]" :class="item.ok ? 'bg-success' : 'bg-warn'"></span>
+              <span class="text-[13px] text-fg">{{ item.label || key }}</span>
+              <span class="ml-auto text-[12px]" :class="item.ok ? 'text-muted-2' : 'text-warn'">
                 {{ item.ok ? '正常' : '未就绪' }}
               </span>
-            </div>
-          </div>
-          <div v-if="envDown" class="mt-3 text-xs text-warn">{{ envDown }} 项未就绪：执行前先确认</div>
-        </div>
-      </div>
+            </li>
+          </ul>
+        </section>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div class="bg-surface rounded-lg border border-line p-5">
-          <h3 class="text-sm font-medium text-fg mb-3">最近失败</h3>
-          <div v-if="!openBugs.length" class="text-sm text-muted-2 py-6 text-center">没有未关闭的缺陷</div>
-          <div v-else class="space-y-2">
-            <div v-for="bug in openBugs.slice(0, 5)" :key="bug.id" class="flex items-start gap-2 text-sm">
-              <span class="text-xs px-1.5 py-0.5 rounded flex-shrink-0" :class="bugClass(bug.severity)">{{ bug.severity || 'major' }}</span>
-              <span class="text-fg-2 truncate flex-1" :title="bug.title">{{ bug.title }}</span>
-              <span v-if="(bug.occurrences ?? 1) > 1" class="text-xs text-muted-2">×{{ bug.occurrences }}</span>
-            </div>
+        <!-- 最近失败 -->
+        <section class="rounded-[12px] border border-line bg-surface px-5 py-4">
+          <div class="flex items-baseline justify-between">
+            <h2 class="text-[13px] font-medium text-fg">最近失败</h2>
+            <router-link :to="`/project/${projectId}/defects`" class="text-[12px] text-muted hover:text-fg">全部缺陷 →</router-link>
           </div>
-        </div>
+          <EmptyState v-if="!openBugs.length" class="mt-4" title="没有未关闭的缺陷" hint="执行出现失败时会自动汇总到这里" />
+          <ul v-else class="mt-3 divide-y divide-line-soft">
+            <li v-for="bug in openBugs.slice(0, 5)" :key="bug.id" class="flex items-center gap-3 py-2">
+              <Badge :tone="bugTone(bug.severity)">{{ bug.severity || 'major' }}</Badge>
+              <span class="min-w-0 flex-1 truncate text-[13px] text-fg" :title="bug.title">{{ bug.title }}</span>
+              <span v-if="(bug.occurrences ?? 1) > 1" class="num text-[12px] text-muted-2">×{{ bug.occurrences }}</span>
+            </li>
+          </ul>
+        </section>
 
-        <div class="bg-surface rounded-lg border border-line p-5">
-          <h3 class="text-sm font-medium text-fg mb-3">最近的 run</h3>
-          <div v-if="!runs.length" class="text-sm text-muted-2 py-6 text-center">还没有工作流运行</div>
-          <div v-else class="space-y-2">
+        <!-- 最近的 run -->
+        <section class="rounded-[12px] border border-line bg-surface px-5 py-4">
+          <div class="flex items-baseline justify-between">
+            <h2 class="text-[13px] font-medium text-fg">最近的运行</h2>
+            <router-link :to="`/project/${projectId}/runs`" class="text-[12px] text-muted hover:text-fg">全部运行 →</router-link>
+          </div>
+          <EmptyState v-if="!runs.length" class="mt-4" title="还没有工作流运行" hint="流水线上每跑一步都会留下一条运行记录" />
+          <ul v-else class="mt-3 divide-y divide-line-soft">
             <router-link
               v-for="run in runs.slice(0, 5)"
               :key="run.id"
               :to="`/project/${projectId}/runs?run=${run.id}`"
-              class="flex items-center gap-2 text-sm hover:bg-surface-2 rounded px-1 py-0.5"
+              class="flex items-center gap-3 py-2 hover:bg-surface-2"
             >
-              <span class="font-mono text-xs text-fg-2">{{ run.id }}</span>
-              <span class="text-xs px-1.5 py-0.5 rounded" :class="runTone(run.status)">{{ run.status }}</span>
-              <span class="text-xs text-muted-2">{{ run.stage }}</span>
-              <span class="ml-auto text-xs text-muted-2">{{ shortTime(run.updated_at) }}</span>
+              <span class="mono text-[12px] text-fg">{{ run.id }}</span>
+              <Badge :tone="runTone(run.status)">{{ RUN_LABEL[run.status] || run.status }}</Badge>
+              <span class="text-[12px] text-muted-2">{{ run.stage }}</span>
+              <span class="num ml-auto text-[12px] text-muted-2">{{ shortTime(run.updated_at) }}</span>
             </router-link>
-          </div>
-        </div>
+          </ul>
+        </section>
       </div>
     </div>
   </div>
