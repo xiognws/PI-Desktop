@@ -1,0 +1,1256 @@
+.github/PULL_REQUEST_TEMPLATE.md
+  h_201ed4c689ac8b 1-13
+.github/workflows/ci.yml
+  h_201ed4c689ac8b 171-175,202-203
+COLLABORATION.zh-CN.md
+  h_201ed4c689ac8b 1-107
+Cargo.toml
+  h_201ed4c689ac8b 9-18
+apps/desktop/electron.vite.config.ts
+  h_201ed4c689ac8b 46-80,83,97-101,103-105
+apps/desktop/electron/main/agent-host-bridge.ts
+  h_201ed4c689ac8b 4-5,31,143-154,156,346-359
+apps/desktop/electron/main/agent-mentions.ts
+  h_201ed4c689ac8b 1-43
+apps/desktop/electron/main/bootstrap/app-lifecycle.ts
+  h_201ed4c689ac8b 742-749
+apps/desktop/electron/main/bootstrap/window.ts
+  h_201ed4c689ac8b 1906,2106-2109
+apps/desktop/electron/main/browser-host.ts
+  h_201ed4c689ac8b 598
+apps/desktop/electron/main/composer-clipboard-directories.ts
+  h_201ed4c689ac8b 1,13-51,55-61,67,70-71,80,82-89,103,107,113,120
+apps/desktop/electron/main/composer-file-references.ts
+  h_201ed4c689ac8b 1-69
+apps/desktop/electron/main/composer-paste.ts
+  h_201ed4c689ac8b 90
+apps/desktop/electron/main/computer-use/cursor-overlay.ts
+  h_201ed4c689ac8b 3,91
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 81,728-736,760,890,950
+apps/desktop/electron/main/ipc/agent-ipc.ts
+  h_201ed4c689ac8b 2,4,8,54-55,113,193-195,233-236,361-380,386,392-394,396-410,412-443,529,538-539,546,559-570,588-591,621,631
+apps/desktop/electron/main/ipc/mcp-ipc.ts
+  h_201ed4c689ac8b 81,158
+apps/desktop/electron/main/ipc/modes-ipc.ts
+  h_201ed4c689ac8b 1-118
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 30-31,85-86,302,342,469
+apps/desktop/electron/main/ipc/session-ipc.ts
+  h_201ed4c689ac8b 2,13,110-111,130,242-250,252,386-399,701-703,706
+apps/desktop/electron/main/ipc/sidebar-preferences-ipc.ts
+  h_201ed4c689ac8b 1-25
+apps/desktop/electron/main/ipc/widgets-ipc.ts
+  h_201ed4c689ac8b 2
+apps/desktop/electron/main/ipc/workspace-ipc.ts
+  h_201ed4c689ac8b 2,4,25,140,600,602,611-612,620-623,665,685,839,925,1007-1008,1010-1018,1097,1133-1135,1138-1142
+apps/desktop/electron/main/local-app-icon.ts
+  h_201ed4c689ac8b 1-66
+apps/desktop/electron/main/local-apps.ts
+  h_201ed4c689ac8b 21,432,506-510
+apps/desktop/electron/main/mcp-control.ts
+  h_201ed4c689ac8b 245
+apps/desktop/electron/main/mcp-oauth.ts
+  h_201ed4c689ac8b 486-493,525,549,647,650-662
+apps/desktop/electron/main/persistence-outbox.ts
+  h_201ed4c689ac8b 1,305-362,366-376,390-398
+apps/desktop/electron/main/plugin-launcher-state.ts
+  h_201ed4c689ac8b 18-21,23,34
+apps/desktop/electron/main/plugin-runtime.ts
+  h_201ed4c689ac8b 123,334,4990,5157,5637
+apps/desktop/electron/main/plugin-workspace-context.ts
+  h_201ed4c689ac8b 1-29
+apps/desktop/electron/main/prompt-attachments.ts
+  h_201ed4c689ac8b 21,24,252-263,364,375-376
+apps/desktop/electron/main/remote/workspace-file-scope.ts
+  h_201ed4c689ac8b 5-21,23,28
+apps/desktop/electron/main/runtime/host.ts
+  h_201ed4c689ac8b 33-34,71,244-247,265,272-273,362-374
+apps/desktop/electron/main/runtime/lifecycle.ts
+  h_201ed4c689ac8b 243-251
+apps/desktop/electron/main/runtime/mode-catalog.ts
+  h_201ed4c689ac8b 1-257
+apps/desktop/electron/main/runtime/mode-runs.ts
+  h_201ed4c689ac8b 1-297
+apps/desktop/electron/main/runtime/mode-services.ts
+  h_201ed4c689ac8b 1-48
+apps/desktop/electron/main/runtime/plans.ts
+  h_201ed4c689ac8b 1,69-73,99,334-345,474
+apps/desktop/electron/main/runtime/session-launch.ts
+  h_201ed4c689ac8b 439-448
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 402
+apps/desktop/electron/main/services/image-generation-service.ts
+  h_201ed4c689ac8b 102
+apps/desktop/electron/main/services/plugin-services.ts
+  h_201ed4c689ac8b 701,734
+apps/desktop/electron/main/sidebar-preferences.ts
+  h_201ed4c689ac8b 1-50
+apps/desktop/electron/main/storage/files.ts
+  h_201ed4c689ac8b 31,205-209
+apps/desktop/electron/main/user-mcp.ts
+  h_201ed4c689ac8b 307-310,321-340,394-399
+apps/desktop/package.json
+  h_201ed4c689ac8b 40-41,100-104
+apps/desktop/resources/models.dev/api.json
+  h_201ed4c689ac8b 1
+apps/desktop/resources/plugins/pi.file-manager/UPSTREAM.md
+  h_201ed4c689ac8b 19,29-33,50-61,64,68,70,86-87,90,98-99,117-129
+apps/desktop/resources/plugins/pi.file-manager/main.js
+  h_201ed4c689ac8b 806-807,809-810,2528-2533
+apps/desktop/resources/plugins/pi.file-manager/manifest.json
+  h_201ed4c689ac8b 5,24
+apps/desktop/resources/plugins/pi.file-manager/views/assets/index.js
+  h_201ed4c689ac8b 1,9,17,25,33
+apps/desktop/src/components/Composer.tsx
+  h_201ed4c689ac8b 36,133,135,325,327,478,527,571-572
+apps/desktop/src/components/ComposerAutocomplete.tsx
+  h_201ed4c689ac8b 10,92-96,130-144,176-178,180-187
+apps/desktop/src/components/ContextUsageInspector.tsx
+  h_201ed4c689ac8b 34,43,54,347,375-380
+apps/desktop/src/components/ConversationMinimap.tsx
+  h_201ed4c689ac8b 21,365,405,408,427
+apps/desktop/src/components/ProjectRunIndicator.tsx
+  h_201ed4c689ac8b 77-80
+apps/desktop/src/components/ReviewChangeCard.tsx
+  h_201ed4c689ac8b 102,104
+apps/desktop/src/components/Sidebar.tsx
+  h_201ed4c689ac8b 2319-2321,2442
+apps/desktop/src/components/TaskDock.tsx
+  h_201ed4c689ac8b 3,11,25-29,31-38,198,205
+apps/desktop/src/components/launcher/LauncherTileButton.tsx
+  h_201ed4c689ac8b 7,9-13,75-77,91
+apps/desktop/src/components/plugins/PluginSettingsSheet.tsx
+  h_201ed4c689ac8b 40-42,65,71-77,135
+apps/desktop/src/components/remote/RemoteProjectGroups.tsx
+  h_201ed4c689ac8b 39-41,52
+apps/desktop/src/components/settings/AgentMcpPage.tsx
+  h_201ed4c689ac8b 77,180-183,200,206,211-213,216-217,220-231,843
+apps/desktop/src/components/settings/ModelSelectionPanes.tsx
+  h_201ed4c689ac8b 47,803,1086-1088,1099,1104-1106
+apps/desktop/src/components/workpanel/ReviewHistoryFile.tsx
+  h_201ed4c689ac8b 29-32
+apps/desktop/src/components/workpanel/ReviewHistoryPanel.tsx
+  h_201ed4c689ac8b 1,6,55-58,73,85-87
+apps/desktop/src/components/workpanel/ReviewHistoryToolbar.tsx
+  h_201ed4c689ac8b 22
+apps/desktop/src/components/workpanel/ReviewTab.tsx
+  h_201ed4c689ac8b 4,58
+apps/desktop/src/features/app/useAppShellRuntime.tsx
+  h_201ed4c689ac8b 19,24,31,451,676-679,789,980-982
+apps/desktop/src/features/chat/DirectoryReferenceCard.tsx
+  h_201ed4c689ac8b 1-60
+apps/desktop/src/features/chat/composer/ComposerInput.tsx
+  h_201ed4c689ac8b 14-15,23-24,63-64,95-107
+apps/desktop/src/features/chat/composer/ComposerModeIcon.tsx
+  h_201ed4c689ac8b 2-8,10-11,14-15
+apps/desktop/src/features/chat/composer/ComposerModePicker.tsx
+  h_201ed4c689ac8b 7-12,14-15,21-23,44-49,67,70,82,106,110-119,123-185
+apps/desktop/src/features/chat/composer/ComposerModelList.tsx
+  h_201ed4c689ac8b 3-5,13,21-99,103-104,106-107,109-115,128-132,134-206,208-262
+apps/desktop/src/features/chat/composer/ComposerModelPicker.tsx
+  h_201ed4c689ac8b 25-26,42,47-53,74,122-124,127-130,133-144
+apps/desktop/src/features/chat/composer/ComposerToolbar.tsx
+  h_201ed4c689ac8b 11,13,158-159,205,251-253
+apps/desktop/src/features/chat/composer/ThinkingLevelSlider.tsx
+  h_201ed4c689ac8b 16-20,55-56,69-71,73-75
+apps/desktop/src/features/chat/composer/directory-attachments.ts
+  h_201ed4c689ac8b 1-16
+apps/desktop/src/features/chat/composer/editor.ts
+  h_201ed4c689ac8b 42-44,59,63-64,261-262,270,290-291,310-314,316,320,355,360-366,385
+apps/desktop/src/features/chat/composer/hooks/useComposerAttachments.ts
+  h_201ed4c689ac8b 237-239,254-255,292,295,316,322-323,330-332
+apps/desktop/src/features/chat/composer/hooks/useComposerCompletions.ts
+  h_201ed4c689ac8b 77,88-89,96,240-257
+apps/desktop/src/features/chat/composer/hooks/useComposerDraft.ts
+  h_201ed4c689ac8b 51-56,90,152,432,502-504,508,550,588,716,770-771
+apps/desktop/src/features/chat/composer/hooks/useComposerImagePreview.ts
+  h_201ed4c689ac8b 101-103
+apps/desktop/src/features/chat/composer/hooks/useComposerModelMenu.ts
+  h_201ed4c689ac8b 33-45,81-84,166,188-229,232,235,267-268,342-353,370-375,402-408,416
+apps/desktop/src/features/chat/composer/image-attachments.ts
+  h_201ed4c689ac8b 4
+apps/desktop/src/features/chat/composer/model.ts
+  h_201ed4c689ac8b 2,37-38,62-63,68
+apps/desktop/src/features/chat/context-usage/ContextCostKpis.tsx
+  h_201ed4c689ac8b 1-90
+apps/desktop/src/features/chat/context-usage/usage-cost-text.ts
+  h_201ed4c689ac8b 1-53
+apps/desktop/src/features/chat/context-usage/useSessionUsageCost.ts
+  h_201ed4c689ac8b 1-54
+apps/desktop/src/features/chat/transcript/ActivityGroup.tsx
+  h_201ed4c689ac8b 123-124
+apps/desktop/src/features/chat/transcript/AssistantTurn.tsx
+  h_201ed4c689ac8b 302-304,448
+apps/desktop/src/features/chat/transcript/AssistantTurnParts.tsx
+  h_201ed4c689ac8b 2,7,22,42,44-46
+apps/desktop/src/features/chat/transcript/MessageRow.tsx
+  h_201ed4c689ac8b 12-13,43-47,49-52,61,69-74,127-132,147-148,332-339,343-344,351
+apps/desktop/src/features/chat/transcript/ToolRow.tsx
+  h_201ed4c689ac8b 52,273,330-336,520,522,527
+apps/desktop/src/features/chat/transcript/TranscriptProse.tsx
+  h_201ed4c689ac8b 1-59
+apps/desktop/src/features/chat/transcript/TurnChangesCard.tsx
+  h_201ed4c689ac8b 59
+apps/desktop/src/features/chat/transcript/TurnProcess.tsx
+  h_201ed4c689ac8b 39
+apps/desktop/src/features/chat/transcript/TurnUsageCapsule.tsx
+  h_201ed4c689ac8b 21-28,117-129,314-320,337,356-363
+apps/desktop/src/features/chat/transcript/hooks/useTranscriptHistoryPaging.ts
+  h_201ed4c689ac8b 8-13,17,34-46,51-52,57-61,65-66,72-81,85,93-102,104-109,112,115-117,121-129,132,134,138,140-155,162-163,165,169-170,173,175,179,197,202,219,236,244,246-248,250-265,267
+apps/desktop/src/features/chat/transcript/hooks/useTranscriptScroll.ts
+  h_201ed4c689ac8b 95,201,203-204,207-208,211-212,251-253,264,397,400,409,414,417,426-430,457-458,504,506
+apps/desktop/src/features/chat/transcript/shared.tsx
+  h_201ed4c689ac8b 163,170-171,193-205,346-350
+apps/desktop/src/features/modes/GoalBudgetSettingsRow.tsx
+  h_201ed4c689ac8b 1-77
+apps/desktop/src/features/modes/ModeRunEditForm.tsx
+  h_201ed4c689ac8b 1-92
+apps/desktop/src/features/modes/ModeRunStatusBar.tsx
+  h_201ed4c689ac8b 1-181
+apps/desktop/src/features/modes/ModesSettingsPage.tsx
+  h_201ed4c689ac8b 1-339
+apps/desktop/src/features/modes/mode-picker-model.ts
+  h_201ed4c689ac8b 1-70
+apps/desktop/src/features/modes/mode-run-model.ts
+  h_201ed4c689ac8b 1-175
+apps/desktop/src/features/modes/modes-api.ts
+  h_201ed4c689ac8b 1-153
+apps/desktop/src/features/modes/modes-settings-model.ts
+  h_201ed4c689ac8b 1-108
+apps/desktop/src/features/modes/modes-store.ts
+  h_201ed4c689ac8b 1-75
+apps/desktop/src/features/modes/modes-sync.ts
+  h_201ed4c689ac8b 1-38
+apps/desktop/src/features/modes/use-mode-source-validation.ts
+  h_201ed4c689ac8b 1-53
+apps/desktop/src/features/scheduled/ScheduledRunHistory.tsx
+  h_201ed4c689ac8b 33-34,42-43,57,60-62
+apps/desktop/src/features/scheduled/ScheduledTaskDetail.tsx
+  h_201ed4c689ac8b 36-37,40,54-55,58,110,119,135,180-181
+apps/desktop/src/features/scheduled/ScheduledTaskRail.tsx
+  h_201ed4c689ac8b 34-35,43-44,102-104
+apps/desktop/src/features/scheduled/scheduled-workspace-cache.ts
+  h_201ed4c689ac8b 1-18
+apps/desktop/src/features/scheduled/use-scheduled-workspace.ts
+  h_201ed4c689ac8b 7,30-36,58-68,70-73,75,81-82,96-117,122,125-126,128-157,168-171,177,180,192,197-198,200,272-280,297-303,307-310
+apps/desktop/src/features/settings/SettingsPage.tsx
+  h_201ed4c689ac8b 11,22,28,34,36,41,44,46-51,59,130,136,139,221-222,224,226,229-230,233,240,249,262,275,370-396,420-426,428-429,432-441,461-463,472
+apps/desktop/src/features/settings/pages/AboutSettings.tsx
+  h_201ed4c689ac8b 1-69
+apps/desktop/src/features/settings/pages/AgentBehaviorSettings.tsx
+  h_201ed4c689ac8b 1-100
+apps/desktop/src/features/settings/pages/AppearanceSettings.tsx
+  h_201ed4c689ac8b 1-99
+apps/desktop/src/features/settings/pages/ConversationSettings.tsx
+  h_201ed4c689ac8b 1-84
+apps/desktop/src/features/settings/pages/SystemSettings.tsx
+  h_201ed4c689ac8b 1-64
+apps/desktop/src/features/settings/primitives.tsx
+  h_201ed4c689ac8b 63-71,75,81-82,88-101,105-108,110-112
+apps/desktop/src/features/tools/tools.css
+  h_201ed4c689ac8b 241
+apps/desktop/src/hooks/use-chat-file-menu.tsx
+  h_201ed4c689ac8b 5-8,30,44,84-91,96,106
+apps/desktop/src/hooks/use-composer-autocomplete.ts
+  h_201ed4c689ac8b 39-40,43,58-60,113-140,214,220-221,238,316-344,401-410,435,441-446
+apps/desktop/src/hooks/use-preview-target.ts
+  h_201ed4c689ac8b 41-44,93-94,106-107,181,197,222,236,277,286-312,417-446
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 178,463-464,930-931,1161-1162,1271,1275,1964-1965,1974-1976,1978-1982,1986
+apps/desktop/src/lib/chat-links.ts
+  h_201ed4c689ac8b 127-136,299,304-305,307-311,313
+apps/desktop/src/lib/composer-draft-cache.ts
+  h_201ed4c689ac8b 24-25,29,37-38,47-48,81-82
+apps/desktop/src/lib/composer-input-history.ts
+  h_201ed4c689ac8b 47-48
+apps/desktop/src/lib/composer-smart-stop.ts
+  h_201ed4c689ac8b 26-27,30,49-50,93-94,96-99
+apps/desktop/src/lib/context-usage.ts
+  h_201ed4c689ac8b 107,112,134-143
+apps/desktop/src/lib/conversation-minimap.ts
+  h_201ed4c689ac8b 23,29-35
+apps/desktop/src/lib/latest-turn-context.ts
+  h_201ed4c689ac8b 8,17,47,69-78,95-96,108
+apps/desktop/src/lib/live-delegation-entries.ts
+  h_201ed4c689ac8b 18-19,21
+apps/desktop/src/lib/remote-host-errors.ts
+  h_201ed4c689ac8b 11-18
+apps/desktop/src/lib/review-focus-request.ts
+  h_201ed4c689ac8b 5-7,47-53
+apps/desktop/src/lib/review-history.ts
+  h_201ed4c689ac8b 59
+apps/desktop/src/lib/session-transcript.ts
+  h_201ed4c689ac8b 12-13,16,42,46,56-57
+apps/desktop/src/lib/settings-search.ts
+  h_201ed4c689ac8b 6-11,15-16,18,20,24,26-27,43-51,58-63,81-84,93-94,99,110-113,117-120,122-123,125,130-131,137-143,145,152,163-166,169-184,198,212-221,289-305,340-369,374,379-382,390-399
+apps/desktop/src/lib/sidebar-preferences.ts
+  h_201ed4c689ac8b 45-47,170,212,221-280
+apps/desktop/src/lib/sidebar-project-runs.ts
+  h_201ed4c689ac8b 34-37,41,43,45-51,64-66
+apps/desktop/src/lib/subagent-topology.ts
+  h_201ed4c689ac8b 387-411
+apps/desktop/src/lib/transcript-content-observer.ts
+  h_201ed4c689ac8b 1-59
+apps/desktop/src/lib/transcript-content-window.ts
+  h_201ed4c689ac8b 1-39
+apps/desktop/src/lib/transcript-latest-navigation.ts
+  h_201ed4c689ac8b 156-158
+apps/desktop/src/lib/transcript-reading-anchor.ts
+  h_201ed4c689ac8b 1-90
+apps/desktop/src/lib/transcript-reading-position.ts
+  h_201ed4c689ac8b 104-107,122
+apps/desktop/src/lib/transcript-scroll.ts
+  h_201ed4c689ac8b 60,62-70
+apps/desktop/src/lib/usage-cost.ts
+  h_201ed4c689ac8b 1-155
+apps/desktop/src/locales/remote.ts
+  h_201ed4c689ac8b 21,78
+apps/desktop/src/pages/ScheduledPage.tsx
+  h_201ed4c689ac8b 32-36,73,78,80-84,89-95,126-127,137-138,141,148
+apps/desktop/src/pages/ToolsPage.tsx
+  h_201ed4c689ac8b 18,255
+apps/desktop/src/stores/app-store.ts
+  h_201ed4c689ac8b 23-24,176,247-251
+apps/desktop/src/stores/helpers/planning-projection.ts
+  h_201ed4c689ac8b 1-42
+apps/desktop/src/stores/helpers/store-helpers.ts
+  h_201ed4c689ac8b 30-31,40,46-47,67
+apps/desktop/src/stores/runtime/catalog-runtime.ts
+  h_201ed4c689ac8b 15-16,22-37,46,68,90
+apps/desktop/src/stores/runtime/session-coordination.ts
+  h_201ed4c689ac8b 199
+apps/desktop/src/stores/runtime/session-runtime.ts
+  h_201ed4c689ac8b 168,183-184,220,224
+apps/desktop/src/stores/runtime/transcript-reading-runtime.ts
+  h_201ed4c689ac8b 56,64-76,83,242-243
+apps/desktop/src/stores/slices/catalog-slice.ts
+  h_201ed4c689ac8b 9,75,77-80,115,122-124,147-156
+apps/desktop/src/stores/slices/events-slice.ts
+  h_201ed4c689ac8b 45,213-218,226-230
+apps/desktop/src/stores/slices/initial-state.ts
+  h_201ed4c689ac8b 2,83
+apps/desktop/src/stores/slices/interaction-slice.ts
+  h_201ed4c689ac8b 21,25-33,99-104,150-156,159-163,165,171-178,181-182,184
+apps/desktop/src/stores/slices/queue-slice.ts
+  h_201ed4c689ac8b 80,312-313,316,320-321,326
+apps/desktop/src/stores/slices/session-slice.ts
+  h_201ed4c689ac8b 58,64,160,213,220-225,229,235,264-267,855,869-878,884-889
+apps/desktop/src/stores/slices/transcript-slice.ts
+  h_201ed4c689ac8b 11,511,513,516,522,531-557
+apps/desktop/src/styles/composer-menus.css
+  h_201ed4c689ac8b 113-114,117-124,126,213-215,223-227,231,293-294,296-300,303-304,307-310,313-316,318-364,368-370,373-375,378-394,397-400,403-405,408-411,414-421,423-424,426-428,431-432,435-440,443-448,451-453,456-457,460-464,467-475,478-551,555,557-563,565-567,570-573,575-576,581-583,586,592,609-655,661,671-674,679-682,713-715,854-863,870-929,938,942
+apps/desktop/src/styles/composer.css
+  h_201ed4c689ac8b 1408-1411,1413-1423,1429-1444,1449,1452-1458,1463-1469
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 1574-1585,2128-2134
+apps/desktop/src/styles/modes.css
+  h_201ed4c689ac8b 1-314
+apps/desktop/src/styles/plugin-launcher.css
+  h_201ed4c689ac8b 179-180,182,192-195,198-200,204,209-214,217-225,228-230,234,240,247
+apps/desktop/src/styles/sessions.css
+  h_201ed4c689ac8b 308-320,323-324,330,333,337,348-349,352,354,358-359,361,365-372,374,379,384-386,389-390,392-412,427-429,431-435
+apps/desktop/src/styles/settings.css
+  h_201ed4c689ac8b 247-252,256-258,260,274-275,288-292,294,308-312,346-384,389,426-429,439-457,463,479-484
+apps/desktop/src/styles/sidebar-threads.css
+  h_201ed4c689ac8b 375-376,379,383-387,391,393,395,398-399,407-415,418-420,423-426,436-437,442,448,451,455-457,459,468,472,474,477,482-483,487
+apps/desktop/src/styles/work-panel.css
+  h_201ed4c689ac8b 964-965,980-981,986,991,995-999,1002-1003
+apps/desktop/test/anthropic-oauth-retry.test.mjs
+  h_201ed4c689ac8b 147
+apps/desktop/test/asktool-resolve-clears-host-input.test.mjs
+  h_201ed4c689ac8b 1,162
+apps/desktop/test/background-tasks-dock-render.test.mjs
+  h_201ed4c689ac8b 60,72-74,139-154,172-195
+apps/desktop/test/bootstrap-sidebar-recovery.test.mjs
+  h_201ed4c689ac8b 1-58
+apps/desktop/test/browser-background-session.test.mjs
+  h_201ed4c689ac8b 229-254,258-267
+apps/desktop/test/browser-preview-tool.test.mjs
+  h_201ed4c689ac8b 69-70
+apps/desktop/test/browser-system-appearance.test.mjs
+  h_201ed4c689ac8b 1-75
+apps/desktop/test/bundled-plugins.test.mjs
+  h_201ed4c689ac8b 84
+apps/desktop/test/chat-file-open-with-menu.test.mjs
+  h_201ed4c689ac8b 54,57-58,115,118-121,179,223,238,248,293-341,484-485,496,505-559
+apps/desktop/test/chat-links.test.mjs
+  h_201ed4c689ac8b 49-51,102-131,146,995-998,1000-1003
+apps/desktop/test/chat-ref-external.test.mjs
+  h_201ed4c689ac8b 68-79
+apps/desktop/test/chat-ref-resolve.test.mjs
+  h_201ed4c689ac8b 31-32,104-127,304-359
+apps/desktop/test/compaction-context-usage.test.mjs
+  h_201ed4c689ac8b 79-108
+apps/desktop/test/composer-agent-mention-user-path.test.mjs
+  h_201ed4c689ac8b 1-217
+apps/desktop/test/composer-agent-mention.test.mjs
+  h_201ed4c689ac8b 1-126
+apps/desktop/test/composer-chip-descenders.test.mjs
+  h_201ed4c689ac8b 84-85
+apps/desktop/test/composer-clipboard-directories.test.mjs
+  h_201ed4c689ac8b 2,12,15-16,19-23,27,29-30,34,37-40,43,45-46,49,52,55,57-188,206-208,223-224,226-231
+apps/desktop/test/composer-directory-paste.test.mjs
+  h_201ed4c689ac8b 52,54-55,92-93,104,129,149-160,190-199
+apps/desktop/test/composer-draft-cache.test.mjs
+  h_201ed4c689ac8b 152,155
+apps/desktop/test/composer-file-reference-display.test.mjs
+  h_201ed4c689ac8b 80-83
+apps/desktop/test/composer-file-reference-draft.test.mjs
+  h_201ed4c689ac8b 1-57
+apps/desktop/test/composer-file-references.test.mjs
+  h_201ed4c689ac8b 1-102
+apps/desktop/test/composer-image-preview-focus.test.mjs
+  h_201ed4c689ac8b 1-67
+apps/desktop/test/composer-inline-image-chips.test.mjs
+  h_201ed4c689ac8b 20
+apps/desktop/test/composer-input-history.test.mjs
+  h_201ed4c689ac8b 82-96
+apps/desktop/test/composer-mcp.test.mjs
+  h_201ed4c689ac8b 1,67
+apps/desktop/test/composer-model-thinking-menu.test.mjs
+  h_201ed4c689ac8b 16-17,19-59,64,104-108,111,116-121,246-253
+apps/desktop/test/composer-paste-files.test.mjs
+  h_201ed4c689ac8b 104,109-111
+apps/desktop/test/composer-send-state.test.mjs
+  h_201ed4c689ac8b 70
+apps/desktop/test/composer-smart-stop.test.mjs
+  h_201ed4c689ac8b 63-76
+apps/desktop/test/composer-stop-rejection.test.mjs
+  h_201ed4c689ac8b 1-97
+apps/desktop/test/computer-use-settings-surface.test.mjs
+  h_201ed4c689ac8b 7-20
+apps/desktop/test/conversation-minimap.test.mjs
+  h_201ed4c689ac8b 62,72-74,78,80,84
+apps/desktop/test/custom-mode-dispatch.test.mjs
+  h_201ed4c689ac8b 1-104
+apps/desktop/test/empty-assistant-persistence.test.mjs
+  h_201ed4c689ac8b 159-166
+apps/desktop/test/failed-session-stop-state.test.mjs
+  h_201ed4c689ac8b 1-19
+apps/desktop/test/fast-mode-session-launch.test.mjs
+  h_201ed4c689ac8b 67-74
+apps/desktop/test/file-manager-directory-location-user-path.e2e.mjs
+  h_201ed4c689ac8b 1-364
+apps/desktop/test/file-manager-directory-location.test.mjs
+  h_201ed4c689ac8b 1-155
+apps/desktop/test/file-manager-git-timeout.test.mjs
+  h_201ed4c689ac8b 1-56
+apps/desktop/test/file-manager-mutations.test.mjs
+  h_201ed4c689ac8b 1-46
+apps/desktop/test/fs-index-git-deadline.test.mjs
+  h_201ed4c689ac8b 1-52
+apps/desktop/test/full-transcript-refresh-race.test.mjs
+  h_201ed4c689ac8b 1-34
+apps/desktop/test/gen-ui-card.test.mjs
+  h_201ed4c689ac8b 35-37
+apps/desktop/test/helpers/background-tasks-hook.stub.ts
+  h_201ed4c689ac8b 18,31
+apps/desktop/test/helpers/builtin-mode-runs.mjs
+  h_201ed4c689ac8b 1-17
+apps/desktop/test/helpers/composer-toolbar.mjs
+  h_201ed4c689ac8b 34
+apps/desktop/test/helpers/domain-source.mjs
+  h_201ed4c689ac8b 3,8-16,38,58
+apps/desktop/test/image-generation.test.mjs
+  h_201ed4c689ac8b 36,38-39,68-70
+apps/desktop/test/image-model-disclosure-user-path.test.mjs
+  h_201ed4c689ac8b 1-88
+apps/desktop/test/interactive-response-retry.test.mjs
+  h_201ed4c689ac8b 1-78
+apps/desktop/test/live-delegation-system-row.test.mjs
+  h_201ed4c689ac8b 1-34
+apps/desktop/test/local-apps.test.mjs
+  h_201ed4c689ac8b 13-16,393,395-464
+apps/desktop/test/macos-release-verification.test.mjs
+  h_201ed4c689ac8b 51-56,85-96,112,161-204,298,313-314,324
+apps/desktop/test/macos-signing-watchdog.test.mjs
+  h_201ed4c689ac8b 344,356-371,390,401-402,413,416-417,421
+apps/desktop/test/manual-handbook.test.mjs
+  h_201ed4c689ac8b 72-75,78-79
+apps/desktop/test/manual-transcript-desktop.test.mjs
+  h_201ed4c689ac8b 1-34
+apps/desktop/test/mcp-control.test.mjs
+  h_201ed4c689ac8b 53-80
+apps/desktop/test/mcp-market-owner-user-path.test.mjs
+  h_201ed4c689ac8b 26,29,38,41,56-62,82-86,102-109,120-121,129-144,156-211,228,232,275,288
+apps/desktop/test/mcp-oauth.test.mjs
+  h_201ed4c689ac8b 1030-1087
+apps/desktop/test/mcp-project-retry.test.mjs
+  h_201ed4c689ac8b 1-92
+apps/desktop/test/message-meta-served-model.test.mjs
+  h_201ed4c689ac8b 1-58
+apps/desktop/test/mode-definitions-renderer.test.mjs
+  h_201ed4c689ac8b 1-336
+apps/desktop/test/mode-definitions-user-path.test.mjs
+  h_201ed4c689ac8b 1-436
+apps/desktop/test/mode-planning-approval.test.mjs
+  h_201ed4c689ac8b 1-61
+apps/desktop/test/mode-runs-main.test.mjs
+  h_201ed4c689ac8b 1-424
+apps/desktop/test/mode-session-create.test.mjs
+  h_201ed4c689ac8b 1-69
+apps/desktop/test/model-advanced-capabilities.test.mjs
+  h_201ed4c689ac8b 110
+apps/desktop/test/model-discovery-retry.test.mjs
+  h_201ed4c689ac8b 1-107
+apps/desktop/test/native-pi-sessions.test.mjs
+  h_201ed4c689ac8b 1,63,131,150
+apps/desktop/test/native-workspace-files.test.mjs
+  h_201ed4c689ac8b 1-32
+apps/desktop/test/packaging-footprint.test.mjs
+  h_201ed4c689ac8b 3,6-7,321-380
+apps/desktop/test/persistence-outbox-atomic-clear.test.mjs
+  h_201ed4c689ac8b 1-70
+apps/desktop/test/persistence-outbox.test.mjs
+  h_201ed4c689ac8b 3,294-415,811,817,828-837
+apps/desktop/test/plugin-launcher-window.test.mjs
+  h_201ed4c689ac8b 81,86-90
+apps/desktop/test/plugin-settings-json-roundtrip.test.mjs
+  h_201ed4c689ac8b 1-48
+apps/desktop/test/plugin-settings-json-user-path.test.mjs
+  h_201ed4c689ac8b 1-145
+apps/desktop/test/plugin-settings.test.mjs
+  h_201ed4c689ac8b 31-49
+apps/desktop/test/plugin-skills.test.mjs
+  h_201ed4c689ac8b 97-99,170,177
+apps/desktop/test/plugin-workspace-session.test.mjs
+  h_201ed4c689ac8b 1-97
+apps/desktop/test/queue-refresh-event-order.test.mjs
+  h_201ed4c689ac8b 1-49
+apps/desktop/test/radial-menu.test.mjs
+  h_201ed4c689ac8b 67-69,71,74-81,84,89
+apps/desktop/test/remote-host-errors.test.mjs
+  h_201ed4c689ac8b 24-34
+apps/desktop/test/remote-host-ssh-bootstrap.test.mjs
+  h_201ed4c689ac8b 184-185
+apps/desktop/test/remote-session-user-path.test.mjs
+  h_201ed4c689ac8b 199,216-220,227-230,232-233,236-257
+apps/desktop/test/review-history.test.mjs
+  h_201ed4c689ac8b 61-91
+apps/desktop/test/review-presentation.test.mjs
+  h_201ed4c689ac8b 37-45
+apps/desktop/test/scheduled-return.test.mjs
+  h_201ed4c689ac8b 158-159
+apps/desktop/test/scheduled-settings.test.mjs
+  h_201ed4c689ac8b 40-42,46
+apps/desktop/test/scheduled-workspace-loading.test.mjs
+  h_201ed4c689ac8b 1-224
+apps/desktop/test/scheduled-workspace.test.mjs
+  h_201ed4c689ac8b 291-308
+apps/desktop/test/send-now-subagent-rendering.test.mjs
+  h_201ed4c689ac8b 55-56
+apps/desktop/test/session-configuration-staging.test.mjs
+  h_201ed4c689ac8b 37
+apps/desktop/test/session-fork-running.test.mjs
+  h_201ed4c689ac8b 22,82-103
+apps/desktop/test/session-message-input.test.mjs
+  h_201ed4c689ac8b 1,82,141
+apps/desktop/test/session-message-presentation.test.mjs
+  h_201ed4c689ac8b 7,53,63,173-193
+apps/desktop/test/session-model-write-order.test.mjs
+  h_201ed4c689ac8b 1-36
+apps/desktop/test/session-reference-ui.test.mjs
+  h_201ed4c689ac8b 151
+apps/desktop/test/session-running-bootstrap.test.mjs
+  h_201ed4c689ac8b 60-62,64,78-80,82
+apps/desktop/test/session-switch-performance.test.mjs
+  h_201ed4c689ac8b 165
+apps/desktop/test/session-transcript-empty-read.test.mjs
+  h_201ed4c689ac8b 79
+apps/desktop/test/session-window-cache-race.test.mjs
+  h_201ed4c689ac8b 1-46
+apps/desktop/test/settings-developer-only-destinations.test.mjs
+  h_201ed4c689ac8b 10,13,125-139,150-153
+apps/desktop/test/settings-font-size.test.mjs
+  h_201ed4c689ac8b 20-26
+apps/desktop/test/settings-general.test.mjs
+  h_201ed4c689ac8b 117-129,131-184,209,212-214,216,218,428-431,439-440,443-446,472-473,475,477,481-482,484,489-492,494-518,534-537,558-577
+apps/desktop/test/settings-help-tooltip.test.mjs
+  h_201ed4c689ac8b 12-23,65-85,123
+apps/desktop/test/settings-project-archive.test.mjs
+  h_201ed4c689ac8b 45
+apps/desktop/test/sidebar-backup.test.mjs
+  h_201ed4c689ac8b 1-56
+apps/desktop/test/sidebar-project-runs.test.mjs
+  h_201ed4c689ac8b 50-53,64,72,83,91-114,134-137,148-149
+apps/desktop/test/sidebar-recovery.test.mjs
+  h_201ed4c689ac8b 1-100
+apps/desktop/test/startup-host-retry.test.mjs
+  h_201ed4c689ac8b 1-64
+apps/desktop/test/startup-watchdog.test.mjs
+  h_201ed4c689ac8b 273-274
+apps/desktop/test/storage-maintenance.test.mjs
+  h_201ed4c689ac8b 390-401
+apps/desktop/test/subagent-topology.test.mjs
+  h_201ed4c689ac8b 20,430-444
+apps/desktop/test/subagent-transcript.test.mjs
+  h_201ed4c689ac8b 105
+apps/desktop/test/tools-page.test.mjs
+  h_201ed4c689ac8b 5,36,125
+apps/desktop/test/transcribe-native-library.test.mjs
+  h_201ed4c689ac8b 1-96
+apps/desktop/test/transcript-content-observer.test.mjs
+  h_201ed4c689ac8b 1-59
+apps/desktop/test/transcript-content-window.test.mjs
+  h_201ed4c689ac8b 1-66
+apps/desktop/test/transcript-display-mode-settings.test.mjs
+  h_201ed4c689ac8b 20-26,29,33-34,43,52
+apps/desktop/test/transcript-file-chips.test.mjs
+  h_201ed4c689ac8b 66-68
+apps/desktop/test/transcript-folding-settings.test.mjs
+  h_201ed4c689ac8b 20-23,118-120,127
+apps/desktop/test/transcript-latest-navigation.test.mjs
+  h_201ed4c689ac8b 9-10,12,15-20,23-28,37,40-41,43-46,48-49,52,54-62,66,68-74,80,82-83,85-86,89,91-96,100,103,106-118
+apps/desktop/test/transcript-projection.test.mjs
+  h_201ed4c689ac8b 210,220
+apps/desktop/test/transcript-reading-anchor.test.mjs
+  h_201ed4c689ac8b 1-21
+apps/desktop/test/transcript-reading-position-fallback.test.mjs
+  h_201ed4c689ac8b 70-92
+apps/desktop/test/transcript-reading.test.mjs
+  h_201ed4c689ac8b 211-245
+apps/desktop/test/transcript-scroll.test.mjs
+  h_201ed4c689ac8b 221-237
+apps/desktop/test/transcript-window.test.mjs
+  h_201ed4c689ac8b 216,220,222,228
+apps/desktop/test/turn-changes-card.test.mjs
+  h_201ed4c689ac8b 214-221
+apps/desktop/test/usage-cost-user-path.test.mjs
+  h_201ed4c689ac8b 1-204
+apps/desktop/test/usage-cost.test.mjs
+  h_201ed4c689ac8b 1-131
+apps/desktop/test/user-mcp.test.mjs
+  h_201ed4c689ac8b 563-731
+apps/desktop/test/vision-pin-session-launch.test.mjs
+  h_201ed4c689ac8b 1-182
+apps/desktop/test/widgets-ipc.test.mjs
+  h_201ed4c689ac8b 2
+apps/desktop/test/widgets-page.test.mjs
+  h_201ed4c689ac8b 2
+apps/pi-host/src/packaging.test.ts
+  h_201ed4c689ac8b 71-75
+crates/host-core/src/background_tasks.rs
+  h_201ed4c689ac8b 16-18,101-110,209,351,380,389-391,393-397,399,404-415,453,466,500,597-599,607-613
+crates/host-core/src/background_tasks/jobs.rs
+  h_201ed4c689ac8b 1-181
+crates/host-core/src/background_tasks/windows_tests.rs
+  h_201ed4c689ac8b 145-146
+crates/host-core/src/data_relocation.rs
+  h_201ed4c689ac8b 334-347
+crates/host-core/src/data_relocation/tests.rs
+  h_201ed4c689ac8b 22-62
+crates/host-core/src/db.rs
+  h_201ed4c689ac8b 10,20,25,33,38,41,80-83
+crates/host-core/src/db/memory_entries_retire_migration.rs
+  h_201ed4c689ac8b 4,27,46,63-64,66,69
+crates/host-core/src/db/memory_entries_retire_test.rs
+  h_201ed4c689ac8b 1,5,33-34,45,54,107,113,143,159,161-162,167
+crates/host-core/src/db/migrations.rs
+  h_201ed4c689ac8b 785,790-794,796,803,806-809,813-815,817-828,832-833,835,838,845,854,856,860-861,863,866,873-875
+crates/host-core/src/db/migrations_test.rs
+  h_201ed4c689ac8b 124
+crates/host-core/src/db/migrations_v31_repair.rs
+  h_201ed4c689ac8b 1,58,74,94,98-99,101,104
+crates/host-core/src/db/mode_runs_migration.rs
+  h_201ed4c689ac8b 1-294
+crates/host-core/src/db/project_groups.rs
+  h_201ed4c689ac8b 212-213,216,219
+crates/host-core/src/db/project_path_migration.rs
+  h_201ed4c689ac8b 1-145
+crates/host-core/src/db/project_path_tests.rs
+  h_201ed4c689ac8b 1-248
+crates/host-core/src/db/repositories.rs
+  h_201ed4c689ac8b 150,219-220,225-230,295-296,298-310,316-317,323-324,331-332,431-434,467,489-490,504-505
+crates/host-core/src/db/schema.rs
+  h_201ed4c689ac8b 192-194
+crates/host-core/src/db/tests.rs
+  h_201ed4c689ac8b 9,17,26,34,36
+crates/host-core/src/main.rs
+  h_201ed4c689ac8b 15
+crates/host-core/src/mode_runs.rs
+  h_201ed4c689ac8b 1-62
+crates/host-core/src/mode_runs/artifacts.rs
+  h_201ed4c689ac8b 1-240
+crates/host-core/src/mode_runs/budget.rs
+  h_201ed4c689ac8b 1-111
+crates/host-core/src/mode_runs/edit_tests.rs
+  h_201ed4c689ac8b 1-225
+crates/host-core/src/mode_runs/engine.rs
+  h_201ed4c689ac8b 1-599
+crates/host-core/src/mode_runs/gates.rs
+  h_201ed4c689ac8b 1-347
+crates/host-core/src/mode_runs/model.rs
+  h_201ed4c689ac8b 1-469
+crates/host-core/src/mode_runs/policy.rs
+  h_201ed4c689ac8b 1-142
+crates/host-core/src/mode_runs/repository.rs
+  h_201ed4c689ac8b 1-287
+crates/host-core/src/mode_runs/return_mode.rs
+  h_201ed4c689ac8b 1-105
+crates/host-core/src/mode_runs/return_mode_tests.rs
+  h_201ed4c689ac8b 1-140
+crates/host-core/src/mode_runs/snapshot.rs
+  h_201ed4c689ac8b 1-408
+crates/host-core/src/mode_runs/snapshot_tests.rs
+  h_201ed4c689ac8b 1-150
+crates/host-core/src/mode_runs/tests.rs
+  h_201ed4c689ac8b 1-667
+crates/host-core/src/plans/approval.rs
+  h_201ed4c689ac8b 156,317-319,434-435
+crates/host-core/src/plans/repository.rs
+  h_201ed4c689ac8b 67-68,70-75,78-81
+crates/host-core/src/plugin_sessions.rs
+  h_201ed4c689ac8b 279,285,297
+crates/host-core/src/plugins/providers/tests.rs
+  h_201ed4c689ac8b 104-108,110
+crates/host-core/src/review/query.rs
+  h_201ed4c689ac8b 283-284
+crates/host-core/src/rpc/background_jobs.rs
+  h_201ed4c689ac8b 1-95
+crates/host-core/src/rpc/computer_rpc.rs
+  h_201ed4c689ac8b 30-45,179,349-355
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 1,8,19-21,635,1217-1219,2023-2026,2035-2038,2313-2317,2832,2859,2861,3027-3028,3037,3048,3054-3057,3810-3820,3879,3984,4041,4396-4399,4404,4406-4408,4410,4495,4537,4554,4706,5010,5160,5231,5256,5279,8655-8692,9311-9335
+crates/host-core/src/rpc/modes_rpc.rs
+  h_201ed4c689ac8b 1-252
+crates/host-core/src/rpc/modes_rpc_tests.rs
+  h_201ed4c689ac8b 1-420
+crates/host-core/src/rpc/review_rpc_tests.rs
+  h_201ed4c689ac8b 826,829,833-834,838,841-842,845-894
+crates/host-core/src/rpc/session_mode_create_tests.rs
+  h_201ed4c689ac8b 1-99
+crates/host-core/src/scheduled.rs
+  h_201ed4c689ac8b 80
+crates/host-core/src/sessions.rs
+  h_201ed4c689ac8b 20,42-44,46-55,63,65-68,73-74,79-80,193-194,227-229,246-248,253-257,326-333,449-451,464-466,473-475,575-577,619-621,672-676,722-725,764,768,778,822,826,836,1503-1512,1533-1536,1541-1547,1563-1564,1577-1578,1580-1582,1944-1945,1948,2037-2038,2049-2075,2078,2104-2105,2116-2117,4555-4576,4579,4585,4597,5025,5546,5552,5564,5959-5982,5989,6364-6401,6407,6413,6433,6493-6496,6562,6568,6580
+crates/host-core/src/sessions/usage.rs
+  h_201ed4c689ac8b 264-363,411-475
+crates/host-core/src/state.rs
+  h_201ed4c689ac8b 104-106,135,137-143,200
+crates/host-core/src/todos.rs
+  h_201ed4c689ac8b 311,313,315,318,324-328
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 33-34,235-237,257-280,752-763,3194
+crates/host-core/src/tools/process_group.rs
+  h_201ed4c689ac8b 1-88
+crates/host-core/src/transcripts.rs
+  h_201ed4c689ac8b 1031-1032,1069-1077,1840-1881
+crates/host-core/src/turn_queue.rs
+  h_201ed4c689ac8b 535-539
+crates/host-core/src/widgets.rs
+  h_201ed4c689ac8b 1
+docs/adr/0089-proactive-background-subagent-delegation.md
+  h_201ed4c689ac8b 129-159
+docs/adr/0130-bounded-mounted-transcript-window.md
+  h_201ed4c689ac8b 53-61,105-112,125-129,143-162,168-170,174-188
+docs/adr/0266-plugin-fs-root-follows-the-calling-session.md
+  h_201ed4c689ac8b 61-81
+docs/adr/0289-signed-macos-github-releases.md
+  h_201ed4c689ac8b 31-35
+docs/adr/0343-plugin-launcher-local-apps.md
+  h_201ed4c689ac8b 74-77
+docs/adr/0345-one-settings-destination-one-subject.md
+  h_201ed4c689ac8b 1-144
+docs/adr/0346-composer-agent-mentions.md
+  h_201ed4c689ac8b 1-68
+docs/adr/0384-widget-packages-run-in-the-agent-sidecar.md
+  h_201ed4c689ac8b 4,10
+docs/adr/README.md
+  h_201ed4c689ac8b 24-26,412-414
+docs/adr/active-turn-steering.md
+  h_201ed4c689ac8b 22-28
+docs/adr/composer-local-file-references.md
+  h_201ed4c689ac8b 1-46
+docs/adr/composer-pasted-directory-references.md
+  h_201ed4c689ac8b 15-18,30-32,36-37
+docs/adr/mode-definitions.md
+  h_201ed4c689ac8b 1-297
+docs/adr/sidebar-layout-recovery.md
+  h_201ed4c689ac8b 1-34
+docs/adr/steering-local-tool-interruption.md
+  h_201ed4c689ac8b 1-31
+docs/project/pi-150-adoption.md
+  h_201ed4c689ac8b 1-115
+docs/project/unreleased.md
+  h_201ed4c689ac8b 3-7
+docs/spec/00-baseline.md
+  h_201ed4c689ac8b 5-7,184
+docs/spec/02-architecture/02-tech-stack.md
+  h_201ed4c689ac8b 15-17
+docs/spec/02-architecture/05-remote-agent-control.md
+  h_201ed4c689ac8b 596-599
+docs/spec/02-architecture/06-pi-runtime-dependency-boundary.md
+  h_201ed4c689ac8b 12,15,42
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 83,231-233,289-293,1000,1082-1102,2130-2134,2461,2468,2475-2493,2510
+docs/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 3-11,148-160,232-233,303-314,318-327,329-330,558-567,663-667,814-816,875-876,1025-1026,1116-1118,1612,1614-1621,1783-1784,2125-2182
+docs/spec/03-runtime/03-tools-and-permissions.md
+  h_201ed4c689ac8b 452-456,775-778,999-1004,1006-1026,1029,1031,1033,1035-1039,1044,1049-1067,1172-1193
+docs/spec/03-runtime/04-data-storage.md
+  h_201ed4c689ac8b 1-21,113,446-448,585-588,620-629,1669-1673,1757,1768,1845-1851,1855-1869,2045-2050,2194-2210
+docs/spec/03-runtime/06-host-rpc-protocol.md
+  h_201ed4c689ac8b 268-273,354-356,400-404,1578-1580,1607-1671
+docs/spec/03-runtime/07-process-model.md
+  h_201ed4c689ac8b 56-59
+docs/spec/03-runtime/08-error-codes.md
+  h_201ed4c689ac8b 93-102,119,387-391,401-404
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 91-95
+docs/spec/03-runtime/13-model-catalog-and-selection.md
+  h_201ed4c689ac8b 473-483
+docs/spec/03-runtime/21-image-generation.md
+  h_201ed4c689ac8b 18-23
+docs/spec/03-runtime/computer-use.md
+  h_201ed4c689ac8b 285-286
+docs/spec/04-ux/01-ui-ia.md
+  h_201ed4c689ac8b 238-242,308-320
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 47-52,54,56-74,77-83,85-90,103,105-111,117-120,162-202,211-228,260-261,265-292,319-320,346-381,391,451-452,628-630,659-686,724-731,802-804,1008-1009,1011,1023-1024,1030-1041,1044-1047,1058-1066,1147-1149,1151-1152
+docs/spec/04-ux/08-component-spec.md
+  h_201ed4c689ac8b 3-36,39-45,53-57,239,1081-1083,1779-1780,1892-1893,2122-2127,2155-2165,2981-2986,3335-3338,3424-3428,3432-3446,3628,3712-3725,3849-3853,4260-4265,4738-4741,4745-4749,4752-4753,4763-4771,4807-4809,4814-4833
+docs/spec/04-ux/09-interaction-patterns.md
+  h_201ed4c689ac8b 860,874-878,881-884,892-894,1024-1026,1058-1061,1635-1639,1698-1737,1741-1743,1781-1783,1973-1975
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 3-234,240-241,243-248,255-257,304,417-430,492-517,881,1341-1345,1354,1431-1436,2334-2350,3667,3675-3681,3686,3690-3694,3727,3737,3821-3822,3833-3834,3837,4249,4257,4890-4895,5595,5859-5861,5870-5878,6299,6309,6931,7163,7202,7295,7719-7720,7724,7726-7728,7740,7743-7748,8018,8062-8068,8075-8077,9231-9235,9427-9463,9602-9625,9831,10226-10229,10234-10236,10242-10244,11541-11547,11551-11559,12337,12387,13659-13661,13674-13676,13681-13688,13692-13698,13719-13725,13728-13767,14557-14558,14561-14565,14858,15048,16764,16769,17424-17429,18094-18113,18638-18660,18814-18817,18820-18821,18916-18917,18922-18924,18938-18988,19353-19354,19356-19363,19539,19545,19555-19557,19931-19932,19947-19950,19977,20173-20180,20190-20202,20245-20417
+docs/spec/06-delivery/06-release-runbook.md
+  h_201ed4c689ac8b 252-260,362,382-383,434-435,439-441
+docs/spec/07-plugins/01-plugin-system.md
+  h_201ed4c689ac8b 541-546
+docs/spec/07-plugins/02-plugin-manifest-schema.md
+  h_201ed4c689ac8b 674-680
+docs/spec/07-plugins/03-plugin-api.md
+  h_201ed4c689ac8b 397-411,1283-1290
+docs/spec/07-plugins/16-trusted-extensions.md
+  h_201ed4c689ac8b 330,351-354,402-405
+docs/spec/07-plugins/18-plugin-launcher.md
+  h_201ed4c689ac8b 90,92-96,98-103,243-246
+docs/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 9-14,349-352,473-474,8365,8367,8386,8411,8436,8462,8487,8514-8581,8645
+docs/zh-CN/adr/0384-widget-packages-run-in-the-agent-sidecar.md
+  h_201ed4c689ac8b 7,12
+docs/zh-CN/adr/index.md
+  h_201ed4c689ac8b 322
+docs/zh-CN/spec/00-baseline.md
+  h_201ed4c689ac8b 144
+docs/zh-CN/spec/02-architecture/02-tech-stack.md
+  h_201ed4c689ac8b 18-20
+docs/zh-CN/spec/02-architecture/05-remote-agent-control.md
+  h_201ed4c689ac8b 194-197
+docs/zh-CN/spec/02-architecture/06-pi-runtime-dependency-boundary.md
+  h_201ed4c689ac8b 13-14
+docs/zh-CN/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 69,795,867-879,1509
+docs/zh-CN/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 3-9,168,396-398,683-684,1063,1315-1344
+docs/zh-CN/spec/03-runtime/03-tools-and-permissions.md
+  h_201ed4c689ac8b 680-682,684-719,803-810
+docs/zh-CN/spec/03-runtime/04-data-storage.md
+  h_201ed4c689ac8b 1,275-278,308-317,1245,1256,1278-1283,1286-1294,1536-1556
+docs/zh-CN/spec/03-runtime/06-host-rpc-protocol.md
+  h_201ed4c689ac8b 260-262,279-281,1170-1216
+docs/zh-CN/spec/03-runtime/08-error-codes.md
+  h_201ed4c689ac8b 110,403
+docs/zh-CN/spec/03-runtime/21-image-generation.md
+  h_201ed4c689ac8b 77-82
+docs/zh-CN/spec/04-ux/01-ui-ia.md
+  h_201ed4c689ac8b 183-185,222-233
+docs/zh-CN/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 27-31,33,35-50,52-63,71-77,79-81,102-125,133-135,140,144-152,154-186,205,212-214,218,226,347-368,459-460,475-481,484-485,490-494,542-544,546-547,552-559
+docs/zh-CN/spec/04-ux/08-component-spec.md
+  h_201ed4c689ac8b 3-28,1376-1378,1398-1401,1973,2183,2237,2345,2377-2385,2814-2815,3135-3154
+docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 3-110,120-133,162-178,1509-1510,1517-1526,1529,1541,1545-1546,1874,2939,3716,3865,3966,5674,6489,6593-6595,6597-6598,6671-6672,6674,6680,7144,7177,7940,8660,8663,9872-9873,9877-9878,9889-9924,10251,10256,10261,10481-10626
+docs/zh-CN/spec/07-plugins/03-plugin-api.md
+  h_201ed4c689ac8b 1076-1081
+docs/zh-CN/spec/07-plugins/16-trusted-extensions.md
+  h_201ed4c689ac8b 256,278-280,307-308
+docs/zh-CN/spec/07-plugins/18-plugin-launcher.md
+  h_201ed4c689ac8b 51,53-54,56,58,144
+docs/zh-CN/spec/07-plugins/19-widget-packages.md
+  h_201ed4c689ac8b 7
+docs/zh-CN/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 12-16,351-354,472-473,5851,5853,5866,5884,5902,5921,5939-5986,6020
+examples/widgets/README.md
+  h_201ed4c689ac8b 1
+examples/widgets/tide-probe/index.mjs
+  h_201ed4c689ac8b 2
+package.json
+  h_201ed4c689ac8b 63,79,114
+packages/agent-host/src/agent-host.test.ts
+  h_201ed4c689ac8b 15,501-532
+packages/agent-host/src/agent-host.ts
+  h_201ed4c689ac8b 47-48,96-97,531-535,567
+packages/agent-host/src/ports.ts
+  h_201ed4c689ac8b 35-42,44
+packages/agent-runtime/package.json
+  h_201ed4c689ac8b 34-36,40
+packages/agent-runtime/src/agent-errors.test.ts
+  h_201ed4c689ac8b 284-304,321-343,716-734,756-760,779-853
+packages/agent-runtime/src/agent-errors.ts
+  h_201ed4c689ac8b 52-59,64-71,73,130-132,134-135,145,148-151,493-496,504,668
+packages/agent-runtime/src/agent-messages.ts
+  h_201ed4c689ac8b 75-83,113,185-199,202-206,219-232,234-241,245-251
+packages/agent-runtime/src/anthropic-oauth-identity.test.ts
+  h_201ed4c689ac8b 1-59
+packages/agent-runtime/src/attachment-history.test.ts
+  h_201ed4c689ac8b 58-103
+packages/agent-runtime/src/attachment-history.ts
+  h_201ed4c689ac8b 182-185,187,193-194,198-213
+packages/agent-runtime/src/background-job-tools.test.ts
+  h_201ed4c689ac8b 1-237
+packages/agent-runtime/src/background-job-tools.ts
+  h_201ed4c689ac8b 1-180
+packages/agent-runtime/src/compaction-restore-tool-pairs.test.ts
+  h_201ed4c689ac8b 1-162
+packages/agent-runtime/src/compaction-tail.test.ts
+  h_201ed4c689ac8b 177-225
+packages/agent-runtime/src/extensions/managed-exec.test.ts
+  h_201ed4c689ac8b 32,37-74
+packages/agent-runtime/src/extensions/managed-exec.ts
+  h_201ed4c689ac8b 1,3,6-16,21-24,35-39,50-62,90-109,111-116
+packages/agent-runtime/src/extensions/runner.test.ts
+  h_201ed4c689ac8b 163-197
+packages/agent-runtime/src/extensions/runner.ts
+  h_201ed4c689ac8b 104-105,572-590
+packages/agent-runtime/src/fixed-tool-declarations.test.ts
+  h_201ed4c689ac8b 4-5
+packages/agent-runtime/src/fixed-tool-declarations.ts
+  h_201ed4c689ac8b 3-4
+packages/agent-runtime/src/image-generation/openai-images.test.ts
+  h_201ed4c689ac8b 1-61
+packages/agent-runtime/src/image-generation/openai-images.ts
+  h_201ed4c689ac8b 147-150
+packages/agent-runtime/src/image-generation/tool.ts
+  h_201ed4c689ac8b 1
+packages/agent-runtime/src/index.ts
+  h_201ed4c689ac8b 8-18
+packages/agent-runtime/src/malformed-tool-recovery.test.ts
+  h_201ed4c689ac8b 2-3,26,34,40,57-93
+packages/agent-runtime/src/mode-definitions.test.ts
+  h_201ed4c689ac8b 1-239
+packages/agent-runtime/src/mode-definitions.ts
+  h_201ed4c689ac8b 1-303
+packages/agent-runtime/src/mode-prompts.test.ts
+  h_201ed4c689ac8b 4,35-37,42-44,49-60
+packages/agent-runtime/src/mode-prompts.ts
+  h_201ed4c689ac8b 18-22,24-38,46-54,58,60,63-68,72-73,75,77-80
+packages/agent-runtime/src/mode-turn-notice.test.ts
+  h_201ed4c689ac8b 1-167
+packages/agent-runtime/src/modes/complete-stage-tool.test.ts
+  h_201ed4c689ac8b 1-192
+packages/agent-runtime/src/modes/complete-stage-tool.ts
+  h_201ed4c689ac8b 1-282
+packages/agent-runtime/src/modes/mode-artifact-reader.ts
+  h_201ed4c689ac8b 1-59
+packages/agent-runtime/src/modes/mode-params.test.ts
+  h_201ed4c689ac8b 1-88
+packages/agent-runtime/src/modes/mode-params.ts
+  h_201ed4c689ac8b 1-238
+packages/agent-runtime/src/modes/mode-policy.test.ts
+  h_201ed4c689ac8b 1-84
+packages/agent-runtime/src/modes/mode-policy.ts
+  h_201ed4c689ac8b 1-38
+packages/agent-runtime/src/modes/mode-state.test.ts
+  h_201ed4c689ac8b 1-120
+packages/agent-runtime/src/modes/mode-state.ts
+  h_201ed4c689ac8b 1-220
+packages/agent-runtime/src/modes/stage-brief.test.ts
+  h_201ed4c689ac8b 1-330
+packages/agent-runtime/src/modes/stage-brief.ts
+  h_201ed4c689ac8b 1-212
+packages/agent-runtime/src/native-pi-session.test.ts
+  h_201ed4c689ac8b 6-7,508,527
+packages/agent-runtime/src/output-truncation.test.ts
+  h_201ed4c689ac8b 1-84
+packages/agent-runtime/src/pi-1.5-adapter-features.test.ts
+  h_201ed4c689ac8b 53
+packages/agent-runtime/src/pi-anthropic-strict-fallback.test.ts
+  h_201ed4c689ac8b 1-2
+packages/agent-runtime/src/pi-file-ops.test.ts
+  h_201ed4c689ac8b 2-5,15,31,40-53,58-106,112,136,138-139,195-198,233-238,307-320,335-580
+packages/agent-runtime/src/pi-runtime-compaction-plan.ts
+  h_201ed4c689ac8b 148-215,220,223,226,241,257,320-330,332-334
+packages/agent-runtime/src/pi-upstream-1.5-contract.test.ts
+  h_201ed4c689ac8b 29,60
+packages/agent-runtime/src/pi-upstream-1.5-identity.test.ts
+  h_201ed4c689ac8b 10,18
+packages/agent-runtime/src/provider-binding.test.ts
+  h_201ed4c689ac8b 1708,1711,1756-1761,1775-1776,1781-1782,1784-1798,1801,1824
+packages/agent-runtime/src/provider-retry.test.ts
+  h_201ed4c689ac8b 21,448-470,504-525,1117-1325
+packages/agent-runtime/src/provider-retry.ts
+  h_201ed4c689ac8b 126-211,522-525,527,530-534,536,564-569
+packages/agent-runtime/src/reasoning-replay.test.ts
+  h_201ed4c689ac8b 29,48,115-150
+packages/agent-runtime/src/reasoning-replay.ts
+  h_201ed4c689ac8b 107-117,121-122,133
+packages/agent-runtime/src/request-usage.test.ts
+  h_201ed4c689ac8b 65-109
+packages/agent-runtime/src/response-model.test.ts
+  h_201ed4c689ac8b 1-29
+packages/agent-runtime/src/response-model.ts
+  h_201ed4c689ac8b 1-32
+packages/agent-runtime/src/runtime.test.ts
+  h_201ed4c689ac8b 307-333,1414-1435,2827-2839,3966,3968-3970,4357-4360,4386,4388-4393,4505-4506,4715-4718,4722-4741,5888-5913,7608-7632,8576-8577,8580,8582-8597,8599-8606,9576-9577,10471-10648,12569-12646,15014-15072
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 1-2,10,39,101,133-134,205,288-296,395-399,412,415,471,833-834,1014-1015,1099-1103,1160,1515,1950-1956,2001,2223,2237-2239,2291,2323,2327,2537-2539,2836-2841,2846,2894,3002-3005,3135-3137,3167-3175,3467,3588,3616-3617,3619-3625,3639,3659,3725-3727,3733-3734,3750-3751,4192-4199,4242,4255-4262,4288-4293,4352-4366,4685-4688,4690,4717-4721,4727,4756,4769,4787,4795-4838,4846,4871-4880,4904,4906,4926,4929,5045-5049,5051-5057,5072-5074,5076,5216-5275,6064,6069,6770,6779,8017-8022,8028,8030,8214-8218,9332-9339,9404-9407,9630-9631,9640,9647-9651,9674,9992-9993,10102-10106,10148-10153,10158,10304,10357-10360,10470-10492
+packages/agent-runtime/src/scheduled-tools.ts
+  h_201ed4c689ac8b 1
+packages/agent-runtime/src/session-affinity-flow.test.ts
+  h_201ed4c689ac8b 1-108
+packages/agent-runtime/src/session-affinity.test.ts
+  h_201ed4c689ac8b 151,154,424-426,465
+packages/agent-runtime/src/session-affinity.ts
+  h_201ed4c689ac8b 55,89-91,102-105
+packages/agent-runtime/src/sidecar.ts
+  h_201ed4c689ac8b 34-38,53,80,130-133,213,216,298,330-333,346,505-508,530,575-576,657,683-686
+packages/agent-runtime/src/subagent-context.test.ts
+  h_201ed4c689ac8b 240-277
+packages/agent-runtime/src/subagent-context.ts
+  h_201ed4c689ac8b 279-286,288-290
+packages/agent-runtime/src/system-transcript-journal.test.ts
+  h_201ed4c689ac8b 5-6
+packages/agent-runtime/src/system-transcript-journal.ts
+  h_201ed4c689ac8b 2-3
+packages/agent-runtime/src/system-transcript-order.test.ts
+  h_201ed4c689ac8b 3-4
+packages/agent-runtime/src/system-transcript.test.ts
+  h_201ed4c689ac8b 13
+packages/agent-runtime/src/text-tool-call.test.ts
+  h_201ed4c689ac8b 1-28
+packages/agent-runtime/src/text-tool-call.ts
+  h_201ed4c689ac8b 1-41
+packages/agent-runtime/src/todo-tool.ts
+  h_201ed4c689ac8b 1
+packages/agent-runtime/src/transcript-payload.test.ts
+  h_201ed4c689ac8b 2-3
+packages/agent-runtime/src/widgets/index.test.ts
+  h_201ed4c689ac8b 2,87,205
+packages/agent-runtime/src/widgets/index.ts
+  h_201ed4c689ac8b 2,99
+packages/agent-runtime/src/widgets/loader.ts
+  h_201ed4c689ac8b 2
+packages/agent-runtime/src/widgets/runner.ts
+  h_201ed4c689ac8b 2
+packages/agent-runtime/src/widgets/types.ts
+  h_201ed4c689ac8b 2,19
+packages/host-runtime/src/agent-sidecar.ts
+  h_201ed4c689ac8b 53-56,87
+packages/host-runtime/src/chat-ref-resolve.ts
+  h_201ed4c689ac8b 33-35,95-98,103-123,217-224,342-356,422-423,425-435,439,467-473,482,528-545
+packages/host-runtime/src/file-batch-bridge.test.ts
+  h_201ed4c689ac8b 28-43
+packages/host-runtime/src/fs-index.ts
+  h_201ed4c689ac8b 64-70,73-74,76-77,85,87-88,92,95-96
+packages/host-runtime/src/host-ports.test.ts
+  h_201ed4c689ac8b 59-71
+packages/host-runtime/src/host-ports.ts
+  h_201ed4c689ac8b 85-86,89-92,97
+packages/host-runtime/src/plan-dispatch.ts
+  h_201ed4c689ac8b 131
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 508-509,572,579,592-593,623-637,821,891-893,1008-1095,1194,1246,1256,1263,1265,1334-1337,1344,1353-1369,1776-1779,3165,3168
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 508-509,584,594,607-608,638-652,833,903-905,1020-1107,1204,1256,1266,1273,1275,1344-1347,1354,1363-1379,1791-1794,3213,3216
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 508-509,572,579,592-593,623-637,821,891-893,1008-1095,1194,1246,1256,1263,1265,1334-1337,1344,1353-1369,1776-1779,3165,3168
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 508-509,572,579,592-593,623-637,821,891-893,1008-1095,1194,1246,1256,1263,1265,1334-1337,1344,1353-1369,1776-1779,3165,3168
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 517-518,584,591,604-605,635-649,830,900-902,1017-1104,1201,1253,1263,1270,1272,1340-1343,1350,1359-1375,1787-1790,3204,3207
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 507-508,571,581,594-595,625-639,820,890-892,1007-1094,1191,1239,1246,1250-1251,1318-1321,1328,1337-1353,1755-1758,3141,3144
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 517-518,584,591,604-605,635-649,830,900-902,1017-1104,1201,1253,1263,1270,1272,1340-1343,1350,1359-1375,1787-1790,3203,3206
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 503-504,577,584,597-598,628-642,826,896-898,1013-1100,1197,1248,1256,1261,1263,1331-1334,1341,1350-1366,1777-1780,3167,3170
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 503-504,577,584,597-598,628-642,826,896-898,1013-1100,1197,1248,1331-1334,1341,1350-1366,1777-1780,3165,3168
+packages/i18n/test/catalogs.test.mjs
+  h_201ed4c689ac8b 113-114,116,118,122-123,125,132-133,135,137,141-142,144,151-152,154,156,160-161,163,167-176
+packages/shared/src/background-jobs.ts
+  h_201ed4c689ac8b 1-20
+packages/shared/src/composer-trigger.test.ts
+  h_201ed4c689ac8b 4,6-7,16,20-40,329-385
+packages/shared/src/composer-trigger.ts
+  h_201ed4c689ac8b 151-206,245,252-284,297-298,309,312-318,323-324,327,331,337
+packages/shared/src/context-compaction.test.ts
+  h_201ed4c689ac8b 64-67
+packages/shared/src/context-compaction.ts
+  h_201ed4c689ac8b 82-83
+packages/shared/src/errors.ts
+  h_201ed4c689ac8b 115
+packages/shared/src/index.ts
+  h_201ed4c689ac8b 6,59-60,98
+packages/shared/src/local-file-references.ts
+  h_201ed4c689ac8b 1-13
+packages/shared/src/mode-definition-parse.ts
+  h_201ed4c689ac8b 1-462
+packages/shared/src/mode-definition.test.ts
+  h_201ed4c689ac8b 1-192
+packages/shared/src/mode-definition.ts
+  h_201ed4c689ac8b 1-172
+packages/shared/src/protocol.test.ts
+  h_201ed4c689ac8b 120,123-125,127
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 159,197-198,263-271,353,608-609
+packages/shared/src/types.ts
+  h_201ed4c689ac8b 8
+packages/shared/src/types/agent.ts
+  h_201ed4c689ac8b 68-69
+packages/shared/src/types/common.ts
+  h_201ed4c689ac8b 2-10,13-14,19,22-28
+packages/shared/src/types/composer.ts
+  h_201ed4c689ac8b 44,46-48
+packages/shared/src/types/filesystem.ts
+  h_201ed4c689ac8b 127-133
+packages/shared/src/types/messages.ts
+  h_201ed4c689ac8b 49-69,73,137-138,142-146,172-173
+packages/shared/src/types/mode-runs.ts
+  h_201ed4c689ac8b 1-150
+packages/shared/src/types/plans.ts
+  h_201ed4c689ac8b 18-20,22
+packages/shared/src/types/sessions.ts
+  h_201ed4c689ac8b 175-177,234
+packages/shared/src/types/settings.ts
+  h_201ed4c689ac8b 72-77
+packages/shared/src/widgets.ts
+  h_201ed4c689ac8b 2
+patches/@earendil-works__pi-ai@1.5.0.patch
+  h_201ed4c689ac8b 2,12-17,26,38,46,55-56,65,71-75,81,88-89,94,96-98,101,107-111,114,120-124,127,136-138,141,145-150,166,181,190,199,215,232,272,295,304,315,327,330,341,344,358,361,395,445,455,465,472,495,524,538,552,601,603,605,607,612,639,676,691,700,709,722,746,755,912,915-916,924,926,929-930,937,939,942-965,967,970-971,973-974,977,988,1031,1040,1049,1060
+patches/@earendil-works__pi-coding-agent@1.5.0.patch
+  h_201ed4c689ac8b 2,5,18,27,36,45,54,68,77,86,124,129,133,136,146,149,158,167
+patches/file-manager-directory-location.patch
+  h_201ed4c689ac8b 1-292
+pnpm-lock.yaml
+  h_201ed4c689ac8b 208-210,233-234,236-237,428-429,431-432,434-435,446-447,1005-1006,1009-1010,1014-1015,1018-1019,1023-1024,1027-1028,1031-1036,1417-1419,3519-3522,4163-4164,5019,5021-5022,5036,5040-5041,5061,5065-5066,5071,5086,5090,5092-5096,5107,5112,5126,5130,5132-5134,5417-5418,7964-7968,8081,8085,8651
+pnpm-workspace.yaml
+  h_201ed4c689ac8b 16,19-26,62-64
+scripts/README.md
+  h_201ed4c689ac8b 26,66-68
+scripts/check-pi-dependencies.mjs
+  h_201ed4c689ac8b 28,72,84-91,94
+scripts/check-pi-patches.mjs
+  h_201ed4c689ac8b 28
+scripts/e2e-anthropic-oauth-identity.mjs
+  h_201ed4c689ac8b 1-243
+scripts/e2e-browser-system-appearance.mjs
+  h_201ed4c689ac8b 1-114
+scripts/e2e-compaction-restore-tool-pairs.mjs
+  h_201ed4c689ac8b 1-128
+scripts/e2e-compaction-tail.mjs
+  h_201ed4c689ac8b 1-39
+scripts/e2e-composer-mcp.mjs
+  h_201ed4c689ac8b 18,103,170-174
+scripts/e2e-composer-paste.mjs
+  h_201ed4c689ac8b 6,19,55-57,75-80,100-102,109,113-123,132-133,136-162,213-216,256-257,287,311-312,315,325-327,355,357-372,374,439-440,453-481
+scripts/e2e-composer-thinking-layout.mjs
+  h_201ed4c689ac8b 82-83,87,89-98,102
+scripts/e2e-goal-live.mjs
+  h_201ed4c689ac8b 1-295
+scripts/e2e-image-generation.mjs
+  h_201ed4c689ac8b 21-23,26-27,29,31,91-94,114,127,135
+scripts/e2e-mode-definitions.mjs
+  h_201ed4c689ac8b 1-153
+scripts/e2e-native-workspace-files.mjs
+  h_201ed4c689ac8b 1-71
+scripts/e2e-plan.mjs
+  h_201ed4c689ac8b 202-214,228
+scripts/e2e-project-path-case.py
+  h_201ed4c689ac8b 1-137
+scripts/e2e-queue-refresh-event-order.mjs
+  h_201ed4c689ac8b 1-66
+scripts/e2e-review-history.mjs
+  h_201ed4c689ac8b 44,46
+scripts/e2e-session-background-jobs.mjs
+  h_201ed4c689ac8b 1-195
+scripts/e2e-session-metadata-reads.mjs
+  h_201ed4c689ac8b 1-246
+scripts/e2e-session-window-cache-race.mjs
+  h_201ed4c689ac8b 1-66
+scripts/e2e-sidebar-recovery.mjs
+  h_201ed4c689ac8b 1-93
+scripts/e2e-task-dock-tabs.mjs
+  h_201ed4c689ac8b 1-60
+scripts/e2e-task-job-selectors.mjs
+  h_201ed4c689ac8b 1-146
+scripts/e2e-transcript-anchor-repair.mjs
+  h_201ed4c689ac8b 1-98
+scripts/e2e-transcript-history-loading.mjs
+  h_201ed4c689ac8b 14-15,53,57-118,122-134,142-143,172,177
+scripts/e2e-transcript-minimap-jump.mjs
+  h_201ed4c689ac8b 86
+scripts/e2e-transcript-prose-state.mjs
+  h_201ed4c689ac8b 1-84
+scripts/e2e-transcript-render.mjs
+  h_201ed4c689ac8b 299
+scripts/e2e/browser-background-session.ts
+  h_201ed4c689ac8b 66-87,138-149
+scripts/e2e/composer-model-selection.tsx
+  h_201ed4c689ac8b 107-114,118-120,123,130,132,137,144-146,148-155,157,163-165,172-173
+scripts/e2e/composer-paste.tsx
+  h_201ed4c689ac8b 34-35,40,42,44-45,51,111-112,164,253-301,303-307,309-311,313-323,400-419,629-640,764-765,773-774
+scripts/e2e/composer-thinking-layout.tsx
+  h_201ed4c689ac8b 23,27,134,136,142,144
+scripts/e2e/full-desktop-transcript.mjs
+  h_201ed4c689ac8b 1-108
+scripts/e2e/hosted-search-sidecar.mjs
+  h_201ed4c689ac8b 216-218
+scripts/e2e/queue-refresh-event-order.tsx
+  h_201ed4c689ac8b 1-47
+scripts/e2e/review-history-fixture.mjs
+  h_201ed4c689ac8b 36-37,42-54,58
+scripts/e2e/review-history.tsx
+  h_201ed4c689ac8b 1-3,45-51,119,121-123,128,208-219,238-245,251-258,263,286,374-396
+scripts/e2e/session-reading-position.tsx
+  h_201ed4c689ac8b 171-174,177-184
+scripts/e2e/session-window-cache-race.tsx
+  h_201ed4c689ac8b 1-41
+scripts/e2e/settings-scroll.jsx
+  h_201ed4c689ac8b 83,184,194,219-220,229,273,275-276,283-284,294,306,320,347
+scripts/e2e/storage-settings.jsx
+  h_201ed4c689ac8b 18,29-32,53,74-83
+scripts/e2e/task-dock-tabs.tsx
+  h_201ed4c689ac8b 1-83
+scripts/e2e/thinking-slider-motion.tsx
+  h_201ed4c689ac8b 60,74,118-121
+scripts/e2e/transcript-anchor-repair.tsx
+  h_201ed4c689ac8b 1-198
+scripts/e2e/transcript-history-loading.tsx
+  h_201ed4c689ac8b 10-23,51,68,73-77,79,88-91,107-127,132-138,158-159,172,202,205,209-219,248-299,304,310-311
+scripts/e2e/transcript-history-navigation.tsx
+  h_201ed4c689ac8b 73-78,87,89-92,138-183,195-199,204,215-237,250,252-255,260-263,268-269,280,289,331-341,362,430-432,434-435,439,468,475-522,552,554,558
+scripts/e2e/transcript-long-history.tsx
+  h_201ed4c689ac8b 244-245,249,279-293,297-304,306-307
+scripts/e2e/transcript-minimap-jump.tsx
+  h_201ed4c689ac8b 180-185,236-271,273
+scripts/e2e/transcript-render.tsx
+  h_201ed4c689ac8b 22-23,552-582,684-722,739
+scripts/macos-signing-watchdog.mjs
+  h_201ed4c689ac8b 22-24
+scripts/macos-stapler-retry-shim.sh
+  h_201ed4c689ac8b 2-4,9,11,37
+scripts/manual-transcript-desktop.mjs
+  h_201ed4c689ac8b 1-136
+scripts/notarize-and-staple-macos-release-dmg.sh
+  h_201ed4c689ac8b 25,30-31,128-131
+scripts/pi-patch-hash.test.mjs
+  h_201ed4c689ac8b 14,47
+scripts/verify-macos-release.sh
+  h_201ed4c689ac8b 8,15-24,80-81
+tests/history-loading-scroll-test-cases.md
+  h_201ed4c689ac8b 6-14,27-101,108-130,144-149,171,173,176-177,189-194,207-208,223-225,236,255-256,265-274,279-280
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5686f1cfa3c0e7f07406074ff6212d033a0a228f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
