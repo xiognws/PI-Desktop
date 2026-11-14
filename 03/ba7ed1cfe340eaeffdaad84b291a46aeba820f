@@ -1,0 +1,14 @@
+.gitignore
+  h_201ed4c689ac8b 18-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "03ba7ed1cfe340eaeffdaad84b291a46aeba820f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
