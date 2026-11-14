@@ -1321,6 +1321,12 @@ sklm: {
     inAppProviderToggleDescription: "Pi-Workspace ile birlikte {{port}} bağlantı noktasında başlar ve bu makinedeki WorkBuddy uygulamasının oturumunu kullanır. Yapıştırılacak anahtar yok.",
     inAppProviderPort: "Yerel bağlantı noktası",
     inAppProviderGatewayDown: "Ağ geçidi çalışmıyor, bu yüzden bu sağlayıcı kapalı. {{reason}}",
+    inAppProviders: "Yerleşik sağlayıcılar",
+    inAppProvidersCaption: "Ağ geçidi Pi-Workspace içinde çalışır ve bu makinedeki WorkBuddy oturumunu kullanır.",
+    inAppProviderPortDetail: "Yerel bağlantı noktası {{port}} · {{models}} model",
+    inAppProviderRunning: "Çalışıyor",
+    inAppProviderStopped: "Durdu",
+
     delete: "Sil",
     theme: "Tema",
     mode: "Varsayılan kip",

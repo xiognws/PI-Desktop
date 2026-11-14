@@ -36,11 +36,16 @@ export type CreditsResult =
 export type InAppProviderSurface = {
   id: string;
   label: string;
+  /** The user's switch, not whether the gateway started. */
   enabled: boolean;
   port: number;
   running: boolean;
   /** Provider row the gateway backs; null until it has been registered. */
   providerId: string | null;
+  /** Models the gateway published on its last successful start. */
+  models: number;
+  /** Why a switched-on gateway is not running, when that is what happened. */
+  reason?: string;
   creditsPath?: string;
 };
 

@@ -1299,6 +1299,12 @@ export const ptBR = {
     inAppProviderToggleDescription: "Inicia com o Pi-Workspace na porta {{port}} e usa a sessão do aplicativo WorkBuddy deste computador. Não há chave para colar.",
     inAppProviderPort: "Porta local",
     inAppProviderGatewayDown: "O gateway não está em execução, então este provedor está desativado. {{reason}}",
+    inAppProviders: "Provedores integrados",
+    inAppProvidersCaption: "O gateway roda dentro do Pi-Workspace e usa a sessão do WorkBuddy deste computador.",
+    inAppProviderPortDetail: "Porta local {{port}} · {{models}} modelos",
+    inAppProviderRunning: "Em execução",
+    inAppProviderStopped: "Parado",
+
     delete: "Excluir",
     theme: "Tema",
     mode: "Modo padrão",

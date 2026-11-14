@@ -1312,6 +1312,12 @@ sklm: {
     inAppProviderToggleDescription: "随 Pi-Workspace 启动，监听 {{port}} 端口，使用本机 WorkBuddy 客户端的登录状态，无需填写密钥。",
     inAppProviderPort: "本机端口",
     inAppProviderGatewayDown: "网关未运行，该提供商已停用。{{reason}}",
+    inAppProviders: "内置提供商",
+    inAppProvidersCaption: "网关随 Pi-Workspace 运行，使用本机 WorkBuddy 客户端的登录状态。",
+    inAppProviderPortDetail: "本机端口 {{port}} · {{models}} 个模型",
+    inAppProviderRunning: "运行中",
+    inAppProviderStopped: "已停用",
+
     delete: "删除",
     theme: "主题",
     mode: "默认模式",

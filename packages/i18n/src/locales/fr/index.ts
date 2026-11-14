@@ -1315,6 +1315,12 @@ sklm: {
     "inAppProviderToggleDescription": "Démarre avec Pi-Workspace sur le port {{port}} et utilise la session de l'application WorkBuddy de cette machine. Aucune clé à saisir.",
     "inAppProviderPort": "Port local",
     "inAppProviderGatewayDown": "La passerelle ne tourne pas, ce fournisseur est donc désactivé. {{reason}}",
+    "inAppProviders": "Fournisseurs intégrés",
+    "inAppProvidersCaption": "La passerelle s'exécute dans Pi-Workspace et utilise la session WorkBuddy de cette machine.",
+    "inAppProviderPortDetail": "Port local {{port}} · {{models}} modèles",
+    "inAppProviderRunning": "En cours",
+    "inAppProviderStopped": "Arrêté",
+
     "delete": "Supprimer",
     "theme": "Thème",
     "mode": "Mode par défaut",

@@ -113,15 +113,22 @@ reserved space — when the provider has no `creditsPath`, the account is
 unlimited, or the remaining total is `0`. A failed read renders as an error
 state, never as a number.
 
-### The plugin stays, switched off
+### The plugin is retired
 
-`community.workbuddy-connect` remains in the bundled set as the dashboard and
-as the way back for a machine that still uses it, but it arrives disabled: two
-gateways cannot both bind the loopback port, and a second copy answering
-`/healthz` would look to the supervisor like its own gateway. The default is
-stamped into the bundled manifest (`enabledByDefault: false`) by the sync step,
-and host-core keeps whatever the user already chose, so an existing install that
-enabled and configured the plugin is untouched by an upgrade.
+`community.workbuddy-connect` is listed in
+`scripts/bundled-plugins-excluded.json`, so the marketplace sync neither bundles
+it nor keeps an expanded copy. Shipping both was the first design — the plugin
+arrived switched off — but it does not survive contact with an install that had
+enabled it before this ADR: the plugin's bridge boots first, binds the loopback
+port this supervisor wants, and the provider row is then left pointing at a
+gateway whose loopback key it does not hold (observed as `EADDRINUSE 18765` plus a
+`401` on every model call). One account gets one gateway, and the gateway is the
+app's. A user who still has the plugin installed keeps it until the next launch
+reconciles the registry against the bundled set (ADR 0105 / ADR 0241).
+
+The supervisor is not the only place a busy port can appear, so a start that
+hits `EADDRINUSE` moves to the next free port and rewrites the row there rather
+than failing.
 
 ## Alternatives rejected
 

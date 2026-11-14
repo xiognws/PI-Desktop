@@ -227,6 +227,107 @@ test("a start failure that is not a busy port is not retried", async () => {
   assert.equal(supervisor.status()[0].running, false);
 });
 
+test("status reports the switch, the port and the model count the card renders", async () => {
+  const { supervisor } = harness();
+  await supervisor.start();
+
+  const [status] = supervisor.status();
+  assert.equal(status.enabled, true);
+  assert.equal(status.running, true);
+  assert.equal(status.port, WORKBUDDY.defaultPort);
+  assert.equal(status.models, 2);
+  assert.equal(status.reason, undefined);
+});
+
+test("switching a gateway off persists the setting and stops the listener", async () => {
+  let stopped = 0;
+  const calls = [];
+  const supervisor = new InAppProviders({
+    callHost: async (method, params) => {
+      calls.push({ method, params });
+      if (method === "providers.list") return { providers: [] };
+      if (method === "providers.create") return { provider: { id: "row-1" } };
+      return {};
+    },
+    startGateway: async () => ({ stop: async () => { stopped += 1; } }),
+    readSettings: async () => ({}),
+    readApiKey: async () => API_KEY,
+    fetchImpl: async (url) => {
+      if (String(url).endsWith(WORKBUDDY.healthPath)) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ data: [{ id: "m-1" }] }) };
+    },
+    log: () => {},
+    healthPollMs: 1,
+    healthTimeoutMs: 50,
+  });
+  await supervisor.start();
+  assert.equal(supervisor.status()[0].running, true);
+
+  const after = await supervisor.setEnabled("workbuddy", false);
+
+  assert.equal(stopped, 1, "the gateway process is stopped, not just hidden");
+  assert.equal(after[0].running, false);
+  assert.equal(after[0].enabled, false);
+  assert.equal(after[0].models, 0);
+  const write = calls.find((call) => call.method === "settings.set");
+  assert.deepEqual(write.params.inAppProvider.workbuddy.enabled, false);
+});
+
+test("switching it back on starts the gateway again", async () => {
+  const spawned = [];
+  const supervisor = new InAppProviders({
+    callHost: async (method) => {
+      if (method === "providers.list") return { providers: [] };
+      if (method === "providers.create") return { provider: { id: "row-1" } };
+      return {};
+    },
+    startGateway: async ({ port }) => {
+      spawned.push(port);
+      return { stop: async () => {} };
+    },
+    readSettings: async () => ({}),
+    readApiKey: async () => API_KEY,
+    fetchImpl: async (url) => {
+      if (String(url).endsWith(WORKBUDDY.healthPath)) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ data: [{ id: "m-1" }] }) };
+    },
+    log: () => {},
+    healthPollMs: 1,
+    healthTimeoutMs: 50,
+  });
+
+  await supervisor.setEnabled("workbuddy", true);
+
+  assert.deepEqual(spawned, [WORKBUDDY.defaultPort]);
+  assert.equal(supervisor.status()[0].running, true);
+});
+
+test("a switched-on gateway that failed to start reports why", async () => {
+  const supervisor = new InAppProviders({
+    callHost: async () => ({}),
+    startGateway: async () => {
+      throw new Error("spawn bridge/core.cjs ENOENT");
+    },
+    readSettings: async () => ({}),
+    readApiKey: async () => API_KEY,
+    fetchImpl: async () => ({ ok: true, json: async () => ({}) }),
+    log: () => {},
+    healthPollMs: 1,
+    healthTimeoutMs: 5,
+  });
+
+  await supervisor.start();
+
+  const [status] = supervisor.status();
+  assert.equal(status.enabled, true);
+  assert.equal(status.running, false);
+  assert.match(status.reason, /ENOENT/);
+});
+
 test("settings resolve to enabled on the descriptor port when absent", () => {
   assert.deepEqual(resolveProviderSettings(WORKBUDDY, {}), {
     enabled: true,
@@ -335,12 +436,17 @@ test("visibility hides an absent surface, a free plan, a zero total and a failur
 test("main and renderer agree on the channel names", () => {
   const main = read("../electron/main/providers/ipc.ts");
   const renderer = read("../src/lib/in-app-provider-channels.ts");
-  for (const channel of ["pi-desktop/in-app-providers/list", "pi-desktop/in-app-providers/credits"]) {
+  for (const channel of [
+    "pi-desktop/in-app-providers/list",
+    "pi-desktop/in-app-providers/credits",
+    "pi-desktop/in-app-providers/set-enabled",
+  ]) {
     assert.ok(main.includes(channel), `main is missing ${channel}`);
     assert.ok(renderer.includes(channel), `renderer is missing ${channel}`);
   }
   assert.deepEqual(IN_APP_PROVIDER_CHANNELS, {
     list: "pi-desktop/in-app-providers/list",
     credits: "pi-desktop/in-app-providers/credits",
+    setEnabled: "pi-desktop/in-app-providers/set-enabled",
   });
 });

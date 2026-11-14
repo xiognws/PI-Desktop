@@ -16,6 +16,7 @@ import { createGatewayStarter, readOrCreateApiKey } from "./gateway-process.ts";
 export const IN_APP_PROVIDER_CHANNELS = {
   list: "pi-desktop/in-app-providers/list",
   credits: "pi-desktop/in-app-providers/credits",
+  setEnabled: "pi-desktop/in-app-providers/set-enabled",
 } as const;
 
 export type InAppProviderSupervisorDeps = {
@@ -85,6 +86,17 @@ export function registerInAppProviderIpc({
   registrar.handle(IN_APP_PROVIDER_CHANNELS.list, async () => ({
     providers: supervisor.status(),
   }));
+  // Switching a gateway on or off answers with the new status list, so the card
+  // never has to guess what happened: it re-renders from the same shape.
+  registrar.handle(
+    IN_APP_PROVIDER_CHANNELS.setEnabled,
+    async (input: { providerId?: unknown; enabled?: unknown } | undefined) => ({
+      providers: await supervisor.setEnabled(
+        typeof input?.providerId === "string" ? input.providerId : "",
+        input?.enabled === true,
+      ),
+    }),
+  );
   // A credit read never throws into the renderer: the UI has states for every
   // failure, and an exception would only remove them.
   registrar.handle(

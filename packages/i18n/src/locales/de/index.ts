@@ -1315,6 +1315,12 @@ sklm: {
     "inAppProviderToggleDescription": "Startet mit Pi-Workspace auf Port {{port}} und nutzt die Anmeldung der WorkBuddy-App auf diesem Rechner. Kein Schlüssel nötig.",
     "inAppProviderPort": "Lokaler Port",
     "inAppProviderGatewayDown": "Das Gateway läuft nicht, dieser Anbieter ist deshalb aus. {{reason}}",
+    "inAppProviders": "Integrierte Anbieter",
+    "inAppProvidersCaption": "Das Gateway läuft in Pi-Workspace und nutzt die Anmeldung der WorkBuddy-App auf diesem Rechner.",
+    "inAppProviderPortDetail": "Lokaler Port {{port}} · {{models}} Modelle",
+    "inAppProviderRunning": "Läuft",
+    "inAppProviderStopped": "Gestoppt",
+
     "delete": "Löschen",
     "theme": "Design",
     "mode": "Standardmodus",

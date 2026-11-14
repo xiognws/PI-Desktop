@@ -64,11 +64,16 @@ export type InAppProvidersDeps = {
 export type InAppProviderStatus = {
   id: string;
   label: string;
+  /** The user's switch (`inAppProvider.<id>.enabled`), not whether it started. */
   enabled: boolean;
   port: number;
   running: boolean;
   /** Provider row this gateway backs, once it has been registered. */
   providerId: string | null;
+  /** Models the gateway published on the last successful start. */
+  models: number;
+  /** Why the gateway is not running, when it should be. Settings shows it. */
+  reason?: string;
   creditsPath?: string;
 };
 
@@ -125,6 +130,9 @@ export class InAppProviders {
   private readonly handles = new Map<string, GatewayHandle>();
   private readonly ports = new Map<string, number>();
   private readonly rowIds = new Map<string, string>();
+  private readonly enabledById = new Map<string, boolean>();
+  private readonly modelCounts = new Map<string, number>();
+  private readonly failureReasons = new Map<string, string>();
   private readonly credits: CreditsCache;
 
   constructor(deps: InAppProvidersDeps) {
@@ -149,6 +157,7 @@ export class InAppProviders {
       try {
         await this.startOne(provider);
       } catch (error) {
+        this.failureReasons.set(provider.id, describeError(error));
         this.log("warn", `[in-app] ${provider.id}: gateway start failed`, {
           error: describeError(error),
         });
@@ -170,15 +179,65 @@ export class InAppProviders {
   }
 
   status(): InAppProviderStatus[] {
-    return this.providers.map((provider) => ({
-      id: provider.id,
-      label: provider.label,
-      enabled: this.handles.has(provider.id),
-      port: this.ports.get(provider.id) ?? provider.defaultPort,
-      running: this.handles.has(provider.id),
-      providerId: this.rowIds.get(provider.id) ?? null,
-      ...(provider.creditsPath ? { creditsPath: provider.creditsPath } : {}),
-    }));
+    return this.providers.map((provider) => {
+      const running = this.handles.has(provider.id);
+      const reason = this.failureReasons.get(provider.id);
+      return {
+        id: provider.id,
+        label: provider.label,
+        enabled: this.enabledById.get(provider.id) ?? true,
+        port: this.ports.get(provider.id) ?? provider.defaultPort,
+        running,
+        providerId: this.rowIds.get(provider.id) ?? null,
+        models: this.modelCounts.get(provider.id) ?? 0,
+        ...(reason && !running ? { reason } : {}),
+        ...(provider.creditsPath ? { creditsPath: provider.creditsPath } : {}),
+      };
+    });
+  }
+
+  /**
+   * Turn one gateway on or off from settings.
+   *
+   * The switch is the persisted setting, not the running process: it survives a
+   * restart, and it is the only thing that keeps a gateway off when the app
+   * starts again. A failed start is reported through {@link status} rather than
+   * thrown, because the card that asked for it has to keep rendering.
+   */
+  async setEnabled(providerId: string, enabled: boolean): Promise<InAppProviderStatus[]> {
+    const provider = this.providers.find((candidate) => candidate.id === providerId);
+    if (!provider) throw new Error(`unknown in-app provider: ${providerId}`);
+    const settings = await this.readSettings();
+    const existingRoot = settings[IN_APP_PROVIDER_SETTINGS_KEY];
+    const root: Record<string, unknown> =
+      existingRoot && typeof existingRoot === "object" && !Array.isArray(existingRoot)
+        ? { ...(existingRoot as Record<string, unknown>) }
+        : {};
+    const existingScope = root[providerId];
+    root[providerId] = {
+      ...(existingScope && typeof existingScope === "object" && !Array.isArray(existingScope)
+        ? (existingScope as Record<string, unknown>)
+        : {}),
+      enabled,
+    };
+    await this.callHost("settings.set", { [IN_APP_PROVIDER_SETTINGS_KEY]: root });
+    await this.forget(providerId);
+    this.failureReasons.delete(providerId);
+    this.enabledById.set(providerId, enabled);
+    if (!enabled) {
+      this.modelCounts.delete(providerId);
+      this.log("info", `[in-app] ${provider.id}: switched off in settings`);
+      return this.status();
+    }
+    try {
+      await this.startOne(provider);
+    } catch (error) {
+      this.failureReasons.set(providerId, describeError(error));
+      this.log("warn", `[in-app] ${provider.id}: gateway start failed`, {
+        error: describeError(error),
+      });
+    }
+    return this.status();
   }
 
   /** Remaining credit for the provider the renderer is showing. */
@@ -226,6 +285,7 @@ export class InAppProviders {
 
   private async startOne(provider: InAppProvider): Promise<void> {
     const settings = resolveProviderSettings(provider, await this.readSettings());
+    this.enabledById.set(provider.id, settings.enabled);
     if (!settings.enabled) {
       this.log("info", `[in-app] ${provider.id}: disabled in settings`);
       return;
@@ -236,6 +296,7 @@ export class InAppProviders {
     this.handles.set(provider.id, handle);
     this.ports.set(provider.id, port);
     if (!(await this.waitForHealth(provider, port))) {
+      this.failureReasons.set(provider.id, `no healthy gateway on port ${port}`);
       this.log("warn", `[in-app] ${provider.id}: gateway did not become healthy`, {
         port,
       });
@@ -244,11 +305,14 @@ export class InAppProviders {
     }
     const models = await this.fetchModels(provider, port, apiKey);
     if (models.length === 0) {
+      this.failureReasons.set(provider.id, "the gateway published no models");
       this.log("warn", `[in-app] ${provider.id}: gateway published no models`);
       return;
     }
     const rowId = await this.upsertProviderRow(provider, port, models, apiKey);
     this.rowIds.set(provider.id, rowId);
+    this.modelCounts.set(provider.id, models.length);
+    this.failureReasons.delete(provider.id);
     this.log("info", `[in-app] ${provider.id}: ready`, {
       port,
       providerId: rowId,

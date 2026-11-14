@@ -1321,6 +1321,12 @@ sklm: {
     inAppProviderToggleDescription: "Pi-Workspace와 함께 {{port}} 포트에서 시작하며 이 컴퓨터의 WorkBuddy 앱 로그인을 사용합니다. 입력할 키가 없습니다.",
     inAppProviderPort: "로컬 포트",
     inAppProviderGatewayDown: "게이트웨이가 실행 중이 아니어서 이 공급자가 꺼져 있습니다. {{reason}}",
+    inAppProviders: "내장 공급자",
+    inAppProvidersCaption: "게이트웨이가 Pi-Workspace 안에서 실행되며 이 컴퓨터의 WorkBuddy 로그인을 사용합니다.",
+    inAppProviderPortDetail: "로컬 포트 {{port}} · 모델 {{models}}개",
+    inAppProviderRunning: "실행 중",
+    inAppProviderStopped: "중지됨",
+
     delete: "삭제",
     theme: "테마",
     mode: "기본 모드",

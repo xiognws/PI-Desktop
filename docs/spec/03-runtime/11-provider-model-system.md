@@ -589,9 +589,11 @@ endpoint the application owns.
    `GET /healthz` until it answers. Only an answering probe makes the provider
    `ready`; the row is registered either way.
 3. Disabled: no gateway process, and the row is reported disabled.
-4. A port another process already holds makes the bind fail. That is a
-   reported state — the row stays disabled and carries the reason — not a crash
-   and not a silent fallback to another port.
+4. A port another process already holds is not a failure: the supervisor binds
+   the next free port and rewrites the row there, because a gateway that cannot
+   start leaves the row pointing at a listener whose loopback key it does not
+   hold. Any other start failure is reported as a state — the row stays disabled
+   and carries the reason — not as a crash.
 5. Stop happens during shutdown, before host RPC closes, so no gateway outlives
    the application.
 
@@ -674,14 +676,32 @@ upstream refuses for credit reports the insufficient-credit error on that turn.
 | `inAppProvider.workbuddy.enabled` | `true` | start the gateway and keep the provider row |
 | `inAppProvider.workbuddy.port` | `18765` | loopback port the gateway prefers; a port another process already owns (the bundled plugin's own bridge, typically) moves the gateway to the next free one and the row is rewritten to that port |
 
-### 8b.8 The bundled plugin is default-disabled
+### 8b.8 The settings card is the only visible half
 
-`community.workbuddy-connect` stays in the bundled plugin set, but arrives
-switched off: two gateways cannot both bind the loopback port, and a second copy
-answering `/healthz` would look to the supervisor like its own gateway. The
-default is a manifest field (`enabledByDefault: false`) stamped by the bundling
-step, and host-core keeps the state a user already chose — an existing install
-that enabled and configured the plugin is not switched off by an upgrade.
+The provider row an in-app gateway creates is an ordinary `openai_compatible`
+row, which is why the Models settings page carries a card of its own above the
+service list: the row cannot show whether the gateway is running, where it
+listens, how many models it published, or why a switched-on gateway is down.
+
+One row per descriptor: the provider's label, a running/stopped badge, the
+listening port with the published model count, the reason when a switched-on
+gateway failed, and the switch. The switch writes
+`inAppProvider.<id>.enabled` through `settings.set` and then stops or starts the
+gateway in place, answering with the new status list — so the card never has to
+guess what happened, and turning it off keeps it off on the next launch. The
+card renders nothing when the registry is empty, which is what an older runtime
+without in-app providers reports.
+
+### 8b.9 The plugin is retired from the bundle
+
+`community.workbuddy-connect` is retired into the app: it is listed in
+`scripts/bundled-plugins-excluded.json`, so the bundling step neither ships it nor
+keeps an expanded copy. Two gateways for one account is the failure this avoids —
+the plugin's bridge binds the loopback port first and the app's provider row is
+then left pointing at a gateway whose loopback key it does not hold. A machine
+that already installed the plugin keeps it until the next launch reconciles the
+registry against the bundled set (ADR 0105 / ADR 0241); the in-app gateway does
+not depend on it, and a start that hits `EADDRINUSE` moves to the next free port.
 
 ## 9. Model catalog service
 

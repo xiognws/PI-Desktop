@@ -11,6 +11,7 @@
   "//native-helper-terminals": "Retired 2026-11-06: both terminals launch an unsigned helper binary (fancy-pty-helper.exe / pi-conpty-helper.exe) from the app's own resource directory. On a host with behaviour-based endpoint protection, an unsigned app spawning unknown executables it shipped itself is indistinguishable from a dropper and gets the whole app flagged. local.terminal covers the same feature in pure JavaScript.",
   "//development-harness-only": "Retired 2026-11-06: development fixtures. One is an offline-harness manifest, the other an API probe; neither is a user-facing feature.",
   "//duplicate-usage-views": "Retired 2026-11-06: io.github.new-beginner.session-usage is the tracked pick and covers the same accounting; shipping three more usage panels only adds host processes.",
+  "//community.workbuddy-connect": "Retired 2026-11-14: WorkBuddy is a built-in provider now (ADR 0397). The app starts the very same bridge out of apps/desktop/resources/in-app-providers and registers the provider row itself, so the plugin is a second gateway for one account - it cannot bind the loopback port the app owns, and a user who still has it enabled gets a provider row pointing at a key that is not theirs. The plugin's dashboard and its credential directory (~/.pi-workbuddy-connect) stay in use by the in-app gateway.",
   "//duplicate-browser": "Retired 2026-11-06: pi.browser is the tracked browser plugin; a second browser plugin doubles the CDP surface for no extra capability.",
   "//market-translator": "Retired 2026-11-06: the marketplace feed is not reachable from this deployment, so a catalog translator has nothing to translate.",
   "excluded": [
@@ -43,6 +44,7 @@
     "io.github.techd81.pi-desktop-usage",
     "io.github.muzimu217.usage-dashboard",
     "io.github.ldzhouquan.fast-browser",
-    "io.github.wenziji-hub.market-translator"
+    "io.github.wenziji-hub.market-translator",
+    "community.workbuddy-connect"
   ]
 }

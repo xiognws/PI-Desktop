@@ -1315,6 +1315,12 @@ sklm: {
     "inAppProviderToggleDescription": "Se inicia con Pi-Workspace en el puerto {{port}} y usa la sesión de la app WorkBuddy de este equipo. No hay clave que pegar.",
     "inAppProviderPort": "Puerto local",
     "inAppProviderGatewayDown": "La puerta de enlace no está en marcha, así que este proveedor está desactivado. {{reason}}",
+    "inAppProviders": "Proveedores integrados",
+    "inAppProvidersCaption": "La puerta de enlace se ejecuta dentro de Pi-Workspace y usa la sesión de WorkBuddy de este equipo.",
+    "inAppProviderPortDetail": "Puerto local {{port}} · {{models}} modelos",
+    "inAppProviderRunning": "En ejecución",
+    "inAppProviderStopped": "Detenido",
+
     "delete": "Eliminar",
     "theme": "Tema",
     "mode": "Modo predeterminado",

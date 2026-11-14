@@ -8,4 +8,5 @@
 export const IN_APP_PROVIDER_CHANNELS = {
   list: "pi-desktop/in-app-providers/list",
   credits: "pi-desktop/in-app-providers/credits",
+  setEnabled: "pi-desktop/in-app-providers/set-enabled",
 } as const;

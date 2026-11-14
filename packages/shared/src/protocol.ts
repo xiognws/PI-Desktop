@@ -314,6 +314,7 @@ export const IPC = {
      */
     inAppProvidersList: "pi-desktop/in-app-providers/list",
     inAppProvidersCredits: "pi-desktop/in-app-providers/credits",
+    inAppProvidersSetEnabled: "pi-desktop/in-app-providers/set-enabled",
     /**
      * Check a TypeSafe key before the Jev settings row keeps it.
      *

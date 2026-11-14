@@ -29,20 +29,23 @@ const repo = new URL("../../../", import.meta.url);
 const read = (relative) => readFileSync(new URL(relative, repo), "utf8");
 const WORKBUDDY = "community.workbuddy-connect";
 
-test("the bundled WorkBuddy bridge ships but starts switched off", () => {
-  const ids = readDefaultDisabledIds(fileURLToPath(repo));
-  assert.ok(ids.includes(WORKBUDDY), `${WORKBUDDY} must be declared default-disabled`);
-
-  // Bundled, not retired: the declaration that decides what may never ship must
-  // not name it, because the dashboard and the existing installs still need it.
+test("the WorkBuddy bridge is retired from the bundle, not merely switched off", () => {
+  // The app runs this bridge itself: shipping the plugin too would put a second
+  // gateway on one account, and its row would point at a key that is not ours.
   const excluded = JSON.parse(read("scripts/bundled-plugins-excluded.json"));
-  assert.ok(!excluded.excluded.includes(WORKBUDDY), `${WORKBUDDY} must stay bundled`);
+  assert.ok(
+    excluded.excluded.includes(WORKBUDDY),
+    `${WORKBUDDY} must be declared retired so the marketplace sync cannot bundle it`,
+  );
 
-  // The reason travels with the id, the way the exclusion file carries its own.
-  const document = JSON.parse(read(DEFAULT_DISABLED_FILE));
-  const reason = document[`//${WORKBUDDY}`];
+  // The reason travels with the id, the way the default-disabled file carries its own.
+  const reason = excluded[`//${WORKBUDDY}`];
   assert.equal(typeof reason, "string");
-  assert.match(reason, /gateway/i);
+  assert.match(reason, /in-app|built-in provider/i);
+
+  // And it is no longer a bundled-but-off plugin: that list now names nothing.
+  const ids = readDefaultDisabledIds(fileURLToPath(repo));
+  assert.ok(!ids.includes(WORKBUDDY), `${WORKBUDDY} is retired, not a bundled default`);
 });
 
 test("the declaration is stamped onto the expanded manifest, not the package", () => {

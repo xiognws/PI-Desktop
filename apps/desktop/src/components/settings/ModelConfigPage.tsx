@@ -34,6 +34,7 @@ import { copyProviderConfiguration, type ProviderCopyDraft } from "./provider-co
 import { ImageGenerationModelRow } from "./ImageGenerationModelRow";
 import { OAuthLoginDialog } from "./OAuthLoginDialog";
 import { ProviderSetupDialog } from "./ProviderSetupDialog";
+import { InAppProviderCard } from "./InAppProviderCard";
 import { ServiceList } from "./ServiceList";
 import { serviceRowKind } from "./service-row-status";
 import { useVendorAccounts } from "./useVendorAccounts";
@@ -415,6 +416,7 @@ export function ModelConfigPage() {
 
   return (
     <div className="settings-stack model-config-page">
+      <InAppProviderCard />
       <section className="settings-card-block">
         <div className="model-config-section-head">
           <div className="settings-card-heading-line">

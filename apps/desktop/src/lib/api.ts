@@ -846,6 +846,11 @@ export const api = {
       IN_APP_PROVIDER_CHANNELS.credits,
       input,
     ),
+  setInAppProviderEnabled: (input: { providerId: string; enabled: boolean }) =>
+    invoke<{ providers: import("./in-app-credits").InAppProviderSurface[] }>(
+      IN_APP_PROVIDER_CHANNELS.setEnabled,
+      input,
+    ),
   updatesGetState: () => invoke<UpdateState>(IPC.invoke.updatesGetState),
   updatesCheck: () => invoke<UpdateState>(IPC.invoke.updatesCheck),
   updatesDownload: () => invoke<UpdateState>(IPC.invoke.updatesDownload),

@@ -1,5 +1,5 @@
 {
   "//": "Bundled plugins this build ships but must not start by themselves. Ids listed here are stamped with \"enabledByDefault\": false in the manifest scripts/sync-bundled-plugins.mjs expands into apps/desktop/resources/plugins. Host-core creates the row from that flag on first boot and, on every later launch, keeps whatever the user chose (crates/host-core/src/plugins/registry.rs), so this file decides only the state of a machine that has never seen the plugin.",
-  "//community.workbuddy-connect": "WorkBuddy is a built-in provider now: the gateway runs inside Pi-Workspace (ADR 0396) and the app registers the provider row itself. This plugin remains bundled as the bridge's dashboard and as the way back for a machine that still uses the plugin, but it must not start on its own - two gateways cannot both bind the loopback port, and a silent second copy would answer /healthz on a port the in-app supervisor believes it owns. A user who turned it on keeps it on.",
-  "defaultDisabled": ["community.workbuddy-connect"]
+  "//community.workbuddy-connect": "Retired into the app (ADR 0397): the in-app provider gateway runs this bridge, and the plugin itself is now listed in bundled-plugins-excluded.json so it cannot ship. An entry here would only matter for a machine that still has the plugin installed, which the exclusion takes care of.",
+  "defaultDisabled": []
 }

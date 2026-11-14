@@ -1325,6 +1325,12 @@ sklm: {
     inAppProviderToggleDescription: "Starts with Pi-Workspace on port {{port}} and uses the sign-in of the WorkBuddy app on this machine. There is no key to paste.",
     inAppProviderPort: "Local port",
     inAppProviderGatewayDown: "The gateway isn't running, so this provider is off. {{reason}}",
+    inAppProviders: "Built-in providers",
+    inAppProvidersCaption: "The gateway runs inside Pi-Workspace and uses this machine's WorkBuddy sign-in.",
+    inAppProviderPortDetail: "Local port {{port}} · {{models}} models",
+    inAppProviderRunning: "Running",
+    inAppProviderStopped: "Stopped",
+
     delete: "Delete",
     theme: "Theme",
     mode: "Default mode",
