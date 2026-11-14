@@ -1,0 +1,18 @@
+apps/desktop/electron/main/agent-extensions.ts
+  h_201ed4c689ac8b 16,152-154,156
+apps/desktop/electron/main/extension-toast-policy.ts
+  h_201ed4c689ac8b 1-47
+apps/desktop/test/agent-extensions.test.mjs
+  h_201ed4c689ac8b 238-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "694aee0e0f95c0b288b0a17caadd517e0e8ef0ed",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
