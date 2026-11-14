@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { BarChart3, Download, TrendingUp, RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import MarkdownBlock from '../components/MarkdownBlock.vue'
 
 const route = useRoute()
@@ -88,106 +90,104 @@ onMounted(loadRuns)
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-auto bg-surface">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[1100px] px-8 py-7">
+      <header class="flex items-start justify-between gap-4">
         <div>
-          <h2 class="text-lg font-medium text-fg">测试报告</h2>
-          <p class="text-sm text-muted mt-1">共 {{ runs.length }} 条运行，点开取该次运行的 Markdown 报告</p>
+          <h1 class="text-[20px] font-medium text-fg">测试报告</h1>
+          <p class="mt-1 text-[13px] text-muted">一次运行一份报告，点开看 Markdown 正文，可下载留档。</p>
         </div>
-        <div class="flex gap-2">
-          <button
-            @click="loadRuns"
-            :disabled="loading"
-            class="flex items-center gap-2 px-4 py-2 border border-line rounded-lg text-sm hover:bg-surface-2 disabled:opacity-60"
-          >
-            <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
-            刷新
-          </button>
+        <button
+          class="flex h-9 items-center gap-2 rounded-[8px] border border-line bg-surface px-3 text-[13px] text-fg hover:bg-surface-3 disabled:opacity-40"
+          :disabled="loading"
+          @click="loadRuns"
+        >
+          <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" /> 刷新
+        </button>
+      </header>
+
+      <div class="mt-5 grid grid-cols-2 divide-line rounded-[12px] border border-line bg-surface md:grid-cols-4 md:divide-x">
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">运行总数</p>
+          <p class="num mt-1 text-[24px] leading-7 text-fg">{{ stats.total }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">已完成</p>
+          <p class="num mt-1 text-[24px] leading-7 text-success">{{ stats.done }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">失败</p>
+          <p class="num mt-1 text-[24px] leading-7" :class="stats.failed ? 'text-danger' : 'text-fg'">{{ stats.failed }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">待审批</p>
+          <p class="num mt-1 text-[24px] leading-7" :class="stats.waiting ? 'text-warn' : 'text-fg'">{{ stats.waiting }}</p>
         </div>
       </div>
 
-      <!-- 统计卡片 -->
-      <div class="grid grid-cols-4 gap-4 mb-6">
-        <div class="bg-surface-2 rounded-lg border border-line p-4">
-          <div class="text-sm text-muted mb-1">运行总数</div>
-          <div class="text-2xl font-semibold text-fg">{{ stats.total }}</div>
+      <div class="mt-5 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div class="hidden grid-cols-[1fr_140px_120px_1fr_auto] gap-4 border-b border-line px-5 py-2 text-[12px] text-muted-2 md:grid">
+          <span>运行</span>
+          <span>模块</span>
+          <span>状态</span>
+          <span>阶段</span>
+          <span class="text-right">操作</span>
         </div>
-        <div class="bg-surface-2 rounded-lg border border-line p-4">
-          <div class="text-sm text-muted mb-1">已完成</div>
-          <div class="text-2xl font-semibold text-success">{{ stats.done }}</div>
+
+        <div
+          v-for="run in runs"
+          :key="run.id"
+          class="grid grid-cols-1 items-center gap-4 border-b border-line-soft px-5 py-3 last:border-b-0 hover:bg-surface-2 md:grid-cols-[1fr_140px_120px_1fr_auto]"
+        >
+          <div class="min-w-0">
+            <p class="mono truncate text-[13px] text-fg">{{ run.id }}</p>
+            <p class="num text-[12px] text-muted-2">{{ shortTime(run.created_at) }}</p>
+          </div>
+          <span class="truncate text-[12px] text-muted">{{ run.module || '未标模块' }}</span>
+          <Badge :tone="run.status === 'done' ? 'success' : run.status === 'failed' ? 'danger' : run.status === 'waiting_human' ? 'warn' : 'accent'">
+            {{ STATUS_LABELS[run.status] || run.status }}
+          </Badge>
+          <span class="truncate text-[12px] text-muted-2">{{ run.stage || '—' }}</span>
+          <button class="text-right text-[12px] text-muted hover:text-fg" @click="openReport(run)">查看报告</button>
         </div>
-        <div class="bg-surface-2 rounded-lg border border-line p-4">
-          <div class="text-sm text-muted mb-1">失败</div>
-          <div class="text-2xl font-semibold text-danger">{{ stats.failed }}</div>
-        </div>
-        <div class="bg-surface-2 rounded-lg border border-line p-4">
-          <div class="text-sm text-muted mb-1">待审批</div>
-          <div class="text-2xl font-semibold text-warn">{{ stats.waiting }}</div>
-        </div>
+
+        <EmptyState
+          v-if="!runs.length"
+          class="m-5"
+          title="还没有可出报告的运行"
+          hint="到「运行记录」跑一次流水线，或在那边点「生成报告」"
+        />
       </div>
 
-      <!-- 报告列表 -->
-      <div class="space-y-3">
-        <div v-for="run in runs" :key="run.id" class="bg-surface-2 rounded-lg border border-line p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <BarChart3 class="w-5 h-5 text-accent" />
-              <span class="font-medium text-fg font-mono">{{ run.id }}</span>
-              <span class="text-xs px-2 py-0.5 rounded bg-surface border border-line text-fg-3">{{ run.module || '未标模块' }}</span>
-            </div>
-            <span class="text-xs text-muted-2">{{ shortTime(run.created_at) }}</span>
-          </div>
-
-          <div class="flex items-center gap-6 text-sm text-fg-3 mb-3">
-            <span>阶段 {{ run.stage || '—' }}</span>
-            <span :class="run.status === 'done' ? 'text-success' : run.status === 'failed' ? 'text-danger' : 'text-muted'">
-              {{ STATUS_LABELS[run.status] || run.status }}
-            </span>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <TrendingUp class="w-4 h-4 text-success" />
-            <button class="text-sm text-accent hover:underline" @click="openReport(run)">查看报告</button>
-          </div>
-        </div>
-
-        <div v-if="!runs.length" class="text-center py-12 text-muted-2 text-sm">
-          暂无运行记录，先去「运行记录」跑一条
-        </div>
-      </div>
-
-      <div v-if="message" class="mt-4 text-xs text-muted">{{ message }}</div>
+      <p v-if="message" class="mt-3 text-[12px] text-muted">{{ message }}</p>
     </div>
 
     <!-- 报告弹层 -->
-    <div v-if="opened" class="fixed inset-0 bg-black/30 flex items-center justify-center z-40" @click.self="opened = null">
-      <div class="w-[760px] max-h-[80vh] bg-surface rounded-lg shadow-lg flex flex-col">
-        <div class="h-11 px-4 flex items-center justify-between border-b border-line-soft">
-          <span class="text-sm font-medium text-fg">{{ opened.name }}</span>
+    <div v-if="opened" class="fixed inset-0 z-40 flex items-center justify-center bg-black/30" @click.self="opened = null">
+      <div class="flex max-h-[82vh] w-[820px] flex-col overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div class="flex h-11 items-center justify-between border-b border-line px-4">
+          <span class="mono text-[13px] text-fg">{{ opened.name }}</span>
           <div class="flex items-center gap-3">
-            <button class="text-xs text-accent hover:underline" @click="download">
-              <Download class="w-3.5 h-3.5 inline" /> 下载 .md
-            </button>
-            <button class="text-muted-2 hover:text-fg" @click="opened = null">关闭</button>
+            <button class="text-[12px] text-muted hover:text-fg" @click="download">下载 .md</button>
+            <button class="text-[12px] text-muted hover:text-fg" @click="opened = null">关闭</button>
           </div>
         </div>
-        <div class="h-9 px-4 flex items-center gap-2 border-b border-line-soft bg-surface-2">
+        <div class="flex h-9 items-center gap-1 border-b border-line px-4">
           <button
-            class="text-xs px-2 py-0.5 rounded"
-            :class="reportView === 'rendered' ? 'bg-surface text-fg shadow-sm' : 'text-muted'"
+            class="h-7 rounded-[6px] px-2 text-[12px]"
+            :class="reportView === 'rendered' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="reportView = 'rendered'"
           >阅读</button>
           <button
-            class="text-xs px-2 py-0.5 rounded"
-            :class="reportView === 'raw' ? 'bg-surface text-fg shadow-sm' : 'text-muted'"
+            class="h-7 rounded-[6px] px-2 text-[12px]"
+            :class="reportView === 'raw' ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
             @click="reportView = 'raw'"
           >原文</button>
-          <span class="ml-auto text-xs text-muted-2">Markdown</span>
+          <span class="ml-auto text-[12px] text-muted-2">Markdown</span>
         </div>
-        <div class="flex-1 overflow-auto p-4">
+        <div class="flex-1 overflow-auto px-4 py-3">
           <MarkdownBlock v-if="reportView === 'rendered'" :source="opened.markdown" />
-          <pre v-else class="text-xs leading-relaxed whitespace-pre-wrap text-fg">{{ opened.markdown }}</pre>
+          <pre v-else class="text-[12px] leading-relaxed whitespace-pre-wrap text-fg">{{ opened.markdown }}</pre>
         </div>
       </div>
     </div>

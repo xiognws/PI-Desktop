@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { CheckCircle, RefreshCw, XCircle } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -32,10 +34,9 @@ function optionLabel(option: string) {
   return option
 }
 
-function optionClass(option: string) {
-  return option === 'reject'
-    ? 'border-line-strong text-fg-2 hover:border-red-400 hover:text-danger'
-    : 'bg-accent-solid border-blue-600 text-white hover:bg-blue-700'
+function optionClass(option: string): string {
+  if (option === 'reject') return 'border border-line text-fg hover:border-danger hover:text-danger'
+  return 'bg-accent-solid text-white hover:bg-accent'
 }
 
 async function load(quiet = false) {
@@ -89,74 +90,76 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden">
-    <div class="bg-surface border-b border-line px-6 py-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base font-medium text-fg">待审批</h2>
-          <span class="text-sm text-muted-2">
-            {{ count ? `${count} 条等你确认` : '没有待办' }}
-          </span>
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[900px] px-8 py-7">
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-[20px] font-medium text-fg">待审批</h1>
+          <p class="mt-1 text-[13px] text-muted">
+            Agent 跑到需要人拍板的步骤会停在这里。不确认，流水线不会往下走。
+          </p>
         </div>
-        <div class="flex items-center gap-3">
-          <span v-if="message" class="text-xs text-muted">{{ message }}</span>
-          <button class="p-1.5 text-muted hover:text-fg" :disabled="loading" @click="load()">
-            <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
-          </button>
-        </div>
+        <button
+          class="flex h-9 items-center gap-2 rounded-[8px] border border-line bg-surface px-3 text-[13px] text-fg hover:bg-surface-3 disabled:opacity-40"
+          :disabled="loading"
+          @click="load()"
+        >
+          <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" /> 刷新
+        </button>
+      </header>
+
+      <div class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[12px] border border-line bg-surface px-5 py-3">
+        <span class="num text-[13px]" :class="count ? 'text-warn' : 'text-fg'">
+          {{ count }}<span class="text-muted"> 条等确认</span>
+        </span>
+        <span v-if="message" class="text-[12px] text-muted">{{ message }}</span>
       </div>
-    </div>
 
-    <p v-if="error" class="px-6 py-2 text-xs text-danger bg-danger-soft border-b border-danger-line">{{ error }}</p>
+      <p v-if="error" class="mt-3 rounded-[8px] border border-danger-line bg-danger-soft px-4 py-2 text-[13px] text-danger">
+        {{ error }}
+      </p>
 
-    <div class="flex-1 overflow-auto bg-surface">
-      <div class="p-6 space-y-4 max-w-4xl">
-        <div
+      <div v-if="decisions.length" class="mt-5 space-y-4">
+        <article
           v-for="item in decisions"
           :key="item.id"
-          class="border border-warn-line bg-warn-soft/50 rounded-lg p-5"
+          class="rounded-[12px] border border-warn-line bg-surface px-5 py-4"
         >
-          <div class="flex items-center gap-2 text-xs text-warn mb-2">
-            <span class="font-medium">人工卡点 · {{ item.stage || '未标阶段' }}</span>
-            <span class="font-mono text-muted">{{ item.run_id }}</span>
-            <span v-if="item.module" class="px-2 py-0.5 rounded bg-surface border border-warn-line text-fg-3">
-              {{ item.module }}
-            </span>
-            <span class="ml-auto text-muted-2">{{ item.created_at || '' }}</span>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span class="h-3 w-[3px] bg-warn"></span>
+            <span class="text-[13px] text-fg">人工卡点 · {{ item.stage || '未标阶段' }}</span>
+            <span class="mono text-[12px] text-muted-2">{{ item.run_id }}</span>
+            <Badge v-if="item.module" tone="neutral">{{ item.module }}</Badge>
+            <span class="num ml-auto text-[12px] text-muted-2">{{ item.created_at || '' }}</span>
           </div>
 
-          <div class="text-sm text-fg whitespace-pre-wrap mb-3">
+          <p class="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-fg">
             {{ item.prompt || '是否继续？' }}
-          </div>
+          </p>
 
-          <div class="flex items-center gap-2">
+          <div class="mt-4 flex flex-wrap items-center gap-2">
             <button
               v-for="option in (item.options && item.options.length ? item.options : ['approve', 'reject'])"
               :key="option"
-              class="px-4 py-1.5 text-sm rounded-lg border disabled:opacity-50 flex items-center gap-1"
+              class="h-8 rounded-[8px] px-3 text-[13px] disabled:opacity-40"
               :class="optionClass(option)"
               :disabled="busyId === item.id"
               @click="decide(item, option)"
-            >
-              <component
-                :is="option === 'reject' ? XCircle : CheckCircle"
-                class="w-4 h-4"
-              />
-              {{ optionLabel(option) }}
-            </button>
+            >{{ optionLabel(option) }}</button>
             <router-link
               :to="`/project/${projectId}/runs?run=${item.run_id}`"
-              class="ml-auto text-xs text-muted hover:text-accent"
-            >
-              查看这个 run 的步骤 →
-            </router-link>
+              class="ml-auto text-[12px] text-muted hover:text-fg"
+            >查这个 run 的步骤 →</router-link>
           </div>
-        </div>
-
-        <div v-if="!decisions.length" class="text-center py-16 text-sm text-muted-2">
-          没有待审批的卡点。等 Agent 跑到需要人确认的步骤时，这里会出现一条。
-        </div>
+        </article>
       </div>
+
+      <EmptyState
+        v-else
+        class="mt-5"
+        title="没有待审批的卡点"
+        hint="Agent 跑到需要人确认的步骤时，这里会出现一条"
+      />
     </div>
   </div>
 </template>

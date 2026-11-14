@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bug, Filter, RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,17 +39,6 @@ const STATUS_LABELS: Record<string, string> = {
   verified: '已验证',
   wontfix: '忽略',
 }
-const STATUS_CLASS: Record<string, string> = {
-  open: 'bg-danger-soft text-danger',
-  fixed: 'bg-warn-soft text-warn',
-  verified: 'bg-success-soft text-success',
-  wontfix: 'bg-surface-3 text-fg-3',
-}
-const SEVERITY_CLASS: Record<string, string> = {
-  blocker: 'bg-danger-soft text-danger',
-  major: 'bg-warn-soft text-warn',
-  minor: 'bg-surface-3 text-fg-3',
-}
 const SEVERITY_LABEL: Record<string, string> = {
   blocker: '阻塞',
   major: '严重',
@@ -59,7 +50,6 @@ const filter = ref('')
 const expanded = ref<string>('')
 const loading = ref(false)
 const message = ref('')
-const showFilter = ref(true)
 
 function shortTime(value?: string) {
   return value ? value.replace('T', ' ').slice(5, 16) : ''
@@ -68,11 +58,16 @@ function reproText(repro?: string) {
   if (!repro) return ''
   return /^\d+$/.test(repro.trim()) ? `执行 #${repro}` : repro
 }
-function statusClass(status: string) {
-  return STATUS_CLASS[status] || 'bg-surface-3 text-fg-3'
+function statusTone(status: string): 'danger' | 'warn' | 'success' | 'neutral' {
+  if (status === 'open') return 'danger'
+  if (status === 'fixed') return 'warn'
+  if (status === 'verified') return 'success'
+  return 'neutral'
 }
-function severityClass(severity?: string) {
-  return SEVERITY_CLASS[severity || ''] || 'bg-surface-3 text-fg-3'
+function severityTone(severity?: string): 'danger' | 'warn' | 'neutral' {
+  if (severity === 'blocker') return 'danger'
+  if (severity === 'major') return 'warn'
+  return 'neutral'
 }
 function severityLabel(severity?: string) {
   return SEVERITY_LABEL[severity || ''] || (severity || '一般')
@@ -196,150 +191,133 @@ onMounted(loadBugs)
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-auto p-6">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h2 class="text-lg font-medium text-fg">缺陷管理</h2>
-        <p class="text-sm text-muted mt-1">失败用例自动归并为缺陷单，复发自动记录次数</p>
-      </div>
-      <div class="flex gap-2">
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[1100px] px-8 py-7">
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-[20px] font-medium text-fg">缺陷</h1>
+          <p class="mt-1 text-[13px] text-muted">失败用例自动归并成缺陷单，复发的记次数，修完在这里验证关闭。</p>
+        </div>
         <button
-          @click="showFilter = !showFilter"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2"
-        >
-          <Filter class="w-4 h-4" />
-          筛选
-        </button>
-        <button
-          @click="loadBugs"
+          class="flex h-9 items-center gap-2 rounded-[8px] border border-line bg-surface px-3 text-[13px] text-fg hover:bg-surface-3 disabled:opacity-40"
           :disabled="loading"
-          class="flex items-center gap-2 px-4 py-2 bg-accent-solid text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
+          @click="loadBugs"
         >
-          <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
-          刷新
+          <RefreshCw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" /> 刷新
         </button>
-      </div>
-    </div>
+      </header>
 
-    <!-- 统计卡片 -->
-    <div class="grid grid-cols-4 gap-4 mb-4">
-      <div class="bg-surface rounded-lg border border-line p-4">
-        <div class="text-2xl font-semibold text-fg">{{ counts.total }}</div>
-        <div class="text-sm text-muted mt-1">当前列表缺陷数</div>
+      <div class="mt-5 grid grid-cols-2 divide-line rounded-[12px] border border-line bg-surface md:grid-cols-4 md:divide-x">
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">当前列表</p>
+          <p class="num mt-1 text-[24px] leading-7 text-fg">{{ counts.total }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">待修</p>
+          <p class="num mt-1 text-[24px] leading-7" :class="counts.open ? 'text-danger' : 'text-fg'">{{ counts.open }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">已修待验证</p>
+          <p class="num mt-1 text-[24px] leading-7" :class="counts.fixed ? 'text-warn' : 'text-fg'">{{ counts.fixed }}</p>
+        </div>
+        <div class="px-5 py-4">
+          <p class="text-[12px] text-muted">已验证</p>
+          <p class="num mt-1 text-[24px] leading-7 text-success">{{ counts.verified }}</p>
+        </div>
       </div>
-      <div class="bg-surface rounded-lg border border-line p-4">
-        <div class="text-2xl font-semibold text-danger">{{ counts.open }}</div>
-        <div class="text-sm text-muted mt-1">待修</div>
-      </div>
-      <div class="bg-surface rounded-lg border border-line p-4">
-        <div class="text-2xl font-semibold text-warn">{{ counts.fixed }}</div>
-        <div class="text-sm text-muted mt-1">已修（待验证）</div>
-      </div>
-      <div class="bg-surface rounded-lg border border-line p-4">
-        <div class="text-2xl font-semibold text-success">{{ counts.verified }}</div>
-        <div class="text-sm text-muted mt-1">已验证</div>
-      </div>
-    </div>
 
-    <!-- 状态筛选 -->
-    <div v-if="showFilter" class="flex items-center gap-2 mb-4">
-      <button
-        v-for="tab in STATUS_TABS"
-        :key="tab.key"
-        class="px-3 py-1.5 text-xs rounded-lg border transition-colors"
-        :class="filter === tab.key
-          ? 'bg-accent-soft border-accent-line text-accent font-medium'
-          : 'bg-surface border-line text-fg-3 hover:bg-surface-2'"
-        @click="setFilter(tab.key)"
+      <!-- 筛选：安静的分段按钮，不抢主操作 -->
+      <div class="mt-4 flex flex-wrap items-center gap-1">
+        <button
+          v-for="tab in STATUS_TABS"
+          :key="tab.key"
+          class="h-8 rounded-[8px] px-2 text-[12px] transition-colors"
+          :class="filter === tab.key ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
+          @click="setFilter(tab.key)"
+        >{{ tab.label }}</button>
+        <span v-if="message" class="ml-3 text-[12px] text-muted">{{ message }}</span>
+      </div>
+
+      <!-- 批量条：只有选中才出现 -->
+      <div
+        v-if="selected.length"
+        class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[8px] border border-accent-line bg-accent-soft px-4 py-2"
       >
-        {{ tab.label }}
-      </button>
-      <span v-if="message" class="ml-3 text-xs text-muted">{{ message }}</span>
-    </div>
-
-    <!-- 批量操作条：有选中才出现 -->
-    <div v-if="bugs.length" class="flex items-center gap-3 mb-3 text-xs">
-      <label class="flex items-center gap-1.5 text-fg-3">
-        <input type="checkbox" :checked="allSelected" @change="toggleSelectAll()" />
-        全选本页 {{ bugs.length }} 张
-      </label>
-      <template v-if="selected.length">
-        <span class="text-muted">已选 {{ selected.length }} 张 →</span>
+        <span class="num text-[12px] text-accent">已选 {{ selected.length }} 张</span>
         <button
           v-for="target in BATCH_TARGETS"
           :key="target.key"
-          class="h-7 px-2.5 rounded border border-line text-fg-3 hover:border-blue-400 hover:text-accent disabled:opacity-40"
+          class="text-[12px] text-fg hover:underline disabled:opacity-40"
           :disabled="batchBusy"
           @click="batchSetStatus(target.key)"
         >{{ target.label }}</button>
-        <button class="h-7 px-2 text-muted-2 hover:text-fg-2" :disabled="batchBusy" @click="selected = []">取消选择</button>
-      </template>
-      <span v-if="message" class="ml-auto text-muted">{{ message }}</span>
-    </div>
+        <button class="text-[12px] text-muted hover:text-fg" :disabled="batchBusy" @click="selected = []">取消选择</button>
+      </div>
 
-    <!-- 缺陷列表 -->
-    <div class="bg-surface rounded-lg border border-line">
-      <div class="divide-y divide-line-soft">
-        <div v-for="bug in bugs" :key="bug.id" class="p-5 hover:bg-surface-2">
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-3 min-w-0">
-              <input
-                type="checkbox"
-                class="flex-shrink-0"
-                :checked="selected.includes(bug.id)"
-                @change="toggleSelect(bug.id)"
-              />
-              <Bug class="w-5 h-5 text-red-500 flex-shrink-0" />
-              <span class="font-medium text-fg truncate">{{ bug.title || bug.id }}</span>
-              <span class="text-xs px-2 py-0.5 rounded flex-shrink-0" :class="statusClass(bug.status)">
-                {{ STATUS_LABELS[bug.status] || bug.status }}
-              </span>
-              <span v-if="bug.occurrences && bug.occurrences > 1" class="text-xs text-muted-2 flex-shrink-0">
-                复发 {{ bug.occurrences }} 次
-              </span>
-            </div>
-            <div class="flex items-center gap-3 flex-shrink-0">
-              <span class="text-xs text-muted-2">最近 {{ shortTime(bug.last_seen_at || bug.created_at) }}</span>
+      <div class="mt-4 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div class="flex items-center gap-3 border-b border-line px-5 py-2 text-[12px] text-muted-2">
+          <input type="checkbox" :checked="allSelected" class="h-3.5 w-3.5 rounded-[3px]" @change="toggleSelectAll()" />
+          <span>全选本页 {{ bugs.length }} 张</span>
+        </div>
+
+        <div
+          v-for="bug in bugs"
+          :key="bug.id"
+          class="state-bar border-b border-line-soft px-5 py-3 last:border-b-0 hover:bg-surface-2"
+          :data-tone="statusTone(bug.status) === 'danger' ? 'danger' : statusTone(bug.status) === 'warn' ? 'warn' : statusTone(bug.status) === 'success' ? 'success' : 'neutral'"
+        >
+          <div class="flex items-center gap-3">
+            <input
+              type="checkbox"
+              class="h-3.5 w-3.5 flex-shrink-0 rounded-[3px]"
+              :checked="selected.includes(bug.id)"
+              @change="toggleSelect(bug.id)"
+            />
+            <span class="min-w-0 flex-1 truncate text-[13px] text-fg" :title="bug.title || bug.id">{{ bug.title || bug.id }}</span>
+            <Badge :tone="severityTone(bug.severity)">{{ severityLabel(bug.severity) }}</Badge>
+            <Badge :tone="statusTone(bug.status)">{{ STATUS_LABELS[bug.status] || bug.status }}</Badge>
+            <span v-if="bug.occurrences && bug.occurrences > 1" class="num text-[12px] text-warn">复发 {{ bug.occurrences }}</span>
+            <span class="num text-[12px] text-muted-2">{{ shortTime(bug.last_seen_at || bug.created_at) }}</span>
+          </div>
+
+          <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 pl-6 text-[12px] text-muted-2">
+            <span class="mono">{{ bug.id }}</span>
+            <span v-if="bug.script_name">脚本 {{ bug.script_name }}</span>
+            <span v-if="bug.error_type">类型 {{ bug.error_type }}</span>
+            <button
+              v-if="bug.last_run_id"
+              class="mono text-muted hover:text-fg"
+              @click="jumpToRun(bug.last_run_id)"
+            >{{ bug.last_run_id }}</button>
+            <span class="ml-auto flex items-center gap-3">
               <button
                 v-for="act in actionsFor(bug.status)"
                 :key="act.key"
-                class="h-7 px-2.5 text-xs rounded border border-line text-fg-3 hover:border-blue-400 hover:text-accent"
+                class="text-muted hover:text-fg"
                 @click="setStatus(bug, act.key)"
-              >
-                {{ act.label }}
+              >{{ act.label }}</button>
+              <button class="text-muted hover:text-fg" @click="expanded = expanded === bug.id ? '' : bug.id">
+                {{ expanded === bug.id ? '收起' : '详情' }}
               </button>
-            </div>
+            </span>
           </div>
 
-          <div class="flex items-center gap-4 text-sm text-muted ml-8 flex-wrap">
-            <span class="font-mono text-xs text-muted-2">{{ bug.id }}</span>
-            <span v-if="bug.script_name">脚本：{{ bug.script_name }}</span>
-            <span class="text-xs px-2 py-0.5 rounded" :class="severityClass(bug.severity)">{{ severityLabel(bug.severity) }}</span>
-            <span v-if="bug.error_type">类型：{{ bug.error_type }}</span>
-            <button
-              v-if="bug.last_run_id"
-              class="text-xs text-accent hover:underline font-mono"
-              @click="jumpToRun(bug.last_run_id)"
-            >{{ bug.last_run_id }}</button>
-            <button
-              class="text-xs text-muted-2 hover:text-accent ml-auto"
-              @click="expanded = expanded === bug.id ? '' : bug.id"
-            >{{ expanded === bug.id ? '收起' : '详情' }}</button>
-          </div>
-
-          <div v-if="expanded === bug.id" class="ml-8 mt-3 pt-3 border-t border-line-soft space-y-1 text-xs text-fg-3">
-            <div v-if="bug.summary"><span class="text-muted-2">摘要：</span>{{ bug.summary }}</div>
-            <div v-if="bug.repro"><span class="text-muted-2">复现：</span>{{ reproText(bug.repro) }}</div>
-            <div>
+          <div v-if="expanded === bug.id" class="mt-2 space-y-1 border-t border-line-soft px-6 pt-2 text-[12px] text-muted">
+            <p v-if="bug.summary"><span class="text-muted-2">摘要：</span>{{ bug.summary }}</p>
+            <p v-if="bug.repro"><span class="text-muted-2">复现：</span>{{ reproText(bug.repro) }}</p>
+            <p class="num">
               <span class="text-muted-2">首次：</span>{{ shortTime(bug.created_at) }}
               <span class="ml-3 text-muted-2">最近：</span>{{ shortTime(bug.last_seen_at) }}
-            </div>
+            </p>
           </div>
         </div>
 
-        <div v-if="!bugs.length" class="py-16 text-center text-sm text-muted-2">
-          这个筛选下没有缺陷单
-        </div>
+        <EmptyState
+          v-if="!bugs.length"
+          class="m-5"
+          title="当前筛选下没有缺陷"
+          hint="执行出现失败时，用例会自动归并成缺陷单"
+        />
       </div>
     </div>
   </div>
