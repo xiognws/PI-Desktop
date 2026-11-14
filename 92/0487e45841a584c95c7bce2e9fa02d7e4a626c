@@ -1,0 +1,16 @@
+docs/adr/README.md
+  h_201ed4c689ac8b 434
+docs/zh-CN/adr/index.md
+  h_201ed4c689ac8b 323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "920487e45841a584c95c7bce2e9fa02d7e4a626c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
