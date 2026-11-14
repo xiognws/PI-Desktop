@@ -504,6 +504,22 @@ def case_review(project_id: str, body: CaseReviewIn) -> dict:
     )
 
 
+def _assertion_counts(stats: dict | None) -> dict | None:
+    """执行统计里补上「真断言 / 骨架」两个口径。
+
+    既有约定 `total = pass + fail + skip` 且 `passed` 含 skip，所以「通过 34/34」
+    在全是骨架时也成立。界面与报告要能说出"其中 N 条真跑了断言"，就得单独给数。
+    """
+    if not stats:
+        return stats
+    total = int(stats.get("total") or 0)
+    skipped = int(stats.get("skip") or 0)
+    enriched = dict(stats)
+    enriched["asserted_cases"] = max(total - skipped, 0)
+    enriched["skeleton_cases"] = skipped
+    return enriched
+
+
 def _prompt_marker(stage: str) -> dict:
     """本次产出用的是哪一版固定提示词：`id@version` + 正文指纹。
 
@@ -925,7 +941,7 @@ def run_status(project_id: str, run_id: str) -> dict:
             {"decision_id": item.get("id"), "prompt": item.get("prompt"), "options": item.get("options")}
             for item in pending
         ],
-        "execution": stats,
+        "execution": _assertion_counts(stats),
         "failures": failures,
         "bugs": bug_count,
     }

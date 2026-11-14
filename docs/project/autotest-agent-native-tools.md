@@ -349,6 +349,25 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
 翻法还不一致；现在两个都给：`status` 保持枚举（脚本/插件按机器值判断），
 `status_label` 给中文（界面直接显示）。新增字段是向后兼容的，不要改 `status` 的取值。
 
+### 8.0.3 断言覆盖：这条用例到底验过没有
+
+骨架脚本跑起来是绿的（`pytest.skip` 被计通过），所以「34/34 通过」在全是骨架时同样成立。
+这条不变量必须在接口、界面、报告三处都说清楚，否则绿就是假信号：
+
+* 分类器 `workflow/script_state.py::classify(content)`：有真实断言且无占位跳过 → `asserted`；
+  有 `pytest.skip(` 或零断言 → `skeleton`；读不到 → `missing`。恒真断言
+  （`assert True` / `assert 1 == 1`）不计入断言数。
+  **判据只用 `pytest.skip(`**：模板块尾的 `print('骨架未实现…')` 在补完断言后可能残留，
+  那是文案噪音，不该把真在验的脚本判回骨架。
+* `GET /scripts`：每条 `assertion_state` / `assert_count`，响应带 `asserted_total` / `skeleton_total`。
+* `GET /cases`：每条 `script_state`（`asserted` / `skeleton` / `none`，同一用例多个脚本取最好），
+  响应带 `asserted_total` / `skeleton_total` / `no_script_total`。
+* run status 的 `execution`：`asserted_cases = total − skip`、`skeleton_cases = skip`。
+* 报告：`- 断言覆盖：真断言 N 条 / 骨架 M 条`，`counts` 增 `asserted` / `skeleton`；
+  `check_report` 在 `skip > 0` 时要求这一行存在。
+* 界面：用例页新增「断言」列（真断言 / 骨架 / 无脚本）与顶部覆盖计数；脚本页卡片徽标
+  「真断言 N」/「骨架（未验）」；编辑器标题栏同样标注；执行详情显示「真断言 X · 骨架 Y」。
+
 ### 8.0.2 孤儿脚本（关联用例已不存在）
 
 脚本是可执行产物，不随用例删除 —— 它可能已经被人补过断言。但"指向一个不存在的

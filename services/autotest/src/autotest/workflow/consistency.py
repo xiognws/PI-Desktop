@@ -174,6 +174,8 @@ def check_report(markdown: str, counts: dict, pass_rate: str) -> dict:
 
     if skipped > 0 and "未计通过" not in text:
         add("skip", "有跳过用例，但报告没有声明「未计通过」")
+    if skipped > 0 and "断言覆盖" not in text:
+        add("skip", "有骨架跳过，但报告没有写出「真断言 / 骨架」的覆盖条数")
 
     if asserted == 0:
         if pass_rate != "—（全部跳过）":

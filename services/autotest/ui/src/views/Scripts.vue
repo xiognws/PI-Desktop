@@ -11,12 +11,15 @@ const scripts = ref<any[]>([])
 const runningIds = ref<string[]>([])
 const message = ref('')
 const error = ref('')
+// 断言覆盖：骨架脚本执行也是绿的，所以「多少个脚本真在验」要单独显示
+const coverage = ref({ asserted: 0, skeleton: 0 })
 
 async function loadScripts() {
   try {
     const res = await fetch(`/api/projects/${projectId}/scripts`)
     const data = await res.json()
     scripts.value = data.scripts || []
+    coverage.value = { asserted: data.asserted_total ?? 0, skeleton: data.skeleton_total ?? 0 }
   } catch (e) {
     console.error('加载脚本失败', e)
   }
@@ -147,6 +150,9 @@ function gateLabel(id: string) {
         <div class="flex items-center gap-3">
           <h2 class="text-base font-medium text-fg">测试脚本</h2>
           <span class="text-sm text-muted-2">共 {{ scripts.length }} 个</span>
+          <span class="text-xs text-muted-2" title="骨架＝自动生成、执行只会跳过；真断言＝脚本里有可判定的断言">
+            真断言 {{ coverage.asserted }} · 骨架 {{ coverage.skeleton }}
+          </span>
         </div>
         <button @click="createScript" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2">
           <Plus class="w-4 h-4" />
@@ -164,6 +170,17 @@ function gateLabel(id: string) {
           <div class="flex items-center gap-2 mb-3">
             <Code2 class="w-5 h-5 text-accent" />
             <span class="font-medium text-fg text-sm">{{ s.name }}</span>
+            <span
+              v-if="s.assertion_state === 'asserted'"
+              class="ml-auto text-xs px-2 py-0.5 rounded bg-success-soft text-success"
+              :title="`${s.assert_count} 条可判定断言`"
+            >真断言 {{ s.assert_count }}</span>
+            <span
+              v-else-if="s.assertion_state === 'skeleton'"
+              class="ml-auto text-xs px-2 py-0.5 rounded bg-warn-soft text-warn"
+              title="自动生成的骨架：执行只会跳过，绿色不代表验过"
+            >骨架（未验）</span>
+            <span v-else class="ml-auto text-xs px-2 py-0.5 rounded bg-surface-3 text-fg-3">文件缺失</span>
           </div>
           <p class="text-xs mb-2" :class="s.case_missing ? 'text-warn' : 'text-muted'">
             关联用例：{{ s.case_id || '未关联' }}

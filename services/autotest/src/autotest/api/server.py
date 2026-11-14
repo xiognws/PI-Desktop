@@ -32,6 +32,7 @@ from autotest.executors import execute_script, read_events
 from autotest.executors.service import cancel_execution
 from autotest.storage.migrations import ensure_project_schema
 from autotest.storage.sqlite import init_db, get_conn
+from autotest.workflow import script_state
 from autotest.workflow.routes import router as workflow_router
 from autotest.api.knowledge_routes import router as knowledge_router
 
@@ -467,6 +468,22 @@ async def list_cases(project_id: str):
     rows = conn.execute("SELECT * FROM test_cases ORDER BY created_at DESC").fetchall()
     conn.close()
 
+    # 用例有没有对应的"真断言"脚本：界面据此区分"验过的"和"只是骨架"。
+    # 特意重开一条连接：上面那条已经关了，且这里读的是 scripts 表（可能不存在于旧库）。
+    per_case: dict[str, list[str]] = {}
+    try:
+        state_conn = sqlite3.connect(db_path)
+        state_conn.row_factory = sqlite3.Row
+        for row in state_conn.execute("SELECT case_id, filepath FROM scripts"):
+            case_ref = str(row["case_id"] or "")
+            if not case_ref:
+                continue
+            state = script_state.classify(_read_script_text(row["filepath"]))["state"]
+            per_case.setdefault(case_ref, []).append(state)
+        state_conn.close()
+    except sqlite3.Error:
+        per_case = {}
+
     cases = []
     for row in rows:
         c = dict(row)
@@ -474,9 +491,17 @@ async def list_cases(project_id: str):
         c["name"] = c.get("title", "")
         c["module"] = c.get("module_id", "")
         c["type"] = c.get("case_type", "正向")
+        states = per_case.get(str(c.get("id") or ""), [])
+        c["script_state"] = script_state.merge(states) if states else "none"
         cases.append(c)
 
-    return {"cases": cases, "total": len(cases)}
+    return {
+        "cases": cases,
+        "total": len(cases),
+        "asserted_total": sum(1 for c in cases if c["script_state"] == "asserted"),
+        "skeleton_total": sum(1 for c in cases if c["script_state"] == "skeleton"),
+        "no_script_total": sum(1 for c in cases if c["script_state"] == "none"),
+    }
 
 
 @app.get("/api/projects/{project_id}/case-stats")
@@ -612,6 +637,16 @@ async def delete_case(project_id: str, case_id: str):
 
 
 # ====== 脚本管理 ======
+def _read_script_text(filepath: object) -> str:
+    """读脚本文件内容用于判定断言状态；读不到就当缺失，不抛。"""
+    if not filepath:
+        return ""
+    try:
+        return Path(str(filepath)).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
 @app.get("/api/projects/{project_id}/scripts")
 async def list_scripts(project_id: str):
     require_project(project_id)
@@ -633,6 +668,10 @@ async def list_scripts(project_id: str):
     for s in scripts:
         script_case = str(s.get("case_id") or "")
         s["case_missing"] = bool(script_case) and script_case not in case_ids
+        # 这条脚本到底验没验：骨架脚本也会跑成绿的，必须能让界面标出来
+        state = script_state.classify(_read_script_text(s.get("filepath")))
+        s["assertion_state"] = state["state"]
+        s["assert_count"] = state["asserts"]
     # 浏览器端 monaco-vscode-api 不允许访问真实磁盘 file:// 路径，
     # 使用统一虚拟根 file:///workspace/scripts，文件内容由编辑器 didOpen 提供给 LSP
     virtual_workspace_uri = "file:///workspace/scripts"
@@ -644,6 +683,8 @@ async def list_scripts(project_id: str):
         "scripts": scripts,
         "total": len(scripts),
         "orphan_total": sum(1 for s in scripts if s["case_missing"]),
+        "asserted_total": sum(1 for s in scripts if s["assertion_state"] == "asserted"),
+        "skeleton_total": sum(1 for s in scripts if s["assertion_state"] == "skeleton"),
         "workspace_uri": virtual_workspace_uri,
     }
 

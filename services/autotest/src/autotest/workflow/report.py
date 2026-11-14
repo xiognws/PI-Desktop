@@ -51,6 +51,7 @@ def build_report(
     lines.append(f"- 设计用例数：{cases_total}")
     lines.append(f"- 执行脚本数：{scripts or total}")
     lines.append(f"- 执行用例数：{total - skipped}（另有 {skipped} 条骨架跳过，未计通过）")
+    lines.append(f"- 断言覆盖：真断言 {asserted} 条 / 骨架 {skipped} 条")
     lines.append(f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append("")
     lines.append("## 结果汇总")
@@ -140,6 +141,9 @@ def build_report(
             "errored": errored,
             "cancelled": cancelled,
             "scripts": scripts or total,
+            # 与 status 的 execution 对齐：真断言条数 / 骨架条数，两处口径一致
+            "asserted": asserted,
+            "skeleton": skipped,
             "bugs": len(bug_list),
         },
         "pass_rate": pass_rate,

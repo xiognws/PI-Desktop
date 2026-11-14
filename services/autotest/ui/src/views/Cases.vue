@@ -12,6 +12,8 @@ const viewMode = ref<'list' | 'tree'>('list')
 let jm: any = null
 
 const cases = ref<any[]>([])
+// 断言覆盖：真断言 / 骨架 / 还没脚本。骨架跑出来也是绿的，所以要单独说清。
+const caseStates = ref({ asserted: 0, skeleton: 0, none: 0 })
 
 // 从后端加载用例
 async function loadCases() {
@@ -19,6 +21,11 @@ async function loadCases() {
     const res = await fetch(`/api/projects/${projectId}/cases`)
     const data = await res.json()
     cases.value = data.cases
+    caseStates.value = {
+      asserted: data.asserted_total ?? 0,
+      skeleton: data.skeleton_total ?? 0,
+      none: data.no_script_total ?? 0,
+    }
   } catch (e) {
     console.error('加载用例失败', e)
   }
@@ -556,6 +563,9 @@ watch(viewMode, (val) => {
           <span class="text-sm text-muted-2">
             共 {{ cases.length }} 条<template v-if="activeFilterCount">（筛选后 {{ visibleCases.length }} 条）</template>
           </span>
+          <span class="text-xs text-muted-2" title="真断言＝脚本里有可判定的断言；骨架＝自动生成、跑起来只会跳过，不能算验过">
+            真断言 {{ caseStates.asserted }} · 骨架 {{ caseStates.skeleton }} · 无脚本 {{ caseStates.none }}
+          </span>
           <span v-if="selectedIds.length > 0" class="text-sm text-accent">已选 {{ selectedIds.length }} 条</span>
           <span class="text-xs text-muted-2" title="写用例的依据来自「知识库」：先把项目资料分解入库，Agent 检索到的就是那些原文">
             依据「知识库」中已入库的项目资料
@@ -681,6 +691,7 @@ watch(viewMode, (val) => {
               <th class="text-left px-4 py-3 text-xs font-medium text-muted">类型</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-muted">标签</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-muted">优先级</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-muted">断言</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-muted">执行状态</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-muted">操作</th>
             </tr>
@@ -718,6 +729,19 @@ watch(viewMode, (val) => {
                   :class="c.priority === '高' ? 'bg-danger-soft text-danger' : c.priority === '中' ? 'bg-warn-soft text-warn' : 'bg-surface-3 text-fg-3'">
                   {{ c.priority }}
                 </span>
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  v-if="c.script_state === 'asserted'"
+                  class="inline-block px-2 py-0.5 text-xs rounded bg-success-soft text-success"
+                  title="脚本里有可判定的断言，执行结果说明它真的验过"
+                >真断言</span>
+                <span
+                  v-else-if="c.script_state === 'skeleton'"
+                  class="inline-block px-2 py-0.5 text-xs rounded bg-warn-soft text-warn"
+                  title="自动生成的骨架：跑起来只会跳过，绿色不代表验过"
+                >骨架</span>
+                <span v-else class="inline-block px-2 py-0.5 text-xs rounded bg-surface-3 text-fg-3" title="还没有生成对应脚本">无脚本</span>
               </td>
               <td class="px-4 py-3">
                 <span class="inline-block px-2 py-0.5 text-xs rounded"
