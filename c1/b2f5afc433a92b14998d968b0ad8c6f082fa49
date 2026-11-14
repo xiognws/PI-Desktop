@@ -1,0 +1,19 @@
+apps/desktop/electron/main/ipc/python-ipc.ts
+  s_64f9b3c01ed37b::t_e66157d9a07224 45-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c1b2f5afc433a92b14998d968b0ad8c6f082fa49",
+  "prompts": {},
+  "sessions": {
+    "s_64f9b3c01ed37b": {
+      "agent_id": {
+        "tool": "dsh",
+        "id": "session-d790956b-609e-481a-953d-0547f5a7b1a3",
+        "model": "12039"
+      },
+      "human_author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
