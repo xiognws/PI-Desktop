@@ -20,6 +20,7 @@ import {
   type InAppProvider,
 } from "./types.ts";
 import { CreditsCache, readCredits, type CreditsResult } from "./credits.ts";
+import { reportedModelLimits } from "../model-discovery.ts";
 
 /** Settings keys owned by the supervisor: `inAppProvider.<id>.{enabled,port}`. */
 export const IN_APP_PROVIDER_SETTINGS_KEY = "inAppProvider";
@@ -81,11 +82,100 @@ type RuntimeProviderRow = {
   id: string;
   vendorKey?: string;
   baseUrl?: string;
-  models?: Array<{ id: string }>;
+  models?: RuntimeModelBinding[];
 };
+
+/**
+ * One saved binding, as `providers.list` reports it.
+ *
+ * The supervisor rewrites this row on every boot, so it must read the stored
+ * binding back before writing: a model id alone would reset the user's limits and
+ * capabilities to the generic defaults each time the app starts.
+ */
+type RuntimeModelBinding = {
+  id: string;
+  alias?: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  contextWindowSource?: string;
+  maxTokensSource?: string;
+  thinkingLevels?: string[];
+  defaultThinkingLevel?: string | null;
+  thinkingProtocol?: string;
+  supportsReasoningEffort?: boolean | null;
+  supportsImages?: boolean | null;
+  supportsDocuments?: boolean | null;
+  availableForSubagents?: boolean;
+  nativeWebSearch?: boolean;
+  fastModeAllowed?: boolean;
+};
+
+/** One model the gateway published, with whatever capacity it stated. */
+type InAppModel = { id: string; contextWindow?: number; maxTokens?: number };
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Bindings to write for the models a gateway just published.
+ *
+ * Two rules, both learned from the same failure: a binding is not a model id.
+ *
+ *  - A model with no saved binding starts from what the gateway states, so a
+ *    1M-token model is not registered as 128k.
+ *  - A model that already has one keeps every stored field. The supervisor
+ *    rewrites this row on each boot, and writing bare `{ id }` reset the user's
+ *    limits (and capability overrides) to the generic defaults every launch.
+ *
+ * A published limit only replaces a stored number that the catalog, not the user,
+ * owned: `contextWindowSource: "user"` is the user's own value and stays.
+ */
+export function bindingsFor(
+  published: readonly InAppModel[],
+  saved?: readonly RuntimeModelBinding[],
+): Array<Record<string, unknown>> {
+  const stored = new Map((saved ?? []).map((binding) => [binding.id, binding]));
+  return published.map((model) => {
+    const prior = stored.get(model.id);
+    const limits = {
+      ...(model.contextWindow !== undefined && prior?.contextWindowSource !== "user"
+        ? { contextWindow: model.contextWindow }
+        : {}),
+      ...(model.maxTokens !== undefined && prior?.maxTokensSource !== "user"
+        ? { maxTokens: model.maxTokens }
+        : {}),
+    };
+    if (!prior) return { id: model.id, ...limits };
+    return {
+      id: prior.id,
+      ...(prior.alias !== undefined ? { alias: prior.alias } : {}),
+      ...(prior.contextWindow !== undefined ? { contextWindow: prior.contextWindow } : {}),
+      ...(prior.contextWindowSource !== undefined
+        ? { contextWindowSource: prior.contextWindowSource }
+        : {}),
+      ...(prior.maxTokens !== undefined ? { maxTokens: prior.maxTokens } : {}),
+      ...(prior.maxTokensSource !== undefined ? { maxTokensSource: prior.maxTokensSource } : {}),
+      ...(prior.thinkingLevels !== undefined ? { thinkingLevels: prior.thinkingLevels } : {}),
+      ...(prior.defaultThinkingLevel !== undefined
+        ? { defaultThinkingLevel: prior.defaultThinkingLevel }
+        : {}),
+      ...(prior.thinkingProtocol !== undefined ? { thinkingProtocol: prior.thinkingProtocol } : {}),
+      ...(prior.supportsReasoningEffort !== undefined
+        ? { supportsReasoningEffort: prior.supportsReasoningEffort }
+        : {}),
+      ...(prior.supportsImages !== undefined ? { supportsImages: prior.supportsImages } : {}),
+      ...(prior.supportsDocuments !== undefined
+        ? { supportsDocuments: prior.supportsDocuments }
+        : {}),
+      ...(prior.availableForSubagents !== undefined
+        ? { availableForSubagents: prior.availableForSubagents }
+        : {}),
+      ...(prior.nativeWebSearch !== undefined ? { nativeWebSearch: prior.nativeWebSearch } : {}),
+      ...(prior.fastModeAllowed !== undefined ? { fastModeAllowed: prior.fastModeAllowed } : {}),
+      ...limits,
+    };
+  });
 }
 
 /** Read one provider's settings, defaulting to enabled on the descriptor port. */
@@ -407,7 +497,7 @@ export class InAppProviders {
     provider: InAppProvider,
     port: number,
     apiKey: string,
-  ): Promise<string[]> {
+  ): Promise<InAppModel[]> {
     const request = this.fetchImpl ?? fetch;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
@@ -426,13 +516,18 @@ export class InAppProviders {
           ? (payload as { data?: unknown }).data
           : undefined;
       if (!Array.isArray(data)) return [];
-      const ids: string[] = [];
+      const models: InAppModel[] = [];
+      const seen = new Set<string>();
       for (const entry of data) {
         if (!entry || typeof entry !== "object") continue;
         const id = (entry as { id?: unknown }).id;
-        if (typeof id === "string" && id.trim() !== "" && !ids.includes(id)) ids.push(id);
+        if (typeof id !== "string" || id.trim() === "" || seen.has(id)) continue;
+        seen.add(id);
+        // The gateway publishes each model's real capacity; dropping it here is
+        // what left every binding at the generic 128k / 8k default.
+        models.push({ id, ...reportedModelLimits(entry) });
       }
-      return ids;
+      return models;
     } catch {
       return [];
     } finally {
@@ -443,7 +538,7 @@ export class InAppProviders {
   private async upsertProviderRow(
     provider: InAppProvider,
     port: number,
-    models: readonly string[],
+    models: readonly InAppModel[],
     apiKey: string,
   ): Promise<string> {
     const vendorKey = inAppProviderVendorKey(provider.id);
@@ -459,8 +554,8 @@ export class InAppProviders {
       baseUrl: `${inAppProviderOrigin(port)}${provider.openaiBasePath}`,
       authKind: "api_key_and_base_url",
       apiStyle: "chat_completions",
-      models: models.map((id) => ({ id })),
-      defaultModelId: models[0],
+      models: bindingsFor(models, existing?.models),
+      defaultModelId: models[0]?.id,
       secretValue: apiKey,
     };
     if (existing) {

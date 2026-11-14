@@ -120,6 +120,26 @@ function reportedContextWindow(row: Record<string, unknown> | null): number | un
   ]);
 }
 
+/**
+ * The limits a model-list row states, in the spellings the endpoints use.
+ *
+ * Exported because the built-in provider supervisor reads the same fields from
+ * its own gateway: one list of keys, so a spelling this build understands cannot
+ * be understood by discovery and ignored on the in-app path.
+ */
+export function reportedModelLimits(row: unknown): {
+  contextWindow?: number;
+  maxTokens?: number;
+} {
+  const record = asRecord(row);
+  const contextWindow = reportedContextWindow(record);
+  const maxTokens = reportedMaxTokens(record);
+  return {
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+  };
+}
+
 /** Output capacity the service itself stated on the row, or nothing. */
 function reportedMaxTokens(row: Record<string, unknown> | null): number | undefined {
   return firstPositiveInteger(row, [

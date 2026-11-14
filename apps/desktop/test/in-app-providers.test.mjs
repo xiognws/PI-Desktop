@@ -64,7 +64,10 @@ function harness({ settings = {}, healthy = true, rows = [], models = ["m-1", "m
         }),
       };
     }
-    const body = { object: "list", data: models.map((id) => ({ id })) };
+    const body = {
+      object: "list",
+      data: models.map((model) => (typeof model === "string" ? { id: model } : model)),
+    };
     return { ok: true, json: async () => body };
   };
   const supervisor = new InAppProviders({
@@ -118,6 +121,53 @@ test("a second boot updates the existing row instead of creating another", async
   assert.equal(calls.filter((call) => call.method === "providers.update").length, 1);
   assert.equal(calls.find((call) => call.method === "providers.update").params.id, "row-1");
   assert.equal(calls.filter((call) => call.method === "providers.setSecret").length, 1);
+});
+
+test("the limits the gateway publishes become the binding's limits", async () => {
+  // The gateway states each model's real capacity; a row registered as a bare id
+  // falls back to 128k / 8k, which is not what the model supports.
+  const { supervisor, calls } = harness({
+    models: [
+      { id: "hy4free", context_length: 960_000, max_tokens: 32_768 },
+      { id: "hy3", context_window: 192_000 },
+    ],
+  });
+  await supervisor.start();
+  const create = calls.find((call) => call.method === "providers.create");
+  assert.ok(create, "no provider row was created");
+  assert.deepEqual(create.params.models, [
+    { id: "hy4free", contextWindow: 960_000, maxTokens: 32_768 },
+    { id: "hy3", contextWindow: 192_000 },
+  ]);
+});
+
+test("a published limit replaces a catalog-owned window but never the user's own", async () => {
+  const { bindingsFor } = await import("../electron/main/providers/in-app-providers.ts");
+  const published = [
+    { id: "hy4free", contextWindow: 960_000, maxTokens: 32_768 },
+    { id: "hy3", contextWindow: 192_000, maxTokens: 16_384 },
+  ];
+  const saved = [
+    // The user set this one by hand: it must survive the boot.
+    { id: "hy4free", contextWindow: 1_000_000, contextWindowSource: "user", maxTokens: 8_192, maxTokensSource: "user", thinkingLevels: ["off", "high"], supportsImages: false },
+    // This one still holds the generic seed: the published value wins.
+    { id: "hy3", contextWindow: 128_000, maxTokens: 8_192 },
+  ];
+  const [userOwned, catalogOwned] = bindingsFor(published, saved);
+  assert.equal(userOwned.contextWindow, 1_000_000);
+  assert.equal(userOwned.maxTokens, 8_192);
+  assert.equal(userOwned.contextWindowSource, "user");
+  // Everything else on that binding is preserved, not reset.
+  assert.deepEqual(userOwned.thinkingLevels, ["off", "high"]);
+  assert.equal(userOwned.supportsImages, false);
+  assert.equal(catalogOwned.contextWindow, 192_000);
+  assert.equal(catalogOwned.maxTokens, 16_384);
+});
+
+test("a model the gateway adds gets no invented limits", async () => {
+  const { bindingsFor } = await import("../electron/main/providers/in-app-providers.ts");
+  const [binding] = bindingsFor([{ id: "new-model" }], []);
+  assert.deepEqual(binding, { id: "new-model" });
 });
 
 test("credits answer for the descriptor id and for the provider row id", async () => {
