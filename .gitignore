@@ -17,7 +17,7 @@ apps/desktop/dist-electron/
 apps/desktop/release/
 # Packaging output that is deliberately kept apart from release/: electron-builder
 # cannot replace release/win-unpacked while that copy is the one running.
-apps/desktop/release-dist/
+apps/desktop/release-dist*/
 packages/*/dist/
 packages/*/dist-bundle/
 apps/*/dist-bundle/
