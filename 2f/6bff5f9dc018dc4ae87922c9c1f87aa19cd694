@@ -1,0 +1,14 @@
+apps/desktop/package.json
+  h_201ed4c689ac8b 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2f6bff5f9dc018dc4ae87922c9c1f87aa19cd694",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
