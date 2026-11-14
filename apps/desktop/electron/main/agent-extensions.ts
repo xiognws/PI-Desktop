@@ -13,6 +13,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { extensionToastText } from "./extension-toast-policy";
 import { assertImportedPackagePath, discoverImportedPackageSkills } from "./imported-package-skills";
 import {
   IMPORTED_PLUGIN_ID_PREFIX,
@@ -148,9 +149,11 @@ export class AgentExtensionBridge {
         this.uiRequests.get(key)?.controller.abort();
         return { kind: "cancel" };
       }
-      case "notify":
-        this.options.onToast(`${envelope.extensionLabel}: ${request.message}`, request.level);
+      case "notify": {
+        const toast = extensionToastText(envelope.extensionLabel, request.message);
+        if (toast) this.options.onToast(toast, request.level);
         return { kind: "notify" };
+      }
       case "setStatus":
         this.options.onStatus({
           sessionId: envelope.sessionId,

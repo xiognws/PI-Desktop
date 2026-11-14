@@ -235,6 +235,21 @@ test("ui requests: notify and status pass through; prompts round-trip, queue per
   const envelope = (request, sessionId = "s1") => ({ sessionId, extensionId: "ext", extensionLabel: "Hello", request });
   assert.deepEqual(await b.requestUi(envelope({ kind: "notify", message: "hi", level: "warning" })), { kind: "notify" });
   assert.deepEqual(events.toasts, [{ message: "Hello: hi", level: "warning" }]);
+  // Extensions that name themselves must not end up labelled twice.
+  await b.requestUi(envelope({ kind: "notify", message: "Hello: ready", level: "info" }));
+  assert.deepEqual(events.toasts.at(-1), { message: "Hello: ready", level: "info" });
+  // Diff view's capture-degradation notice stays out of the toast stack; the run
+  // itself is still marked incomplete in the panel and audited by the plugin.
+  const diff = { sessionId: "s1", extensionId: "ext", extensionLabel: "Diff view" };
+  await b.requestUi({
+    ...diff,
+    request: {
+      kind: "notify",
+      message: "Diff view: 快照采集降级 (ENOENT)；请检查文件权限、存储空间及 actions.jsonl。",
+      level: "warning",
+    },
+  });
+  assert.equal(events.toasts.length, 2, "degradation notice is not relayed");
   await b.requestUi(envelope({ kind: "setStatus", key: "k", text: "busy" }));
   await b.requestUi(envelope({ kind: "setWorkingMessage", text: undefined }));
   assert.deepEqual(events.statuses.map((s) => [s.key, s.text]), [["k", "busy"], ["working", undefined]]);
