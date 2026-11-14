@@ -25,6 +25,7 @@ from autotest.prompts import load as load_prompt
 from autotest.workflow import analysis as analysis_service
 from autotest.workflow import cases as case_service
 from autotest.workflow import consistency
+from autotest.workflow import script_state
 from autotest.workflow import execution as execution_service
 from autotest.workflow import grounding
 from autotest.workflow import prd as prd_service
@@ -286,6 +287,9 @@ class ScriptAuthorIn(BaseModel):
     run_id: str
     cases: list[dict] | None = None
     sdk: str = "pytest"
+    # 默认不覆盖"已补断言"的脚本：骨架是模板产物，补完断言的脚本是人的资产。
+    # 需要整体重出时显式传 true。
+    overwrite: bool = False
 
 
 class ExecuteIn(BaseModel):
@@ -636,27 +640,48 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         script_judgement = consistency.check_scripts(authored["scripts"])
 
         created: list[dict] = []
+        preserved: list[str] = []
         for item in authored["scripts"]:
-            script_id = f"script_{uuid.uuid4().hex[:8]}"
             filepath = scripts_dir / item["name"]
-            filepath.write_text(item["content"], encoding="utf-8")
-            conn.execute(
-                "INSERT INTO scripts (id, case_id, name, language, status, filepath) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    script_id,
-                    case_ids.get(str(item["case_ref"]["title"]), item["case_ref"]["title"]),
-                    item["name"],
-                    item["language"],
-                    "就绪",
-                    str(filepath),
-                ),
-            )
+            # 已经补过断言的脚本不再被骨架覆盖：重新生成用例后顺手丢掉几天的补充工作
+            # 是不可接受的（这类"重新生成"在流水线里点一下就会发生）。
+            keep_file = False
+            if not body.overwrite and filepath.is_file():
+                current = script_state.classify(filepath.read_text(encoding="utf-8", errors="replace"))
+                keep_file = current["state"] == "asserted"
+            if keep_file:
+                # 文件不动，但库里的关联要更新：用例重设计后 case_id 会变，
+                # 不更新就会把一条好脚本变成孤儿。
+                preserved.append(item["name"])
+            else:
+                filepath.write_text(item["content"], encoding="utf-8")
+            case_ref = case_ids.get(str(item["case_ref"]["title"]), item["case_ref"]["title"])
+            # 按文件名覆盖而不是再插一行：重新生成同一个用例的脚本时，旧的 INSERT
+            # 会在 scripts 表里留下第二条同名记录（脚本数虚高、断言覆盖翻倍），
+            # 而且执行历史里的 script_id 也跟着漂移。
+            existing = conn.execute(
+                "SELECT id FROM scripts WHERE name = ? LIMIT 1", (item["name"],)
+            ).fetchone()
+            if existing is not None:
+                script_id = str(existing["id"])
+                conn.execute(
+                    "UPDATE scripts SET case_id = ?, language = ?, status = ?, filepath = ?,"
+                    " updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (case_ref, item["language"], "就绪", str(filepath), script_id),
+                )
+            else:
+                script_id = f"script_{uuid.uuid4().hex[:8]}"
+                conn.execute(
+                    "INSERT INTO scripts (id, case_id, name, language, status, filepath) VALUES (?, ?, ?, ?, ?, ?)",
+                    (script_id, case_ref, item["name"], item["language"], "就绪", str(filepath)),
+                )
             created.append(
                 {
                     "script_id": script_id,
                     "name": item["name"],
                     "filepath": str(filepath),
                     "case_type": item["case_ref"]["case_type"],
+                    "preserved": keep_file,
                 }
             )
 
@@ -668,6 +693,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             status="ok" if script_judgement["ok"] else "warning",
             summary=(
                 f"生成 {len(created)} 个 pytest 骨架"
+                + (f"（保留 {len(preserved)} 个已补断言的脚本）" if preserved else "")
                 + (
                     f"，不符合提示词规则 {len(script_judgement['issues'])} 处"
                     if not script_judgement["ok"]
@@ -677,6 +703,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             payload={
                 "scripts": created,
                 "stats": authored["stats"],
+                "preserved": preserved,
                 "prompt": _prompt_marker("script-author"),
                 "consistency": script_judgement,
             },
@@ -688,10 +715,15 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "script_total": len(created),
         "scripts": created[:10],
         "stats": authored["stats"],
+        "preserved": preserved,
+        "preserved_total": len(preserved),
         "prompt": _prompt_marker("script-author"),
         "consistency": script_judgement,
     }
-    return _envelope(f"生成 {len(created)} 个 pytest 骨架，已落 scripts 表", data, body.run_id)
+    summary = f"生成 {len(created)} 个 pytest 骨架，已落 scripts 表"
+    if preserved:
+        summary += f"；保留 {len(preserved)} 个已补断言的脚本（要重出请传 overwrite=true）"
+    return _envelope(summary, data, body.run_id)
 
 
 def _run_batch_thread(
