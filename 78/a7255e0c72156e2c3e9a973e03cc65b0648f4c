@@ -1,0 +1,30 @@
+apps/desktop/electron/main/installation.ts
+  h_201ed4c689ac8b 2-3,36-62
+apps/desktop/electron/main/providers/in-app-providers.ts
+  h_201ed4c689ac8b 234-235,237-238,240,245,250,253,259-299
+apps/desktop/test/development-branding.test.mjs
+  h_201ed4c689ac8b 48-51,54,56
+apps/desktop/test/in-app-providers.test.mjs
+  h_201ed4c689ac8b 151-229
+apps/desktop/test/notification-contract.test.mjs
+  h_201ed4c689ac8b 116-118
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 938-947
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 675
+docs/spec/06-delivery/06-release-runbook.md
+  h_201ed4c689ac8b 35-42
+docs/zh-CN/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 535
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "78a7255e0c72156e2c3e9a973e03cc65b0648f4c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
