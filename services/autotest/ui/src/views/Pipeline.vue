@@ -8,15 +8,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import {
-  AlertCircle,
-  ArrowRight,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  RefreshCw,
-  Play,
-} from 'lucide-vue-next'
+import { AlertCircle, ArrowRight, Loader2, Play, RefreshCw } from 'lucide-vue-next'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -262,13 +254,6 @@ async function waitForExecution() {
   throw new Error('执行超时（6 分钟未返回结果）')
 }
 
-function dotClass(key: string): string {
-  if (busy.value === key) return 'text-accent'
-  if (stepDone(key)) return 'text-success'
-  if (blocker(key)) return 'text-muted-2'
-  return 'text-accent'
-}
-
 async function loadPrompts() {
   try {
     const body = await api('/workflow/prompts')
@@ -288,136 +273,153 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-auto bg-surface">
-    <div class="p-6 max-w-5xl w-full">
-      <div class="flex items-start justify-between mb-5">
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[1100px] px-8 py-7">
+      <!-- 页头：标题 + 一句说清这一页做什么。不放按钮，动作在轨道上 -->
+      <header class="flex items-start justify-between gap-4">
         <div>
-          <h2 class="text-lg font-medium text-fg">流水线</h2>
-          <p class="text-sm text-muted mt-1">
-            资料 → 知识库 → 用例 → 脚本 → 执行 → 报告。每一步都用真实数据，做完了才允许下一步。
+          <h1 class="text-[20px] font-medium text-fg">流水线</h1>
+          <p class="mt-1 text-[13px] text-muted">
+            资料 → 知识库 → 用例 → 脚本 → 执行 → 报告。每一步都用真实数据，前一步没完成就不让点下一步。
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 pt-1">
           <select
             v-model="runId"
-            class="text-sm border border-line rounded-lg px-2 py-1.5 bg-surface text-fg"
+            class="h-9 min-w-[260px] rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg"
             @change="loadStatus"
           >
-            <option value="">（还没有运行）</option>
+            <option value="">选择一次运行</option>
             <option v-for="run in runs" :key="run.id" :value="run.id">
-              {{ run.id }} · {{ run.requirement_ref || '未选资料' }} · {{ run.stage || 'parsed' }}
+              {{ run.id }} · {{ run.requirement_ref || '未选资料' }}
             </option>
           </select>
           <button
-            class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-surface-2"
+            class="flex h-9 items-center gap-2 rounded-[8px] border border-line bg-surface px-3 text-[13px] text-fg hover:bg-surface-3"
             @click="refresh"
           >
-            <RefreshCw class="w-4 h-4" /> 刷新
+            <RefreshCw class="h-4 w-4" /> 刷新
           </button>
         </div>
+      </header>
+
+      <!-- 运行摘要：一行等宽读数（这是页面上唯一的"仪表"位置） -->
+      <div class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[12px] border border-line bg-surface px-5 py-3">
+        <label class="flex items-center gap-2 text-[13px] text-muted">
+          解析哪份资料
+          <select
+            v-model="reference"
+            class="h-8 min-w-[240px] rounded-[8px] border border-line bg-surface px-2 text-[13px] text-fg"
+          >
+            <option v-for="item in requirements" :key="item.filename" :value="item.filename">
+              {{ item.filename }}
+            </option>
+          </select>
+        </label>
+        <span class="mono text-[13px] text-fg">
+          {{ progress }}<span class="text-muted">/{{ STEPS.length }} 步</span>
+        </span>
+        <span v-if="status" class="mono text-[12px] text-muted">
+          {{ status.run_id }} · {{ status.stage || '—' }} · {{ statusLabel }}
+        </span>
       </div>
 
-      <!-- 资料来源 + 进度 -->
-      <div class="bg-surface rounded-lg border border-line p-4 mb-5 flex items-center gap-4 flex-wrap">
-        <label class="text-sm text-muted">解析哪份资料</label>
-        <select
-          v-model="reference"
-          class="text-sm border border-line rounded-lg px-2 py-1.5 bg-surface text-fg min-w-64"
-        >
-          <option v-for="item in requirements" :key="item.filename" :value="item.filename">
-            {{ item.filename }}
-          </option>
-        </select>
-        <span class="text-xs text-muted-2">
-          已完成 {{ progress }} / {{ STEPS.length }} 步
-        </span>
-        <span v-if="status" class="ml-auto text-xs text-muted">
-          run {{ status.run_id }} · 阶段 {{ status.stage || '—' }} · 状态 {{ statusLabel }}
-        </span>
-      </div>
+      <p v-if="message" class="mt-3 text-[13px] text-success">{{ message }}</p>
+      <p v-if="error" class="mt-3 text-[13px] text-danger">{{ error }}</p>
 
-      <div v-if="message" class="text-sm text-success mb-3">{{ message }}</div>
-      <div v-if="error" class="text-sm text-danger mb-3">{{ error }}</div>
-
-      <!-- 步骤列表 -->
-      <div class="space-y-3">
-        <div
-          v-for="step in STEPS"
+      <!-- 七步轨道：每步一行，左侧 3px 状态竖条 + 等宽序号 -->
+      <ol class="mt-5 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <li
+          v-for="(step, index) in STEPS"
           :key="step.key"
-          class="bg-surface rounded-lg border border-line p-4 flex items-start gap-3"
+          class="state-bar flex items-start gap-4 border-b border-line-soft px-5 py-4 last:border-b-0"
+          :data-tone="
+            busy === step.key
+              ? 'accent'
+              : stepDone(step.key)
+                ? 'success'
+                : blocker(step.key)
+                  ? 'neutral'
+                  : 'accent'
+          "
         >
-          <component
-            :is="busy === step.key ? Loader2 : stepDone(step.key) ? CheckCircle2 : blocker(step.key) ? Circle : Circle"
-            class="w-5 h-5 mt-0.5"
-            :class="[dotClass(step.key), busy === step.key ? 'animate-spin' : '']"
-          />
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <span class="font-medium text-fg">{{ step.title }}</span>
-              <span class="text-xs text-muted-2">{{ step.hint }}</span>
-            </div>
-            <div class="text-sm text-muted mt-1">{{ stepSummary(step.key) }}</div>
+          <span class="mono w-6 shrink-0 pt-0.5 text-[12px] text-muted-2">
+            {{ String(index + 1).padStart(2, '0') }}
+          </span>
 
-            <!-- 执行统计 -->
-            <div v-if="step.key === 'execute' && status?.execution?.total" class="text-xs text-muted mt-1">
-              用例 {{ status.execution.total }} 条 · 通过 {{ status.execution.pass ?? 0 }} · 跳过
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-baseline gap-x-2">
+              <span class="text-[14px] text-fg">{{ step.title.replace(/^[①-⑦]\s*/, '') }}</span>
+              <span class="text-[12px] text-muted-2">{{ step.hint }}</span>
+            </div>
+            <p class="mt-1 text-[13px] text-muted">{{ stepSummary(step.key) }}</p>
+
+            <p
+              v-if="step.key === 'execute' && status?.execution?.total"
+              class="mono mt-1 text-[12px] text-muted"
+            >
+              用例 {{ status.execution.total }} · 通过 {{ status.execution.pass ?? 0 }} · 跳过
               {{ status.execution.skip ?? 0 }} · 失败 {{ status.execution.fail ?? 0 }} · 脚本
-              {{ status.execution.scripts ?? 0 }} 个
-            </div>
-            <div v-if="step.key === 'design'" class="text-xs text-muted mt-1">
-              用例库共 <span class="text-fg">{{ caseCount }}</span> 条
-            </div>
-            <div v-if="step.key === 'design' && designGaps.length" class="mt-2 text-xs">
-              <div class="text-warn mb-1">待补资料（这些功能点没有原文依据，未生成用例）：</div>
-              <ul class="space-y-0.5">
-                <li v-for="gap in designGaps" :key="gap.function_point" class="text-muted">
-                  · <span class="text-fg-2">{{ gap.function_point }}</span>
-                  <span class="text-muted-2">（{{ GAP_REASONS[gap.reason] || gap.reason }}）</span>
+              {{ status.execution.scripts ?? 0 }}
+            </p>
+            <p v-if="step.key === 'design'" class="mono mt-1 text-[12px] text-muted">
+              用例库 {{ caseCount }} 条
+            </p>
+            <p v-if="step.key === 'author'" class="mono mt-1 text-[12px] text-muted">
+              脚本库 {{ scriptCount }} 个
+            </p>
+
+            <div v-if="step.key === 'design' && designGaps.length" class="mt-2">
+              <p class="text-[12px] text-warn">待补资料：这些功能点没有原文依据，未生成用例</p>
+              <ul class="mt-1 space-y-0.5">
+                <li v-for="gap in designGaps" :key="gap.function_point" class="text-[12px] text-muted">
+                  <span class="text-fg-2">{{ gap.function_point }}</span>
+                  <span class="text-muted-2"> — {{ GAP_REASONS[gap.reason] || gap.reason }}</span>
                 </li>
               </ul>
             </div>
-            <div v-if="step.key === 'author'" class="text-xs text-muted mt-1">
-              脚本库共 <span class="text-fg">{{ scriptCount }}</span> 个
-            </div>
 
-            <!-- 失败明细 -->
-            <div
-              v-if="step.key === 'execute' && status?.failures?.length"
-              class="mt-2 text-xs text-danger space-y-1"
-            >
-              <div v-for="(item, index) in status.failures" :key="index" class="flex items-start gap-1">
-                <AlertCircle class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+            <ul v-if="step.key === 'execute' && status?.failures?.length" class="mt-2 space-y-1">
+              <li
+                v-for="(item, i) in status.failures"
+                :key="i"
+                class="flex items-start gap-2 text-[12px] text-danger"
+              >
+                <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span class="truncate">{{ item.script_name }}：{{ item.failure }}</span>
-              </div>
-            </div>
+              </li>
+            </ul>
           </div>
 
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex shrink-0 items-center gap-1">
             <button
-              class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-line hover:bg-surface-2 disabled:opacity-40"
+              class="flex h-8 items-center gap-2 rounded-[8px] border border-line px-3 text-[13px] text-fg hover:bg-surface-3 disabled:opacity-40"
               :disabled="Boolean(busy) || Boolean(blocker(step.key))"
               :title="blocker(step.key) || '执行这一步'"
               @click="runStage(step.key)"
             >
-              <Play class="w-4 h-4" />
-              {{ busy === step.key ? '进行中…' : stepDone(step.key) ? '重跑' : '执行' }}
+              <Loader2 v-if="busy === step.key" class="h-3.5 w-3.5 animate-spin" />
+              <Play v-else class="h-3.5 w-3.5" />
+              {{ busy === step.key ? '进行中' : stepDone(step.key) ? '重跑' : '执行' }}
             </button>
             <router-link
               :to="`/project/${projectId}/${step.to}`"
-              class="flex items-center gap-1 px-2 py-1.5 text-sm text-accent hover:underline"
+              class="flex h-8 items-center gap-1 rounded-[8px] px-2 text-[13px] text-muted hover:bg-surface-3 hover:text-fg"
             >
-              查看 <ArrowRight class="w-3.5 h-3.5" />
+              查看 <ArrowRight class="h-3.5 w-3.5" />
             </router-link>
           </div>
-        </div>
-      </div>
+        </li>
+      </ol>
 
-      <p class="text-xs text-muted-2 mt-5">
-        「生成脚本」产出的是 pytest 骨架（每条用例一个文件、断言待补）；已补完断言的脚本执行时会得到真实的通过/失败。
-      </p>
-      <p v-if="promptRefs.length" class="text-xs text-muted-2 mt-2">
-        规则版本：{{ promptRefs.map((item) => item.ref).join(' · ') }}
-      </p>
+      <footer class="mt-4 space-y-1">
+        <p class="text-[12px] text-muted-2">
+          ⑤ 生成的是 pytest 骨架（每条用例一个文件、断言待补）；补完断言的脚本执行时才得到真实通过/失败。
+        </p>
+        <p v-if="promptRefs.length" class="mono text-[12px] text-muted-2">
+          规则 {{ promptRefs.map((item) => item.ref).join(' · ') }}
+        </p>
+      </footer>
     </div>
   </div>
 </template>

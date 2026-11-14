@@ -15,6 +15,42 @@ import {
 const route = useRoute()
 const router = useRouter()
 
+// 导航按「一次测试活动的顺序」分组：流程 → 产物 → 结果 → 资料。
+// 之前顶部横排 12 项平铺，扫一遍要读完 12 个词；分组后每层 2–3 项。
+const NAV: { group: string; items: { path: string; name: string }[] }[] = [
+  {
+    group: '流程',
+    items: [
+      { path: 'pipeline', name: '流水线' },
+      { path: 'runs', name: '运行记录' },
+      { path: 'approvals', name: '待审批' },
+    ],
+  },
+  {
+    group: '产物',
+    items: [
+      { path: 'cases', name: '用例' },
+      { path: 'scripts', name: '脚本' },
+    ],
+  },
+  {
+    group: '结果',
+    items: [
+      { path: 'executions', name: '执行' },
+      { path: 'reports', name: '报告' },
+      { path: 'bugs', name: '缺陷' },
+    ],
+  },
+  {
+    group: '资料',
+    items: [
+      { path: 'requirements', name: '项目资料' },
+      { path: 'knowledge', name: '知识库' },
+    ],
+  },
+  { group: '其他', items: [{ path: 'settings', name: '设置' }] },
+]
+
 const projectId = route.params.projectId as string
 const projectName = ref('加载中...')
 
@@ -171,39 +207,6 @@ function backToHome() {
         </div>
       </div>
 
-      <nav class="flex items-center gap-1">
-        <router-link
-          v-for="nav in [
-            { path: 'overview', name: '概览' },
-            { path: 'pipeline', name: '流水线' },
-            { path: 'runs', name: '运行记录' },
-            { path: 'executions', name: '执行' },
-            { path: 'approvals', name: '待审批' },
-            { path: 'bugs', name: '缺陷' },
-            { path: 'knowledge', name: '知识库' },
-            { path: 'requirements', name: '项目资料' },
-            { path: 'cases', name: '用例' },
-            { path: 'scripts', name: '脚本' },
-            { path: 'reports', name: '报告' },
-            { path: 'settings', name: '设置' },
-          ]"
-          :key="nav.path"
-          :to="`/project/${projectId}/${nav.path}`"
-          class="relative px-3 py-1.5 text-xs transition-colors"
-          :class="
-            route.path.includes(nav.path)
-              ? 'text-fg font-medium'
-              : 'text-muted hover:text-fg'
-          "
-        >
-          <span
-            v-if="route.path.includes(nav.path)"
-            class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-accent-solid rounded-full"
-          ></span>
-          {{ nav.name }}
-        </router-link>
-      </nav>
-
       <div class="flex items-center gap-3">
         <div class="w-48 relative">
           <Search class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-2" />
@@ -218,17 +221,17 @@ function backToHome() {
         <!-- 通知：有运行在等人工审批时高亮 -->
         <button
           @click="router.push(`/project/${projectId}/runs`)"
-          class="relative p-1.5 text-muted hover:text-fg-2"
+          class="relative p-2 text-muted hover:text-fg-2"
           title="待审批的运行"
         >
           <Bell class="w-4 h-4" />
           <span
             v-if="runsSummary.waiting > 0"
-            class="absolute -top-0.5 -right-0.5 min-w-3.5 h-3.5 px-1 rounded-full bg-red-500 text-white text-[10px] leading-3.5 text-center"
+            class="absolute -top-0.5 -right-0.5 min-w-3.5 h-3.5 px-1 rounded-full bg-danger text-white text-[10px] leading-3.5 text-center"
           >{{ runsSummary.waiting }}</span>
         </button>
         <!-- 运行时信息 -->
-        <button @click="openRuntime" class="p-1.5 text-muted hover:text-fg-2">
+        <button @click="openRuntime" class="p-2 text-muted hover:text-fg-2">
           <Settings class="w-4 h-4" />
         </button>
         <!-- 用户头像 -->
@@ -240,13 +243,36 @@ function backToHome() {
 
     <div class="flex flex-1 overflow-hidden">
       <!-- 左侧栏：项目结构（真实知识模块）+ 最近运行 -->
-      <aside class="w-56 bg-surface border-r border-line flex flex-col">
+      <aside class="w-60 bg-surface border-r border-line flex flex-col">
         <div class="flex-1 overflow-auto p-2">
-          <div class="text-xs font-medium text-muted-2 px-2 py-1.5">项目结构</div>
+          <!-- 导航：分组 + 每项 32px，选中项左侧一根 3px 竖条（全站唯一强调色） -->
+          <nav class="mb-3 space-y-3">
+            <div v-for="group in NAV" :key="group.group">
+              <p class="px-2 pb-1 text-[12px] text-muted-2">{{ group.group }}</p>
+              <div class="space-y-0.5">
+                <router-link
+                  v-for="item in group.items"
+                  :key="item.path"
+                  :to="`/project/${projectId}/${item.path}`"
+                  class="flex h-8 items-center rounded-[8px] px-2 text-[13px] transition-colors"
+                  :class="
+                    route.path.includes(item.path)
+                      ? 'state-bar bg-surface-3 text-fg'
+                      : 'text-muted hover:bg-surface-3 hover:text-fg'
+                  "
+                  :data-tone="route.path.includes(item.path) ? 'accent' : undefined"
+                >
+                  {{ item.name }}
+                </router-link>
+              </div>
+            </div>
+          </nav>
+
+          <div class="text-[12px] text-muted-2 px-2 py-2">项目结构</div>
           <div class="mb-1">
             <button
               @click="structureExpanded = !structureExpanded"
-              class="w-full flex items-center gap-1.5 px-2 py-1 rounded text-xs text-fg-2 hover:bg-surface-3"
+              class="w-full flex items-center gap-2 px-2 py-1 rounded text-xs text-fg-2 hover:bg-surface-3"
             >
               <ChevronRight
                 class="w-3 h-3 transition-transform"
@@ -272,7 +298,7 @@ function backToHome() {
 
         <!-- 最近运行 -->
         <div class="border-t border-line-soft p-2">
-          <div class="text-xs font-medium text-muted-2 px-2 py-1.5 flex items-center gap-1">
+          <div class="text-xs font-medium text-muted-2 px-2 py-2 flex items-center gap-1">
             <Clock class="w-3 h-3" />
             最近运行
           </div>
@@ -283,8 +309,8 @@ function backToHome() {
               @click="openRun(r.id)"
               class="w-full text-left px-2 py-1 rounded text-xs text-fg-3 hover:bg-surface-3"
             >
-              <div class="truncate font-mono text-[11px] text-fg-2">{{ r.id }}</div>
-              <div class="truncate text-[10px] text-muted-2">{{ r.module || '未标模块' }} · {{ shortTime(r.created_at) }}</div>
+              <div class="truncate mono text-[12px] text-fg-2">{{ r.id }}</div>
+              <div class="truncate text-[12px] text-muted-2">{{ r.module || '未标模块' }} · {{ shortTime(r.created_at) }}</div>
             </button>
             <div v-if="!recentRuns.length" class="px-2 py-1 text-xs text-muted-2">还没有运行记录</div>
           </div>
@@ -297,7 +323,7 @@ function backToHome() {
           <div class="text-center">
             <p class="text-sm text-fg-2">这个项目（<span class="font-mono text-xs">{{ projectId }}</span>）当前数据目录里不存在。</p>
             <p class="mt-1 text-xs text-muted-2">可能是换了数据目录，或者项目已被删除。</p>
-            <router-link to="/" class="mt-4 inline-block px-4 py-1.5 text-sm bg-accent-solid text-white rounded-lg hover:bg-blue-700">
+            <router-link to="/" class="mt-4 inline-block px-4 py-2 text-sm bg-accent-solid text-white rounded-lg hover:bg-blue-700">
               返回项目列表
             </router-link>
           </div>
@@ -309,7 +335,7 @@ function backToHome() {
     <!-- 底部环境状态栏 -->
     <div class="h-7 bg-surface-3 border-t border-line flex items-center px-4 gap-4 text-xs text-fg-3 flex-shrink-0">
       <span v-for="(item, key) in envStatus" :key="key" class="flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full" :class="item.ok ? 'bg-green-500' : 'bg-red-500'"></span>
+        <span class="w-1.5 h-1.5 rounded-full" :class="item.ok ? 'bg-success' : 'bg-danger'"></span>
         {{ item.label }}
       </span>
       <span class="ml-auto flex items-center gap-3 text-muted">
@@ -318,7 +344,7 @@ function backToHome() {
           运行中 {{ runsSummary.running }}
         </span>
         <span class="flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-warn"></span>
           待审批 {{ runsSummary.waiting }}
         </span>
         <span>最近运行 {{ runsSummary.total }} 条</span>

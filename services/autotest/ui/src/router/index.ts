@@ -23,7 +23,7 @@ const router = createRouter({
           path: '',
           // 字符串 redirect 不会替换 :projectId（vue-router 按字面量处理），
           // 点项目卡会跳到字面路径 /project/:projectId/cases → 无匹配 → 空白页。
-          redirect: (to) => `/project/${to.params.projectId}/overview`,
+          redirect: (to) => `/project/${to.params.projectId}/pipeline`,
         },
         {
           path: 'overview',
