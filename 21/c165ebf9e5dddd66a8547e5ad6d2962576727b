@@ -1,0 +1,18 @@
+apps/desktop/electron/main/model-discovery.ts
+  h_201ed4c689ac8b 123-142
+apps/desktop/electron/main/providers/in-app-providers.ts
+  h_201ed4c689ac8b 23,85,88-115,120-180,500,519-520,524-528,530,541,557-558
+apps/desktop/test/in-app-providers.test.mjs
+  h_201ed4c689ac8b 67-70,126-172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "21c165ebf9e5dddd66a8547e5ad6d2962576727b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
