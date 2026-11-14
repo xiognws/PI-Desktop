@@ -251,6 +251,10 @@ onBeforeUnmount(() => {
           <span class="text-success flex items-center gap-1"><CheckCircle class="w-4 h-4" /> 通过 {{ counts.pass }}</span>
           <span class="text-danger flex items-center gap-1"><XCircle class="w-4 h-4" /> 失败 {{ counts.fail }}</span>
           <span class="text-muted flex items-center gap-1"><Clock class="w-4 h-4" /> 跳过 {{ counts.skip }}</span>
+          <span
+            class="text-xs px-2 py-0.5 rounded bg-surface-3 text-fg-3"
+            title="真跑了断言的用例数 / 只是骨架跳过的用例数——骨架的绿不能算验过"
+          >真断言 {{ counts.pass + counts.fail }} · 骨架 {{ counts.skip }}</span>
           <span v-if="runEnd" class="text-muted-2 text-xs">replay 命中 {{ runEnd.replayHit ? '是' : '否' }} · 模型调用 {{ runEnd.modelCalls ?? 0 }}</span>
         </div>
 

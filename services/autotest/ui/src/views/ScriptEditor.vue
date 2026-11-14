@@ -409,6 +409,16 @@ onBeforeUnmount(() => {
         {{ currentScript?.name || '加载中...' }}
       </div>
       <span
+        v-if="currentScript?.assertion_state === 'skeleton'"
+        class="text-xs px-2 py-0.5 rounded border border-warn text-warn"
+        title="自动生成的骨架：执行时只会跳过，绿色不代表验过；补上断言后这里会变成「真断言」"
+      >骨架（未验）</span>
+      <span
+        v-else-if="currentScript?.assertion_state === 'asserted'"
+        class="text-xs px-2 py-0.5 rounded border border-success text-success"
+        :title="`${currentScript.assert_count} 条可判定断言`"
+      >真断言 {{ currentScript.assert_count }}</span>
+      <span
         v-if="currentScript?.case_missing"
         class="text-xs px-2 py-0.5 rounded border border-warn text-warn"
         title="生成这条脚本的用例已经被删除（例如资料缺口导致跳过用例）；重新设计用例后请确认是否重新生成脚本"
