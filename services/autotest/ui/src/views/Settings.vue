@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Save, Plug, Settings2, RefreshCw } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
 
 const activeTab = ref('system')
 const tabs = [
@@ -83,124 +84,114 @@ onMounted(loadRuntime)
 
 <template>
   <div class="min-h-screen bg-surface-2">
-    <header class="h-14 bg-surface border-b border-line flex items-center justify-between px-6">
-      <div class="flex items-center gap-2">
-        <button @click="$router.push('/')" class="text-sm text-muted hover:text-fg-2">← 返回工作台</button>
-      </div>
-      <h1 class="text-base font-medium text-fg">系统设置</h1>
-      <div class="w-8"></div>
+    <header class="flex h-14 items-center justify-between border-b border-line bg-surface px-6">
+      <button class="text-[13px] text-muted hover:text-fg" @click="$router.push('/')">← 返回工作台</button>
+      <h1 class="text-[15px] font-medium text-fg">系统设置</h1>
+      <span class="w-8"></span>
     </header>
 
-    <div class="flex max-w-6xl mx-auto p-6 gap-6">
-      <!-- 左侧设置菜单 -->
-      <aside class="w-48 bg-surface rounded-lg border border-line h-fit sticky top-6">
-        <div class="p-2">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            @click="activeTab = tab.id"
-            class="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm mb-0.5"
-            :class="activeTab === tab.id ? 'bg-accent-soft text-accent font-medium' : 'text-fg-3 hover:bg-surface-3'"
-          >
-            <component :is="tab.icon" class="w-4 h-4" />
-            {{ tab.name }}
-          </button>
-        </div>
+    <div class="mx-auto flex max-w-[1040px] gap-6 px-8 py-7">
+      <!-- 左侧：分组用文字标签，选中项一根竖条 -->
+      <aside class="sticky top-7 h-fit w-44 rounded-[12px] border border-line bg-surface p-2">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="mb-0.5 flex h-8 w-full items-center gap-2 rounded-[8px] px-2 text-[13px]"
+          :class="activeTab === tab.id ? 'state-bar bg-surface-3 text-fg' : 'text-muted hover:bg-surface-3 hover:text-fg'"
+          @click="activeTab = tab.id"
+        >
+          <component :is="tab.icon" class="h-4 w-4" />
+          {{ tab.name }}
+        </button>
       </aside>
 
-      <!-- 右侧设置内容 -->
-      <main class="flex-1 space-y-6">
-        <p v-if="runtimeError" class="px-4 py-2 text-xs text-danger bg-danger-soft border border-danger-line rounded-lg">{{ runtimeError }}</p>
+      <main class="flex-1 space-y-5">
+        <p v-if="runtimeError" class="rounded-[8px] border border-danger-line bg-danger-soft px-4 py-2 text-[12px] text-danger">{{ runtimeError }}</p>
 
-        <!-- 平台运行时：这一栏是「平台到底跑在哪、用什么解释器」的唯一答案 -->
-        <div class="bg-surface rounded-lg border border-line">
-          <div class="px-6 py-4 border-b border-line flex items-center justify-between">
-            <h2 class="text-base font-medium text-fg">平台运行时</h2>
-            <button @click="loadRuntime" :disabled="loading"
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-line rounded-lg hover:bg-surface-2 disabled:opacity-50">
-              <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" />
-              刷新
+        <!-- 平台运行时：平台跑在哪、用什么解释器的唯一答案 -->
+        <section class="rounded-[12px] border border-line bg-surface">
+          <div class="flex items-center justify-between border-b border-line px-5 py-3">
+            <h2 class="text-[13px] font-medium text-fg">平台运行时</h2>
+            <button
+              class="flex h-8 items-center gap-2 rounded-[8px] px-2 text-[12px] text-muted hover:bg-surface-3 hover:text-fg disabled:opacity-40"
+              :disabled="loading"
+              @click="loadRuntime"
+            >
+              <RefreshCw class="h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" /> 刷新
             </button>
           </div>
-          <div class="p-6 space-y-3 text-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-muted">状态</span>
-              <span :class="runtime.healthy ? 'text-success' : 'text-danger'">
-                {{ runtime.healthy ? '运行中' : '不可用' }}
+          <dl class="divide-y divide-line-soft text-[13px]">
+            <div class="flex items-center justify-between px-5 py-2.5">
+              <dt class="text-muted">状态</dt>
+              <dd><Badge :tone="runtime.healthy ? 'success' : 'danger'">{{ runtime.healthy ? '运行中' : '不可用' }}</Badge></dd>
+            </div>
+            <div class="flex items-center justify-between gap-4 px-5 py-2.5">
+              <dt class="flex-shrink-0 text-muted">Python 解释器</dt>
+              <dd class="mono min-w-0 truncate text-[12px] text-fg">{{ runtime.python || '（未配置）' }}</dd>
+            </div>
+            <div class="flex items-center justify-between px-5 py-2.5">
+              <dt class="text-muted">后端端口</dt>
+              <dd class="num text-[12px] text-fg">{{ runtime.backend_port ?? '（未知）' }}</dd>
+            </div>
+            <div class="flex items-start justify-between gap-4 px-5 py-2.5">
+              <dt class="flex-shrink-0 text-muted">项目工作空间</dt>
+              <dd class="mono break-all text-right text-[12px] text-fg">{{ runtime.workspace || '（未知）' }}</dd>
+            </div>
+            <div v-if="runtime.agents?.length" class="px-5 py-2.5">
+              <dt class="text-[12px] text-muted-2">平台侧阶段（模型由桌面端 Agent 提供）</dt>
+              <dd class="mt-2 flex flex-wrap gap-2">
+                <Badge v-for="a in runtime.agents" :key="a.id" tone="neutral">{{ a.name || a.id }}</Badge>
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <!-- MCP -->
+        <section v-if="activeTab === 'mcp'" class="rounded-[12px] border border-line bg-surface">
+          <div class="border-b border-line px-5 py-3">
+            <h2 class="text-[13px] font-medium text-fg">MCP 服务器</h2>
+          </div>
+          <p v-if="mcpServers.length === 0" class="px-5 py-4 text-[13px] text-muted-2">
+            平台没有登记 MCP 服务器。MCP 的启用与授权在桌面端的设置里管理。
+          </p>
+          <ul v-else class="divide-y divide-line-soft">
+            <li v-for="server in mcpServers" :key="server.id" class="flex items-center gap-3 px-5 py-2.5">
+              <span class="h-3 w-[3px]" :class="server.enabled ? 'bg-success' : 'bg-surface-4'"></span>
+              <div class="min-w-0 flex-1">
+                <p class="text-[13px] text-fg">{{ server.name }}</p>
+                <p class="mono truncate text-[12px] text-muted-2">{{ server.url }}</p>
+              </div>
+              <span class="text-[12px]" :class="server.enabled ? 'text-fg' : 'text-muted-2'">
+                {{ server.enabled ? '已启用' : '未启用' }}
               </span>
-            </div>
-            <div class="flex items-center justify-between gap-4">
-              <span class="text-muted flex-shrink-0">Python 解释器</span>
-              <span class="font-mono text-xs text-fg-2 truncate">{{ runtime.python || '（未配置）' }}</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-muted">后端端口</span>
-              <span class="font-mono text-xs text-fg-2">{{ runtime.backend_port ?? '（未知）' }}</span>
-            </div>
-            <div class="flex items-start justify-between gap-4">
-              <span class="text-muted flex-shrink-0">项目工作空间</span>
-              <span class="font-mono text-xs text-fg-2 break-all text-right">{{ runtime.workspace || '（未知）' }}</span>
-            </div>
-            <div v-if="runtime.agents?.length" class="pt-2 border-t border-line-soft">
-              <div class="text-muted mb-2">平台侧阶段（模型由桌面端 Agent 提供）</div>
-              <div class="flex flex-wrap gap-2">
-                <span v-for="a in runtime.agents" :key="a.id"
-                  class="px-2 py-0.5 text-xs bg-surface-3 text-fg-2 rounded">{{ a.name || a.id }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+            </li>
+          </ul>
+        </section>
 
-        <!-- MCP 插件 -->
-        <div v-if="activeTab === 'mcp'" class="bg-surface rounded-lg border border-line">
-          <div class="px-6 py-4 border-b border-line">
-            <h2 class="text-base font-medium text-fg">MCP 服务器</h2>
+        <!-- 系统 -->
+        <section v-if="activeTab === 'system'" class="rounded-[12px] border border-line bg-surface">
+          <div class="border-b border-line px-5 py-3">
+            <h2 class="text-[13px] font-medium text-fg">系统设置</h2>
           </div>
-          <div class="p-6">
-            <div v-if="mcpServers.length === 0" class="text-sm text-muted-2 py-4">
-              平台没有登记 MCP 服务器。MCP 的启用与授权在桌面端的设置里管理。
-            </div>
-            <div v-else class="space-y-3">
-              <div v-for="server in mcpServers" :key="server.id" class="flex items-center justify-between p-3 border border-line-soft rounded-lg">
-                <div class="flex items-center gap-3">
-                  <span class="w-2 h-2 rounded-full" :class="server.enabled ? 'bg-green-500' : 'bg-gray-300'"></span>
-                  <div>
-                    <div class="text-sm font-medium text-fg">{{ server.name }}</div>
-                    <div class="text-xs text-muted">{{ server.url }}</div>
-                  </div>
-                </div>
-                <span class="text-xs" :class="server.enabled ? 'text-green-500' : 'text-muted-2'">
-                  {{ server.enabled ? '已启用' : '未启用' }}
-                </span>
-              </div>
-            </div>
+          <div class="px-5 py-4">
+            <label class="block text-[12px] text-muted">项目工作空间路径</label>
+            <input
+              v-model="systemConfig.projectPath"
+              type="text"
+              class="mono mt-1 h-9 w-full rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg"
+            />
+            <p class="mt-1 text-[12px] text-muted-2">每个项目的数据（data.db、脚本、执行记录）都落在这个目录下。</p>
+            <p v-if="saveMessage" class="mt-2 text-[12px] text-success">{{ saveMessage }}</p>
+            <p v-if="saveError" class="mt-2 text-[12px] text-danger">{{ saveError }}</p>
           </div>
-        </div>
+        </section>
 
-        <!-- 系统设置 -->
-        <div v-if="activeTab === 'system'" class="bg-surface rounded-lg border border-line">
-          <div class="px-6 py-4 border-b border-line">
-            <h2 class="text-base font-medium text-fg">系统设置</h2>
-          </div>
-          <div class="p-6 space-y-4">
-            <div>
-              <label class="block text-sm text-fg-2 mb-1">项目工作空间路径</label>
-              <input v-model="systemConfig.projectPath" type="text"
-                class="w-full px-3 py-2 border border-line rounded-lg text-sm font-mono" />
-              <p class="text-xs text-muted-2 mt-1">
-                每个项目的数据（data.db、脚本、执行记录）都落在这个目录下。
-              </p>
-            </div>
-            <p v-if="saveMessage" class="text-xs text-success">{{ saveMessage }}</p>
-            <p v-if="saveError" class="text-xs text-danger">{{ saveError }}</p>
-          </div>
-        </div>
-
-        <!-- 保存按钮 -->
         <div class="flex justify-end">
-          <button @click="saveSettings" class="flex items-center gap-2 px-4 py-2 bg-accent-solid text-white rounded-lg hover:bg-blue-700">
-            <Save class="w-4 h-4" />
-            保存设置
+          <button
+            class="flex h-9 items-center gap-2 rounded-[8px] bg-accent-solid px-3 text-[13px] text-white hover:bg-accent"
+            @click="saveSettings"
+          >
+            <Save class="h-4 w-4" /> 保存设置
           </button>
         </div>
       </main>
