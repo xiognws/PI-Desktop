@@ -24,7 +24,9 @@ from autotest.prompts import catalog as prompt_catalog
 from autotest.prompts import load as load_prompt
 from autotest.workflow import analysis as analysis_service
 from autotest.workflow import cases as case_service
+from autotest.workflow import assertion_gen
 from autotest.workflow import consistency
+from autotest.workflow import dut_contract
 from autotest.workflow import script_state
 from autotest.workflow import execution as execution_service
 from autotest.workflow import grounding
@@ -635,7 +637,28 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
 
         scripts_dir = (server.WORKSPACE / project_id / "scripts").resolve()
         scripts_dir.mkdir(parents=True, exist_ok=True)
-        authored = script_service.author_scripts(cases, body.sdk)
+        # 有被测件契约就把断言生成出来；没有契约的用例继续出骨架（并进"待补接口"）。
+        contract = dut_contract.load(conn, project_id)
+        assertions: dict[str, list[str]] = {}
+        contract_notes: list[dict] = []
+        for case in cases:
+            function_point = str(case.get("function_point") or "")
+            entry = contract.get(function_point)
+            title = str(case.get("title") or "")
+            if entry is None:
+                contract_notes.append({"title": title, "function_point": function_point, "reason": "missing_contract"})
+                continue
+            try:
+                generated = assertion_gen.generate(
+                    case, entry, driver=contract.driver, imports=contract.imports
+                )
+            except assertion_gen.GenerationError as problem:
+                contract_notes.append(
+                    {"title": title, "function_point": function_point, "reason": str(problem)}
+                )
+                continue
+            assertions[title] = generated.body
+        authored = script_service.author_scripts(cases, body.sdk, assertions)
         # 脚本规则同样要可判定：骨架写成 assert True 或忘记 skip，执行器一跑就是绿的
         script_judgement = consistency.check_scripts(authored["scripts"])
 
@@ -692,8 +715,9 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             stage="authored",
             status="ok" if script_judgement["ok"] else "warning",
             summary=(
-                f"生成 {len(created)} 个 pytest 骨架"
-                + (f"（保留 {len(preserved)} 个已补断言的脚本）" if preserved else "")
+                f"生成 {len(created)} 个脚本"
+                + (f"（其中 {len(assertions)} 个带契约断言）" if assertions else "")
+                + (f"，保留 {len(preserved)} 个已补断言的脚本" if preserved else "")
                 + (
                     f"，不符合提示词规则 {len(script_judgement['issues'])} 处"
                     if not script_judgement["ok"]
@@ -717,6 +741,9 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "stats": authored["stats"],
         "preserved": preserved,
         "preserved_total": len(preserved),
+        "asserted_generated": len(assertions),
+        "skeleton_remaining": len(created) - len(assertions) - len(preserved),
+        "contract_notes": contract_notes[:20],
         "prompt": _prompt_marker("script-author"),
         "consistency": script_judgement,
     }
@@ -1139,6 +1166,58 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
         "consistency": report_judgement,
     }
     return _envelope(f"报告已生成：通过率 {result['pass_rate']}", data, run_id)
+
+
+class ContractIn(BaseModel):
+    driver: str = ""
+    imports: list[str] | None = None
+    entries: list[dict] = []
+
+
+@router.get("/dut-contract")
+def get_dut_contract(project_id: str) -> dict:
+    """被测件契约：每个功能点怎么驱动、从哪里读判定。
+
+    没有契约时返回空 entries —— 那意味着只能出骨架（断言生成需要接口信息）。
+    """
+    with _project_conn(project_id) as conn:
+        contract = dut_contract.load(conn, project_id)
+    return _envelope(
+        f"{len(contract.entries)} 个功能点已接入被测件",
+        {
+            "driver": contract.driver,
+            "imports": contract.imports,
+            "entries": [
+                {
+                    "function_point": entry.function_point,
+                    "factory": entry.factory,
+                    "arrange": entry.arrange,
+                    "observe": entry.observe,
+                    "expect": entry.expect,
+                    "tolerance": entry.tolerance,
+                }
+                for entry in contract.entries.values()
+            ],
+            "total": len(contract.entries),
+        },
+        "",
+    )
+
+
+@router.put("/dut-contract")
+def put_dut_contract(project_id: str, body: ContractIn) -> dict:
+    """写入契约。坏契约直接 400：宁可拒绝，也不要产出一批假断言。"""
+    payload = {
+        "driver": body.driver,
+        "imports": body.imports or [],
+        "entries": body.entries,
+    }
+    try:
+        with _project_conn(project_id) as conn:
+            contract = dut_contract.save(conn, project_id, payload)
+    except dut_contract.ContractError as problem:
+        raise HTTPException(status_code=400, detail=str(problem)) from problem
+    return _envelope(f"契约已保存：{len(contract.entries)} 个功能点", {"total": len(contract.entries)}, "")
 
 
 @router.get("/prompts")

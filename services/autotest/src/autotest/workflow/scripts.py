@@ -42,11 +42,7 @@ def test_{slug}():
 {expected_comment}
     # 判定用 env 而不是 sys.modules：本文件自己 import 过 pytest 也不算
     # "在 pytest 里跑"；PYTEST_CURRENT_TEST 只在 pytest 执行用例时存在。
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        import pytest
-
-        pytest.skip("自动生成的骨架：补充被测调用与断言后重新执行")
-    print({notice_literal})
+{body_or_skip}
 
 
 if __name__ == "__main__":
@@ -83,7 +79,16 @@ def _slug(case: dict) -> str:
     return "case_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
 
 
-def author_script(case: dict, sdk: str = "pytest") -> dict:
+SKELETON_BODY = '''    if "PYTEST_CURRENT_TEST" in os.environ:
+        import pytest
+
+        pytest.skip("自动生成的骨架：补充被测调用与断言后重新执行")
+    print({notice_literal})'''
+
+
+def author_script(
+    case: dict, sdk: str = "pytest", assertion_body: list[str] | None = None
+) -> dict:
     """把一条用例落成脚本文本。
 
     目前只有 pytest 一种 SDK；保留 `sdk` 参数是为了后续接其它执行器时
@@ -127,6 +132,12 @@ def author_script(case: dict, sdk: str = "pytest") -> dict:
         expected_literal=repr(expected),
         steps_comment=steps_comment,
         expected_comment=expected_comment,
+        # 有契约断言时直接把断言写进函数体，不再打印"骨架未实现"
+        body_or_skip=(
+            "\n".join(assertion_body)
+            if assertion_body
+            else SKELETON_BODY.format(notice_literal=repr(f"骨架未实现：{title}"))
+        ),
     )
 
     return {
@@ -143,9 +154,18 @@ def author_script(case: dict, sdk: str = "pytest") -> dict:
     }
 
 
-def author_scripts(cases: list[dict], sdk: str = "pytest") -> dict:
-    """批量生成，超过 200 条的部分丢弃（与用例上限一致）。"""
-    scripts = [author_script(case, sdk) for case in cases[:200]]
+def author_scripts(
+    cases: list[dict], sdk: str = "pytest", assertions: dict[str, list[str]] | None = None
+) -> dict:
+    """批量生成，超过 200 条的部分丢弃（与用例上限一致）。
+
+    `assertions` 是「用例标题 → 断言块」，由契约生成器产出；给了就写进函数体，
+    没给的用例仍然是骨架。
+    """
+    bodies = assertions or {}
+    scripts = [
+        author_script(case, sdk, bodies.get(str(case.get("title") or ""))) for case in cases[:200]
+    ]
     return {
         "scripts": scripts,
         "stats": {"total": len(scripts), "sdk": sdk, "lines": sum(item["stats"]["lines"] for item in scripts)},
