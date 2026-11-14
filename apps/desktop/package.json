@@ -25,7 +25,7 @@
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "bundle:python": "node ../../scripts/bundle-python-runtime.mjs",
     "stage:manual": "node ../../scripts/stage-desktop-manual.mjs",
-    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && electron-builder --dir",
+    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && electron-builder --dir -c.extraMetadata.piDistribution=zip",
     "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
     "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --mac --publish never",
     "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
