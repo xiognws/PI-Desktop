@@ -1,0 +1,14 @@
+services/autotest/ui/src/views/Knowledge.vue
+  h_201ed4c689ac8b 4-6,258-302,306-309,311-324,326-329,332-347,349-363,365-398,402-405,407-414,418-421,424,426-430,432,435,437,441,443
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c943da14b1d26c9044e0e4f1e9059e409df13abb",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
