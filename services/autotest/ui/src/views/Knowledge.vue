@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Search, Lightbulb, Upload, FileText, RefreshCw } from 'lucide-vue-next'
+import { Search, Upload, RefreshCw } from 'lucide-vue-next'
+import Badge from '@/components/Badge.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -253,173 +255,192 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col overflow-auto p-6">
-    <div class="flex items-start justify-between mb-6">
-      <div>
-        <h2 class="text-lg font-medium text-fg">知识库</h2>
-        <p class="text-sm text-muted mt-1">导入文档后按段落切分，Agent 出用例前先查这里；报告也会归档进来</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <input v-model="uploadModule" class="h-8 w-24 px-2 text-xs border border-line rounded-lg" placeholder="模块" />
-        <input v-model="uploadTags" class="h-8 w-24 px-2 text-xs border border-line rounded-lg" placeholder="标签" />
-        <input ref="fileInput" type="file" multiple class="hidden" @change="upload(($event.target as HTMLInputElement).files)" />
-        <button
-          class="flex items-center gap-2 px-4 py-2 bg-accent-solid text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
-          :disabled="busy"
-          @click="fileInput?.click()"
-        >
-          <Upload class="w-4 h-4" />
-          导入文件
-        </button>
-      </div>
-    </div>
+  <div class="flex-1 overflow-auto bg-surface-2">
+    <div class="mx-auto w-full max-w-[1100px] px-8 py-7">
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-[20px] font-medium text-fg">知识库</h1>
+          <p class="mt-1 text-[13px] text-muted">
+            文档按段落切分入库，生成用例时逐条回查这里；报告也会归档进来。
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+          <input v-model="uploadModule" class="h-9 w-24 rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg placeholder:text-muted-2" placeholder="模块" />
+          <input v-model="uploadTags" class="h-9 w-24 rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg placeholder:text-muted-2" placeholder="标签" />
+          <input ref="fileInput" type="file" multiple class="hidden" @change="upload(($event.target as HTMLInputElement).files)" />
+          <button
+            class="flex h-9 items-center gap-2 rounded-[8px] bg-accent-solid px-3 text-[13px] text-white hover:bg-accent disabled:opacity-40"
+            :disabled="busy"
+            @click="fileInput?.click()"
+          >
+            <Upload class="h-4 w-4" /> 导入文件
+          </button>
+        </div>
+      </header>
 
-    <!-- 检索 -->
-    <div class="max-w-6xl">
-      <div class="relative mb-2 max-w-xl">
-        <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-2" />
-        <input
-          v-model="kw"
-          type="text"
-          placeholder="搜索历史经验、用例、修复方案，如 DTC / 0x22"
-          class="w-full pl-9 pr-3 py-2 border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          @keydown.enter="searchKnowledge"
-        />
-      </div>
-      <div class="flex items-center gap-2 mb-6">
-        <input v-model="kwModule" class="h-8 w-36 px-2 text-xs border border-line rounded-lg" placeholder="限定模块（可选）" />
-        <input v-model="kwTags" class="h-8 w-36 px-2 text-xs border border-line rounded-lg" placeholder="限定标签（可选）" />
-        <button
-          class="h-8 px-4 text-xs rounded-lg bg-accent-solid text-white hover:bg-blue-700 disabled:opacity-60"
-          :disabled="busy"
-          @click="searchKnowledge"
-        >检索</button>
-        <span v-if="status" class="text-xs text-muted">{{ status }}</span>
+      <!-- 检索 -->
+      <div class="mt-5 rounded-[12px] border border-line bg-surface px-5 py-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="relative min-w-[260px] flex-1">
+            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-2" />
+            <input
+              v-model="kw"
+              type="text"
+              placeholder="搜历史经验、用例、修复方案，如 DTC / 0x22"
+              class="h-9 w-full rounded-[8px] border border-line bg-surface pl-9 pr-3 text-[13px] text-fg placeholder:text-muted-2 focus:border-accent focus:outline-none"
+              @keydown.enter="searchKnowledge"
+            />
+          </div>
+          <input v-model="kwModule" class="h-9 w-32 rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg placeholder:text-muted-2" placeholder="限定模块" />
+          <input v-model="kwTags" class="h-9 w-32 rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg placeholder:text-muted-2" placeholder="限定标签" />
+          <button
+            class="h-9 rounded-[8px] border border-line px-3 text-[13px] text-fg hover:bg-surface-3 disabled:opacity-40"
+            :disabled="busy"
+            @click="searchKnowledge"
+          >检索</button>
+          <span v-if="status" class="text-[12px] text-muted">{{ status }}</span>
+        </div>
       </div>
 
       <!-- 检索结果 -->
-      <div v-if="hits.length" class="space-y-4 mb-8">
-        <div class="flex items-center gap-2">
-          <h3 class="text-sm font-medium text-fg">检索结果</h3>
-          <span class="text-xs text-muted-2">{{ hits.length }} 条</span>
+      <section v-if="hits.length" class="mt-5 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div class="flex items-center justify-between border-b border-line px-5 py-2">
+          <h2 class="text-[13px] font-medium text-fg">检索结果</h2>
+          <span class="num text-[12px] text-muted-2">{{ hits.length }} 条</span>
         </div>
-        <div v-for="(hit, idx) in hits" :key="idx" class="bg-surface rounded-lg border border-line p-5 hover:border-accent-line">
-          <div class="flex items-center gap-2 mb-2">
-            <Lightbulb class="w-4 h-4 text-yellow-500" />
-            <span class="font-medium text-fg">{{ hit.title || hit.source_ref || '未命名段落' }}</span>
-            <span v-if="hit.module" class="text-xs px-2 py-0.5 rounded bg-accent-soft text-accent">{{ hit.module }}</span>
-            <span v-if="hit.score === null || hit.score === undefined" class="text-xs px-2 py-0.5 rounded bg-surface-3 text-muted">模糊匹配</span>
-            <button class="ml-auto text-xs text-accent hover:underline" @click="insertHit(hit)">加入上下文</button>
-            <button class="text-xs text-muted hover:underline" @click="copyHit(hit)">复制</button>
+        <article
+          v-for="(hit, idx) in hits"
+          :key="idx"
+          class="border-b border-line-soft px-5 py-3 last:border-b-0"
+        >
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span class="min-w-0 flex-1 truncate text-[13px] text-fg">{{ hit.title || hit.source_ref || '未命名段落' }}</span>
+            <Badge v-if="hit.module" tone="accent">{{ hit.module }}</Badge>
+            <Badge v-if="hit.score === null || hit.score === undefined" tone="neutral">模糊匹配</Badge>
+            <span v-if="hit.score !== null && hit.score !== undefined" class="num text-[12px] text-muted-2">
+              相关度 {{ Number(hit.score).toFixed(3) }}
+            </span>
+            <button class="text-[12px] text-fg hover:underline" @click="insertHit(hit)">加入上下文</button>
+            <button class="text-[12px] text-muted hover:text-fg" @click="copyHit(hit)">复制</button>
           </div>
-          <p class="text-sm text-fg-3 mb-3 leading-relaxed">{{ hit.excerpt || '' }}</p>
-          <div class="flex items-center justify-between text-xs text-muted-2">
-            <span>{{ hit.source_ref || '' }}</span>
-            <span v-if="hit.score !== null && hit.score !== undefined">相关度 {{ Number(hit.score).toFixed(3) }}</span>
-          </div>
-        </div>
-      </div>
+          <p class="mt-1.5 text-[13px] leading-6 text-muted">{{ hit.excerpt || '' }}</p>
+          <p class="mono mt-1 text-[12px] text-muted-2">{{ hit.source_ref || '' }}</p>
+        </article>
+      </section>
 
       <!-- 文档库 -->
-      <div class="flex items-center gap-2 mb-3">
-        <h3 class="text-sm font-medium text-fg">文档库</h3>
-        <span class="text-xs text-muted-2">
-          {{ visibleDocs.length }} 篇<span v-if="kwModule">（{{ kwModule }}）</span>
-          <span v-if="stats"> · 共 {{ stats.total.chunks }} 段</span>
-        </span>
-        <button
-          v-if="checkedIds.length"
-          class="ml-auto text-xs text-danger hover:underline"
-          @click="removeChecked()"
-        >删除选中 {{ checkedIds.length }}</button>
-        <button class="p-1 text-muted-2 hover:text-fg-2" :class="checkedIds.length ? '' : 'ml-auto'" @click="loadDocs"><RefreshCw class="w-3.5 h-3.5" /></button>
-      </div>
+      <section class="mt-5 overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-2">
+          <h2 class="text-[13px] font-medium text-fg">文档库</h2>
+          <span class="num text-[12px] text-muted-2">
+            {{ visibleDocs.length }} 篇<template v-if="kwModule">（{{ kwModule }}）</template>
+            <template v-if="stats"> · 共 {{ stats.total.chunks }} 段</template>
+          </span>
+          <button
+            v-if="checkedIds.length"
+            class="text-[12px] text-danger hover:underline"
+            @click="removeChecked()"
+          >删除选中 {{ checkedIds.length }}</button>
+          <button class="ml-auto text-muted-2 hover:text-fg" @click="loadDocs">
+            <RefreshCw class="h-3.5 w-3.5" />
+          </button>
+        </div>
 
-      <!-- 模块分组：点一下只筛文档库，不影响上面的检索条件 -->
-      <div v-if="stats && stats.modules.length" class="flex flex-wrap items-center gap-2 mb-3">
-        <button
-          class="text-xs px-2 py-1 rounded border"
-          :class="!kwModule ? 'bg-accent-soft border-accent-line text-accent' : 'bg-surface border-line text-fg-3'"
-          @click="kwModule = ''"
-        >全部 {{ stats.total.docs }}</button>
-        <button
-          v-for="m in stats.modules"
-          :key="m.module"
-          class="text-xs px-2 py-1 rounded border"
-          :class="kwModule === m.module ? 'bg-accent-soft border-accent-line text-accent' : 'bg-surface border-line text-fg-3'"
-          @click="kwModule = kwModule === m.module ? '' : m.module"
-        >{{ m.module }} {{ m.docs }}<span class="ml-1 text-muted-2">{{ m.chunks }} 段</span></button>
-      </div>
+        <!-- 模块分组：只筛文档库，不动上面的检索条件 -->
+        <div v-if="stats && stats.modules.length" class="flex flex-wrap items-center gap-1 border-b border-line px-3 py-2">
+          <button
+            class="h-7 rounded-[6px] px-2 text-[12px]"
+            :class="!kwModule ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
+            @click="kwModule = ''"
+          >全部 <span class="num">{{ stats.total.docs }}</span></button>
+          <button
+            v-for="m in stats.modules"
+            :key="m.module"
+            class="h-7 rounded-[6px] px-2 text-[12px]"
+            :class="kwModule === m.module ? 'bg-surface-3 text-fg' : 'text-muted hover:text-fg'"
+            @click="kwModule = kwModule === m.module ? '' : m.module"
+          >{{ m.module }} <span class="num text-muted-2">{{ m.docs }} / {{ m.chunks }} 段</span></button>
+        </div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div v-for="doc in visibleDocs" :key="doc.doc_id" class="bg-surface rounded-lg border border-line p-4 flex items-start gap-3">
-          <input
-            type="checkbox"
-            class="mt-1"
-            :checked="checkedIds.includes(doc.doc_id)"
-            @change="toggleCheck(doc.doc_id)"
-          />
-          <FileText class="w-5 h-5 text-muted-2 flex-shrink-0 mt-0.5" />
-          <div class="min-w-0 flex-1">
-            <div class="font-medium text-fg truncate">{{ doc.filename || doc.doc_id }}</div>
+        <div
+          v-for="doc in visibleDocs"
+          :key="doc.doc_id"
+          class="state-bar border-b border-line-soft px-5 py-3 last:border-b-0 hover:bg-surface-2"
+          :data-tone="'neutral'"
+        >
+          <div class="flex items-start gap-3">
+            <input
+              type="checkbox"
+              class="mt-1 h-3.5 w-3.5 flex-shrink-0 rounded-[3px]"
+              :checked="checkedIds.includes(doc.doc_id)"
+              @change="toggleCheck(doc.doc_id)"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="mono truncate text-[13px] text-fg">{{ doc.filename || doc.doc_id }}</p>
 
-            <div v-if="editingId !== doc.doc_id" class="text-xs text-muted-2 mt-1">
-              {{ moduleOf(doc) }} · {{ doc.chunk_count ?? 0 }} 段 · {{ shortTime(doc.created_at) }}
-              <span v-if="doc.tags" class="text-muted"> · {{ doc.tags }}</span>
-            </div>
-            <div v-else class="mt-2 space-y-2">
-              <input v-model="editModule" class="w-full h-7 px-2 text-xs border border-line rounded" placeholder="模块（留空 = 未分组）" />
-              <input v-model="editTags" class="w-full h-7 px-2 text-xs border border-line rounded" placeholder="标签，逗号分隔" />
-            </div>
+              <p v-if="editingId !== doc.doc_id" class="num mt-0.5 text-[12px] text-muted-2">
+                {{ moduleOf(doc) }} · {{ doc.chunk_count ?? 0 }} 段 · {{ shortTime(doc.created_at) }}
+                <span v-if="doc.tags" class="text-muted"> · {{ doc.tags }}</span>
+              </p>
+              <div v-else class="mt-1.5 flex flex-wrap items-center gap-2">
+                <input v-model="editModule" class="h-8 w-48 rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg placeholder:text-muted-2" placeholder="模块（留空 = 未分组）" />
+                <input v-model="editTags" class="h-8 w-48 rounded-[8px] border border-line bg-surface px-2 text-[12px] text-fg placeholder:text-muted-2" placeholder="标签，逗号分隔" />
+              </div>
 
-            <div class="flex items-center gap-3 mt-2">
-              <button class="text-xs text-accent hover:underline" @click="previewChunks(doc, 0)">查看切分</button>
-              <template v-if="editingId === doc.doc_id">
-                <button class="text-xs text-accent hover:underline" @click="saveEdit(doc)">保存</button>
-                <button class="text-xs text-muted-2 hover:text-fg-2" @click="editingId = ''">取消</button>
-              </template>
-              <button v-else class="text-xs text-muted hover:underline" @click="startEdit(doc)">改模块</button>
-              <button class="text-xs text-muted-2 hover:text-danger" @click="removeDoc(doc)">删除</button>
+              <div class="mt-1.5 flex items-center gap-4 text-[12px]">
+                <button class="text-fg hover:underline" @click="previewChunks(doc, 0)">查看切分</button>
+                <template v-if="editingId === doc.doc_id">
+                  <button class="text-fg hover:underline" @click="saveEdit(doc)">保存</button>
+                  <button class="text-muted hover:text-fg" @click="editingId = ''">取消</button>
+                </template>
+                <button v-else class="text-muted hover:text-fg" @click="startEdit(doc)">改模块</button>
+                <button class="text-muted hover:text-danger" @click="removeDoc(doc)">删除</button>
+              </div>
             </div>
           </div>
         </div>
-        <div v-if="!visibleDocs.length" class="col-span-2 text-center py-12 text-sm text-muted-2 bg-surface rounded-lg border border-line">
-          还没有文档，点右上「导入文件」
+
+        <div v-if="visibleDocs.length" class="flex items-center gap-2 border-t border-line px-5 py-2 text-[12px] text-muted-2">
+          <input type="checkbox" :checked="allChecked" class="h-3.5 w-3.5 rounded-[3px]" @change="toggleAll()" />
+          <span>全选本页 {{ visibleDocs.length }} 篇</span>
         </div>
-      </div>
-      <div v-if="visibleDocs.length" class="mt-2 flex items-center gap-2 text-xs text-muted">
-        <input type="checkbox" :checked="allChecked" @change="toggleAll()" />
-        <span>全选本页 {{ visibleDocs.length }} 篇</span>
-      </div>
+
+        <EmptyState
+          v-if="!visibleDocs.length"
+          class="m-5"
+          title="还没有文档"
+          hint="点右上「导入文件」把需求文档、协议表、历史报告导进来"
+        />
+      </section>
     </div>
 
     <!-- 切分预览 -->
-    <div v-if="chunkDoc" class="fixed inset-0 bg-black/30 flex items-center justify-center z-40" @click.self="chunkDoc = null">
-      <div class="w-[760px] max-h-[80vh] bg-surface rounded-lg shadow-lg flex flex-col">
-        <div class="h-11 px-4 flex items-center justify-between border-b border-line-soft">
-          <span class="text-sm font-medium text-fg">
+    <div v-if="chunkDoc" class="fixed inset-0 z-40 flex items-center justify-center bg-black/30" @click.self="chunkDoc = null">
+      <div class="flex max-h-[82vh] w-[780px] flex-col overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div class="flex h-11 items-center justify-between border-b border-line px-4">
+          <span class="mono truncate text-[13px] text-fg">
             {{ chunkDoc.doc.filename || chunkDoc.doc.doc_id }} · {{ chunkDoc.total }} 段
           </span>
-          <button class="text-muted-2 hover:text-fg" @click="chunkDoc = null">关闭</button>
+          <button class="text-[12px] text-muted hover:text-fg" @click="chunkDoc = null">关闭</button>
         </div>
-        <div class="flex-1 overflow-auto px-4 py-3 space-y-2">
-          <div v-for="(chunk, idx) in chunkDoc.chunks" :key="idx" class="border border-line-soft rounded">
-            <div class="px-3 py-1.5 bg-surface-2 text-xs text-fg-2 flex items-center gap-2">
-              <span class="truncate">{{ chunk.title || '未命名段落' }}</span>
-              <span class="ml-auto text-muted-2">{{ chunk.chars || 0 }} 字符</span>
+        <div class="flex-1 space-y-2 overflow-auto px-4 py-3">
+          <div v-for="(chunk, idx) in chunkDoc.chunks" :key="idx" class="overflow-hidden rounded-[8px] border border-line">
+            <div class="flex items-center gap-3 border-b border-line-soft bg-surface-2 px-3 py-1.5">
+              <span class="min-w-0 flex-1 truncate text-[12px] text-fg">{{ chunk.title || '未命名段落' }}</span>
+              <span class="num text-[12px] text-muted-2">{{ chunk.chars || 0 }} 字符</span>
             </div>
-            <div class="px-3 py-2 text-xs text-fg-3 whitespace-pre-wrap">{{ chunk.excerpt }}</div>
+            <div class="whitespace-pre-wrap px-3 py-2 text-[12px] leading-5 text-muted">{{ chunk.excerpt }}</div>
           </div>
         </div>
-        <div class="h-11 px-4 flex items-center justify-center gap-3 border-t border-line-soft text-xs text-fg-3">
+        <div class="flex h-11 items-center justify-center gap-3 border-t border-line text-[12px] text-muted">
           <button
-            class="px-2 py-1 border border-line rounded disabled:opacity-40"
+            class="h-7 rounded-[6px] border border-line px-2 text-fg disabled:opacity-40"
             :disabled="chunkOffset <= 0"
             @click="previewChunks(chunkDoc.doc, Math.max(0, chunkOffset - CHUNK_PAGE))"
           >上一页</button>
-          <span>{{ chunkOffset + 1 }} - {{ Math.min(chunkOffset + CHUNK_PAGE, chunkDoc.total) }} / {{ chunkDoc.total }}</span>
+          <span class="num">{{ chunkOffset + 1 }} - {{ Math.min(chunkOffset + CHUNK_PAGE, chunkDoc.total) }} / {{ chunkDoc.total }}</span>
           <button
-            class="px-2 py-1 border border-line rounded disabled:opacity-40"
+            class="h-7 rounded-[6px] border border-line px-2 text-fg disabled:opacity-40"
             :disabled="chunkOffset + CHUNK_PAGE >= chunkDoc.total"
             @click="previewChunks(chunkDoc.doc, chunkOffset + CHUNK_PAGE)"
           >下一页</button>
