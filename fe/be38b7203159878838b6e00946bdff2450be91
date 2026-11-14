@@ -1,0 +1,50 @@
+apps/desktop/electron/main/gen-ui-permissions.ts
+  h_201ed4c689ac8b 22
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 1093
+apps/desktop/resources/plugins/pi.session-orchestrator/UPSTREAM.md
+  h_201ed4c689ac8b 5
+apps/desktop/test/gen-ui-permissions.test.mjs
+  h_201ed4c689ac8b 60
+apps/desktop/test/session-orchestrator-delivery.test.mjs
+  h_201ed4c689ac8b 8
+apps/desktop/test/settings-developer-only-destinations.test.mjs
+  h_201ed4c689ac8b 155
+apps/desktop/test/settings-general.test.mjs
+  h_201ed4c689ac8b 217
+docs/adr/0385-sidebar-workline-strip.md
+  h_201ed4c689ac8b 6,12
+docs/adr/0386-sessiontask-delegation-card.md
+  h_201ed4c689ac8b 6,12
+docs/adr/0398-vendored-session-orchestrator-push-delivery.md
+  h_201ed4c689ac8b 1
+docs/adr/0399-remove-voice-feature.md
+  h_201ed4c689ac8b 1
+docs/adr/README.md
+  h_201ed4c689ac8b 435-436
+docs/notes/super-agent-mapping.md
+  h_201ed4c689ac8b 61,73
+docs/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 1500
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 401,1024
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 11660
+docs/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 8626,8642
+docs/zh-CN/adr/index.md
+  h_201ed4c689ac8b 324-325
+docs/zh-CN/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "febe38b7203159878838b6e00946bdff2450be91",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
