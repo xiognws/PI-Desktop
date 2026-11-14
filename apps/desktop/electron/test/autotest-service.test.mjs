@@ -70,6 +70,8 @@ test("resolveServiceDir 在源码不存在时返回 null 而不是猜一个路�
 
 test("resolvePythonRuntime 选自带 python，并带上 site-packages", async () => {
   clearEnv();
+  // 没有这条，测试就会随机器的 PATH 变化：自带运行时只在“不优先用户解释器”时胜出。
+  process.env.PI_PYTHON_STRATEGY = "bundled";
   const root = await mkdtemp(join(tmpdir(), "autotest-svc-"));
   try {
     const { moduleDir } = await makeRepo(root);
@@ -85,6 +87,9 @@ test("resolvePythonRuntime 选自带 python，并带上 site-packages", async ()
 
 test("resolvePythonRuntime 没有自带环境也没有显式配置时返回 null", async () => {
   clearEnv();
+  // 显式要求系统解释器：没有自带树可退，结果与机器上装了什么无关。
+  process.env.PI_PYTHON_STRATEGY = "system";
+  process.env.PATH = "";
   const root = await mkdtemp(join(tmpdir(), "autotest-svc-"));
   try {
     assert.equal(resolvePythonRuntime({ dataDir: root, moduleDir: root }), null);

@@ -133,7 +133,7 @@ export class HostProcess extends RuntimeHostProcess {
     // Every Bash/Core tool command inherits host-core's environment, so the
     // Python path is set here rather than per call: the runtime is a property of
     // the installation, not of the session that happens to run a script.
-    const python = resolvePythonRuntime();
+    const python = resolvePythonRuntime({ dataDir });
     const pythonPath = python.state === "present" ? pythonEnv(python.runtime, [
       join(dataDir, USER_SITE_DIR),
     ]) : null;

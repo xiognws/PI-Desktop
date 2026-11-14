@@ -1,8 +1,8 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { mkdir, readdir, readFile } from "node:fs/promises";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { getModuleDirectory } from "./module-path.ts";
 
 /**
@@ -15,11 +15,22 @@ import { getModuleDirectory } from "./module-path.ts";
  * and the pinned wheels into `<resources>/python`, and this module is the only
  * thing that decides where that tree is and whether it is still intact.
  *
- * Three layers, resolved here and nowhere else:
+ * The interpreter is chosen from four places, in this order, and this module is
+ * the only thing that decides:
  *
- *   <resources>/python/runtime/        the interpreter, read-only
+ *   1. `PI_DESKTOP_PYTHON` / `PI_AUTOTEST_PYTHON`  an explicit path
+ *   2. `<data>/python/venv`                        a venv the user owns — outside
+ *                                                  the install, so an update and
+ *                                                  a `pip install` never collide
+ *   3. a CPython on `PATH`                          the user's own interpreter
+ *   4. `<resources>/python/runtime`                 the bundled tree, last resort
+ *
+ * A customer's Python comes first because their libraries are the ones that know
+ * their files; the bundled tree exists so a machine without Python still works.
+ * What passes between the two is the library path, not the interpreter:
+ *
  *   <resources>/python/site-packages/  the bundled libraries, read-only
- *   <data>/python-site/                the user's own installs, writable, first
+ *   <data>/python-site/                the user's installs, writable, first
  *
  * The user layer comes first on `PYTHONPATH` so a customer who upgrades a
  * library keeps that upgrade across app updates, and so a reinstall never has
@@ -53,34 +64,83 @@ export const LIBRARY_DROP_DIR = "python-site-drop";
  */
 export const LIBRARY_WORKER = "install_libs.py";
 
+/** Where the interpreter we run came from; the UI names this. */
+export type PythonSource = "explicit" | "user-venv" | "system" | "bundled";
+
 export type PythonRuntime = {
-  /** Root of the bundled tree. */
+  /** Root of the tree this interpreter came from (its prefix's parent). */
   root: string;
-  /** `python.exe` (or `bin/python3`) inside `root`. */
+  /** `python.exe` (or `bin/python3`). */
   executable: string;
-  /** The interpreter's prefix, for `PYTHONHOME`. */
+  /** `PYTHONHOME` for the bundled tree; empty for an interpreter that owns its prefix. */
   home: string;
-  /** Bundled libraries, read-only. */
+  /**
+   * Library directory to prepend, or empty when this interpreter cannot use it.
+   *
+   * The bundled libraries are CPython 3.12 wheels with compiled extensions, so a
+   * 3.13 or a PyPy interpreter must not see them: importing a `_pydantic` built
+   * for another ABI is a crash, not a fallback.
+   */
   sitePackages: string;
+  /** Which step of the chain answered. */
+  source: PythonSource;
+  /** `major.minor` of the interpreter, when it could be probed. */
+  version?: string;
+  /** Root that holds `tools/` and `MANIFEST.json` (the bundled tree, when present). */
+  assetsRoot: string;
 };
 
 export type PythonRuntimeStatus =
   | { state: "missing"; reason: string }
   | { state: "present"; runtime: PythonRuntime };
 
+/**
+ * How hard to prefer the customer's own interpreter.
+ *
+ *  - `auto`     the chain below (default)
+ *  - `bundled`  never leave the shipped tree; for a machine whose own Python has
+ *               half its libraries and none of the reproducibility
+ *  - `system`   never fall back to the shipped tree; for a user who insists on
+ *               their own environment and wants a loud failure when it is missing
+ */
+export type PythonStrategy = "auto" | "bundled" | "system";
+
+export function pythonStrategyFromEnv(env: NodeJS.ProcessEnv = process.env): PythonStrategy {
+  const value = (env.PI_PYTHON_STRATEGY ?? "").trim().toLowerCase();
+  return value === "bundled" || value === "system" ? value : "auto";
+}
+
+export type ResolvePythonOptions = {
+  /** `<data>`; the user-owned venv and library folders hang off it. */
+  dataDir?: string;
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  /** Overrides `<resources>`, for a caller that knows its own layout. */
+  resourcesPath?: string;
+  /** Overrides the module-relative candidates, for tests and other hosts. */
+  moduleDir?: string;
+  /** Probe an interpreter's `major.minor`; injectable so tests can fake it. */
+  probe?: (executable: string) => string | undefined;
+  /** Whether an interpreter already imports the document libraries; injectable. */
+  canRunTools?: (executable: string) => boolean;
+  /** Overrides `PI_PYTHON_STRATEGY`. */
+  strategy?: PythonStrategy;
+};
+
 /** Same probe order as `resolveBuiltinSkillPath`: packaged, then a checkout. */
-function resourceCandidates(): string[] {
-  const moduleDir = getModuleDirectory(import.meta.url);
+function resourceCandidates(options: ResolvePythonOptions): string[] {
+  const moduleDir = options.moduleDir ?? getModuleDirectory(import.meta.url);
+  const resources = options.resourcesPath ?? process.resourcesPath ?? "";
   return [
-    join(process.resourcesPath || "", "python"),
+    resources ? join(resources, "python") : "",
     join(moduleDir, "../../resources/python"),
     join(moduleDir, "../../../resources/python"),
   ];
 }
 
-function executableIn(root: string): string | null {
+function executableIn(root: string, platform: NodeJS.Platform): string | null {
   const candidates =
-    process.platform === "win32"
+    platform === "win32"
       ? [join(root, RUNTIME_DIR, "python.exe")]
       : [join(root, RUNTIME_DIR, "bin", "python3"), join(root, RUNTIME_DIR, "bin", "python")];
   for (const candidate of candidates) {
@@ -89,60 +149,261 @@ function executableIn(root: string): string | null {
   return null;
 }
 
+/** Interpreter inside a venv or a prefix the user owns. */
+function userInterpreter(root: string, platform: NodeJS.Platform): string | null {
+  const candidates =
+    platform === "win32"
+      ? [join(root, "Scripts", "python.exe"), join(root, "python.exe")]
+      : [join(root, "bin", "python3"), join(root, "bin", "python")];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 /**
- * The runtime this build ships, or a reason it is absent.
+ * Interpreter candidates on `PATH`, in the order the shell would pick them.
  *
- * Absence is not an error at this level: a development checkout that has never
- * run the bundle script, and a Linux or macOS build that has no pinned runtime
- * yet, both land here. The caller decides whether that is a degraded feature or
- * a hard failure.
+ * Only names that are unambiguously CPython: the Microsoft Store aliases
+ * (`WindowsApps`) are skipped because they open the store instead of running.
  */
-export function resolvePythonRuntime(): PythonRuntimeStatus {
-  for (const root of resourceCandidates()) {
-    if (!root || !existsSync(root)) continue;
-    const executable = executableIn(root);
-    if (!executable) {
+function pathInterpreterCandidates(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+): string[] {
+  const pathValue = env.PATH ?? env.Path ?? "";
+  const separator = platform === "win32" ? ";" : ":";
+  const names =
+    platform === "win32" ? ["python.exe", "python3.exe"] : ["python3", "python"];
+  const found: string[] = [];
+  for (const directory of pathValue.split(separator)) {
+    const trimmed = directory.trim();
+    if (!trimmed) continue;
+    if (platform === "win32" && /\\WindowsApps$/i.test(trimmed)) continue;
+    for (const name of names) {
+      const candidate = join(trimmed, name);
+      if (!existsSync(candidate) || found.includes(candidate)) continue;
+      found.push(candidate);
+    }
+  }
+  return found;
+}
+
+const versionCache = new Map<string, string | undefined>();
+
+/** `major.minor` of an interpreter, or undefined when it cannot be asked. */
+export function probePythonVersion(executable: string): string | undefined {
+  if (versionCache.has(executable)) return versionCache.get(executable);
+  let version: string | undefined;
+  try {
+    const output = execFileSync(
+      executable,
+      ["-c", "import sys;print('%d.%d' % sys.version_info[:2])"],
+      { timeout: 8_000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const match = String(output).trim().match(/^(\d+)\.(\d+)$/);
+    if (match) version = `${match[1]}.${match[2]}`;
+  } catch {
+    version = undefined;
+  }
+  versionCache.set(executable, version);
+  return version;
+}
+
+/**
+ * The libraries the agent's document tools import, in one probe.
+ *
+ * A system interpreter is only worth preferring when it can already do the work:
+ * a bare `python` on `PATH` without openpyxl and pandas would make every
+ * spreadsheet read fail, which is worse than the bundled tree it replaced. One
+ * subprocess answers the whole question and the answer is cached per executable.
+ */
+const REQUIRED_LIBRARIES = ["openpyxl", "docx", "pptx", "pandas", "PIL", "pypdf"];
+const capabilityCache = new Map<string, boolean>();
+
+export function probePythonCapabilities(executable: string): boolean {
+  const cached = capabilityCache.get(executable);
+  if (cached !== undefined) return cached;
+  let usable = false;
+  try {
+    execFileSync(
+      executable,
+      ["-c", REQUIRED_LIBRARIES.map((name) => `import ${name}`).join(";")],
+      { timeout: 30_000, windowsHide: true, stdio: ["ignore", "ignore", "ignore"] },
+    );
+    usable = true;
+  } catch {
+    usable = false;
+  }
+  capabilityCache.set(executable, usable);
+  return usable;
+}
+
+/** The version the bundled libraries were built for, from the bundle manifest. */
+function bundledLibraryVersion(root: string): string | undefined {
+  try {
+    const manifest = JSON.parse(readFileSync(join(root, MANIFEST_FILE), "utf8")) as {
+      python?: unknown;
+    };
+    const text = typeof manifest.python === "string" ? manifest.python : "";
+    const match = text.match(/^(\d+)\.(\d+)/);
+    return match ? `${match[1]}.${match[2]}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function bundledRuntime(root: string, platform: NodeJS.Platform): PythonRuntime | null {
+  const executable = executableIn(root, platform);
+  if (!executable) return null;
+  return {
+    root,
+    executable,
+    home: join(root, RUNTIME_DIR),
+    sitePackages: join(root, SITE_PACKAGES_DIR),
+    source: "bundled",
+    version: bundledLibraryVersion(root),
+    assetsRoot: root,
+  };
+}
+
+/**
+ * The interpreter this installation should run.
+ *
+ * Ordered by who knows the customer's files best: their explicit choice, the venv
+ * they provisioned beside the app's data, their `PATH`, and only then the tree we
+ * ship. Each step is probed rather than assumed — a stale `python.exe` that cannot
+ * start must not shadow a working interpreter further down.
+ */
+export function resolvePythonRuntime(
+  options: ResolvePythonOptions = {},
+): PythonRuntimeStatus {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
+  const probe = options.probe ?? probePythonVersion;
+  const canRunTools = options.canRunTools ?? probePythonCapabilities;
+  const strategy = options.strategy ?? pythonStrategyFromEnv(env);
+  const bundledRoots = resourceCandidates(options).filter((root) => root && existsSync(root));
+  const bundledAssets = bundledRoots
+    .map((root) => bundledRuntime(root, platform))
+    .find((runtime) => runtime !== null);
+  const bundledVersion = bundledAssets?.version;
+
+  /** Libraries handed to an interpreter that is not the bundled one. */
+  const libraryDirFor = (version?: string): string =>
+    bundledAssets && bundledVersion && version === bundledVersion
+      ? bundledAssets.sitePackages
+      : "";
+
+  // An explicit path is a decision, not a hint: honoured under every strategy.
+  const explicit = (env.PI_DESKTOP_PYTHON ?? env.PI_AUTOTEST_PYTHON ?? "").trim();
+  if (explicit && existsSync(explicit)) {
+    const version = probe(explicit);
+    return {
+      state: "present",
+      runtime: {
+        root: dirname(explicit),
+        executable: explicit,
+        home: "",
+        sitePackages: libraryDirFor(version),
+        source: "explicit",
+        version,
+        assetsRoot: bundledAssets?.root ?? "",
+      },
+    };
+  }
+
+  if (strategy !== "bundled" && options.dataDir) {
+    const venv = join(options.dataDir, "python", "venv");
+    const executable = userInterpreter(venv, platform);
+    if (executable) {
+      const version = probe(executable);
+      return {
+        state: "present",
+        runtime: {
+          root: venv,
+          executable,
+          home: "",
+          sitePackages: libraryDirFor(version),
+          source: "user-venv",
+          version,
+          assetsRoot: bundledAssets?.root ?? "",
+        },
+      };
+    }
+  }
+
+  for (const executable of strategy === "bundled" ? [] : pathInterpreterCandidates(env, platform)) {
+    const version = probe(executable);
+    if (!version) continue;
+    const [majorText, minorText] = version.split(".");
+    const major = Number(majorText);
+    const minor = Number(minorText);
+    // 3.10 is the floor the agent's own scripts rely on; anything newer is fine.
+    if (major !== 3 || !Number.isFinite(minor) || minor < 10) continue;
+    // And it must already do the job. A `python` that cannot import openpyxl is
+    // not an upgrade over the tree we ship, it is a regression.
+    if (!canRunTools(executable)) continue;
+    return {
+      state: "present",
+      runtime: {
+        root: dirname(dirname(executable)),
+        executable,
+        home: "",
+        sitePackages: libraryDirFor(version),
+        source: "system",
+        version,
+        assetsRoot: bundledAssets?.root ?? "",
+      },
+    };
+  }
+
+  if (bundledAssets && strategy !== "system") {
+    return { state: "present", runtime: bundledAssets };
+  }
+
+  for (const root of bundledRoots) {
+    if (!executableIn(root, platform)) {
       return {
         state: "missing",
         reason: `${root} exists but has no interpreter at ${RUNTIME_DIR}/`,
       };
     }
-    return {
-      state: "present",
-      runtime: {
-        root,
-        executable,
-        home: join(root, RUNTIME_DIR),
-        sitePackages: join(root, SITE_PACKAGES_DIR),
-      },
-    };
   }
-  return { state: "missing", reason: "no bundled python tree in this build" };
+  return { state: "missing", reason: "no python interpreter found (bundled tree absent too)" };
 }
 
 /**
- * Environment for a child that should see the bundled libraries.
+ * Environment for a child that should see the right libraries.
  *
- * `PYTHONNOUSERSITE` keeps the customer's own `%APPDATA%\\Python` out of the
- * import path: a library they installed for their own projects must not
- * shadow the pinned one every time the agent reads a spreadsheet.
+ * A bundled interpreter needs `PYTHONHOME` pointing at its own prefix and
+ * `PYTHONNOUSERSITE` so the customer's per-user installs cannot shadow the pinned
+ * ones. A customer's own interpreter needs neither: setting `PYTHONHOME` on it
+ * breaks it outright, and suppressing the user site would throw away exactly the
+ * libraries that made it worth choosing. Only the library path is shared, and only
+ * when the two versions agree (see `PythonRuntime.sitePackages`).
  */
 export function pythonEnv(
   runtime: PythonRuntime,
   userSiteDirs: readonly string[] = [],
 ): NodeJS.ProcessEnv {
-  // One ordered list, most specific first: the customer's own installs win over
-  // the pinned bundle, and the bundle wins over nothing.
-  const entries = [...userSiteDirs.filter((dir) => dir.length > 0), runtime.sitePackages];
-  return {
+  const entries = [
+    ...userSiteDirs.filter((dir) => dir.length > 0),
+    ...(runtime.sitePackages ? [runtime.sitePackages] : []),
+  ];
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
-    PYTHONHOME: runtime.home,
-    PYTHONPATH: entries.join(delimiter),
-    PYTHONNOUSERSITE: "1",
     // Unbuffered so a long-running script's progress reaches the tool output
     // instead of arriving in one block when the process exits.
     PYTHONUNBUFFERED: "1",
   };
+  if (entries.length) env.PYTHONPATH = entries.join(delimiter);
+  else delete env.PYTHONPATH;
+  if (runtime.home) env.PYTHONHOME = runtime.home;
+  else delete env.PYTHONHOME;
+  if (runtime.source === "bundled") env.PYTHONNOUSERSITE = "1";
+  else delete env.PYTHONNOUSERSITE;
+  return env;
 }
 
 export type ManifestEntry = { path: string; sha256: string; size: number };
@@ -195,7 +456,7 @@ export async function verifyPythonRuntime(
   runtime: PythonRuntime,
   options: { limit?: number } = {},
 ): Promise<VerifyResult> {
-  const manifest = await readManifest(runtime.root);
+  const manifest = await readManifest(runtime.assetsRoot || runtime.root);
   if (!manifest) return { checked: 0, missing: [], corrupted: [] };
   const entries = options.limit ? manifest.files.slice(0, options.limit) : manifest.files;
   const missing: string[] = [];
@@ -254,7 +515,7 @@ export async function installDroppedLibraries(
   options: { execFile?: typeof execFile } = {},
 ): Promise<LibraryDropResult> {
   const run = options.execFile ?? execFile;
-  const script = join(runtime.root, "tools", LIBRARY_WORKER);
+  const script = join(runtime.assetsRoot || runtime.root, "tools", LIBRARY_WORKER);
   if (!existsSync(script)) {
     return { state: "no-runtime", reason: `${script} is missing from this build` };
   }

@@ -20,6 +20,8 @@ import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolvePythonRuntime as resolveSharedPythonRuntime } from "../main/python-runtime.ts";
+
 /** 本模块所在目录，用于在源码仓库里定位 `services/autotest`（测试可覆盖）。 */
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -73,29 +75,26 @@ export function resolveServiceDir(options: AutotestServiceOptions): string | nul
 
 export type PythonRuntime = { exe: string; home: string; sitePackages: string };
 
-/** 解释器：先用 Pi 自带的那份（3.12 + office 栈），再退到显式配置/系统 python。 */
+/**
+ * 解释器：与主进程共用同一条解析链（用户显式指定 → 数据目录里的 venv → PATH →
+ * 自带运行时）。
+ *
+ * 这里不再维护一份自己的顺序：两份规则曾经分叉——主进程跑工具用一个 Python、
+ * autotest 用另一个，同一台机器上两套库各说各话。`python-runtime.ts` 是唯一答案，
+ * autotest 只是把它提供的解释器拿去起 uvicorn。
+ */
 export function resolvePythonRuntime(options: AutotestServiceOptions): PythonRuntime | null {
-  const moduleDir = options.moduleDir ?? MODULE_DIR;
-  const bundled = [
-    options.resourcesPath ? join(options.resourcesPath, "python") : "",
-    join(moduleDir, "..", "..", "..", "..", "apps", "desktop", "resources", "python"),
-  ].filter((value) => value.trim().length > 0);
-  for (const root of bundled) {
-    const exe = interpreterIn(join(root, "runtime"));
-    if (existsSync(exe)) {
-      return { exe, home: join(root, "runtime"), sitePackages: join(root, "site-packages") };
-    }
-  }
-  const explicit = (process.env.PI_DESKTOP_PYTHON ?? process.env.PI_AUTOTEST_PYTHON ?? "").trim();
-  if (explicit && existsSync(explicit)) {
-    // 显式给的解释器可能来自另一份自带运行时（例如开发期复用的主 checkout），
-    // 若它是 `<pythonRoot>/runtime/python.exe` 形态，旁边的 site-packages 一并挂上。
-    const home = dirname(explicit);
-    const root = dirname(home);
-    const sitePackages = join(root, "site-packages");
-    return { exe: explicit, home, sitePackages: existsSync(sitePackages) ? sitePackages : "" };
-  }
-  return null;
+  const resolved = resolveSharedPythonRuntime({
+    dataDir: options.dataDir,
+    ...(options.resourcesPath ? { resourcesPath: options.resourcesPath } : {}),
+    ...(options.moduleDir ? { moduleDir: options.moduleDir } : {}),
+  });
+  if (resolved.state !== "present") return null;
+  return {
+    exe: resolved.runtime.executable,
+    home: resolved.runtime.home,
+    sitePackages: resolved.runtime.sitePackages,
+  };
 }
 
 /** 服务子进程的环境：只有一个解释器，依赖放 `.deps`，自带 site-packages 一并挂上。 */

@@ -433,7 +433,7 @@ export function createHostRuntime({
    * lands here is importable by the next tool call — no restart needed.
    */
   const drainLibraryDropFolder = async (): Promise<void> => {
-    const python = resolvePythonRuntime();
+    const python = resolvePythonRuntime({ dataDir });
     if (python.state !== "present") return;
     const drop = join(dataDir, LIBRARY_DROP_DIR);
     const site = join(dataDir, USER_SITE_DIR);
