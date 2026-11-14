@@ -1,0 +1,14 @@
+docs/handbook/Pi-Workspace-0.21.0-使用手册.md
+  h_201ed4c689ac8b 711,715-719,777-807,883,915-917
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "04b25eb7da1598605bdc419390026f1f1a3377c6",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
