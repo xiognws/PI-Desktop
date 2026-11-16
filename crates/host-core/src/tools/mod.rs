@@ -31,6 +31,7 @@ pub mod ignore_rules;
 mod image_dimensions;
 #[cfg(test)]
 mod inherited_python_env_tests;
+pub mod lsp;
 pub mod office;
 #[cfg(any(unix, test))]
 mod process_group;

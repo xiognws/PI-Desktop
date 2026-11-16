@@ -5,7 +5,10 @@
 1. Remote Gateway / WebUI remote control (the local loopback MCP control plane
    is an opt-in desktop-side exception, not a remote gateway)
 2. Cloud accounts and multi-device sync
-3. Full IDE (LSP, debugger, multi-file editor workspace)
+3. A full IDE: debugger, multi-file editor workspace, completion, formatting,
+   refactor actions, and any editor surface driven by the user. Read-only
+   symbol queries the agent invokes itself (definition, references, diagnostics)
+   are in scope under ADR 0401 and are not an exception to this item.
 4. A from-scratch agent loop replacing pi
 5. Full plugin marketplace at day one
 6. Mobile clients
