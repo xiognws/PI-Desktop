@@ -5,8 +5,17 @@
 //! server is narrower — "where is this defined", "who else calls this", "what does
 //! the compiler already know is wrong here" — answered in one round trip.
 //!
-//! Stage 1 (this module) is the wire: framing and message shapes, tested without a
-//! server. Process lifecycle, the initialize handshake and per-language server
-//! discovery come next, and they are the parts that need the real binaries.
+//! Stages follow ADR 0401 and each is useful on its own:
+//!
+//! 1. `framing` — the wire format, tested without a server (done).
+//! 2. `session` — one server process per language, responses correlated by id,
+//!    bounded timeouts, deterministic shutdown (done).
+//! 3. the three tools that call it (next).
+//!
+//! Until stage 3 lands nothing outside this module's tests constructs a session, so
+//! the module reads as dead code to the compiler. The allow below is deliberate and
+//! local rather than a repo-wide relaxation: delete it when the tools arrive.
+#![allow(dead_code)]
 
 pub mod framing;
+pub mod session;

@@ -83,18 +83,6 @@ pub fn validate_stream_rules_setting(value: &Value) -> Result<(), String> {
     Ok(())
 }
 
-/// Rule ids in stored order, for callers that only need to know what is configured.
-pub fn stream_rule_ids(value: &Value) -> Vec<String> {
-    let Some(rules) = value.as_array() else {
-        return Vec::new();
-    };
-    rules
-        .iter()
-        .filter_map(|rule| rule.get("id").and_then(Value::as_str))
-        .map(str::to_string)
-        .collect()
-}
-
 fn string_field(value: Option<&Value>) -> &str {
     value.and_then(Value::as_str).unwrap_or("")
 }

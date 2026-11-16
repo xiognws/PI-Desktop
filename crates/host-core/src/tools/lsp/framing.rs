@@ -1,18 +1,18 @@
-/**
- * LSP wire framing, and nothing else.
- *
- * The Language Server Protocol puts JSON-RPC messages on a stream as
- * `Content-Length: N\r\n\r\n<N bytes>` frames. Getting that wrong is invisible
- * until a real server desynchronizes halfway through a session and every later
- * request answers the wrong one, so the codec lives alone here with tests rather
- * than inside the session code where reading a stream is mixed with process
- * lifecycle.
- *
- * This module has no I/O: it takes bytes and returns messages, or takes a message
- * and returns bytes. That is what makes the failure cases (a partial frame, a
- * header without a length, a body shorter than its declared length) testable
- * without spawning a language server.
- */
+//!
+//! LSP wire framing, and nothing else.
+//!
+//! The Language Server Protocol puts JSON-RPC messages on a stream as
+//! `Content-Length: N\r\n\r\n<N bytes>` frames. Getting that wrong is invisible
+//! until a real server desynchronizes halfway through a session and every later
+//! request answers the wrong one, so the codec lives alone here with tests rather
+//! than inside the session code where reading a stream is mixed with process
+//! lifecycle.
+//!
+//! This module has no I/O: it takes bytes and returns messages, or takes a message
+//! and returns bytes. That is what makes the failure cases (a partial frame, a
+//! header without a length, a body shorter than its declared length) testable
+//! without spawning a language server.
+//!
 
 /** A decoded frame: the JSON payload only; headers other than the length are ignored. */
 #[derive(Debug, Clone, PartialEq, Eq)]
