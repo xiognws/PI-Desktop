@@ -1,0 +1,18 @@
+docs/adr/mode-definitions.md
+  h_201ed4c689ac8b 111,114
+docs/handbook/Pi-Workspace-0.21.0-使用手册.md
+  h_201ed4c689ac8b 284,286
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 389,393
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f2794854b3c7a12e1a682f1df611fa536089318a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
