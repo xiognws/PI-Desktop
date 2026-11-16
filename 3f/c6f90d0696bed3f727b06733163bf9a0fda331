@@ -1,0 +1,19 @@
+services/autotest/ui/src/views/Pipeline.vue
+  s_64f9b3c01ed37b::t_563d1888bdc0ee 317-327,331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3fc6f90d0696bed3f727b06733163bf9a0fda331",
+  "prompts": {},
+  "sessions": {
+    "s_64f9b3c01ed37b": {
+      "agent_id": {
+        "tool": "dsh",
+        "id": "session-d790956b-609e-481a-953d-0547f5a7b1a3",
+        "model": "8859"
+      },
+      "human_author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
