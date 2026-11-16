@@ -1,0 +1,18 @@
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 717-720,784-788,805-808,826-829,837-839,1307-1362
+services/autotest/tests/test_contract_scaffold.py
+  h_201ed4c689ac8b 1-97
+services/autotest/ui/src/views/Pipeline.vue
+  h_201ed4c689ac8b 57-80,269,419-430,507-528
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e442a210e54b1f96f8d0869706b3c50b5b7c89ee",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
