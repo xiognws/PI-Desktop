@@ -9,6 +9,7 @@ import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
 import { WidgetRegistry } from "./widgets/index.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
+import { parseStreamRules } from "./stream-rules.js";
 import { hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
@@ -137,6 +138,8 @@ type RuntimeParams = {
   infiniteProviderRetry?: boolean;
   /** Session `/fast` switch AND the model's opt-in, resolved by main (ADR 0334). */
   fastMode?: boolean;
+  /** Stream rules from settings. Validated here: the renderer supplies the list. */
+  streamRules?: unknown;
   /** Background skill review policy, resolved by Electron main (see runtime.ts). */
   skillReview?: SkillReviewPolicy;
   /** Opt-in TypeSafe classifier credential resolved by Electron main. */
@@ -283,6 +286,17 @@ async function runtimeFor(
   // attributed to its cause (#1948) instead of surfacing only as a reset.
   const mismatch = existing?.firstMismatch(config) ?? null;
   const reusable = existing && mismatch === null ? existing : undefined;
+  // Stream rules arrive from settings, so they are untrusted here: a pattern that does
+  // not compile must not become a runtime that silently ignores every rule. Report the
+  // rule by name and run without rules rather than failing the turn.
+  const streamRuleResult = params.streamRules === undefined
+    ? ({ ok: true, rules: [] } as const)
+    : parseStreamRules(params.streamRules);
+  const streamRules = streamRuleResult.ok ? streamRuleResult.rules : [];
+  if (!streamRuleResult.ok) {
+    console.error(`[runtime] stream rules rejected (session=${sessionId}): ${streamRuleResult.error}`);
+  }
+
   if (existing && !reusable) {
     console.error(
       `[runtime] rebuilding ${sessionId}: runtime config mismatch (${mismatch ?? "unknown"})`,
@@ -294,6 +308,7 @@ async function runtimeFor(
     reusable.setPluginSkills(pluginSkills);
     reusable.setCompactionSettings(params.compactionSettings);
     reusable.setInfiniteProviderRetry(params.infiniteProviderRetry === true);
+    reusable.setStreamRules(streamRules);
     reusable.setFastMode(params.fastMode === true);
     reusable.setMode(mode, modeDefinition);
     return reusable;
@@ -395,6 +410,7 @@ async function runtimeFor(
       });
     }
   }
+  runtime.setStreamRules(streamRules);
   return runtime;
 }
 
