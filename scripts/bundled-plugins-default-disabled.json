@@ -1,5 +1,9 @@
 {
   "//": "Bundled plugins this build ships but must not start by themselves. Ids listed here are stamped with \"enabledByDefault\": false in the manifest scripts/sync-bundled-plugins.mjs expands into apps/desktop/resources/plugins. Host-core creates the row from that flag on first boot and, on every later launch, keeps whatever the user chose (crates/host-core/src/plugins/registry.rs), so this file decides only the state of a machine that has never seen the plugin.",
   "//community.workbuddy-connect": "Retired into the app (ADR 0397): the in-app provider gateway runs this bridge, and the plugin itself is now listed in bundled-plugins-excluded.json so it cannot ship. An entry here would only matter for a machine that still has the plugin installed, which the exclusion takes care of.",
-  "defaultDisabled": []
+  "defaultDisabled": [],
+  "//defaultDisabledOnPlatforms": "Ids that ship switched off on one platform only. A plugin whose implementation cannot run on a platform must not arrive enabled there: it lists as a working tool, opens an empty panel and reports nothing, which is worse than not offering it. `local.terminal` drives the shell through embedded Python `pty`/`fcntl`/`termios`/`pwd` modules and defaults to `/bin/zsh`, so it only runs on macOS.",
+  "defaultDisabledOnPlatforms": {
+    "win32": ["local.terminal"]
+  }
 }

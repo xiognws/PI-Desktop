@@ -32,23 +32,53 @@ export function parseDefaultDisabled(text, label = DEFAULT_DISABLED_FILE) {
   } catch (error) {
     throw new Error(`${label}: ${error.message}`);
   }
-  const raw = document?.defaultDisabled;
+  const ids = readIdList(document?.defaultDisabled, label, "defaultDisabled");
+  // Platform-scoped entries: a plugin that cannot run on a platform must not
+  // arrive enabled there, where it would list as a working tool and then open an
+  // empty panel.
+  const rawPlatforms = document?.defaultDisabledOnPlatforms ?? {};
+  if (rawPlatforms === null || typeof rawPlatforms !== "object" || Array.isArray(rawPlatforms)) {
+    throw new Error(`${label}: defaultDisabledOnPlatforms must be an object of platform → plugin ids`);
+  }
+  const byPlatform = {};
+  for (const [platform, value] of Object.entries(rawPlatforms)) {
+    if (platform.startsWith("//")) continue;
+    if (!/^[a-z][a-z0-9]*$/.test(platform)) {
+      throw new Error(`${label}: defaultDisabledOnPlatforms keys must be platform names, got "${platform}"`);
+    }
+    byPlatform[platform] = readIdList(value, label, `defaultDisabledOnPlatforms.${platform}`);
+  }
+  return { ids, byPlatform, document };
+}
+
+/** Validate one list of plugin ids. */
+function readIdList(raw, label, field) {
   if (!Array.isArray(raw)) {
-    throw new Error(`${label}: defaultDisabled must be an array of plugin ids`);
+    throw new Error(`${label}: ${field} must be an array of plugin ids`);
   }
   const ids = [];
   for (const id of raw) {
     if (typeof id !== "string" || id.trim() === "") {
-      throw new Error(`${label}: defaultDisabled entries must be non-empty strings`);
+      throw new Error(`${label}: ${field} entries must be non-empty strings`);
     }
     if (!ids.includes(id)) ids.push(id);
   }
-  return { ids, document };
+  return ids;
 }
 
-/** The declared ids, read from a repository root. */
-export function readDefaultDisabledIds(repoRoot) {
-  return parseDefaultDisabled(readFileSync(join(repoRoot, DEFAULT_DISABLED_FILE), "utf8")).ids;
+/**
+ * The declared ids for one platform, read from a repository root.
+ *
+ * The platform argument exists so a test can ask "what would a Windows build
+ * disable" without pretending to run on Windows.
+ */
+export function readDefaultDisabledIds(repoRoot, platform = process.platform) {
+  const parsed = parseDefaultDisabled(readFileSync(join(repoRoot, DEFAULT_DISABLED_FILE), "utf8"));
+  const ids = [...parsed.ids];
+  for (const id of parsed.byPlatform[platform] ?? []) {
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
 }
 
 /**

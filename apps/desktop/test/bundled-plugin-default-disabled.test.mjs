@@ -106,6 +106,36 @@ test("a malformed declaration fails loudly instead of shipping quietly", () => {
   ).ids, [WORKBUDDY]);
 });
 
+test("a plugin that only runs on one platform ships disabled on the others", () => {
+  // The list is about where the plugin can do its job. `local.terminal` drives
+  // the shell through macOS PTY modules, so a Windows build must not offer it as
+  // a working tool that opens an empty panel.
+  const windows = readDefaultDisabledIds(fileURLToPath(repo), "win32");
+  assert.ok(windows.includes("local.terminal"), "win32 must disable local.terminal");
+  const macos = readDefaultDisabledIds(fileURLToPath(repo), "darwin");
+  assert.ok(!macos.includes("local.terminal"), "macOS keeps the terminal enabled");
+
+  // The platform map parses on its own and still feeds the stamping step.
+  const parsed = parseDefaultDisabled(JSON.stringify({
+    defaultDisabled: ["pi.todo"],
+    defaultDisabledOnPlatforms: { win32: ["local.terminal"] },
+  }));
+  assert.deepEqual(parsed.byPlatform, { win32: ["local.terminal"] });
+  const stamped = withDefaultDisabled({ id: "local.terminal", enabledByDefault: true }, new Set(windows));
+  assert.equal(stamped.changed, true);
+  assert.equal(stamped.manifest.enabledByDefault, false);
+
+  // Malformed platform entries are rejected, not ignored.
+  assert.throws(
+    () => parseDefaultDisabled(JSON.stringify({ defaultDisabled: [], defaultDisabledOnPlatforms: [] })),
+    /must be an object/,
+  );
+  assert.throws(
+    () => parseDefaultDisabled(JSON.stringify({ defaultDisabled: [], defaultDisabledOnPlatforms: { "bad key": [] } })),
+    /platform names/,
+  );
+});
+
 test("the sync script stamps it and host-core keeps the user's own choice", () => {
   const sync = read("scripts/sync-bundled-plugins.mjs");
   assert.match(sync, /new Set\(readDefaultDisabledIds\(REPO\)\)/);
