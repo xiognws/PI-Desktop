@@ -1,0 +1,22 @@
+crates/host-core/src/tools/lsp.rs
+  h_201ed4c689ac8b 1-12
+crates/host-core/src/tools/lsp/framing.rs
+  h_201ed4c689ac8b 1-193
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 34
+docs/adr/0401-read-only-language-intelligence.md
+  h_201ed4c689ac8b 1-87
+docs/spec/01-product/02-non-goals.md
+  h_201ed4c689ac8b 8-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ce654907b8f69738648b8422fd69addd38ada52c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
