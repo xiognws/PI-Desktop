@@ -22,7 +22,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -43,6 +43,7 @@ const OUT = flag("out", join(REPO, "apps", "desktop", "release", "win-unpacked",
 const PYTHON = flag("python", "");
 const FROM = flag("from", "");
 const DRY_RUN = has("dry-run");
+const REFRESH = has("refresh");
 
 const lock = JSON.parse(await readFile(LOCK_PATH, "utf8"));
 const wheels = lock.extraWheels ?? [];
@@ -86,8 +87,75 @@ function resolvePython() {
 }
 
 const python = resolvePython();
-const siteDir = join(OUT, "site-packages");
 const wheelsDir = join(STAGING, "wheels");
+
+/*
+ * The assembled tree is cached, because electron-builder deletes `win-unpacked`
+ * on every packaging run: re-installing 360 wheels for an unchanged tree costs
+ * minutes each time. The fingerprint covers everything that decides the contents
+ * — interpreter version, platform, every wheel hash, every overlay — so a real
+ * change rebuilds and an unchanged lock only copies.
+ */
+const cacheRoot = join(STAGING, "installed");
+const cacheMarker = join(cacheRoot, "EXTRAS.json");
+const outMarker = join(OUT, "EXTRAS.json");
+const fingerprint = createHash("sha256")
+  .update(
+    JSON.stringify({
+      python: lock.python.version,
+      platform: lock.python.platform,
+      wheels: wheels.map((wheel) => `${wheel.name}==${wheel.version}:${wheel.sha256}`).sort(),
+      overlays: (lock.overlays ?? [])
+        .filter((entry) => entry.scope === "extras")
+        .map((entry) => [entry.type ?? "copy", entry.from ?? entry.file, entry.to, entry.replace ?? null]),
+    }),
+  )
+  .digest("hex");
+
+function readFingerprint(marker) {
+  try {
+    return JSON.parse(readFileSync(marker, "utf8")).fingerprint ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function markerBody(entries) {
+  return (
+    JSON.stringify(
+      {
+        schemaVersion: 2,
+        fingerprint,
+        python: lock.python.version,
+        platform: lock.python.platform,
+        builtAt: new Date().toISOString(),
+        wheels: wheels.map((wheel) => `${wheel.name}==${wheel.version}`),
+        entries,
+      },
+      null,
+      2,
+    ) + "\n"
+  );
+}
+
+const siteDir = join(cacheRoot, "site-packages");
+if (!REFRESH && readFingerprint(outMarker) === fingerprint && existsSync(join(OUT, "site-packages"))) {
+  console.log("  already assembled for this lock; nothing to do");
+  process.exit(0);
+}
+if (!REFRESH && readFingerprint(cacheMarker) === fingerprint && existsSync(siteDir)) {
+  const started = Date.now();
+  await rm(OUT, { recursive: true, force: true });
+  await mkdir(dirname(OUT), { recursive: true });
+  await cp(cacheRoot, OUT, {
+    recursive: true,
+    force: true,
+    filter: (source) => !source.split(/[\\/]/).includes("__pycache__"),
+  });
+  console.log(`  reused the cached tree → ${resolve(OUT)} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+  process.exit(0);
+}
+
 await mkdir(STAGING, { recursive: true });
 await mkdir(wheelsDir, { recursive: true });
 await writeFile(join(STAGING, "requirements.txt"), requirementsTxt());
@@ -167,22 +235,19 @@ if (smoke.length) {
 }
 
 const installed = await readdir(siteDir);
-await writeFile(
-  join(OUT, "EXTRAS.json"),
-  JSON.stringify(
-    {
-      schemaVersion: 1,
-      python: lock.python.version,
-      platform: lock.python.platform,
-      builtAt: new Date().toISOString(),
-      wheels: wheels.map((wheel) => `${wheel.name}==${wheel.version}`),
-      entries: installed.length,
-    },
-    null,
-    2,
-  ) + "\n",
+await writeFile(cacheMarker, markerBody(installed.length));
+const copyStarted = Date.now();
+// Publish the cached tree to the image; the cache stays authoritative.
+await rm(OUT, { recursive: true, force: true });
+await mkdir(dirname(OUT), { recursive: true });
+await cp(cacheRoot, OUT, {
+  recursive: true,
+  force: true,
+  filter: (source) => !source.split(/[\\/]/).includes("__pycache__"),
+});
+console.log(
+  `assembled: ${installed.length} entries, ${wheels.length} wheels → ${resolve(OUT)} (copied in ${((Date.now() - copyStarted) / 1000).toFixed(1)}s)`,
 );
-console.log(`assembled: ${installed.length} entries, ${wheels.length} wheels → ${siteDir}`);
 
 /** Copy a directory tree, skipping caches. */
 async function cpTree(from, to) {
