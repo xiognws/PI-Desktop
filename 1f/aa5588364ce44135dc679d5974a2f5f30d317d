@@ -1,0 +1,30 @@
+services/autotest/prompts/case-design.md
+  h_201ed4c689ac8b 3,29,67-69,72-73,76,78-80,82
+services/autotest/src/autotest/workflow/assertion_gen.py
+  h_201ed4c689ac8b 18,54-58,67-72,74-75
+services/autotest/src/autotest/workflow/dut_contract.py
+  h_201ed4c689ac8b 55-81
+services/autotest/src/autotest/workflow/exception_matrix.py
+  h_201ed4c689ac8b 35-68,77-90,163
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 696,717-721,794-800,846,1357
+services/autotest/src/autotest/workflow/script_state.py
+  h_201ed4c689ac8b 20-22,45-46
+services/autotest/tests/test_fixed_prompts.py
+  h_201ed4c689ac8b 42
+services/autotest/tests/test_generic_pipeline.py
+  h_201ed4c689ac8b 1-119
+services/autotest/tests/test_prompt_api.py
+  h_201ed4c689ac8b 80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1faa5588364ce44135dc679d5974a2f5f30d317d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
