@@ -12,6 +12,8 @@ from __future__ import annotations
 
 MAX_CASES = 200
 
+from . import exception_matrix
+
 SUPPORTED_TYPES = ("功能", "异常", "边界", "接口", "兼容")
 
 _TEMPLATES: dict[str, dict[str, object]] = {
@@ -232,6 +234,17 @@ def _reason_counts(
     return counts
 
 
+def _evidence_payload(point_evidence: list[dict]) -> dict | None:
+    primary = point_evidence[0] if point_evidence else None
+    if not primary:
+        return None
+    return {
+        "doc": primary.get("doc"),
+        "quote": primary.get("quote"),
+        "numbers": [_format_number(item) for item in (primary.get("numbers") or [])],
+    }
+
+
 def design_cases(
     prd_result: dict,
     types: list[str] | None = None,
@@ -239,6 +252,7 @@ def design_cases(
     evidence: dict[str, list[dict]] | None = None,
     reasons: dict[str, str] | None = None,
     skip_ungrounded: bool = True,
+    exception_budget: int = exception_matrix.DEFAULT_EXCEPTION_BUDGET,
 ) -> dict:
     """按功能点 × 测试类型生成用例。
 
@@ -260,6 +274,7 @@ def design_cases(
     cases: list[dict] = []
     levels = {"strong": 0, "weak": 0, "none": 0}
     uncovered: dict[str, dict] = {}
+    exception_gaps: dict[str, list[str]] = {}
 
     for point in function_points:
         name = str(point.get("name") or "").strip()
@@ -267,7 +282,50 @@ def design_cases(
             continue
         priority = str(point.get("priority") or "中")
         point_evidence = grounded_map.get(name) or []
+
+        # 异常不是一条模板：按依据能支撑的失效模式逐类生成（越界/边界/非法枚举/
+        # 通信超时/电气故障/上下电/并发重入/持久化）。依据支撑不了的类记进缺口。
+        matrix_emitted = False
+        if "异常" in chosen_types and point_evidence:
+            classes, gap_classes = exception_matrix.applicable(name, point_evidence, exception_budget)
+            primary = point_evidence[0] or {}
+            raw_numbers = [item for item in (primary.get("numbers") or []) if item.get("value") is not None]
+            for class_id in classes:
+                if len(cases) >= MAX_CASES:
+                    break
+                built = exception_matrix.build(class_id, name, point_evidence)
+                # 只有步骤/预期里真的引用了原文数值才算 strong —— 与既有判定同口径
+                built_text = " ".join(built["steps"]) + " ".join(built["expected"])
+                level = (
+                    "strong"
+                    if raw_numbers and _format_number(raw_numbers[0]) in built_text
+                    else "weak"
+                )
+                levels[level] += 1
+                cases.append(
+                    {
+                        "title": f"{name}-异常-{exception_matrix.label_of(class_id)}",
+                        "function_point": name,
+                        "case_type": "异常",
+                        "exception_class": class_id,
+                        "priority": exception_matrix.priority_for(name, point_evidence, priority),
+                        "precondition": built["precondition"],
+                        "steps": built["steps"],
+                        "expected": built["expected"],
+                        "grounding": level,
+                        "basis_reason": "ok",
+                        "evidence": _evidence_payload(point_evidence),
+                    }
+                )
+                matrix_emitted = True
+            if gap_classes:
+                exception_gaps[name] = exception_matrix.gap_labels(gap_classes)
+
         for case_type in chosen_types:
+            if case_type == "异常" and matrix_emitted:
+                # 已经按失效模式生成过，不再追加一条泛化的"异常输入"。
+                # 没有任何失效模式可写时（依据太薄）仍走条款路径，不能因此少一条反面用例。
+                continue
             if len(cases) >= MAX_CASES:
                 break
             spec = _TEMPLATES[case_type]
@@ -305,7 +363,6 @@ def design_cases(
 
             levels[level] += 1
             reason = "ok" if level != "none" else (reason_map.get(name) or "no_clause")
-            primary = point_evidence[0] if point_evidence else None
             cases.append(
                 {
                     "title": f"{name}-{spec['suffix']}",
@@ -317,23 +374,23 @@ def design_cases(
                     "expected": expected,
                     "grounding": level,
                     "basis_reason": reason,
-                    "evidence": (
-                        {
-                            "doc": primary.get("doc"),
-                            "quote": primary.get("quote"),
-                            "numbers": [_format_number(item) for item in (primary.get("numbers") or [])],
-                        }
-                        if primary
-                        else None
-                    ),
+                    "evidence": _evidence_payload(point_evidence),
                 }
             )
         if len(cases) >= MAX_CASES:
             break
 
     by_type: dict[str, int] = {}
+    by_exception_class: dict[str, int] = {}
+    exception_matrix_map: dict[str, list[str]] = {}
     for case in cases:
         by_type[case["case_type"]] = by_type.get(case["case_type"], 0) + 1
+        class_id = case.get("exception_class")
+        if class_id:
+            by_exception_class[class_id] = by_exception_class.get(class_id, 0) + 1
+            exception_matrix_map.setdefault(case["function_point"], []).append(
+                exception_matrix.label_of(class_id)
+            )
 
     return {
         "cases": cases,
@@ -348,5 +405,10 @@ def design_cases(
             "skipped": sum(len(item["case_types"]) for item in uncovered.values()),
             "uncovered": list(uncovered.values()),
             "generate_all": not skip_ungrounded,
+            # 异常覆盖面：每个功能点覆盖了哪些失效模式、还缺哪些依据
+            "exception_matrix": exception_matrix_map,
+            "exception_gaps": exception_gaps,
+            "by_exception_class": by_exception_class,
+            "exception_budget": exception_budget,
         },
     }

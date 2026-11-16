@@ -153,6 +153,34 @@ def _drop_stale_ungrounded(
     return removed
 
 
+def _drop_superseded_generic_exception(
+    conn: sqlite3.Connection, module: str, titles: list[str]
+) -> int:
+    """旧的泛化「-异常输入」被按失效模式拆开后，要把老那条删掉。
+
+    否则用例库里同一个功能点会同时挂着「X-异常输入」和「X-异常-越界值」，
+    数量看着涨了，其实一半是重复。只删本模块、且该功能点本轮已按失效模式
+    生成过用例的行；没有失效模式覆盖的功能点不动。
+    """
+    covered = {
+        title.rsplit("-异常-", 1)[0] for title in titles if "-异常-" in title
+    }
+    if not covered:
+        return 0
+    removed = 0
+    rows = conn.execute(
+        "SELECT id, title FROM test_cases WHERE COALESCE(module_id, '') = ?", (module,)
+    ).fetchall()
+    for row in rows:
+        title = str(row["title"])
+        if not title.endswith("-异常输入"):
+            continue
+        if title[: -len("-异常输入")] in covered:
+            conn.execute("DELETE FROM test_cases WHERE id = ?", (row["id"],))
+            removed += 1
+    return removed
+
+
 def _case_evidence_text(case: dict) -> str:
     """用例的依据落库：JSON（doc/quote/numbers + grounding 等级）。
 
@@ -164,6 +192,9 @@ def _case_evidence_text(case: dict) -> str:
         "reason": str(case.get("basis_reason") or ""),
         "evidence": case.get("evidence"),
     }
+    if case.get("exception_class"):
+        # 失效模式（越界/通信超时/上下电…）跟着依据一起存，列表页据此分组统计
+        payload["exception_class"] = str(case["exception_class"])
     if not payload["evidence"]:
         return json.dumps(
             {"grounding": payload["grounding"], "reason": payload["reason"], "evidence": None},
@@ -415,7 +446,9 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         # 之前生成过、这次因为"没依据"被跳过的空壳要从用例库里清掉，
         # 否则它们会一直挂在列表里，看着像已经覆盖了那个功能点。
         removed = _drop_stale_ungrounded(conn, module, set(case_ids))
+        superseded = _drop_superseded_generic_exception(conn, module, list(case_ids))
         result["stats"]["removed_stale"] = removed
+        result["stats"]["removed_generic_exception"] = superseded
         result["case_ids"] = case_ids
         store.append_step(
             conn,
@@ -450,6 +483,9 @@ def case_design(project_id: str, body: CaseDesignIn) -> dict:
         "grounding": result["stats"]["grounding"],
         "reasons": result["stats"].get("reasons") or {},
         "uncovered": result["stats"].get("uncovered") or [],
+        "exception_matrix": result["stats"].get("exception_matrix") or {},
+        "exception_gaps": result["stats"].get("exception_gaps") or {},
+        "by_exception_class": result["stats"].get("by_exception_class") or {},
         "consistency": result.get("consistency"),
         "prompt": result.get("prompt"),
         "skipped": result["stats"].get("skipped") or 0,

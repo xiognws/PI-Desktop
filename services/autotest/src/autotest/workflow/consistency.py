@@ -51,6 +51,11 @@ def check_case(case: dict) -> list[dict]:
         add("title", "标题为空")
     if case_type not in CASE_TYPES:
         add("case_type", f"类型 {case_type!r} 不在固定枚举里")
+    elif case_type == "异常":
+        # 异常用例按失效模式分（-异常-越界值 / -异常-通信超时 …），
+        # 老库里还有泛化的 -异常输入，两种都接受；别的一律不认。
+        if "-异常" not in title:
+            add("title", "异常用例标题应包含「-异常」与失效模式（如 -异常-越界值）")
     elif not title.endswith(TYPE_SUFFIX[case_type]):
         add("title", f"标题后缀应为 {TYPE_SUFFIX[case_type]}")
     if str(case.get("priority") or "") not in PRIORITIES:

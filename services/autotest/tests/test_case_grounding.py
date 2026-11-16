@@ -83,18 +83,20 @@ def test_grounded_cases_carry_the_real_threshold():
     result = case_service.design_cases(
         {"function_points": [{"name": "过流保护"}]}, types=["功能", "异常"], evidence=evidence
     )
-    assert result["stats"]["grounding"]["strong"] == 2
+    # 功能 1 条 + 异常按失效模式拆开（越界、边界都引用了原文 120A）
+    strong = [c for c in result["cases"] if c["grounding"] == "strong"]
+    assert len(strong) >= 3
 
     functional = result["cases"][0]
     assert functional["grounding"] == "strong"
     assert "120A" in " ".join(functional["steps"])
     assert "《CPM低软开发需求0409.docx》" in functional["precondition"]
 
-    abnormal = result["cases"][1]
-    joined = " ".join(abnormal["steps"])
+    out_of_range = next(c for c in result["cases"] if c.get("exception_class") == "out_of_range")
+    joined = " ".join(out_of_range["steps"])
     # 越界值按原文阈值外扩 10%：120A → 132A
     assert "132" in joined
-    assert "超出原文阈值 120A" in joined
+    assert "120A" in joined
 
 
 def test_cases_without_evidence_are_skipped_not_templated():

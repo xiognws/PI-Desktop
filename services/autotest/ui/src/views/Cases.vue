@@ -3,6 +3,7 @@ import { computed, ref, onMounted, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Plus, Star, X } from 'lucide-vue-next'
 import Badge from '@/components/Badge.vue'
+import { exceptionLabel, exceptionSummary } from '@/lib/exceptionClasses'
 import EmptyState from '@/components/EmptyState.vue'
 import 'jsmind/style/jsmind.css'
 import jsMind from 'jsmind'
@@ -16,6 +17,8 @@ let jm: any = null
 const cases = ref<any[]>([])
 // 断言覆盖：真断言 / 骨架 / 还没脚本。骨架跑出来也是绿的，所以要单独说清。
 const caseStates = ref({ asserted: 0, skeleton: 0, none: 0 })
+// 异常覆盖面：按失效模式统计（越界/边界/通信超时…），以及还没覆盖到的类别
+const exceptionStats = ref<{ total: number; byClass: Record<string, number> }>({ total: 0, byClass: {} })
 
 // 从后端加载用例
 async function loadCases() {
@@ -27,6 +30,10 @@ async function loadCases() {
       asserted: data.asserted_total ?? 0,
       skeleton: data.skeleton_total ?? 0,
       none: data.no_script_total ?? 0,
+    }
+    exceptionStats.value = {
+      total: data.exception_total ?? 0,
+      byClass: data.by_exception_class ?? {},
     }
   } catch (e) {
     console.error('加载用例失败', e)
@@ -583,6 +590,14 @@ watch(viewMode, (val) => {
         <span class="mono text-[12px] text-success">真断言 {{ caseStates.asserted }}</span>
         <span class="mono text-[12px] text-warn">骨架 {{ caseStates.skeleton }}</span>
         <span class="mono text-[12px] text-muted-2">无脚本 {{ caseStates.none }}</span>
+        <span
+          v-if="exceptionStats.total"
+          class="mono text-[12px] text-fg"
+          :title="exceptionSummary(exceptionStats.byClass)"
+        >
+          异常 {{ exceptionStats.total }}
+          <span class="text-muted-2">/ {{ Object.keys(exceptionStats.byClass).length }} 类</span>
+        </span>
 
         <div class="ml-auto flex items-center gap-1">
           <button
@@ -707,7 +722,12 @@ watch(viewMode, (val) => {
             {{ c.name }}
           </button>
           <span class="truncate text-[12px] text-muted">{{ c.module }}</span>
-          <span class="text-[12px] text-muted">{{ c.type }}</span>
+          <span class="text-[12px] text-muted">
+            {{ c.type }}
+            <span v-if="c.exception_class" class="block text-[12px] text-muted-2">
+              {{ exceptionLabel(c.exception_class) }}
+            </span>
+          </span>
           <span class="truncate text-[12px] text-muted-2">{{ c.tags.join(' · ') || '—' }}</span>
           <span class="text-[12px]" :class="c.priority === '高' ? 'text-danger' : c.priority === '中' ? 'text-warn' : 'text-muted-2'">
             {{ c.priority }}

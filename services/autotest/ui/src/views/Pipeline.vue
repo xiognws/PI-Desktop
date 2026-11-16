@@ -9,6 +9,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { AlertCircle, ArrowRight, Loader2, Play, RefreshCw } from 'lucide-vue-next'
+import { exceptionSummary } from '@/lib/exceptionClasses'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -44,6 +45,20 @@ const reference = ref('')
 const busy = ref('')
 // ③ 跳过哪些用例、为什么：这是"待补资料"清单，随设计结果一起显示。
 const designGaps = ref<{ function_point: string; reason: string; case_types: string[] }[]>([])
+// 异常覆盖面：这次设计覆盖了哪些失效模式、哪些功能点还缺异常依据
+const exceptionCoverage = ref<{ byClass: Record<string, number>; gaps: Record<string, string[]> }>({
+  byClass: {},
+  gaps: {},
+})
+
+// 汇总"还缺哪些失效模式"，同一类在多处缺失只报一次
+const gapClassesText = computed(() => {
+  const seen = new Set<string>()
+  for (const labels of Object.values(exceptionCoverage.value.gaps)) {
+    for (const label of labels) seen.add(label)
+  }
+  return Array.from(seen).join(' · ')
+})
 // 这一页的产出按哪一版固定提示词规则生成：规则在 services/autotest/prompts/ 里，改规则要升版本。
 const promptRefs = ref<{ stage: string; ref: string }[]>([])
 const message = ref('')
@@ -207,6 +222,10 @@ async function runStage(key: string) {
         body: JSON.stringify({ run_id: runId.value }),
       })
       designGaps.value = body.data?.uncovered || []
+      exceptionCoverage.value = {
+        byClass: body.data?.by_exception_class || {},
+        gaps: body.data?.exception_gaps || {},
+      }
       message.value = body.summary || '用例已生成'
     } else if (key === 'review') {
       const body = await api('/workflow/case-review', {
@@ -368,6 +387,22 @@ onMounted(async () => {
             <p v-if="step.key === 'author'" class="mono mt-1 text-[12px] text-muted">
               脚本库 {{ scriptCount }} 个
             </p>
+
+            <div
+              v-if="step.key === 'design' && Object.keys(exceptionCoverage.byClass).length"
+              class="mt-2"
+            >
+              <p class="text-[12px] text-fg-2">
+                异常覆盖 {{ exceptionSummary(exceptionCoverage.byClass) }}
+              </p>
+              <p
+                v-if="Object.keys(exceptionCoverage.gaps).length"
+                class="mt-0.5 text-[12px] text-muted-2"
+              >
+                {{ Object.keys(exceptionCoverage.gaps).length }} 个功能点还有失效模式因资料没写到而没出用例：
+                {{ gapClassesText }}
+              </p>
+            </div>
 
             <div v-if="step.key === 'design' && designGaps.length" class="mt-2">
               <p class="text-[12px] text-warn">待补资料：这些功能点没有原文依据，未生成用例</p>

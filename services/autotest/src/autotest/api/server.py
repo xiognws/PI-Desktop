@@ -493,7 +493,23 @@ async def list_cases(project_id: str):
         c["type"] = c.get("case_type", "正向")
         states = per_case.get(str(c.get("id") or ""), [])
         c["script_state"] = script_state.merge(states) if states else "none"
+        # 异常用例的失效模式（越界/边界/通信超时…）存在 evidence JSON 里，
+        # 列表页要按类别分组计数，就得在这一层解出来，不让前端各解一遍。
+        raw_evidence = c.get("evidence")
+        if raw_evidence:
+            try:
+                parsed = json.loads(raw_evidence) if isinstance(raw_evidence, str) else raw_evidence
+            except (TypeError, ValueError):
+                parsed = None
+            if isinstance(parsed, dict) and parsed.get("exception_class"):
+                c["exception_class"] = str(parsed["exception_class"])
         cases.append(c)
+
+    by_exception_class: dict[str, int] = {}
+    for c in cases:
+        class_id = c.get("exception_class")
+        if class_id:
+            by_exception_class[class_id] = by_exception_class.get(class_id, 0) + 1
 
     return {
         "cases": cases,
@@ -501,6 +517,9 @@ async def list_cases(project_id: str):
         "asserted_total": sum(1 for c in cases if c["script_state"] == "asserted"),
         "skeleton_total": sum(1 for c in cases if c["script_state"] == "skeleton"),
         "no_script_total": sum(1 for c in cases if c["script_state"] == "none"),
+        "by_exception_class": by_exception_class,
+        "exception_cases": sum(by_exception_class.values()),
+        "exception_total": sum(1 for c in cases if c.get("case_type") == "异常"),
     }
 
 

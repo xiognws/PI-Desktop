@@ -38,7 +38,8 @@ def test_prompt_files_are_all_registered_and_no_orphans() -> None:
 
 
 def test_ref_is_stable_and_versioned() -> None:
-    assert ref("case-design") == "autotest.case-design@1.0.0"
+    # 版本跟着 prompts/case-design.md 的 frontmatter 走（1.1.0 加了异常失效模式矩阵）
+    assert ref("case-design") == "autotest.case-design@1.1.0"
     assert load("case-design").ref == ref("case-design")
     # 正文指纹用于发现"改了内容忘了升版本"
     assert len(load("case-design").digest) == 12
