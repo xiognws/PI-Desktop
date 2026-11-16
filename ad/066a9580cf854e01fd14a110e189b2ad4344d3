@@ -1,0 +1,19 @@
+apps/desktop/electron/test/python-runtime-chain.test.mjs
+  s_64f9b3c01ed37b::t_27bdaeee24b0e4 59-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ad066a9580cf854e01fd14a110e189b2ad4344d3",
+  "prompts": {},
+  "sessions": {
+    "s_64f9b3c01ed37b": {
+      "agent_id": {
+        "tool": "dsh",
+        "id": "session-d790956b-609e-481a-953d-0547f5a7b1a3",
+        "model": "8859"
+      },
+      "human_author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
