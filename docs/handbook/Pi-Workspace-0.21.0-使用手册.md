@@ -281,7 +281,9 @@ Follow the repository conventions.
 | stage | `exit` | 有序闸门 | 无 |
 | stage | `next` | 下一个阶段；缺省即终点 | 无 |
 
+::: v-pre
 变量只有三种：`{{run.id}}`、`{{run.input}}`（启动 run 的那条消息）、`{{artifacts.<id>.path}}`，纯文本替换。
+:::
 
 ### 4.4 运行语义（决定你怎么写提示词）
 

@@ -108,8 +108,10 @@ Follow the repository conventions.
 | stage | `exit` | Ordered gates | none |
 | stage | `next` | Next stage; when absent, the stage is final | none |
 
+::: v-pre
 Variables are `{{run.id}}`, `{{run.input}}` (the message that started the run)
 and `{{artifacts.<id>.path}}`. Substitution is text-only.
+:::
 
 ### 3. Run semantics
 

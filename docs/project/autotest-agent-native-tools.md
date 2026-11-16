@@ -386,9 +386,11 @@ Agent 侧不做自动注入——这一点和你原方案完全一致，不需�
   被测件不一样。读写：`GET/PUT /api/projects/{id}/workflow/dut-contract`。
 * `expect.kind` 只有四种：`bool` / `number`（可带 `tolerance`）/ `contains` / `raises`。
   坏契约直接 400（缺字段、kind 不认识、功能点重复），**不入库**。
+::: v-pre
 * `{{number}}` / `{{number:1}}` 从用例的 `evidence.numbers` 取值，并**剥掉单位**
   （条款写 `3.65V`，写进代码是 `3.65`）。没有数值的用例直接报 `GenerationError`，
   不会生成"看起来在验"的空断言。
+:::
 * 生成的前置固定：`sys.path` 指向驱动所在目录 → `from <driver> import <imports>` →
   `dut = <factory>`。没有这段，断言调的是不存在的 `dut`，脚本连收集都过不去。
 * `script-author` 返回 `asserted_generated` / `skeleton_remaining` / `contract_notes`
