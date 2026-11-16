@@ -314,9 +314,21 @@ async function loadPrompts() {
   }
 }
 
+async function loadContractGap() {
+  // 进页面就把"缺被测件契约"的功能点摆出来：这是骨架补不上断言的真正原因，
+  // 不该只有点过「执行」之后才看得到。
+  try {
+    const body = await api('/workflow/dut-contract/scaffold')
+    contractGap.value = (body.data?.entries ?? []).map((item: { function_point: string }) => item.function_point)
+  } catch {
+    contractGap.value = []
+  }
+}
+
 onMounted(async () => {
   await refresh()
   await loadPrompts()
+  await loadContractGap()
 })
 </script>
 
