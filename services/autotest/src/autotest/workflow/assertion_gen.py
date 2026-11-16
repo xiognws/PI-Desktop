@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from autotest.workflow import exception_matrix
 from autotest.workflow.dut_contract import Entry
 
 PLACEHOLDER = re.compile(r"\{\{(number|over|under|near)(?::(\d+))?(?::([+-]))?\}\}")
@@ -50,6 +51,11 @@ def _numeric(text: str) -> str:
     return match.group(1)
 
 
+def _decimals(value: float) -> int:
+    text = f"{float(value):.10f}".rstrip("0")
+    return len(text.split(".")[1]) if "." in text else 0
+
+
 def _offset(raw: str, kind: str, sign: str) -> str:
     """把原文数值按占位符的类型偏移，返回写进代码的字面量（不带单位）。"""
     base = float(_numeric(raw))
@@ -58,8 +64,15 @@ def _offset(raw: str, kind: str, sign: str) -> str:
     ratio = OFFSET_RATIO[kind]
     if kind == "near":
         ratio = 0.01 if sign != "-" else -0.01
-    step = max(abs(base) * abs(ratio), 0.01)
+    # 与 workflow.exception_matrix 同口径（单一真相源）：越界按 10%，
+    # 但不小于原文精度（5.5V → 6.05V，5 次 → 6 次）；边界只动 1%。
+    if abs(ratio) < 0.05:
+        step = max(abs(base) * abs(ratio), 10 ** -max(_decimals(base) - 1, 2))
+    else:
+        step = exception_matrix.step_for(base)
     moved = base + step if (ratio > 0) else max(base - step, 0.0)
+    if float(moved).is_integer():
+        return str(int(moved))
     return f"{moved:.2f}".rstrip("0").rstrip(".")
 
 

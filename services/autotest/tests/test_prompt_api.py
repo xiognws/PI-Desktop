@@ -77,7 +77,7 @@ def test_prd_parse_and_case_design_报告提示词版本(client: TestClient) -> 
         json={"run_id": parsed["data"]["run_id"]},
     ).json()
 
-    assert designed["data"]["prompt"]["ref"] == "autotest.case-design@1.1.0"
+    assert designed["data"]["prompt"]["ref"] == "autotest.case-design@1.2.0"
     judgement = designed["data"]["consistency"]
     assert judgement["checked"] >= 1
     # 确定性模板产出的用例必须过自家的规则，否则规则本身就写歪了

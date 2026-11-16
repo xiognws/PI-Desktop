@@ -17,6 +17,9 @@ SKELETON_MARKERS = ("pytest.skip(", )
 # 恒真断言不算断言
 _TAUTOLOGY = re.compile(r"assert\s+(True|1\s*==\s*1)\b")
 _ASSERT_LINE = re.compile(r"^\s*assert\s+", re.MULTILINE)
+# `pytest.raises(...)` 也是真断言：被测件没抛异常它就失败。
+# 反面用例生成的正是这种断言，漏掉它会把"验过拒绝"的脚本判成骨架。
+_RAISES_LINE = re.compile(r"^\s*(?:with\s+)?pytest\.raises\(|^\s*with\s+pytest\.raises\(", re.MULTILINE)
 
 
 def classify(content: str | None) -> dict:
@@ -39,6 +42,8 @@ def classify(content: str | None) -> dict:
             continue
         asserts += 1
 
+    raises = len(_RAISES_LINE.findall(text))
+    asserts += raises
     state = "asserted" if asserts > 0 and not has_skip else "skeleton"
     return {"state": state, "asserts": asserts, "has_skip": has_skip}
 

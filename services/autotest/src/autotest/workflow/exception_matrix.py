@@ -32,18 +32,60 @@ class ExceptionClass:
 CLASSES: tuple[ExceptionClass, ...] = (
     ExceptionClass("out_of_range", "越界值", ("阈值", "范围", "限值", "最大值", "最小值", "上限", "下限"), needs_numbers=True),
     ExceptionClass("boundary", "边界值", ("阈值", "范围", "限值", "上限", "下限", "临界"), needs_numbers=True),
-    ExceptionClass("illegal_value", "非法枚举", ("状态", "模式", "档位", "枚举", "命令", "指令", "模式切换")),
-    ExceptionClass("comm_timeout", "通信超时", ("报文", "信号", "通信", "CAN", "LIN", "以太网", "总线", "周期")),
-    ExceptionClass("electrical", "电气故障", ("采样", "电压", "电流", "开路", "短路", "传感器", "保护")),
-    ExceptionClass("power_cycle", "上下电", ("上电", "下电", "掉电", "休眠", "唤醒", "复位", "初始化")),
-    ExceptionClass("concurrency", "并发重入", ("重复", "并发", "多次", "并行", "触发", "请求")),
-    ExceptionClass("persistence", "持久化", ("存储", "记录", "写入", "掉数据", "NVM", "Flash", "快照")),
+    # 关键词要覆盖不同类型的项目：嵌入式（报文/采样/上电）、上位机与接口
+    # （请求/响应/数据库/事务）、HMI（交互/状态/权限）。命中不了就不生成，不猜。
+    ExceptionClass(
+        "illegal_value",
+        "非法枚举",
+        ("状态", "模式", "档位", "枚举", "命令", "指令", "参数", "入参", "非法值", "未定义"),
+    ),
+    ExceptionClass(
+        "comm_timeout",
+        "通信超时",
+        ("报文", "信号", "通信", "CAN", "LIN", "以太网", "总线", "周期",
+         "网络", "接口", "请求", "响应", "超时", "第三方", "HTTP", "RPC"),
+    ),
+    ExceptionClass(
+        "electrical",
+        "电气故障",
+        ("采样", "电压", "电流", "开路", "短路", "传感器", "保护", "硬件"),
+    ),
+    ExceptionClass(
+        "power_cycle",
+        "上下电",
+        ("上电", "下电", "掉电", "休眠", "唤醒", "复位", "初始化", "启动", "重启", "冷启"),
+    ),
+    ExceptionClass(
+        "concurrency",
+        "并发重入",
+        ("重复", "并发", "多次", "并行", "触发", "请求", "同时", "幂等", "重入"),
+    ),
+    ExceptionClass(
+        "persistence",
+        "持久化",
+        ("存储", "记录", "写入", "掉数据", "NVM", "Flash", "快照",
+         "数据库", "缓存", "事务", "持久化", "落盘"),
+    ),
 )
 
 # 命中这些词说明失效后果涉及安全/硬件，优先级要抬到"高"。
 SAFETY_KEYWORDS = ("保护", "过压", "过流", "短路", "急停", "互锁", "失效", "安全", "烧", "熔断")
 
 DEFAULT_EXCEPTION_BUDGET = 3
+
+
+def step_for(value: float) -> float:
+    """越界步长：先按 10%，但不小于原文精度（整数就至少 1，一位小数就至少 0.1）。
+
+    5.5V 的越界值是 6.05V（+10%），5 次的越界值是 6 次（+1）；
+    统一用 1.0 会让 5.5V 变成 6.5V，统一用 0.01 会让"5 次"变成 5.5 次。
+    """
+    decimals = 0
+    text = f"{float(value):.10f}".rstrip("0")
+    if "." in text:
+        decimals = len(text.split(".")[1])
+    floor = 10 ** (-decimals) if decimals else 1.0
+    return max(abs(float(value)) * 0.10, floor)
 
 
 def _format(value: float, unit: str) -> str:
@@ -118,7 +160,7 @@ def build(class_id: str, name: str, evidence: list[dict]) -> dict:
     shown = "、".join(_format(v, u) for v, u in nums[:3])
 
     if class_id == "out_of_range" and first_value is not None:
-        step = max(abs(first_value) * 0.1, 1.0)
+        step = step_for(first_value)
         over = _format(first_value + step, first_unit)
         under = _format(max(first_value - step, 0.0), first_unit)
         return {

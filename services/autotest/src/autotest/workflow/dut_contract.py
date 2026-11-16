@@ -52,6 +52,33 @@ class Contract:
     def get(self, function_point: str) -> Entry | None:
         return self.entries.get(function_point)
 
+    def resolve(self, function_point: str) -> Entry | None:
+        """按功能点名找契约，允许"短名 ↔ 全名"的差异。
+
+        需求文档里的功能点常常是一整句（"登录失败锁定：连续 5 次密码错误后锁定 300 秒"），
+        而人写契约时只会写短名。严格相等匹配会让这类项目永远"缺契约"，
+        所以这里依次尝试：全名 → 冒号/逗号/括号前的短名 → 短名作为前缀唯一命中。
+        """
+        exact = self.entries.get(function_point)
+        if exact is not None:
+            return exact
+        head = function_point
+        for separator in ("：", ":", "，", ",", "（", "(", " - ", "—"):
+            if separator in head:
+                head = head.split(separator, 1)[0]
+        head = head.strip()
+        if head and head in self.entries:
+            return self.entries[head]
+        if head:
+            prefixed = [entry for key, entry in self.entries.items() if function_point.startswith(key)]
+            if len(prefixed) == 1:
+                return prefixed[0]
+        return None
+
+    def covered_names(self, function_points: list[str]) -> set[str]:
+        """哪些功能点已经能解析到契约（供脚手架算"已接入"）。"""
+        return {name for name in function_points if self.resolve(name) is not None}
+
     def missing(self, function_points: list[str]) -> list[str]:
         return [name for name in function_points if name not in self.entries]
 

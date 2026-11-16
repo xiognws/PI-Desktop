@@ -693,7 +693,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         contract_notes: list[dict] = []
         for case in cases:
             function_point = str(case.get("function_point") or "")
-            entry = contract.get(function_point)
+            entry = contract.resolve(function_point)
             title = str(case.get("title") or "")
             if entry is None:
                 contract_notes.append({"title": title, "function_point": function_point, "reason": "missing_contract"})
@@ -714,6 +714,11 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 continue
             assertions[title] = generated.body
         authored = script_service.author_scripts(cases, body.sdk, assertions)
+        asserted_by_type: dict[str, int] = {}
+        for case in cases:
+            if str(case.get("title") or "") in assertions:
+                key = str(case.get("case_type") or "功能")
+                asserted_by_type[key] = asserted_by_type.get(key, 0) + 1
         # 缺契约的功能点：骨架补不上断言就是卡在这里，摘要必须说出来。
         # 注意只统计 missing_contract —— 契约写了但条款没数值也会记 note，
         # 那是另一类问题，混进来会把"缺契约"的数字报大。
@@ -786,7 +791,13 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             status="ok" if script_judgement["ok"] and not vacuity_report["vacuous"] else "warning",
             summary=(
                 f"生成 {len(created)} 个脚本"
-                + (f"（其中 {len(assertions)} 个带契约断言）" if assertions else "")
+                + (
+                    f"（其中 {len(assertions)} 个带契约断言"
+                    + (f"，异常 {asserted_by_type.get('异常', 0)} 条" if asserted_by_type.get("异常") else "")
+                    + "）"
+                    if assertions
+                    else ""
+                )
                 + (
                     f"，{len(missing_points)} 个功能点还缺被测件契约（{len(missing_notes)} 条用例只能是骨架）"
                     if missing_points
@@ -832,6 +843,7 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "preserved": preserved,
         "preserved_total": len(preserved),
         "asserted_generated": len(assertions),
+        "asserted_by_type": asserted_by_type,
         "skeleton_remaining": len(created) - len(assertions) - len(preserved),
         "contract_notes": contract_notes[:20],
         "contract_missing_cases": len(missing_notes),
@@ -1342,7 +1354,7 @@ def dut_contract_scaffold(project_id: str) -> dict:
                 continue
             points.setdefault(name, set()).add(str(case.get("case_type") or ""))
 
-    have = set(contract.entries)
+    have = contract.covered_names(list(points))
     missing = sorted(name for name in points if name not in have)
     entries = []
     for name in missing:
