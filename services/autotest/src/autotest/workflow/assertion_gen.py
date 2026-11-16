@@ -17,7 +17,11 @@ from pathlib import Path
 
 from autotest.workflow.dut_contract import Entry
 
-PLACEHOLDER = re.compile(r"\{\{number(?::(\d+))?\}\}")
+PLACEHOLDER = re.compile(r"\{\{(number|over|under|near)(?::(\d+))?(?::([+-]))?\}\}")
+
+# 反面用例要的是"按原文阈值算出来的输入"，不是原文那个合法值：
+# over/under 外扩 10%（与 workflow.exception_matrix 同口径），near 内收 1%。
+OFFSET_RATIO = {"over": 0.10, "under": -0.10, "near": 0.01, "near_down": -0.01}
 
 class GenerationError(ValueError):
     """这条用例没法按契约生成断言（缺数值、形态不支持等）。"""
@@ -46,12 +50,30 @@ def _numeric(text: str) -> str:
     return match.group(1)
 
 
-def _substitute(line: str, numbers: list[str]) -> str:
+def _offset(raw: str, kind: str, sign: str) -> str:
+    """把原文数值按占位符的类型偏移，返回写进代码的字面量（不带单位）。"""
+    base = float(_numeric(raw))
+    if kind == "number":
+        return _numeric(raw)
+    ratio = OFFSET_RATIO[kind]
+    if kind == "near":
+        ratio = 0.01 if sign != "-" else -0.01
+    step = max(abs(base) * abs(ratio), 0.01)
+    moved = base + step if (ratio > 0) else max(base - step, 0.0)
+    return f"{moved:.2f}".rstrip("0").rstrip(".")
+
+
+def _substitute(line: str, numbers: list[str], negative: bool = False) -> str:
     def replace(match: re.Match[str]) -> str:
-        index = int(match.group(1) or 0)
+        kind = match.group(1)
+        if negative and kind == "number":
+            # 反面用例要喂的是越界值：契约只写了合法值，越界值由阈值算出
+            kind = "over"
+        index = int(match.group(2) or 0)
+        sign = match.group(3) or "+"
         if index >= len(numbers):
             raise GenerationError(f"占位符引用了第 {index + 1} 个数值，但条款只有 {len(numbers)} 个")
-        return _numeric(numbers[index])
+        return _offset(numbers[index], kind, sign)
 
     return PLACEHOLDER.sub(replace, line)
 
@@ -79,15 +101,26 @@ def generate(
     *,
     driver: str = "",
     imports: list[str] | None = None,
+    polarity: str | None = None,
 ) -> Generated:
-    """生成断言块；body 与 mutation 都是缩进 4 空格的语句行。"""
+    """生成断言块；body 与 mutation 都是缩进 4 空格的语句行。
+
+    `polarity="negative"` 用于异常用例：契约必须声明 `expect.kind: raises`，
+    否则说明契约没说清"这个点应该被拒绝"，宁可不生成也不写假断言。
+    """
     numbers = _numbers(case)
+    negative = polarity == "negative"
     prelude = _preamble(driver, list(imports or []), entry.factory)
-    arrange = [f"    {_substitute(line, numbers)}" for line in entry.arrange]
+    arrange = [f"    {_substitute(line, numbers, negative)}" for line in entry.arrange]
     observe = entry.observe
     kind = entry.kind
     value = entry.value
     label = entry.function_point
+
+    if negative and kind != "raises":
+        raise GenerationError(
+            f"契约把 {label} 写成 {kind}，没有声明该点会被拒绝；异常用例不能用合法值断言"
+        )
 
     if kind == "raises":
         # 异常类是裸名字，不能加引号（`pytest.raises('ValueError')` 跑不起来）

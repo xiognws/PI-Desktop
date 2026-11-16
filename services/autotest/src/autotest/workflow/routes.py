@@ -689,7 +689,12 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 continue
             try:
                 generated = assertion_gen.generate(
-                    case, entry, driver=contract.driver, imports=contract.imports
+                    case,
+                    entry,
+                    driver=contract.driver,
+                    imports=contract.imports,
+                    # 异常用例走反面断言：喂越界值、断言被测件拒绝；没有 raises 契约就不生成
+                    polarity="negative" if case.get("case_type") == "异常" else None,
                 )
             except assertion_gen.GenerationError as problem:
                 contract_notes.append(
