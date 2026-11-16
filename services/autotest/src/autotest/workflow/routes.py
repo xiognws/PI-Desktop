@@ -714,6 +714,10 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 continue
             assertions[title] = generated.body
         authored = script_service.author_scripts(cases, body.sdk, assertions)
+        # 缺契约的功能点：骨架补不上断言就是卡在这里，摘要必须说出来
+        missing_points = sorted(
+            {note["function_point"] for note in contract_notes if note.get("function_point")}
+        )
         # 脚本规则同样要可判定：骨架写成 assert True 或忘记 skip，执行器一跑就是绿的
         script_judgement = consistency.check_scripts(authored["scripts"])
 
@@ -777,6 +781,11 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
             summary=(
                 f"生成 {len(created)} 个脚本"
                 + (f"（其中 {len(assertions)} 个带契约断言）" if assertions else "")
+                + (
+                    f"，{len(missing_points)} 个功能点还缺被测件契约（对应脚本只能是骨架）"
+                    if missing_points
+                    else ""
+                )
                 + (f"，保留 {len(preserved)} 个已补断言的脚本" if preserved else "")
                 + (
                     f"，变异抽查发现 {len(vacuity_report['vacuous'])} 条空断言"
@@ -793,6 +802,10 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 "scripts": created,
                 "stats": authored["stats"],
                 "preserved": preserved,
+                "contract_missing_total": sum(
+                    1 for note in contract_notes if note.get("reason") == "missing_contract"
+                ),
+                "contract_missing_points": missing_points,
                 "prompt": _prompt_marker("script-author"),
                 "consistency": script_judgement,
                 "vacuity": vacuity_report,
@@ -810,6 +823,10 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "asserted_generated": len(assertions),
         "skeleton_remaining": len(created) - len(assertions) - len(preserved),
         "contract_notes": contract_notes[:20],
+        "contract_missing_total": sum(
+            1 for note in contract_notes if note.get("reason") == "missing_contract"
+        ),
+        "contract_missing_points": missing_points,
         "vacuity": vacuity_report,
         "prompt": _prompt_marker("script-author"),
         "consistency": script_judgement,
@@ -817,6 +834,9 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
     summary = f"生成 {len(created)} 个 pytest 骨架，已落 scripts 表"
     if preserved:
         summary += f"；保留 {len(preserved)} 个已补断言的脚本（要重出请传 overwrite=true）"
+    if missing_points:
+        # 骨架补不上断言就卡在这里：摘要里必须说清是"缺被测件契约"，不是"生成完了"
+        summary += f"；{len(missing_points)} 个功能点还缺被测件契约"
     return _envelope(summary, data, body.run_id)
 
 
@@ -1281,6 +1301,62 @@ def get_dut_contract(project_id: str) -> dict:
             "total": len(contract.entries),
         },
         "",
+    )
+
+
+@router.get("/dut-contract/scaffold")
+def dut_contract_scaffold(project_id: str) -> dict:
+    """给"还没接被测件"的功能点生成一份可编辑的契约骨架。
+
+    79 个骨架脚本之所以补不上断言，是因为没人一次性把"怎么驱动、从哪读判定"
+    写清楚。这里按功能点列出条目，异常用例需要的 `raises` 形状直接填好，
+    人只需要把工厂/观测点/取值换成真实接口。
+    """
+    with _project_conn(project_id) as conn:
+        contract = dut_contract.load(conn, project_id)
+        # 项目库是每个项目一份，取本项目最后一次用例设计的产出即可
+        row = conn.execute(
+            "SELECT payload_json FROM workflow_steps WHERE tool = 'autotest_case_design'"
+            " ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        designed = json.loads(row["payload_json"]) if row and row["payload_json"] else {}
+        cases = designed.get("cases") or []
+        points: dict[str, set[str]] = {}
+        for case in cases:
+            name = str(case.get("function_point") or "").strip()
+            if not name:
+                continue
+            points.setdefault(name, set()).add(str(case.get("case_type") or ""))
+
+    have = set(contract.entries)
+    missing = sorted(name for name in points if name not in have)
+    entries = []
+    for name in missing:
+        needs_raises = "异常" in points[name]
+        entries.append(
+            {
+                "function_point": name,
+                "factory": "Dut()  # TODO: 换成真实被测件构造",
+                "arrange": ["dut.setup()  # TODO: 驱动到该功能点"],
+                "observe": "dut.observe()  # TODO: 判定读哪里",
+                "expect": (
+                    {"kind": "raises", "value": "DutError"}
+                    if needs_raises
+                    else {"kind": "bool", "value": True}
+                ),
+            }
+        )
+    return _envelope(
+        f"{len(missing)} 个功能点还缺被测件契约",
+        {
+            "driver": contract.driver or "_support/dut.py",
+            "imports": contract.imports or ["Dut", "DutError"],
+            "entries": entries,
+            "covered_total": len(have),
+            "missing_total": len(missing),
+        },
+        "",
+        kind="scaffold",
     )
 
 

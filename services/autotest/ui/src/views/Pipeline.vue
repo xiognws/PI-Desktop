@@ -54,6 +54,30 @@ const exceptionCoverage = ref<{ byClass: Record<string, number>; gaps: Record<st
 // 评审阶段回报的异常覆盖面（评审看到的和用例页一致）
 const reviewCoverage = ref<Record<string, number>>({})
 
+// 缺被测件契约的功能点：脚本补不上断言就卡在这里
+const contractGap = ref<string[]>([])
+const scaffoldOpen = ref(false)
+const scaffoldText = ref('')
+
+async function openScaffold() {
+  try {
+    const body = await api('/workflow/dut-contract/scaffold')
+    scaffoldText.value = JSON.stringify(body.data?.entries ?? [], null, 2)
+    scaffoldOpen.value = true
+  } catch (error) {
+    message.value = `拉契约模板失败：${(error as Error).message}`
+  }
+}
+
+async function copyScaffold() {
+  try {
+    await navigator.clipboard.writeText(scaffoldText.value)
+    message.value = '契约模板已复制到剪贴板'
+  } catch {
+    message.value = '复制失败：浏览器不允许写剪贴板，请手动全选'
+  }
+}
+
 // 汇总"还缺哪些失效模式"，同一类在多处缺失只报一次
 const gapClassesText = computed(() => {
   const seen = new Set<string>()
@@ -242,6 +266,7 @@ async function runStage(key: string) {
         method: 'POST',
         body: JSON.stringify({ run_id: runId.value }),
       })
+      contractGap.value = body.data?.contract_missing_points || []
       message.value = body.summary || '脚本已生成'
     } else if (key === 'execute') {
       await api(`/workflow/runs/${runId.value}/execute`, {
@@ -391,6 +416,18 @@ onMounted(async () => {
             <p v-if="step.key === 'author'" class="mono mt-1 text-[12px] text-muted">
               脚本库 {{ scriptCount }} 个
             </p>
+            <div v-if="step.key === 'author' && contractGap.length" class="mt-2">
+              <p class="text-[12px] text-warn">
+                {{ contractGap.length }} 个功能点还没接入被测件，对应脚本只能停在骨架
+              </p>
+              <p class="mt-0.5 text-[12px] text-muted-2">
+                {{ contractGap.slice(0, 4).join(' · ') }}<span v-if="contractGap.length > 4"> …</span>
+              </p>
+              <button
+                class="mt-1 h-7 rounded-[6px] border border-line px-2 text-[12px] text-fg hover:bg-surface-3"
+                @click="openScaffold"
+              >生成契约模板</button>
+            </div>
 
             <p
               v-if="step.key === 'review' && Object.keys(reviewCoverage).length"
@@ -466,6 +503,28 @@ onMounted(async () => {
           规则 {{ promptRefs.map((item) => item.ref).join(' · ') }}
         </p>
       </footer>
+    </div>
+
+    <!-- 契约模板：缺契约的功能点一次列全，复制回去填真实接口 -->
+    <div v-if="scaffoldOpen" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40" @click.self="scaffoldOpen = false">
+      <div class="flex max-h-[80vh] w-[720px] flex-col overflow-hidden rounded-[12px] border border-line bg-surface">
+        <div class="flex h-11 items-center justify-between border-b border-line px-4">
+          <span class="text-[13px] font-medium text-fg">被测件契约模板（{{ contractGap.length }} 个功能点）</span>
+          <div class="flex items-center gap-3">
+            <button class="text-[12px] text-fg hover:underline" @click="copyScaffold">复制</button>
+            <button class="text-[12px] text-muted hover:text-fg" @click="scaffoldOpen = false">关闭</button>
+          </div>
+        </div>
+        <textarea
+          :value="scaffoldText"
+          readonly
+          class="mono flex-1 resize-none bg-surface-2 px-4 py-3 text-[12px] leading-5 text-fg"
+          spellcheck="false"
+        ></textarea>
+        <p class="border-t border-line px-4 py-2 text-[12px] text-muted-2">
+          把 factory / arrange / observe 换成真实被测件接口，再用 PUT /workflow/dut-contract 写回；异常用例要求对应条目是 expect.kind = raises。
+        </p>
+      </div>
     </div>
   </div>
 </template>
