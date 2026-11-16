@@ -166,16 +166,37 @@ async function copyTree(from, to) {
   });
 }
 
+/**
+ * Point `link` at `target` without copying it.
+ *
+ * A directory junction is instant and costs no disk, and electron-builder only
+ * deletes the link when it rebuilds the image — the cache survives. The copy is
+ * the fallback, because a copy of 1.1 GB over 30k small files measured 4m30s
+ * here, which is slower than reinstalling the wheels.
+ */
+async function linkOrCopy(target, link) {
+  if (process.platform === "win32") {
+    // `rmdir` removes a junction without following it into the cache.
+    spawnSync("cmd", ["/c", "rmdir", link], { stdio: "ignore" });
+    await rm(link, { recursive: true, force: true });
+    await mkdir(dirname(link), { recursive: true });
+    const result = spawnSync("cmd", ["/c", "mklink", "/J", link, target], { stdio: "ignore" });
+    if (result.status === 0) return "junction";
+  }
+  await copyTree(target, link);
+  return "copy";
+}
+
 const siteDir = join(cacheRoot, "site-packages");
 if (!REFRESH && readFingerprint(outMarker) === fingerprint && existsSync(join(OUT, "site-packages"))) {
   console.log("  already assembled for this lock; nothing to do");
   process.exit(0);
 }
 if (!REFRESH && readFingerprint(cacheMarker) === fingerprint && existsSync(siteDir)) {
-  // No interpreter needed: a cached tree is a copy, not an install.
+  // No interpreter needed: a cached tree is linked or copied, not installed.
   const started = Date.now();
-  await copyTree(cacheRoot, OUT);
-  console.log(`  reused the cached tree → ${resolve(OUT)} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+  const how = await linkOrCopy(cacheRoot, OUT);
+  console.log(`  reused the cached tree (${how}) → ${resolve(OUT)} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
   process.exit(0);
 }
 
@@ -263,9 +284,9 @@ const installed = await readdir(siteDir);
 await writeFile(cacheMarker, markerBody(installed.length));
 const copyStarted = Date.now();
 // Publish the cached tree to the image; the cache stays authoritative.
-await copyTree(cacheRoot, OUT);
+const publishHow = await linkOrCopy(cacheRoot, OUT);
 console.log(
-  `assembled: ${installed.length} entries, ${wheels.length} wheels → ${resolve(OUT)} (copied in ${((Date.now() - copyStarted) / 1000).toFixed(1)}s)`,
+  `assembled: ${installed.length} entries, ${wheels.length} wheels → ${resolve(OUT)} (${publishHow} in ${((Date.now() - copyStarted) / 1000).toFixed(1)}s)`,
 );
 
 /** Copy a directory tree, skipping caches. */
