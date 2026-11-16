@@ -1,0 +1,20 @@
+services/autotest/src/autotest/workflow/consistency.py
+  h_201ed4c689ac8b 178-180,205-208
+services/autotest/src/autotest/workflow/report.py
+  h_201ed4c689ac8b 23-65,74-75,111
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 1137-1142,1150-1151,1162-1167
+services/autotest/tests/test_report_exception_section.py
+  h_201ed4c689ac8b 1-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b47470bb472dcde3805b0ad975567fdb959898d1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
