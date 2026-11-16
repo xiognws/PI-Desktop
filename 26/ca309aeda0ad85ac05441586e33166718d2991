@@ -1,0 +1,18 @@
+crates/host-core/src/tools/lsp.rs
+  h_201ed4c689ac8b 8-18,21
+crates/host-core/src/tools/lsp/framing.rs
+  h_201ed4c689ac8b 1-15
+crates/host-core/src/tools/lsp/session.rs
+  h_201ed4c689ac8b 1-591
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "26ca309aeda0ad85ac05441586e33166718d2991",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
