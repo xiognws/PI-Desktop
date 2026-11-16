@@ -1,0 +1,20 @@
+crates/host-core/src/config_sync/domains.rs
+  h_201ed4c689ac8b 48
+crates/host-core/src/main.rs
+  h_201ed4c689ac8b 37
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 1220-1224
+crates/host-core/src/stream_rules_setting.rs
+  h_201ed4c689ac8b 1-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c46a2d73352b10b20f661022adb1acfa4659e6fb",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
