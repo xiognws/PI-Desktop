@@ -24,8 +24,8 @@ mod plugin_usage;
 mod plugins;
 mod providers;
 mod review;
-mod runtime_tmp;
 mod rpc;
+mod runtime_tmp;
 mod scheduled;
 mod scratch;
 mod secrets;
@@ -91,6 +91,16 @@ async fn main() -> anyhow::Result<()> {
 
     let state = Arc::new(Mutex::new(AppState::open(&data_dir)?));
     tracing::info!(path = %data_dir.display(), "host-core starting");
+    {
+        // The installation's own standing facts (platform, temp-file location,
+        // language) belong to every conversation, so they are seeded here rather
+        // than left to a session that happens to mention them.
+        let st = state.lock().await;
+        match memory::seed_installation_facts(&st.db, &data_dir) {
+            Ok(count) => tracing::info!(count, "installation memories in place"),
+            Err(error) => tracing::warn!(error = %error, "could not seed installation memories"),
+        }
+    }
     {
         // Sweep orphaned/stale session scratch dirs left behind by crashes or
         // deletions that bypassed session.delete (D114).

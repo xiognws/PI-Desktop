@@ -418,6 +418,60 @@ fn pinned_memories_come_back_without_a_query() {
 }
 
 #[test]
+fn a_pinned_rule_survives_an_unrelated_query() {
+    let (db, dir) = db();
+    // The installation facts are pinned globals: no matter what the turn is
+    // about, the agent must still be told them.
+    crate::memory::seed_installation_facts(&db, &dir.path().join("data")).unwrap();
+    db.remember(project_memory(
+        "deploy note",
+        "release is cut on fridays",
+        "/w/pi",
+    ))
+    .unwrap();
+
+    let hits = db
+        .recall(RecallQuery {
+            query: "unrelated text with no overlap".into(),
+            project_path: Some("/w/pi".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    let titles: Vec<&str> = hits.iter().map(|hit| hit.memory.title.as_str()).collect();
+    assert!(
+        titles.iter().any(|title| title.contains("tmp")),
+        "{titles:?}"
+    );
+    assert!(
+        titles.iter().any(|title| title.contains("运行平台")),
+        "{titles:?}"
+    );
+    assert!(
+        titles.iter().any(|title| title.contains("中文")),
+        "{titles:?}"
+    );
+    assert!(
+        !titles.iter().any(|title| title.contains("deploy")),
+        "an unmatched unpinned memory must stay out: {titles:?}"
+    );
+
+    // A matching query still gets its own hit, after the pinned ones.
+    let matched = db
+        .recall(RecallQuery {
+            query: "release".into(),
+            project_path: Some("/w/pi".into()),
+            limit: Some(8),
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(matched.iter().any(|hit| hit.memory.title == "deploy note"));
+    assert!(
+        matched[0].memory.pinned,
+        "the standing facts keep the first slots"
+    );
+}
+
+#[test]
 fn invalid_writes_are_rejected_before_any_state_changes() {
     let (db, _dir) = db();
     let missing_path = NewMemory::new(MemoryScope::Project, MemoryKind::Fact, "t", "b");

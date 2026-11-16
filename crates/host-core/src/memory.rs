@@ -26,7 +26,9 @@ use sha2::{Digest, Sha256};
 
 use crate::db::{now_ms, Connection, Database, MEMORIES_FTS_DDL};
 
+mod seed;
 mod tidy;
+pub use seed::seed_installation_facts;
 #[allow(unused_imports)] // TidyOutcome is the documented return type
 pub use tidy::{TidyOutcome, TidyPolicy};
 
@@ -484,20 +486,40 @@ impl Database {
     /// Keyword recall. Scope filtering is part of the query, not a post-filter:
     /// a project session must never see another project's memories.
     ///
+    /// Pinned memories (global, this project, this session) are prepended
+    /// unconditionally and take the first slots; the query fills the rest. That is
+    /// what makes a pinned rule a rule rather than a lucky hit.
+    ///
     /// The trigram index answers the terms it can express as a substring; a term
     /// too short for one is narrowed with `instr()` in the same statement, so a
     /// two-character Chinese query still filters instead of matching everything.
     /// A query with no indexable term at all is a plain scan of `memories`,
     /// which holds hundreds of rows — reading them is cheaper than not matching.
     pub fn recall(&self, query: RecallQuery) -> Result<Vec<MemoryHit>> {
-        let plan = RecallPlan::parse(&query.query);
-        if plan.is_empty() {
-            return Ok(Vec::new());
-        }
         let limit = query
             .limit
             .unwrap_or(DEFAULT_RECALL_LIMIT)
-            .clamp(1, MAX_RECALL_LIMIT) as i64;
+            .clamp(1, MAX_RECALL_LIMIT);
+        // Pinned memories are standing facts: the installation's platform,
+        // temp-file and language rules are written there. They are returned
+        // whatever the query says, because a rule the agent must always follow
+        // cannot depend on how one message happens to be worded.
+        let mut hits: Vec<MemoryHit> = self
+            .pinned_memories(
+                query.project_path.as_deref(),
+                query.session_id.as_deref(),
+                limit,
+            )?
+            .into_iter()
+            .map(|memory| MemoryHit { memory, score: 0.0 })
+            .collect();
+        let plan = RecallPlan::parse(&query.query);
+        if plan.is_empty() {
+            let touched: Vec<String> = hits.iter().map(|hit| hit.memory.id.clone()).collect();
+            self.mark_used(&touched)?;
+            return Ok(hits);
+        }
+        let limit = limit as i64;
         let indexed = !plan.indexed.is_empty();
         let (from, score) = if indexed {
             (
@@ -558,14 +580,20 @@ impl Database {
         let rows = stmt.query_map(rusqlite::params_from_iter(binds), |row| {
             Ok((row_to_memory(row)?, row.get::<_, f64>(18)?))
         })?;
-        let mut hits = Vec::new();
-        let mut touched = Vec::new();
         for row in rows {
             let (memory, score) = row?;
-            touched.push(memory.id.clone());
+            // A pinned memory already occupies its slot above; the query must not
+            // spend a second one on the same row.
+            if hits.iter().any(|hit| hit.memory.id == memory.id) {
+                continue;
+            }
+            if hits.len() >= limit as usize {
+                break;
+            }
             hits.push(MemoryHit { memory, score });
         }
         drop(stmt);
+        let touched: Vec<String> = hits.iter().map(|hit| hit.memory.id.clone()).collect();
         self.mark_used(&touched)?;
         Ok(hits)
     }
