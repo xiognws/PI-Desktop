@@ -1,0 +1,18 @@
+packages/agent-runtime/src/index.ts
+  h_201ed4c689ac8b 35
+packages/agent-runtime/src/stream-rule-guard.test.ts
+  h_201ed4c689ac8b 1-121
+packages/agent-runtime/src/stream-rule-guard.ts
+  h_201ed4c689ac8b 1-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "52c2502338c14868bde085dae8d8352729b9aa43",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
