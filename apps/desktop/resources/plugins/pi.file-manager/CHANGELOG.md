@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.9.1-pi.3
+
+- Put the file list on the right and the editor on the left, so the editor keeps
+  the wide reading column. The divider now resizes the sidebar by dragging from
+  the right edge, and the sidebar draws its own left border.
+
+## 0.9.1-pi.2
+
 
 - Fix SSH workspaces remaining on Loading: remote directories and text/image
   previews now use the paired Host's scoped SDK reads, with explicit read-only

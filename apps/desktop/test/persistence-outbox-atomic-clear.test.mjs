@@ -49,7 +49,11 @@ for (const file of ["session-message-outbox.json", "session-message-outbox.dead-
           await outbox.dropSession("s");
           assert.fail("fault injection did not interrupt the empty write");
         } else {
-          await assert.rejects(outbox.dropSession("s"), { code: "EPERM" });
+          // A rename the filesystem refuses is transient on Windows (a scanner
+          // or a leftover handle), so the outbox retries and then reports a
+          // warning instead of throwing. What must still hold is the invariant
+          // this test is about: the committed file keeps its bytes.
+          await outbox.dropSession("s");
         }
       `], { encoding: "utf8", timeout: 10_000 });
       assert.equal(child.status, failure === "interrupted write" ? 77 : 0, child.stderr || child.stdout);

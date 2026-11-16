@@ -1,3 +1,4 @@
+import { app } from "electron";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -17,12 +18,13 @@ import {
 } from "../host-boot-diagnostics";
 import type { Logger } from "../logger";
 import {
-  describeUnfinishedRun,
   readLastExitReason,
   readRunMarker,
   setRunMarkerDirectory,
   writeRunMarker,
 } from "../run-marker.js";
+import { countCrashDumpsSince } from "../crash-report.js";
+import { judgePreviousRun, previousRunVerdictLevel } from "../run-verdict.js";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import { syncPluginDisplayLocale } from "../plugin-display-locale";
@@ -226,17 +228,44 @@ export function createRuntimeLifecycle({
     logger.app("lifecycle", "info", "app boot " + APP_NAME + " " + APP_VERSION, {
       data: { protocolVersion: PROTOCOL_VERSION },
     });
-    // The previous run leaves a breadcrumb behind unless it quit gracefully, so
-    // a crash or a hard kill is visible on this start instead of being inferred
-    // from silence later.
+    // The previous run leaves a breadcrumb behind unless it quit gracefully.
+    // Several traces can explain why it is still there — a deliberate exit, a
+    // Crashpad dump, a main-process throw — and reading them one by one leaves
+    // the reader correlating timestamps by hand. One verdict record states the
+    // outcome (clean / deliberate / crash / killed) and the evidence behind it.
     setRunMarkerDirectory(dataDir);
-    const unfinishedRun = describeUnfinishedRun(readRunMarker());
-    if (unfinishedRun) {
-      const deliberate = readLastExitReason();
-      logger.app("lifecycle", "warn", "unfinished previous run", {
-        data: deliberate
-          ? `${unfinishedRun}; last deliberate exit ${deliberate.at}: ${deliberate.reason}`
-          : unfinishedRun,
+    const previousMarker = readRunMarker();
+    try {
+      const previousStartedMs = previousMarker
+        ? Date.parse(previousMarker.startedAt)
+        : Number.NaN;
+      const verdict = judgePreviousRun({
+        marker: previousMarker,
+        lastExitReason: previousMarker ? readLastExitReason() : null,
+        // Only dumps written after the previous run began belong to it; an
+        // earlier crash's dumps are already accounted for.
+        newCrashDumps: Number.isFinite(previousStartedMs)
+          ? countCrashDumpsSince(app.getPath("crashDumps"), previousStartedMs)
+          : { main: 0, renderer: 0, gpu: 0, utility: 0 },
+        // The fatal main-process record is already written by the
+        // `uncaughtException` / `unhandledRejection` handlers; the marker
+        // surviving an error-level app/runtime record is the signal here.
+        mainProcessErrorSinceStart: false,
+      });
+      logger.app(
+        "lifecycle",
+        previousRunVerdictLevel(verdict),
+        verdict.summary,
+        {
+          event: "previousRunVerdict",
+          data: { outcome: verdict.outcome, evidence: verdict.evidence, ...verdict.detail },
+        },
+      );
+    } catch (error) {
+      // Diagnostics must never hold up the first window (D602).
+      logger.app("lifecycle", "warn", "previous run verdict failed", {
+        event: "previousRunVerdictFailed",
+        data: String(error),
       });
     }
     writeRunMarker(APP_VERSION);

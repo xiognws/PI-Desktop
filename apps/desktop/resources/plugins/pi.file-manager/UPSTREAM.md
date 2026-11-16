@@ -16,7 +16,7 @@ unpublished plugin contribution as an official upstream release.
 | Integration source | https://github.com/Seraph-x/pi-desktop-plugin-file-manager/tree/f47ce21fab3c59f3f4b94d30f3e3a0c8124447e1 |
 | Integration commit | `f47ce21fab3c59f3f4b94d30f3e3a0c8124447e1` |
 | Companion upstream proposal | https://github.com/Tioit-Wang/pi-desktop-plugin-file-manager/pull/5 |
-| Bundled version | `0.9.1-pi.2` — Desktop hotfix, not an upstream release |
+| Bundled version | `0.9.1-pi.3` — Desktop hotfix, not an upstream release |
 | License | MIT; preserve the bundled `LICENSE` and PDF.js notices |
 | Locally packed runtime | `pi.file-manager-0.9.1-pi.1.piplug`, 6921923 bytes, SHA-256 `e8b6041cb5d3d4eab2b68a1e7fa61a8c7089235d9918f4a418541bd60cd109b3` |
 | Marketplace publication | Not published; no marketplace artifact or accepted upstream tag is claimed for this hotfix |
@@ -26,11 +26,12 @@ separate, immutable contribution commit. Its remote consumer uses public
 `pi.fs.list` / `pi.fs.readPreview`, not local filesystem reads for opaque remote
 identities. Remote editing/search/Git/watch remain unavailable explicitly.
 
-The hotfix is strictly newer than the previous bundled `0.9.1-pi.1` (and still
-than the older `0.5.3-pi.1` and marketplace `0.9.0`), so `sync_builtin` can
-repair either installation. A future stable upstream `0.9.1` remains strictly
-newer than the `-pi.2` prerelease and can replace it normally. The source
-candidate version `0.9.1` is not reused as a supposedly released version.
+The hotfix is strictly newer than the previous bundled `0.9.1-pi.2` and
+`0.9.1-pi.1` (and still than the older `0.5.3-pi.1` and marketplace `0.9.0`),
+so `sync_builtin` can repair any of those installations. A future stable
+upstream `0.9.1` remains strictly newer than the `-pi.3` prerelease and can
+replace it normally. The source candidate version `0.9.1` is not reused as a
+supposedly released version.
 
 ## Build inputs
 
@@ -58,7 +59,7 @@ so the synthetic filesystem events could reach Node.
    `views-src/verify-host-open.mjs`. No minified JavaScript is edited by hand.
 3. Register `verify:host-open` in `views-src/package.json` and include it in
    the `verify` chain.
-4. Set manifest version to `0.9.1-pi.2`, add `license: MIT`, and prefix its
+4. Set manifest version to `0.9.1-pi.3`, add `license: MIT`, and prefix its
    changelog with the Desktop hotfix description. Keep all other manifest
    declarations, permissions and safety notes from the integration source.
 5. Keep Desktop's MIT `LICENSE` and `package.json` CommonJS marker. The latter
@@ -80,14 +81,14 @@ is recorded here. `UPSTREAM.md` is the provenance record, not a runtime input.
 
 | File | Bytes | SHA-256 |
 | --- | --- | --- |
-| `CHANGELOG.md` | 34520 | `b7a3c06c07b2dbe5ce79577bbc6c6a53ffa00324bd64a27d0d5634493dec48b4` |
+| `CHANGELOG.md` | 34759 | `bb67371c86e6232fcb4ed03d40c37c6d8a52f51cd07ce8a42f1822f7c34792ca` |
 | `LICENSE` | 1067 | `ebaec3ae096498a39f6b86e3ac8017e39818fb5aaff80b452349f94bc275ec0d` |
 | `README.md` | 38470 | `4ecf6e3afa2051b59b479907c485d156caca54ef6d1f4e3c410805807942a268` |
 | `main.js` | 125487 | `f819c13bb8e0196e92a0cbef18ffb147a5f38fdc9a8e7fbe27d58463fd991088` |
-| `manifest.json` | 40092 | `ea3798770849c77193f16da5a582157cc07e5f756f7225dcbec1762ed591d461` |
+| `manifest.json` | 40093 | `75ba3bcc23540e60f74004511df268bf860868cb78ef3a48bb03b6c94cbc5c33` |
 | `package.json` | 25 | `8005a3491db7d92f36ac66369861589f9c47123d3a7c71e643fc2c06168cd45a` |
 | `remote-workspace.js` | 3757 | `931a579801fd4b334c3d96231aafc7ff52e0c03e7baebbabaf00b4c5e17cc366` |
-| `views/assets/index.js` | 6617597 | `75fe29bb98db38e8246aa38bcc55c21c28a6b9310cf1ae5ae146bf6c304f080a` |
+| `views/assets/index.js` | 6617635 | `fdbf66e851435e43a8f5b0ce22e5679b788f10ae322d4e0e30333c7dd98e85ac` |
 | `views/assets/pdfjs-LICENSES.txt` | 61789 | `a8b04e2e9022721482079ee5c85b9f05ae129e6a2cfd59ea67f2629a3fc23640` |
 | `views/index.html` | 345 | `771fd3d8afdea7fca75ed1f1918c1ce93ad1c87babdb321cfb85e910465cd2c1` |
 
@@ -127,3 +128,26 @@ The Git timeout rejects immediately and destroys its captured output streams,
 instead of waiting for a `close` event that inherited child pipes may delay.
 The existing best-effort snapshot path returns unavailable Git metadata while
 preserving directory listing and preview. No upstream release is claimed.
+
+## Local view layout change (0.9.1-pi.3)
+
+The file list moved to the right of the editor: the layout container renders
+`<FileEditor/>` before the `treeCollapsed ? null : <aside>…</aside>` fragment,
+the sidebar draws `border-left` because it now sits against the right edge, and
+the split handle measures `rect.right - clientX` so dragging still widens the
+sidebar. The `splitRatio` value keeps its meaning (sidebar share) and its
+`0.15`–`0.70` clamp, so persisted preferences need no migration.
+
+**This is the one change here made by editing the built view by hand.** The
+`views-src/` tree and the `patches/` directory are not part of the shipped
+plugin, so `views/assets/index.js` was patched in place with anchored edits
+against the minified bundle. That departs from the "no minified JavaScript is
+edited by hand" rule recorded above for the two source-level hotfixes. The
+layout therefore has no corresponding source patch: steps 1–3 of *Reproducing
+or updating this hotfix* will produce a bundle **without** this change unless
+the same edit is applied to `views-src` first. Prefer reimplementing it in
+`views-src` whenever that tree is exported again, then delete this section.
+
+`CHANGELOG.md`, `manifest.json` and `views/assets/index.js` checksums above
+reflect this version; `manifest.json` only gained the version bump and the
+right-hand wording in its descriptions.

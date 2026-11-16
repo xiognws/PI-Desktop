@@ -107,7 +107,15 @@ export class PersistenceOutbox {
       this.entries.push(entry);
     }
     await this.persist();
-    void this.flush(getHost);
+    // A background drain must never become an uncaught rejection: the caller
+    // that enqueued this append has already returned, so a throw here lands on
+    // the process instead of on that caller. The queue keeps its entries and
+    // the next enqueue or explicit flush retries them.
+    void this.flush(getHost).catch((error: unknown) => {
+      this.logger("warn", "session persistence outbox drain failed", {
+        data: String(error),
+      });
+    });
   }
 
   async flush(getHost: () => HostProcess | null): Promise<void> {
@@ -416,8 +424,12 @@ export class PersistenceOutbox {
   private async persist(): Promise<void> {
     const write = this.persistChain.then(async () => {
       await mkdir(dirname(this.path), { recursive: true });
-      await writeFile(this.tempPath, `${JSON.stringify(this.entries.map(encodeBinaryStorage))}\n`, "utf8");
-      await rename(this.tempPath, this.path);
+      await writeFile(
+        this.tempPath,
+        `${JSON.stringify(this.entries.map(encodeBinaryStorage))}\n`,
+        "utf8",
+      );
+      await replaceAtomically(this.tempPath, this.path, this.logger);
     });
     this.persistChain = write.catch(() => undefined);
     await write;
@@ -426,8 +438,16 @@ export class PersistenceOutbox {
   private async persistDeadLetters(): Promise<void> {
     const write = this.persistChain.then(async () => {
       await mkdir(dirname(this.deadLetterPath), { recursive: true });
-      await writeFile(this.tempDeadLetterPath, `${JSON.stringify(this.deadLetters.map(encodeBinaryStorage))}\n`, "utf8");
-      await rename(this.tempDeadLetterPath, this.deadLetterPath);
+      await writeFile(
+        this.tempDeadLetterPath,
+        `${JSON.stringify(this.deadLetters.map(encodeBinaryStorage))}\n`,
+        "utf8",
+      );
+      await replaceAtomically(
+        this.tempDeadLetterPath,
+        this.deadLetterPath,
+        this.logger,
+      );
     });
     this.persistChain = write.catch(() => undefined);
     await write;
@@ -471,4 +491,90 @@ function decodeAppend(value: unknown): MessageAppend {
     throw new Error("Invalid session persistence outbox entry");
   }
   return entry as MessageAppend;
+}
+
+/**
+ * Replace `targetPath` with `tempPath` across a platform refusal.
+ *
+ * Windows refuses a `rename` onto a file another process holds open (`EPERM` /
+ * `EBUSY`), and refuses to replace a target that has its own open handle
+ * (`EACCES`). An on-access antivirus scanner is the usual cause: it opens every
+ * file the moment it is created or renamed, and closes it once satisfied. That
+ * window is real — measured here at 21:36–22:18 on a machine whose data
+ * directory sat outside the scanner's exclusions — so a single `rename` is not
+ * a sound way to publish a file.
+ *
+ * Three layers, cheapest first, and none of them fatal:
+ *
+ * 1. Retry with backoff over the whole scanner window (`RENAME_RETRY_DELAYS_MS`).
+ * 2. After a refusal, compare the target against the bytes we meant to publish.
+ *    A replace that already landed is success, not a retry — this is what keeps
+ *    a duplicate `persist()` from fighting a scanner over an identical file.
+ * 3. If the window is longer than the budget, report one bounded warn and let
+ *    the caller keep the queue in memory for the next write. A held handle must
+ *    never become an uncaught rejection that takes the process down.
+ */
+async function replaceAtomically(
+  tempPath: string,
+  targetPath: string,
+  logger: OutboxLogger,
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= RENAME_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      await rename(tempPath, targetPath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientRenameError(error)) break;
+      // A previous attempt may have landed even though the platform still
+      // reported failure for a concurrent handle. Publishing identical bytes
+      // twice is harmless; fighting over them is not.
+      if (await targetMatchesTemp(tempPath, targetPath)) return;
+      const delay = RENAME_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  logger("warn", "session persistence outbox write blocked by the filesystem", {
+    file: targetPath,
+    data: String(lastError),
+  });
+}
+
+/**
+ * True when the target already holds exactly the bytes waiting in the temp
+ * file. Any read failure is "not published" — the caller keeps its queue and
+ * retries rather than assuming a write it cannot verify.
+ */
+async function targetMatchesTemp(
+  tempPath: string,
+  targetPath: string,
+): Promise<boolean> {
+  try {
+    const [pending, committed] = await Promise.all([
+      readFile(tempPath),
+      readFile(targetPath),
+    ]);
+    return pending.equals(committed);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Backoff before each retry. The total budget (~1.6s) is chosen to outlast an
+ * on-access scanner's first-pass inspection of a small JSON file, which is the
+ * refusal this module actually sees.
+ */
+const RENAME_RETRY_DELAYS_MS = [10, 25, 50, 100, 200, 400, 800];
+
+/**
+ * A rename the platform refused for a reason that can clear on its own.
+ * `ENOENT` is not transient here: the temp file is gone, so nothing to retry.
+ */
+function isTransientRenameError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error)) return false;
+  const code = String((error as { code: unknown }).code);
+  return code === "EPERM" || code === "EBUSY" || code === "EACCES";
 }

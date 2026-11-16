@@ -316,6 +316,7 @@ export function reportPreviousCrashDumps(input: {
           },
         },
       );
+
     }
     if (
       crashDumps.newestMtimeMs !== null &&
@@ -329,4 +330,41 @@ export function reportPreviousCrashDumps(input: {
       data: String(error),
     });
   }
+}
+
+/**
+ * Count the dumps a run left behind, split by process type.
+ *
+ * `describeCrashDumps` already answers "how many are new", but the verdict needs
+ * the split, because only a browser/main dump means the whole app died. The
+ * caller passes the moment the previous run started; dumps older than that
+ * belong to an earlier crash and are ignored. A missing directory is an empty
+ * result, a stat race is skipped, and anything else propagates so a broken tree
+ * stays observable.
+ */
+export function countCrashDumpsSince(
+  directory: string,
+  sinceMs: number,
+): { main: number; renderer: number; gpu: number; utility: number } {
+  const counts = { main: 0, renderer: 0, gpu: 0, utility: 0 };
+  const found: string[] = [];
+  collectDumpPaths(directory, MAX_DUMP_SCAN_DEPTH, found);
+  for (const path of found) {
+    let mtimeMs: number;
+    try {
+      mtimeMs = statSync(path).mtimeMs;
+    } catch (error) {
+      if (isEnoent(error)) continue; // removed between readdir and stat
+      throw error;
+    }
+    if (mtimeMs <= sinceMs) continue;
+    const type = processTypeOfDump(path);
+    // `unknown` still counts as a child dump: it is evidence a process died,
+    // but not evidence that the browser process died.
+    if (type === "main") counts.main += 1;
+    else if (type === "renderer") counts.renderer += 1;
+    else if (type === "gpu") counts.gpu += 1;
+    else counts.utility += 1;
+  }
+  return counts;
 }

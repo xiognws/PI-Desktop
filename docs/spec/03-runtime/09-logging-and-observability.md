@@ -87,6 +87,17 @@ The application categories are:
   `byProcessType`, `directory`, and `newestMtimeMs`. A recovered renderer crash
   is therefore not reported as the previous app run aborting. A scan failure is
   one `crashDumpReportFailed` warn and never blocks the first window (D602).
+  Alongside it, every start writes exactly one `previousRunVerdict` record in
+  `lifecycle` whose `data.outcome` is one of the closed set `clean` (the marker
+  was cleared by a graceful quit), `deliberate` (a recorded `app.exit()`
+  reason), `crash` (a browser/main Crashpad dump or a fatal main-process
+  record), or `killed` (the marker survived with no crash evidence — a kill, an
+  unresponsive-process termination, or a power loss). `data.evidence` names the
+  traces the verdict rests on (`run-marker`, `exit-reason`, `crash-dump`,
+  `app-log`) and carries the previous pid, start stamp and version, so one line
+  answers "was that exit normal, and if not, how". Only `crash` is logged at
+  `error`; `clean` is `info` and the rest are `warn`. A verdict that cannot be
+  computed is one `previousRunVerdictFailed` warn.
   Each renderer `render-process-gone` event records one `renderer.process.gone`
   entry with the Electron exit `reason` and `exitCode`, plus whether the current
   main window was reloaded. Clean exits are informational; unexpected exits are

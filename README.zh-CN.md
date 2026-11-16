@@ -4,671 +4,77 @@
 
 # Pi-Workspace
 
-### 可拆卸的 AI Agent 桌面工作台
+### 本地开发用的 AI Agent 桌面工作台
 
-**把项目、Agent、模型、插件和工作流，装进一个长期可用的桌面环境。**
-
-本地优先 · 模型自由 · 插件驱动 · macOS / Windows / Linux
-
-<br />
-
-[![Release](https://img.shields.io/github/v/release/xiognws/Pi-Workspace?label=release)](https://github.com/xiognws/Pi-Workspace/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/xiognws/Pi-Workspace/total?label=downloads)](https://github.com/xiognws/Pi-Workspace/releases)
-[![Stars](https://img.shields.io/github/stars/xiognws/Pi-Workspace?style=flat\&label=stars)](https://github.com/xiognws/Pi-Workspace/stargazers)
-[![CI](https://github.com/xiognws/Pi-Workspace/actions/workflows/ci.yml/badge.svg)](https://github.com/xiognws/Pi-Workspace/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/xiognws/Pi-Workspace)](LICENSE)
-[![Reddit](https://img.shields.io/badge/Reddit-r%2FAIUO-FF4500?logo=reddit\&logoColor=white)](https://www.reddit.com/r/AIUO/)
-[![QQ 群：点击加入 Pi-Workspace 开发者交流群](https://img.shields.io/badge/QQ-%E5%8A%A0%E5%85%A5%E5%BC%80%E5%8F%91%E8%80%85%E4%BA%A4%E6%B5%81%E7%BE%A4-12B7F5?logo=tencentqq&logoColor=white)](https://qm.qq.com/q/iWP8i0XxIc)
-
-<br />
-
-**[立即下载](https://github.com/xiognws/Pi-Workspace/releases/latest)** ·
-[使用文档](https://pi-docs.aiuo.net/) ·
-[插件开发](docs/plugin-development.md) ·
-[界面预览](docs/guide/screenshots.md) ·
-[English](README.md)
-
-<br />
-
-<img src="docs/image/readme/home.webp" alt="Pi-Workspace" width="94%" />
-
-<br />
-
-**你的项目留在本地 · 你的模型由你选择 · 你的工作台由你组装**
+Electron + React 渲染层 · Rust `host-core` 持久化 · Node `agent-runtime` 执行
 
 </div>
 
 ---
 
-## 为什么是 Pi-Workspace？
+## 这是什么
 
-终端 Agent 擅长执行，IDE Agent 擅长嵌入编辑器。
+Pi-Workspace 是一个本地运行的 AI Agent 桌面工作台。项目、会话、模型、插件和工作流都在同一个桌面应用里持续存在，不依赖云端账号，也不绑定某一家模型厂商。
 
-Pi-Workspace 想做得更进一步：
-
-> **给 AI Agent 一个独立、长期、可扩展的桌面工作空间。**
-
-<table>
-<tr>
-
-<td width="25%" valign="top">
-
-### 独立工作台
-
-不依附某个 IDE 或 Terminal。
-
-Project、Session、Review、Preview 与 Agent 都有自己的空间。
-
-</td>
-
-<td width="25%" valign="top">
-
-### 插件驱动
-
-插件扩展的不只是 Agent。
-
-面板、视图、Widget、Tool、MCP、主题与后台服务都可以插件化。
-
-</td>
-
-<td width="25%" valign="top">
-
-### Agent 编排
-
-一个 Agent 不够，就拆开做。
-
-Subagent 与 Worker Session 可以承担独立任务并行工作。
-
-</td>
-
-<td width="25%" valign="top">
-
-### 模型自由
-
-云端、本地、自建网关、Compatible API。
-
-模型随时换，工作流不用换。
-
-</td>
-
-</tr>
-</table>
-
-<div align="center">
-
-**它不是某个模型的壳，也不是某个 IDE 的插件。**
-
-### 它是承载 Agent 工作流的桌面平台。
-
-</div>
-
-> [!NOTE]
-> **Pi-Workspace 目前仍处于 Early Preview。** 已可用于真实开发工作流，部分 API、插件接口与桌面能力仍在持续演进。
-
-> **当前发布线：0.21.x（Early Preview）。**
+**本地个人使用**：直接从源码构建运行，不走安装包分发。
 
 ---
 
-## 插件不是附加功能，而是工作台的一部分
+## 主要能力
 
-Pi-Workspace 的 Core 负责提供稳定底座。
+- **工作区结构**：Project → Session → Agent → Work，多项目多会话并行，会话跨启动继续
+- **三种模式**：Agent（直接执行）/ Plan（先方案后执行）/ Goal（给目标自行推进）
+- **多级编排**：Subagent（独立上下文的子智能体）+ Worker Session（拆成多个完整会话并行）
+- **模型自由**：OpenAI、Anthropic、OpenAI 兼容 API、自建网关、Ollama、LM Studio、本地模型，会话内可随时切换
+- **插件化**：Command、Panel、Floating Widget、Work Panel View、Agent Tool、Skill、Theme、MCP Server、Service、Message Bus
+- **技能 / MCP / 记忆 / 子智能体**：全局级 `~/.agents/` 与项目级 `<项目>/.agents/` 两级配置
+- **权限层**：Agent → 工具请求 → 权限层 → 允许 / 询问 / 拒绝 → 执行
+- **本地优先**：数据全部本地，凭证存操作系统钥匙串，无遥测
 
-**真正属于你的工作流，由插件组合出来。**
+---
 
-<table>
-<tr>
-
-<td width="33%" valign="top">
-
-### Agent
-
-扩展 Agent 能力
-
-**Agent Tools**
-**Skills**
-**Completion**
-**pi Extensions**
-
-</td>
-
-<td width="33%" valign="top">
-
-### Workspace
-
-扩展整个桌面
-
-**Commands**
-**Panels**
-**Work Panel Views**
-**Floating Widgets**
-**Themes**
-
-</td>
-
-<td width="33%" valign="top">
-
-### Platform
-
-扩展运行平台
-
-**MCP Servers**
-**Resident Services**
-**Plugin Message Bus**
-
-</td>
-
-</tr>
-</table>
-
-插件不必只是“给 Agent 多加一个 Tool”。
-
-它可以是一整个产品：
+## 技术栈与进程模型
 
 ```text
-Voice Agent
-├── Floating Widget
-├── Speech Service
-├── Agent Tool
-└── Commands
-
-GitHub Workspace
-├── Work Panel
-├── MCP Server
-├── Agent Tools
-└── Background Service
-
-Session Analytics
-├── Dashboard
-├── Commands
-└── Workspace View
+Renderer (React)
+   ↓
+Preload IPC
+   ↓
+Electron Main
+   ↓
+Rust Host Core  /  Node Agent Runtime
+   ↓
+pi-ai / pi-agent-core
 ```
 
-### 插件能做什么？
-
-| 能力                  | 用途                  |
-| ------------------- | ------------------- |
-| **Command**         | 向全局命令系统添加操作         |
-| **Panel**           | 创建独立插件界面            |
-| **Floating Widget** | 创建语音球、状态窗、计时器等悬浮界面  |
-| **Work Panel View** | 向右侧工作区加入新视图         |
-| **Agent Tool**      | 注册 Agent 可调用工具      |
-| **Completion**      | 调用用户已经配置的模型         |
-| **Skill**           | 为 Agent 提供可复用能力与工作流 |
-| **Theme**           | 修改工作台视觉             |
-| **MCP Server**      | 接入本地或远程 MCP         |
-| **Service**         | 运行常驻后台任务            |
-| **Message Bus**     | 在插件之间传递消息           |
-
-插件可以通过 `.piplug` 分发，也可以从插件市场安装。
-
-<div align="center">
-
-### [开发一个插件 →](docs/plugin-development.md)
-
-</div>
+| 层 | 职责 |
+| --- | --- |
+| `apps/desktop` | Electron 主进程 + React 渲染层 |
+| `crates/host-core` | 持久化（SQLite 独占）、原生能力、host 状态 |
+| `packages/agent-runtime` | Agent 执行 |
+| `packages/plugin-sdk` | 插件扩展契约 |
+| `packages/shared` | 跨边界契约与 schema |
 
 ---
 
-## 一个底座，组装不同的工作流
+## 本地运行
 
-```text
-                         Pi-Workspace
-                             │
-          ┌──────────────────┼──────────────────┐
-          │                  │                  │
-        Agent            Workspace           Platform
-          │                  │                  │
-     Agent Tools           Panels              MCP
-       Skills             Widgets            Services
-     Subagents             Views            Message Bus
-   pi Extensions          Themes
-          │                  │                  │
-          └──────────────────┼──────────────────┘
-                             │
-                       Your Workflow
-```
+### 环境要求
 
-Pi-Workspace 可以只是一个 Coding Agent。
+- Node.js `>=22.19`
+- pnpm `>=10`
+- 稳定版 Rust 工具链
 
-也可以被组装成：
-
-**AI 开发工作台 · Voice Agent · DevOps Console · GitHub Workspace · 数据分析助手 · 多 Agent 调度中心 · 自动化平台**
-
-> **Core 提供底座，插件决定它最终长什么样。**
-
----
-
-## 三种工作方式
-
-<table>
-<tr>
-
-<td width="33%" valign="top">
-
-### Agent
-
-**你给任务，它直接做。**
-
-读代码、改文件、跑命令、测试、持续迭代。
-
-适合日常开发。
-
-</td>
-
-<td width="33%" valign="top">
-
-### Plan
-
-**它先给方案，你确认后再执行。**
-
-先研究项目，再生成实施计划。
-
-适合重构与高风险修改。
-
-</td>
-
-<td width="33%" valign="top">
-
-### Goal
-
-**你定义结果，它决定路径。**
-
-锁定目标与验收条件，其余交给 Agent。
-
-适合复杂与长期任务。
-
-</td>
-
-</tr>
-</table>
-
-高权限操作始终经过 Pi-Workspace 的 Permission Layer。
-
----
-
-## 一个 Agent 不够，就拆开做
-
-复杂任务不应该全部挤在一个 Context 里。
-
-Pi-Workspace 提供两层任务拆分能力。
-
-### Subagents
-
-把独立工作交给后台 Agent：
-
-**代码调查 · 独立实现 · 测试分析 · Research · Review**
-
-每个 Subagent 拥有独立 Context，完成后将结果返回主 Agent。
-
-### Session Orchestrator
-
-需要更完整、更长期的并行任务时，可以继续拆成多个 Worker Session。
-
-```text
-Main Session
-│
-├── Worker A
-│   └── Frontend
-│
-├── Worker B
-│   └── Backend
-│
-├── Worker C
-│   └── Tests
-│
-└── Worker D
-    └── Review
-```
-
-Worker 是完整的 Pi-Workspace Session：
-
-**独立 Context · 独立运行 · 可直接查看 · 可持续接受任务 · 保留完整 Transcript**
-
-<table>
-<tr>
-
-<td width="50%">
-
-<img src="docs/image/readme/session-orchestrator-overview.png" alt="Session Orchestrator" />
-
-<p align="center"><sub>一个 Session 编排多个 Worker</sub></p>
-
-</td>
-
-<td width="50%">
-
-<img src="docs/image/readme/session-orchestrator-worker.png" alt="Worker Session" />
-
-<p align="center"><sub>每个 Worker 都是完整、可查看的 Session</sub></p>
-
-</td>
-
-</tr>
-</table>
-
-<div align="center">
-
-**从「一个 Agent 帮我写代码」，走向「多个 Agent 分工完成任务」。**
-
-</div>
-
----
-
-## 为持续工作而设计
-
-Pi-Workspace 围绕：
-
-<div align="center">
-
-### Project → Session → Agent → Work
-
-</div>
-
-而不是围绕一次性聊天窗口设计。
-
-支持：
-
-* 多 Project / 多 Session
-* Pin / Archive / Branch / Search
-* Agent 运行时继续 Queue Prompt
-* 使用 `@` 引用项目文件
-* Slash Commands
-* Diff Review
-* Command Output
-* Work Panel
-* Streaming Checkpoint
-* 异常后尽可能恢复任务现场
-
-**Session 可以跨多次启动持续工作。**
-
----
-
-## 看见 Agent 在做什么
-
-<table>
-<tr>
-
-<td width="50%">
-
-<img src="docs/image/readme/chat_en.png" alt="Pi-Workspace Session" />
-
-<p align="center"><sub>长期 Session，而不是一次性对话</sub></p>
-
-</td>
-
-<td width="50%">
-
-<img src="docs/image/readme/model_en.png" alt="Pi-Workspace Model" />
-
-<p align="center"><sub>在 Session 中直接切换模型与推理等级</sub></p>
-
-</td>
-
-</tr>
-
-<tr>
-
-<td width="50%">
-
-<img src="docs/image/readme/plugins_en.png" alt="Pi-Workspace Plugins" />
-
-<p align="center"><sub>插件市场：扩展 Agent，也扩展整个桌面</sub></p>
-
-</td>
-
-<td width="50%">
-
-<img src="docs/image/readme/addmodel_en.png" alt="Pi-Workspace Providers" />
-
-<p align="center"><sub>连接 Provider、Gateway 或本地模型</sub></p>
-
-</td>
-
-</tr>
-</table>
-
-<div align="center">
-
-**[查看更多界面 →](docs/guide/screenshots.md)**
-
-</div>
-
----
-
-## 模型可以换，工作流不用换
-
-Pi-Workspace 不把 Agent 工作流绑定到某一家模型厂商。
-
-支持：
-
-**OpenAI · Anthropic · OpenAI Compatible API · 自建 Gateway · Ollama · LM Studio · Local Model**
-
-每个模型都可以独立配置：
-
-**Provider · Model ID · Context Window · 最大输出 · Reasoning / Thinking · Temperature · OAuth · API Key · Endpoint**
-
-不同 Session 可以使用不同模型。
-
-同一个 Session 也可以随时切换。
-
-```text
-Planning     → Model A
-Coding       → Model B
-Review       → Model C
-Private Task → Local Model
-```
-
-> **模型是可以替换的组件，而不是工作流本身。**
-
----
-
-## 已经在用其他 Coding Agent？
-
-已有工作不需要从零开始。
-
-Pi-Workspace 可以导入本地 Session：
-
-**Claude Code · Codex · OpenCode · Pi**
-
----
-
-## Local-first
-
-Pi-Workspace 不要求你把开发环境搬到我们的云端。
-
-| 数据                   | 默认行为               |
-| -------------------- | ------------------ |
-| Project              | 本地                 |
-| Session              | 本地                 |
-| Settings             | 本地                 |
-| Logs                 | 本地                 |
-| API Credentials      | OS Keychain        |
-| Pi-Workspace Telemetry | 无                  |
-| Model Request        | 直接发送到你配置的 Provider |
-
-**无需 Pi-Workspace 账号。**
-
-**无需经过 Pi-Workspace 云端 Relay。**
-
-使用远程模型时，请求所需 Context 会直接发送给对应 Provider。
-
----
-
-## 权限属于你
-
-Agent 可以读取文件、修改代码、运行命令、调用 Tool、使用扩展和委派任务。
-
-高权限操作仍然经过 Permission Layer：
-
-```text
-Agent
-  ↓
-Tool Request
-  ↓
-Permission Layer
-  ↓
-Allow / Ask / Deny
-  ↓
-Execution
-```
-
-**你决定每个 Session 拥有多少自主权。**
-
----
-
-## 开始使用
-
-<table>
-<tr>
-
-<td width="25%" valign="top">
-
-### 01
-
-**下载**
-
-安装 Pi-Workspace
-
-</td>
-
-<td width="25%" valign="top">
-
-### 02
-
-**连接模型**
-
-配置 Provider
-
-</td>
-
-<td width="25%" valign="top">
-
-### 03
-
-**打开项目**
-
-选择本地 Repository
-
-</td>
-
-<td width="25%" valign="top">
-
-### 04
-
-**开始工作**
-
-Agent / Plan / Goal
-
-</td>
-
-</tr>
-</table>
-
-<div align="center">
-
-### [下载 Pi-Workspace →](https://github.com/xiognws/Pi-Workspace/releases/latest)
-
-**macOS · Windows · Linux**
-
-</div>
-
-### 安装包
-
-| Platform | Architecture  | Package                                 |
-| -------- | ------------- | --------------------------------------- |
-| macOS    | Apple Silicon | `.dmg` / `.zip`                         |
-| macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows  | x64           | 安装程序 / `.zip`                       |
-| Linux    | x64 / ARM64   | `.AppImage` / `.deb` / `.rpm` / `.asar` |
-
-macOS Release 使用 Developer ID 签名并经过 Apple Notarization。
-
-<details>
-<summary><strong>Linux Compatibility</strong></summary>
-
-<br />
-
-Linux 软件包（x64 与 arm64）需要 **glibc 2.35+**。
-
-常见支持版本：
-
-* Ubuntu 22.04+
-* Debian 12+
-* Fedora 36+
-
-检查当前版本：
+### 安装与启动
 
 ```bash
-ldd --version
-```
-
-</details>
-
----
-
-## Built on Pi
-
-Pi-Workspace 构建在 [pi](https://github.com/badlogic/pi-mono) 生态之上。
-
-Agent Runtime 使用：
-
-* `pi-ai`
-* `pi-agent-core`
-* `pi-coding-agent`
-
-> **Pi 提供 Agent Engine，Pi-Workspace 在其上构建 Desktop Workspace、Session、权限、插件与 Agent 编排。**
-
----
-
-## 开发者
-
-Pi-Workspace 也可以作为开发者构建 Agent 产品的宿主平台。
-
-你可以开发：
-
-**Plugin · MCP Server · Skill · Agent Tool · pi Extension · Theme · Panel · Floating Widget · Background Service**
-
-### 插件快速开始
-
-内置模板：
-
-* `panel-basic`
-* `agent-tool-basic`
-* `skill-pack`
-* `full-demo`
-
-创建完成后即可作为 Development Plugin 加载。
-
-**[Plugin Development Guide →](docs/plugin-development.md)**
-
-### 从源码运行
-
-<details>
-<summary><strong>Development Setup</strong></summary>
-
-<br />
-
-#### Requirements
-
-* Node.js `>=22.19`
-* pnpm `>=10`
-* Stable Rust Toolchain
-
-#### Start
-
-```bash
-git clone https://github.com/xiognws/Pi-Workspace.git
-cd Pi-Workspace
-
 pnpm install
-
 cargo build -p host-core
 pnpm build:js
-
 pnpm dev
 ```
 
-#### Validate
+### 校验
 
 ```bash
 pnpm typecheck
@@ -676,94 +82,47 @@ pnpm lint
 pnpm test
 ```
 
-</details>
+### 打包（需要时）
 
-### 文档
+```bash
+pnpm build
+```
 
-[Documentation](https://pi-docs.aiuo.net/) ·
-[Architecture](docs/spec/02-architecture/01-architecture.md) ·
-[Specification](docs/spec/README.md) ·
-[Plugin Development](docs/plugin-development.md) ·
-[E2E Test Plan](docs/spec/06-delivery/04-e2e-test-plan.md) ·
-[Release Runbook](docs/spec/06-delivery/06-release-runbook.md) ·
-[AGENTS.md](AGENTS.md)
+产物为 Electron 应用目录（未签名），仅本机使用，不需要发布流程。
 
 ---
 
-## Contributing
+## 数据目录
 
-欢迎：
+持久数据默认位于用户数据目录（Windows 下为 `%LOCALAPPDATA%\PiWorkspace\pi`），可用环境变量覆盖：
 
-**Issues · Pull Requests · Plugins · Skills · MCP Integrations · Documentation · Translations**
+| 环境变量 | 作用 |
+| --- | --- |
+| `PI_DESKTOP_DATA_DIR` | 直接指定数据目录（最高优先级） |
+| `PI_DESKTOP_DATA_ROOT` | 指定数据根，其下含 `data`、`userdata` 等 |
 
-对于相对独立的新能力，优先考虑一个问题：
-
-> **它是否更适合作为一个 Plugin？**
-
-让 Core 保持克制，让生态持续生长。
-
-**[提交 Issue](https://github.com/xiognws/Pi-Workspace/issues/new/choose)** ·
-[查看 Issues](https://github.com/xiognws/Pi-Workspace/issues) ·
-[开发插件](docs/plugin-development.md)
+其中 `agent/AGENTS.md` 是全局 Agent 指令文件，`widgets/` 放自定义挂件，`tools/state.json` 记录工具包启用状态。
 
 ---
 
-## 项目趋势
+## 文档（本地）
 
-<div align="center">
+- [使用手册](docs/handbook/Pi-Workspace-0.21.0-使用手册.md) —— 安装、界面、设置、挂件与工具包、故障排查
+- [插件开发](docs/plugin-development.md)
+- [架构说明](docs/spec/02-architecture/01-architecture.md)
+- [规格目录](docs/spec/README.md)
+- [界面截图](docs/guide/screenshots.md)
+- [仓库开发规范](AGENTS.md)
 
-<a href="https://trendshift.io/repositories/178787?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-178787">
-<img src="https://trendshift.io/api/badge/repositories/178787" alt="Pi-Workspace on Trendshift" width="230" height="51" />
-</a>
-
-</div>
-
----
-
-## 友情链接
-
-[Linux.Do](https://linux.do/) — 新的理想型社区
+内置插件模板：`panel-basic`、`agent-tool-basic`、`skill-pack`、`full-demo`。
 
 ---
 
-## Model Acknowledgements
+## 备注
 
-> **Not by a lone genius, but by a token-powered construction crew.**
-
-Pi-Workspace 的开发过程中使用了来自多个 Provider 的模型。
-
-累计模型使用量已超过 **27 Billion Tokens**。
-
-感谢参与构建 Pi-Workspace 的每一位贡献者，以及陪我们一起写下这些代码的模型。
+- 当前版本 `0.21.0`，部分插件接口与桌面能力仍在演进，升级前留意破坏性变更。
+- 仓库采用 worktree 隔离开发，改动请在自己的分支与 worktree 内进行，见 [AGENTS.md](AGENTS.md)。
 
 ---
 
-## License
-
-Pi-Workspace 使用 **GNU Lesser General Public License v3.0**。
-
-详见 [LICENSE](LICENSE)。
-
----
-
-<div align="center">
-
-<img src="docs/image/readme/logo.png" alt="Pi-Workspace" width="72" />
-
-## Pi-Workspace
-
-### Build your own Agent workspace.
-
-**你的模型 · 你的 Agent · 你的插件 · 你的工作台**
-
-<br />
-
-**[立即下载](https://github.com/xiognws/Pi-Workspace/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
-[Build a Plugin](docs/plugin-development.md)
-
-<br /><br />
-
-<sub>Local-first · Model-agnostic · Plugin-powered</sub>
-
-</div>
+许可：GNU Lesser General Public License v3.0，详见 [LICENSE](LICENSE)。
