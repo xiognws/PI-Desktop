@@ -1,0 +1,16 @@
+docs/adr/0400-stream-rules-abort-and-retry.md
+  h_201ed4c689ac8b 5-13
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 71-76,2153-2160,7779-7849,7855-7856,7862-7865,9416
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e70ccc7c74ffa9d7907720f2bbd1e256cbeb9a7b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
