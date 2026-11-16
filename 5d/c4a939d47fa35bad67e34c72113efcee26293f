@@ -1,0 +1,22 @@
+services/autotest/src/autotest/workflow/consistency.py
+  h_201ed4c689ac8b 34-48,147-162,171
+services/autotest/src/autotest/workflow/routes.py
+  h_201ed4c689ac8b 547-548
+services/autotest/tests/test_review_exception_rules.py
+  h_201ed4c689ac8b 1-80
+services/autotest/tests/test_review_report_rules.py
+  h_201ed4c689ac8b 46-54
+services/autotest/ui/src/views/Pipeline.vue
+  h_201ed4c689ac8b 54-56,238,395-401
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5dc4a939d47fa35bad67e34c72113efcee26293f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
