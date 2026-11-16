@@ -1,5 +1,5 @@
 {
-  "//": "Pinned Python runtime for the bundled Office/file capabilities. Every entry is an exact wheel and its sha256; scripts/bundle-python-runtime.mjs installs with --require-hashes so a substituted or truncated wheel fails the build instead of shipping. Refresh deliberately: bump a version here, run the bundle script, and commit the regenerated apps/desktop/resources/python/MANIFEST.json in the same change.",
+  "//": "Pinned Python stacks for this build. `wheels` is the Office/file set installed inside <resources>/python by scripts/bundle-python-runtime.mjs; `extraWheels` is the optional engineering stack installed beside the image (<app dir>/python-extras) by scripts/bundle-python-extras.mjs. Every entry is an exact wheel and its sha256, installed with --require-hashes so a substituted or truncated wheel fails the build instead of shipping. The two sets install independently, so a shared dependency appears in both and each set keeps the version its own constraints allow. `overlays` are the files no index can provide (the ZLG python-can backend), applied per `scope` after pip install. Refresh deliberately: bump a version here, run the bundle script, and commit the regenerated apps/desktop/resources/python/MANIFEST.json in the same change.",
   "python": {
     "version": "3.12.13",
     "implementation": "cpython",
@@ -115,5 +115,752 @@
     "PIL",
     "pypdf",
     "xlsxwriter"
+  ],
+  "overlays": [
+    {
+      "why": "周立功（ZLG）USBCAN 后端：本机维护的 python-can 补丁，不在任何索引上",
+      "from": "python-can-zlg",
+      "to": "can/interfaces/zlg",
+      "scope": "extras"
+    },
+    {
+      "why": "把 zlg 后端注册进 python-can 的 BACKENDS",
+      "type": "patch",
+      "file": "can/interfaces/__init__.py",
+      "replace": [
+        {
+          "find": "    \"virtual\",\n]",
+          "with": "    \"virtual\",\n    \"zlg\",\n]"
+        },
+        {
+          "find": "    \"socketcand\": (\"can.interfaces.socketcand\", \"SocketCanDaemonBus\"),\n}",
+          "with": "    \"socketcand\": (\"can.interfaces.socketcand\", \"SocketCanDaemonBus\"),\n    \"zlg\": (\"can.interfaces.zlg\", \"ZlgUsbCanBus\"),\n}"
+        }
+      ],
+      "scope": "extras"
+    },
+    {
+      "why": "让 pip --target 目录像真正的 site 目录：pywin32 的 .pth 与 DLL 目录只在 site 目录生效",
+      "from": "sitecustomize.py",
+      "to": "sitecustomize.py",
+      "scope": "extras"
+    }
+  ],
+  "extraWheels": [
+    {
+      "name": "aiohappyeyeballs",
+      "version": "2.7.1",
+      "file": "aiohappyeyeballs-2.7.1-py3-none-any.whl",
+      "sha256": "9243213661e29250eb41368e5daa826fc017156c3b8a11440826b2e3ed376472",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "aiohttp",
+      "version": "3.14.5",
+      "file": "aiohttp-3.14.5-cp312-cp312-win_amd64.whl",
+      "sha256": "2cc38a4f2b516bef1714e690df87a0e043faf1a7693c82d860091684453d5111",
+      "why": "异步 HTTP 客户端/服务端"
+    },
+    {
+      "name": "aiosignal",
+      "version": "1.4.0",
+      "file": "aiosignal-1.4.0-py3-none-any.whl",
+      "sha256": "053243f8b92b990551949e63930a839ff0cf0b0ebbe0597b0f3fb19e1a0fe82e",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "annotated_types",
+      "version": "0.8.0",
+      "file": "annotated_types-0.8.0-py3-none-any.whl",
+      "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "anyio",
+      "version": "4.16.0",
+      "file": "anyio-4.16.0-py3-none-any.whl",
+      "sha256": "c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026",
+      "why": "异步抽象层"
+    },
+    {
+      "name": "apscheduler",
+      "version": "3.11.3",
+      "file": "apscheduler-3.11.3-py3-none-any.whl",
+      "sha256": "bbeb2ec02d23d3c06a6c07ed7f0f3939ada6680eb121fae809a69bb42c537a30",
+      "why": "定时调度"
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "file": "attrs-26.1.0-py3-none-any.whl",
+      "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "bcrypt",
+      "version": "5.0.0",
+      "file": "bcrypt-5.0.0-cp39-abi3-win_amd64.whl",
+      "sha256": "64ee8434b0da054d830fa8e89e1c8bf30061d539044a39524ff7dec90481e5c2",
+      "why": "paramiko 依赖（密码杂凑）"
+    },
+    {
+      "name": "beautifulsoup4",
+      "version": "4.15.0",
+      "file": "beautifulsoup4-4.15.0-py3-none-any.whl",
+      "sha256": "d6f88de62e1d4e38ecb1077eb9724cd0eff29d2a08ca16a401e9b9e93f117cf9",
+      "why": "HTML 解析"
+    },
+    {
+      "name": "boto3",
+      "version": "1.44.3",
+      "file": "boto3-1.44.3-py3-none-any.whl",
+      "sha256": "8c9c4844c7ce184494b102983696d6cdb09f5307ec7f238ca4ad5849fb14e26b",
+      "why": "S3 / AWS"
+    },
+    {
+      "name": "botocore",
+      "version": "1.44.3",
+      "file": "botocore-1.44.3-py3-none-any.whl",
+      "sha256": "793eac2a7ca167e9376b136cf000e1675e9ffe8d7ec609160cc1ee00b93ace28",
+      "why": "boto3 依赖"
+    },
+    {
+      "name": "can_isotp",
+      "version": "2.0.7",
+      "file": "can_isotp-2.0.7-py3-none-any.whl",
+      "sha256": "28d155dec1c640bf32771fb4e271323d777158ab130372724a8b7b82aca66a7c",
+      "why": "ISO-TP 传输层"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.10.23",
+      "file": "certifi-2026.10.23-py3-none-any.whl",
+      "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1",
+      "file": "cffi-2.1.1-cp312-cp312-win_amd64.whl",
+      "sha256": "f53e442b08449d42821fa4a4fba000095af9f62742a500f978a9f557ec44339a",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "chardet",
+      "version": "7.7.0",
+      "file": "chardet-7.7.0-cp312-cp312-win_amd64.whl",
+      "sha256": "e3fa9ea40e766b26b10360edbb4742cfef9e52728b644b39aae7fa39e89df767",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "charset_normalizer",
+      "version": "3.5.2",
+      "file": "charset_normalizer-3.5.2-cp312-cp312-win_amd64.whl",
+      "sha256": "780fbe7cab297b81dad9fb8dc5eb003c0468ffb0d9e5f65068c53a34661a96bc",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "cloudpickle",
+      "version": "3.1.2",
+      "file": "cloudpickle-3.1.2-py3-none-any.whl",
+      "sha256": "9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a",
+      "why": "序列化"
+    },
+    {
+      "name": "colorama",
+      "version": "0.4.6",
+      "file": "colorama-0.4.6-py2.py3-none-any.whl",
+      "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "comtypes",
+      "version": "1.5.0",
+      "file": "comtypes-1.5.0-py3-none-any.whl",
+      "sha256": "c648ed3b243b1eb3b7cb893a873d1b35104ca1c8922061f4b1efafeb255bacb5",
+      "why": "Windows COM"
+    },
+    {
+      "name": "construct",
+      "version": "2.10.70",
+      "file": "construct-2.10.70-py3-none-any.whl",
+      "sha256": "c80be81ef595a1a821ec69dc16099550ed22197615f4320b57cc9ce2a672cb30",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "contourpy",
+      "version": "1.4.0",
+      "file": "contourpy-1.4.0-cp312-cp312-win_amd64.whl",
+      "sha256": "6e697d94e69f499ff6bebb899cae97a58d5d14f0e1fe9568b43a0248d2f9af8c",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "croniter",
+      "version": "7.0.0",
+      "file": "croniter-7.0.0-py3-none-any.whl",
+      "sha256": "92090bce3cef195a037a46b78430c4cdd6250e90671d9d7dcd9e486147daaca4",
+      "why": "cron 表达式"
+    },
+    {
+      "name": "cryptography",
+      "version": "50.0.2",
+      "file": "cryptography-50.0.2-cp311-abi3-win_amd64.whl",
+      "sha256": "7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c",
+      "why": "TLS / 证书"
+    },
+    {
+      "name": "cycler",
+      "version": "0.12.1",
+      "file": "cycler-0.12.1-py3-none-any.whl",
+      "sha256": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "defusedxml",
+      "version": "0.7.1",
+      "file": "defusedxml-0.7.1-py2.py3-none-any.whl",
+      "sha256": "a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61",
+      "why": "安全 XML 解析"
+    },
+    {
+      "name": "docker",
+      "version": "7.2.0",
+      "file": "docker-7.2.0-py3-none-any.whl",
+      "sha256": "a3f45fdeb9165e2d25d9a1d02ddf3bc70fb572cf5ebbf9b58558c22caf29b71f",
+      "why": "容器控制"
+    },
+    {
+      "name": "filelock",
+      "version": "4.2.10",
+      "file": "filelock-4.2.10-py3-none-any.whl",
+      "sha256": "9479aaeb4db20b5a53e3da28493edd24720b66b8a0b84030aa56ccdf243d6857",
+      "why": "文件锁"
+    },
+    {
+      "name": "fonttools",
+      "version": "4.68.0",
+      "file": "fonttools-4.68.0-cp312-cp312-win_amd64.whl",
+      "sha256": "fedc183bdbc3fdbfbdca26e0e04566d089cbb404712509a4e824608e9304cc77",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "frozenlist",
+      "version": "1.8.0",
+      "file": "frozenlist-1.8.0-cp312-cp312-win_amd64.whl",
+      "sha256": "34187385b08f866104f0c0617404c8eb08165ab1272e884abc89c112e9c00746",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "file": "h11-0.16.0-py3-none-any.whl",
+      "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+      "why": "HTTP/1.1 协议实现"
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "file": "httpcore-1.0.9-py3-none-any.whl",
+      "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+      "why": "httpx 依赖"
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "file": "httpx-0.28.1-py3-none-any.whl",
+      "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+      "why": "同步/异步 HTTP 客户端"
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "file": "idna-3.20-py3-none-any.whl",
+      "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "ijson",
+      "version": "3.6.0",
+      "file": "ijson-3.6.0-cp312-cp312-win_amd64.whl",
+      "sha256": "d5aceb2da334db519c5bb7be0d043f357493554bda2a480eea3e2fe78352ab0c",
+      "why": "流式 JSON 解析"
+    },
+    {
+      "name": "invoke",
+      "version": "3.0.3",
+      "file": "invoke-3.0.3-py3-none-any.whl",
+      "sha256": "f11327165e5cbb89b2ad1d88d3292b5113332c43b8553b494da435d6ec6f5053",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "jmespath",
+      "version": "1.1.0",
+      "file": "jmespath-1.1.0-py3-none-any.whl",
+      "sha256": "a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "joblib",
+      "version": "1.6.0",
+      "file": "joblib-1.6.0-py3-none-any.whl",
+      "sha256": "3dbbf9f6e4b592a2357b854608e980fe6390d131d7a82f011a377ef2ebef7aba",
+      "why": "任务并行/缓存"
+    },
+    {
+      "name": "jsonschema",
+      "version": "4.26.0",
+      "file": "jsonschema-4.26.0-py3-none-any.whl",
+      "sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce",
+      "why": "JSON Schema 校验"
+    },
+    {
+      "name": "jsonschema_specifications",
+      "version": "2025.9.1",
+      "file": "jsonschema_specifications-2025.9.1-py3-none-any.whl",
+      "sha256": "98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "kiwisolver",
+      "version": "1.5.1",
+      "file": "kiwisolver-1.5.1-cp312-cp312-win_amd64.whl",
+      "sha256": "06a6917674de9e0fe3f66f5430787f59a9f2ddb64af9b714eaec547e29ef5c19",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "loguru",
+      "version": "0.8.0",
+      "file": "loguru-0.8.0-py3-none-any.whl",
+      "sha256": "e0fba09d6f76ba2d2f4bd1757122942f5a670c702e988b5efaeab99dacba0069",
+      "why": "日志"
+    },
+    {
+      "name": "markdown",
+      "version": "3.11.3",
+      "file": "markdown-3.11.3-py3-none-any.whl",
+      "sha256": "e1a31a112232504d753e5c01bb8c2de90d3f0ba986b063e10770cf7695b09e73",
+      "why": "Markdown 渲染"
+    },
+    {
+      "name": "markdown_it_py",
+      "version": "4.3.0",
+      "file": "markdown_it_py-4.3.0-py3-none-any.whl",
+      "sha256": "7aa1511a46c39138de78d9eba92ce47e63124d8003fc98b3a351909e04239efa",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "markdownify",
+      "version": "1.2.3",
+      "file": "markdownify-1.2.3-py3-none-any.whl",
+      "sha256": "a189a0bedfd14009030fde5f85bb6f77c56897cb839b5c25315dd7d4e3e290ba",
+      "why": "HTML→Markdown"
+    },
+    {
+      "name": "matplotlib",
+      "version": "3.11.2",
+      "file": "matplotlib-3.11.2-cp312-cp312-win_amd64.whl",
+      "sha256": "c5c1c68ee401fc98271263410f0e5ce88285abacf7627132914e8adf3d70ff43",
+      "why": "绘图"
+    },
+    {
+      "name": "mdurl",
+      "version": "0.1.2",
+      "file": "mdurl-0.1.2-py3-none-any.whl",
+      "sha256": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "multidict",
+      "version": "7.2.1",
+      "file": "multidict-7.2.1-cp312-cp312-win_amd64.whl",
+      "sha256": "781ca5dfc2f1d58e47f52216a0c1c7e1ba91ce8aa235459e20de2d402af77fb3",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "narwhals",
+      "version": "2.28.0",
+      "file": "narwhals-2.28.0-py3-none-any.whl",
+      "sha256": "1f69d6385ec30e2fa6e1fdeb37c562ecabd0f713f6f3e3b58a668c5c9df9567f",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "networkx",
+      "version": "3.7",
+      "file": "networkx-3.7-py3-none-any.whl",
+      "sha256": "e3fd2c13a7814cee3746340d8d7f8598a67f16a58bf47fb7f8793fab6efca1b0",
+      "why": "图算法"
+    },
+    {
+      "name": "numpy",
+      "version": "2.5.4",
+      "file": "numpy-2.5.4-cp312-cp312-win_amd64.whl",
+      "sha256": "a7b1b6353e36a7e50de2973a38d705c88ee93adcf120673cee7f45a4a3fa223a",
+      "why": "pandas runtime dependency（内置栈与扩展栈各自独立安装，各带一份）"
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "file": "packaging-26.3-py3-none-any.whl",
+      "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "paramiko",
+      "version": "5.1.0",
+      "file": "paramiko-5.1.0-py3-none-any.whl",
+      "sha256": "d9fe6d67a9d0bbf3eb85b051d26ab850b678c02d060f32915b944e5ca6d0d9e1",
+      "why": "SSH/SFTP"
+    },
+    {
+      "name": "passlib",
+      "version": "1.7.4",
+      "file": "passlib-1.7.4-py2.py3-none-any.whl",
+      "sha256": "aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1",
+      "why": "口令杂凑"
+    },
+    {
+      "name": "pdfminer_six",
+      "version": "20260107",
+      "file": "pdfminer_six-20260107-py3-none-any.whl",
+      "sha256": "366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pdfplumber",
+      "version": "0.11.10",
+      "file": "pdfplumber-0.11.10-py3-none-any.whl",
+      "sha256": "7741ea81bf165b474b153e6789d10d18e06b6ddcf3ec84289c3ef2fed6802580",
+      "why": "PDF 表格/文本提取"
+    },
+    {
+      "name": "pillow",
+      "version": "13.0.0",
+      "file": "pillow-13.0.0-cp312-cp312-win_amd64.whl",
+      "sha256": "ff3fe9eb621fbb9db4c4be33ab946f6bac5f98ab50ca8d3260503653656c961b",
+      "why": "pdfplumber 要求 Pillow>=12.2，扩展栈用 13.0（内置 Office 栈仍为 11.3）"
+    },
+    {
+      "name": "propcache",
+      "version": "0.5.4",
+      "file": "propcache-0.5.4-cp312-cp312-win_amd64.whl",
+      "sha256": "98914de2c4d7f0f9f4a8c6ea4bf05841f4175796941e3ef7d47eb718f22311fb",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "psutil",
+      "version": "7.2.2",
+      "file": "psutil-7.2.2-cp37-abi3-win_amd64.whl",
+      "sha256": "eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988",
+      "why": "进程/系统信息"
+    },
+    {
+      "name": "pycparser",
+      "version": "3.12",
+      "file": "pycparser-3.12-py3-none-any.whl",
+      "sha256": "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pycryptodome",
+      "version": "4.5.0",
+      "file": "pycryptodome-4.5.0-cp39-abi3-win_amd64.whl",
+      "sha256": "b05fed07d07d69c5205689293c3b71a21b8bb4c6f4bb964d1c2d24dfdf22433d",
+      "why": "对称/非对称加密"
+    },
+    {
+      "name": "pydantic",
+      "version": "2.14.3",
+      "file": "pydantic-2.14.3-py3-none-any.whl",
+      "sha256": "3f7b347782ab7e4cf4c798496ae3a82787d9f21ec12676a9c564355eeef8daa8",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pydantic_core",
+      "version": "2.50.4",
+      "file": "pydantic_core-2.50.4-cp312-cp312-win_amd64.whl",
+      "sha256": "ea2f61b0bc12f3592288503961b764579dea0658852d96a0b3d823614d808821",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pygments",
+      "version": "2.21.0",
+      "file": "pygments-2.21.0-py3-none-any.whl",
+      "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pyjwt",
+      "version": "2.15.1",
+      "file": "pyjwt-2.15.1-py3-none-any.whl",
+      "sha256": "42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193",
+      "why": "JWT"
+    },
+    {
+      "name": "pynacl",
+      "version": "1.6.2",
+      "file": "pynacl-1.6.2-cp38-abi3-win_amd64.whl",
+      "sha256": "62985f233210dee6548c223301b6c25440852e13d59a8b81490203c3227c5ba0",
+      "why": "paramiko 依赖（Ed25519）"
+    },
+    {
+      "name": "pyparsing",
+      "version": "3.3.3",
+      "file": "pyparsing-3.3.3-py3-none-any.whl",
+      "sha256": "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pypdfium2",
+      "version": "5.15.2",
+      "file": "pypdfium2-5.15.2-py3-none-win_amd64.whl",
+      "sha256": "74d1bace34fb01c660d0b64344d5a4b7d276942b7c6623c88ab59ea21c5acfbd",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pyserial",
+      "version": "3.5",
+      "file": "pyserial-3.5-py2.py3-none-any.whl",
+      "sha256": "c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0",
+      "why": "串口"
+    },
+    {
+      "name": "python_can",
+      "version": "4.6.1",
+      "file": "python_can-4.6.1-py3-none-any.whl",
+      "sha256": "17f95255868a95108dcfcb90565a684dad32d5a3ebb35afd14f739e18c84ff6c",
+      "why": "CAN 总线（含本机 zlg 后端）"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "file": "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "sha256": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "why": "boto3/botocore 要求 <3，扩展栈用 2.9（内置 Office 栈仍为 4.0）"
+    },
+    {
+      "name": "python_dotenv",
+      "version": "1.2.4",
+      "file": "python_dotenv-1.2.4-py3-none-any.whl",
+      "sha256": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc",
+      "why": ".env 读取"
+    },
+    {
+      "name": "pyusb",
+      "version": "1.3.1",
+      "file": "pyusb-1.3.1-py3-none-any.whl",
+      "sha256": "bf9b754557af4717fe80c2b07cc2b923a9151f5c08d17bdb5345dac09d6a0430",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pywin32",
+      "version": "312",
+      "file": "pywin32-312-cp312-cp312-win_amd64.whl",
+      "sha256": "b457f6d628a47e8a7346ce22acb7e1a46a4a78b52e1d17e1af56871bd19a93bc",
+      "why": "Windows API（win32api / win32com）"
+    },
+    {
+      "name": "pyxcp",
+      "version": "0.30.4",
+      "file": "pyxcp-0.30.4-cp312-cp312-win_amd64.whl",
+      "sha256": "160ded15822fee78aa133fc41762595b592c08d0f11e7a0ce2fd5c92b15a3e21",
+      "why": "XCP 标定协议"
+    },
+    {
+      "name": "pyyaml",
+      "version": "6.0.3",
+      "file": "pyyaml-6.0.3-cp312-cp312-win_amd64.whl",
+      "sha256": "5fcd34e47f6e0b794d17de1b4ff496c00986e1c83f7ab2fb8fcfe9616ff7477b",
+      "why": "YAML"
+    },
+    {
+      "name": "referencing",
+      "version": "0.37.0",
+      "file": "referencing-0.37.0-py3-none-any.whl",
+      "sha256": "381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "file": "requests-2.34.2-py3-none-any.whl",
+      "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+      "why": "工程脚本最常用的 HTTP 客户端"
+    },
+    {
+      "name": "rich",
+      "version": "15.0.0",
+      "file": "rich-15.0.0-py3-none-any.whl",
+      "sha256": "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb",
+      "why": "终端富文本"
+    },
+    {
+      "name": "rpds_py",
+      "version": "2026.9.1",
+      "file": "rpds_py-2026.9.1-cp312-cp312-win_amd64.whl",
+      "sha256": "5ce8943f79c2210f7abcc28e86367b03b28d95027fd01c46d2472373ae70c86f",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "s3transfer",
+      "version": "0.19.3",
+      "file": "s3transfer-0.19.3-py3-none-any.whl",
+      "sha256": "24eb7535804306355e31c952a90022bf5b2f9d760f9a11062c7493a217c08553",
+      "why": "boto3 依赖"
+    },
+    {
+      "name": "scikit_learn",
+      "version": "1.9.1",
+      "file": "scikit_learn-1.9.1-cp312-cp312-win_amd64.whl",
+      "sha256": "4b59abb30618121cc46b45972d6bf53a7128b4df4cd346c6ca6f4d5f9031e49c",
+      "why": "机器学习"
+    },
+    {
+      "name": "scipy",
+      "version": "1.18.1",
+      "file": "scipy-1.18.1-cp312-cp312-win_amd64.whl",
+      "sha256": "5e4d44984abc0020154ea81b247adeddcc3ac5527b975ff798bd1ba0adc513c2",
+      "why": "科学计算"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "file": "six-1.17.0-py2.py3-none-any.whl",
+      "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "soupsieve",
+      "version": "4.1.1",
+      "file": "soupsieve-4.1.1-py3-none-any.whl",
+      "sha256": "8ff3422dab0b720fb667ee79864d80531a0e57994a13eb701697719ffcb751f6",
+      "why": "beautifulsoup4 依赖"
+    },
+    {
+      "name": "tabulate",
+      "version": "0.10.0",
+      "file": "tabulate-0.10.0-py3-none-any.whl",
+      "sha256": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+      "why": "表格输出"
+    },
+    {
+      "name": "tenacity",
+      "version": "9.2.1",
+      "file": "tenacity-9.2.1-py3-none-any.whl",
+      "sha256": "9e56f17539296baab7beabb08b92f6ee3d7be92d8be72d763360677c2ad6580e",
+      "why": "重试"
+    },
+    {
+      "name": "threadpoolctl",
+      "version": "3.8.0",
+      "file": "threadpoolctl-3.8.0-py3-none-any.whl",
+      "sha256": "f1b49c82704d50f13ffae019c727b0fa4f6791a58f48f06a09c45face1be66da",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "toml",
+      "version": "0.10.2",
+      "file": "toml-0.10.2-py2.py3-none-any.whl",
+      "sha256": "806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "tqdm",
+      "version": "4.70.1",
+      "file": "tqdm-4.70.1-py3-none-any.whl",
+      "sha256": "c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73",
+      "why": "进度条"
+    },
+    {
+      "name": "traitlets",
+      "version": "5.16.1",
+      "file": "traitlets-5.16.1-py3-none-any.whl",
+      "sha256": "f775618166caa0396c8e337099240f2bd3e5e917d203b2e6fbe21a58d3cb1f6b",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "file": "typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "why": "python-docx / python-pptx runtime dependency（内置栈与扩展栈各自独立安装，各带一份）"
+    },
+    {
+      "name": "typing_inspection",
+      "version": "0.4.5",
+      "file": "typing_inspection-0.4.5-py3-none-any.whl",
+      "sha256": "bc210535442b39e1bf2805e0c7a17dfd6a4ace760c84c7f7d16245d23a6b1c39",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "tzdata",
+      "version": "2026.6",
+      "file": "tzdata-2026.6-py2.py3-none-any.whl",
+      "sha256": "0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec",
+      "why": "tzlocal（apscheduler 依赖）在 Windows 上需要 tzdata"
+    },
+    {
+      "name": "tzlocal",
+      "version": "5.4.5",
+      "file": "tzlocal-5.4.5-py3-none-any.whl",
+      "sha256": "ecab534f6d65d9deb4c4ea52c121ab6dd5958e9b878e71dcb102578269752454",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "udsoncan",
+      "version": "1.26.1",
+      "file": "udsoncan-1.26.1-py3-none-any.whl",
+      "sha256": "c1bd6cc54d6c1124c0eafeff2ffaab48bfeb7d0d2576959f21840c37e96dfb9a",
+      "why": "UDS 诊断协议"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.8.0",
+      "file": "urllib3-2.8.0-py3-none-any.whl",
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "win32_setctime",
+      "version": "1.2.1",
+      "file": "win32_setctime-1.2.1-py3-none-any.whl",
+      "sha256": "a9edc685b35414bec69392c866ed82456ad125ac4a6a4b703ec1d8b462d4f477",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "wrapt",
+      "version": "1.17.3",
+      "file": "wrapt-1.17.3-cp312-cp312-win_amd64.whl",
+      "sha256": "e71d5c6ebac14875668a1e90baf2ea0ef5b7ac7918355850c0908ae82bcb297c",
+      "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "xlrd",
+      "version": "2.0.2",
+      "file": "xlrd-2.0.2-py2.py3-none-any.whl",
+      "sha256": "ea762c3d29f4cca48d82df517b6d89fbce4db3107f9d78713e48cd321d5c9aa9",
+      "why": "旧版 xls 读取"
+    },
+    {
+      "name": "yarl",
+      "version": "1.25.1",
+      "file": "yarl-1.25.1-cp312-cp312-win_amd64.whl",
+      "sha256": "7d575b54cb3863ef9bc290ea4b009999d55dc237326131e4853cf33e888fee03",
+      "why": "A+B 工程/数据栈"
+    }
+  ],
+  "extrasSmokeImports": [
+    "can",
+    "serial",
+    "paramiko",
+    "requests",
+    "httpx",
+    "scipy",
+    "sklearn",
+    "matplotlib",
+    "rich",
+    "jsonschema",
+    "pdfplumber",
+    "boto3",
+    "win32api"
   ]
 }

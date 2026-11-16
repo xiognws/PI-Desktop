@@ -243,6 +243,13 @@ without asking the user to install anything.
   customer's own interpreter is never used, so behaviour does not vary with what
   happens to be on their machine. `PYTHONNOUSERSITE` keeps their per-user
   `site-packages` out of the import path.
+- **Where the optional extras live.** The everyday engineering stack (~400 MB
+  unpacked: `scipy`, `scikit-learn`, `matplotlib`, `python-can`, `paramiko`,
+  `boto3`, `pywin32`, …) is assembled by `scripts/bundle-python-extras.mjs` into
+  `<app dir>/python-extras/site-packages` — beside the image, not inside the
+  installer — and joins `PYTHONPATH` only when that folder exists and only for
+  the bundled interpreter. Removing the folder disables the extras without
+  affecting Office and file tools.
 - **Where the work runs.** One short-lived child process of host-core per call,
   running `tools/office.py` from that bundle. A malformed document can only kill
   that process; the host reads a broken response and the session continues. No

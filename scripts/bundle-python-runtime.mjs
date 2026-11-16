@@ -70,6 +70,57 @@ if (!lock.python.platform.startsWith(platform)) {
 /** A stable relative path inside the bundle, with forward slashes. */
 const rel = (base, file) => file.slice(base.length + 1).split("\\").join("/");
 
+/**
+ * Apply the files the lock cannot express as a wheel.
+ *
+ * `scripts/python-runtime.lock.json` can only describe published wheels, but a
+ * library the customer maintains locally is not on any index: the ZLG
+ * (周立功) USBCAN backend is a patched copy of `can.interfaces` that has to land
+ * inside `python-can` after pip installs it. Two overlay kinds are enough:
+ *
+ *   copy   a directory or file from `resources/python/patches/…` into
+ *          `site-packages/…`
+ *   patch  replace exact text inside an installed file (idempotent: a patch
+ *          whose replacement is already present is skipped)
+ *
+ * Both fail loudly. A silently missing backend would ship an import error to
+ * every customer instead of failing this build.
+ */
+async function applyOverlays(sitePackages) {
+  // `scope` splits the overlays between the bundled Office stack and the
+  // optional extras folder: a `can` patch has no meaning in a tree that does not
+  // install python-can.
+  const overlays = (lock.overlays ?? []).filter((overlay) => (overlay.scope ?? "bundle") === "bundle");
+  if (!overlays.length) return;
+  // The patches are tracked source (`apps/desktop/python-patches`), not part of
+  // the generated `resources/python` tree this script rebuilds.
+  const patchesRoot = join(REPO, "apps", "desktop", "python-patches");
+  for (const overlay of overlays) {
+    if (!overlay.to) throw new Error(`overlay without a destination: ${JSON.stringify(overlay)}`);
+    if (overlay.type === "patch") {
+      const file = join(sitePackages, overlay.file ?? overlay.to);
+      if (!existsSync(file)) throw new Error(`overlay target missing: ${file}`);
+      let text = await readFile(file, "utf8");
+      for (const edit of overlay.replace ?? []) {
+        if (text.includes(edit.with)) continue; // already applied
+        if (!text.includes(edit.find)) {
+          throw new Error(`${overlay.file}: anchor not found, so ${overlay.why ?? "the overlay"} cannot be applied`);
+        }
+        text = text.replace(edit.find, edit.with);
+      }
+      await writeFile(file, text);
+      console.log(`  patched ${overlay.file} (${overlay.why ?? "local overlay"})`);
+      continue;
+    }
+    const source = join(patchesRoot, overlay.from);
+    if (!existsSync(source)) throw new Error(`overlay source missing: ${source}`);
+    const destination = join(sitePackages, overlay.to);
+    const isDirectory = (await stat(source)).isDirectory();
+    await cp(source, destination, isDirectory);
+    console.log(`  copied ${overlay.from} → ${overlay.to} (${overlay.why ?? "local overlay"})`);
+  }
+}
+
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -213,6 +264,9 @@ execFileSync(
 
 // A runtime that cannot import its own libraries is worse than no runtime: the
 // client would advertise Office support and fail on the first request.
+console.log("applying local overlays…");
+await applyOverlays(siteDir);
+
 console.log("smoke-testing the stack…");
 execFileSync(
   python,

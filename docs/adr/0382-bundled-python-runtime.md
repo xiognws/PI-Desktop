@@ -37,12 +37,47 @@ and size of every shipped file.
 `pip` and no `sysconfig`, and a customer installing their own library into the
 user layer needs both. The extra size buys that path.
 
-**Three layers, resolved in one place** (`apps/desktop/electron/main/python-runtime.ts`):
+**The bundled wheel set stays small; the engineering stack ships beside the image.**
+The Office and file libraries (`pandas`, `openpyxl`, `python-docx`, `python-pptx`,
+`pypdf`, `xlsxwriter`) are the reason the runtime exists, so they live inside
+`<resources>/python` where the built-in tools need them.
+
+A desktop agent that runs Python at all is also asked for the ordinary
+engineering stack — HTTP, SSH and serial, `python-can`/`isotp`/`udsoncan`/`pyxcp`,
+`scipy`/`scikit-learn`/`matplotlib`, PDF and Markdown parsing, `boto3`,
+`pywin32` — but that is roughly 400 MB unpacked, and putting it in every
+installer taxes the users who never touch Python. It is therefore assembled by
+`scripts/bundle-python-extras.mjs` into `<app dir>/python-extras/site-packages`,
+**after** electron-builder has produced the installers, and is put on
+`PYTHONPATH` only when the folder exists. The installer and the portable build
+stay small; the unpacked/portable **folder** carries everything, and a customer
+who only needs Office can delete `python-extras` without breaking anything.
+
+The extras are added only for the bundled interpreter: they are 3.12 wheels, and
+offering them to a customer's own 3.11 would turn a working import into a crash.
+
+**Locally maintained code ships through an overlay.** Some libraries are not on
+any index: the ZLG (周立功) USBCAN backend is a patched `python-can` interface
+that the customer maintains. `python-runtime.lock.json` therefore carries
+`overlays` — `copy` for a directory or file from
+`apps/desktop/python-patches/`, `patch` for exact-text registration inside an
+installed file — each tagged with the `scope` (`bundle` or `extras`) that should
+receive it. Both are applied after `pip install` and both fail the build rather
+than shipping a library that imports without its backend. The overlay source is
+tracked; the generated trees stay disposable.
+
+The two trees are installed independently, so a package both of them need
+(`typing-extensions`, `numpy`, `pillow`, `python-dateutil`, `tzdata`) is listed
+in both wheel sets, and where their dependency constraints differ each tree keeps
+the version that satisfies its own set.
+
+**Four layers, resolved in one place** (`apps/desktop/electron/main/python-runtime.ts`):
 
 ```text
-<resources>/python/runtime/        the interpreter, read-only
-<resources>/python/site-packages/  the pinned libraries, read-only
-<data>/python-site/                the customer's own installs, writable, first
+<data>/python-site/                      the customer's own installs, writable, first
+<app dir>/python-extras/site-packages/   the optional engineering stack, if present
+<resources>/python/site-packages/        the pinned Office libraries, read-only
+<resources>/python/runtime/              the interpreter, read-only
 ```
 
 The user layer comes first on `PYTHONPATH`, so an upgrade survives app updates

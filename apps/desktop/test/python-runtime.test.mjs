@@ -80,6 +80,9 @@ test("the import path puts the user layer first and never the user's own site", 
       executable: join(dir, "python", "runtime", "python.exe"),
       home: join(dir, "python", "runtime"),
       sitePackages: join(dir, "python", "site-packages"),
+      // The bundled source is what makes `PYTHONNOUSERSITE` appropriate: a
+      // customer's own interpreter must keep its user site.
+      source: "bundled",
     };
     const userA = join(dir, "user-a");
     const userB = join(dir, "user-b");
@@ -91,6 +94,61 @@ test("the import path puts the user layer first and never the user's own site", 
     // the pinned one on every spreadsheet read.
     assert.equal(env.PYTHONNOUSERSITE, "1");
   } finally {
+    clean();
+  }
+});
+
+test("the extras folder is offered to the bundled interpreter, between user and bundle", () => {
+  const { dir, clean } = scratch();
+  const previous = process.env.PI_DESKTOP_PYTHON_EXTRAS;
+  try {
+    const extras = join(dir, "python-extras", "site-packages");
+    mkdirSync(extras, { recursive: true });
+    process.env.PI_DESKTOP_PYTHON_EXTRAS = extras;
+    const runtime = {
+      root: join(dir, "python"),
+      executable: join(dir, "python", "runtime", "python.exe"),
+      home: join(dir, "python", "runtime"),
+      sitePackages: join(dir, "python", "site-packages"),
+      source: "bundled",
+    };
+    const user = join(dir, "user-a");
+    const split = (value) => String(value).split(process.platform === "win32" ? ";" : ":");
+
+    // A customer's upgrade of one library still wins over the shipped extras.
+    assert.deepEqual(split(pythonEnv(runtime, [user]).PYTHONPATH), [user, extras, runtime.sitePackages]);
+
+    // The extras are 3.12 wheels: offering them to a customer's own interpreter
+    // would turn a working import into a confusing crash.
+    assert.deepEqual(split(pythonEnv({ ...runtime, source: "system" }, [user]).PYTHONPATH), [
+      user,
+      runtime.sitePackages,
+    ]);
+  } finally {
+    if (previous === undefined) delete process.env.PI_DESKTOP_PYTHON_EXTRAS;
+    else process.env.PI_DESKTOP_PYTHON_EXTRAS = previous;
+    clean();
+  }
+});
+
+test("a missing extras folder leaves no dangling entry on the import path", () => {
+  const { dir, clean } = scratch();
+  const previous = process.env.PI_DESKTOP_PYTHON_EXTRAS;
+  try {
+    // The override names a directory that was never assembled.
+    process.env.PI_DESKTOP_PYTHON_EXTRAS = join(dir, "python-extras", "site-packages");
+    const runtime = {
+      root: join(dir, "python"),
+      executable: join(dir, "python", "runtime", "python.exe"),
+      home: join(dir, "python", "runtime"),
+      sitePackages: join(dir, "python", "site-packages"),
+      source: "bundled",
+    };
+    const entries = String(pythonEnv(runtime, []).PYTHONPATH).split(process.platform === "win32" ? ";" : ":");
+    assert.deepEqual(entries, [runtime.sitePackages]);
+  } finally {
+    if (previous === undefined) delete process.env.PI_DESKTOP_PYTHON_EXTRAS;
+    else process.env.PI_DESKTOP_PYTHON_EXTRAS = previous;
     clean();
   }
 });

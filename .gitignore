@@ -139,6 +139,10 @@ __pycache__/
 # as a tree.
 /apps/desktop/resources/python/
 /.python-staging/
+# The optional extras folder assembled next to the image (not inside it) by
+# scripts/bundle-python-extras.mjs; same reasoning as the runtime tree above.
+/.python-extras-staging/
+/apps/desktop/release/win-unpacked/python-extras/
 
 # Local scratch work (audit scripts, throwaway output)
 .scratch/

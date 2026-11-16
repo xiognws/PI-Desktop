@@ -31,6 +31,8 @@ import { getModuleDirectory } from "./module-path.ts";
  *
  *   <resources>/python/site-packages/  the bundled libraries, read-only
  *   <data>/python-site/                the user's installs, writable, first
+ *   <app dir>/python-extras/site-packages  optional engineering stack, shipped
+ *                                     beside the image instead of inside it
  *
  * The user layer comes first on `PYTHONPATH` so a customer who upgrades a
  * library keeps that upgrade across app updates, and so a reinstall never has
@@ -46,6 +48,32 @@ const MANIFEST_FILE = "MANIFEST.json";
 
 /** Where a customer's own `pip install --target` writes. */
 export const USER_SITE_DIR = "python-site";
+
+/**
+ * Optional library folder that sits **beside the app image**, not inside it.
+ *
+ * `scripts/bundle-python-extras.mjs` fills `python-extras/site-packages` with the
+ * everyday engineering stack (HTTP, SSH, CAN, scipy/matplotlib, pywin32 …). It is
+ * deliberately outside `<resources>`: those libraries are optional, and shipping
+ * ~180 MB of them inside every installer would tax the users who never run
+ * Python. The folder is added to `PYTHONPATH` only for the bundled interpreter,
+ * because its wheels are built for exactly that CPython version.
+ *
+ * `PI_DESKTOP_PYTHON_EXTRAS` overrides the location for a development tree.
+ */
+export const EXTRAS_DIR = "python-extras";
+
+/** The extras `site-packages` directory, or null when the folder is not installed. */
+export function extrasSitePackages(): string | null {
+  const candidates = [
+    process.env.PI_DESKTOP_PYTHON_EXTRAS ?? "",
+    join(dirname(process.execPath), EXTRAS_DIR, SITE_PACKAGES_DIR),
+  ].filter((value) => value.length > 0);
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
 
 /**
  * Where the user drops `.whl` files they brought from elsewhere.
@@ -427,8 +455,13 @@ export function pythonEnv(
   runtime: PythonRuntime,
   userSiteDirs: readonly string[] = [],
 ): NodeJS.ProcessEnv {
+  // The optional extras folder is version-locked to the bundled CPython, so it is
+  // only offered to that interpreter: pointing a customer's own 3.11 at 3.12
+  // wheels would turn a working import into a confusing crash.
+  const extras = runtime.source === "bundled" ? extrasSitePackages() : null;
   const entries = [
     ...userSiteDirs.filter((dir) => dir.length > 0),
+    ...(extras ? [extras] : []),
     ...(runtime.sitePackages ? [runtime.sitePackages] : []),
   ];
   const env: NodeJS.ProcessEnv = {
