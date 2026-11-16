@@ -56,6 +56,43 @@ function makeVenv(dataDir, version = "3.12") {
   return { venv, exe, version };
 }
 
+test("picking the shipped interpreter keeps its home, libraries and extras", () => {
+  const fx = fixture();
+  const previous = process.env.PI_DESKTOP_PYTHON_EXTRAS;
+  try {
+    const extras = join(fx.root, "win-unpacked", "python-extras", "site-packages");
+    mkdirSync(extras, { recursive: true });
+    process.env.PI_DESKTOP_PYTHON_EXTRAS = extras;
+    const bundledExe = join(fx.bundled, "runtime", exeName);
+
+    // Settings stores an interpreter path, so "use the built-in one" arrives here
+    // as an ordinary preferred path. It must resolve to the bundle itself, not to
+    // an anonymous user interpreter: a user path gets no PYTHONHOME, no pinned
+    // libraries and no extras folder.
+    const runtime = resolvePythonRuntime({
+      dataDir: fx.dataDir,
+      resourcesPath: fx.resources,
+      env: { PATH: "" },
+      preferred: bundledExe,
+      probe: () => "3.12",
+      canRunTools: () => true,
+    });
+    assert.equal(runtime.state, "present");
+    assert.equal(runtime.runtime.source, "bundled");
+    assert.equal(runtime.runtime.home, join(fx.bundled, "runtime"));
+    assert.equal(runtime.runtime.sitePackages, join(fx.bundled, "site-packages"));
+
+    const entries = String(pythonEnv(runtime.runtime, []).PYTHONPATH).split(
+      process.platform === "win32" ? ";" : ":",
+    );
+    assert.ok(entries.includes(extras), `the extras folder must stay on the path: ${entries}`);
+  } finally {
+    if (previous === undefined) delete process.env.PI_DESKTOP_PYTHON_EXTRAS;
+    else process.env.PI_DESKTOP_PYTHON_EXTRAS = previous;
+    fx.cleanup();
+  }
+});
+
 test("an explicit path wins over everything", () => {
   const fx = fixture();
   try {

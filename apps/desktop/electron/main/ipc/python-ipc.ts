@@ -5,6 +5,7 @@ import { IPC } from "@pi-workspace/shared";
 
 import { readPythonInterpreterPreference, writePythonInterpreterPreference } from "../python-preferences.ts";
 import {
+  bundledPython,
   getPreferredPythonPath,
   probePythonCapabilities,
   probePythonVersion,
@@ -70,7 +71,16 @@ export function registerPythonIpc({ registrar, dataDir, callHost }: PythonIpcDep
 
   registrar.handle(IPC.invoke.pythonScan, async () => {
     const configured = readPythonInterpreterPreference(dataDir) || getPreferredPythonPath();
-    const candidates = scanPythonInstallations({ dataDir, configured });
+    // The shipped runtime is a candidate like any other, so "use the built-in
+    // one" is a choice in the list rather than only an implicit fallback.
+    const bundled = bundledPython();
+    const candidates = scanPythonInstallations({
+      dataDir,
+      configured,
+      ...(bundled
+        ? { bundled: { path: bundled.executable, version: bundled.version, sitePackages: bundled.sitePackages } }
+        : {}),
+    });
     return { candidates, configured };
   });
 

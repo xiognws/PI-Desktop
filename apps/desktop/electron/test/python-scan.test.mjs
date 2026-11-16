@@ -36,6 +36,63 @@ function fixture() {
   };
 }
 
+test("the shipped runtime is offered first, with its libraries already present", () => {
+  const fx = fixture();
+  try {
+    const bundledRoot = join(fx.root, "resources", "python");
+    const bundledExe = join(bundledRoot, "runtime", name);
+    const sitePackages = join(bundledRoot, "site-packages");
+    mkdirSync(join(bundledRoot, "runtime"), { recursive: true });
+    mkdirSync(sitePackages, { recursive: true });
+    writeFileSync(bundledExe, "");
+
+    const candidates = scanPythonInstallations({
+      env: { PATH: fx.bin },
+      platform: process.platform,
+      probeVersion: () => "3.12",
+      // A user interpreter would report missing libraries here; the bundled one
+      // must not depend on this probe at all, because its wheels reach it through
+      // PYTHONPATH rather than its own site-packages.
+      probeLibraries: () => false,
+      bundled: { path: bundledExe, version: "3.12", sitePackages },
+    });
+
+    assert.equal(candidates[0].path, bundledExe, "the shipped runtime ranks first");
+    assert.equal(candidates[0].source, "bundled");
+    assert.equal(candidates[0].hasLibraries, true);
+    assert.equal(candidates[0].version, "3.12");
+    assert.equal(
+      candidates.filter((candidate) => candidate.path === bundledExe).length,
+      1,
+      "it must not also appear as a PATH or common-root find",
+    );
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a build without a bundled site-packages is not advertised as complete", () => {
+  const fx = fixture();
+  try {
+    const bundledExe = join(fx.root, "resources", "python", "runtime", name);
+    mkdirSync(join(fx.root, "resources", "python", "runtime"), { recursive: true });
+    writeFileSync(bundledExe, "");
+
+    const candidates = scanPythonInstallations({
+      env: { PATH: "" },
+      platform: process.platform,
+      probeVersion: () => "3.12",
+      probeLibraries: () => false,
+      bundled: { path: bundledExe, sitePackages: join(fx.root, "nowhere") },
+    });
+
+    assert.equal(candidates[0].source, "bundled");
+    assert.equal(candidates[0].hasLibraries, false, "an unfinished build must not claim the libraries");
+  } finally {
+    fx.cleanup();
+  }
+});
+
 test("finds PATH and common install roots, deduped, best first", () => {
   const fx = fixture();
   try {

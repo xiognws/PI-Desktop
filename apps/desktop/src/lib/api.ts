@@ -840,7 +840,8 @@ export type PythonCandidate = {
   path: string;
   version?: string;
   hasLibraries: boolean;
-  source: "configured" | "data-venv" | "launcher" | "path" | "common";
+  /** `bundled` is the runtime this build ships, offered first in the list. */
+  source: "bundled" | "configured" | "data-venv" | "launcher" | "path" | "common";
 };
 
 export const api = {

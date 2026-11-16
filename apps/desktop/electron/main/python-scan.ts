@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { probePythonCapabilities, probePythonVersion } from "./python-runtime.ts";
 
-export type PythonCandidateSource = "configured" | "data-venv" | "launcher" | "path" | "common";
+export type PythonCandidateSource = "bundled" | "configured" | "data-venv" | "launcher" | "path" | "common";
 
 export type PythonCandidate = {
   path: string;
@@ -22,6 +22,14 @@ export type PythonCandidate = {
   /** Whether it already imports the libraries the document tools need. */
   hasLibraries: boolean;
   source: PythonCandidateSource;
+};
+
+/** The runtime this build ships, described by the caller that knows its layout. */
+export type BundledCandidate = {
+  path: string;
+  version?: string;
+  /** Where its pinned wheels live; empty when the build has no such folder. */
+  sitePackages?: string;
 };
 
 export type ScanOptions = {
@@ -35,6 +43,13 @@ export type ScanOptions = {
   probeLibraries?: (executable: string) => boolean;
   /** `py -0p` output for the launcher; injected so tests do not spawn anything. */
   launcherPaths?: readonly string[];
+  /**
+   * The interpreter this build ships. Offered even when it is also on `PATH`
+   * (`C:\` installs are), and ranked first: it is the one interpreter whose
+   * document libraries are guaranteed, so a user who picks it never has to read
+   * a "missing libraries" warning.
+   */
+  bundled?: BundledCandidate;
 };
 
 /**
@@ -169,6 +184,23 @@ export function scanPythonInstallations(options: ScanOptions = {}): PythonCandid
 
   const seen = new Set<string>();
   const candidates: PythonCandidate[] = [];
+  // The shipped runtime goes first: it is the one interpreter whose document
+  // libraries this build verified, so it is the safe answer to "which should I
+  // pick". Its libraries are found through `PYTHONPATH`, not through the
+  // interpreter's own site-packages, so presence of the folder is the check.
+  if (options.bundled) {
+    const bundledPath = options.bundled.path;
+    const key = bundledPath.toLowerCase();
+    if (existsSync(bundledPath)) {
+      seen.add(key);
+      candidates.push({
+        path: bundledPath,
+        version: options.bundled.version ?? probeVersion(bundledPath),
+        hasLibraries: Boolean(options.bundled.sitePackages && existsSync(options.bundled.sitePackages)),
+        source: "bundled",
+      });
+    }
+  }
   for (const { path, source } of ordered) {
     const key = path.toLowerCase();
     if (seen.has(key)) continue;

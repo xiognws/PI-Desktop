@@ -321,6 +321,30 @@ function bundledRuntime(root: string, platform: NodeJS.Platform): PythonRuntime 
 }
 
 /**
+ * The interpreter this build ships, if the resources are where the app expects.
+ *
+ * Exported because Settings has to offer it as one of the choices: the runtime is
+ * not on `PATH`, so without this the list only ever shows the machine's own
+ * interpreters and their "missing libraries" warnings.
+ */
+export function bundledPython(options: ResolvePythonOptions = {}): PythonRuntime | null {
+  const platform = options.platform ?? process.platform;
+  return (
+    resourceCandidates(options)
+      .filter((root) => root && existsSync(root))
+      .map((root) => bundledRuntime(root, platform))
+      .find((runtime) => runtime !== null) ?? null
+  );
+}
+
+/** Whether two interpreter paths name the same file (Windows paths fold case). */
+function sameExecutable(left: string, right: string): boolean {
+  if (!left || !right) return false;
+  const normalise = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return normalise(left) === normalise(right);
+}
+
+/**
  * The interpreter this installation should run.
  *
  * Ordered by who knows the customer's files best: their explicit choice, the venv
@@ -351,6 +375,12 @@ export function resolvePythonRuntime(
   // An explicit path is a decision, not a hint: honoured under every strategy.
   const explicit = (env.PI_DESKTOP_PYTHON ?? env.PI_AUTOTEST_PYTHON ?? "").trim();
   if (explicit && existsSync(explicit)) {
+    // Picking the shipped interpreter must behave exactly like falling back to
+    // it — same `PYTHONHOME`, same pinned libraries, same extras folder. Treating
+    // it as an arbitrary user path would silently drop all three.
+    if (bundledAssets && sameExecutable(explicit, bundledAssets.executable)) {
+      return { state: "present", runtime: bundledAssets };
+    }
     const version = probe(explicit);
     return {
       state: "present",
@@ -371,6 +401,9 @@ export function resolvePythonRuntime(
   // interpreter is missing so the choice stays informed.
   const preferred = (options.preferred ?? preferredPythonPath).trim();
   if (strategy !== "bundled" && preferred && existsSync(preferred)) {
+    if (bundledAssets && sameExecutable(preferred, bundledAssets.executable)) {
+      return { state: "present", runtime: bundledAssets };
+    }
     const version = probe(preferred);
     return {
       state: "present",

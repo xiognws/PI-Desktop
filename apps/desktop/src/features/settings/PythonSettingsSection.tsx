@@ -9,11 +9,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { api, type PythonCandidate, type PythonStatus } from "../../lib/api";
 import { Badge, Button, SettingsToggle } from "../../components/ui";
+import { api, type PythonCandidate, type PythonStatus } from "../../lib/api";
 import { SettingsCard, SettingsRow } from "./primitives";
 
 const SOURCE_LABEL: Record<PythonCandidate["source"], string> = {
+  bundled: "settings.pythonBundled",
   configured: "settings.pythonSourceConfigured",
   "data-venv": "settings.pythonSourceDataVenv",
   launcher: "settings.pythonSourceLauncher",
