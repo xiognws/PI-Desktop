@@ -148,6 +148,20 @@
   ],
   "extraWheels": [
     {
+      "name": "absl_py",
+      "version": "2.5.0",
+      "file": "absl_py-2.5.0-py3-none-any.whl",
+      "sha256": "0f17b89f2a4eaaedc4f28c622998aa690564b3012a396a4ffad0821007fe03ba",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "adbutils",
+      "version": "2.12.0",
+      "file": "adbutils-2.12.0-py3-none-win_amd64.whl",
+      "sha256": "e7629bb5783f4aa40942889da1455c879b21f9d1cc057596003b42f3371543be",
+      "why": "扩展栈的自有依赖"
+    },
+    {
       "name": "aiohappyeyeballs",
       "version": "2.7.1",
       "file": "aiohappyeyeballs-2.7.1-py3-none-any.whl",
@@ -162,6 +176,13 @@
       "why": "异步 HTTP 客户端/服务端"
     },
     {
+      "name": "aiohttp_retry",
+      "version": "2.9.1",
+      "file": "aiohttp_retry-2.9.1-py3-none-any.whl",
+      "sha256": "66d2759d1921838256a05a3f80ad7e724936f083e35be5abb5e16eed6be6dc54",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "aiosignal",
       "version": "1.4.0",
       "file": "aiosignal-1.4.0-py3-none-any.whl",
@@ -169,11 +190,60 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "aiosqlite",
+      "version": "0.22.1",
+      "file": "aiosqlite-0.22.1-py3-none-any.whl",
+      "sha256": "21c002eb13823fad740196c5a2e9d8e62f6243bd9e7e4a1f87fb5e44ecb4fceb",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "aistudio_sdk",
+      "version": "0.3.9",
+      "file": "aistudio_sdk-0.3.9-py3-none-any.whl",
+      "sha256": "41621d052ddb7a58643438a7ca541f58ef0ab94a2acdfff0a71db81bf68dc027",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "akshare",
+      "version": "1.18.55",
+      "file": "akshare-1.18.55-py3-none-any.whl",
+      "sha256": "6ac4af6cebcc0b522961ebf967fef5c303408069baeef526cea58991f65c5531",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "altgraph",
+      "version": "0.17.5",
+      "file": "altgraph-0.17.5-py2.py3-none-any.whl",
+      "sha256": "f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "amqp",
+      "version": "5.3.1",
+      "file": "amqp-5.3.1-py3-none-any.whl",
+      "sha256": "43b3319e1b4e7d1251833a93d672b4af1e40f3d632d479b98661a95f117880a2",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "annotated_doc",
+      "version": "0.0.4",
+      "file": "annotated_doc-0.0.4-py3-none-any.whl",
+      "sha256": "571ac1dc6991c450b25a9c2d84a3705e2ae7a53467b5d111c24fa8baabbed320",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "annotated_types",
       "version": "0.8.0",
       "file": "annotated_types-0.8.0-py3-none-any.whl",
       "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "anthropic",
+      "version": "0.104.1",
+      "file": "anthropic-0.104.1-py3-none-any.whl",
+      "sha256": "35c8cb456f5a4405aafe1f10f03f6fcc54fa51fa8ec01d655cc4b437d120e9b7",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "anyio",
@@ -190,11 +260,46 @@
       "why": "定时调度"
     },
     {
+      "name": "astor",
+      "version": "0.8.1",
+      "file": "astor-0.8.1-py2.py3-none-any.whl",
+      "sha256": "070a54e890cefb5b3739d19f30f5a5ec840ffc9c50ffa7d23cc9fc1a38ebbfc5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "attrs",
       "version": "26.1.0",
       "file": "attrs-26.1.0-py3-none-any.whl",
       "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "bandit",
+      "version": "1.9.3",
+      "file": "bandit-1.9.3-py3-none-any.whl",
+      "sha256": "4745917c88d2246def79748bde5e08b9d5e9b92f877863d43fab70cd8814ce6a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "banks",
+      "version": "2.5.0",
+      "file": "banks-2.5.0-py3-none-any.whl",
+      "sha256": "8804c58f23e41a5aabe9ecfdf64235cdf1d5f3b16ad95ec2a54b6dc738dc1dfc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "baostock",
+      "version": "0.9.1",
+      "file": "baostock-0.9.1-py3-none-any.whl",
+      "sha256": "a30749f095fd58ecd7ba3799dad605d355ad8e6d19310bc437039e1e526f15fe",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "bce_python_sdk",
+      "version": "0.9.76",
+      "file": "bce_python_sdk-0.9.76-py3-none-any.whl",
+      "sha256": "e629181d060f4ed8f29749f47139bf08f1f9b0d8b15daedc956900785587e8d8",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "bcrypt",
@@ -211,6 +316,27 @@
       "why": "HTML 解析"
     },
     {
+      "name": "billiard",
+      "version": "4.2.4",
+      "file": "billiard-4.2.4-py3-none-any.whl",
+      "sha256": "525b42bdec68d2b983347ac312f892db930858495db601b5836ac24e6477cde5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "blake3",
+      "version": "1.0.8",
+      "file": "blake3-1.0.8-cp312-cp312-win_amd64.whl",
+      "sha256": "6a6eafc29e4f478d365a87d2f25782a521870c8514bb43734ac85ae9be71caf7",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "bm25s",
+      "version": "0.3.11",
+      "file": "bm25s-0.3.11-py3-none-any.whl",
+      "sha256": "3d1d28badb299d6fc9324111e5c8276927e990b908607b39ff9bd65b102e9a24",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "boto3",
       "version": "1.44.3",
       "file": "boto3-1.44.3-py3-none-any.whl",
@@ -225,11 +351,46 @@
       "why": "boto3 依赖"
     },
     {
+      "name": "browser_cookie3",
+      "version": "0.20.1",
+      "file": "browser_cookie3-0.20.1-py3-none-any.whl",
+      "sha256": "4b38bf669d386250733c8339f0036e1cf09c3d8e4d326fd507b9afb84def13d6",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "cachetools",
+      "version": "7.1.4",
+      "file": "cachetools-7.1.4-py3-none-any.whl",
+      "sha256": "323dc4127934744db5b54eb4924482d7edafbf9554e820d1531c2e08c0e4ef54",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "can_isotp",
       "version": "2.0.7",
       "file": "can_isotp-2.0.7-py3-none-any.whl",
       "sha256": "28d155dec1c640bf32771fb4e271323d777158ab130372724a8b7b82aca66a7c",
       "why": "ISO-TP 传输层"
+    },
+    {
+      "name": "capstone",
+      "version": "5.0.9",
+      "file": "capstone-5.0.9-py3-none-win_amd64.whl",
+      "sha256": "732cedbbb56d42e723f14d7af6387f1454194a820b4b96b56d1e53f865ef85d0",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "cbor2",
+      "version": "6.1.1",
+      "file": "cbor2-6.1.1-cp312-cp312-win_amd64.whl",
+      "sha256": "63ab065ae26e48d39fc6f4d7f44dd0780afdb91a70ffb8f33e281f54ee35ad14",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "celery",
+      "version": "5.6.3",
+      "file": "celery-5.6.3-py3-none-any.whl",
+      "sha256": "0808f42f80909c4d5833202360ffafb2a4f83f4d8e23e1285d926610e9a7afa6",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "certifi",
@@ -260,6 +421,34 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "click",
+      "version": "8.5.0",
+      "file": "click-8.5.0-py3-none-any.whl",
+      "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "click_didyoumean",
+      "version": "0.3.1",
+      "file": "click_didyoumean-0.3.1-py3-none-any.whl",
+      "sha256": "5c4bb6007cfea5f2fd6583a2fb6701a22a41eb98957e63d0fac41c10e7c3117c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "click_plugins",
+      "version": "1.1.1.2",
+      "file": "click_plugins-1.1.1.2-py2.py3-none-any.whl",
+      "sha256": "008d65743833ffc1f5417bf0e78e8d2c23aab04d9745ba817bd3e71b0feb6aa6",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "click_repl",
+      "version": "0.3.0",
+      "file": "click_repl-0.3.0-py3-none-any.whl",
+      "sha256": "fb7e06deb8da8de86180a33a9da97ac316751c094c6899382da7feeeeb51b812",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "cloudpickle",
       "version": "3.1.2",
       "file": "cloudpickle-3.1.2-py3-none-any.whl",
@@ -274,11 +463,39 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "coloredlogs",
+      "version": "15.0.1",
+      "file": "coloredlogs-15.0.1-py2.py3-none-any.whl",
+      "sha256": "612ee75c546f53e92e70049c9dbfcc18c935a2b9a53b66085ce9ef6a6e5c0934",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "colorlog",
+      "version": "6.10.1",
+      "file": "colorlog-6.10.1-py3-none-any.whl",
+      "sha256": "2d7e8348291948af66122cff006c9f8da6255d224e7cf8e37d8de2df3bad8c9c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "colorthief",
+      "version": "0.2.1",
+      "file": "colorthief-0.2.1-py2.py3-none-any.whl",
+      "sha256": "b04fc8ce5cf9c888768745e29cb19b7b688d5711af6fba26e8057debabec56b9",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "comtypes",
       "version": "1.5.0",
       "file": "comtypes-1.5.0-py3-none-any.whl",
       "sha256": "c648ed3b243b1eb3b7cb893a873d1b35104ca1c8922061f4b1efafeb255bacb5",
       "why": "Windows COM"
+    },
+    {
+      "name": "concurrent_log_handler",
+      "version": "0.9.29",
+      "file": "concurrent_log_handler-0.9.29-py3-none-any.whl",
+      "sha256": "0d6c077fbaef2dae49a25975dcf72a602fe0a6a4ce80a3b7c37696d37e10459a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "construct",
@@ -295,6 +512,27 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "coverage",
+      "version": "7.15.4",
+      "file": "coverage-7.15.4-cp312-cp312-win_amd64.whl",
+      "sha256": "6befeab5fb2b51c958ca4ac6c5d141a1e8240f4f76e46350f1911963deda49cd",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "cramjam",
+      "version": "2.11.0",
+      "file": "cramjam-2.11.0-cp312-cp312-win_amd64.whl",
+      "sha256": "53fed080476d5f6ad7505883ec5d1ec28ba36c2273db3b3e92d7224fe5e463db",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "crc32c",
+      "version": "2.9",
+      "file": "crc32c-2.9-cp312-cp312-win_amd64.whl",
+      "sha256": "147adf3cce798ffae2ae737b240fb3c62fffd3579efdd8226e7af84b7ae42b26",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "croniter",
       "version": "7.0.0",
       "file": "croniter-7.0.0-py3-none-any.whl",
@@ -309,11 +547,46 @@
       "why": "TLS / 证书"
     },
     {
+      "name": "curl_cffi",
+      "version": "0.15.0",
+      "file": "curl_cffi-0.15.0-cp310-abi3-win_amd64.whl",
+      "sha256": "5a0c1896a0d5a5ac1eb89cd24b008d2b718dd1df6fd2f75451b59ca66e49e572",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "cycler",
       "version": "0.12.1",
       "file": "cycler-0.12.1-py3-none-any.whl",
       "sha256": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "cython",
+      "version": "3.2.4",
+      "file": "cython-3.2.4-cp312-cp312-win_amd64.whl",
+      "sha256": "767b143704bdd08a563153448955935844e53b852e54afdc552b43902ed1e235",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "darkdetect",
+      "version": "0.8.0",
+      "file": "darkdetect-0.8.0-py3-none-any.whl",
+      "sha256": "a7509ccf517eaad92b31c214f593dbcf138ea8a43b2935406bbd565e15527a85",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "dataclasses_json",
+      "version": "0.6.7",
+      "file": "dataclasses_json-0.6.7-py3-none-any.whl",
+      "sha256": "0dbf33f26c8d5305befd61b39d2b3414e8a407bedc2834dea9b8d642666fb40a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "decorator",
+      "version": "5.2.1",
+      "file": "decorator-5.2.1-py3-none-any.whl",
+      "sha256": "d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "defusedxml",
@@ -323,6 +596,69 @@
       "why": "安全 XML 解析"
     },
     {
+      "name": "deprecated",
+      "version": "1.3.1",
+      "file": "deprecated-1.3.1-py2.py3-none-any.whl",
+      "sha256": "597bfef186b6f60181535a29fbe44865ce137a5079f295b479886c82729d5f3f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "deprecation",
+      "version": "2.1.0",
+      "file": "deprecation-2.1.0-py2.py3-none-any.whl",
+      "sha256": "a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a",
+      "why": "扩展栈的自有依赖"
+    },
+    {
+      "name": "depyf",
+      "version": "0.20.0",
+      "file": "depyf-0.20.0-py3-none-any.whl",
+      "sha256": "d31effad4261cebecb58955d832e448ace88f432328f95f82fd99c30fd9308d4",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "detect_installer",
+      "version": "0.1.0",
+      "file": "detect_installer-0.1.0-py3-none-any.whl",
+      "sha256": "034fb20fd665c36e6ba52b8821525ea07fb4f7f938cac459df889fb33801528a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "dill",
+      "version": "0.4.1",
+      "file": "dill-0.4.1-py3-none-any.whl",
+      "sha256": "1e1ce33e978ae97fcfcff5638477032b801c46c7c65cf717f95fbc2248f79a9d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "dirtyjson",
+      "version": "1.0.8",
+      "file": "dirtyjson-1.0.8-py3-none-any.whl",
+      "sha256": "125e27248435a58acace26d5c2c4c11a1c0de0a9c5124c5a94ba78e517d74f53",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "diskcache",
+      "version": "5.6.3",
+      "file": "diskcache-5.6.3-py3-none-any.whl",
+      "sha256": "5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "distro",
+      "version": "1.9.0",
+      "file": "distro-1.9.0-py3-none-any.whl",
+      "sha256": "7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "dnspython",
+      "version": "2.8.0",
+      "file": "dnspython-2.8.0-py3-none-any.whl",
+      "sha256": "01d9bbc4a2d76bf0db7c1f729812ded6d912bd318d3b1cf81d30c0f845dbf3af",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "docker",
       "version": "7.2.0",
       "file": "docker-7.2.0-py3-none-any.whl",
@@ -330,11 +666,123 @@
       "why": "容器控制"
     },
     {
+      "name": "docstring_parser",
+      "version": "0.18.0",
+      "file": "docstring_parser-0.18.0-py3-none-any.whl",
+      "sha256": "b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "ecdsa",
+      "version": "0.19.2",
+      "file": "ecdsa-0.19.2-py2.py3-none-any.whl",
+      "sha256": "840f5dc5e375c68f36c1a7a5b9caad28f95daa65185c9253c0c08dd952bb7399",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "edge_tts",
+      "version": "7.2.7",
+      "file": "edge_tts-7.2.7-py3-none-any.whl",
+      "sha256": "ac11d9e834347e5ee62cbe72e8a56ffd65d3c4e795be14b1e593b72cf6480dd9",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "einops",
+      "version": "0.8.2",
+      "file": "einops-0.8.2-py3-none-any.whl",
+      "sha256": "54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "email_validator",
+      "version": "2.3.0",
+      "file": "email_validator-2.3.0-py3-none-any.whl",
+      "sha256": "80f13f623413e6b197ae73bb10bf4eb0908faf509ad8362c5edeb0be7fd450b4",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "et-xmlfile",
+      "version": "2.0.0",
+      "file": "et_xmlfile-2.0.0-py3-none-any.whl",
+      "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+      "why": "扩展栈的自有依赖（与内置栈同版本）"
+    },
+    {
+      "name": "etils",
+      "version": "1.14.0",
+      "file": "etils-1.14.0-py3-none-any.whl",
+      "sha256": "b5df7341f54dbe1405a4450b2741207b4a8c279780402b45f87202b94dfc52b4",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "execnet",
+      "version": "2.1.2",
+      "file": "execnet-2.1.2-py3-none-any.whl",
+      "sha256": "67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "fastapi",
+      "version": "0.136.0",
+      "file": "fastapi-0.136.0-py3-none-any.whl",
+      "sha256": "8793d44ec7378e2be07f8a013cf7f7aa47d6327d0dfe9804862688ec4541a6b4",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "fastapi_cli",
+      "version": "0.0.24",
+      "file": "fastapi_cli-0.0.24-py3-none-any.whl",
+      "sha256": "4a1f78ed798f106b4fee85ca93b85d8fe33c0a3570f775964d37edb80b8f0edc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "fastapi_cloud_cli",
+      "version": "0.18.0",
+      "file": "fastapi_cloud_cli-0.18.0-py3-none-any.whl",
+      "sha256": "1f136fc651b0b6e2f4a9679e23c56e1c3be3405e74469c14ba6e2d5b87fdc113",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "fastar",
+      "version": "0.11.0",
+      "file": "fastar-0.11.0-cp312-cp312-win_amd64.whl",
+      "sha256": "920bc56c3c0b8a8ca492904941d1883c1c947c858cd93343356c29122a38f44c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "fastparquet",
+      "version": "2026.5.0",
+      "file": "fastparquet-2026.5.0-cp312-cp312-win_amd64.whl",
+      "sha256": "76f5e7df0fbeb50c694023bf0d77afeb0a33982d30e827d473abd7caf5462a9d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "filelock",
       "version": "4.2.10",
       "file": "filelock-4.2.10-py3-none-any.whl",
       "sha256": "9479aaeb4db20b5a53e3da28493edd24720b66b8a0b84030aa56ccdf243d6857",
       "why": "文件锁"
+    },
+    {
+      "name": "filetype",
+      "version": "1.2.0",
+      "file": "filetype-1.2.0-py2.py3-none-any.whl",
+      "sha256": "7ce71b6880181241cf7ac8697a2f1eb6a8bd9b429f7ad6d27b8db9ba5f1c2d25",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "fire",
+      "version": "0.7.1",
+      "file": "fire-0.7.1-py3-none-any.whl",
+      "sha256": "e43fd8a5033a9001e7e2973bab96070694b9f12f2e0ecf96d4683971b5ab1882",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "flatbuffers",
+      "version": "25.12.19",
+      "file": "flatbuffers-25.12.19-py2.py3-none-any.whl",
+      "sha256": "7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "fonttools",
@@ -351,11 +799,137 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "fsspec",
+      "version": "2026.2.0",
+      "file": "fsspec-2026.2.0-py3-none-any.whl",
+      "sha256": "98de475b5cb3bd66bedd5c4679e87b4fdfe1a3bf4d707b151b3c07e58c9a2437",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "future",
+      "version": "1.0.0",
+      "file": "future-1.0.0-py3-none-any.whl",
+      "sha256": "929292d34f5872e70396626ef385ec22355a1fae8ad29e1a734c3e43f9fbc216",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "gcovr",
+      "version": "8.6",
+      "file": "gcovr-8.6-py3-none-any.whl",
+      "sha256": "dbf9d87c38042752ad6f530aa8210427e22b526611bb7b7bfed0e81977d1f1ef",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "gguf",
+      "version": "0.19.0",
+      "file": "gguf-0.19.0-py3-none-any.whl",
+      "sha256": "70bcd10edfe697fb2dad6e40af2234b9d8ece9a41a99761405121ebda1c3c1cd",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "glfw",
+      "version": "2.10.2",
+      "file": "glfw-2.10.2-py2.py3-none-win_amd64.whl",
+      "sha256": "15fd0666cd8f1b0ecb535c3abb712b8ddda053bf8d16de2353b1c6ced0e65402",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "googleapis_common_protos",
+      "version": "1.75.0",
+      "file": "googleapis_common_protos-1.75.0-py3-none-any.whl",
+      "sha256": "961ed60399c457ceb0ee8f285a84c870aabc9c6a832b9d37bb281b5bebde43ed",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "greenlet",
+      "version": "3.5.5",
+      "file": "greenlet-3.5.5-cp312-cp312-win_amd64.whl",
+      "sha256": "49ddacd36af37735fab103846f4ee4d18a492dde72730d1699c0c8ebe30d9f18",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "griffe",
+      "version": "2.2.0",
+      "file": "griffe-2.2.0-py3-none-any.whl",
+      "sha256": "db20672b31c3de2a1af5a18a3b3d8c186ccc2425e10290486b4f0364d25929e9",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "griffecli",
+      "version": "2.2.0",
+      "file": "griffecli-2.2.0-py3-none-any.whl",
+      "sha256": "8ebb7ae1dcc2617f5d39f00e4c238dd6b5cd0b13157b0ce22c1ea4ca8b4c5d1d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "griffelib",
+      "version": "2.2.0",
+      "file": "griffelib-2.2.0-py3-none-any.whl",
+      "sha256": "d71c3bc2bbed9f958488634fe788b843a9f705d6d2838ca32cd6c25eeb64dfc4",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "grpcio",
+      "version": "1.80.0",
+      "file": "grpcio-1.80.0-cp312-cp312-win_amd64.whl",
+      "sha256": "9fe648599c0e37594c4809d81a9e77bd138cc82eb8baa71b6a86af65426723ff",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "grpcio_tools",
+      "version": "1.80.0",
+      "file": "grpcio_tools-1.80.0-cp312-cp312-win_amd64.whl",
+      "sha256": "ac6fdd42d5bb18f0d903a067e2825be172deff70cf197164b6f65676cb506c9b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "h11",
       "version": "0.16.0",
       "file": "h11-0.16.0-py3-none-any.whl",
       "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
       "why": "HTTP/1.1 协议实现"
+    },
+    {
+      "name": "h2",
+      "version": "4.4.1",
+      "file": "h2-4.4.1-py3-none-any.whl",
+      "sha256": "0e25f1462b23c9cb82d9eb02e28bc706dac2a68cb457c6a0d74d63c8a2a5d0e6",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "hf_transfer",
+      "version": "0.1.9",
+      "file": "hf_transfer-0.1.9-cp38-abi3-win_amd64.whl",
+      "sha256": "16f208fc678911c37e11aa7b586bc66a37d02e636208f18b6bc53d29b5df40ad",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "hf_xet",
+      "version": "1.6.0",
+      "file": "hf_xet-1.6.0-cp38-abi3-win_amd64.whl",
+      "sha256": "fb4fadde1b2b70bf4c0c14a6dccbe7194b1c28947fefd5bbe3fed9d940676c3b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "hindsight_client",
+      "version": "0.9.2",
+      "file": "hindsight_client-0.9.2-py3-none-any.whl",
+      "sha256": "31d26d116a07da5203bc913c5ed017de95d875edd5e295afad3c05373665ff6b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "hpack",
+      "version": "4.2.0",
+      "file": "hpack-4.2.0-py3-none-any.whl",
+      "sha256": "858ac0b02280fa582b5080d68db0899c62a80375e0e5413a74970c5e518b6986",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "html5lib",
+      "version": "1.1",
+      "file": "html5lib-1.1-py2.py3-none-any.whl",
+      "sha256": "0d78f8fde1c230e99fe37986a60526d7049ed4bf8a9fadbad5f00e22e58e041d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "httpcore",
@@ -365,11 +939,46 @@
       "why": "httpx 依赖"
     },
     {
+      "name": "httptools",
+      "version": "0.8.0",
+      "file": "httptools-0.8.0-cp312-cp312-win_amd64.whl",
+      "sha256": "cd96f29b4bab1d42fa6e3d008711c75e0f79e94e06827330160e3a304227f150",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "httpx",
       "version": "0.28.1",
       "file": "httpx-0.28.1-py3-none-any.whl",
       "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
       "why": "同步/异步 HTTP 客户端"
+    },
+    {
+      "name": "httpx_sse",
+      "version": "0.4.3",
+      "file": "httpx_sse-0.4.3-py3-none-any.whl",
+      "sha256": "0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "huggingface_hub",
+      "version": "0.36.2",
+      "file": "huggingface_hub-0.36.2-py3-none-any.whl",
+      "sha256": "48f0c8eac16145dfce371e9d2d7772854a4f591bcb56c9cf548accf531d54270",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "humanfriendly",
+      "version": "10.0",
+      "file": "humanfriendly-10.0-py2.py3-none-any.whl",
+      "sha256": "1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "hyperframe",
+      "version": "6.1.0",
+      "file": "hyperframe-6.1.0-py3-none-any.whl",
+      "sha256": "b03380493a519fce58ea5af42e4a42317bf9bd425596f7a0835ffce80f1a42e5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "idna",
@@ -386,11 +995,60 @@
       "why": "流式 JSON 解析"
     },
     {
+      "name": "imagesize",
+      "version": "2.0.1",
+      "file": "imagesize-2.0.1-py3-none-any.whl",
+      "sha256": "ea0c9a0384df69ed86a943a15cde37d0360b82491b3910dc2215e202e62b5b02",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "iniconfig",
+      "version": "2.3.0",
+      "file": "iniconfig-2.3.0-py3-none-any.whl",
+      "sha256": "f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "interegular",
+      "version": "0.3.3",
+      "file": "interegular-0.3.3-py37-none-any.whl",
+      "sha256": "b0c07007d48c89d6d19f7204972d369b2a77222722e126b6aa63aa721dc3b19c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "invoke",
       "version": "3.0.3",
       "file": "invoke-3.0.3-py3-none-any.whl",
       "sha256": "f11327165e5cbb89b2ad1d88d3292b5113332c43b8553b494da435d6ec6f5053",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "ir_datasets",
+      "version": "0.6.3",
+      "file": "ir_datasets-0.6.3-py3-none-any.whl",
+      "sha256": "8188ad99408dc042b3be7493fa8a9d76cf04681ca1ea010e97a5f93a0aaf1dbd",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "jieba",
+      "version": "0.42.1",
+      "file": "jieba-0.42.1-py3-none-any.whl",
+      "sha256": "b7fbc9712423bb7617bc01537cc110af0b0c6bf66f19de70975df706056e077f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "jinja2",
+      "version": "3.1.6",
+      "file": "jinja2-3.1.6-py3-none-any.whl",
+      "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "jiter",
+      "version": "0.15.0",
+      "file": "jiter-0.15.0-cp312-cp312-win_amd64.whl",
+      "sha256": "40b2c7e92c44a84d748d21706c68dc6ff8161d80b59c99d774721a0d2317d7c7",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "jmespath",
@@ -405,6 +1063,20 @@
       "file": "joblib-1.6.0-py3-none-any.whl",
       "sha256": "3dbbf9f6e4b592a2357b854608e980fe6390d131d7a82f011a377ef2ebef7aba",
       "why": "任务并行/缓存"
+    },
+    {
+      "name": "jpype1",
+      "version": "1.5.2",
+      "file": "jpype1-1.5.2-cp312-cp312-win_amd64.whl",
+      "sha256": "c7b1c2d76d211cab60be16505d32a6b3c9fffc51ce79c68e81a3d48e5effff2d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "jsonpath",
+      "version": "0.82.2",
+      "file": "jsonpath-0.82.2-py3-none-any.whl",
+      "sha256": "2375f266581b4e2e6f79ccb9b1bae35f75eaf25e298827554dd8a1f8b4be3ea9",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "jsonschema",
@@ -428,11 +1100,109 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "kombu",
+      "version": "5.6.2",
+      "file": "kombu-5.6.2-py3-none-any.whl",
+      "sha256": "efcfc559da324d41d61ca311b0c64965ea35b4c55cc04ee36e55386145dace93",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "lark",
+      "version": "1.2.2",
+      "file": "lark-1.2.2-py3-none-any.whl",
+      "sha256": "c2276486b02f0f1b90be155f2c8ba4a8e194d42775786db622faccd652d8e80c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "line_profiler",
+      "version": "5.0.1",
+      "file": "line_profiler-5.0.1-cp312-cp312-win_amd64.whl",
+      "sha256": "87d2295feaa5ac933e672d1c5ac5b83e2a1f7ebce25d290f81a7aabb1d46ac1f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "line_profiler_pycharm",
+      "version": "1.2.0",
+      "file": "line_profiler_pycharm-1.2.0-py3-none-any.whl",
+      "sha256": "2d4c47c6894ab81f48fbb132ac4830490813b13c297016ae0d97bc7ef12041ad",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "llama_index_core",
+      "version": "0.14.24",
+      "file": "llama_index_core-0.14.24-py3-none-any.whl",
+      "sha256": "a12f39b8a777cc526bf400d929016cd244372af61c5e98f6f4186f51a0b9288c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "llama_index_instrumentation",
+      "version": "0.6.0",
+      "file": "llama_index_instrumentation-0.6.0-py3-none-any.whl",
+      "sha256": "9588618b271e6c74e58dc81542ea022547c427f036e7cacb655865c4982610bb",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "llama_index_llms_openai",
+      "version": "0.8.0",
+      "file": "llama_index_llms_openai-0.8.0-py3-none-any.whl",
+      "sha256": "4580598f0af87a1d5ca776c850253f07a60c62a93a3e86f720dd00a29133bdc5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "llama_index_retrievers_bm25",
+      "version": "0.8.0",
+      "file": "llama_index_retrievers_bm25-0.8.0-py3-none-any.whl",
+      "sha256": "ef00595e9d5b059619bfc9c6ef2021447e2412c0b55d02d9c2fb766ea2613547",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "llama_index_vector_stores_qdrant",
+      "version": "0.10.3",
+      "file": "llama_index_vector_stores_qdrant-0.10.3-py3-none-any.whl",
+      "sha256": "cb684add1a0e44b73cc6cb347c5e5a1ccf9384e452c6150a0b025f541dd0186b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "llama_index_workflows",
+      "version": "2.23.3",
+      "file": "llama_index_workflows-2.23.3-py3-none-any.whl",
+      "sha256": "d7ad51363ba4817b4140526c5e785d2f143861f618823456e2f379adfe0b321b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "lm_format_enforcer",
+      "version": "0.11.3",
+      "file": "lm_format_enforcer-0.11.3-py3-none-any.whl",
+      "sha256": "cf586350875def1ae7a8fba84fcbbfc8371424b6c9d05c1fcba70aa233fbf06f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "loguru",
       "version": "0.8.0",
       "file": "loguru-0.8.0-py3-none-any.whl",
       "sha256": "e0fba09d6f76ba2d2f4bd1757122942f5a670c702e988b5efaeab99dacba0069",
       "why": "日志"
+    },
+    {
+      "name": "lxml",
+      "version": "6.1.3",
+      "file": "lxml-6.1.3-cp312-cp312-win_amd64.whl",
+      "sha256": "3e9a00d1c2c30936f7add097c41afc5da6556c580909104aafd382cac92a855c",
+      "why": "扩展栈的自有依赖（与内置栈共用同一版本）"
+    },
+    {
+      "name": "lz4",
+      "version": "4.4.5",
+      "file": "lz4-4.4.5-cp312-cp312-win_amd64.whl",
+      "sha256": "713a777de88a73425cf08eb11f742cd2c98628e79a8673d6a52e3c5f0c116f33",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "mako",
+      "version": "1.3.10",
+      "file": "mako-1.3.10-py3-none-any.whl",
+      "sha256": "baef24a52fc4fc514a0887ac600f9f1cff3d82c61d4d700a1fa84d597b88db59",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "markdown",
@@ -456,11 +1226,32 @@
       "why": "HTML→Markdown"
     },
     {
+      "name": "markupsafe",
+      "version": "3.0.3",
+      "file": "markupsafe-3.0.3-cp312-cp312-win_amd64.whl",
+      "sha256": "26a5784ded40c9e318cfc2bdb30fe164bdb8665ded9cd64d500a34fb42067b1c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "marshmallow",
+      "version": "3.26.2",
+      "file": "marshmallow-3.26.2-py3-none-any.whl",
+      "sha256": "013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "matplotlib",
       "version": "3.11.2",
       "file": "matplotlib-3.11.2-cp312-cp312-win_amd64.whl",
       "sha256": "c5c1c68ee401fc98271263410f0e5ce88285abacf7627132914e8adf3d70ff43",
       "why": "绘图"
+    },
+    {
+      "name": "mcp",
+      "version": "1.27.1",
+      "file": "mcp-1.27.1-py3-none-any.whl",
+      "sha256": "1af3c4203b329430fde7a87b4fcb6392a041f5cb851fd68fc674016ab4e7c06f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "mdurl",
@@ -470,11 +1261,88 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "mini_racer",
+      "version": "0.14.1",
+      "file": "mini_racer-0.14.1-py3-none-win_amd64.whl",
+      "sha256": "4abd58c62c9955988dbc0cbf5a798914334fe570d2b192f8890bec20135ab6d1",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "ml_dtypes",
+      "version": "0.6.0",
+      "file": "ml_dtypes-0.6.0-cp312-cp312-win_amd64.whl",
+      "sha256": "2a3e9d53925597fbffafd2a37048dadeddd0bdaba58058f6ae0869ed709a184d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "model_hosting_container_standards",
+      "version": "0.1.15",
+      "file": "model_hosting_container_standards-0.1.15-py3-none-any.whl",
+      "sha256": "849e08c4732203ee861c8c24966b4e916ea4420fa324b430f7f74a1e1fe8811a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "modelscope",
+      "version": "1.37.1",
+      "file": "modelscope-1.37.1-py3-none-any.whl",
+      "sha256": "7f7af2dd37339188cbd3c18a858b1297b8a75222b9a0fbf176c7df8189cac39a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "mouseinfo",
+      "version": "0.1.3",
+      "file": "mouseinfo-0.1.3-py3-none-any.whl",
+      "sha256": "1cd6a2d88ad9e04f4a2bab9f6f7a6f90394bf707549af5c943ffcdfe851dc28e",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "mpmath",
+      "version": "1.3.0",
+      "file": "mpmath-1.3.0-py3-none-any.whl",
+      "sha256": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "msgspec",
+      "version": "0.21.1",
+      "file": "msgspec-0.21.1-cp312-cp312-win_amd64.whl",
+      "sha256": "d4ab834a054c6f0cbeef6df9e7e1b33d5f1bc7b86dea1d2fd7cad003873e783d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "mujoco",
+      "version": "3.11.0",
+      "file": "mujoco-3.11.0-cp312-cp312-win_amd64.whl",
+      "sha256": "98c08a5eec9411ecd6f763f1e635fbc8f31e3ea3701584d6b7edcc24d8d6c575",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "multidict",
       "version": "7.2.1",
       "file": "multidict-7.2.1-cp312-cp312-win_amd64.whl",
       "sha256": "781ca5dfc2f1d58e47f52216a0c1c7e1ba91ce8aa235459e20de2d402af77fb3",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "multiprocess",
+      "version": "0.70.19",
+      "file": "multiprocess-0.70.19-py312-none-any.whl",
+      "sha256": "3a56c0e85dd5025161bac5ce138dcac1e49174c7d8e74596537e729fd5c53c28",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "multitasking",
+      "version": "0.0.12",
+      "file": "multitasking-0.0.12-py3-none-any.whl",
+      "sha256": "51919575c8fb84a835972f0003a7341d34937a61fc095aef708aac654f03aa92",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "mypy_extensions",
+      "version": "1.1.0",
+      "file": "mypy_extensions-1.1.0-py3-none-any.whl",
+      "sha256": "1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "narwhals",
@@ -484,11 +1352,32 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "nest_asyncio",
+      "version": "1.6.0",
+      "file": "nest_asyncio-1.6.0-py3-none-any.whl",
+      "sha256": "87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "networkx",
       "version": "3.7",
       "file": "networkx-3.7-py3-none-any.whl",
       "sha256": "e3fd2c13a7814cee3746340d8d7f8598a67f16a58bf47fb7f8793fab6efca1b0",
       "why": "图算法"
+    },
+    {
+      "name": "ninja",
+      "version": "1.13.0",
+      "file": "ninja-1.13.0-py3-none-win_amd64.whl",
+      "sha256": "fb8ee8719f8af47fed145cced4a85f0755dd55d45b2bddaf7431fa89803c5f3e",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "nltk",
+      "version": "3.10.3",
+      "file": "nltk-3.10.3-py3-none-any.whl",
+      "sha256": "ff9598a8e20518ee0d557745890cc4435b9578489e2dcbc69c4f81fa060caf7c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "numpy",
@@ -498,11 +1387,130 @@
       "why": "pandas runtime dependency（内置栈与扩展栈各自独立安装，各带一份）"
     },
     {
+      "name": "onnx",
+      "version": "1.22.0",
+      "file": "onnx-1.22.0-cp312-abi3-win_amd64.whl",
+      "sha256": "72ccebab3bac07215c204ce8848d42e78eaaa666badbf72d25cd359b9f269e3a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "openai",
+      "version": "2.24.0",
+      "file": "openai-2.24.0-py3-none-any.whl",
+      "sha256": "fed30480d7d6c884303287bde864980a4b137b60553ffbcf9ab4a233b7a73d94",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "openai_harmony",
+      "version": "0.0.8",
+      "file": "openai_harmony-0.0.8-cp38-abi3-win_amd64.whl",
+      "sha256": "39d44f0d8f466bd56698e7ead708bead3141e27b9b87e3ab7d5a6d0e4a869ee5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "file": "openpyxl-3.1.5-py2.py3-none-any.whl",
+      "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
+      "why": "扩展栈的自有依赖（与内置栈共用同一版本）"
+    },
+    {
+      "name": "opentelemetry_api",
+      "version": "1.42.1",
+      "file": "opentelemetry_api-1.42.1-py3-none-any.whl",
+      "sha256": "51a69edacadbc03a8950ace1c4c21099cacc538820ac2c9e36277e78cebba714",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opentelemetry_exporter_otlp",
+      "version": "1.42.1",
+      "file": "opentelemetry_exporter_otlp-1.42.1-py3-none-any.whl",
+      "sha256": "aedd54545bb0587cd45210abdc8be545af9c01413f3307786e276df1e3c83bee",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opentelemetry_exporter_otlp_proto_common",
+      "version": "1.42.1",
+      "file": "opentelemetry_exporter_otlp_proto_common-1.42.1-py3-none-any.whl",
+      "sha256": "f48d395ab815b444da118868977e9798ea354c25737d5cf39578ae894011c140",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opentelemetry_exporter_otlp_proto_grpc",
+      "version": "1.42.1",
+      "file": "opentelemetry_exporter_otlp_proto_grpc-1.42.1-py3-none-any.whl",
+      "sha256": "0ae1177e2038b18a929b3098215243631ef91136cba26b7e2b12790ceb7e87cc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opentelemetry_exporter_otlp_proto_http",
+      "version": "1.42.1",
+      "file": "opentelemetry_exporter_otlp_proto_http-1.42.1-py3-none-any.whl",
+      "sha256": "00a16da1b312a1d6c7233d600d557c91df71125af73020f3b9a7765bd699d59d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opentelemetry_proto",
+      "version": "1.42.1",
+      "file": "opentelemetry_proto-1.42.1-py3-none-any.whl",
+      "sha256": "dedb74cba2886c59c7789b227a7a670613025a07489040050aedff6e5c0fb43c",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opentelemetry_sdk",
+      "version": "1.42.1",
+      "file": "opentelemetry_sdk-1.42.1-py3-none-any.whl",
+      "sha256": "083cd4bbfaa5aa7b5a9e552430d9951219967cfb27aa61feb13a77aba1fc839d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opentelemetry_semantic_conventions",
+      "version": "0.63b1",
+      "file": "opentelemetry_semantic_conventions-0.63b1-py3-none-any.whl",
+      "sha256": "dfe5ef4dee82586b746f522b818ceb298d00b3d59f660042bd79404bff8d0682",
+      "why": "opentelemetry-sdk 要求精确匹配 0.63b1"
+    },
+    {
+      "name": "opentelemetry_semantic_conventions_ai",
+      "version": "0.5.1",
+      "file": "opentelemetry_semantic_conventions_ai-0.5.1-py3-none-any.whl",
+      "sha256": "25aeb22bd261543b4898a73824026d96770e5351209c7d07a0b1314762b1f6e4",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "opt_einsum",
+      "version": "3.3.0",
+      "file": "opt_einsum-3.3.0-py3-none-any.whl",
+      "sha256": "2455e59e3947d3c275477df7f5205b30635e266fe6dc300e3d9f9646bfcea147",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "outcome",
+      "version": "1.3.0.post0",
+      "file": "outcome-1.3.0.post0-py2.py3-none-any.whl",
+      "sha256": "e771c5ce06d1415e356078d3bdd68523f284b4ce5419828922b6871e65eda82b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "outlines_core",
+      "version": "0.2.14",
+      "file": "outlines_core-0.2.14-cp312-cp312-win_amd64.whl",
+      "sha256": "87b42440478764cce1353a87d8560ef82f3b39b9d753bfe93195ea3584f369e3",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "packaging",
       "version": "26.3",
       "file": "packaging-26.3-py3-none-any.whl",
       "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pandas",
+      "version": "2.2.3",
+      "file": "pandas-2.2.3-cp312-cp312-win_amd64.whl",
+      "sha256": "59ef3764d0fe818125a5097d2ae867ca3fa64df032331b7e0917cf5d7bf66b13",
+      "why": "扩展栈的自有依赖（与内置栈共用同一版本）"
     },
     {
       "name": "paramiko",
@@ -512,11 +1520,32 @@
       "why": "SSH/SFTP"
     },
     {
+      "name": "partial_json_parser",
+      "version": "0.2.1.1.post7",
+      "file": "partial_json_parser-0.2.1.1.post7-py3-none-any.whl",
+      "sha256": "145119e5eabcf80cbb13844a6b50a85c68bf99d376f8ed771e2a3c3b03e653ae",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "passlib",
       "version": "1.7.4",
       "file": "passlib-1.7.4-py2.py3-none-any.whl",
       "sha256": "aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1",
       "why": "口令杂凑"
+    },
+    {
+      "name": "pathspec",
+      "version": "1.1.1",
+      "file": "pathspec-1.1.1-py3-none-any.whl",
+      "sha256": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pdf2image",
+      "version": "1.17.0",
+      "file": "pdf2image-1.17.0-py3-none-any.whl",
+      "sha256": "ecdd58d7afb810dffe21ef2b1bbc057ef434dabbac6c33778a38a3f7744a27e2",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "pdfminer_six",
@@ -533,11 +1562,67 @@
       "why": "PDF 表格/文本提取"
     },
     {
+      "name": "pefile",
+      "version": "2024.8.26",
+      "file": "pefile-2024.8.26-py3-none-any.whl",
+      "sha256": "76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "pillow",
       "version": "13.0.0",
       "file": "pillow-13.0.0-cp312-cp312-win_amd64.whl",
       "sha256": "ff3fe9eb621fbb9db4c4be33ab946f6bac5f98ab50ca8d3260503653656c961b",
       "why": "pdfplumber 要求 Pillow>=12.2，扩展栈用 13.0（内置 Office 栈仍为 11.3）"
+    },
+    {
+      "name": "platformdirs",
+      "version": "4.11.5",
+      "file": "platformdirs-4.11.5-py3-none-any.whl",
+      "sha256": "89f8d42695853b89c7170bd49bc3dc593f98a71e695ede88e06a3b247bc4563b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pluggy",
+      "version": "1.6.0",
+      "file": "pluggy-1.6.0-py3-none-any.whl",
+      "sha256": "e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "portalocker",
+      "version": "3.2.0",
+      "file": "portalocker-3.2.0-py3-none-any.whl",
+      "sha256": "3cdc5f565312224bc570c49337bd21428bba0ef363bbcf58b9ef4a9f11779968",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "prettytable",
+      "version": "3.18.0",
+      "file": "prettytable-3.18.0-py3-none-any.whl",
+      "sha256": "b3346e0e6f79180833aebaac088ae926340586cf6d7d991b9eb125b65f72313a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "prometheus_client",
+      "version": "0.25.0",
+      "file": "prometheus_client-0.25.0-py3-none-any.whl",
+      "sha256": "d5aec89e349a6ec230805d0df882f3807f74fd6c1a2fa86864e3c2279059fed1",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "prometheus_fastapi_instrumentator",
+      "version": "7.1.0",
+      "file": "prometheus_fastapi_instrumentator-7.1.0-py3-none-any.whl",
+      "sha256": "978130f3c0bb7b8ebcc90d35516a6fe13e02d2eb358c8f83887cdef7020c31e9",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "prompt_toolkit",
+      "version": "3.0.52",
+      "file": "prompt_toolkit-3.0.52-py3-none-any.whl",
+      "sha256": "9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "propcache",
@@ -547,11 +1632,74 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "protobuf",
+      "version": "6.33.6",
+      "file": "protobuf-6.33.6-cp310-abi3-win_amd64.whl",
+      "sha256": "0cd27b587afca21b7cfa59a74dcbd48a50f0a6400cfb59391340ad729d91d326",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "psutil",
       "version": "7.2.2",
       "file": "psutil-7.2.2-cp37-abi3-win_amd64.whl",
       "sha256": "eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988",
       "why": "进程/系统信息"
+    },
+    {
+      "name": "py",
+      "version": "1.11.0",
+      "file": "py-1.11.0-py2.py3-none-any.whl",
+      "sha256": "607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "py_cpuinfo",
+      "version": "9.0.0",
+      "file": "py_cpuinfo-9.0.0-py3-none-any.whl",
+      "sha256": "859625bc251f64e21f077d099d4162689c762b5d6a4c3c97553d56241c9674d5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyasn1",
+      "version": "0.6.3",
+      "file": "pyasn1-0.6.3-py3-none-any.whl",
+      "sha256": "a80184d120f0864a52a073acc6fc642847d0be408e7c7252f31390c0f4eadcde",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyautogui",
+      "version": "0.9.54",
+      "file": "pyautogui-0.9.54-py3-none-any.whl",
+      "sha256": "8ea3bd45dd4e64ff54aad83698c489248e6f22f79ea19f11f93c83bf462aac4f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pybase64",
+      "version": "1.4.3",
+      "file": "pybase64-1.4.3-cp312-cp312-win_amd64.whl",
+      "sha256": "9f2da8f56d9b891b18b4daf463a0640eae45a80af548ce435be86aa6eff3603b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pybind11",
+      "version": "3.0.2",
+      "file": "pybind11-3.0.2-py3-none-any.whl",
+      "sha256": "f8a6500548919cc33bcd220d5f984688326f574fa97f1107f2f4fdb4c6fb019f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyclipper",
+      "version": "1.4.0",
+      "file": "pyclipper-1.4.0-cp312-cp312-win_amd64.whl",
+      "sha256": "d1e5498d883b706a4ce636247f0d830c6eb34a25b843a1b78e2c969754ca9037",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pycountry",
+      "version": "26.2.16",
+      "file": "pycountry-26.2.16-py3-none-any.whl",
+      "sha256": "115c4baf7cceaa30f59a4694d79483c9167dbce7a9de4d3d571c5f3ea77c305a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "pycparser",
@@ -568,6 +1716,13 @@
       "why": "对称/非对称加密"
     },
     {
+      "name": "pycryptodomex",
+      "version": "3.23.0",
+      "file": "pycryptodomex-3.23.0-cp37-abi3-win_amd64.whl",
+      "sha256": "52e5ca58c3a0b0bd5e100a9fbc8015059b05cffc6c66ce9d98b4b45e023443b9",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "pydantic",
       "version": "2.14.3",
       "file": "pydantic-2.14.3-py3-none-any.whl",
@@ -582,11 +1737,67 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "pydantic_extra_types",
+      "version": "2.11.1",
+      "file": "pydantic_extra_types-2.11.1-py3-none-any.whl",
+      "sha256": "1722ea2bddae5628ace25f2aa685b69978ef533123e5638cfbddb999e0100ec1",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pydantic_settings",
+      "version": "2.13.1",
+      "file": "pydantic_settings-2.13.1-py3-none-any.whl",
+      "sha256": "d56fd801823dbeae7f0975e1f8c8e25c258eb75d278ea7abb5d9cebb01b56237",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyelftools",
+      "version": "0.32",
+      "file": "pyelftools-0.32-py3-none-any.whl",
+      "sha256": "013df952a006db5e138b1edf6d8a68ecc50630adbd0d83a2d41e7f846163d738",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyflakes",
+      "version": "4.0.3",
+      "file": "pyflakes-4.0.3-py2.py3-none-any.whl",
+      "sha256": "330ba92b8c1db2eb0b8f4068f6c58674e2649a99e334769aa50e3e9c5b11c23a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pygetwindow",
+      "version": "0.0.9",
+      "file": "pygetwindow-0.0.9-py3-none-any.whl",
+      "sha256": "e79b9ea4478ecdb74b94076448d23b5795da84563bf3d854ae88d5b2b4a67daa",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyghidra",
+      "version": "3.1.0",
+      "file": "pyghidra-3.1.0-py3-none-any.whl",
+      "sha256": "62d76e4c42352fc38cb3a9526ba7e25681d21388c16e59a2d17e99aeaf47ac94",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "pygments",
       "version": "2.21.0",
       "file": "pygments-2.21.0-py3-none-any.whl",
       "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "pyinstaller",
+      "version": "6.22.3",
+      "file": "pyinstaller-6.22.3-py3-none-win_amd64.whl",
+      "sha256": "500bd58c7bf7e584a8435adccbd763a0b918d5c12b08d74ff50fd79b2915458b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyinstaller_hooks_contrib",
+      "version": "2026.7",
+      "file": "pyinstaller_hooks_contrib-2026.7-py3-none-any.whl",
+      "sha256": "24257a04c7a5a7a034cf28e39dcee20fbeeb9f043076729480f2e1b69904408a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "pyjwt",
@@ -596,11 +1807,32 @@
       "why": "JWT"
     },
     {
+      "name": "pymodbus",
+      "version": "3.11.4",
+      "file": "pymodbus-3.11.4-py3-none-any.whl",
+      "sha256": "89865929f53bd5e32b4076dde00ee86d9b8afb1686832ed74e69d55df22729c3",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pymsgbox",
+      "version": "2.0.1",
+      "file": "pymsgbox-2.0.1-py3-none-any.whl",
+      "sha256": "5de8ec19bca2ca7e6c09d39c817c83f17c75cee80275235f43a9931db699f73b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "pynacl",
       "version": "1.6.2",
       "file": "pynacl-1.6.2-cp38-abi3-win_amd64.whl",
       "sha256": "62985f233210dee6548c223301b6c25440852e13d59a8b81490203c3227c5ba0",
       "why": "paramiko 依赖（Ed25519）"
+    },
+    {
+      "name": "pyopengl",
+      "version": "3.1.10",
+      "file": "pyopengl-3.1.10-py3-none-any.whl",
+      "sha256": "794a943daced39300879e4e47bd94525280685f42dbb5a998d336cfff151d74f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "pyparsing",
@@ -617,11 +1849,109 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "pyperclip",
+      "version": "1.11.0",
+      "file": "pyperclip-1.11.0-py3-none-any.whl",
+      "sha256": "299403e9ff44581cb9ba2ffeed69c7aa96a008622ad0c46cb575ca75b5b84273",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pypiwin32",
+      "version": "223",
+      "file": "pypiwin32-223-py3-none-any.whl",
+      "sha256": "67adf399debc1d5d14dffc1ab5acacb800da569754fafdc576b2a039485aa775",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyreadline3",
+      "version": "3.5.6",
+      "file": "pyreadline3-3.5.6-py3-none-any.whl",
+      "sha256": "8449b734232e42a5dcd74048e39b60db2839a4c38cf3ae2bf7707d58b5389c0d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyrect",
+      "version": "0.2.0",
+      "file": "pyrect-0.2.0-py2.py3-none-any.whl",
+      "sha256": "5e815250920ede23115269fdcbdc3ed3dda894a4e88b4637f36cdb55fad42432",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyscreeze",
+      "version": "1.0.1",
+      "file": "pyscreeze-1.0.1-py3-none-any.whl",
+      "sha256": "eb86f1d0b0a9246dba8e3da77f8b86e8c9d7b255edfffb2f82a6dcd15fe671ff",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "pyserial",
       "version": "3.5",
       "file": "pyserial-3.5-py2.py3-none-any.whl",
       "sha256": "c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0",
       "why": "串口"
+    },
+    {
+      "name": "PySocks",
+      "version": "1.7.1",
+      "file": "PySocks-1.7.1-py3-none-any.whl",
+      "sha256": "2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "PyStemmer",
+      "version": "2.2.0.3",
+      "file": "PyStemmer-2.2.0.3-cp312-cp312-win_amd64.whl",
+      "sha256": "320c1da333f5f8571e2b313c9fa6c0a7a79d8a00a2ad0bf29932d931d236d7e8",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytest",
+      "version": "7.4.3",
+      "file": "pytest-7.4.3-py3-none-any.whl",
+      "sha256": "0d009c083ea859a71b76adf7c1d502e4bc170b80a8ef002da5806527b9591fac",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytest_cov",
+      "version": "7.1.0",
+      "file": "pytest_cov-7.1.0-py3-none-any.whl",
+      "sha256": "a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytest_html",
+      "version": "3.2.0",
+      "file": "pytest_html-3.2.0-py3-none-any.whl",
+      "sha256": "868c08564a68d8b2c26866f1e33178419bb35b1e127c33784a28622eb827f3f3",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytest_metadata",
+      "version": "3.1.1",
+      "file": "pytest_metadata-3.1.1-py3-none-any.whl",
+      "sha256": "c8e0844db684ee1c798cfa38908d20d67d0463ecb6137c72e91f418558dd5f4b",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytest_ordering",
+      "version": "0.6",
+      "file": "pytest_ordering-0.6-py3-none-any.whl",
+      "sha256": "3f314a178dbeb6777509548727dc69edf22d6d9a2867bf2d310ab85c403380b6",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytest_xdist",
+      "version": "3.3.1",
+      "file": "pytest_xdist-3.3.1-py3-none-any.whl",
+      "sha256": "ff9daa7793569e6a68544850fd3927cd257cc03a7ef76c95e86915355e82b5f2",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "python_bidi",
+      "version": "0.6.11",
+      "file": "python_bidi-0.6.11-cp312-cp312-win_amd64.whl",
+      "sha256": "0608bddcc1c53dfa5293499de13ca9935b31aa46d1c722c404a88c703d1a4e47",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "python_can",
@@ -645,6 +1975,48 @@
       "why": ".env 读取"
     },
     {
+      "name": "python_jose",
+      "version": "3.5.0",
+      "file": "python_jose-3.5.0-py2.py3-none-any.whl",
+      "sha256": "abd1202f23d34dfad2c3d28cb8617b90acf34132c7afd60abd0b0b7d3cb55771",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "python_json_logger",
+      "version": "4.1.0",
+      "file": "python_json_logger-4.1.0-py3-none-any.whl",
+      "sha256": "132994765cf75bf44554be9aa49b06ef2345d23661a96720262716438141b6b2",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "python_multipart",
+      "version": "0.0.26",
+      "file": "python_multipart-0.0.26-py3-none-any.whl",
+      "sha256": "c0b169f8c4484c13b0dcf2ef0ec3a4adb255c4b7d18d8e420477d2b1dd03f185",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyttsx3",
+      "version": "2.99",
+      "file": "pyttsx3-2.99-py3-none-any.whl",
+      "sha256": "ff3e4ff756c24d72b9f3f2f304e0edaafd0f58adb0e6f4b90d930440cda8b207",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytweening",
+      "version": "1.2.0",
+      "file": "pytweening-1.2.0-py3-none-any.whl",
+      "sha256": "30510067a0f494eca052d27e73a7bda367a4a8d7a8e2f4ecdb376df4fcb6d0f1",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pytz",
+      "version": "2026.6",
+      "file": "pytz-2026.6-py2.py3-none-any.whl",
+      "sha256": "7fed3fee8fd6bd4a2b7b75a8d56021d0624127bf69bd5691f115db929ac570b3",
+      "why": "扩展栈的自有依赖（与内置栈同版本）"
+    },
+    {
       "name": "pyusb",
       "version": "1.3.1",
       "file": "pyusb-1.3.1-py3-none-any.whl",
@@ -652,11 +2024,39 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "pyvisa",
+      "version": "1.16.0",
+      "file": "pyvisa-1.16.0-py3-none-any.whl",
+      "sha256": "10b49ab9b04c5c6f3ea3b9e69398ab49133f46dbe827f0cea13ea934e092d3d0",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pyvisa_py",
+      "version": "0.8.1",
+      "file": "pyvisa_py-0.8.1-py3-none-any.whl",
+      "sha256": "31208a2933c1793b4e829ba5f07d265b83f280668df440ee7ee6ac505dea4ee9",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "pywin32",
       "version": "312",
       "file": "pywin32-312-cp312-cp312-win_amd64.whl",
       "sha256": "b457f6d628a47e8a7346ce22acb7e1a46a4a78b52e1d17e1af56871bd19a93bc",
       "why": "Windows API（win32api / win32com）"
+    },
+    {
+      "name": "pywin32_ctypes",
+      "version": "0.2.3",
+      "file": "pywin32_ctypes-0.2.3-py3-none-any.whl",
+      "sha256": "8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "pywinpty",
+      "version": "2.0.15",
+      "file": "pywinpty-2.0.15-cp312-cp312-win_amd64.whl",
+      "sha256": "83a8f20b430bbc5d8957249f875341a60219a4e971580f2ba694fbfb54a45ebc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "pyxcp",
@@ -673,11 +2073,39 @@
       "why": "YAML"
     },
     {
+      "name": "pyzmq",
+      "version": "27.1.0",
+      "file": "pyzmq-27.1.0-cp312-abi3-win_amd64.whl",
+      "sha256": "9ce490cf1d2ca2ad84733aa1d69ce6855372cb5ce9223802450c9b2a7cba0ccf",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "qdrant_client",
+      "version": "1.19.0",
+      "file": "qdrant_client-1.19.0-py3-none-any.whl",
+      "sha256": "13602a2b3478a95ecdf42f97b93d7f703b63a3361cd912a04495a33a5ac14121",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "rank_bm25",
+      "version": "0.2.2",
+      "file": "rank_bm25-0.2.2-py3-none-any.whl",
+      "sha256": "7bd4a95571adadfc271746fa146a4bcfd89c0cf731e49c3d1ad863290adbe8ae",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "referencing",
       "version": "0.37.0",
       "file": "referencing-0.37.0-py3-none-any.whl",
       "sha256": "381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "regex",
+      "version": "2026.5.9",
+      "file": "regex-2026.5.9-cp312-cp312-win_amd64.whl",
+      "sha256": "86f40a5d6444db30a125c9c9177e6b25dad981cbc37451fd838f145e6edac92e",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "requests",
@@ -687,6 +2115,20 @@
       "why": "工程脚本最常用的 HTTP 客户端"
     },
     {
+      "name": "retry",
+      "version": "0.9.2",
+      "file": "retry-0.9.2-py2.py3-none-any.whl",
+      "sha256": "ccddf89761fa2c726ab29391837d4327f819ea14d244c232a1d24c67a2f98606",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "retry2",
+      "version": "0.9.5",
+      "file": "retry2-0.9.5-py2.py3-none-any.whl",
+      "sha256": "f7fee13b1e15d0611c462910a6aa72a8919823988dd0412152bc3719c89a4e55",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "rich",
       "version": "15.0.0",
       "file": "rich-15.0.0-py3-none-any.whl",
@@ -694,11 +2136,46 @@
       "why": "终端富文本"
     },
     {
+      "name": "rich_toolkit",
+      "version": "0.19.10",
+      "file": "rich_toolkit-0.19.10-py3-none-any.whl",
+      "sha256": "93a41f67a09aefe90379f1729495c2fee9ccbcc8cfda48e2ca2ae54a995e32b1",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "rignore",
+      "version": "0.7.6",
+      "file": "rignore-0.7.6-cp312-cp312-win_amd64.whl",
+      "sha256": "c96a285e4a8bfec0652e0bfcf42b1aabcdda1e7625f5006d188e3b1c87fdb543",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "rpds_py",
       "version": "2026.9.1",
       "file": "rpds_py-2026.9.1-cp312-cp312-win_amd64.whl",
       "sha256": "5ce8943f79c2210f7abcc28e86367b03b28d95027fd01c46d2472373ae70c86f",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "rsa",
+      "version": "4.9.1",
+      "file": "rsa-4.9.1-py3-none-any.whl",
+      "sha256": "68635866661c6836b8d39430f97a996acbd61bfa49406748ea243539fe239762",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "ruamel_yaml",
+      "version": "0.18.17",
+      "file": "ruamel_yaml-0.18.17-py3-none-any.whl",
+      "sha256": "9c8ba9eb3e793efdf924b60d521820869d5bf0cb9c6f1b82d82de8295e290b9d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "ruamel_yaml_clib",
+      "version": "0.2.15",
+      "file": "ruamel_yaml_clib-0.2.15-cp312-cp312-win_amd64.whl",
+      "sha256": "2b216904750889133d9222b7b873c199d48ecbb12912aca78970f84a5aa1a4bc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "s3transfer",
@@ -722,6 +2199,69 @@
       "why": "科学计算"
     },
     {
+      "name": "selenium",
+      "version": "4.16.0",
+      "file": "selenium-4.16.0-py3-none-any.whl",
+      "sha256": "aec71f4e6ed6cb3ec25c9c1b5ed56ae31b6da0a7f17474c7566d303f84e6219f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "sentencepiece",
+      "version": "0.2.1",
+      "file": "sentencepiece-0.2.1-cp312-cp312-win_amd64.whl",
+      "sha256": "4cdc7c36234fda305e85c32949c5211faaf8dd886096c7cea289ddc12a2d02de",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "sentry_sdk",
+      "version": "2.60.0",
+      "file": "sentry_sdk-2.60.0-py3-none-any.whl",
+      "sha256": "28a536c03291c8bcb363cf35c611b32738ec118ff64d8d6383b096448ac4c803",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "setproctitle",
+      "version": "1.3.7",
+      "file": "setproctitle-1.3.7-cp312-cp312-win_amd64.whl",
+      "sha256": "9888ceb4faea3116cf02a920ff00bfbc8cc899743e4b4ac914b03625bdc3c300",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "setuptools",
+      "version": "84.2.1",
+      "file": "setuptools-84.2.1-py3-none-any.whl",
+      "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+      "why": "扩展栈的自有依赖"
+    },
+    {
+      "name": "setuptools_cpp",
+      "version": "0.1.0",
+      "file": "setuptools_cpp-0.1.0-py3-none-any.whl",
+      "sha256": "cd8179c038a12dbf2914999928f193f54d4713fd11715efdc5d6f450f663c8bd",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "shadowcopy",
+      "version": "0.0.4",
+      "file": "shadowcopy-0.0.4-py3-none-any.whl",
+      "sha256": "fc51e59a639dc6a5a3a7a9b4e3ecadc71989e339f2d995d90aaa491acd4ba4eb",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "shellingham",
+      "version": "1.5.4",
+      "file": "shellingham-1.5.4-py2.py3-none-any.whl",
+      "sha256": "7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "shiboken6",
+      "version": "6.11.0",
+      "file": "shiboken6-6.11.0-cp310-abi3-win_amd64.whl",
+      "sha256": "483ff78a73c7b3189ca924abc694318084f078bcfeaffa68e32024ff2d025ee1",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "six",
       "version": "1.17.0",
       "file": "six-1.17.0-py2.py3-none-any.whl",
@@ -729,11 +2269,81 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "sniffio",
+      "version": "1.3.1",
+      "file": "sniffio-1.3.1-py3-none-any.whl",
+      "sha256": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "socksio",
+      "version": "1.0.0",
+      "file": "socksio-1.0.0-py3-none-any.whl",
+      "sha256": "95dc1f15f9b34e8d7b16f06d74b8ccf48f609af32ab33c608d08761c5dcbb1f3",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "sortedcontainers",
+      "version": "2.4.0",
+      "file": "sortedcontainers-2.4.0-py2.py3-none-any.whl",
+      "sha256": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "soupsieve",
       "version": "4.1.1",
       "file": "soupsieve-4.1.1-py3-none-any.whl",
       "sha256": "8ff3422dab0b720fb667ee79864d80531a0e57994a13eb701697719ffcb751f6",
       "why": "beautifulsoup4 依赖"
+    },
+    {
+      "name": "sqlalchemy",
+      "version": "2.0.52",
+      "file": "sqlalchemy-2.0.52-cp312-cp312-win_amd64.whl",
+      "sha256": "2d5e53e36e37129fe0be8b9d08b6e4052c10a963ee6cda56c8c10dcc194b99ca",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "sqlitedict",
+      "version": "2.1.0",
+      "file": "sqlitedict-2.1.0-py3-none-any.whl",
+      "sha256": "6b65dd3e3067e84ab938323a78f25e5a142ab3ead5ab4eccfe78df49c60c8a19",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "sse_starlette",
+      "version": "3.4.4",
+      "file": "sse_starlette-3.4.4-py3-none-any.whl",
+      "sha256": "3f4dd50d8aed2771a091f3a83000323fc3844541c16b4fe585ae2420cc6df973",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "starlette",
+      "version": "0.52.1",
+      "file": "starlette-0.52.1-py3-none-any.whl",
+      "sha256": "0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "stevedore",
+      "version": "5.6.0",
+      "file": "stevedore-5.6.0-py3-none-any.whl",
+      "sha256": "4a36dccefd7aeea0c70135526cecb7766c4c84c473b1af68db23d541b6dc1820",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "supervisor",
+      "version": "4.3.0",
+      "file": "supervisor-4.3.0-py2.py3-none-any.whl",
+      "sha256": "0bcb763fddafba410f35cbde226aa7f8514b9fb82eb05a0c85f6588d1c13f8db",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "sympy",
+      "version": "1.14.0",
+      "file": "sympy-1.14.0-py3-none-any.whl",
+      "sha256": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "tabulate",
@@ -750,6 +2360,20 @@
       "why": "重试"
     },
     {
+      "name": "termcolor",
+      "version": "3.3.0",
+      "file": "termcolor-3.3.0-py3-none-any.whl",
+      "sha256": "cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "texttable",
+      "version": "1.7.0",
+      "file": "texttable-1.7.0-py2.py3-none-any.whl",
+      "sha256": "72227d592c82b3d7f672731ae73e4d1f88cd8e2ef5b075a7a7f01a23a3743917",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "threadpoolctl",
       "version": "3.8.0",
       "file": "threadpoolctl-3.8.0-py3-none-any.whl",
@@ -757,11 +2381,39 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "tiktoken",
+      "version": "0.13.0",
+      "file": "tiktoken-0.13.0-cp312-cp312-win_amd64.whl",
+      "sha256": "8f2d16e7a7c783ad81f36e457d046d1f1c8af70b22aec8a13238efe531977c41",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "tinytag",
+      "version": "2.3.1",
+      "file": "tinytag-2.3.1-py3-none-any.whl",
+      "sha256": "8aa1d5363d62b5bda21390fd195d05e2a96eefb4a7746523bf116b717a2a7b79",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "toml",
       "version": "0.10.2",
       "file": "toml-0.10.2-py2.py3-none-any.whl",
       "sha256": "806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "tomlkit",
+      "version": "0.13.3",
+      "file": "tomlkit-0.13.3-py3-none-any.whl",
+      "sha256": "c89c649d79ee40629a9fda55f8ace8c6a1b42deb912b2a8fd8d942ddadb606b0",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "tornado",
+      "version": "6.5.4",
+      "file": "tornado-6.5.4-cp39-abi3-win_amd64.whl",
+      "sha256": "fa07d31e0cd85c60713f2b995da613588aa03e1303d75705dca6af8babc18ddc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "tqdm",
@@ -778,11 +2430,46 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "trimesh",
+      "version": "5.0.0",
+      "file": "trimesh-5.0.0-py3-none-any.whl",
+      "sha256": "51ec67d7f9f74b918f2a695da5fd511b9c084e96307648ae83f45b58f13f8009",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "trio",
+      "version": "0.32.0",
+      "file": "trio-0.32.0-py3-none-any.whl",
+      "sha256": "4ab65984ef8370b79a76659ec87aa3a30c5c7c83ff250b4de88c29a8ab6123c5",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "trio_websocket",
+      "version": "0.12.2",
+      "file": "trio_websocket-0.12.2-py3-none-any.whl",
+      "sha256": "df605665f1db533f4a386c94525870851096a223adcb97f72a07e8b4beba45b6",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "typer",
+      "version": "0.25.1",
+      "file": "typer-0.25.1-py3-none-any.whl",
+      "sha256": "75caa44ed46a03fb2dab8808753ffacdbfea88495e74c85a28c5eefcf5f39c89",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "typing-extensions",
       "version": "4.16.0",
       "file": "typing_extensions-4.16.0-py3-none-any.whl",
       "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
       "why": "python-docx / python-pptx runtime dependency（内置栈与扩展栈各自独立安装，各带一份）"
+    },
+    {
+      "name": "typing_inspect",
+      "version": "0.9.0",
+      "file": "typing_inspect-0.9.0-py3-none-any.whl",
+      "sha256": "9ee6fc59062311ef8547596ab6b955e1b8aa46242d854bfc78f4f6b0eff35f9f",
+      "why": "扩展栈的自有依赖"
     },
     {
       "name": "typing_inspection",
@@ -813,11 +2500,95 @@
       "why": "UDS 诊断协议"
     },
     {
+      "name": "uiautomator2",
+      "version": "3.5.0",
+      "file": "uiautomator2-3.5.0-py3-none-any.whl",
+      "sha256": "3480c6f1cc3f660ba97588516340b65c61098901de355a21f06c059e316aad7a",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "ujson",
+      "version": "5.13.0",
+      "file": "ujson-5.13.0-cp312-cp312-win_amd64.whl",
+      "sha256": "6692d49ff970aaa5008f4a6fe06974bc91fd957bf13173f765e46d8ba44906ea",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "uptime",
+      "version": "3.0.1",
+      "file": "uptime-3.0.1-cp312-cp312-win_amd64.whl",
+      "sha256": "489a5c5186a82f0814e485e009b701546cb7071e48a7fa3a994dbda441e53834",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "urllib3",
       "version": "2.8.0",
       "file": "urllib3-2.8.0-py3-none-any.whl",
       "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.44.0",
+      "file": "uvicorn-0.44.0-py3-none-any.whl",
+      "sha256": "ce937c99a2cc70279556967274414c087888e8cec9f9c94644dfca11bd3ced89",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "vine",
+      "version": "5.1.0",
+      "file": "vine-5.1.0-py3-none-any.whl",
+      "sha256": "40fdf3c48b2cfe1c38a49e9ae2da6fda88e4794c810050a728bd7413811fb1dc",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "watchfiles",
+      "version": "1.2.0",
+      "file": "watchfiles-1.2.0-cp312-cp312-win_amd64.whl",
+      "sha256": "f155b3a1b2a5fc89cdc70d47ee5d54e3b75e88efa34982028a35daef9ba00379",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "wcwidth",
+      "version": "0.7.0",
+      "file": "wcwidth-0.7.0-py3-none-any.whl",
+      "sha256": "5d69154c429a82910e241c738cd0e2976fac8a2dd47a1a805f4afed1c0f136f2",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "webdriver_manager",
+      "version": "4.1.2",
+      "file": "webdriver_manager-4.1.2-py3-none-any.whl",
+      "sha256": "552bbb4e6f95e6e8b772565d2023e7c0ec5ff1736db0b186922d0466fc78c3de",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "webencodings",
+      "version": "0.5.1",
+      "file": "webencodings-0.5.1-py2.py3-none-any.whl",
+      "sha256": "a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "websocket_client",
+      "version": "1.9.0",
+      "file": "websocket_client-1.9.0-py3-none-any.whl",
+      "sha256": "af248a825037ef591efbf6ed20cc5faa03d3b47b9e5a2230a529eeee1c1fc3ef",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "websockets",
+      "version": "15.0.1",
+      "file": "websockets-15.0.1-cp312-cp312-win_amd64.whl",
+      "sha256": "fcd5cf9e305d7b8338754470cf69cf81f420459dbae8a3b40cee57417f4614a7",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "weditor",
+      "version": "0.7.3",
+      "file": "weditor-0.7.3-py3-none-any.whl",
+      "sha256": "889ffd2bd4aad9c69f90d3332a2978fa628eec0cd7c1f54d0b8b9291585fc67d",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "win32_setctime",
@@ -827,11 +2598,32 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "WMI",
+      "version": "1.5.1",
+      "file": "WMI-1.5.1-py2.py3-none-any.whl",
+      "sha256": "1d6b085e5c445141c475476000b661f60fff1aaa19f76bf82b7abb92e0ff4942",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "word2number",
+      "version": "1.1",
+      "file": "word2number-1.1-py3-none-any.whl",
+      "sha256": "2c86f9079fea71a6778047613ed173f9a921f73da96bc3d4bb558ebcc9e20680",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "wrapt",
       "version": "1.17.3",
       "file": "wrapt-1.17.3-cp312-cp312-win_amd64.whl",
       "sha256": "e71d5c6ebac14875668a1e90baf2ea0ef5b7ac7918355850c0908ae82bcb297c",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "wsproto",
+      "version": "1.3.2",
+      "file": "wsproto-1.3.2-py3-none-any.whl",
+      "sha256": "61eea322cdf56e8cc904bd3ad7573359a242ba65688716b0710a5eb12beab584",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
       "name": "xlrd",
@@ -841,11 +2633,39 @@
       "why": "旧版 xls 读取"
     },
     {
+      "name": "xlwt",
+      "version": "1.3.0",
+      "file": "xlwt-1.3.0-py2.py3-none-any.whl",
+      "sha256": "a082260524678ba48a297d922cc385f58278b8aa68741596a87de01a9c628b2e",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "xxhash",
+      "version": "3.7.0",
+      "file": "xxhash-3.7.0-cp312-cp312-win_amd64.whl",
+      "sha256": "7bd7bc82dd4f185f28f35193c2e968ef46131628e3cac62f639dadf321cba4d1",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
       "name": "yarl",
       "version": "1.25.1",
       "file": "yarl-1.25.1-cp312-cp312-win_amd64.whl",
       "sha256": "7d575b54cb3863ef9bc290ea4b009999d55dc237326131e4853cf33e888fee03",
       "why": "A+B 工程/数据栈"
+    },
+    {
+      "name": "zipp",
+      "version": "4.1.0",
+      "file": "zipp-4.1.0-py3-none-any.whl",
+      "sha256": "25ad4e16390cd314347dd8f1de67a2ac538ae658ed4ab9db16029c07c188e97f",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
+    },
+    {
+      "name": "zstandard",
+      "version": "0.25.0",
+      "file": "zstandard-0.25.0-cp312-cp312-win_amd64.whl",
+      "sha256": "ffef5a74088f1e09947aecf91011136665152e0b4b359c42be3373897fb39b01",
+      "why": "与 C:\\Python3119 的本地环境保持一致"
     }
   ],
   "extrasSmokeImports": [

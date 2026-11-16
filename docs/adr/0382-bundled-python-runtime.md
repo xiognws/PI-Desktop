@@ -56,6 +56,16 @@ who only needs Office can delete `python-extras` without breaking anything.
 The extras are added only for the bundled interpreter: they are 3.12 wheels, and
 offering them to a customer's own 3.11 would turn a working import into a crash.
 
+The extras set is a mirror of the customer's own working environment (406
+distributions on `C:\Python3119`), so it is installed with `--no-deps`: pip's
+resolver refuses the set as a whole because several packages want an older numpy
+than the Office stack ships, while every one of them works with the pinned one.
+What replaces the resolver is stronger than it: every wheel's metadata is scanned
+for requirements that this set does not satisfy, packages whose dependency is
+deliberately excluded (torch, onnxruntime, pyarrow and their dependents) are
+dropped rather than shipped broken, and the assembled tree is verified by
+importing all ~390 top-level modules with the packaged interpreter.
+
 **Locally maintained code ships through an overlay.** Some libraries are not on
 any index: the ZLG (周立功) USBCAN backend is a patched `python-can` interface
 that the customer maintains. `python-runtime.lock.json` therefore carries

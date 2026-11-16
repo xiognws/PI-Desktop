@@ -119,9 +119,14 @@ if (wheelSource) {
 await rm(siteDir, { recursive: true, force: true });
 await mkdir(siteDir, { recursive: true });
 console.log("  installing…");
+// `--no-deps`: the extras set is a mirror of a working environment, and pip's
+// resolver cannot satisfy every pin at once (several packages want an older
+// numpy than the Office stack ships). The set is closed instead by
+// `scripts/python-extras-lock`-style scans over the wheels' metadata plus the
+// import smoke test below, which is what actually proves the tree works.
 execFileSync(
   python,
-  ["-m", "pip", "install", "--no-index", "--find-links", wheelsDir, "--target", siteDir, "--no-compile", "--require-hashes", "-r", join(STAGING, "requirements.txt")],
+  ["-m", "pip", "install", "--no-index", "--find-links", wheelsDir, "--target", siteDir, "--no-compile", "--no-deps", "--require-hashes", "-r", join(STAGING, "requirements.txt")],
   { stdio: "inherit" },
 );
 
