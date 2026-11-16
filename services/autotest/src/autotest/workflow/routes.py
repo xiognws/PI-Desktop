@@ -537,8 +537,17 @@ def case_review(project_id: str, body: CaseReviewIn) -> dict:
         )
         store.touch_run(conn, body.run_id, stage="reviewed")
 
+    # 规则失败必须出现在摘要里：只说"评审结论 ok"会让人以为这轮评审干净，
+    # 而实际可能是 3 条异常用例根本没有失效模式。
+    rule_note = (
+        f"、规则不通过 {len(review_judgement['issues'])} 处"
+        if not review_judgement["ok"]
+        else ""
+    )
     return _envelope(
-        f"评审结论 {result['verdict']}：不可测 {len(result['untestable'])} 条、重复 {len(result['duplicates'])} 条",
+        f"评审结论 {result['verdict']}：不可测 {len(result['untestable'])} 条、"
+        f"重复 {len(result['duplicates'])} 条、异常覆盖 {len(review_judgement.get('exception_coverage') or {})} 类"
+        f"{rule_note}",
         {
             "run_id": body.run_id,
             **result,
