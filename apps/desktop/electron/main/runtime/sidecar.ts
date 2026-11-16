@@ -16,6 +16,7 @@ import { createComputerUseTool } from "../computer-use/service";
 import { resolveComputerUseProvider } from "../computer-use/provider";
 import type { ComputerCursorOverlay } from "../computer-use/cursor-overlay";
 import { registerPluginDevTools } from "../plugin-dev-tools";
+import { AstEditStaging, createAstEditApplyTool, createAstEditTool } from "../ast-edit-tool";
 import { createAstSearchTool } from "../ast-search-tool";
 import { resolveLocalFile } from "../browser-view";
 import { catalogModelConfigFor } from "../models-dev-catalog";
@@ -605,6 +606,17 @@ export function createSidecarRuntime({
     "AstSearch",
     createAstSearchTool({ getRoots: (sessionId) => browserHost.getFileRoots(sessionId) }),
   );
+  // Structural rewrite: propose here, apply on request. Two tools rather than one
+  // because "show me what would change" and "change it" are different decisions,
+  // and the staged text is what keeps a codemod from overwriting a file the user
+  // edited in between.
+  const astEditStaging = new AstEditStaging();
+  const astEditOptions = {
+    getRoots: (sessionId: string) => browserHost.getFileRoots(sessionId),
+    staging: astEditStaging,
+  };
+  s.setLocalTool("AstEdit", createAstEditTool(astEditOptions));
+  s.setLocalTool("AstEditApply", createAstEditApplyTool(astEditOptions));
   // Granted native application control (ADR 0342, ADR 0344). The host
   // authorises the call through `tools.execute` before this handler runs, and
   // the loop here holds no grant of its own: it asks the host for the desktop

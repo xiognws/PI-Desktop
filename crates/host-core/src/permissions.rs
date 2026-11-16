@@ -127,7 +127,7 @@ impl PermissionManager {
             // listed so neither tool name drifts back into the approval path.
             "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
             | "memory" | "skill_manage" | "Skill" => Risk::Low,
-            "Write" | "Edit" | "Bash" | "GenerateImages" | "Computer" => Risk::High,
+            "Write" | "Edit" | "AstEdit" | "AstEditApply" | "Bash" | "GenerateImages" | "Computer" => Risk::High,
             name if name.starts_with("plugin_") => match declared {
                 Some("low") => Risk::Low,
                 Some("high") => Risk::High,

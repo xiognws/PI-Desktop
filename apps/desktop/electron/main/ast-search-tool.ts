@@ -76,7 +76,7 @@ function grammarThatParsesPattern(pattern: string): string | undefined {
 type WalkHit = { file: string; language: string; text: string };
 
 /** Depth-first walk bounded by `AST_SEARCH_MAX_FILES`, in name order. */
-async function collectParseableFiles(base: string, signal: AbortSignal): Promise<{
+export async function collectParseableFiles(base: string, signal: AbortSignal): Promise<{
   files: WalkHit[];
   truncated: boolean;
 }> {

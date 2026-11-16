@@ -3878,6 +3878,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           return (
             "Search the session's code by its syntax tree instead of its text: one ast-grep pattern matches calls, declarations, and member access across TypeScript, Tsx, JavaScript, Html, and Css files. Use it when a Grep regex would also match comments, strings, or unrelated names. Returns `path:line:column` rows and stops at a bounded number of files and matches, reporting what it left out."
           );
+        case "AstEdit":
+          return (
+            "Rewrite every match of an ast-grep structural pattern in one pass. Two steps: this call only *proposes* — it returns a proposalId plus a per-file preview and replacement count and writes nothing. Call AstEditApply with that proposalId to write it. Use it for codemods (`console.log($X)` → `logger.info($X)`) instead of one Edit per site. Applies only while the files are unchanged since the proposal; a changed file makes the apply fail instead of overwriting text."
+          );
+        case "AstEditApply":
+          return (
+            "Apply a staged AstEdit proposal: writes every file in it atomically per file (temp file then rename) and consumes the proposal. Fails without writing anything when any file changed since the proposal was made, when the proposal expired, or when it belongs to another session. Re-run AstEdit to regenerate it."
+          );
         case "OfficeRead":
           return (
             "Read an Office document: `xlsx` (sheet rows), `docx` (paragraphs and tables), " +
@@ -4020,6 +4028,30 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         limit: Type.Optional(
           Type.Number({ description: "Maximum reported matches from 1 to 100; defaults to 20." }),
         ),
+      },
+      AstEdit: {
+        pattern: Type.String({
+          description:
+            "ast-grep structural pattern to rewrite, for example `console.log($X)` or `class $C { $M($$$) }`.",
+        }),
+        rewrite: Type.String({
+          description:
+            "Replacement template. `$NAME` inserts that capture, `$$$NAME` inserts a multi-capture; unknown names stay literal.",
+        }),
+        path: Type.Optional(
+          Type.String({
+            description:
+              "File or directory inside the session project or scratch directory. Defaults to the project root.",
+          }),
+        ),
+        limit: Type.Optional(
+          Type.Number({ description: "Maximum replacements to stage from 1 to 100; defaults to 100." }),
+        ),
+      },
+      AstEditApply: {
+        proposalId: Type.String({
+          description: "The `proposalId` returned by AstEdit. Consumed by this call.",
+        }),
       },
       OfficeRead: {
         format: Type.Union(
@@ -4696,6 +4728,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "Glob",
             "Grep",
             "AstSearch",
+            "AstEdit",
+            "AstEditApply",
             "BrowserPreview",
             "PluginCheck",
             "TodoWrite",
@@ -4711,6 +4745,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "Bash",
             "Write",
             "Edit",
+            "AstEdit",
+            "AstEditApply",
             "OfficeRead",
             "OfficeWrite",
           ];
