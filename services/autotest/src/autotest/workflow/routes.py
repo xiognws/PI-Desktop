@@ -1134,6 +1134,12 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
                 )
                 verified_bug_ids.append(bug_id)
 
+        # 异常覆盖来自 case-design 的产出：哪些功能点覆盖了哪些失效模式、还缺什么。
+        designed = store.last_payload(conn, run_id, "autotest_case_design") or {}
+        designed_stats = designed.get("stats") or {}
+        exception_coverage = designed_stats.get("exception_matrix") or {}
+        exception_gaps = designed_stats.get("exception_gaps") or {}
+
         result = report_service.build_report(
             run_id,
             str(run.get("module") or ""),
@@ -1141,6 +1147,8 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
             cases_total=cases_total,
             requirement=str(run.get("requirement_ref") or ""),
             bugs=bugs,
+            exception_coverage=exception_coverage,
+            exception_gaps=exception_gaps,
         )
         reports_dir = (server.WORKSPACE / project_id / "reports").resolve()
         reports_dir.mkdir(parents=True, exist_ok=True)
@@ -1151,7 +1159,12 @@ def build_report(project_id: str, run_id: str, body: ReportIn) -> dict:
         first_execution = next(
             (item.get("execution_id") for item in (payload.get("results") or [])), None
         )
-        report_judgement = consistency.check_report(result["markdown"], counts, result["pass_rate"])
+        report_judgement = consistency.check_report(
+            result["markdown"],
+            counts,
+            result["pass_rate"],
+            exception_expected=bool(exception_coverage or exception_gaps),
+        )
         report_id = f"report_{uuid.uuid4().hex[:8]}"
         conn.execute(
             "INSERT INTO reports (id, name, total, passed, failed, pass_rate, execution_id)"

@@ -175,7 +175,9 @@ def check_review(review: dict, cases: list[dict]) -> dict:
 REPORT_COLUMNS = ("总数", "通过", "跳过", "失败", "异常", "取消", "通过率", "总耗时")
 
 
-def check_report(markdown: str, counts: dict, pass_rate: str) -> dict:
+def check_report(
+    markdown: str, counts: dict, pass_rate: str, exception_expected: bool = False
+) -> dict:
     """`prompts/report.md` 的规则落到生成的报告文本上。
 
     报告是唯一对外交付物，最容易出现"数字和明细对不上但没人发现"。这里不改报告，
@@ -199,6 +201,10 @@ def check_report(markdown: str, counts: dict, pass_rate: str) -> dict:
     header = "| " + " | ".join(REPORT_COLUMNS) + " |"
     if header not in text:
         add("table", "结果汇总表头列顺序不符合报告规则")
+
+    # 有异常用例就必须有覆盖表：只有通过率，读的人无法判断反面验了什么
+    if exception_expected and "## 异常覆盖" not in text:
+        add("exception", "报告缺少「异常覆盖」小节（类别 × 功能点）")
 
     row = re.search(r"^\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|", text, re.MULTILINE)
     if row is None:

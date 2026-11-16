@@ -20,6 +20,49 @@ def _clip(text: str, limit: int = MAX_EVIDENCE_CHARS) -> str:
     return text if len(text) <= limit else text[:limit] + "\n…（已截断）"
 
 
+def _exception_section(
+    coverage: dict[str, list[str]] | None,
+    gaps: dict[str, list[str]] | None,
+) -> list[str]:
+    """异常覆盖表：功能点 × 失效模式，外加"资料没写到"的缺口。
+
+    报告是唯一对外交付物。只给一个"通过率 100%"而不说反面覆盖了哪几类失效模式，
+    读的人无法判断这轮到底验了什么 —— 这条就是补这个信息。
+    """
+    coverage = coverage or {}
+    gaps = gaps or {}
+    if not coverage and not gaps:
+        return []
+
+    lines = ["## 异常覆盖", ""]
+    if coverage:
+        labels: list[str] = []
+        for items in coverage.values():
+            for label in items:
+                if label not in labels:
+                    labels.append(label)
+        lines.append("| 功能点 | " + " | ".join(labels) + " |")
+        lines.append("| --- | " + " | ".join("---" for _ in labels) + " |")
+        for point, items in sorted(coverage.items()):
+            marks = ["●" if label in items else "—" for label in labels]
+            lines.append(f"| {point} | " + " | ".join(marks) + " |")
+        lines.append("")
+        lines.append(f"- 覆盖失效模式：{len(labels)} 类（{', '.join(labels)}）")
+    else:
+        lines.append("- 本轮没有生成任何异常用例")
+    if gaps:
+        lines.append("")
+        lines.append("### 待补资料的失效模式")
+        lines.append("")
+        lines.append("| 功能点 | 缺依据的失效模式 |")
+        lines.append("| --- | --- |")
+        for point, items in sorted(gaps.items()):
+            if items:
+                lines.append(f"| {point} | {', '.join(items)} |")
+    lines.append("")
+    return lines
+
+
 def build_report(
     run_id: str,
     module: str,
@@ -28,6 +71,8 @@ def build_report(
     cases_total: int = 0,
     requirement: str = "",
     bugs: list[dict] | None = None,
+    exception_coverage: dict[str, list[str]] | None = None,
+    exception_gaps: dict[str, list[str]] | None = None,
 ) -> dict:
     """把一次执行 payload 拼成 Markdown 报告。"""
     stats = payload.get("stats") or {}
@@ -63,6 +108,7 @@ def build_report(
         f"| {pass_rate} | {stats.get('duration_ms', 0)} ms |"
     )
     lines.append("")
+    lines.extend(_exception_section(exception_coverage, exception_gaps))
 
     if total != cases_total:
         lines.append(
