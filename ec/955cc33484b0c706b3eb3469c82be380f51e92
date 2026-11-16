@@ -1,0 +1,14 @@
+scripts/bundle-python-extras.mjs
+  h_201ed4c689ac8b 28,140-168,175,177,182-183,266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ec955cc33484b0c706b3eb3469c82be380f51e92",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
