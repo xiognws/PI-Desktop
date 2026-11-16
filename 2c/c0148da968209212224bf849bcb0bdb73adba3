@@ -1,0 +1,34 @@
+README.zh-CN.md
+  h_201ed4c689ac8b 7,9,15,17,19,23,25-32,36,39-47,50-56,60,62,64-66,68,77,85,87-89,91,95,97,99-102,104,108,110-115,117,121,123-124,128
+apps/desktop/electron/main/crash-report.ts
+  h_201ed4c689ac8b 319,334-370
+apps/desktop/electron/main/persistence-outbox.ts
+  h_201ed4c689ac8b 110-118,427-432,441-450,495-580
+apps/desktop/electron/main/runtime/lifecycle.ts
+  h_201ed4c689ac8b 1,26-27,231-235,237-268
+apps/desktop/resources/plugins/pi.file-manager/CHANGELOG.md
+  h_201ed4c689ac8b 3-10
+apps/desktop/resources/plugins/pi.file-manager/UPSTREAM.md
+  h_201ed4c689ac8b 19,29-34,62,84,88,91,131-153
+apps/desktop/resources/plugins/pi.file-manager/manifest.json
+  h_201ed4c689ac8b 5-6,10,15
+apps/desktop/resources/plugins/pi.file-manager/views/assets/index.js
+  h_201ed4c689ac8b 33
+apps/desktop/test/bundled-plugins.test.mjs
+  h_201ed4c689ac8b 84
+apps/desktop/test/persistence-outbox-atomic-clear.test.mjs
+  h_201ed4c689ac8b 52-56
+docs/spec/03-runtime/09-logging-and-observability.md
+  h_201ed4c689ac8b 90-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2cc0148da968209212224bf849bcb0bdb73adba3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
