@@ -1,0 +1,14 @@
+crates/host-core/src/permissions.rs
+  h_201ed4c689ac8b 130-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c0f1e6123a048c98fbef0e4fb11c96e6cf2a7137",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+docs/adr/0400-stream-rules-abort-and-retry.md
+  h_201ed4c689ac8b 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2c3a513cd176a8ec9dd40654f9c18eb12adf05ac",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

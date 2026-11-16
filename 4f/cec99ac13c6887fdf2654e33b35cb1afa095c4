@@ -1,0 +1,14 @@
+packages/agent-runtime/src/sidecar.ts
+  h_201ed4c689ac8b 12,141-142,289-299,311,413
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4fcec99ac13c6887fdf2654e33b35cb1afa095c4",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

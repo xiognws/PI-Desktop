@@ -1,0 +1,24 @@
+apps/desktop/electron/main/ast-edit-tool.ts
+  h_201ed4c689ac8b 1-350
+apps/desktop/electron/main/ast-search-tool.ts
+  h_201ed4c689ac8b 79
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 19,609-619
+apps/desktop/electron/test/ast-edit-tool.test.mjs
+  h_201ed4c689ac8b 1-170
+crates/host-core/src/permissions.rs
+  h_201ed4c689ac8b 130
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 3881-3888,4032-4055,4731-4732,4748-4749
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8b2f9c0a808a1a86e87b5458c1ad39e04c4ba8fd",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}

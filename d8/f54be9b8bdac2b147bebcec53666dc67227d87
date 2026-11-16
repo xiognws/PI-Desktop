@@ -1,0 +1,26 @@
+apps/desktop/electron/main/runtime/session-launch.ts
+  h_201ed4c689ac8b 766-771
+apps/desktop/src/features/settings/pages/AgentBehaviorSettings.tsx
+  h_201ed4c689ac8b 14,98-99
+apps/desktop/src/features/settings/stream-rules/StreamRulesSettings.tsx
+  h_201ed4c689ac8b 1-101
+apps/desktop/src/styles/settings.css
+  h_201ed4c689ac8b 3942-3949
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1763-1775
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1749-1761
+packages/shared/src/types/settings.ts
+  h_201ed4c689ac8b 83-88,314-338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d8f54be9b8bdac2b147bebcec53666dc67227d87",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
