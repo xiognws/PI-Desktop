@@ -96,6 +96,9 @@ where
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    // A session outlives one command, so a leaked PYTHONHOME would poison every
+    // later call in it.
+    super::strip_inherited_python_env(&mut command);
     if let Some(scratch_dir) = config.scratch_dir.as_deref() {
         command.env("PI_SCRATCH_DIR", scratch_dir);
     }

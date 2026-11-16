@@ -29,6 +29,8 @@ mod grep_rg;
 pub mod hashline;
 pub mod ignore_rules;
 mod image_dimensions;
+#[cfg(test)]
+mod inherited_python_env_tests;
 pub mod office;
 #[cfg(any(unix, test))]
 mod process_group;
@@ -40,6 +42,25 @@ mod shell_session_tests;
 mod windows_process_tree;
 
 pub use hashline::{HashlineContext, HashlineStore};
+
+/// Python variables the desktop injects for its bundled interpreter
+/// (`apps/desktop/electron/main/python-runtime.ts`).
+///
+/// host-core needs them: `tools/office.rs` starts that interpreter, and it reads
+/// its libraries from `PYTHONPATH`. They must not reach a user command, though.
+/// A Bash session that inherits them makes the *customer's* `python` load the
+/// bundled 3.12 standard library — on their own 3.11 interpreter every `pytest`
+/// run then dies with `module '_thread' has no attribute
+/// 'daemon_threads_allowed'`, and any script silently sees the wrong
+/// `site-packages`.
+pub const INHERITED_PYTHON_ENV_VARS: [&str; 3] = ["PYTHONHOME", "PYTHONPATH", "PYTHONNOUSERSITE"];
+
+/// Remove the bundled-interpreter variables from a command a user runs.
+pub fn strip_inherited_python_env(command: &mut Command) {
+    for name in INHERITED_PYTHON_ENV_VARS {
+        command.env_remove(name);
+    }
+}
 
 /// Ceiling on what the streaming capture retains per stream.
 ///
@@ -552,6 +573,7 @@ async fn run_one_shot_runner(
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
+    strip_inherited_python_env(&mut command);
     if let Some(scratch_dir) = config.scratch_dir.as_deref() {
         command.env("PI_SCRATCH_DIR", scratch_dir);
     }

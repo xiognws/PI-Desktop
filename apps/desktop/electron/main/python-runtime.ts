@@ -36,7 +36,12 @@ import { getModuleDirectory } from "./module-path.ts";
  *
  * The user layer comes first on `PYTHONPATH` so a customer who upgrades a
  * library keeps that upgrade across app updates, and so a reinstall never has
- * to reason about their changes. The bundled layers are verified against the
+ * to reason about their changes. host-core inherits this environment but strips
+ * these three variables again for every shell it starts
+ * (`tools::strip_inherited_python_env`): a `PYTHONHOME` that reaches a Bash
+ * command makes the customer's own `python` load the bundled standard library,
+ * which breaks an unrelated 3.11 interpreter with `_thread` errors. The bundled
+ * layers are verified against the
  * manifest the build wrote, which is what makes "the image is what we built"
  * checkable after an antivirus quarantine or a half-finished update.
  */
