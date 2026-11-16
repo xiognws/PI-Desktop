@@ -69,6 +69,12 @@ import {
   taskMessageSnapshot,
 } from "./delegation-message.js";
 import {
+  MAX_RULE_RETRIES,
+  StreamRuleGuard,
+  assistantTextOf,
+} from "./stream-rule-guard.js";
+import type { StreamRule } from "./stream-rules.js";
+import {
   Agent,
   type AgentContext,
   type AgentEvent,
@@ -2144,6 +2150,14 @@ export class DesktopAgentRuntime {
    */
   private allowSilentCompletion = false;
   private silentTurnRerunInProgress = false;
+  /** Configured stream rules. Empty means the feature is off. */
+  private streamRules: readonly StreamRule[] = [];
+  /** Built lazily from `streamRules`; aborts the stream when a rule fires. */
+  private streamRuleGuard: StreamRuleGuard | undefined;
+  /** A rule fired: the turn is retried with its reminder once the loop is idle. */
+  private pendingStreamRuleRetry:
+    | { reminder: string; ruleId: string; attempt: number }
+    | undefined;
   private suppressSilentTurnRunEnd = false;
   /** Autonomous plan/goal execution: one progress-only continue (#43). */
   private autonomousExecution = false;
@@ -7762,15 +7776,91 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
    * Returns false when overflow recovery could not create a checkpoint and the
    * caller must stop; the error event is already emitted.
    */
+  /**
+   * Install the stream rules for this session.
+   *
+   * Rules are validated by `parseStreamRules` at the settings boundary, so anything
+   * arriving here is already known to compile. An empty list disables the guard
+   * entirely, which is what keeps this feature invisible on a default install.
+   */
+  setStreamRules(rules: readonly StreamRule[]): void {
+    this.streamRules = rules;
+    this.streamRuleGuard = rules.length
+      ? new StreamRuleGuard({
+          rules,
+          // Abort first, decide afterwards: the reminder is only usable once the
+          // provider stream has stopped producing tokens for this attempt.
+          abort: () => this.agent.abort(),
+        })
+      : undefined;
+    this.pendingStreamRuleRetry = undefined;
+  }
+
+  /**
+   * Check the assistant text produced so far against the configured rules.
+   *
+   * Called from the message_update branch with the accumulated text, not the
+   * delta: a pattern like an import at line start is a statement about the whole
+   * attempt. The guard aborts the stream itself, so nothing here waits on the
+   * provider; the reminder is applied by retryPendingStreamRule once the loop has
+   * actually stopped.
+   */
+  private observeStreamRules(text: string): void {
+    const guard = this.streamRuleGuard;
+    if (!guard || this.pendingStreamRuleRetry) return;
+    const fire = guard.observe(text);
+    if (!fire) return;
+    this.pendingStreamRuleRetry = {
+      reminder: fire.reminder,
+      ruleId: fire.hit.rule.id,
+      attempt: fire.attempt,
+    };
+    process.stderr.write(
+      `[agent-runtime] stream rule fired (session=${this.sessionId} turn=${this.turnId} rule=${fire.hit.rule.id} attempt=${fire.attempt}/${MAX_RULE_RETRIES}): ${fire.hit.match.length} chars matched
+`,
+    );
+  }
+
+  /**
+   * Retry the turn with the fired rule reminder appended.
+   *
+   * The abandoned partial assistant message is removed first: continue() refuses a
+   * transcript ending in an assistant message, and leaving it would show the model
+   * its own discarded draft as though it had been accepted.
+   */
+  private async retryPendingStreamRule(): Promise<void> {
+    const pending = this.pendingStreamRuleRetry;
+    if (!pending) return;
+    this.pendingStreamRuleRetry = undefined;
+    const messages = removeTrailingAssistantMessages(this.agent.state.messages);
+    messages.push({
+      role: "user",
+      content: [{ type: "text", text: pending.reminder }],
+    } as AgentMessage);
+    this.setAgentMessages(messages);
+    this.streamRuleGuard?.beginAttempt();
+    try {
+      if (this.disposed) throw new Error("runtime disposed");
+      await this.agent.continue();
+      await this.waitForIdleAndSteering();
+    } finally {
+      this.pendingStreamRuleRetry = undefined;
+    }
+  }
   private async runPendingRecoveries(): Promise<boolean> {
     while (
       this.pendingProviderRetry ||
       this.pendingOverflow ||
       this.pendingSilentTurnRerun ||
-      this.pendingProgressTurnRerun
+      this.pendingProgressTurnRerun ||
+      this.pendingStreamRuleRetry
     ) {
       if (this.pendingProviderRetry) {
         await this.retryPendingProviderFailure();
+        continue;
+      }
+      if (this.pendingStreamRuleRetry) {
+        await this.retryPendingStreamRule();
         continue;
       }
       if (this.pendingOverflow) {
@@ -9323,6 +9413,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           const previousText = this.currentAssistant.content;
           const previousThinking = this.currentAssistant.thinking ?? "";
           const nextText = content.hasText ? content.text : previousText;
+          this.observeStreamRules(nextText);
           const nextThinking = content.hasThinking
             ? content.thinking
             : previousThinking;

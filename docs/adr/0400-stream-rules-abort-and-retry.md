@@ -2,8 +2,15 @@
 
 ## Status
 
-Proposed. The matching half is implemented (`packages/agent-runtime/src/stream-rules.ts`);
-the abort-and-retry half is not, and this ADR is its prerequisite.
+Accepted. Implemented in `packages/agent-runtime/src/stream-rules.ts` (matching),
+`stream-rule-guard.ts` (firing and budgets) and the `message_update` hook in
+`runtime.ts` (abort, then retry through `runPendingRecoveries`).
+
+One debt remains and it cannot be paid in this package: the firing is logged, not
+emitted as a protocol event, because `AgentEvent` is a closed union owned by
+`@earendil-works/pi-agent-core`. A dedicated event needs either an upstream change
+or a local enrichment of the envelope; until then a rule firing appears in the
+application log with its session, turn, rule id and match size.
 
 ## Context
 
