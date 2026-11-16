@@ -45,6 +45,7 @@ pub(crate) const PORTABLE_APPLICATION_FIELDS: &[&str] = &[
     "defaultModelId",
     "defaultMode",
     "infiniteProviderRetry",
+    "streamRules",
     "keybindings",
     "linkOpenTarget",
     "contextUsageDisplay",

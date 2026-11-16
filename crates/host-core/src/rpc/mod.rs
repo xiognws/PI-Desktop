@@ -1217,6 +1217,11 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
     if let Err(message) = crate::mode_runs::validate_goal_budget_setting(value) {
         return Err(rpc_err(1002, message, "INVALID_PARAMS"));
     }
+    if let Some(rules) = object.get("streamRules") {
+        if let Err(message) = crate::stream_rules_setting::validate_stream_rules_setting(rules) {
+            return Err(rpc_err(1002, message, "INVALID_PARAMS"));
+        }
+    }
     if let Some(infinite_retry) = object.get("infiniteProviderRetry") {
         if !infinite_retry.is_boolean() {
             return Err(rpc_err(
