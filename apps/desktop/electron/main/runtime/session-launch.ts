@@ -763,6 +763,12 @@ export function createSessionLaunchRuntime({
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,
         infiniteProviderRetry: settings.infiniteProviderRetry === true,
+        // Stream rules are the user's, like the review policy above: the
+        // runtime only executes them. Validation happened at the settings write,
+        // and the sidecar re-validates because the list crosses a process boundary.
+        ...(Array.isArray(settings.streamRules) && settings.streamRules.length
+          ? { streamRules: settings.streamRules }
+          : {}),
         // The session `/fast` switch only reaches a model the user allowed it
         // for in model settings (ADR 0334).
         fastMode: session.fastMode === true && storedModel?.fastModeAllowed === true,

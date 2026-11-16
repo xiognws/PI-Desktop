@@ -3939,3 +3939,11 @@
   font-size: var(--text-2xs, 11px);
   white-space: nowrap;
 }
+
+/* A stream rule is a pattern, the sentence it injects, its switch and remove. */
+.settings-stream-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}

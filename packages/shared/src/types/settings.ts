@@ -80,6 +80,12 @@ export type AppSettings = {
    * Absent and false use the bounded ten-retry policy.
    */
   infiniteProviderRetry?: boolean;
+  /**
+   * Rules matched against the assistant text while it streams (ADR 0400).
+   * A match aborts the turn, injects the rule message and retries it, so the
+   * rule costs nothing on the turns that behave. Absent means no rules.
+   */
+  streamRules?: StreamRuleSetting[];
   /** Allow Agent mode to call TypeSafe Jev for explicit structured classifications. */
   jevEnabled?: boolean;
   /** Prevent idle system sleep while this desktop app runs; off when absent. */
@@ -303,6 +309,31 @@ export type AppSettings = {
    */
   radialMenu?: RadialMenuPreferences;
   onboardingDismissed: boolean;
+};
+
+/**
+ * One stream rule as the user configures it.
+ *
+ * `pattern` is a regular expression source matched against the assistant text of
+ * the current attempt; a match aborts the turn and injects `message` before the
+ * retry. Validation happens where the value is stored, so a rule that reaches the
+ * runtime is known to compile.
+ */
+export type StreamRuleSetting = {
+  /** Stable id; also the key that activation counts are reported under. */
+  id: string;
+  /** Short name shown in the session log when the rule fires. */
+  name: string;
+  /** Regular expression source. */
+  pattern: string;
+  /** `i`, `m`, `s`, `u` or `g`; omitted means no flags. */
+  flags?: string;
+  /** Injected as a reminder when the rule fires. */
+  message: string;
+  /** Activations allowed inside one turn; defaults to 1. */
+  maxPerTurn?: number;
+  /** A disabled rule stays configured and never matches. */
+  enabled?: boolean;
 };
 
 export type ChineseVariant = "simplified" | "traditional-taiwan" | "traditional-hong-kong";
