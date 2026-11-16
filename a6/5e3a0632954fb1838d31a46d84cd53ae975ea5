@@ -1,0 +1,19 @@
+crates/host-core/src/tools/inherited_python_env_tests.rs
+  s_973d6e01543158::t_31036c65a94e1c 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a65e3a0632954fb1838d31a46d84cd53ae975ea5",
+  "prompts": {},
+  "sessions": {
+    "s_973d6e01543158": {
+      "agent_id": {
+        "tool": "dsh",
+        "id": "session-d367812b-5a73-40d3-8da4-ecc4b9a4b20a",
+        "model": "7997"
+      },
+      "human_author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
