@@ -1,0 +1,18 @@
+apps/desktop/test/bundled-plugin-default-disabled.test.mjs
+  h_201ed4c689ac8b 109-138
+scripts/bundled-plugins-default-disabled.json
+  h_201ed4c689ac8b 4-8
+scripts/bundled-plugins-defaults.mjs
+  h_201ed4c689ac8b 35-55,57,62,66,69-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "fc543cfb90c8dc836bf90228fc987c9f16005f97",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
