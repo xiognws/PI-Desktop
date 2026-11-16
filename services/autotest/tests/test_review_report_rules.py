@@ -43,7 +43,15 @@ def _case(**over: object) -> dict:
 
 
 def test_clean_cases_review_ok_and_pass_the_rules() -> None:
-    cases = [_case(), _case(title="语音唤醒-异常输入", case_type="异常")]
+    cases = [
+        _case(),
+        _case(
+            title="语音唤醒-异常-非法枚举",
+            case_type="异常",
+            exception_class="illegal_value",
+            expected=["未定义唤醒词被拒绝并上报错误码"],
+        ),
+    ]
     result = review_service.review_cases(cases, "座舱")
     assert result["verdict"] == "ok"
     verdict = consistency.check_review(result, cases)

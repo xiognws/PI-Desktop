@@ -31,6 +31,21 @@ PLACEHOLDERS = (
 )
 
 
+# 预期里必须出现其中一类，才算"可观测"：具体数值、拒绝/保护动作、状态位或诊断码
+JUDGEABLE_MARKERS = (
+    "拒绝", "拦截", "保护", "降级", "停机", "闭锁", "熔断",
+    "DTC", "错误码", "故障码", "状态字", "状态位", "标志位",
+    "恢复", "复位", "重试", "一致", "不变", "不写入",
+)
+
+
+def _judgeable(text: str) -> bool:
+    """预期是否可判定：有数字（含单位）或命中动作/状态词，二者之一即可。"""
+    if re.search(r"\d", text):
+        return True
+    return any(marker in text for marker in JUDGEABLE_MARKERS)
+
+
 def _text(items: object) -> str:
     if isinstance(items, list):
         return " ".join(str(item) for item in items)
@@ -129,6 +144,22 @@ def check_review(review: dict, cases: list[dict]) -> dict:
             title = str((cases[index] or {}).get("title") or index)
             add("grounding", f"无依据用例「{title}」没有被判为不可测")
 
+    # 异常用例必须落到具体失效模式上：泛化的"异常输入"在评审阶段就该被拦下，
+    # 否则它会一路流到脚本，变成一条永远不会失败的断言。
+    coverage: dict[str, int] = {}
+    for case in cases:
+        if str(case.get("case_type") or "") != "异常":
+            continue
+        class_id = str(case.get("exception_class") or "")
+        title = str(case.get("title") or "")
+        if not class_id and "-异常-" not in title:
+            add("exception_class", f"异常用例「{title}」没有失效模式，仍是泛化模板")
+            continue
+        if class_id:
+            coverage[class_id] = coverage.get(class_id, 0) + 1
+        if not _judgeable(_text(case.get("expected"))):
+            add("expected", f"异常用例「{title}」的预期没有可判定结果（需数值/拒绝或保护动作/状态位/DTC）")
+
     by_field: dict[str, int] = {}
     for issue in issues:
         by_field[issue["field"]] = by_field.get(issue["field"], 0) + 1
@@ -137,6 +168,7 @@ def check_review(review: dict, cases: list[dict]) -> dict:
         "checked": len(cases),
         "issues": issues[:20],
         "by_field": by_field,
+        "exception_coverage": coverage,
     }
 
 

@@ -51,6 +51,9 @@ const exceptionCoverage = ref<{ byClass: Record<string, number>; gaps: Record<st
   gaps: {},
 })
 
+// 评审阶段回报的异常覆盖面（评审看到的和用例页一致）
+const reviewCoverage = ref<Record<string, number>>({})
+
 // 汇总"还缺哪些失效模式"，同一类在多处缺失只报一次
 const gapClassesText = computed(() => {
   const seen = new Set<string>()
@@ -232,6 +235,7 @@ async function runStage(key: string) {
         method: 'POST',
         body: JSON.stringify({ run_id: runId.value }),
       })
+      reviewCoverage.value = body.data?.exception_coverage || {}
       message.value = body.summary || '评审完成'
     } else if (key === 'author') {
       const body = await api('/workflow/script-author', {
@@ -386,6 +390,13 @@ onMounted(async () => {
             </p>
             <p v-if="step.key === 'author'" class="mono mt-1 text-[12px] text-muted">
               脚本库 {{ scriptCount }} 个
+            </p>
+
+            <p
+              v-if="step.key === 'review' && Object.keys(reviewCoverage).length"
+              class="mt-2 text-[12px] text-muted"
+            >
+              评审覆盖 {{ exceptionSummary(reviewCoverage) }}
             </p>
 
             <div

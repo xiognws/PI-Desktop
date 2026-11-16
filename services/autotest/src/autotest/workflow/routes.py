@@ -544,6 +544,8 @@ def case_review(project_id: str, body: CaseReviewIn) -> dict:
             **result,
             "prompt": _prompt_marker("case-review"),
             "consistency": review_judgement,
+            # 评审结论附带异常覆盖面：评审人一眼看到这次覆盖了哪几类失效模式
+            "exception_coverage": review_judgement.get("exception_coverage") or {},
         },
         body.run_id,
     )
