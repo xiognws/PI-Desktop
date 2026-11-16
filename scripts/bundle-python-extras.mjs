@@ -25,7 +25,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK_PATH = join(REPO, "scripts", "python-runtime.lock.json");
@@ -86,7 +86,6 @@ function resolvePython() {
   throw new Error("no Python matching the lock is on PATH; pass --python <exe>");
 }
 
-const python = resolvePython();
 const wheelsDir = join(STAGING, "wheels");
 
 /*
@@ -138,23 +137,49 @@ function markerBody(entries) {
   );
 }
 
+/**
+ * Copy a tree with the fastest tool available.
+ *
+ * `fs.cp` walks 30k files in JavaScript and took ~5 minutes for 1.1 GB on this
+ * machine; robocopy does the same in seconds and ships with Windows. The JS path
+ * stays as the fallback so the script still works on macOS and Linux.
+ */
+async function copyTree(from, to) {
+  await rm(to, { recursive: true, force: true });
+  await mkdir(dirname(to), { recursive: true });
+  if (process.platform === "win32") {
+    const result = spawnSync(
+      "robocopy",
+      // /MT:16 matters on a workstation running several agents at once: the copy
+      // is 30k small files, and single-threaded it crawls.
+      [from, to, "/E", "/MT:16", "/NFL", "/NDL", "/NJH", "/NJS", "/NP", "/XD", "__pycache__"],
+      { stdio: "ignore" },
+    );
+    // robocopy reports 0-7 for success (8+ is a real failure).
+    if (result.status !== null && result.status < 8) return;
+    throw new Error(`robocopy failed with ${result.status ?? result.error}`);
+  }
+  await cp(from, to, {
+    recursive: true,
+    force: true,
+    filter: (source) => !source.split(/[\\/]/).includes("__pycache__"),
+  });
+}
+
 const siteDir = join(cacheRoot, "site-packages");
 if (!REFRESH && readFingerprint(outMarker) === fingerprint && existsSync(join(OUT, "site-packages"))) {
   console.log("  already assembled for this lock; nothing to do");
   process.exit(0);
 }
 if (!REFRESH && readFingerprint(cacheMarker) === fingerprint && existsSync(siteDir)) {
+  // No interpreter needed: a cached tree is a copy, not an install.
   const started = Date.now();
-  await rm(OUT, { recursive: true, force: true });
-  await mkdir(dirname(OUT), { recursive: true });
-  await cp(cacheRoot, OUT, {
-    recursive: true,
-    force: true,
-    filter: (source) => !source.split(/[\\/]/).includes("__pycache__"),
-  });
+  await copyTree(cacheRoot, OUT);
   console.log(`  reused the cached tree → ${resolve(OUT)} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
   process.exit(0);
 }
+
+const python = resolvePython();
 
 await mkdir(STAGING, { recursive: true });
 await mkdir(wheelsDir, { recursive: true });
@@ -238,13 +263,7 @@ const installed = await readdir(siteDir);
 await writeFile(cacheMarker, markerBody(installed.length));
 const copyStarted = Date.now();
 // Publish the cached tree to the image; the cache stays authoritative.
-await rm(OUT, { recursive: true, force: true });
-await mkdir(dirname(OUT), { recursive: true });
-await cp(cacheRoot, OUT, {
-  recursive: true,
-  force: true,
-  filter: (source) => !source.split(/[\\/]/).includes("__pycache__"),
-});
+await copyTree(cacheRoot, OUT);
 console.log(
   `assembled: ${installed.length} entries, ${wheels.length} wheels → ${resolve(OUT)} (copied in ${((Date.now() - copyStarted) / 1000).toFixed(1)}s)`,
 );
