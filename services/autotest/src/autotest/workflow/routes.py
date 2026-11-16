@@ -714,10 +714,16 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 continue
             assertions[title] = generated.body
         authored = script_service.author_scripts(cases, body.sdk, assertions)
-        # 缺契约的功能点：骨架补不上断言就是卡在这里，摘要必须说出来
+        # 缺契约的功能点：骨架补不上断言就是卡在这里，摘要必须说出来。
+        # 注意只统计 missing_contract —— 契约写了但条款没数值也会记 note，
+        # 那是另一类问题，混进来会把"缺契约"的数字报大。
+        missing_notes = [note for note in contract_notes if note.get("reason") == "missing_contract"]
         missing_points = sorted(
-            {note["function_point"] for note in contract_notes if note.get("function_point")}
+            {note["function_point"] for note in missing_notes if note.get("function_point")}
         )
+        no_number_notes = [
+            note for note in contract_notes if str(note.get("reason") or "").startswith("用例没有条款数值")
+        ]
         # 脚本规则同样要可判定：骨架写成 assert True 或忘记 skip，执行器一跑就是绿的
         script_judgement = consistency.check_scripts(authored["scripts"])
 
@@ -782,8 +788,13 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
                 f"生成 {len(created)} 个脚本"
                 + (f"（其中 {len(assertions)} 个带契约断言）" if assertions else "")
                 + (
-                    f"，{len(missing_points)} 个功能点还缺被测件契约（对应脚本只能是骨架）"
+                    f"，{len(missing_points)} 个功能点还缺被测件契约（{len(missing_notes)} 条用例只能是骨架）"
                     if missing_points
+                    else ""
+                )
+                + (
+                    f"，另有 {len(no_number_notes)} 条用例的条款里没有数值，断言无从生成"
+                    if no_number_notes
                     else ""
                 )
                 + (f"，保留 {len(preserved)} 个已补断言的脚本" if preserved else "")
@@ -823,10 +834,9 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         "asserted_generated": len(assertions),
         "skeleton_remaining": len(created) - len(assertions) - len(preserved),
         "contract_notes": contract_notes[:20],
-        "contract_missing_total": sum(
-            1 for note in contract_notes if note.get("reason") == "missing_contract"
-        ),
+        "contract_missing_cases": len(missing_notes),
         "contract_missing_points": missing_points,
+        "notes_without_numbers": len(no_number_notes),
         "vacuity": vacuity_report,
         "prompt": _prompt_marker("script-author"),
         "consistency": script_judgement,
@@ -836,7 +846,11 @@ def script_author(project_id: str, body: ScriptAuthorIn) -> dict:
         summary += f"；保留 {len(preserved)} 个已补断言的脚本（要重出请传 overwrite=true）"
     if missing_points:
         # 骨架补不上断言就卡在这里：摘要里必须说清是"缺被测件契约"，不是"生成完了"
-        summary += f"；{len(missing_points)} 个功能点还缺被测件契约"
+        summary += (
+            f"；{len(missing_points)} 个功能点还缺被测件契约（{len(missing_notes)} 条用例只能是骨架）"
+        )
+    if no_number_notes:
+        summary += f"；另有 {len(no_number_notes)} 条用例的条款里没有数值，断言无从生成"
     return _envelope(summary, data, body.run_id)
 
 

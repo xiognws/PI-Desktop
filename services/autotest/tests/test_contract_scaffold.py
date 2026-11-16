@@ -92,6 +92,11 @@ def test_script_author_summary_names_the_missing_contract(client, project):
     body = client.post(
         f"/api/projects/{project['id']}/workflow/script-author", json={"run_id": run_id}
     ).json()
-    assert body["data"]["contract_missing_total"] >= 1
-    assert body["data"]["contract_missing_points"]
+    data = body["data"]
+    assert data["contract_missing_cases"] >= 1
+    assert data["contract_missing_points"]
     assert "还缺被测件契约" in body["summary"]
+    # 缺契约的点数不能把"条款没数值"的点混进来（那是另一类问题）
+    assert set(data["contract_missing_points"]) <= {
+        note["function_point"] for note in data["contract_notes"]
+    }

@@ -46,6 +46,7 @@ const NAV: { group: string; items: { path: string; name: string }[] }[] = [
     items: [
       { path: 'requirements', name: '项目资料' },
       { path: 'knowledge', name: '知识库' },
+      { path: 'contract', name: '被测件契约' },
     ],
   },
   { group: '其他', items: [{ path: 'settings', name: '设置' }] },
