@@ -34,6 +34,10 @@ each phase is additive on `main`.
 | `turn` | the loop: request → stream → tools → repeat | `agent/conversation_loop.py` |
 | `session` | transcript, tool-pair repair | `agent/turn_recovery.py` |
 | `skills` | skill catalog (id/name/description + 60-char index cap), catalog budget gate, the `Skill` tool (listing answered here, body loaded by the host) | `tools/skills_tool.py`, catalog block of `agent/system_prompt.py` |
+| `memory` | the `memory` tool: `remember` (single and batched), `update`, `forget`, `search` over `memory.*`, scope coherence, procedure gate, credential masking | `tools/memory*.py`, `memory-agent-tool.ts` |
+| `memory_context` | per-turn recall rendered as one `<memory_context>` block in the user message | `memory-context.ts` |
+| `skill_overlap` | the procedure-versus-fact gate and the "which skill covers this" hint | `memory-skill-overlap.ts` |
+| `redaction` | credential vocabulary and the scrub applied on the way out (memory, outbound text) | `packages/shared/src/redaction.ts` |
 | `context` | window/hard-limit/trigger arithmetic, token estimate anchored on provider usage | `agent/context_compressor.py` |
 | `compaction` | cut point, summary request, retained tail, fallback selection | `agent/context_compressor.py`, `agent/conversation_compression.py` |
 
@@ -78,7 +82,7 @@ printf '%s\n' \
 | 3b-3 | loop integration (gate before every step, compact in place), provider-written summary with retry on transient failure, `agent.compact`, `compaction_start`/`compaction_end` events | **done** |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5a | skills: catalog parsing (sorted, deduplicated), 60-character index cap, 8k catalog budget gate, Skills prompt section, `Skill` tool with a kernel-answered listing and host-delegated body load | **done** |
-| 5b | memory store (`memory.remember/recall/update/forget` over the host) | |
+| 5b | memory: the `memory` tool over `memory.remember/update/forget/recall` (single and 50-item batch writes, scope coherence, procedure gate naming the skill to patch, credential masking), per-turn `<memory_context>` recall injected into the user message, `AgentError::Refused` for model-fixable tool refusals | **done** |
 | 6 | MCP client, cron/scheduled runs, subagent delegation | |
 | 7 | packaging: single exe, switch `runtime/sidecar.ts`, differential parity run, delete `packages/agent-runtime` | |
 
@@ -89,7 +93,13 @@ scope a phase, not a guess.
 
 - One module, one responsibility. Business rules do not live in the binary.
 - Tool failures are results, not turn failures — the model must be able to
-  recover from them.
+  recover from them. A refusal the model can fix (`AgentError::Refused`) reaches
+  it as its own sentence, with no wrapper.
+- Memory recall is opt-in per prompt: `agent.prompt` carries `memoryRecall: true`
+  when the host offers memory, and the kernel then issues one bounded
+  `memory.recall` (`<memory_context>` into the user message, never the system
+  prompt). Without the flag no recall request is made at all, which is what keeps
+  an older host's request sequence unchanged.
 - No network, clock, filesystem or credential in a unit test: scripted provider
   and in-memory transcript only. Real-provider behaviour is tested at the
   transport phase with recorded fixtures.

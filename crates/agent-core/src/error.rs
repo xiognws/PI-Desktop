@@ -27,6 +27,11 @@ pub enum AgentError {
     StepLimit { limit: usize },
     #[error("invalid request: {0}")]
     Invalid(String),
+    /// A tool call the tool itself refused, with a sentence written for the
+    /// model: which argument is wrong and what to do instead. Rendered as the
+    /// result text alone — a wrapper would bury the instruction the model needs.
+    #[error("{0}")]
+    Refused(String),
     #[error("stream ended before the provider finished the response")]
     IncompleteStream,
     #[error("transport: {0}")]
@@ -48,6 +53,7 @@ impl AgentError {
             Self::Cancelled => "TURN_CANCELLED",
             Self::StepLimit { .. } => "STEP_LIMIT",
             Self::Invalid(_) => "INVALID_REQUEST",
+            Self::Refused(_) => "TOOL_REFUSED",
             Self::IncompleteStream => "INCOMPLETE_STREAM",
             Self::Transport(_) => "TRANSPORT_ERROR",
             Self::Host { code, .. } => code,

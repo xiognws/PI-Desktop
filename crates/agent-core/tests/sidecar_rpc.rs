@@ -407,3 +407,68 @@ async fn without_a_catalog_the_skill_tool_is_not_offered() {
         "the tool is absent from the session: {raw}"
     );
 }
+
+#[tokio::test]
+async fn memory_recall_is_requested_only_when_the_prompt_offers_it() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "text": "answered", "turns": 3},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+
+    // A prompt that says the host has memory: the kernel asks once, before the
+    // turn's first request.
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1",
+            "prompt": "how long is the build",
+            "projectPath": "D:/repo",
+            "memoryRecall": true
+        }),
+    )
+    .await;
+    // The host never answers here, so recall times out and the turn proceeds.
+    let host_call = lines
+        .wait_for_message("host.proxy", Duration::from_secs(5))
+        .await
+        .expect("a host call");
+    assert_eq!(host_call["params"]["method"], "memory.recall");
+    assert_eq!(host_call["params"]["params"]["projectPath"], "D:/repo");
+    assert_eq!(host_call["params"]["params"]["sessionId"], "s1");
+    assert_eq!(host_call["params"]["params"]["limit"], 5);
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(15))
+        .await
+        .expect("the turn finishes without memory");
+
+    // A prompt that does not offer it: no further recall request, and the same
+    // session still answers. An older host therefore sees the request sequence
+    // it always saw.
+    let before = lines.notifications("host.proxy").len();
+    call(
+        &sidecar,
+        3,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t2", "prompt": "and the tests?"}),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(15))
+        .await
+        .expect("the second turn finishes");
+    assert_eq!(
+        lines.notifications("host.proxy").len(),
+        before,
+        "no recall without the capability flag"
+    );
+}

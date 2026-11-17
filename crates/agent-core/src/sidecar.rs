@@ -484,7 +484,9 @@ impl Sidecar {
 
         {
             let mut transcript = session.transcript.lock().await;
-            let mut message = Message::user_text(text);
+            // The transcript keeps the user's own text; the recall query below
+            // reads the same string, so the row and the query cannot drift.
+            let mut message = Message::user_text(text.clone());
             // The renderer already drew this row optimistically; keeping its id
             // is what lets main reconcile instead of duplicating it.
             if let Some(id) = request.str_param("userMessageId") {
@@ -519,6 +521,31 @@ impl Sidecar {
         }) {
             config.model = model.to_string();
         }
+        // Durable memory: only when this prompt says the host offers it. A host
+        // without memory gets no recall round trip, which is what keeps the
+        // request sequence of an older host unchanged.
+        let memory_prefix = if matches!(mode, crate::prompt::SessionMode::Agent)
+            && request
+                .params
+                .get("memoryRecall")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        {
+            let project_path = request
+                .str_param("projectPath")
+                .or_else(|| request.str_param("workspaceRoot"));
+            crate::memory_context::recall_prefix(
+                &*self.bridge,
+                &text,
+                project_path,
+                Some(session_id.as_str()),
+                crate::memory_context::RECALL_LIMIT,
+            )
+            .await
+        } else {
+            None
+        };
+
         let tools = self
             .tools
             .lock()
@@ -527,16 +554,32 @@ impl Sidecar {
         // `Skill` exists only when a library exists, and only in the mode that may
         // write one — the same gate the desktop runtime uses. A tool whose only
         // honest answer is "there is nothing here" is noise in every request.
-        let tools = if !catalog.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
+        let mut extra: Vec<Arc<dyn crate::Tool>> = Vec::new();
+        if !catalog.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
             // An id lookup is forwarded to the host's own `Skill` handler when
             // main declared one; the listing is answered here.
             let load = tools.get(crate::skills::SKILL_TOOL_NAME);
-            Arc::new(tools.extended(vec![Arc::new(crate::skills::SkillTool::new(
+            extra.push(Arc::new(crate::skills::SkillTool::new(
                 session.skills.clone(),
                 load,
-            ))]))
-        } else {
+            )));
+        }
+        if matches!(mode, crate::prompt::SessionMode::Agent) {
+            // Memory writes and reads are host RPCs; the store, the dedupe and
+            // the scope filtering stay in one place.
+            extra.push(Arc::new(crate::memory::MemoryTool::new(
+                self.bridge.clone(),
+                request
+                    .str_param("projectPath")
+                    .or_else(|| request.str_param("workspaceRoot"))
+                    .map(str::to_string),
+                session.skills.clone(),
+            )));
+        }
+        let tools = if extra.is_empty() {
             tools
+        } else {
+            Arc::new(tools.extended(extra))
         };
         let engine = TurnEngine::new(
             provider,
@@ -551,7 +594,8 @@ impl Sidecar {
         let engine = match model_limits_from(request) {
             Some(limits) => engine.with_model_limits(limits),
             None => engine,
-        };
+        }
+        .with_memory_prefix(memory_prefix);
 
         let task_session = session.clone();
         let task_session_id = session_id.clone();

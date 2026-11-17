@@ -93,6 +93,10 @@ pub struct TurnEngine {
     /// never compacts: a caller that does not know the window cannot be told
     /// its request was too large.
     model_limits: Option<ModelLimits>,
+    /// Durable memories relevant to this turn's prompt. Prepended to the user
+    /// message while a request is built, never written into the transcript: the
+    /// row the UI shows stays exactly what the user typed.
+    memory_prefix: Option<String>,
 }
 
 impl TurnEngine {
@@ -107,6 +111,7 @@ impl TurnEngine {
             sink,
             steering: None,
             model_limits: None,
+            memory_prefix: None,
         }
     }
 
@@ -120,6 +125,12 @@ impl TurnEngine {
     /// Attach the model's context facts, which enables automatic compaction.
     pub fn with_model_limits(mut self, limits: ModelLimits) -> Self {
         self.model_limits = Some(limits);
+        self
+    }
+
+    /// Attach the recalled memory block for this turn.
+    pub fn with_memory_prefix(mut self, prefix: Option<String>) -> Self {
+        self.memory_prefix = prefix;
         self
     }
 
@@ -208,7 +219,13 @@ impl TurnEngine {
                 }
             }
 
-            let mut request = ChatRequest::new(&config.model, transcript.messages().to_vec());
+            let messages = match &self.memory_prefix {
+                Some(prefix) => {
+                    crate::memory_context::prepend_to_last_user(transcript.messages(), prefix)
+                }
+                None => transcript.messages().to_vec(),
+            };
+            let mut request = ChatRequest::new(&config.model, messages);
             request.system = config.system.clone();
             request.tools = self.tools.specs();
             request.temperature = config.temperature;
