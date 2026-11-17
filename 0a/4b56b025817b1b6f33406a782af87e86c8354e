@@ -1,0 +1,26 @@
+crates/agent-core/src/error.rs
+  h_201ed4c689ac8b 17-19,100,113,117-128
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 46
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 176-187,201-202
+crates/agent-core/src/retry.rs
+  h_201ed4c689ac8b 1-244
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 605-610,628,703-708,724,828,1321,1355-1357
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 49-54,66,254-322,837-848
+crates/agent-core/tests/turn_retry.rs
+  h_201ed4c689ac8b 1-187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0a4b56b025817b1b6f33406a782af87e86c8354e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
