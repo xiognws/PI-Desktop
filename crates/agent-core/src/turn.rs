@@ -60,10 +60,18 @@ pub struct TurnOutcome {
     pub stop_reason: StopReason,
 }
 
+/// Where a running turn looks for messages the user sent while it was working.
+/// The sidecar owns the queue; the loop only drains it, which keeps the loop
+/// free of RPC concerns and testable with a plain vector.
+pub trait SteeringSource: Send + Sync {
+    fn drain(&self) -> Vec<Message>;
+}
+
 pub struct TurnEngine {
     provider: Arc<dyn Provider>,
     tools: Arc<ToolRegistry>,
     sink: Arc<dyn EventSink>,
+    steering: Option<Arc<dyn SteeringSource>>,
 }
 
 impl TurnEngine {
@@ -76,7 +84,15 @@ impl TurnEngine {
             provider,
             tools,
             sink,
+            steering: None,
         }
+    }
+
+    /// Attach the queue a steer lands in. Without it the turn ignores steering
+    /// entirely, which is what the self-check and the loop tests want.
+    pub fn with_steering(mut self, source: Arc<dyn SteeringSource>) -> Self {
+        self.steering = Some(source);
+        self
     }
 
     fn emit(&self, session_id: &str, turn_id: &str, event: AgentEvent) {
@@ -126,13 +142,24 @@ impl TurnEngine {
                 return Err(AgentError::Cancelled);
             }
 
+            // A steer the user sent while this turn was working becomes an
+            // ordinary user row on the next step: the model sees it in the
+            // request that follows, and the transcript keeps the order it was
+            // typed in.
+            if let Some(steering) = &self.steering {
+                for message in steering.drain() {
+                    added_ids.push(message.id.clone());
+                    transcript.push(message.clone());
+                    self.emit(session_id, turn_id, AgentEvent::MessageEnd { message });
+                }
+            }
+
             let mut request = ChatRequest::new(&config.model, transcript.messages().to_vec());
             request.system = config.system.clone();
             request.tools = self.tools.specs();
             request.temperature = config.temperature;
             request.max_output_tokens = config.max_output_tokens;
             request.thinking = config.thinking;
-
             let assembled = match self.run_step(session_id, turn_id, request, &cancel).await {
                 Ok(assembled) => assembled,
                 Err(error) => {

@@ -50,7 +50,7 @@ pub use sidecar::{LineSink, Sidecar};
 pub use tool::{
     AllowAll, DenyList, Permission, PermissionGate, Tool, ToolContext, ToolRegistry, ToolSpec,
 };
-pub use turn::{TurnConfig, TurnEngine, TurnOutcome};
+pub use turn::{SteeringSource, TurnConfig, TurnEngine, TurnOutcome};
 
 /// Crate version, surfaced by the sidecar handshake.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

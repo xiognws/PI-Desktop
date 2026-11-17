@@ -45,11 +45,30 @@ async fn health_reports_the_rust_runtime() {
 }
 
 #[tokio::test]
-async fn configure_alone_is_enough_to_report_a_provider() {
+async fn configure_records_host_metadata_and_accepts_no_provider() {
     let (sidecar, _) = sidecar();
-    let response = call(&sidecar, 1, "sidecar.configure", scripted_configure()).await;
-    assert_eq!(response["result"]["model"], "scripted-model");
-    let health = call(&sidecar, 2, "sidecar.health", json!({})).await;
+    // Main's real payload: host identity, data dir, proxy settings.
+    let response = call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "hostBinary": "pi-desktop-host-core.exe",
+            "dataDir": "C:/data/pi",
+            "networkProxy": {"mode": "system"},
+        }),
+    )
+    .await;
+    assert_eq!(response["result"]["ok"], true);
+    assert_eq!(response["result"]["mode"], "host-proxy");
+    assert_eq!(response["result"]["providerDeclared"], false);
+    assert_eq!(response["result"]["tools"], 0);
+
+    // A harness may still declare a provider here; that is a shortcut, not the
+    // product path (a prompt carries its own).
+    let response = call(&sidecar, 2, "sidecar.configure", scripted_configure()).await;
+    assert_eq!(response["result"]["providerDeclared"], true);
+    let health = call(&sidecar, 3, "sidecar.health", json!({})).await;
     assert_eq!(health["result"]["providerConfigured"], true);
 }
 

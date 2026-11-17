@@ -153,8 +153,14 @@ impl LineSink for RecordingLines {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct RuntimeConfig {
+    /// Host metadata from `sidecar.configure`. Main sends host identity, the
+    /// data directory and proxy settings — not model credentials, which arrive
+    /// per prompt (`params.provider`), exactly as the Node sidecar expects.
+    host_binary: Option<String>,
+    data_dir: Option<String>,
+    network_proxy: Option<Value>,
     model: String,
     system: Option<String>,
     max_steps: usize,
@@ -162,14 +168,11 @@ struct RuntimeConfig {
     max_output_tokens: Option<u32>,
 }
 
-impl Default for RuntimeConfig {
-    fn default() -> Self {
+impl RuntimeConfig {
+    fn new() -> Self {
         Self {
-            model: String::new(),
-            system: None,
             max_steps: 24,
-            temperature: None,
-            max_output_tokens: None,
+            ..Self::default()
         }
     }
 }
@@ -179,6 +182,10 @@ struct Session {
     cancel: Mutex<CancelToken>,
     running: AtomicBool,
     current_turn: Mutex<Option<String>>,
+    /// Messages a user sent while the turn was running. Drained by the loop
+    /// between steps, so a steer reaches the model on the next request instead
+    /// of waiting for the turn to finish.
+    steering: Mutex<std::collections::VecDeque<Message>>,
 }
 
 impl Session {
@@ -188,7 +195,17 @@ impl Session {
             cancel: Mutex::new(CancelToken::new()),
             running: AtomicBool::new(false),
             current_turn: Mutex::new(None),
+            steering: Mutex::new(std::collections::VecDeque::new()),
         }
+    }
+}
+
+impl crate::turn::SteeringSource for Session {
+    fn drain(&self) -> Vec<Message> {
+        self.steering
+            .lock()
+            .map(|mut queue| queue.drain(..).collect())
+            .unwrap_or_default()
     }
 }
 
@@ -222,7 +239,7 @@ impl Sidecar {
             provider: Mutex::new(None),
             tools: Mutex::new(Arc::new(ToolRegistry::new(gate.clone()))),
             gate,
-            config: Mutex::new(RuntimeConfig::default()),
+            config: Mutex::new(RuntimeConfig::new()),
             sessions: Mutex::new(HashMap::new()),
         }
     }
@@ -263,30 +280,38 @@ impl Sidecar {
             })),
             "sidecar.configure" => self.configure(request),
             "agent.prompt" | "agent.turn" => self.prompt(request).await,
+            "agent.steer" => self.steer(request),
+            "agent.steeringContext" => self.steering_context(request),
             "agent.abort" => self.abort(request),
             "agent.getStatus" => self.get_status(request),
             "agent.disposeSession" => self.dispose_session(request),
             "native.session.get" => self.session_get(request).await,
+            "native.session.list" => self.session_list(request),
+            "native.session.fork" => self.session_fork(request).await,
+            "native.session.search" => self.session_search(request).await,
             other => Err(RpcError::method_not_found(other)),
         }
     }
 
     fn configure(&self, request: &Request) -> Result<Value, RpcError> {
-        let provider_spec = request
-            .params
-            .get("provider")
-            .ok_or_else(|| RpcError::invalid_params("`provider` is required"))?;
-        let provider: Arc<dyn Provider> = build_provider(provider_spec)?;
-
+        // Main's payload is host metadata, not credentials: keep it opaque and
+        // answer with what was accepted. A provider here is a harness shortcut
+        // for tests and the self-check; a real prompt carries its own.
         let mut config = self
             .config
             .lock()
             .map_err(|_| RpcError::internal("config lock poisoned"))?;
-        config.model = request
-            .str_param("model")
-            .map(str::to_string)
-            .unwrap_or_else(|| provider.name().to_string());
-        config.system = request.str_param("system").map(str::to_string);
+        config.host_binary = request.str_param("hostBinary").map(str::to_string);
+        config.data_dir = request.str_param("dataDir").map(str::to_string);
+        if let Some(proxy) = request.params.get("networkProxy") {
+            config.network_proxy = Some(proxy.clone());
+        }
+        if let Some(system) = request.str_param("system") {
+            config.system = Some(system.to_string());
+        }
+        if let Some(model) = request.str_param("model") {
+            config.model = model.to_string();
+        }
         if let Some(steps) = request.params.get("maxSteps").and_then(Value::as_u64) {
             config.max_steps = steps.max(1) as usize;
         }
@@ -300,32 +325,53 @@ impl Sidecar {
             .get("maxOutputTokens")
             .and_then(Value::as_u64)
             .map(|value| value as u32);
-        let model = config.model.clone();
         drop(config);
 
-        *self
-            .provider
-            .lock()
-            .map_err(|_| RpcError::internal("provider lock poisoned"))? = Some(provider);
-
-        // Tool declarations come from the host: it is the side that owns the
-        // tool set, and every call is served by `tools.execute` rather than by
-        // kernel code.
-        let mut declared = 0usize;
-        if let Some(tools) = request.params.get("tools").and_then(Value::as_array) {
-            let mut registry = ToolRegistry::new(self.gate.clone());
-            for declaration in tools {
-                let spec = tool_spec_from_value(declaration).map_err(RpcError::invalid_params)?;
-                registry.register(Arc::new(HostTool::new(spec, self.bridge.clone())));
-                declared += 1;
-            }
+        let mut provider_declared = false;
+        if let Some(spec) = request.params.get("provider") {
+            let provider = build_provider(spec)?;
             *self
-                .tools
+                .provider
                 .lock()
-                .map_err(|_| RpcError::internal("tool lock poisoned"))? = Arc::new(registry);
+                .map_err(|_| RpcError::internal("provider lock poisoned"))? = Some(provider);
+            provider_declared = true;
         }
 
-        Ok(json!({ "model": model, "tools": declared }))
+        let tools = match request.params.get("tools").and_then(Value::as_array) {
+            Some(declarations) => self.install_tools(declarations)?,
+            None => {
+                let count = self
+                    .tools
+                    .lock()
+                    .map_err(|_| RpcError::internal("tool lock poisoned"))?
+                    .specs()
+                    .len();
+                json!(count)
+            }
+        };
+
+        Ok(json!({
+            "ok": true,
+            "mode": "host-proxy",
+            "providerDeclared": provider_declared,
+            "tools": tools,
+        }))
+    }
+
+    /// Replace the tool set with host declarations: every call is served by
+    /// `tools.execute` rather than by kernel code.
+    fn install_tools(&self, declarations: &[Value]) -> Result<Value, RpcError> {
+        let mut registry = ToolRegistry::new(self.gate.clone());
+        for declaration in declarations {
+            let spec = tool_spec_from_value(declaration).map_err(RpcError::invalid_params)?;
+            registry.register(Arc::new(HostTool::new(spec, self.bridge.clone())));
+        }
+        let count = declarations.len();
+        *self
+            .tools
+            .lock()
+            .map_err(|_| RpcError::internal("tool lock poisoned"))? = Arc::new(registry);
+        Ok(json!(count))
     }
 
     fn session(&self, session_id: &str) -> Result<Arc<Session>, RpcError> {
@@ -341,22 +387,38 @@ impl Sidecar {
 
     async fn prompt(&self, request: &Request) -> Result<Value, RpcError> {
         let session_id = request.require_str("sessionId")?.to_string();
+        // Main sends `content`; `prompt`/`text` stay accepted so a harness does
+        // not have to mimic the renderer.
         let text = request
-            .str_param("prompt")
+            .str_param("content")
+            .or_else(|| request.str_param("prompt"))
             .or_else(|| request.str_param("text"))
-            .ok_or_else(|| RpcError::invalid_params("`prompt` must be a string"))?
+            .ok_or_else(|| RpcError::invalid_params("`content` must be a string"))?
             .to_string();
-        let provider = self
-            .provider
-            .lock()
-            .map_err(|_| RpcError::internal("provider lock poisoned"))?
-            .clone()
-            .ok_or_else(|| {
-                RpcError::app(
-                    "PROVIDER_NOT_CONFIGURED",
-                    "sidecar.configure must run before agent.prompt",
-                )
-            })?;
+        // A prompt carries its own provider: main stamps the session's model and
+        // credentials on every turn. The configured provider is only a fallback
+        // for harnesses and the self-check.
+        let provider = match request
+            .params
+            .get("provider")
+            .filter(|value| !value.is_null())
+        {
+            Some(spec) => build_provider(spec)?,
+            None => self
+                .provider
+                .lock()
+                .map_err(|_| RpcError::internal("provider lock poisoned"))?
+                .clone()
+                .ok_or_else(|| {
+                    RpcError::app(
+                        "PROVIDER_NOT_CONFIGURED",
+                        "the prompt carries no provider and none is configured",
+                    )
+                })?,
+        };
+        if let Some(declarations) = request.params.get("tools").and_then(Value::as_array) {
+            self.install_tools(declarations)?;
+        }
 
         let session = self.session(&session_id)?;
         // One turn at a time, per session: the flag is the admission gate.
@@ -383,14 +445,29 @@ impl Sidecar {
 
         {
             let mut transcript = session.transcript.lock().await;
-            transcript.push(Message::user_text(text));
+            let mut message = Message::user_text(text);
+            // The renderer already drew this row optimistically; keeping its id
+            // is what lets main reconcile instead of duplicating it.
+            if let Some(id) = request.str_param("userMessageId") {
+                message.id = id.to_string();
+            }
+            transcript.push(message);
         }
 
-        let config = self
+        let mut config = self
             .config
             .lock()
             .map_err(|_| RpcError::internal("config lock poisoned"))?
             .clone();
+        if let Some(model) = request.str_param("modelId").or_else(|| {
+            request
+                .params
+                .get("provider")
+                .and_then(|provider| provider.get("modelId"))
+                .and_then(Value::as_str)
+        }) {
+            config.model = model.to_string();
+        }
         let tools = self
             .tools
             .lock()
@@ -402,7 +479,8 @@ impl Sidecar {
             Arc::new(NotificationSink {
                 out: self.out.clone(),
             }),
-        );
+        )
+        .with_steering(session.clone());
 
         let task_session = session.clone();
         let task_session_id = session_id.clone();
@@ -447,7 +525,102 @@ impl Sidecar {
             }
         });
 
-        Ok(json!({ "sessionId": session_id, "turnId": turn_id }))
+        Ok(json!({ "accepted": true, "sessionId": session_id, "turnId": turn_id }))
+    }
+
+    /// Queue a message into the running turn. It reaches the model on the next
+    /// step, and the loop emits it as a user row so the transcript keeps the
+    /// order the user typed it in.
+    fn steer(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let content = request
+            .str_param("content")
+            .or_else(|| request.str_param("text"))
+            .ok_or_else(|| RpcError::invalid_params("`content` must be a string"))?
+            .to_string();
+
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?;
+        let Some(session) = sessions.get(session_id) else {
+            return Err(RpcError::app("TURN_NOT_FOUND", "no active turn to steer"));
+        };
+        if !session.running.load(Ordering::SeqCst) {
+            return Err(RpcError::app("TURN_NOT_FOUND", "no active turn to steer"));
+        }
+        let current = session
+            .current_turn
+            .lock()
+            .map_err(|_| RpcError::internal("turn lock poisoned"))?
+            .clone();
+        if let Some(expected) = request
+            .str_param("expectedTurnId")
+            .filter(|value| !value.is_empty())
+        {
+            if current.as_deref() != Some(expected) {
+                return Err(RpcError::app(
+                    "TURN_NOT_FOUND",
+                    "the turn changed since the steer was addressed",
+                ));
+            }
+        }
+
+        let mut message = Message::user_text(content);
+        if let Some(id) = request
+            .str_param("messageId")
+            .or_else(|| request.str_param("userMessageId"))
+        {
+            message.id = id.to_string();
+        }
+        session
+            .steering
+            .lock()
+            .map_err(|_| RpcError::internal("steering lock poisoned"))?
+            .push_back(message);
+
+        Ok(json!({ "accepted": true, "turnId": current }))
+    }
+
+    /// What a reconnecting renderer needs: the running turn and anything the
+    /// user queued for it that the turn has not consumed yet.
+    fn steering_context(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?;
+        let Some(session) = sessions.get(session_id) else {
+            return Ok(json!({
+                "turnId": Value::Null,
+                "pending": [],
+                "steering": false,
+            }));
+        };
+        let current = session
+            .current_turn
+            .lock()
+            .map_err(|_| RpcError::internal("turn lock poisoned"))?
+            .clone();
+        let addressed_to_current = request
+            .str_param("expectedTurnId")
+            .filter(|value| !value.is_empty())
+            .map(|expected| current.as_deref() == Some(expected))
+            .unwrap_or(true);
+        let pending: Vec<String> = if addressed_to_current {
+            session
+                .steering
+                .lock()
+                .map(|queue| queue.iter().map(|message| message.text()).collect())
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        Ok(json!({
+            "turnId": current,
+            "pending": pending,
+            "steering": session.running.load(Ordering::SeqCst),
+        }))
     }
 
     fn abort(&self, request: &Request) -> Result<Value, RpcError> {
@@ -457,15 +630,138 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("session lock poisoned"))?;
         let Some(session) = sessions.get(session_id) else {
-            return Ok(json!({ "aborted": false, "reason": "unknown session" }));
+            return Ok(json!({ "ok": false, "aborted": false, "reason": "unknown session" }));
         };
+        // An abort addressed at a turn that already ended is a no-op, not an
+        // error: the renderer's Stop may race the turn's own finish.
+        if let Some(expected) = request
+            .str_param("turnId")
+            .filter(|value| !value.is_empty())
+        {
+            let current = session
+                .current_turn
+                .lock()
+                .map_err(|_| RpcError::internal("turn lock poisoned"))?
+                .clone();
+            if current.as_deref() != Some(expected) {
+                return Ok(json!({ "ok": false, "aborted": false }));
+            }
+        }
         let running = session.running.load(Ordering::SeqCst);
         session
             .cancel
             .lock()
             .map_err(|_| RpcError::internal("cancel lock poisoned"))?
             .cancel();
-        Ok(json!({ "aborted": running }))
+        Ok(json!({ "ok": running, "aborted": running }))
+    }
+
+    /// Sessions this process owns. Until the kernel gains persistence these are
+    /// live, in-memory sessions — the store arrives with the host-core session
+    /// phase, and this method then reads from it instead of from the table.
+    fn session_list(&self, _request: &Request) -> Result<Value, RpcError> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?;
+        let mut out: Vec<Value> = Vec::with_capacity(sessions.len());
+        for (id, session) in sessions.iter() {
+            let (message_count, title) = match session.transcript.try_lock() {
+                Ok(transcript) => {
+                    let title = transcript
+                        .messages()
+                        .iter()
+                        .find(|message| message.role == crate::message::Role::User)
+                        .map(|message| snippet(&message.text(), 80))
+                        .unwrap_or_default();
+                    (transcript.len(), title)
+                }
+                // A running turn holds the transcript; report what is known.
+                Err(_) => (0, String::new()),
+            };
+            out.push(json!({
+                "id": id,
+                "messageCount": message_count,
+                "title": title,
+                "isRunning": session.running.load(Ordering::SeqCst),
+            }));
+        }
+        out.sort_by(|left, right| {
+            left["id"]
+                .as_str()
+                .unwrap_or_default()
+                .cmp(right["id"].as_str().unwrap_or_default())
+        });
+        Ok(json!({ "sessions": out }))
+    }
+
+    async fn session_fork(&self, request: &Request) -> Result<Value, RpcError> {
+        let source_id = request
+            .str_param("id")
+            .or_else(|| request.str_param("sessionId"))
+            .ok_or_else(|| RpcError::invalid_params("`id` must be a string"))?;
+        let source = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?
+            .get(source_id)
+            .cloned()
+            .ok_or_else(|| {
+                RpcError::app("SESSION_NOT_FOUND", format!("no session `{source_id}`"))
+            })?;
+        let target_id = request
+            .str_param("targetId")
+            .map(str::to_string)
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+        // Copy the messages, never the running turn: a fork is a new, idle
+        // conversation that starts from the same history.
+        let messages = source.transcript.lock().await.messages().to_vec();
+        let message_count = messages.len();
+        let target = self.session(&target_id)?;
+        *target.transcript.lock().await = Transcript::from_messages(messages);
+
+        Ok(json!({
+            "session": { "id": target_id, "messageCount": message_count },
+            "sourceId": source_id,
+        }))
+    }
+
+    async fn session_search(&self, request: &Request) -> Result<Value, RpcError> {
+        let query = request
+            .str_param("query")
+            .ok_or_else(|| RpcError::invalid_params("`query` must be a string"))?
+            .to_lowercase();
+        if query.is_empty() {
+            return Ok(json!({ "results": [] }));
+        }
+        let sessions: Vec<(String, Arc<Session>)> = {
+            let sessions = self
+                .sessions
+                .lock()
+                .map_err(|_| RpcError::internal("session lock poisoned"))?;
+            sessions
+                .iter()
+                .map(|(id, session)| (id.clone(), session.clone()))
+                .collect()
+        };
+
+        let mut results: Vec<Value> = Vec::new();
+        for (session_id, session) in sessions {
+            let transcript = session.transcript.lock().await;
+            for message in transcript.messages() {
+                let text = message.text();
+                if text.to_lowercase().contains(&query) {
+                    results.push(json!({
+                        "sessionId": session_id,
+                        "messageId": message.id,
+                        "role": message.role.as_str(),
+                        "snippet": snippet(&text, 160),
+                    }));
+                }
+            }
+        }
+        Ok(json!({ "results": results }))
     }
 
     fn get_status(&self, request: &Request) -> Result<Value, RpcError> {
@@ -631,4 +927,15 @@ fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
             "unknown provider kind `{other}`"
         ))),
     }
+}
+
+/// First `limit` characters of `text` with runs of whitespace collapsed, for
+/// titles and search snippets.
+fn snippet(text: &str, limit: usize) -> String {
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() <= limit {
+        return collapsed;
+    }
+    let head: String = collapsed.chars().take(limit).collect();
+    format!("{head}…")
 }

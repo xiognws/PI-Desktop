@@ -109,7 +109,8 @@ fn the_binary_speaks_the_sidecar_protocol_on_stdio() {
     };
 
     assert_eq!(by_id(1)["result"]["runtime"], "rust");
-    assert_eq!(by_id(2)["result"]["model"], "scripted-model");
+    assert_eq!(by_id(2)["result"]["providerDeclared"], true);
+    assert_eq!(by_id(3)["result"]["accepted"], true);
     assert_eq!(by_id(3)["result"]["turnId"], "pipe-turn");
 
     // The malformed frame produced a parse error with a null id.

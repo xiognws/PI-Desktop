@@ -67,7 +67,8 @@ printf '%s\n' \
 | 1 | message model, events, cancellation, SSE + OpenAI/Anthropic decode, tool registry and gate, turn loop, transcript repair, self-check binary | **done** |
 | 2a | NDJSON JSON-RPC codec, sidecar method surface (`sidecar.health/configure`, `agent.prompt/abort/getStatus/disposeSession`, `native.session.get`), HTTP transports over `reqwest`+`rustls` for both wires, `serve` mode over stdio | **done** |
 | 2b | host-core tool bridge: declarations arrive on `sidecar.configure`, each call travels back as `host.proxy` → `tools.execute`, answers map onto tool results | **done** |
-| 2c | provider/auth config read from host settings instead of the `configure` payload, remaining sidecar methods (`agent.steer`, `agent.compact`, `native.session.list/fork/search`) | next |
+| 2c | per-prompt provider (`params.provider`), `content`/`userMessageId` prompt fields, `agent.steer` + `agent.steeringContext` drained between steps, `native.session.list/fork/search`, abort addressed at a turn | **done** |
+| 2d | remaining gap for a real session: `agent.compact` (needs phase 3), persistence so `native.session.*` reads a store instead of live sessions, `sidecar.configure` network proxy actually applied to the HTTP client | next |
 | 3 | prompt composition and project instructions, context budget and compaction | |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5 | memory store and skills | |
