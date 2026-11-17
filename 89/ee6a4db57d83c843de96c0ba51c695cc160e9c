@@ -1,0 +1,36 @@
+Cargo.lock
+  h_201ed4c689ac8b 44
+crates/agent-core/Cargo.toml
+  h_201ed4c689ac8b 17,21
+crates/agent-core/README.md
+  h_201ed4c689ac8b 40,49-59,65-66
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 36,38,47
+crates/agent-core/src/main.rs
+  h_201ed4c689ac8b 196-252,269
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 1-578
+crates/agent-core/src/provider/mod.rs
+  h_201ed4c689ac8b 14,107
+crates/agent-core/src/rpc.rs
+  h_201ed4c689ac8b 1-297
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1-496
+crates/agent-core/tests/http_transport.rs
+  h_201ed4c689ac8b 1-284
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 1-238
+crates/agent-core/tests/stdio_protocol.rs
+  h_201ed4c689ac8b 1-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "89ee6a4db57d83c843de96c0ba51c695cc160e9c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
