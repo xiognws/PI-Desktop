@@ -93,11 +93,32 @@ printf '%s\n' \
 | 6b | delegation resume: a delegate that is still working (or settled with a report nobody read) keeps the parent turn open, its report is handed over as one resumed user turn — `DELEGATION_RESUME_PROMPT` plus `## agent (id) — status` blocks bounded at 50k characters, marked delivered before the request goes out — and a stopped or aborted delegate never keeps the turn open | **done** |
 | 6b- | delegation gaps left open on purpose: model overrides and configured fallbacks, `resume` chains, and the scratch spill file for oversized reports | note |
 | 6c | MCP selection: a composer's `mcpServerIds`/`mcpToolNames` resolve to the exact tool set those names authorize (exact identity, never a prefix match) and an unsatisfiable selection refuses the prompt with `COMPOSER_MCP_UNAVAILABLE`/`TOOL_DENIED`. The MCP *client* stays where it already is: host-core owns the server records (`crates/host-core/src/mcp_servers.rs`), Electron main owns the processes, handshakes and `callTool`, and the kernel only ever sees MCP tools as host-declared tools | **done** |
-| 6d | cron/scheduled runs | |
-| 7 | packaging: single exe, switch `runtime/sidecar.ts`, differential parity run, delete `packages/agent-runtime` | |
+| 6d | cron/scheduled runs: **no kernel work**. Host-core owns the records, the cadence and the automation pass (`crates/host-core/src/scheduled.rs`, 741 lines + `automation`/`timing`/`project`), and a run is an ordinary prompt against a session — which the kernel already serves. Nothing here spawns the agent itself | verified |
+| 7a | packaging, measured on commit `0a4b56b02`: `cargo build -p agent-core --release --offline` → **6.34 MiB** `pi-desktop-agent-core.exe`; imports only Windows system libraries (KERNEL32, ADVAPI32, bcrypt, bcryptprimitives, ntdll, ws2_32, dbghelp, api-ms-win-core-synch) — no Node, Python, OpenSSL or VC++ redistributable; `self-check` 6/6; a scripted NDJSON session over real stdio returns 3 responses and the full `agent_start…agent_end` event sequence | **done** |
+| 7b | switch `runtime/sidecar.ts` to spawn this binary, differential parity run against the Node sidecar, then delete `packages/agent-runtime` | next |
 
 Sizes being ported are recorded per component in ADR 0402; use that table to
 scope a phase, not a guess.
+
+## Packaging
+
+```bash
+cargo build -p agent-core --release --offline   # -> target/release/pi-desktop-agent-core.exe
+./target/release/pi-desktop-agent-core.exe self-check
+printf '%s
+' '{"jsonrpc":"2.0","id":1,"method":"sidecar.health","params":{}}'   | ./target/release/pi-desktop-agent-core.exe serve
+```
+
+Measured on Windows 11 / rustc 1.98 (release, `--offline`):
+
+- size **6.34 MiB**, one file, no installer;
+- imports only Windows system DLLs (KERNEL32, ADVAPI32, bcrypt, bcryptprimitives,
+  ntdll, ws2_32, dbghelp, api-ms-win-core-synch): nothing needs installing on the
+  target machine — TLS is `rustls`, and SQLite is host-core's, not this binary's;
+- `self-check` passes all 6 assertions, and a scripted NDJSON session over stdio
+  produces the three responses plus the full event sequence
+  (`agent_start`, `turn_start`, `message_start`, `message_update`, `message_end`,
+  `usage`, `turn_end`, `agent_end`).
 
 ## Conventions
 
