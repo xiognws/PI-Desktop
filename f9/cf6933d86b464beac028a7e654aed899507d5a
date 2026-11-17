@@ -1,0 +1,20 @@
+docs/spec/03-runtime/09-logging-and-observability.md
+  h_201ed4c689ac8b 235-247,277-279
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 966-972
+docs/zh-CN/spec/03-runtime/09-logging-and-observability.md
+  h_201ed4c689ac8b 168-176,203-204
+docs/zh-CN/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 433-436
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f9cf6933d86b464beac028a7e654aed899507d5a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
