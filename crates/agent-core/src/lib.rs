@@ -29,6 +29,7 @@
 //! provider transports, compaction, memory, skills, MCP, cron and delegation.
 
 pub mod cancel;
+pub mod context;
 pub mod error;
 pub mod event;
 pub mod host_bridge;

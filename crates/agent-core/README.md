@@ -33,6 +33,7 @@ each phase is additive on `main`.
 | `sidecar` | the method surface, session table, one turn per session, `agent.event` notifications | — |
 | `turn` | the loop: request → stream → tools → repeat | `agent/conversation_loop.py` |
 | `session` | transcript, tool-pair repair | `agent/turn_recovery.py` |
+| `context` | window/hard-limit/trigger arithmetic, token estimate anchored on provider usage | `agent/context_compressor.py` |
 
 ## Running it
 
@@ -70,7 +71,9 @@ printf '%s\n' \
 | 2c | per-prompt provider (`params.provider`), `content`/`userMessageId` prompt fields, `agent.steer` + `agent.steeringContext` drained between steps, `native.session.list/fork/search`, abort addressed at a turn | **done** |
 | 3a | system prompt composition: persona (`SYSTEM.md` replaces it), `APPEND_SYSTEM.md`, host tool guidance, the `AGENTS.md`/`CLAUDE.md` chain with per-directory precedence and separate global/project byte budgets, verbatim mode prompts | **done** |
 | 2d | remaining gap for a real session: `agent.compact` (needs 3b), persistence so `native.session.*` reads a store instead of live sessions, `sidecar.configure` network proxy actually applied to the HTTP client | next |
-| 3b | context budget and compaction (Hermes `context_compressor.py` 5,737 lines; desktop spec 5.1 checkpoint protection), then `agent.compact` | next |
+| 3b-1 | context budget: window ceiling, `hardLimit`, headroom, trigger at half, retained-tail target, usage-anchored token estimate | **done** |
+| 3b-2 | compaction: preflight, summary request, checkpoint cut point, retained tail | next |
+| 3b-3 | loop integration (compact between steps), `agent.compact`, `compaction_start`/`compaction_end` events | next |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5 | memory store and skills | |
 | 6 | MCP client, cron/scheduled runs, subagent delegation | |
