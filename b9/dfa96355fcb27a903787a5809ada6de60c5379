@@ -1,0 +1,22 @@
+apps/desktop/resources/plugins/billion-context/README.md
+  h_201ed4c689ac8b 16,22-25
+apps/desktop/resources/plugins/billion-context/SOURCES.md
+  h_201ed4c689ac8b 7-8
+apps/desktop/resources/plugins/billion-context/THIRD_PARTY_NOTICES.md
+  h_201ed4c689ac8b 4
+apps/desktop/resources/plugins/billion-context/agent-extension.mjs
+  h_201ed4c689ac8b 9
+apps/desktop/resources/plugins/billion-context/vendor/pi/billion-context.mjs
+  h_201ed4c689ac8b 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b9dfa96355fcb27a903787a5809ada6de60c5379",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
