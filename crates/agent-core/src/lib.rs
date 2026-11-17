@@ -36,6 +36,7 @@ pub mod delegate;
 pub mod error;
 pub mod event;
 pub mod host_bridge;
+pub mod mcp;
 pub mod memory;
 pub mod memory_context;
 pub mod message;

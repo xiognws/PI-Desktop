@@ -714,3 +714,75 @@ async fn a_prompt_that_declares_subagents_offers_the_task_tools() {
         "the delegate starts and Task returns immediately: {raw}"
     );
 }
+
+#[tokio::test]
+async fn an_mcp_selection_that_cannot_be_honoured_refuses_the_prompt() {
+    let (sidecar, _lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({"provider": {"kind": "scripted", "text": "answered"}, "model": "scripted-model"}),
+    )
+    .await;
+
+    // The declared catalog holds one MCP tool from the `files` server.
+    let declarations = json!([
+        {"name": "mcp_files_read", "description": "read a file", "parameters": {"type": "object"}, "mcpServerId": "files"},
+        {"name": "Read", "description": "read a file", "parameters": {"type": "object"}}
+    ]);
+    let refused = call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1",
+            "prompt": "read it",
+            "tools": declarations,
+            "mcpServerIds": ["nope"]
+        }),
+    )
+    .await;
+    assert_eq!(
+        refused["error"]["data"]["errorCode"],
+        "COMPOSER_MCP_UNAVAILABLE"
+    );
+
+    // A tool from a server that was not selected is refused too.
+    let refused = call(
+        &sidecar,
+        3,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1b",
+            "prompt": "read it",
+            "tools": declarations,
+            "mcpServerIds": ["files"],
+            "mcpToolNames": ["mcp_git_status"]
+        }),
+    )
+    .await;
+    assert_eq!(
+        refused["error"]["data"]["errorCode"],
+        "COMPOSER_MCP_UNAVAILABLE"
+    );
+
+    // The same selection without the impossible name is accepted.
+    let accepted = call(
+        &sidecar,
+        4,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1c",
+            "prompt": "read it",
+            "tools": declarations,
+            "mcpServerIds": ["files"],
+            "mcpToolNames": ["mcp_files_read"]
+        }),
+    )
+    .await;
+    assert_eq!(accepted["result"]["accepted"], true);
+}

@@ -468,6 +468,44 @@ impl Sidecar {
         if let Some(declarations) = request.params.get("tools").and_then(Value::as_array) {
             self.install_tools(declarations)?;
         }
+        // A composer can name MCP servers or exact tools. The answer is the set
+        // those names authorize — resolved by exact identity, never by the shape
+        // of a tool name — and a selection that cannot be honoured refuses the
+        // prompt instead of quietly running without the tool.
+        if request.params.get("mcpServerIds").is_some()
+            || request.params.get("mcpToolNames").is_some()
+        {
+            let identities: Vec<crate::mcp::McpToolIdentity> = request
+                .params
+                .get("tools")
+                .and_then(Value::as_array)
+                .map(|declarations| {
+                    declarations
+                        .iter()
+                        .filter_map(crate::mcp::McpToolIdentity::from_value)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let declared = self
+                .tools
+                .lock()
+                .map_err(|_| RpcError::internal("tool lock poisoned"))?
+                .clone();
+            let available = |name: &str| declared.contains(name);
+            match crate::mcp::resolve_mcp_tool_selection(
+                request.params.get("mcpServerIds"),
+                &identities,
+                &available,
+                request.params.get("mcpToolNames"),
+            ) {
+                Ok(names) => tracing::debug!(
+                    target: "agent_core::sidecar",
+                    count = names.len(),
+                    "mcp tools selected for this prompt"
+                ),
+                Err(error) => return Err(RpcError::app(error.code(), error.message())),
+            }
+        }
 
         let session = self.session(&session_id)?;
         // One turn at a time, per session: the flag is the admission gate.

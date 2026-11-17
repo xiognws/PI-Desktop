@@ -38,6 +38,7 @@ each phase is additive on `main`.
 | `memory_context` | per-turn recall rendered as one `<memory_context>` block in the user message | `memory-context.ts` |
 | `skill_overlap` | the procedure-versus-fact gate and the "which skill covers this" hint | `memory-skill-overlap.ts` |
 | `redaction` | credential vocabulary and the scrub applied on the way out (memory, outbound text) | `packages/shared/src/redaction.ts` |
+| `mcp` | MCP tool selection: exact server/tool identity resolution, never a name-prefix match, with `INVALID_ARGUMENT`/`COMPOSER_MCP_UNAVAILABLE`/`TOOL_DENIED` | `mcp-tool-selection.ts` |
 | `delegate` | subagents: `Task`/`TaskWait`/`TaskList`/`TaskStop`, per-session delegation registry with its own cancel, delegate prompt framing, bounded reports (12,000 chars, both ends kept) | `subagent.ts`, `delegation-chain.ts` |
 | `ask` | the `asktool` card: question validation (300 code points, ≤20 questions), duplicate-label collapse, `asktool_request` event, `asktool.resolve` validation, skipped answers on abort | `asktool` in `packages/shared/src/types/agent.ts`, spec `17-asktool-questions.md` |
 | `context` | window/hard-limit/trigger arithmetic, token estimate anchored on provider usage | `agent/context_compressor.py` |
@@ -89,7 +90,8 @@ printf '%s\n' \
 | 6a | subagent delegation: `Task` starts a bounded delegate turn (own prompt, own transcript, only its declared tools, 24 steps) and returns at once; `TaskWait` converges and reads the report once, `TaskList` reports state, `TaskStop` settles one delegate without touching the parent turn; reports bounded to 12,000 characters keeping both ends; every delegate event carries `parentToolCallId`/`agentName` | **done** |
 | 6b | delegation resume: a delegate that is still working (or settled with a report nobody read) keeps the parent turn open, its report is handed over as one resumed user turn — `DELEGATION_RESUME_PROMPT` plus `## agent (id) — status` blocks bounded at 50k characters, marked delivered before the request goes out — and a stopped or aborted delegate never keeps the turn open | **done** |
 | 6b- | delegation gaps left open on purpose: model overrides and configured fallbacks, `resume` chains, and the scratch spill file for oversized reports | note |
-| 6c | MCP client, cron/scheduled runs | |
+| 6c | MCP selection: a composer's `mcpServerIds`/`mcpToolNames` resolve to the exact tool set those names authorize (exact identity, never a prefix match) and an unsatisfiable selection refuses the prompt with `COMPOSER_MCP_UNAVAILABLE`/`TOOL_DENIED`. The MCP *client* stays where it already is: host-core owns the server records (`crates/host-core/src/mcp_servers.rs`), Electron main owns the processes, handshakes and `callTool`, and the kernel only ever sees MCP tools as host-declared tools | **done** |
+| 6d | cron/scheduled runs | |
 | 7 | packaging: single exe, switch `runtime/sidecar.ts`, differential parity run, delete `packages/agent-runtime` | |
 
 Sizes being ported are recorded per component in ADR 0402; use that table to
