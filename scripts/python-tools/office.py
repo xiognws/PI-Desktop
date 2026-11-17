@@ -3,7 +3,7 @@
 The host runs this file with the Python runtime the installer ships, one short
 lived process per tool call. Keeping the Office work here rather than in Rust
 has two payoffs: the libraries that actually understand these formats
-(openpyxl, python-docx, python-pptx, pypdf, pandas) are Python-only, and a
+(openpyxl, python-docx, python-pptx, pypdf) are Python-only, and a
 malformed document can only crash this process, never the host.
 
 Protocol: one JSON request object on stdin, one JSON response object on stdout.

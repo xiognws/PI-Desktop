@@ -267,11 +267,13 @@ export function probePythonVersion(executable: string): string | undefined {
  * The libraries the agent's document tools import, in one probe.
  *
  * A system interpreter is only worth preferring when it can already do the work:
- * a bare `python` on `PATH` without openpyxl and pandas would make every
- * spreadsheet read fail, which is worse than the bundled tree it replaced. One
+ * a bare `python` on `PATH` without openpyxl would make every spreadsheet read
+ * fail, which is worse than the bundled tree it replaced. The list is the
+ * document stack only — `pandas` and `PIL` are optional extras, so requiring
+ * them here would reject a working interpreter that has no use for them. One
  * subprocess answers the whole question and the answer is cached per executable.
  */
-const REQUIRED_LIBRARIES = ["openpyxl", "docx", "pptx", "pandas", "PIL", "pypdf"];
+const REQUIRED_LIBRARIES = ["openpyxl", "docx", "pptx", "pypdf"];
 const capabilityCache = new Map<string, boolean>();
 
 export function probePythonCapabilities(executable: string): boolean {

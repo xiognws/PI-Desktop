@@ -23,13 +23,6 @@
       "why": "python-docx / python-pptx XML backend"
     },
     {
-      "name": "numpy",
-      "version": "2.5.4",
-      "file": "numpy-2.5.4-cp312-cp312-win_amd64.whl",
-      "sha256": "a7b1b6353e36a7e50de2973a38d705c88ee93adcf120673cee7f45a4a3fa223a",
-      "why": "pandas runtime dependency"
-    },
-    {
       "name": "openpyxl",
       "version": "3.1.5",
       "file": "openpyxl-3.1.5-py2.py3-none-any.whl",
@@ -37,18 +30,11 @@
       "why": "read and write .xlsx"
     },
     {
-      "name": "pandas",
-      "version": "2.2.3",
-      "file": "pandas-2.2.3-cp312-cp312-win_amd64.whl",
-      "sha256": "59ef3764d0fe818125a5097d2ae867ca3fa64df032331b7e0917cf5d7bf66b13",
-      "why": "tabular analysis over .xlsx/.csv"
-    },
-    {
       "name": "pillow",
       "version": "11.3.0",
       "file": "pillow-11.3.0-cp312-cp312-win_amd64.whl",
       "sha256": "a6444696fce635783440b7f7a9fc24b3ad10a9ea3f0ab66c5905be1c19ccf17d",
-      "why": "image conversion for Office embedding"
+      "why": "python-pptx runtime dependency (Pillow >=3.3.2): without it pip resolves an unpinned Pillow and the hashed install fails"
     },
     {
       "name": "pypdf",
@@ -56,13 +42,6 @@
       "file": "pypdf-6.2.0-py3-none-any.whl",
       "sha256": "4c0f3e62677217a777ab79abe22bf1285442d70efabf552f61c7a03b6f5c569f",
       "why": "read, merge, split, generate PDF"
-    },
-    {
-      "name": "python-dateutil",
-      "version": "4.0.0",
-      "file": "python_dateutil-4.0.0-py3-none-any.whl",
-      "sha256": "a5e246f79eb80475e691bf93862cead98decd8a498cf53ba0516fcdc0f50dc1c",
-      "why": "pandas runtime dependency"
     },
     {
       "name": "python-docx",
@@ -79,25 +58,11 @@
       "why": "read and write .pptx"
     },
     {
-      "name": "pytz",
-      "version": "2026.6",
-      "file": "pytz-2026.6-py2.py3-none-any.whl",
-      "sha256": "7fed3fee8fd6bd4a2b7b75a8d56021d0624127bf69bd5691f115db929ac570b3",
-      "why": "pandas runtime dependency"
-    },
-    {
       "name": "typing-extensions",
       "version": "4.16.0",
       "file": "typing_extensions-4.16.0-py3-none-any.whl",
       "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
       "why": "python-docx / python-pptx runtime dependency"
-    },
-    {
-      "name": "tzdata",
-      "version": "2026.6",
-      "file": "tzdata-2026.6-py2.py3-none-any.whl",
-      "sha256": "0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec",
-      "why": "pandas timezone database on Windows"
     },
     {
       "name": "xlsxwriter",
@@ -111,8 +76,6 @@
     "openpyxl",
     "docx",
     "pptx",
-    "pandas",
-    "PIL",
     "pypdf",
     "xlsxwriter"
   ],
@@ -1842,6 +1805,13 @@
       "why": "A+B 工程/数据栈"
     },
     {
+      "name": "pypdf",
+      "version": "6.2.0",
+      "file": "pypdf-6.2.0-py3-none-any.whl",
+      "sha256": "4c0f3e62677217a777ab79abe22bf1285442d70efabf552f61c7a03b6f5c569f",
+      "why": "Office stack fallback when python-extras is installed (bundled tree keeps it for the document tools)"
+    },
+    {
       "name": "pypdfium2",
       "version": "5.15.2",
       "file": "pypdfium2-5.15.2-py3-none-win_amd64.whl",
@@ -1947,6 +1917,27 @@
       "why": "与 C:\\Python3119 的本地环境保持一致"
     },
     {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "file": "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "sha256": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "why": "boto3/botocore 要求 <3，扩展栈用 2.9（内置 Office 栈仍为 4.0）"
+    },
+    {
+      "name": "python-docx",
+      "version": "1.2.0",
+      "file": "python_docx-1.2.0-py3-none-any.whl",
+      "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+      "why": "Office stack fallback when python-extras is installed (bundled tree keeps it for the document tools)"
+    },
+    {
+      "name": "python-pptx",
+      "version": "1.0.2",
+      "file": "python_pptx-1.0.2-py3-none-any.whl",
+      "sha256": "160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba",
+      "why": "Office stack fallback when python-extras is installed (bundled tree keeps it for the document tools)"
+    },
+    {
       "name": "python_bidi",
       "version": "0.6.11",
       "file": "python_bidi-0.6.11-cp312-cp312-win_amd64.whl",
@@ -1959,13 +1950,6 @@
       "file": "python_can-4.6.1-py3-none-any.whl",
       "sha256": "17f95255868a95108dcfcb90565a684dad32d5a3ebb35afd14f739e18c84ff6c",
       "why": "CAN 总线（含本机 zlg 后端）"
-    },
-    {
-      "name": "python-dateutil",
-      "version": "2.9.0.post0",
-      "file": "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
-      "sha256": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
-      "why": "boto3/botocore 要求 <3，扩展栈用 2.9（内置 Office 栈仍为 4.0）"
     },
     {
       "name": "python_dotenv",
@@ -2631,6 +2615,13 @@
       "file": "xlrd-2.0.2-py2.py3-none-any.whl",
       "sha256": "ea762c3d29f4cca48d82df517b6d89fbce4db3107f9d78713e48cd321d5c9aa9",
       "why": "旧版 xls 读取"
+    },
+    {
+      "name": "xlsxwriter",
+      "version": "3.2.9",
+      "file": "xlsxwriter-3.2.9-py3-none-any.whl",
+      "sha256": "9a5db42bc5dff014806c58a20b9eae7322a134abb6fce3c92c181bfb275ec5b3",
+      "why": "Office stack fallback when python-extras is installed (bundled tree keeps it for the document tools)"
     },
     {
       "name": "xlwt",
