@@ -1,0 +1,22 @@
+[package]
+name = "agent-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rust agent core (Hermes kernel) for Pi-Workspace"
+
+[lib]
+name = "agent_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pi-desktop-agent-core"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "io-util"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
