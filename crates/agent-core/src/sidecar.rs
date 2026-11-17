@@ -646,6 +646,17 @@ impl Sidecar {
             extra.push(Arc::new(crate::ask::AskTool::new(self.asks.clone())));
         }
         if matches!(mode, crate::prompt::SessionMode::Agent) {
+            // The skill library's writer: every action is a `skills.*` RPC, so
+            // the runtime, the UI and a background review share one path rule.
+            extra.push(Arc::new(crate::skill_manage::SkillManageTool::new(
+                self.bridge.clone(),
+                request
+                    .str_param("projectPath")
+                    .or_else(|| request.str_param("workspaceRoot"))
+                    .map(str::to_string),
+            )));
+        }
+        if matches!(mode, crate::prompt::SessionMode::Agent) {
             // Memory writes and reads are host RPCs; the store, the dedupe and
             // the scope filtering stay in one place.
             extra.push(Arc::new(crate::memory::MemoryTool::new(

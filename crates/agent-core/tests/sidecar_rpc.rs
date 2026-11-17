@@ -786,3 +786,47 @@ async fn an_mcp_selection_that_cannot_be_honoured_refuses_the_prompt() {
     .await;
     assert_eq!(accepted["result"]["accepted"], true);
 }
+
+#[tokio::test]
+async fn the_agent_can_write_its_own_skill_library() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "skill_manage", "arguments": {"action": "create"}}},
+                {"text": "noted"}
+            ]},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t1", "prompt": "record this"}),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn finishes");
+
+    let session = call(
+        &sidecar,
+        3,
+        "native.session.get",
+        json!({"sessionId": "s1"}),
+    )
+    .await;
+    let raw = session["result"].to_string();
+    // The tool is registered in agent mode, and its refusals reach the model
+    // without a host round trip.
+    assert!(
+        raw.contains("`name` is required to create"),
+        "skill_manage is offered and refuses a nameless create: {raw}"
+    );
+}
