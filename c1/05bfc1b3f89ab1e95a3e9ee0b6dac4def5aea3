@@ -1,0 +1,14 @@
+docs/adr/0401-read-only-language-intelligence.md
+  h_201ed4c689ac8b 54-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c105bfc1b3f89ab1e95a3e9ee0b6dac4def5aea3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
