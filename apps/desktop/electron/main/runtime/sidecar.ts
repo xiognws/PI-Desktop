@@ -1,3 +1,4 @@
+import { createLspDefinitionTool, createLspDiagnosticsTool, createLspReferencesTool } from "../lsp/tools.ts";
 import { IPC, type AgentEventEnvelope, type ComputerGrantView, type UiMessage } from "@pi-workspace/shared";
 import {
   findSubagentProviderSource,
@@ -617,6 +618,18 @@ export function createSidecarRuntime({
   };
   s.setLocalTool("AstEdit", createAstEditTool(astEditOptions));
   s.setLocalTool("AstEditApply", createAstEditApplyTool(astEditOptions));
+  // Read-only language intelligence (ADR 0401): navigation and diagnostics the
+  // language server already computes. Nothing here can write, so these sit at
+  // Risk::Low with Read and Grep instead of behind an approval card.
+  const lspOptions = {
+    getRoots: (sessionId: string) => browserHost.getFileRoots(sessionId),
+    // A worktree session answers with its worktree, so the server indexes the tree
+    // the tools actually edit rather than the project at large.
+    getProjectRoot: (sessionId: string) => sessionFileRoot(sessionId),
+  };
+  s.setLocalTool("LspDefinition", createLspDefinitionTool(lspOptions));
+  s.setLocalTool("LspReferences", createLspReferencesTool(lspOptions));
+  s.setLocalTool("LspDiagnostics", createLspDiagnosticsTool(lspOptions));
   // Granted native application control (ADR 0342, ADR 0344). The host
   // authorises the call through `tools.execute` before this handler runs, and
   // the loop here holds no grant of its own: it asks the host for the desktop

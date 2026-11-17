@@ -125,8 +125,12 @@ impl PermissionManager {
             // root — so they sit with the other low-risk tools and never raise a
             // card. `Remember` is the historical name for the same write; both are
             // listed so neither tool name drifts back into the approval path.
+            // Language-server queries read the workspace and never write: the client
+            // declares no edit capability, so they belong with Read and Grep rather
+            // than behind a card the user has to dismiss on every navigation.
             "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
-            | "memory" | "skill_manage" | "Skill" => Risk::Low,
+            | "memory" | "skill_manage" | "Skill" | "LspDefinition" | "LspReferences"
+            | "LspDiagnostics" => Risk::Low,
             "Write" | "Edit" | "AstEdit" | "AstEditApply" | "Bash" | "GenerateImages"
             | "Computer" => Risk::High,
             name if name.starts_with("plugin_") => match declared {
