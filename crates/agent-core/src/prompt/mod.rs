@@ -94,6 +94,9 @@ pub struct PromptInputs<'a> {
     pub custom: Option<&'a CustomSystemPrompt>,
     /// Already-resolved instruction chain; skipped when `None`.
     pub project: Option<&'a ProjectInstructions>,
+    /// The skill catalog the session was launched with. Only the id, name and
+    /// description travel here; a body is loaded through the `Skill` tool.
+    pub skills: &'a [crate::skills::SkillDef],
 }
 
 impl PromptInputs<'_> {
@@ -109,6 +112,7 @@ impl PromptInputs<'_> {
             product_prompt: None,
             custom: None,
             project: None,
+            skills: &[],
         }
     }
 }
@@ -192,6 +196,12 @@ pub fn compose_system_prompt(inputs: &PromptInputs<'_>) -> ComposedPrompt {
             text: context_parts.join("\n\n"),
         });
     }
+    if let Some(skills) = crate::skills::prompt_section(inputs.skills) {
+        sections.push(PromptSection {
+            name: "skills",
+            text: skills,
+        });
+    }
     if !mode_text.trim().is_empty() {
         sections.push(PromptSection {
             name: "mode",
@@ -234,6 +244,39 @@ pub fn declared_tool_names(tools: &[ToolSpec]) -> Vec<&str> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_skill_catalog_is_a_section_of_its_own() {
+        let skills = vec![
+            crate::skills::SkillDef::new("pi/release", "Release", Some("cut a release".into())),
+            crate::skills::SkillDef::new("two", "Two", None),
+        ];
+        let mut inputs = PromptInputs::new(None);
+        inputs.skills = &skills;
+        let composed = compose_system_prompt(&inputs);
+
+        let section = composed.section("skills").expect("a skills section");
+        assert!(section.starts_with("# Skills"));
+        assert!(section.contains("- `pi/release` — Release: cut a release"));
+        assert!(section.contains("- `two` — Two"));
+        // The section is rendered before the mode rules: what exists comes
+        // before what this mode may do with it.
+        let names: Vec<&str> = composed
+            .sections
+            .iter()
+            .map(|section| section.name)
+            .collect();
+        let skills_at = names.iter().position(|name| *name == "skills").unwrap();
+        if let Some(mode_at) = names.iter().position(|name| *name == "mode") {
+            assert!(skills_at < mode_at);
+        }
+    }
+
+    #[test]
+    fn an_empty_skill_catalog_adds_no_section() {
+        let composed = compose_system_prompt(&PromptInputs::new(None));
+        assert!(composed.section("skills").is_none());
+    }
 
     fn tool(name: &str) -> ToolSpec {
         ToolSpec::new(name, "does a thing", json!({"type": "object"}))

@@ -33,6 +33,7 @@ each phase is additive on `main`.
 | `sidecar` | the method surface, session table, one turn per session, `agent.event` notifications | — |
 | `turn` | the loop: request → stream → tools → repeat | `agent/conversation_loop.py` |
 | `session` | transcript, tool-pair repair | `agent/turn_recovery.py` |
+| `skills` | skill catalog (id/name/description + 60-char index cap), catalog budget gate, the `Skill` tool (listing answered here, body loaded by the host) | `tools/skills_tool.py`, catalog block of `agent/system_prompt.py` |
 | `context` | window/hard-limit/trigger arithmetic, token estimate anchored on provider usage | `agent/context_compressor.py` |
 | `compaction` | cut point, summary request, retained tail, fallback selection | `agent/context_compressor.py`, `agent/conversation_compression.py` |
 
@@ -76,7 +77,8 @@ printf '%s\n' \
 | 3b-2 | compaction plan: cut point per mode, summary request sized the way it is sent, bounded reduction, chunk splitting, retained-tail fallback | **done** |
 | 3b-3 | loop integration (gate before every step, compact in place), provider-written summary with retry on transient failure, `agent.compact`, `compaction_start`/`compaction_end` events | **done** |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
-| 5 | memory store and skills | |
+| 5a | skills: catalog parsing (sorted, deduplicated), 60-character index cap, 8k catalog budget gate, Skills prompt section, `Skill` tool with a kernel-answered listing and host-delegated body load | **done** |
+| 5b | memory store (`memory.remember/recall/update/forget` over the host) | |
 | 6 | MCP client, cron/scheduled runs, subagent delegation | |
 | 7 | packaging: single exe, switch `runtime/sidecar.ts`, differential parity run, delete `packages/agent-runtime` | |
 

@@ -188,6 +188,9 @@ struct Session {
     /// between steps, so a steer reaches the model on the next request instead
     /// of waiting for the turn to finish.
     steering: Mutex<std::collections::VecDeque<Message>>,
+    /// The catalog this session was launched with, kept live so a `Skill` call
+    /// mid-turn lists what exists now rather than what existed at session start.
+    skills: Arc<crate::skills::SkillCatalog>,
 }
 
 impl Session {
@@ -198,6 +201,7 @@ impl Session {
             running: AtomicBool::new(false),
             current_turn: Mutex::new(None),
             steering: Mutex::new(std::collections::VecDeque::new()),
+            skills: Arc::new(crate::skills::SkillCatalog::new()),
         }
     }
 }
@@ -381,7 +385,13 @@ impl Sidecar {
     ///
     /// The real product prompt, the instruction chain and the mode rules are
     /// all resolved here so the loop only ever sees one string.
-    fn compose_prompt(&self, request: &Request, config: &RuntimeConfig) -> String {
+    fn compose_prompt(
+        &self,
+        request: &Request,
+        config: &RuntimeConfig,
+        mode: crate::prompt::SessionMode,
+        skills: &[crate::skills::SkillDef],
+    ) -> String {
         let fs: Arc<dyn crate::prompt::PromptFs> = Arc::new(crate::prompt::StdFs);
         let workspace_root = request
             .str_param("workspaceRoot")
@@ -394,11 +404,12 @@ impl Sidecar {
         inputs.global_agent_dir = request
             .str_param("agentDataHome")
             .or(config.data_dir.as_deref());
-        inputs.mode = crate::prompt::SessionMode::parse(request.str_param("mode"));
+        inputs.mode = mode;
         inputs.tool_instructions = request.str_param("toolInstructions");
         inputs.product_prompt = request
             .str_param("systemPrompt")
             .or(config.system.as_deref());
+        inputs.skills = skills;
         crate::prompt::build_system_prompt(&fs, &inputs).system
     }
 
@@ -487,9 +498,15 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("config lock poisoned"))?
             .clone();
+        // The catalog main launched this session with. Only ids, names and
+        // descriptions arrive; the documents stay on the host.
+        let catalog = crate::skills::parse_catalog(request.params.get("pluginSkills"));
+        session.skills.replace(catalog.clone());
+        let mode = crate::prompt::SessionMode::parse(request.str_param("mode"));
         // Compose the system prompt for this turn: persona, custom append, tool
-        // guidance, the project instruction chain and the mode's rules.
-        let composed = self.compose_prompt(request, &config);
+        // guidance, the project instruction chain, the skill catalog and the
+        // mode's rules.
+        let composed = self.compose_prompt(request, &config, mode.clone(), &catalog);
         if !composed.trim().is_empty() {
             config.system = Some(composed);
         }
@@ -507,6 +524,20 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("tool lock poisoned"))?
             .clone();
+        // `Skill` exists only when a library exists, and only in the mode that may
+        // write one — the same gate the desktop runtime uses. A tool whose only
+        // honest answer is "there is nothing here" is noise in every request.
+        let tools = if !catalog.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
+            // An id lookup is forwarded to the host's own `Skill` handler when
+            // main declared one; the listing is answered here.
+            let load = tools.get(crate::skills::SKILL_TOOL_NAME);
+            Arc::new(tools.extended(vec![Arc::new(crate::skills::SkillTool::new(
+                session.skills.clone(),
+                load,
+            ))]))
+        } else {
+            tools
+        };
         let engine = TurnEngine::new(
             provider,
             tools,

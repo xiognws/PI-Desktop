@@ -300,3 +300,110 @@ async fn a_manual_compaction_rewrites_the_session_the_next_prompt_reads() {
     assert!(text.starts_with("[context checkpoint]"), "got: {text}");
     assert!(text.contains("hello from the kernel"));
 }
+
+#[tokio::test]
+async fn a_skill_catalog_reaches_the_prompt_and_a_bare_skill_call_lists_it() {
+    let (sidecar, lines) = sidecar();
+    // The model asks for the library, then answers.
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "Skill", "arguments": {}}},
+                {"text": "done"}
+            ]},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    let long_description = "x".repeat(120);
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1",
+            "prompt": "what can you do?",
+            "pluginSkills": [
+                {"id": "pi/release", "name": "Release", "description": "cut a release"},
+                {"id": "aaa", "name": "Aaa", "description": long_description},
+                {"id": "", "name": "no id"}
+            ]
+        }),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn reaches agent_end");
+
+    // The listing is answered by the kernel, so it lands in the transcript even
+    // though main declared no `Skill` handler at all.
+    let session = call(
+        &sidecar,
+        3,
+        "native.session.get",
+        json!({"sessionId": "s1"}),
+    )
+    .await;
+    let raw = session["result"].to_string();
+    assert!(
+        raw.contains("- `pi/release` — Release: cut a release"),
+        "the catalog entry is listed: {raw}"
+    );
+    assert!(
+        raw.contains("- `aaa` — Aaa: "),
+        "the description is shown: {raw}"
+    );
+    let aaa = raw.find("- `aaa`").expect("the aaa entry");
+    let release = raw.find("- `pi/release`").expect("the release entry");
+    assert!(aaa < release, "entries are sorted by id");
+    assert!(
+        !raw.contains("no id"),
+        "an entry without an id is not in the catalog"
+    );
+}
+
+#[tokio::test]
+async fn without_a_catalog_the_skill_tool_is_not_offered() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "Skill", "arguments": {}}},
+                {"text": "carried on"}
+            ]},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t1", "prompt": "hi"}),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn reaches agent_end");
+    let session = call(
+        &sidecar,
+        3,
+        "native.session.get",
+        json!({"sessionId": "s1"}),
+    )
+    .await;
+    let raw = session["result"].to_string();
+    assert!(
+        raw.contains("no tool named `Skill` is registered"),
+        "the tool is absent from the session: {raw}"
+    );
+}

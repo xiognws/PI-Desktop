@@ -40,6 +40,7 @@ pub mod provider;
 pub mod rpc;
 pub mod session;
 pub mod sidecar;
+pub mod skills;
 pub mod tool;
 pub mod turn;
 
@@ -53,6 +54,7 @@ pub use host_bridge::{HostBridge, HostError, HostTool};
 pub use message::{ContentPart, Message, Role, StopReason, ToolCall, ToolResult, Usage};
 pub use provider::{ChatRequest, Provider, ProviderStream, StreamEvent, ThinkingLevel};
 pub use sidecar::{LineSink, Sidecar};
+pub use skills::{SkillCatalog, SkillDef, SkillTool, SKILL_TOOL_NAME};
 pub use tool::{
     AllowAll, DenyList, Permission, PermissionGate, Tool, ToolContext, ToolRegistry, ToolSpec,
 };

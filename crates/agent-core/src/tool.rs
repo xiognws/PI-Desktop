@@ -160,6 +160,30 @@ impl ToolRegistry {
         self.tools.contains_key(name)
     }
 
+    /// The tool registered under `name`, so a kernel tool can forward a call to
+    /// the host-declared handler it wraps.
+    pub fn get(&self, name: &str) -> Option<Arc<dyn Tool>> {
+        self.tools.get(name).cloned()
+    }
+
+    /// A copy of this registry with extra tools added.
+    ///
+    /// A per-session tool has to be built per prompt (its catalog belongs to one
+    /// session), while the host's declarations are shared — so the registry is
+    /// copied rather than mutated in place, and two sessions cannot see each
+    /// other's tools.
+    pub fn extended(&self, extra: Vec<Arc<dyn Tool>>) -> ToolRegistry {
+        let mut tools = self.tools.clone();
+        for tool in extra {
+            tools.insert(tool.spec().name, tool);
+        }
+        ToolRegistry {
+            tools,
+            gate: self.gate.clone(),
+            result_limit_chars: self.result_limit_chars,
+        }
+    }
+
     /// Execute one call. Never returns `Err` for a tool-level failure: the
     /// failure becomes a result the model can read.
     pub async fn call(&self, call: &ToolCall, ctx: &ToolContext) -> ToolResult {
