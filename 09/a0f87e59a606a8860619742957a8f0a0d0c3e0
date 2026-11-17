@@ -1,0 +1,28 @@
+crates/agent-core/README.md
+  h_201ed4c689ac8b 77
+crates/agent-core/src/compaction.rs
+  h_201ed4c689ac8b 49-57
+crates/agent-core/src/event.rs
+  h_201ed4c689ac8b 61-78,85-105
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 47-51
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 24,26,36,285,518-523,571-667,1079-1092
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 22-27,29-32,79-86,92-95,109,120-125,185-210,342-544
+crates/agent-core/tests/compaction_loop.rs
+  h_201ed4c689ac8b 1-320
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 243-302
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "09a0f87e59a606a8860619742957a8f0a0d0c3e0",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
