@@ -1,0 +1,16 @@
+apps/desktop/electron/main/diagnostics/bundle.ts
+  h_201ed4c689ac8b 1-170
+apps/desktop/electron/test/diagnostics-bundle.test.mjs
+  h_201ed4c689ac8b 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "25d8089da2c00ad24ac2f81c88bf7dba2bdd3378",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
