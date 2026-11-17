@@ -36,6 +36,8 @@ export type MainProcessErrorSink = {
 
 let installed = false;
 let sink: MainProcessErrorSink | null = null;
+/** Called once for an error the process cannot continue from; it owns exiting. */
+let fatal: ((record: MainProcessErrorRecord) => void | Promise<void>) | null = null;
 
 /** Chromium/undici throws this when a response header is not a ByteString. */
 export function isNonAsciiHttpHeaderError(error: unknown): boolean {
@@ -98,6 +100,48 @@ function defaultEmit(record: MainProcessErrorRecord): void {
   }
 }
 
+/**
+ * Whether the process can keep serving after this error.
+ *
+ * A bad HTTP header or a closed pipe leaves the event loop consistent, so the app
+ * keeps running. An uncaught exception does not: Node has already unwound past the
+ * call site and the state that threw is unknown, so continuing produces quieter,
+ * later failures instead of one honest restart.
+ *
+ * A rejection is treated as survivable: it is a promise nobody handled, not a stack
+ * that unwound through the event loop, and restarting the app for one is a worse
+ * trade for the user than logging it.
+ */
+export function isFatalMainProcessError(record: MainProcessErrorRecord): boolean {
+  return record.kind === "uncaughtException" && !record.recoverable;
+}
+
+/**
+ * Install the handler that owns a fatal error. Registered from bootstrap, because
+ * only that layer knows how to flush state and how to quit Electron.
+ */
+export function setMainProcessFatalHandler(
+  handler: ((record: MainProcessErrorRecord) => void | Promise<void>) | null,
+): void {
+  fatal = handler;
+}
+
+/** How long a fatal handler may take before the process exits anyway. */
+const FATAL_HANDLER_DEADLINE_MS = 3_000;
+
+async function runFatal(record: MainProcessErrorRecord): Promise<void> {
+  const handler = fatal;
+  if (!handler) return;
+  try {
+    await Promise.race([
+      Promise.resolve(handler(record)),
+      new Promise((resolve) => setTimeout(resolve, FATAL_HANDLER_DEADLINE_MS)),
+    ]);
+  } catch {
+    // A throwing fatal handler must not stop the exit it was asked to perform.
+  }
+}
+
 export function reportMainProcessError(
   kind: MainProcessErrorKind,
   error: unknown,
@@ -123,7 +167,10 @@ export function installMainProcessErrorHandlers(next?: MainProcessErrorSink): vo
   if (installed) return;
   installed = true;
   process.on("uncaughtException", (error) => {
-    reportMainProcessError("uncaughtException", error);
+    const record = reportMainProcessError("uncaughtException", error);
+    // Log first, decide second: the record is what the next launch will show, and it
+    // must exist even if the fatal handler throws or the exit is immediate.
+    if (isFatalMainProcessError(record)) void runFatal(record);
   });
   process.on("unhandledRejection", (reason) => {
     reportMainProcessError("unhandledRejection", reason);

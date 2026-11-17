@@ -40,7 +40,11 @@ import {
 } from "./workspace-roots";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { Logger } from "./logger";
-import { describeError, installMainProcessErrorHandlers } from "./main-process-errors";
+import {
+  describeError,
+  installMainProcessErrorHandlers,
+  setMainProcessFatalHandler,
+} from "./main-process-errors";
 import {
   ModelsDevCatalog,
   catalogModelConfigFor,
@@ -238,6 +242,19 @@ installMainProcessErrorHandlers({
       data: { recoverable: record.recoverable, detail: record.detail },
     });
   },
+});
+
+// A fatal main-process error gets one honest restart instead of a process that keeps
+// serving with state nobody can reason about: the record is already logged, so the next
+// launch can report it, and Crashpad has whatever dump the crash left behind.
+setMainProcessFatalHandler((record) => {
+  logger.app("runtime", "error", "fatal main-process error: restarting", {
+    code: record.code,
+    data: { kind: record.kind },
+  });
+  // `app.exit` rather than `quit`: quit runs before-quit handlers that may be the very
+  // code that threw, and the user is waiting on a window that no longer functions.
+  app.exit(1);
 });
 
 const persistenceOutbox = new PersistenceOutbox(dataDir, (level, message, data) => {
