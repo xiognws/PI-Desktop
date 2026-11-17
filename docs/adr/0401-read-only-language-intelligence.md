@@ -51,6 +51,23 @@ Staged delivery, each stage useful on its own:
    like the existing search tools (path, line, symbol), permission risk `Low`
    because they read and never write.
 
+## Placement: the client belongs where the tools live
+
+Stages 1 and 2 were written in `crates/host-core/src/tools/lsp/`, and that was the
+wrong layer. Agent tools execute in the Node sidecar: `Read`, `Grep`, `Write` and the
+`AstEdit` pair are all `setLocalTool` registrations in
+`apps/desktop/electron/main/runtime/sidecar.ts`, and host-core owns persistence, native
+state and permissions rather than agent execution (AGENTS §4). A language client in
+host-core would have to be reached over an RPC invented for it, adding a protocol hop
+and a second process boundary for no benefit - the sidecar can spawn the server itself.
+
+So stage 3 is built in TypeScript beside the other tools, and the Rust module is a
+prototype to be deleted rather than extended. What carries over is the design and its
+tests: framing that asks for more bytes on a partial frame, correlation by id rather
+than arrival order, orphaned responses dropped instead of misrouted, three separate
+timeouts, and shutdown that cannot leave a server behind. Those properties are the
+content of stages 1 and 2; their language is an implementation detail.
+
 ## Consequences
 
 * Language servers are external binaries. A missing server is a normal state, not an
