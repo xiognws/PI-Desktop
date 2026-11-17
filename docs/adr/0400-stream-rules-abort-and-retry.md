@@ -86,3 +86,13 @@ Constraints that make this safe rather than a foot-gun:
 * ADR 0371 — durable memory; recall is the other channel that changes a turn's
   input without touching the system prompt.
 * `packages/agent-runtime/src/stream-rules.ts` — rule validation and matching.
+
+## Deferred, with the reason on record
+
+The protocol event for a firing is not implemented and will not be until
+`@earendil-works/pi-agent-core` opens its `AgentEvent` union or this app starts
+enriching the envelope itself. Until then a firing is written to the application
+log with its session, turn, rule id, attempt and match length, which is enough to
+diagnose a rule that keeps firing and enough to prove one never fired at all. The
+gap is display, not correctness: the turn is still aborted and retried exactly as
+described above.
