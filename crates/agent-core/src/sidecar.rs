@@ -23,13 +23,14 @@ use serde_json::{json, Value};
 use crate::cancel::CancelToken;
 use crate::error::Result;
 use crate::event::{AgentEventEnvelope, EventSink};
+use crate::host_bridge::{tool_spec_from_value, HostBridge, HostTool};
 use crate::message::Message;
 use crate::provider::http::{HttpProvider, HttpProviderConfig};
 use crate::provider::scripted::ScriptedProvider;
 use crate::provider::{Provider, StreamEvent};
 use crate::rpc::{self, Request, RpcError};
 use crate::session::Transcript;
-use crate::tool::ToolRegistry;
+use crate::tool::{AllowAll, PermissionGate, ToolRegistry};
 use crate::turn::{TurnConfig, TurnEngine};
 
 /// Destination for one encoded protocol line.
@@ -67,6 +68,62 @@ impl RecordingLines {
             .filter(|value| value.get("method").and_then(Value::as_str) == Some(method))
             .filter_map(|value| value.get("params").cloned())
             .collect()
+    }
+
+    /// Wait until a message with `method` has arrived and return the whole
+    /// frame (id included), for tests that must answer a host call.
+    pub async fn wait_for_message(
+        &self,
+        method: &str,
+        timeout: std::time::Duration,
+    ) -> Option<Value> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let found = self
+                .lines()
+                .iter()
+                .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+                .find(|value| value.get("method").and_then(Value::as_str) == Some(method));
+            if let Some(value) = found {
+                return Some(value);
+            }
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(remaining) => return None,
+                _ = self.notify.notified() => {}
+            }
+        }
+    }
+
+    /// Wait until an `agent.event` notification of `event_type` has arrived.
+    /// Tests assert on the turn's own terminator instead of polling, so a turn
+    /// that never ends fails as a timeout rather than a spin.
+    pub async fn wait_for_event(
+        &self,
+        event_type: &str,
+        timeout: std::time::Duration,
+    ) -> Option<Value> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            if let Some(found) = self
+                .notifications("agent.event")
+                .into_iter()
+                .find(|params| params["event"]["type"] == event_type)
+            {
+                return Some(found);
+            }
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(remaining) => return None,
+                _ = self.notify.notified() => {}
+            }
+        }
     }
 
     /// Wait until a notification with `method` has arrived, and return its
@@ -150,20 +207,35 @@ impl EventSink for NotificationSink {
 pub struct Sidecar {
     out: Arc<dyn LineSink>,
     provider: Mutex<Option<Arc<dyn Provider>>>,
-    tools: Arc<ToolRegistry>,
+    tools: Mutex<Arc<ToolRegistry>>,
+    gate: Arc<dyn PermissionGate>,
+    bridge: Arc<HostBridge>,
     config: Mutex<RuntimeConfig>,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
 }
 
 impl Sidecar {
-    pub fn new(out: Arc<dyn LineSink>, tools: Arc<ToolRegistry>) -> Self {
+    pub fn new(out: Arc<dyn LineSink>, gate: Arc<dyn PermissionGate>) -> Self {
         Self {
+            bridge: Arc::new(HostBridge::new(out.clone())),
             out,
             provider: Mutex::new(None),
-            tools,
+            tools: Mutex::new(Arc::new(ToolRegistry::new(gate.clone()))),
+            gate,
             config: Mutex::new(RuntimeConfig::default()),
             sessions: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Convenience constructor for callers with no policy of their own.
+    pub fn with_default_gate(out: Arc<dyn LineSink>) -> Self {
+        Self::new(out, Arc::new(AllowAll))
+    }
+
+    /// The outbound half of the host channel. The serve loop feeds answers back
+    /// through `HostBridge::complete`.
+    pub fn bridge(&self) -> Arc<HostBridge> {
+        self.bridge.clone()
     }
 
     /// Answer one request. Notifications get no answer.
@@ -236,7 +308,24 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("provider lock poisoned"))? = Some(provider);
 
-        Ok(json!({ "model": model }))
+        // Tool declarations come from the host: it is the side that owns the
+        // tool set, and every call is served by `tools.execute` rather than by
+        // kernel code.
+        let mut declared = 0usize;
+        if let Some(tools) = request.params.get("tools").and_then(Value::as_array) {
+            let mut registry = ToolRegistry::new(self.gate.clone());
+            for declaration in tools {
+                let spec = tool_spec_from_value(declaration).map_err(RpcError::invalid_params)?;
+                registry.register(Arc::new(HostTool::new(spec, self.bridge.clone())));
+                declared += 1;
+            }
+            *self
+                .tools
+                .lock()
+                .map_err(|_| RpcError::internal("tool lock poisoned"))? = Arc::new(registry);
+        }
+
+        Ok(json!({ "model": model, "tools": declared }))
     }
 
     fn session(&self, session_id: &str) -> Result<Arc<Session>, RpcError> {
@@ -302,9 +391,14 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("config lock poisoned"))?
             .clone();
+        let tools = self
+            .tools
+            .lock()
+            .map_err(|_| RpcError::internal("tool lock poisoned"))?
+            .clone();
         let engine = TurnEngine::new(
             provider,
-            self.tools.clone(),
+            tools,
             Arc::new(NotificationSink {
                 out: self.out.clone(),
             }),
@@ -446,18 +540,62 @@ fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
     match kind {
         // Development and test only: replays a fixed response without a socket.
         "scripted" => {
-            let text = spec
-                .get("text")
-                .and_then(Value::as_str)
-                .unwrap_or("scripted response");
-            let responses = (0..spec.get("turns").and_then(Value::as_u64).unwrap_or(1))
-                .map(|_| {
-                    vec![
-                        StreamEvent::TextDelta(text.to_string()),
-                        StreamEvent::Finish(crate::message::StopReason::EndTurn),
-                    ]
-                })
-                .collect::<Vec<_>>();
+            let responses = if let Some(script) = spec.get("script").and_then(Value::as_array) {
+                // Each entry is one provider response: either a tool call or
+                // text. Enough to drive a multi-step turn from a harness.
+                script
+                    .iter()
+                    .map(|step| {
+                        let mut events = Vec::new();
+                        if let Some(call) = step.get("toolCall") {
+                            events.push(StreamEvent::ToolCallStart {
+                                index: 0,
+                                id: call
+                                    .get("id")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("call_1")
+                                    .to_string(),
+                                name: call
+                                    .get("name")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("tool")
+                                    .to_string(),
+                            });
+                            events.push(StreamEvent::ToolCallDelta {
+                                index: 0,
+                                arguments_delta: call
+                                    .get("arguments")
+                                    .cloned()
+                                    .unwrap_or_else(|| json!({}))
+                                    .to_string(),
+                            });
+                            events.push(StreamEvent::Finish(crate::message::StopReason::ToolUse));
+                        } else {
+                            events.push(StreamEvent::TextDelta(
+                                step.get("text")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                                    .to_string(),
+                            ));
+                            events.push(StreamEvent::Finish(crate::message::StopReason::EndTurn));
+                        }
+                        events
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                let text = spec
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or("scripted response");
+                (0..spec.get("turns").and_then(Value::as_u64).unwrap_or(1))
+                    .map(|_| {
+                        vec![
+                            StreamEvent::TextDelta(text.to_string()),
+                            StreamEvent::Finish(crate::message::StopReason::EndTurn),
+                        ]
+                    })
+                    .collect::<Vec<_>>()
+            };
             Ok(Arc::new(ScriptedProvider::new(responses)))
         }
         "openai" | "anthropic" => {

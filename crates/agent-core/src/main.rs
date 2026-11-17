@@ -214,11 +214,10 @@ async fn serve() -> ExitCode {
         }
     });
 
-    // Phase 2 ships no tools: filesystem/shell tools arrive with the host-core
-    // bridge, and an empty registry keeps declarations honest meanwhile.
-    let registry = ToolRegistry::new(Arc::new(AllowAll));
+    // Tools are host-declared: `sidecar.configure` installs the ones main
+    // sends, and each call travels back through the bridge.
     let sink: Arc<dyn agent_core::sidecar::LineSink> = Arc::new(writer_tx.clone());
-    let sidecar = Arc::new(agent_core::sidecar::Sidecar::new(sink, Arc::new(registry)));
+    let sidecar = Arc::new(agent_core::sidecar::Sidecar::with_default_gate(sink));
 
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     loop {
@@ -231,21 +230,29 @@ async fn serve() -> ExitCode {
                         error,
                     ));
                 }
+                agent_core::rpc::Incoming::Response { id, outcome } => {
+                    if let Some(id) = id.as_str() {
+                        sidecar.bridge().complete(id, outcome);
+                    }
+                }
                 agent_core::rpc::Incoming::Request(request) => {
                     if let Some(answer) = sidecar.handle(request).await {
                         let _ = writer_tx.send(answer);
                     }
                 }
             },
-            // The peer closed stdin: shut down like a well-behaved child.
+            // The peer closed stdin: shut down like a well-behaved child, and
+            // fail every host call still waiting before the process exits.
             Ok(None) => break,
             Err(error) => {
                 eprintln!("stdin read failed: {error}");
+                sidecar.bridge().fail_all("stdin closed");
                 return ExitCode::FAILURE;
             }
         }
     }
 
+    sidecar.bridge().fail_all("peer closed stdin");
     drop(sidecar);
     drop(writer_tx);
     let _ = writer.await;

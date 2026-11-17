@@ -5,14 +5,13 @@ use std::time::Duration;
 
 use agent_core::rpc::Request;
 use agent_core::sidecar::{RecordingLines, Sidecar};
-use agent_core::{AllowAll, LineSink, ToolRegistry};
+use agent_core::LineSink;
 use serde_json::{json, Value};
 
 fn sidecar() -> (Arc<Sidecar>, RecordingLines) {
     let lines = RecordingLines::new();
     let sink: Arc<dyn LineSink> = Arc::new(lines.clone());
-    let tools = Arc::new(ToolRegistry::new(Arc::new(AllowAll)));
-    (Arc::new(Sidecar::new(sink, tools)), lines)
+    (Arc::new(Sidecar::with_default_gate(sink)), lines)
 }
 
 async fn call(sidecar: &Sidecar, id: i64, method: &str, params: Value) -> Value {
@@ -69,24 +68,10 @@ async fn a_prompt_runs_a_turn_and_streams_agent_events() {
     assert_eq!(response["result"]["sessionId"], "s1");
     assert_eq!(response["result"]["turnId"], "t1");
 
-    let end = lines
-        .wait_for("agent.event", Duration::from_secs(10))
+    let last = lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
         .await
-        .expect("notifications arrive");
-
-    // The last notification is `agent_end` once the turn finishes.
-    let deadline = std::time::Instant::now() + Duration::from_secs(10);
-    let mut last = end;
-    while last["event"]["type"] != "agent_end" {
-        assert!(
-            std::time::Instant::now() < deadline,
-            "turn did not end; last event: {last}"
-        );
-        last = lines
-            .wait_for("agent.event", Duration::from_millis(500))
-            .await
-            .expect("a further event");
-    }
+        .expect("the turn reaches agent_end");
     assert_eq!(last["sessionId"], "s1");
     assert_eq!(last["turnId"], "t1");
 

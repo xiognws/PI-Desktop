@@ -31,13 +31,15 @@ pub enum AgentError {
     IncompleteStream,
     #[error("transport: {0}")]
     Transport(String),
+    #[error("host error ({code}): {message}")]
+    Host { code: String, message: String },
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }
 
 impl AgentError {
     /// Stable machine code for logs and RPC error payloads.
-    pub fn code(&self) -> &'static str {
+    pub fn code(&self) -> &str {
         match self {
             Self::Provider { .. } => "PROVIDER_ERROR",
             Self::Tool { .. } => "TOOL_ERROR",
@@ -48,6 +50,7 @@ impl AgentError {
             Self::Invalid(_) => "INVALID_REQUEST",
             Self::IncompleteStream => "INCOMPLETE_STREAM",
             Self::Transport(_) => "TRANSPORT_ERROR",
+            Self::Host { code, .. } => code,
             Self::Json(_) => "INVALID_JSON",
         }
     }

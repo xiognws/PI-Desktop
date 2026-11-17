@@ -137,6 +137,13 @@ impl std::error::Error for RpcError {}
 #[derive(Debug)]
 pub enum Incoming {
     Request(Request),
+    /// An answer to a call this process issued (the host bridge). The serve
+    /// loop routes these to [`crate::host_bridge::HostBridge::complete`] instead
+    /// of dispatching them as methods.
+    Response {
+        id: Id,
+        outcome: std::result::Result<Value, RpcError>,
+    },
     /// Parsed but unusable: the caller answers with the error, using the id
     /// when one could be recovered (`null` otherwise, per JSON-RPC).
     Invalid {
@@ -153,7 +160,38 @@ pub fn parse_line(line: &str) -> Incoming {
     if trimmed.is_empty() {
         return Incoming::Empty;
     }
-    match serde_json::from_str::<Request>(trimmed) {
+    let value: Value = match serde_json::from_str(trimmed) {
+        Ok(value) => value,
+        Err(error) => {
+            return Incoming::Invalid {
+                error: RpcError::parse_error(format!("invalid JSON: {error}")),
+                id: None,
+            }
+        }
+    };
+
+    // A line that answers a call this process issued: an id plus a result or an
+    // error, and no method. `host.proxy` replies arrive this way.
+    if value.get("method").is_none()
+        && value.get("id").is_some()
+        && (value.get("result").is_some() || value.get("error").is_some())
+    {
+        let id = value.get("id").cloned().unwrap_or(Value::Null);
+        let outcome = match value.get("error") {
+            Some(error) if !error.is_null() => {
+                match serde_json::from_value::<RpcError>(error.clone()) {
+                    Ok(error) => Err(error),
+                    Err(parse) => Err(RpcError::parse_error(format!(
+                        "malformed error object: {parse}"
+                    ))),
+                }
+            }
+            _ => Ok(value.get("result").cloned().unwrap_or(Value::Null)),
+        };
+        return Incoming::Response { id, outcome };
+    }
+
+    match serde_json::from_value::<Request>(value.clone()) {
         Ok(request) => {
             if request.method.trim().is_empty() {
                 return Incoming::Invalid {
@@ -164,13 +202,11 @@ pub fn parse_line(line: &str) -> Incoming {
             Incoming::Request(request)
         }
         Err(error) => {
-            // Recover the id when the envelope is otherwise usable, so the
+            // Recover the id when the envelope is otherwise unusable, so the
             // caller can still correlate the failure.
-            let id = serde_json::from_str::<Value>(trimmed)
-                .ok()
-                .and_then(|value| value.get("id").cloned());
+            let id = value.get("id").cloned();
             Incoming::Invalid {
-                error: RpcError::parse_error(format!("invalid JSON: {error}")),
+                error: RpcError::parse_error(format!("invalid JSON-RPC frame: {error}")),
                 id,
             }
         }

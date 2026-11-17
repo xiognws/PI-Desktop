@@ -28,6 +28,9 @@ each phase is additive on `main`.
 | `provider::anthropic` | Anthropic Messages streaming decode | `agent/anthropic_adapter.py` |
 | `provider::scripted` | deterministic provider for tests and the self-check | — |
 | `tool` | declarations, registry, approval gate, result ceiling | `tools/registry.py`, `agent/tool_executor.py`, `tools/approval.py` |
+| `host_bridge` | outbound `host.proxy` calls, `tools.execute` relay, tool declarations from the host | — (desktop contract, from `parent-host-proxy.ts`) |
+| `rpc` | NDJSON JSON-RPC 2.0 codec (requests, responses, notifications, error codes) | — (desktop contract, from `sidecar.ts`) |
+| `sidecar` | the method surface, session table, one turn per session, `agent.event` notifications | — |
 | `turn` | the loop: request → stream → tools → repeat | `agent/conversation_loop.py` |
 | `session` | transcript, tool-pair repair | `agent/turn_recovery.py` |
 
@@ -63,7 +66,8 @@ printf '%s\n' \
 | --- | --- | --- |
 | 1 | message model, events, cancellation, SSE + OpenAI/Anthropic decode, tool registry and gate, turn loop, transcript repair, self-check binary | **done** |
 | 2a | NDJSON JSON-RPC codec, sidecar method surface (`sidecar.health/configure`, `agent.prompt/abort/getStatus/disposeSession`, `native.session.get`), HTTP transports over `reqwest`+`rustls` for both wires, `serve` mode over stdio | **done** |
-| 2b | host-core tool bridge (tool calls travel back through main, as the Node runtime's parent proxy does), provider/auth config read from host settings instead of the `configure` payload, remaining sidecar methods (`agent.steer`, `agent.compact`, `native.session.list/fork/search`) | next |
+| 2b | host-core tool bridge: declarations arrive on `sidecar.configure`, each call travels back as `host.proxy` → `tools.execute`, answers map onto tool results | **done** |
+| 2c | provider/auth config read from host settings instead of the `configure` payload, remaining sidecar methods (`agent.steer`, `agent.compact`, `native.session.list/fork/search`) | next |
 | 3 | prompt composition and project instructions, context budget and compaction | |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5 | memory store and skills | |
@@ -83,3 +87,25 @@ scope a phase, not a guess.
   transport phase with recorded fixtures.
 - Vendored C/C++ is compiled through `build.rs`; never hand-edit vendored
   sources.
+
+## Host tool contract
+
+The kernel implements no filesystem, shell or search tool. Main declares the
+tool set and serves every call, which keeps permissions, approvals and the audit
+trail in the place that already owns them.
+
+```text
+sidecar.configure {provider, model, tools:[{name, description, parameters}]}
+
+kernel -> main   {"jsonrpc":"2.0","id":"<uuid>","method":"host.proxy",
+                  "params":{"method":"tools.execute","params":{
+                    "sessionId","turnId","toolCallId","toolName","args"}}}
+main  -> kernel  {"jsonrpc":"2.0","id":"<uuid>",
+                  "result":{"ok":true,"content":...}}          # or "error"
+```
+
+- `ok: false`, `isError: true` and `errorCode: "PERMISSION_DENIED"` become an
+  error tool result, and the turn continues so the model can react.
+- An unanswered call times out (600 s default) and a closed channel fails every
+  waiter — neither may hang the turn.
+- A late answer to a call that already timed out is dropped, not mis-delivered.

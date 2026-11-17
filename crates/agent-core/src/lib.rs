@@ -31,6 +31,7 @@
 pub mod cancel;
 pub mod error;
 pub mod event;
+pub mod host_bridge;
 pub mod message;
 pub mod provider;
 pub mod rpc;
@@ -42,6 +43,7 @@ pub mod turn;
 pub use cancel::CancelToken;
 pub use error::{AgentError, Result};
 pub use event::{AgentEvent, AgentEventEnvelope, EventSink, RecordingSink};
+pub use host_bridge::{HostBridge, HostError, HostTool};
 pub use message::{ContentPart, Message, Role, StopReason, ToolCall, ToolResult, Usage};
 pub use provider::{ChatRequest, Provider, ProviderStream, StreamEvent, ThinkingLevel};
 pub use sidecar::{LineSink, Sidecar};
