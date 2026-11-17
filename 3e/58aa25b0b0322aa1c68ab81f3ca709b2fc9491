@@ -1,0 +1,18 @@
+docs/project/autotest-agent-native-tools.md
+  h_201ed4c689ac8b 401-429
+services/autotest/src/autotest/workflow/assertion_gen.py
+  h_201ed4c689ac8b 141-158,214-221
+services/autotest/tests/test_pipeline_acceptance.py
+  h_201ed4c689ac8b 1-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3e58aa25b0b0322aa1c68ab81f3ca709b2fc9491",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
