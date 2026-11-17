@@ -13,11 +13,15 @@ vendored files are the published package's own entry and bundle.
 
 | Field | Value |
 | --- | --- |
-| extension entry | `agent-extension.mjs` → `vendor/pi/billion-context.js` |
+| extension entry | `agent-extension.mjs` → `vendor/pi/billion-context.mjs` |
 | permission | `agent.extension` |
 | upstream pi entry | `./dist/agent/billion-context.js` (from its `package.json` `pi.extensions`) |
 
 ## Notes
+
+- Vendored files use `.mjs`: the plugin host treats a plugin folder as CommonJS
+  (`ensureCommonJsPackage`), and a `.js` file carrying ESM syntax fails to load
+  there (`Failed to load the ES module`).
 
 - It ships enabled (`enabledByDefault: true`): a machine that has never seen the
   plugin starts with it on. Disabling it in Settings is remembered across app

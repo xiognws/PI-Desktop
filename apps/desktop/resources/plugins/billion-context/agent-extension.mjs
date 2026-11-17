@@ -6,4 +6,4 @@
  * plugin's `contributes.agentExtensions` has a stable local entry. The vendored
  * files are byte-identical to the published package — see SOURCES.md.
  */
-export { default } from "./vendor/pi/billion-context.js";
+export { default } from "./vendor/pi/billion-context.mjs";

@@ -1,7 +1,7 @@
 # Third-party notices
 
 This plugin bundles the pi extension from `billion-context@0.1.215` (https://github.com/ranxianglei/billion-context) unmodified:
-`vendor/pi/billion-context.js` and `vendor/pi/pi-native.js`. See SOURCES.md for provenance.
+`vendor/pi/billion-context.mjs` and `vendor/pi/pi-native.mjs`. See SOURCES.md for provenance.
 
 The upstream implementation is MIT licensed:
 
