@@ -1,0 +1,52 @@
+Cargo.lock
+  h_201ed4c689ac8b 40-51
+Cargo.toml
+  h_201ed4c689ac8b 2
+crates/agent-core/Cargo.toml
+  h_201ed4c689ac8b 1-22
+crates/agent-core/README.md
+  h_201ed4c689ac8b 1-72
+crates/agent-core/src/cancel.rs
+  h_201ed4c689ac8b 1-87
+crates/agent-core/src/error.rs
+  h_201ed4c689ac8b 1-113
+crates/agent-core/src/event.rs
+  h_201ed4c689ac8b 1-177
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 1-51
+crates/agent-core/src/main.rs
+  h_201ed4c689ac8b 1-217
+crates/agent-core/src/message.rs
+  h_201ed4c689ac8b 1-326
+crates/agent-core/src/provider/anthropic.rs
+  h_201ed4c689ac8b 1-333
+crates/agent-core/src/provider/mod.rs
+  h_201ed4c689ac8b 1-452
+crates/agent-core/src/provider/openai.rs
+  h_201ed4c689ac8b 1-278
+crates/agent-core/src/provider/scripted.rs
+  h_201ed4c689ac8b 1-71
+crates/agent-core/src/provider/sse.rs
+  h_201ed4c689ac8b 1-147
+crates/agent-core/src/session.rs
+  h_201ed4c689ac8b 1-284
+crates/agent-core/src/tool.rs
+  h_201ed4c689ac8b 1-407
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 1-372
+crates/agent-core/tests/turn_loop.rs
+  h_201ed4c689ac8b 1-431
+docs/adr/0402-rust-agent-core.md
+  h_201ed4c689ac8b 1-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ae4a2f5481deb9c200b592f983ec492afa6623da",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
