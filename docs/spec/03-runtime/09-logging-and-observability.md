@@ -232,8 +232,19 @@ fields for forensic inspection. They are structured audit data, not a separate
 MVP provides:
 
 1. in-app error text with a stable code;
-2. an “Open logs folder” command; and
-3. optional copy of error details (code and `traceId`).
+2. an “Open logs folder” command;
+3. optional copy of error details (code and `traceId`); and
+4. a support bundle the user saves from Settings → About: one stored,
+   uncompressed zip holding `summary.txt` (version, platform, generation time,
+   the data directory with the user's name replaced by `[user]`, counts of what
+   the installation holds, and the names of any crash dumps) and, when there is
+   any, `app.log.tail` (the newest lines of each live category log, redacted
+   under §6). It carries no message text, no attachments, and no minidump
+   content. The destination is always the user's choice, and a dismissed save
+   dialog writes nothing.
+
+The bundle leaves the machine only because the user sends it: it is a file on
+disk, not a transfer, and no destination is contacted to produce one.
 
 There is no remote telemetry pipeline or cloud crash analytics in the MVP.
 
@@ -263,3 +274,6 @@ Session transcripts are user data and are not deleted by log rotation.
    broken pipe.
 6. Host restart, permission failure, shell timeout, and process abort remain
    diagnosable from stable lifecycle records and error codes.
+7. A support bundle built from a live installation opens as a zip, states
+   counts instead of content, carries no secret and no home-directory user
+   name, and is written only where the user chose to put it.

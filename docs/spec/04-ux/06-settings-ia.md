@@ -963,6 +963,13 @@ system while preserving their different data ownership:
 ### Info
 - Application name and version + open logs. The panel shows no internal
   protocol or host version and no build-time environment line
+- **Export diagnostics** row: one action builds the support bundle described in
+  the logging specification (§8) and saves it wherever the user picks, starting
+  from a dated `pi-diagnostics-<stamp>.zip` in Downloads. The row states the
+  saved path after a successful save and the failure text in place after a
+  failed one; dismissing the dialog leaves the row unchanged. Nothing is
+  uploaded, and the bundle's contents are counts and redacted log lines — never
+  message text
 - No outbound destination: the panel carries no report-a-problem action and no
   release link. A distribution build must not identify the project it derives
   from, so every affordance that opened an external repository or an external
