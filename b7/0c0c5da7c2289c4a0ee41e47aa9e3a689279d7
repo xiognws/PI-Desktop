@@ -1,0 +1,18 @@
+apps/desktop/electron/main/run-verdict.ts
+  h_201ed4c689ac8b 1-166
+apps/desktop/electron/test/run-verdict.test.mjs
+  h_201ed4c689ac8b 1-105
+apps/desktop/test/persistence-outbox-fs-lock.test.mjs
+  h_201ed4c689ac8b 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b70c0c5da7c2289c4a0ee41e47aa9e3a689279d7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
