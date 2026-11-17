@@ -1,0 +1,32 @@
+docs/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 579-584,598,600,695-699,703-707
+docs/spec/03-runtime/21-memory-store.md
+  h_201ed4c689ac8b 315-321
+packages/agent-runtime/src/context-budget.test.ts
+  h_201ed4c689ac8b 7,33,38-39,44-69,109-110,114-117,119-123
+packages/agent-runtime/src/context-budget.ts
+  h_201ed4c689ac8b 45-60,79-92,136,140-142
+packages/agent-runtime/src/memory-agent-tool.test.ts
+  h_201ed4c689ac8b 202-274
+packages/agent-runtime/src/memory-agent-tool.ts
+  h_201ed4c689ac8b 48-61,72,138-172,396-476,651
+packages/agent-runtime/src/runtime.test.ts
+  h_201ed4c689ac8b 7984,7989,7994,8008-8010,8029
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 1036-1042,1046-1047,8312-8316,8335,8337-8340,8342,8354
+packages/agent-runtime/src/subagent-context.test.ts
+  h_201ed4c689ac8b 303,305
+packages/shared/src/model-catalog.ts
+  h_201ed4c689ac8b 163-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "26d0d1c6832c5a2946350903fed0c8c7dc56ee74",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
