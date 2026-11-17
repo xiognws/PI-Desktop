@@ -1,0 +1,36 @@
+crates/agent-core/Cargo.toml
+  h_201ed4c689ac8b 17
+crates/agent-core/README.md
+  h_201ed4c689ac8b 37-40,85,96-102
+crates/agent-core/src/error.rs
+  h_201ed4c689ac8b 30-34,56
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 37-38,42,46
+crates/agent-core/src/memory.rs
+  h_201ed4c689ac8b 1-1197
+crates/agent-core/src/memory_context.rs
+  h_201ed4c689ac8b 1-325
+crates/agent-core/src/redaction.rs
+  h_201ed4c689ac8b 1-179
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 487-489,524-548,557-558,562,565-579,581-582,597-598
+crates/agent-core/src/skill_overlap.rs
+  h_201ed4c689ac8b 1-291
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 96-99,114,131-136,222-228
+crates/agent-core/tests/memory_flow.rs
+  h_201ed4c689ac8b 1-139
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 410-474
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "22ffa247a0460b1f6a486f71648fc7c55221f73f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
