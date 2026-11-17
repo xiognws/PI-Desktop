@@ -1,0 +1,22 @@
+crates/agent-core/README.md
+  h_201ed4c689ac8b 41,90
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 49
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 648-658
+crates/agent-core/src/skill_manage.rs
+  h_201ed4c689ac8b 1-828
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 789-832
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "90e2d777f7d0c6d9554139bc0a457a9356923a33",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
