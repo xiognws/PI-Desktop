@@ -155,6 +155,32 @@ export type ServerCommand = {
   label: string;
 };
 
+/**
+ * Spawn the server, working around Windows shims.
+ *
+ * `typescript-language-server` and `pyright` install as `.cmd` shims on Windows, and
+ * Node refuses to spawn those directly (`EINVAL`) since the BatBadBut fix. They have
+ * to go through the command processor, with quoting we do ourselves: `shell: true`
+ * would split a path containing a space, which is exactly where these live
+ * (`C:\Program Files\...`).
+ */
+function spawnServerProcess(spec: ServerCommand): ChildProcessWithoutNullStreams {
+  const stdio: ["pipe", "pipe", "pipe"] = ["pipe", "pipe", "pipe"];
+  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(spec.command)) {
+    // `cmd /s` strips the first and last quote of the whole command line, so the
+    // line needs one extra pair around it: without it the server receives a mangled
+    // first argument and exits with code 1 before the handshake.
+    const argumentsLine = spec.args.map((argument) => `"${argument}"`).join(" ");
+    const line = `""${spec.command}" ${argumentsLine}"`;
+    return spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", line], {
+      stdio,
+      windowsHide: true,
+      windowsVerbatimArguments: true,
+    });
+  }
+  return spawn(spec.command, spec.args, { stdio, windowsHide: true });
+}
+
 /** A running language server. */
 export class LspClient {
   private buffer = Buffer.alloc(0);
@@ -199,7 +225,7 @@ export class LspClient {
     root: string,
     timeouts: SessionTimeouts = DEFAULT_TIMEOUTS,
   ): Promise<LspClient> {
-    const child = spawn(spec.command, spec.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+    const child = spawnServerProcess(spec);
     const dispatcher: Dispatcher = new Dispatcher((payload) => {
       if (!child.stdin.destroyed) child.stdin.write(encodeFrame(payload));
     });
