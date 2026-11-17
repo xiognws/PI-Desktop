@@ -138,12 +138,24 @@ def generate(
     if kind == "raises":
         # 异常类是裸名字，不能加引号（`pytest.raises('ValueError')` 跑不起来）
         exception = str(value)
-        body = [
-            *prelude,
-            "    import pytest",
-            f"    with pytest.raises({exception}):",
-            *[f"        {line.strip()}" for line in arrange],
-        ]
+        if negative:
+            body = [
+                *prelude,
+                "    import pytest",
+                f"    with pytest.raises({exception}):",
+                *[f"        {line.strip()}" for line in arrange],
+            ]
+        else:
+            # 正向用例不能用同一形状：契约说"越界会被拒绝"，那么合法输入就必须
+            # **不被**拒绝。照抄 raises 会让正向用例因为被测件没抛异常而假失败。
+            body = [
+                *prelude,
+                "    import pytest",
+                "    try:",
+                *[f"        {line.strip()}" for line in arrange],
+                f"    except {exception} as problem:",
+                f'        pytest.fail(f"{label}：合法输入不应被拒绝（{{problem}}）")',
+            ]
     elif kind == "bool":
         expected = "True" if value else "False"
         body = [
@@ -199,8 +211,14 @@ def invert(
     label = entry.function_point
 
     if kind == "raises":
-        # 反过来的意思：本不该抛异常 —— 若真抛了，这条变异体就会失败
-        return [*prelude, *arrange, f'    assert True, "{label} 的变异体"']
+        # 反过来的意思：期望"被拒绝"。真实被测件不该拒绝合法输入，所以这条变异体
+        # 必然失败 —— 若它还能通过，说明断言没有真正生效。
+        return [
+            *prelude,
+            "    import pytest",
+            f"    with pytest.raises({value}):",
+            *[f"        {line.strip()}" for line in arrange],
+        ]
     if kind == "bool":
         flipped = "False" if value else "True"
         return [*prelude, *arrange, f'    assert {observe} is {flipped}, "{label} 的变异体"']
