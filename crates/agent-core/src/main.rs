@@ -193,6 +193,63 @@ fn usage() {
     println!("usage:");
     println!("  pi-desktop-agent-core --version     print the crate version");
     println!("  pi-desktop-agent-core self-check    run a scripted turn and print its events");
+    println!("  pi-desktop-agent-core serve         serve NDJSON JSON-RPC on stdio");
+}
+
+/// The protocol loop Electron main uses: one JSON value per line in, one out,
+/// `agent.event` notifications interleaved with responses.
+async fn serve() -> ExitCode {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    let (writer_tx, mut writer_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let writer = tokio::spawn(async move {
+        let mut stdout = tokio::io::stdout();
+        while let Some(line) = writer_rx.recv().await {
+            if stdout.write_all(line.as_bytes()).await.is_err() {
+                break;
+            }
+            if stdout.flush().await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Phase 2 ships no tools: filesystem/shell tools arrive with the host-core
+    // bridge, and an empty registry keeps declarations honest meanwhile.
+    let registry = ToolRegistry::new(Arc::new(AllowAll));
+    let sink: Arc<dyn agent_core::sidecar::LineSink> = Arc::new(writer_tx.clone());
+    let sidecar = Arc::new(agent_core::sidecar::Sidecar::new(sink, Arc::new(registry)));
+
+    let mut lines = BufReader::new(tokio::io::stdin()).lines();
+    loop {
+        match lines.next_line().await {
+            Ok(Some(line)) => match agent_core::rpc::parse_line(&line) {
+                agent_core::rpc::Incoming::Empty => {}
+                agent_core::rpc::Incoming::Invalid { error, id } => {
+                    let _ = writer_tx.send(agent_core::rpc::error_response(
+                        id.unwrap_or(Value::Null),
+                        error,
+                    ));
+                }
+                agent_core::rpc::Incoming::Request(request) => {
+                    if let Some(answer) = sidecar.handle(request).await {
+                        let _ = writer_tx.send(answer);
+                    }
+                }
+            },
+            // The peer closed stdin: shut down like a well-behaved child.
+            Ok(None) => break,
+            Err(error) => {
+                eprintln!("stdin read failed: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+
+    drop(sidecar);
+    drop(writer_tx);
+    let _ = writer.await;
+    ExitCode::SUCCESS
 }
 
 #[tokio::main]
@@ -209,6 +266,7 @@ async fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         }
+        Some("serve") => serve().await,
         _ => {
             usage();
             ExitCode::from(2)

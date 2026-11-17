@@ -11,6 +11,7 @@
 //! the sidecar in phase 2. That keeps the whole kernel testable from fixtures.
 
 pub mod anthropic;
+pub mod http;
 pub mod openai;
 pub mod scripted;
 pub mod sse;
@@ -103,6 +104,7 @@ pub trait Provider: Send + Sync {
     ) -> BoxFuture<'a, Result<ProviderStream>>;
 }
 
+#[derive(Debug)]
 pub struct ProviderStream {
     rx: mpsc::Receiver<StreamEvent>,
 }

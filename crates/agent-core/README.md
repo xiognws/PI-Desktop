@@ -37,6 +37,7 @@ each phase is additive on `main`.
 cargo test -p agent-core --offline
 cargo clippy -p agent-core --all-targets --offline
 cargo run -p agent-core --offline -- self-check
+cargo run -p agent-core --offline -- serve     # NDJSON JSON-RPC on stdio
 ```
 
 `self-check` runs a scripted two-step turn through the real loop and prints
@@ -45,12 +46,24 @@ the tool output, usage accumulated, event order). It is the smoke test the
 packaging step runs after a build, and it needs no network, credential or paid
 request.
 
+`serve` is the sidecar Electron main spawns. A session needs
+`sidecar.configure` before `agent.prompt`; the `scripted` provider kind exists
+for harnesses, and `openai`/`anthropic` take `baseUrl` plus `apiKey`:
+
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"sidecar.configure","params":{"provider":{"kind":"scripted","text":"hi"},"model":"m"}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"agent.prompt","params":{"sessionId":"s","turnId":"t","prompt":"hello"}}' \
+  | ./target/debug/pi-desktop-agent-core serve
+```
+
 ## Phase status
 
 | Phase | Contents | Status |
 | --- | --- | --- |
 | 1 | message model, events, cancellation, SSE + OpenAI/Anthropic decode, tool registry and gate, turn loop, transcript repair, self-check binary | **done** |
-| 2 | sidecar RPC surface (`sidecar.*`, `agent.prompt/steer/abort/compact/getStatus/disposeSession`, `native.session.*`), HTTP transports over `reqwest`+`rustls`, provider registry and auth from host config, host-core tool bridge | next |
+| 2a | NDJSON JSON-RPC codec, sidecar method surface (`sidecar.health/configure`, `agent.prompt/abort/getStatus/disposeSession`, `native.session.get`), HTTP transports over `reqwest`+`rustls` for both wires, `serve` mode over stdio | **done** |
+| 2b | host-core tool bridge (tool calls travel back through main, as the Node runtime's parent proxy does), provider/auth config read from host settings instead of the `configure` payload, remaining sidecar methods (`agent.steer`, `agent.compact`, `native.session.list/fork/search`) | next |
 | 3 | prompt composition and project instructions, context budget and compaction | |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5 | memory store and skills | |

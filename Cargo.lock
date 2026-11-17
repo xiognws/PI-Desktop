@@ -41,6 +41,7 @@ dependencies = [
 name = "agent-core"
 version = "0.21.0"
 dependencies = [
+ "reqwest",
  "serde",
  "serde_json",
  "thiserror",

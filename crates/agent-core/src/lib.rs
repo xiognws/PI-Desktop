@@ -33,7 +33,9 @@ pub mod error;
 pub mod event;
 pub mod message;
 pub mod provider;
+pub mod rpc;
 pub mod session;
+pub mod sidecar;
 pub mod tool;
 pub mod turn;
 
@@ -42,6 +44,7 @@ pub use error::{AgentError, Result};
 pub use event::{AgentEvent, AgentEventEnvelope, EventSink, RecordingSink};
 pub use message::{ContentPart, Message, Role, StopReason, ToolCall, ToolResult, Usage};
 pub use provider::{ChatRequest, Provider, ProviderStream, StreamEvent, ThinkingLevel};
+pub use sidecar::{LineSink, Sidecar};
 pub use tool::{
     AllowAll, DenyList, Permission, PermissionGate, Tool, ToolContext, ToolRegistry, ToolSpec,
 };
