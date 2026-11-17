@@ -33,6 +33,28 @@ impl CancelToken {
         self.inner.cancelled.load(Ordering::SeqCst)
     }
 
+    /// A token that is cancelled when either this token or itself is.
+    ///
+    /// A subagent gets one so `TaskStop` can end it alone, while the user's Stop
+    /// still reaches it: the child watches the parent.
+    pub fn child(&self) -> CancelToken {
+        let child = CancelToken::new();
+        if self.is_cancelled() {
+            child.cancel();
+            return child;
+        }
+        let parent = self.clone();
+        let watched = child.clone();
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = parent.cancelled() => watched.cancel(),
+                // The delegate settled on its own; stop watching.
+                _ = watched.cancelled() => {}
+            }
+        });
+        child
+    }
+
     /// Resolve when the token is cancelled. Safe to call in a `select!`: a
     /// token cancelled before the call resolves immediately.
     pub async fn cancelled(&self) {

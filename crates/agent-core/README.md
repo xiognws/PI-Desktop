@@ -38,6 +38,7 @@ each phase is additive on `main`.
 | `memory_context` | per-turn recall rendered as one `<memory_context>` block in the user message | `memory-context.ts` |
 | `skill_overlap` | the procedure-versus-fact gate and the "which skill covers this" hint | `memory-skill-overlap.ts` |
 | `redaction` | credential vocabulary and the scrub applied on the way out (memory, outbound text) | `packages/shared/src/redaction.ts` |
+| `delegate` | subagents: `Task`/`TaskWait`/`TaskList`/`TaskStop`, per-session delegation registry with its own cancel, delegate prompt framing, bounded reports (12,000 chars, both ends kept) | `subagent.ts`, `delegation-chain.ts` |
 | `ask` | the `asktool` card: question validation (300 code points, ≤20 questions), duplicate-label collapse, `asktool_request` event, `asktool.resolve` validation, skipped answers on abort | `asktool` in `packages/shared/src/types/agent.ts`, spec `17-asktool-questions.md` |
 | `context` | window/hard-limit/trigger arithmetic, token estimate anchored on provider usage | `agent/context_compressor.py` |
 | `compaction` | cut point, summary request, retained tail, fallback selection | `agent/context_compressor.py`, `agent/conversation_compression.py` |
@@ -85,7 +86,9 @@ printf '%s\n' \
 | 4b | where the rest of phase 4 actually lives: file/shell/search tools execute in the host (`tools.execute`), their per-class result budgets are host-enforced (spec 16), and `permissions.request` never reaches the kernel — main forwards it to the renderer itself, so `Permission::Ask` here only covers kernel-registered tools | note |
 | 5a | skills: catalog parsing (sorted, deduplicated), 60-character index cap, 8k catalog budget gate, Skills prompt section, `Skill` tool with a kernel-answered listing and host-delegated body load | **done** |
 | 5b | memory: the `memory` tool over `memory.remember/update/forget/recall` (single and 50-item batch writes, scope coherence, procedure gate naming the skill to patch, credential masking), per-turn `<memory_context>` recall injected into the user message, `AgentError::Refused` for model-fixable tool refusals | **done** |
-| 6 | MCP client, cron/scheduled runs, subagent delegation | |
+| 6a | subagent delegation: `Task` starts a bounded delegate turn (own prompt, own transcript, only its declared tools, 24 steps) and returns at once; `TaskWait` converges and reads the report once, `TaskList` reports state, `TaskStop` settles one delegate without touching the parent turn; reports bounded to 12,000 characters keeping both ends; every delegate event carries `parentToolCallId`/`agentName` | **done** |
+| 6b | delegation gaps left open on purpose: model overrides and configured fallbacks, `resume` chains, the scratch spill file for oversized reports, and automatic delivery of a report into a turn that already stopped calling tools (today `TaskWait` in the next turn is what reads it) | note |
+| 6c | MCP client, cron/scheduled runs | |
 | 7 | packaging: single exe, switch `runtime/sidecar.ts`, differential parity run, delete `packages/agent-runtime` | |
 
 Sizes being ported are recorded per component in ADR 0402; use that table to

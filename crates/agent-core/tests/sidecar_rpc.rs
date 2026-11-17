@@ -652,3 +652,65 @@ async fn aborting_a_turn_settles_its_open_card_as_skipped() {
     .await;
     assert_eq!(late["error"]["data"]["errorCode"], "ASKTOOL_NOT_FOUND");
 }
+
+#[tokio::test]
+async fn a_prompt_that_declares_subagents_offers_the_task_tools() {
+    let (sidecar, lines) = sidecar();
+    // Two Task calls in one turn: the first names a delegate that does not
+    // exist (refused without starting anything), the second starts one.
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "Task", "arguments": {"agent": "nope", "task": "x"}}},
+                {"toolCall": {"id": "call_2", "name": "Task", "arguments": {"agent": "explorer", "task": "find the parser"}}},
+                {"text": "done"},
+                {"text": "child one"},
+                {"text": "child two"},
+                {"text": "child three"}
+            ]},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1",
+            "prompt": "explore the repo",
+            "subagents": [{
+                "name": "explorer",
+                "description": "Read-only search across the repository.",
+                "prompt": "Search widely and report exact paths.",
+                "tools": ["Read", "Grep"]
+            }]
+        }),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(15))
+        .await
+        .expect("the turn finishes");
+
+    let session = call(
+        &sidecar,
+        3,
+        "native.session.get",
+        json!({"sessionId": "s1"}),
+    )
+    .await;
+    let raw = session["result"].to_string();
+    assert!(
+        raw.contains("Unknown subagent \\\"nope\\\""),
+        "the catalog is enforced: {raw}"
+    );
+    assert!(
+        raw.contains("is working in the background"),
+        "the delegate starts and Task returns immediately: {raw}"
+    );
+}

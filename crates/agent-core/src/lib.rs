@@ -32,6 +32,7 @@ pub mod ask;
 pub mod cancel;
 pub mod compaction;
 pub mod context;
+pub mod delegate;
 pub mod error;
 pub mod event;
 pub mod host_bridge;

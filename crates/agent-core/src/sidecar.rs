@@ -28,7 +28,7 @@ use crate::host_bridge::{tool_spec_from_value, HostBridge, HostTool};
 use crate::message::Message;
 use crate::provider::http::{HttpProvider, HttpProviderConfig};
 use crate::provider::scripted::ScriptedProvider;
-use crate::provider::{Provider, StreamEvent};
+use crate::provider::{BoxFuture, Provider, StreamEvent};
 use crate::rpc::{self, Request, RpcError};
 use crate::session::Transcript;
 use crate::tool::{AllowAll, PermissionGate, ToolRegistry};
@@ -191,10 +191,13 @@ struct Session {
     /// The catalog this session was launched with, kept live so a `Skill` call
     /// mid-turn lists what exists now rather than what existed at session start.
     skills: Arc<crate::skills::SkillCatalog>,
+    /// Delegations this session started. Kept per session so a report that
+    /// settled after the parent stopped calling tools is still readable.
+    delegations: Arc<crate::delegate::DelegationRegistry>,
 }
 
 impl Session {
-    fn new() -> Self {
+    fn new(session_id: &str) -> Self {
         Self {
             transcript: Arc::new(tokio::sync::Mutex::new(Transcript::new())),
             cancel: Mutex::new(CancelToken::new()),
@@ -202,6 +205,7 @@ impl Session {
             current_turn: Mutex::new(None),
             steering: Mutex::new(std::collections::VecDeque::new()),
             skills: Arc::new(crate::skills::SkillCatalog::new()),
+            delegations: Arc::new(crate::delegate::DelegationRegistry::new(session_id)),
         }
     }
 }
@@ -426,7 +430,7 @@ impl Sidecar {
             .map_err(|_| RpcError::internal("session lock poisoned"))?;
         Ok(sessions
             .entry(session_id.to_string())
-            .or_insert_with(|| Arc::new(Session::new()))
+            .or_insert_with(|| Arc::new(Session::new(session_id)))
             .clone())
     }
 
@@ -560,7 +564,30 @@ impl Sidecar {
         // `Skill` exists only when a library exists, and only in the mode that may
         // write one — the same gate the desktop runtime uses. A tool whose only
         // honest answer is "there is nothing here" is noise in every request.
+        let subagents = parse_subagents(request);
         let mut extra: Vec<Arc<dyn crate::Tool>> = Vec::new();
+        if !subagents.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
+            // A delegate runs its own turn with the session's provider and only
+            // the tools its definition declares.
+            let hub = Arc::new(crate::delegate::DelegationHub::new(
+                session.delegations.clone(),
+                subagents,
+                Arc::new(SidecarDelegateRunner {
+                    provider: provider.clone(),
+                    tools: tools.clone(),
+                    sink: Arc::new(NotificationSink {
+                        out: self.out.clone(),
+                    }),
+                    model: config.model.clone(),
+                    model_limits: model_limits_from(request),
+                    guidance: Vec::new(),
+                }),
+            ));
+            extra.push(Arc::new(crate::delegate::TaskTool::new(hub.clone())));
+            extra.push(Arc::new(crate::delegate::TaskWaitTool::new(hub.clone())));
+            extra.push(Arc::new(crate::delegate::TaskListTool::new(hub.clone())));
+            extra.push(Arc::new(crate::delegate::TaskStopTool::new(hub)));
+        }
         if !catalog.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
             // An id lookup is forwarded to the host's own `Skill` handler when
             // main declared one; the listing is answered here.
@@ -1200,4 +1227,203 @@ fn model_limits_from(request: &Request) -> Option<ModelLimits> {
         context_window,
         max_tokens,
     })
+}
+
+/// Attributes everything a delegate emits to the `Task` call that started it, so
+/// the renderer can nest the rows under it and the parent's history stays one
+/// stream.
+struct DelegateSink {
+    inner: Arc<dyn crate::EventSink>,
+    parent_tool_call_id: String,
+    agent_name: String,
+}
+
+impl crate::EventSink for DelegateSink {
+    fn emit(&self, envelope: crate::AgentEventEnvelope) {
+        self.inner
+            .emit(envelope.with_delegate(&self.parent_tool_call_id, &self.agent_name));
+    }
+}
+
+/// Runs one delegate turn: its own transcript, its own prompt, only its own tools.
+struct SidecarDelegateRunner {
+    provider: Arc<dyn Provider>,
+    tools: Arc<ToolRegistry>,
+    sink: Arc<dyn crate::EventSink>,
+    model: String,
+    model_limits: Option<crate::context::ModelLimits>,
+    guidance: Vec<String>,
+}
+
+impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
+    fn run<'a>(
+        &'a self,
+        request: crate::delegate::DelegateRunRequest,
+    ) -> BoxFuture<'a, crate::delegate::DelegateOutcome> {
+        Box::pin(async move {
+            use crate::delegate::{DelegateOutcome, DelegationError, DelegationStatus};
+            let prompt = crate::delegate::compose_subagent_system_prompt(
+                &request.definition,
+                &self.guidance,
+                &request.definition.tools,
+            );
+            let scoped = Arc::new(self.tools.restricted(&request.definition.tools));
+            let sink: Arc<dyn crate::EventSink> = Arc::new(DelegateSink {
+                inner: self.sink.clone(),
+                parent_tool_call_id: request.parent_tool_call_id.clone(),
+                agent_name: request.definition.name.clone(),
+            });
+            let mut engine = TurnEngine::new(self.provider.clone(), scoped, sink);
+            if let Some(limits) = self.model_limits {
+                engine = engine.with_model_limits(limits);
+            }
+            let mut transcript = Transcript::new();
+            transcript.push(Message::user_text(request.task.clone()));
+            let config = TurnConfig {
+                model: self.model.clone(),
+                system: Some(prompt),
+                max_steps: crate::delegate::SUBAGENT_MAX_STEPS,
+                temperature: None,
+                max_output_tokens: None,
+                thinking: ThinkingLevel::Off,
+            };
+            let outcome = engine
+                .run_turn(
+                    &request.session_id,
+                    &request.delegation_id,
+                    &mut transcript,
+                    &config,
+                    request.cancel.clone(),
+                )
+                .await;
+            let report = last_assistant_text(&transcript);
+            let tool_calls = transcript
+                .messages()
+                .iter()
+                .map(|message| message.tool_results().len())
+                .sum();
+            match outcome {
+                Ok(outcome) => {
+                    if report.trim().is_empty() {
+                        DelegateOutcome {
+                            status: DelegationStatus::Failed,
+                            report: String::new(),
+                            turns: outcome.steps,
+                            tool_calls,
+                            usage: outcome.usage,
+                            error: Some(DelegationError {
+                                code: "SUBAGENT_NO_REPORT".into(),
+                                message: "The subagent finished without writing a report.".into(),
+                            }),
+                        }
+                    } else {
+                        DelegateOutcome {
+                            status: DelegationStatus::Completed,
+                            report,
+                            turns: outcome.steps,
+                            tool_calls,
+                            usage: outcome.usage,
+                            error: None,
+                        }
+                    }
+                }
+                Err(crate::error::AgentError::Cancelled) => DelegateOutcome {
+                    status: DelegationStatus::Aborted,
+                    report,
+                    turns: 0,
+                    tool_calls,
+                    usage: crate::Usage::default(),
+                    error: None,
+                },
+                Err(error) => DelegateOutcome {
+                    status: DelegationStatus::Failed,
+                    report,
+                    turns: 0,
+                    tool_calls,
+                    usage: crate::Usage::default(),
+                    error: Some(DelegationError {
+                        code: error.code().to_string(),
+                        message: error.to_string(),
+                    }),
+                },
+            }
+        })
+    }
+}
+
+/// The delegate's final assistant text: the only thing the parent model reads.
+fn last_assistant_text(transcript: &Transcript) -> String {
+    transcript
+        .messages()
+        .iter()
+        .rev()
+        .find(|message| message.role == crate::Role::Assistant)
+        .map(|message| message.text())
+        .unwrap_or_default()
+}
+
+/// Tools that can change files or run commands, for the delegate's mutability note.
+const MUTATING_TOOLS: [&str; 6] = [
+    "Write",
+    "Edit",
+    "Bash",
+    "OfficeWrite",
+    "AstEdit",
+    "AstEditApply",
+];
+
+/// Read the subagent definitions a prompt declares.
+///
+/// An entry without a name is dropped: the model picks a delegate by name, so an
+/// entry it cannot name is not one it can start.
+fn parse_subagents(request: &Request) -> Vec<crate::delegate::SubagentDefinition> {
+    let Some(entries) = request.params.get("subagents").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let mut definitions = Vec::new();
+    for entry in entries {
+        let Some(name) = entry
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+        else {
+            continue;
+        };
+        let description = entry
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let prompt = entry
+            .get("prompt")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let tools: Vec<String> = entry
+            .get("tools")
+            .and_then(Value::as_array)
+            .map(|tools| {
+                tools
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::trim)
+                    .filter(|tool| !tool.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let can_mutate = tools
+            .iter()
+            .any(|tool| MUTATING_TOOLS.iter().any(|known| known == tool));
+        definitions.push(crate::delegate::SubagentDefinition {
+            name: name.to_string(),
+            description,
+            prompt,
+            tools,
+            can_mutate,
+        });
+    }
+    definitions
 }

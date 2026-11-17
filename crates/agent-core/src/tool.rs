@@ -172,6 +172,24 @@ impl ToolRegistry {
     /// session), while the host's declarations are shared — so the registry is
     /// copied rather than mutated in place, and two sessions cannot see each
     /// other's tools.
+    /// A copy holding only `names`, keeping the same gate.
+    ///
+    /// A subagent gets exactly the tools its definition declares: delegation must
+    /// not become a way to reach a capability the parent's definition withheld.
+    pub fn restricted(&self, names: &[String]) -> ToolRegistry {
+        let tools = self
+            .tools
+            .iter()
+            .filter(|(name, _)| names.iter().any(|wanted| wanted == *name))
+            .map(|(name, tool)| (name.clone(), tool.clone()))
+            .collect();
+        ToolRegistry {
+            tools,
+            gate: self.gate.clone(),
+            result_limit_chars: self.result_limit_chars,
+        }
+    }
+
     pub fn extended(&self, extra: Vec<Arc<dyn Tool>>) -> ToolRegistry {
         let mut tools = self.tools.clone();
         for tool in extra {

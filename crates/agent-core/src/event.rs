@@ -116,6 +116,12 @@ pub struct AgentEventEnvelope {
     pub session_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub turn_id: Option<String>,
+    /// Set on events a subagent produced, naming the `Task` call that owns it.
+    #[serde(rename = "parentToolCallId", skip_serializing_if = "Option::is_none")]
+    pub parent_tool_call_id: Option<String>,
+    /// Set on events a subagent produced: the definition's name.
+    #[serde(rename = "agentName", skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
     pub ts: i64,
     pub event: AgentEvent,
 }
@@ -129,9 +135,18 @@ impl AgentEventEnvelope {
         Self {
             session_id: session_id.into(),
             turn_id: Some(turn_id.into()),
+            parent_tool_call_id: None,
+            agent_name: None,
             ts: now_ms(),
             event,
         }
+    }
+
+    /// Attribute this event to the delegate that produced it.
+    pub fn with_delegate(mut self, parent_tool_call_id: &str, agent_name: &str) -> Self {
+        self.parent_tool_call_id = Some(parent_tool_call_id.to_string());
+        self.agent_name = Some(agent_name.to_string());
+        self
     }
 }
 
