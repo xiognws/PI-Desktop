@@ -1,0 +1,22 @@
+crates/agent-core/README.md
+  h_201ed4c689ac8b 90-91
+crates/agent-core/src/delegate.rs
+  h_201ed4c689ac8b 54-62,403-424,460-461,478,483-563,969,972
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 641-642
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 28,101-104,120,143-149,268-283,388-457
+crates/agent-core/tests/delegation_resume.rs
+  h_201ed4c689ac8b 1-335
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bf64bd1c271d377179d724a4287d5936f687e91c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
