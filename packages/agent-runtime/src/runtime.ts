@@ -3900,6 +3900,18 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           return (
             "Apply a staged AstEdit proposal: writes every file in it atomically per file (temp file then rename) and consumes the proposal. Fails without writing anything when any file changed since the proposal was made, when the proposal expired, or when it belongs to another session. Re-run AstEdit to regenerate it."
           );
+        case "LspDefinition":
+          return (
+            "Find where a symbol is declared, using the project's language server. Prefer this over Grep when you need the declaration rather than every mention: grep cannot tell a definition from a use. Positions are 1-based. A missing server is reported with the binary it looked for and where it searched."
+          );
+        case "LspReferences":
+          return (
+            "Find every reference to the symbol at a position, using the project's language server. This is the blast radius of a rename; a Grep count is not, because it also matches unrelated names. Pass includeDeclaration to include the declaration itself."
+          );
+        case "LspDiagnostics":
+          return (
+            "Ask the language server what is wrong with a file you just edited, instead of assuming it compiled. Opens the file and waits a bounded few seconds for the server to publish. An empty result can also mean the server is still indexing, and the answer says which happened."
+          );
         case "OfficeRead":
           return (
             "Read an Office document: `xlsx` (sheet rows), `docx` (paragraphs and tables), " +
@@ -4066,6 +4078,22 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         proposalId: Type.String({
           description: "The `proposalId` returned by AstEdit. Consumed by this call.",
         }),
+      },
+      LspDefinition: {
+        file: Type.String({ description: "File containing the symbol, relative to the workspace root." }),
+        line: Type.Number({ description: "1-based line of the symbol." }),
+        column: Type.Number({ description: "1-based column of the symbol." }),
+      },
+      LspReferences: {
+        file: Type.String({ description: "File containing the symbol, relative to the workspace root." }),
+        line: Type.Number({ description: "1-based line of the symbol." }),
+        column: Type.Number({ description: "1-based column of the symbol." }),
+        includeDeclaration: Type.Optional(
+          Type.Boolean({ description: "Include the declaration itself. Defaults to false." }),
+        ),
+      },
+      LspDiagnostics: {
+        file: Type.String({ description: "File to inspect, relative to the workspace root." }),
       },
       OfficeRead: {
         format: Type.Union(
@@ -4744,6 +4772,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "AstSearch",
             "AstEdit",
             "AstEditApply",
+            "LspDefinition",
+            "LspReferences",
+            "LspDiagnostics",
             "BrowserPreview",
             "PluginCheck",
             "TodoWrite",
@@ -4761,6 +4792,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "Edit",
             "AstEdit",
             "AstEditApply",
+            "LspDefinition",
+            "LspReferences",
+            "LspDiagnostics",
             "OfficeRead",
             "OfficeWrite",
           ];
