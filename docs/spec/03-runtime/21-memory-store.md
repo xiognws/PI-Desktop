@@ -312,7 +312,13 @@ The list is retired:
   contradicting memory supersedes the old one (`superseded_by`) instead of
   deleting it. The agent tool exposes `remember` / `update` / `forget` / `search`
   over this surface; the whole-store editing actions (`add`, `patch`, `replace`,
-  `remove`, `batch`) and the character budgets are gone.
+  `remove`, `batch`) and the character budgets are gone. `remember` still writes
+  one memory, but accepts `items` — up to 50 memories in a single call — because
+  an import of a few thousand memories otherwise costs one provider request per
+  memory: a measured 3,330-entry migration ran 1,237 tool calls inside one turn
+  and re-sent a growing transcript 312 times (87.8M prompt tokens). `items` is a
+  transport batch over the same per-memory validation, procedure gate and
+  credential scrub; it is not the retired whole-store `batch` editor.
 - **Retrieval, not injection.** Nothing renders the store into the system prompt.
   Each turn asks `memory.recall` for memories relevant to the user's message and
   places the hits in the *user* message, capped in characters, so the request

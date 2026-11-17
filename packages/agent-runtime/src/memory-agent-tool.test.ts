@@ -199,6 +199,79 @@ describe("remember", () => {
   });
 });
 
+describe("remember items (batch)", () => {
+  it("stores a whole batch inside one tool call", async () => {
+    const { result, host } = await run({
+      action: "remember",
+      items: [
+        { title: "Build tool", body: "the repo builds with pnpm" },
+        { title: "Relay board", body: "external-only", tags: ["hardware"] },
+        { title: "Port clash", body: "8888 is taken", kind: "pitfall" },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    // One provider request, three host writes: the point of the batch.
+    expect(host.calls.map((call) => call.method)).toEqual([
+      "memory.remember",
+      "memory.remember",
+      "memory.remember",
+    ]);
+    expect(result.text).toContain("Saved 3 memories.");
+    expect(result.details).toMatchObject({ action: "remember", count: 3, failed: 0 });
+  });
+
+  it("saves the valid items and says which ones it refused", async () => {
+    const { result, host } = await run({
+      action: "remember",
+      items: [
+        { title: "Build tool", body: "the repo builds with pnpm" },
+        { title: "", body: "no title on this one" },
+        { title: "Port clash", body: "8888 is taken" },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(host.calls).toHaveLength(2);
+    expect(result.text).toContain("Saved 2 of 3 memories.");
+    expect(result.text).toContain("Not saved");
+    expect(result.details).toMatchObject({ count: 2, failed: 1 });
+  });
+
+  it("refuses more items than one call may carry, before any RPC", async () => {
+    const items = Array.from({ length: 51 }, (_, index) => ({
+      title: `t${index}`,
+      body: `b${index}`,
+    }));
+
+    const { result, host } = await run({ action: "remember", items });
+
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("at most 50");
+    expect(host.calls).toHaveLength(0);
+  });
+
+  it("requires a non-empty array", async () => {
+    const { result, host } = await run({ action: "remember", items: [] });
+
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("non-empty array");
+    expect(host.calls).toHaveLength(0);
+  });
+
+  it("trims the echoed lines so a big batch does not refill the context", async () => {
+    const items = Array.from({ length: 20 }, (_, index) => ({
+      title: `item ${index}`,
+      body: `fact ${index}`,
+    }));
+
+    const { result } = await run({ action: "remember", items });
+
+    expect(result.text).toContain("Saved 20 memories.");
+    expect(result.text).toContain("(+8 more saved)");
+  });
+});
+
 describe("the procedure gate", () => {
   it("refuses a procedure and names the skill to patch instead", async () => {
     // Measured: the same four-step procedure landed in the library *and* in

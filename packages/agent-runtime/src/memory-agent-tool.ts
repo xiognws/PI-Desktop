@@ -45,6 +45,20 @@ const MAX_SEARCH_LIMIT = 50;
 const MEMORY_KINDS = ["fact", "preference", "decision", "pitfall", "procedure"] as const;
 const MEMORY_SCOPES = ["global", "project", "session"] as const;
 
+/**
+ * Most memories one `remember` call may carry in `items`.
+ *
+ * A bulk import (a memory store migration, a notes file) must not degenerate
+ * into one tool call — and therefore one full-context provider request — per
+ * memory: a measured 3,330-entry import ran 1,237 `memory` calls inside a single
+ * turn and re-sent a growing transcript 312 times, 87.8M prompt tokens. Batched,
+ * the same import is a few dozen calls.
+ */
+const MEMORY_BATCH_LIMIT = 50;
+
+/** Batch lines echoed back before the result is summarized instead. */
+const MEMORY_BATCH_LINES_SHOWN = 12;
+
 type MemoryKindName = (typeof MEMORY_KINDS)[number];
 type MemoryScopeName = (typeof MEMORY_SCOPES)[number];
 
@@ -55,6 +69,7 @@ const MEMORY_TOOL_DESCRIPTION = [
   "",
   "Actions:",
   "- `remember` stores one memory. Required: `title` (a few words naming what it is about) and `body` (the memory itself). Optional: `kind` — `fact` (default), `preference`, `decision`, `pitfall`; `tags`; `scope` — `global` (default, true everywhere), `project` (this project only), `session` (this conversation only); `pinned` (recalled every turn). Writing the same title and body again refreshes the existing memory instead of duplicating it.",
+  "- `remember` with `items` stores many memories in one call (at most 50). Use it whenever you have more than a couple to write — an import, a migration, a notes file: one call per memory is 50 provider requests, each re-sending the whole conversation.",
   "- `update` changes a memory you already hold, by `id`: any of `title`, `body`, `tags`, `pinned`, `confidence`. Use it when the fact changed, rather than storing a contradicting second copy.",
   "- `forget` deletes one memory by `id`. Use it for what turned out wrong, or that the user asked you to drop.",
   "- `search` runs a keyword query over the store and returns the closest memories with their ids, best first. Search before `remember` when you may already know this, and before `update` or `forget` when you do not have the id. Query with the words the memory would contain, not with a question.",
@@ -119,6 +134,41 @@ const MEMORY_TOOL_PARAMETERS = Type.Object(
     query: Type.Optional(Type.String({ description: "search. Words the memory would contain." })),
     limit: Type.Optional(
       Type.Number({ description: "search. How many hits at most. Defaults to 8, capped at 50." }),
+    ),
+    items: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            title: Type.String({ description: "A few words naming what this memory is about." }),
+            body: Type.String({
+              description: "The memory itself: one fact, preference, decision or pitfall.",
+            }),
+            kind: Type.Optional(
+              Type.Union(MEMORY_KINDS.map((kind) => Type.Literal(kind)), {
+                description: "Defaults to `fact`.",
+              }),
+            ),
+            tags: Type.Optional(
+              Type.Array(Type.String(), {
+                description: "Short labels that make this memory findable later.",
+              }),
+            ),
+            scope: Type.Optional(
+              Type.Union(MEMORY_SCOPES.map((scope) => Type.Literal(scope)), {
+                description: "Defaults to `global`.",
+              }),
+            ),
+            pinned: Type.Optional(
+              Type.Boolean({ description: "Recalled on every turn; standing instructions only." }),
+            ),
+          },
+          { additionalProperties: false },
+        ),
+        {
+          maxItems: MEMORY_BATCH_LIMIT,
+          description: `remember only. Store many memories in one call (at most ${MEMORY_BATCH_LIMIT}) instead of one call per memory — use this for imports and migrations. Each item takes the same fields as a single \`remember\`.`,
+        },
+      ),
     ),
   },
   { additionalProperties: false },
@@ -343,6 +393,87 @@ export function createMemoryTool(host: MemoryToolHost, options: MemoryToolOption
     });
   };
 
+  /**
+   * Store many memories in one tool call: one provider request, N host writes.
+   *
+   * `remember` is reused per item, so an item's validation, procedure gate and
+   * credential masking are exactly the single-memory ones; only the result is
+   * composed here, and the echoed lines are capped so a 50-item import does not
+   * put 50 lines back into the context it was trying to save.
+   */
+  const rememberBatch = async (
+    raw: Record<string, unknown>,
+  ): Promise<AgentToolResult<Record<string, unknown>>> => {
+    const items = raw.items;
+    if (!Array.isArray(items) || items.length === 0) {
+      return text(
+        'items must be a non-empty array: [{"title": ..., "body": ...}, ...].',
+        { errorCode: "MEMORY_INVALID_ARGUMENT" },
+        true,
+      );
+    }
+    if (items.length > MEMORY_BATCH_LIMIT) {
+      return text(
+        `items takes at most ${MEMORY_BATCH_LIMIT} memories per call (${items.length} given). Send the first ${MEMORY_BATCH_LIMIT}, then the rest in another call.`,
+        { errorCode: "MEMORY_INVALID_ARGUMENT" },
+        true,
+      );
+    }
+    const saved: { line: string; id?: string }[] = [];
+    const failed: string[] = [];
+    let masked = false;
+    for (const [index, item] of items.entries()) {
+      const position = index + 1;
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        failed.push(`#${position}: not an object with a title and a body`);
+        continue;
+      }
+      const result = await remember(item as Record<string, unknown>);
+      const message = result.content
+        .map((part) => (part.type === "text" ? part.text : ""))
+        .join("\n");
+      if (result.isError) {
+        failed.push(`#${position}: ${message}`);
+        continue;
+      }
+      const details = result.details ?? {};
+      if (details.masked === true) masked = true;
+      saved.push({
+        line: message.split(MEMORY_SCRUB_NOTE)[0] ?? message,
+        ...(typeof details.id === "string" ? { id: details.id } : {}),
+      });
+    }
+    if (saved.length === 0) {
+      return text(
+        ["No memory was saved.", "", ...failed].join("\n"),
+        { action: "remember", count: 0, failed: failed.length },
+        true,
+      );
+    }
+    const lines = [
+      saved.length === items.length
+        ? `Saved ${saved.length} memories.`
+        : `Saved ${saved.length} of ${items.length} memories.`,
+      "",
+      ...saved.slice(0, MEMORY_BATCH_LINES_SHOWN).map((entry) => entry.line),
+    ];
+    if (saved.length > MEMORY_BATCH_LINES_SHOWN) {
+      lines.push(`(+${saved.length - MEMORY_BATCH_LINES_SHOWN} more saved)`);
+    }
+    if (failed.length > 0) {
+      lines.push("", "Not saved (fix and send again in the same batch):", ...failed);
+    }
+    const ids = saved.flatMap((entry) => (entry.id ? [entry.id] : []));
+    const body = lines.join("\n");
+    return text(masked ? `${body}${MEMORY_SCRUB_NOTE}` : body, {
+      action: "remember",
+      count: saved.length,
+      failed: failed.length,
+      ...(ids.length > 0 ? { ids } : {}),
+      ...(masked ? { masked: true } : {}),
+    });
+  };
+
   /** Patch one memory: any subset of the editable fields, one host call. */
   const update = async (
     raw: Record<string, unknown>,
@@ -517,7 +648,7 @@ export function createMemoryTool(host: MemoryToolHost, options: MemoryToolOption
       const raw = (rawParams ?? {}) as Record<string, unknown>;
       switch (raw.action) {
         case "remember":
-          return remember(raw);
+          return raw.items === undefined ? remember(raw) : rememberBatch(raw);
         case "update":
           return update(raw);
         case "forget":

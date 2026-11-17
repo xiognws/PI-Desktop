@@ -7981,17 +7981,17 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
     vi.spyOn(runtime as any, "contextBudget")
       .mockReturnValueOnce({
-        tokens: 195_000,
+        tokens: 90_000,
         hardLimit: 224_000,
         requestHeadroom: 32_000,
       })
       .mockReturnValueOnce({
-        tokens: 198_000,
+        tokens: 96_000,
         hardLimit: 224_000,
         requestHeadroom: 32_000,
       })
       .mockReturnValue({
-        tokens: 100_000,
+        tokens: 40_000,
         hardLimit: 224_000,
         requestHeadroom: 32_000,
       });
@@ -8005,8 +8005,9 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const stillBelow = await prepareNextTurn(nextTurn);
     await handleAgentEvent({ type: "turn_end", message: assistant, toolResults: [toolResult] });
 
-    // 29k left is inside the first reminder tier but still below the 90%
-    // compaction trigger, so the model can close out before host compaction.
+    // 22k left before the 112,000 compaction trigger is inside the first
+    // reminder tier (25% of the trigger) and still short of the trigger, so the
+    // model can close out before host compaction.
     expect(below.context.systemPrompt).toContain("<context_budget>");
     expect(below.context.systemPrompt).toContain("new_context");
     expect(below.context.messages.at(-1)).toMatchObject({
@@ -8025,7 +8026,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
 
     vi.spyOn(runtime as any, "contextBudget")
       .mockReturnValueOnce({
-        tokens: 225_000,
+        tokens: 120_000,
         hardLimit: 224_000,
         requestHeadroom: 32_000,
       })

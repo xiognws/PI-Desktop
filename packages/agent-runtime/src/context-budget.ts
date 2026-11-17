@@ -42,6 +42,22 @@ export const COMPACTION_MAX_KEEP_RECENT_TOKENS = 64_000;
  */
 export const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS = 20_000;
 
+/**
+ * Ceiling on the window a session plans its compaction against.
+ *
+ * The compaction trigger is a fraction of the window, so a model that advertises
+ * a million tokens would let one turn carry half a million tokens through
+ * hundreds of requests: a measured Hindsight->memory import turn ran 312
+ * requests from 13k to 527k tokens, 87.8M prompt tokens in one turn.
+ *
+ * Hermes bounds the same problem per model with `context_length: 262144`, and
+ * this ceiling is the same number: a bigger reported window still runs, but the
+ * session compacts at half of 262,144 instead of half a million. The model's own
+ * reported window is left as published — this bounds spend, not capability —
+ * and the summary request is still preflighted against the real window.
+ */
+export const COMPACTION_CONTEXT_WINDOW_CEILING = 262_144;
+
 /** Context limits derived from the active model's window.
  *
  * `hardLimit` is the safety boundary: the next provider request must not be
@@ -60,8 +76,20 @@ export type ContextBudget = {
   keepRecentTokens: number;
 };
 
-/** Fraction of the safe request budget that starts automatic compaction. */
-export const AUTO_COMPACTION_TRIGGER_RATIO = 0.9;
+/**
+ * Fraction of the safe request budget that starts automatic compaction.
+ *
+ * Mirrors Hermes' `compression.threshold: 0.5`: compaction is a share of the
+ * window, not a late safety valve. At 0.9 a model advertising a million tokens
+ * did not compact until 855,000, so every request in a long turn re-sent up to
+ * half a million tokens - one measured Hindsight->memory import turn carried 312
+ * requests from 13k to 527k tokens, 87.8M prompt tokens in a single turn.
+ *
+ * The window itself is bounded separately: `COMPACTION_CONTEXT_WINDOW_CEILING`
+ * caps the window a session plans against, the way Hermes caps it per model with
+ * `context_length`.
+ */
+export const AUTO_COMPACTION_TRIGGER_RATIO = 0.5;
 
 /**
  * Start compaction before the hard boundary so estimator drift and one-turn
@@ -105,10 +133,13 @@ export type ContextBudgetLimits = Omit<ContextBudget, "tokens">;
 export function contextBudgetLimitsFor(
   model: ContextBudgetModel,
 ): ContextBudgetLimits {
-  const contextWindow = Math.max(
+  const reportedWindow = Math.max(
     1,
     Math.round(model.contextWindow || DEFAULT_CONTEXT_WINDOW),
   );
+  // Spend bound, not a capability claim: a million-token window still serves a
+  // request of that size, but the session compacts as if the window were smaller.
+  const contextWindow = Math.min(reportedWindow, COMPACTION_CONTEXT_WINDOW_CEILING);
   const modelOutputBudget = Math.min(
     Math.max(1, Math.round(model.maxTokens || DEFAULT_MAX_TOKENS)),
     Math.max(1, Math.floor(contextWindow * 0.25)),

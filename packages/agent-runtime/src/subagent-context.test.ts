@@ -300,9 +300,9 @@ describe("prepareDelegateTurnContext", () => {
     const messages: AgentMessage[] = [
       userMessage(taskBrief),
       assistantToolCall("call-1"),
-      toolResult("a".repeat(2_300), "call-1"),
+      toolResult("a".repeat(900), "call-1"),
       assistantToolCall("call-2"),
-      toolResult("b".repeat(2_300), "call-2"),
+      toolResult("b".repeat(900), "call-2"),
     ];
     const baseBudget = contextBudgetFor(smallModel(), messages);
     expect(baseBudget.tokens).toBeLessThan(

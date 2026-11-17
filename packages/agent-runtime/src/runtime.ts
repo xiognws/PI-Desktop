@@ -1033,12 +1033,18 @@ const CONTEXT_COMPACTION_TOOL_REPLY: Record<CompactionStrategy, string> = {
  * Two-tier budget reminder, matching Codex's `TokenBudgetReminder` and
  * `AutoCompactFallbackPrompt`. Codex reads both thresholds and both texts from
  * per-model metadata; we have no such feed, so the thresholds are derived from
- * the same hard limit the compaction guard uses and the texts are ours.
+ * the automatic-compaction trigger — the point the reminder is warning about —
+ * and the texts are ours.
+ *
+ * Deriving them from the trigger rather than the hard limit is what keeps them
+ * reachable now that compaction starts at half of the safe budget: a tier that
+ * only fires below 15% of the hard budget would sit *after* the trigger and
+ * could never be shown before compaction replaced the context.
  */
 const CONTEXT_REMINDER_MIN_TOKENS = 8_000;
 const CONTEXT_REMINDER_MAX_TOKENS = 32_000;
-const CONTEXT_REMINDER_RATIO = 0.15;
-/** Close enough to the boundary that the next turn is likely to cross it. */
+const CONTEXT_REMINDER_RATIO = 0.25;
+/** Close enough to the trigger that the next turn is likely to cross it. */
 const CONTEXT_FALLBACK_REMINDER_TOKENS = 2_000;
 
 function contextBudgetReminder(remaining: number): string {
@@ -8303,8 +8309,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     context: AgentContext,
     budget: ContextBudget,
   ): AgentContext {
-    const remaining = Math.max(0, budget.hardLimit - budget.tokens);
-    const reminder = this.claimContextBudgetReminder(remaining, budget);
+    const trigger = automaticCompactionThresholdFor(budget);
+    // What the model is told is what is true: the space left *before compaction*,
+    // not the space left before the hard boundary it will never reach.
+    const remaining = Math.max(0, trigger - budget.tokens);
+    const reminder = this.claimContextBudgetReminder(remaining, trigger);
     if (!reminder) return context;
     const legacyContext = context as AgentContext & { systemPrompt?: string };
     const systemPrompt =
@@ -8323,10 +8332,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
 
   private claimContextBudgetReminder(
     remaining: number,
-    budget: ContextBudget,
+    trigger: number,
   ): string | undefined {
+    const fallbackThreshold = Math.max(
+      CONTEXT_FALLBACK_REMINDER_TOKENS,
+      Math.floor(trigger * 0.02),
+    );
     if (
-      remaining <= CONTEXT_FALLBACK_REMINDER_TOKENS &&
+      remaining <= fallbackThreshold &&
       !this.contextFallbackReminderClaimed
     ) {
       this.contextFallbackReminderClaimed = true;
@@ -8338,7 +8351,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       CONTEXT_REMINDER_MAX_TOKENS,
       Math.max(
         CONTEXT_REMINDER_MIN_TOKENS,
-        Math.floor(budget.hardLimit * CONTEXT_REMINDER_RATIO),
+        Math.floor(trigger * CONTEXT_REMINDER_RATIO),
       ),
     );
     if (remaining > threshold || this.contextReminderClaimed) return undefined;

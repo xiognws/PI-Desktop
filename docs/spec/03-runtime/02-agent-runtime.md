@@ -576,8 +576,12 @@ reference only, not a linked or copied dependency.
 
 Compaction follows Codex's mechanism (ADR 0064, amended by D623): it remains
 inline at turn boundaries, and the model can request it through `new_context`.
-Automatic compaction starts at 90% of the derived `hardLimit`; there is no
-background pre-computation.
+Automatic compaction starts at half of the derived `hardLimit` — the same 0.5
+share Hermes uses for `compression.threshold` — and the window that budget is
+derived from is capped at 262,144 tokens
+(`COMPACTION_CONTEXT_WINDOW_CEILING`), so a model that advertises a million
+tokens cannot let one turn carry half a million tokens through hundreds of
+requests; there is no background pre-computation.
 
 pi 0.84.4+ invokes `prepareNextTurn` only when the loop will start another
 assistant turn in the same run — including between a completed tool batch and
@@ -591,9 +595,9 @@ For every pi loop turn:
    results for that turn are complete
 2. Pi-Workspace rebuilds the context from the full transcript plus the newest
    valid checkpoint and estimates the next request budget
-3. below 90% of `hardLimit`, and with no pending model request, the next turn
+3. below half of `hardLimit` (the trigger), and with no pending model request, the next turn
    proceeds unchanged (a budget reminder may be added to that request)
-4. at or above the 90% trigger, or when the model called `new_context`,
+4. at or above that trigger, or when the model called `new_context`,
    compaction runs synchronously before the next provider request. In the
    summary family, generation is mandatory; the runtime preflights the summary
    input against the model window, reduces it once, and then splits a range that
@@ -688,14 +692,19 @@ and testable.
 context window at the next turn boundary; it never clears or resets environment
 state. Two budget reminders are appended to the current turn's system prompt,
 each at most once per checkpoint window and reset when a checkpoint is
-installed: one when the remaining budget falls to
-`clamp(hardLimit * 0.15, 8k, 32k)`, asking the model to start closing out, and
-one at 2,000 tokens remaining, telling it to write down whatever must survive.
+installed: one when the budget left before the compaction trigger falls to
+`clamp(trigger * 0.25, 8k, 32k)`, asking the model to start closing out, and
+one at `max(2,000, 2% of the trigger)` before that trigger, telling it to write
+down whatever must survive. Both are measured against the trigger rather than
+the hard limit, so they are still shown before compaction replaces the context.
 Neither reminder is persisted or shown in the transcript.
 
 The hard boundary is the model context window minus request headroom. Automatic
-compaction starts at 90% of `hardLimit`; this deterministic margin is not
-configurable. Headroom is the maximum of a 16,384-token reserve floor, model
+compaction starts at half of `hardLimit`; this deterministic margin is not
+configurable, and the window the boundary is computed from is capped at 262,144
+tokens (`COMPACTION_CONTEXT_WINDOW_CEILING`), so a larger advertised window
+bounds spend rather than deferring compaction. Headroom is the maximum of a
+16,384-token reserve floor, model
 maximum output capped at 25% of the context window, and a 5% safety margin. The
 reserve floor is itself capped at half the window. The cut-point target used by
 the runtime-owned preparation is derived from the model window as 20% of the hard budget clamped to

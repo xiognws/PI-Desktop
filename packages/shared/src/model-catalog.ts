@@ -160,6 +160,11 @@ export const CATALOG_DEFAULT_MAX_TOKENS = 32_768;
  * A binding without provenance keeps its stored value. Older records cannot
  * distinguish an intentional 128k override from the generic seed, so inferring
  * catalog ownership would risk overwriting a user choice.
+ *
+ * The published window is reported as published: what a session may *plan*
+ * against is a separate decision, capped in `context-budget.ts`
+ * (`COMPACTION_CONTEXT_WINDOW_CEILING`), so paying for a million-token prefix
+ * on every request is a budget rule rather than a lie about the model.
  */
 export function effectiveContextWindow(
   publishedContextWindow?: number | null,
