@@ -1,0 +1,18 @@
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 43-47,247-259
+apps/desktop/electron/main/main-process-errors.ts
+  h_201ed4c689ac8b 39-40,103-144,170-173
+apps/desktop/electron/test/main-process-fatal.test.mjs
+  h_201ed4c689ac8b 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "906d864c6416351e6934c57390dbfb3ba8a38f2a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
