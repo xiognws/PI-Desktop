@@ -68,8 +68,9 @@ printf '%s\n' \
 | 2a | NDJSON JSON-RPC codec, sidecar method surface (`sidecar.health/configure`, `agent.prompt/abort/getStatus/disposeSession`, `native.session.get`), HTTP transports over `reqwest`+`rustls` for both wires, `serve` mode over stdio | **done** |
 | 2b | host-core tool bridge: declarations arrive on `sidecar.configure`, each call travels back as `host.proxy` → `tools.execute`, answers map onto tool results | **done** |
 | 2c | per-prompt provider (`params.provider`), `content`/`userMessageId` prompt fields, `agent.steer` + `agent.steeringContext` drained between steps, `native.session.list/fork/search`, abort addressed at a turn | **done** |
-| 2d | remaining gap for a real session: `agent.compact` (needs phase 3), persistence so `native.session.*` reads a store instead of live sessions, `sidecar.configure` network proxy actually applied to the HTTP client | next |
-| 3 | prompt composition and project instructions, context budget and compaction | |
+| 3a | system prompt composition: persona (`SYSTEM.md` replaces it), `APPEND_SYSTEM.md`, host tool guidance, the `AGENTS.md`/`CLAUDE.md` chain with per-directory precedence and separate global/project byte budgets, verbatim mode prompts | **done** |
+| 2d | remaining gap for a real session: `agent.compact` (needs 3b), persistence so `native.session.*` reads a store instead of live sessions, `sidecar.configure` network proxy actually applied to the HTTP client | next |
+| 3b | context budget and compaction (Hermes `context_compressor.py` 5,737 lines; desktop spec 5.1 checkpoint protection), then `agent.compact` | next |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5 | memory store and skills | |
 | 6 | MCP client, cron/scheduled runs, subagent delegation | |

@@ -374,6 +374,31 @@ impl Sidecar {
         Ok(json!(count))
     }
 
+    /// Build the system prompt for one turn from the request's session inputs.
+    ///
+    /// The real product prompt, the instruction chain and the mode rules are
+    /// all resolved here so the loop only ever sees one string.
+    fn compose_prompt(&self, request: &Request, config: &RuntimeConfig) -> String {
+        let fs: Arc<dyn crate::prompt::PromptFs> = Arc::new(crate::prompt::StdFs);
+        let workspace_root = request
+            .str_param("workspaceRoot")
+            .or_else(|| request.str_param("projectPath"))
+            .or_else(|| request.str_param("cwd"));
+        let mut inputs = crate::prompt::PromptInputs::new(workspace_root);
+        inputs.workspace_path = request
+            .str_param("workspacePath")
+            .or_else(|| request.str_param("activeFile"));
+        inputs.global_agent_dir = request
+            .str_param("agentDataHome")
+            .or(config.data_dir.as_deref());
+        inputs.mode = crate::prompt::SessionMode::parse(request.str_param("mode"));
+        inputs.tool_instructions = request.str_param("toolInstructions");
+        inputs.product_prompt = request
+            .str_param("systemPrompt")
+            .or(config.system.as_deref());
+        crate::prompt::build_system_prompt(&fs, &inputs).system
+    }
+
     fn session(&self, session_id: &str) -> Result<Arc<Session>, RpcError> {
         let mut sessions = self
             .sessions
@@ -459,6 +484,12 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("config lock poisoned"))?
             .clone();
+        // Compose the system prompt for this turn: persona, custom append, tool
+        // guidance, the project instruction chain and the mode's rules.
+        let composed = self.compose_prompt(request, &config);
+        if !composed.trim().is_empty() {
+            config.system = Some(composed);
+        }
         if let Some(model) = request.str_param("modelId").or_else(|| {
             request
                 .params
