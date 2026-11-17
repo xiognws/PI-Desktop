@@ -1,0 +1,54 @@
+apps/desktop/electron/main/crash-report.ts
+  h_201ed4c689ac8b 283-310
+apps/desktop/electron/main/diagnostics/bundle.ts
+  h_201ed4c689ac8b 129-130,148-149,151
+apps/desktop/electron/main/diagnostics/export.ts
+  h_201ed4c689ac8b 1-152
+apps/desktop/electron/main/ipc/diagnostics-ipc.ts
+  h_201ed4c689ac8b 1,5-10,19-20,30,42-68
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 571
+apps/desktop/electron/main/logger.ts
+  h_201ed4c689ac8b 3,5,7-9,14,94-100,511-611
+apps/desktop/electron/test/diagnostics-bundle.test.mjs
+  h_201ed4c689ac8b 68
+apps/desktop/electron/test/diagnostics-export.test.mjs
+  h_201ed4c689ac8b 1-218
+apps/desktop/src/features/settings/pages/AboutSettings.tsx
+  h_201ed4c689ac8b 2-4,6,25-47,86-109
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 1946-1955
+apps/desktop/src/styles/settings.css
+  h_201ed4c689ac8b 2693-2698
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 2141-2144
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 2174-2177
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 2141-2144
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 2141-2144
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 2157-2160
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 2117-2120
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 2157-2160
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 2155-2158
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 2142-2145
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 502-503
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "dc35c67d0c51bd7316b474c62fd8c1ec79e76e24",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
