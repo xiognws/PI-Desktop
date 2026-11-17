@@ -568,6 +568,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     stripWinLongPrefix,
     isDeveloperMode,
     getMainWindow,
+    getHost,
   });
 
   registerManualIpc({ registrar, stripWinLongPrefix });

@@ -65,7 +65,7 @@ describe("bundleFiles", () => {
     dataDir: DATA_DIR,
     logLines: ["started", "token=abcdef123456", "crashed"],
     crashDumps: ["reports/crash-1.dmp"],
-    tableCounts: { sessions: 28, messages: 5120 },
+    counts: { sessions: 28, messages: 5120 },
   };
 
   it("reports counts, never message content", () => {

@@ -280,6 +280,34 @@ export function crashDumpsDirectory(dataDir: string): string {
   return join(dataDir, CRASH_DUMPS_DIR_NAME);
 }
 
+/**
+ * Dump names below `directory`, newest first, relative to it.
+ *
+ * A support bundle carries the names only: a minidump can hold process memory,
+ * and the bundle is meant to be sent to someone else. Newest first is the order
+ * a reader wants them in — the dump that matters is the last one.
+ */
+export function listCrashDumps(directory: string, limit = 20): string[] {
+  const found: string[] = [];
+  collectDumpPaths(directory, MAX_DUMP_SCAN_DEPTH, found);
+  const entries: { name: string; mtimeMs: number }[] = [];
+  for (const path of found) {
+    let mtimeMs: number;
+    try {
+      mtimeMs = statSync(path).mtimeMs;
+    } catch (error) {
+      if (isEnoent(error)) continue; // removed between readdir and stat
+      throw error;
+    }
+    entries.push({
+      name: path.slice(directory.length + 1).split("\\").join("/"),
+      mtimeMs,
+    });
+  }
+  entries.sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name));
+  return entries.slice(0, limit).map((entry) => entry.name);
+}
+
 /** Create the installation-local Crashpad root and return it. */
 export function ensureCrashDumpsDirectory(dataDir: string): string {
   const directory = crashDumpsDirectory(dataDir);

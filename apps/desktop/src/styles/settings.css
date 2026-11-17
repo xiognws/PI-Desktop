@@ -2690,6 +2690,12 @@
   font-size: var(--text-sm);
 }
 
+/* An action's failure, stated where the action lives instead of in a dialog. */
+.settings-error {
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+}
+
 /* Agent extension state inside a plugin row (spec 16 §11). */
 .plugins-agent-extension {
   display: flex;

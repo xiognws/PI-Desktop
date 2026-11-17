@@ -1943,6 +1943,16 @@ export const api = {
   executeCommand: (commandId: string) =>
     invoke(IPC.invoke.commandPaletteExecute, commandId),
   openLogs: () => invoke(IPC.invoke.logOpenFolder),
+  /**
+   * Save a support bundle where the user picks. `ok: false` with reason
+   * `canceled` means the save dialog was dismissed, not that anything failed —
+   * a real failure rejects.
+   */
+  exportDiagnostics: () =>
+    invoke<
+      | { ok: true; path: string; files: number; bytes: number }
+      | { ok: false; reason: "canceled" }
+    >(IPC.invoke.diagnosticsExport),
   /** Open the handbook this build shipped with (About panel). */
   /** What the next launch would play as its boot animation (D679). */
   startupAnimationStatus: () =>

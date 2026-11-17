@@ -1,11 +1,17 @@
 import {
   appendFileSync,
+  closeSync,
   existsSync,
+  fstatSync,
   mkdirSync,
+  openSync,
+  readdirSync,
+  readSync,
   renameSync,
   statSync,
   unlinkSync,
 } from "node:fs";
+import type { Dirent } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { localTimestamp } from "./log-timestamp.ts";
@@ -85,6 +91,13 @@ export type LoggerOptions = {
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const KEEP_ROTATED = 2;
+/** Channels `readLogTail` walks; rotated copies are `<category>.<n>.log`. */
+const LOG_CHANNELS: readonly LogChannel[] = ["app", "host", "agent"];
+const ROTATED_LOG_RE = /\.\d+\.log$/;
+/** How much of a file's end is read to find its last lines. */
+const TAIL_CHUNK_BYTES = 64 * 1024;
+/** Upper bound on the log text a bundle may carry. */
+const MAX_TAIL_BYTES = 512 * 1024;
 const MAX_MESSAGE_CHARS = 512;
 const MAX_DATA_BYTES = 8 * 1024;
 const MAX_DATA_STRING_CHARS = 1_024;
@@ -494,4 +507,105 @@ function safeJson(value: unknown): string {
   } catch {
     return JSON.stringify({ serializationError: true });
   }
+}
+
+/** A log file is unreadable because it just rotated away; the bundle moves on. */
+function isMissingFile(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "ENOENT"
+  );
+}
+
+/** Read at most `limit` trailing lines without loading the whole file. */
+function readTailLines(path: string, limit: number): string[] {
+  const fd = openSync(path, "r");
+  try {
+    const size = fstatSync(fd).size;
+    if (size === 0) return [];
+    const length = Math.min(size, TAIL_CHUNK_BYTES);
+    const buffer = Buffer.alloc(length);
+    readSync(fd, buffer, 0, length, size - length);
+    let text = buffer.toString("utf8");
+    if (length < size) {
+      // The window starts mid-line; that first partial line is not a log record.
+      const newline = text.indexOf("\n");
+      text = newline >= 0 ? text.slice(newline + 1) : "";
+    }
+    return text
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0)
+      .slice(-limit);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * The tail of the current log files, oldest first, as `channel/file: line`.
+ *
+ * A support bundle carries a bounded slice rather than a whole log: enough to
+ * see what led to a failure, small enough to attach to a message. Rotated files
+ * (`session.1.log`) are skipped — they are older than the file that rotated
+ * them out, and the bundle is about what just happened.
+ *
+ * A channel this installation never wrote to, or a file that rotated away
+ * between the listing and the read, is not an error: the bundle is still worth
+ * producing. Any other failure propagates, because a broken log tree is exactly
+ * what someone would want to hear about.
+ */
+export function readLogTail(
+  dataDir: string,
+  {
+    maxLinesPerFile = 40,
+    maxLines = 300,
+  }: { maxLinesPerFile?: number; maxLines?: number } = {},
+): string[] {
+  const files: { name: string; path: string; mtimeMs: number }[] = [];
+  for (const channel of LOG_CHANNELS) {
+    const dir = join(dataDir, "logs", channel);
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch (error) {
+      if (isMissingFile(error)) continue;
+      throw error;
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".log")) continue;
+      if (ROTATED_LOG_RE.test(entry.name)) continue;
+      const path = join(dir, entry.name);
+      try {
+        files.push({
+          name: `${channel}/${entry.name}`,
+          path,
+          mtimeMs: statSync(path).mtimeMs,
+        });
+      } catch (error) {
+        if (isMissingFile(error)) continue;
+        throw error;
+      }
+    }
+  }
+  files.sort((a, b) => a.mtimeMs - b.mtimeMs || a.name.localeCompare(b.name));
+
+  const lines: string[] = [];
+  for (const file of files) {
+    for (const line of readTailLines(file.path, maxLinesPerFile)) {
+      lines.push(`${file.name}: ${line}`);
+    }
+  }
+  // A log line can carry a whole tool payload, so a line budget alone does not
+  // bound the size of an attachment. Keep the newest lines that fit; a bundle
+  // too big to email is a bundle nobody sends.
+  const bounded: string[] = [];
+  let bytes = 0;
+  for (const line of lines.slice(-maxLines).reverse()) {
+    bytes += Buffer.byteLength(line, "utf8") + 1;
+    if (bytes > MAX_TAIL_BYTES) break;
+    bounded.push(line);
+  }
+  return bounded.reverse();
 }

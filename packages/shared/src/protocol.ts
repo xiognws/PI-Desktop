@@ -499,6 +499,8 @@ export const IPC = {
     commandPaletteSearch: "pi-desktop/commandPalette/search",
     commandPaletteExecute: "pi-desktop/commandPalette/execute",
     logOpenFolder: "pi-desktop/log/openFolder",
+    /** Save a support bundle: version, log tail and counts, no conversation content. */
+    diagnosticsExport: "pi-desktop/diagnostics/export",
     /** Open the shipped user handbook, or reveal it when it has no Markdown handler. */
     manualOpen: "pi-desktop/manual/open",
     pythonStatus: "pi-desktop/python/status",

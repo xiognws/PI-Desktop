@@ -1,8 +1,9 @@
 /**
- * Info destination: what is installed, how it updates, and the two ways out of
- * a problem (logs, bug report). The Developer card stays here because the
- * things it unlocks are diagnostics, not preferences.
+ * Info destination: what is installed, how it updates, and the three ways out of
+ * a problem (logs, a support bundle, a bug report). The Developer card stays here
+ * because the things it unlocks are diagnostics, not preferences.
  */
+import { useState } from "react";
 import { APP_NAME, type AppSettings } from "@pi-workspace/shared";
 import { useTranslation } from "react-i18next";
 import { api } from "../../../lib/api";
@@ -21,6 +22,29 @@ export function AboutSettings({
 }) {
   const { t } = useTranslation();
   const version = useAppStore((s) => s.version);
+  const [exporting, setExporting] = useState(false);
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  /*
+   * A dismissed save dialog is not a failure and not a result: the row stays as
+   * it was. Only a written file or a thrown error changes what is on screen, so
+   * the row never claims something happened that did not.
+   */
+  const exportBundle = async () => {
+    setExporting(true);
+    setExportError(null);
+    setSavedPath(null);
+    try {
+      const result = await api.exportDiagnostics();
+      if (result.ok) setSavedPath(result.path);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="settings-stack">
       <div className="settings-about-hero">
@@ -59,6 +83,30 @@ export function AboutSettings({
             {t("settings.openLogs")}
           </Button>
         </SettingsRow>
+        <SettingsRow
+          title={t("settings.diagnosticsExport")}
+          description={t("settings.diagnosticsExportDesc")}
+          detail={
+            savedPath ? (
+              <span className="settings-storage-path">
+                {t("settings.diagnosticsExportDone", { path: savedPath })}
+              </span>
+            ) : undefined
+          }
+        >
+          <Button
+            variant="secondary"
+            disabled={exporting}
+            onClick={() => void exportBundle()}
+          >
+            {t("settings.diagnosticsExport")}
+          </Button>
+        </SettingsRow>
+        {exportError ? (
+          <p className="settings-error" role="alert">
+            {t("settings.diagnosticsExportFailed", { error: exportError })}
+          </p>
+        ) : null}
       </SettingsCard>
 
       {settings && (

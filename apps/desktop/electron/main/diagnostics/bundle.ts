@@ -126,8 +126,8 @@ export type DiagnosticsInput = {
   logLines: readonly string[];
   /** Crash dump file names, newest first. */
   crashDumps: readonly string[];
-  /** Row counts per table, and nothing from inside them. */
-  tableCounts: Record<string, number>;
+  /** How much this installation holds, per kind, and nothing from inside it. */
+  counts: Record<string, number>;
   /** Anything the caller already knows is worth stating. */
   notes?: readonly string[];
 };
@@ -145,10 +145,10 @@ export function bundleFiles(input: DiagnosticsInput, now = new Date()): BundleFi
     `generated: ${now.toISOString()}`,
     `data dir: ${redact(input.dataDir)}`,
     "",
-    "row counts (counts only; no message content is included):",
-    ...Object.entries(input.tableCounts)
+    "counts (sizes only; no message content is included):",
+    ...Object.entries(input.counts)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([table, count]) => `  ${table}: ${count}`),
+      .map(([name, count]) => `  ${name}: ${count}`),
     "",
     `crash dumps found: ${input.crashDumps.length}`,
     ...input.crashDumps.map((name) => `  ${name}`),
