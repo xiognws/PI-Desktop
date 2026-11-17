@@ -1,0 +1,16 @@
+apps/desktop/electron/test/fixtures/fake-lsp-server.mjs
+  h_201ed4c689ac8b 1-72
+apps/desktop/electron/test/lsp-session-e2e.test.mjs
+  h_201ed4c689ac8b 1-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d0fa558bc0cc51b0a3e68eed651a949dfcff3670",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
