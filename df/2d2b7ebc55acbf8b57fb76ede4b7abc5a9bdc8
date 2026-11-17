@@ -1,0 +1,32 @@
+.gitignore
+  h_201ed4c689ac8b 109-113
+apps/desktop/resources/plugins/billion-context/README.md
+  h_201ed4c689ac8b 1-29
+apps/desktop/resources/plugins/billion-context/SOURCES.md
+  h_201ed4c689ac8b 1-17
+apps/desktop/resources/plugins/billion-context/THIRD_PARTY_NOTICES.md
+  h_201ed4c689ac8b 1-64
+apps/desktop/resources/plugins/billion-context/agent-extension.mjs
+  h_201ed4c689ac8b 1-9
+apps/desktop/resources/plugins/billion-context/main.js
+  h_201ed4c689ac8b 1-3
+apps/desktop/resources/plugins/billion-context/manifest.json
+  h_201ed4c689ac8b 1-24
+apps/desktop/resources/plugins/billion-context/vendor/LICENSE
+  h_201ed4c689ac8b 1-57
+apps/desktop/resources/plugins/billion-context/vendor/pi/billion-context.js
+  h_201ed4c689ac8b 1
+apps/desktop/resources/plugins/billion-context/vendor/pi/pi-native.js
+  h_201ed4c689ac8b 1-8152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "df2d2b7ebc55acbf8b57fb76ede4b7abc5a9bdc8",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
