@@ -1,0 +1,24 @@
+crates/agent-core/README.md
+  h_201ed4c689ac8b 71-73
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 36
+crates/agent-core/src/prompt/instructions.rs
+  h_201ed4c689ac8b 1-623
+crates/agent-core/src/prompt/mod.rs
+  h_201ed4c689ac8b 1-385
+crates/agent-core/src/prompt/modes.rs
+  h_201ed4c689ac8b 1-127
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 377-401,487-492
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "afe30692b9324bce4e71f007e95ce6bd1df5e72c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
