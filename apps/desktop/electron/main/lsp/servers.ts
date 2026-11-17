@@ -1,11 +1,18 @@
 /**
  * Which language server to run for a file, and what to say when there is none.
  *
+ * Scope for now is this project only: TypeScript and JavaScript through
+ * `typescript-language-server`, the one server actually installed and verified here.
+ * Python, Rust and Go are deliberately absent rather than half-supported — a `.rs`
+ * file that resolves to "no server configured" sends the reader back to Grep, while an
+ * entry for a server nobody installed only produces a worse message. Adding a language
+ * later is one entry plus the binary.
+ *
  * Discovery is deliberately dumb: look for a known binary on PATH, or a project-local
- * install (`node_modules/.bin`, a venv). Nothing is downloaded at runtime and nothing
- * is guessed — a missing server is a normal state, and the tool reports which binary
- * it looked for and where, because "no definition found" from a client that never
- * started a server is indistinguishable from a real answer.
+ * install in `node_modules/.bin`. Nothing is downloaded at runtime and nothing is
+ * guessed — a missing server is a normal state, and the tool reports which binary it
+ * looked for and where, because "no definition found" from a client that never started
+ * a server is indistinguishable from a real answer.
  */
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
@@ -21,49 +28,24 @@ export type ServerSpec = {
   extensions: string[];
 };
 
+const TYPESCRIPT_SERVER = {
+  label: "typescript-language-server",
+  command: "typescript-language-server",
+  args: ["--stdio"],
+};
+
 /**
  * The servers this client knows how to start.
  *
- * Ordered most-specific first: `.ts` must reach the TypeScript server rather than a
- * generic JS one, and `.tsx` maps to `typescriptreact` because the server picks its
- * grammar from the language id.
+ * Ordered most-specific first: `.tsx` must reach `typescriptreact` rather than
+ * `typescript`, because the server picks its grammar from the language id and JSX in a
+ * `.ts` context parses as something else entirely.
  */
 export const KNOWN_SERVERS: ServerSpec[] = [
-  {
-    languageId: "rust",
-    label: "rust-analyzer",
-    command: "rust-analyzer",
-    args: [],
-    extensions: [".rs"],
-  },
-  {
-    languageId: "python",
-    label: "pyright",
-    command: "pyright-langserver",
-    args: ["--stdio"],
-    extensions: [".py", ".pyi"],
-  },
-  {
-    languageId: "typescript",
-    label: "typescript-language-server",
-    command: "typescript-language-server",
-    args: ["--stdio"],
-    extensions: [".ts", ".mts", ".cts"],
-  },
-  {
-    languageId: "typescriptreact",
-    label: "typescript-language-server",
-    command: "typescript-language-server",
-    args: ["--stdio"],
-    extensions: [".tsx"],
-  },
-  {
-    languageId: "go",
-    label: "gopls",
-    command: "gopls",
-    args: [],
-    extensions: [".go"],
-  },
+  { ...TYPESCRIPT_SERVER, languageId: "typescriptreact", extensions: [".tsx"] },
+  { ...TYPESCRIPT_SERVER, languageId: "javascriptreact", extensions: [".jsx"] },
+  { ...TYPESCRIPT_SERVER, languageId: "typescript", extensions: [".ts", ".mts", ".cts"] },
+  { ...TYPESCRIPT_SERVER, languageId: "javascript", extensions: [".js", ".mjs", ".cjs"] },
 ];
 
 export type Discovery =
@@ -96,14 +78,12 @@ export function discoverServer(
   }
   const directories = [
     join(projectRoot, "node_modules", ".bin"),
-    join(projectRoot, ".venv", "Scripts"),
-    join(projectRoot, ".venv", "bin"),
-    join(projectRoot, "venv", "Scripts"),
     ...searchPath.split(delimiter).filter(Boolean),
   ];
-  const names = process.platform === "win32"
-    ? [`${spec.command}.cmd`, `${spec.command}.exe`, spec.command]
-    : [spec.command];
+  const names =
+    process.platform === "win32"
+      ? [`${spec.command}.cmd`, `${spec.command}.exe`, spec.command]
+      : [spec.command];
   for (const directory of directories) {
     for (const name of names) {
       const candidate = join(directory, name);
@@ -113,8 +93,8 @@ export function discoverServer(
   return {
     ok: false,
     reason: `${spec.label} is not installed`,
-    // The list of directories is the actionable part: "not installed" alone leaves
-    // the reader guessing whether it is on PATH at all.
+    // The list of directories is the actionable part: "not installed" alone leaves the
+    // reader guessing whether it is on PATH at all.
     lookedFor: directories.map((directory) => join(directory, spec.command)),
   };
 }
