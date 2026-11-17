@@ -1,0 +1,14 @@
+crates/agent-core/README.md
+  h_201ed4c689ac8b 96-98,103-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3802dde81258384683c9db840824a09404d7fc2f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
