@@ -76,6 +76,13 @@ pub enum AgentEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<CompactionFailure>,
     },
+    /// A question the model asked; the renderer draws a card and answers it
+    /// through `asktool.resolve`. The wire name is one word: the renderer's event
+    /// union spells it `asktool_request`, not `ask_tool_request`.
+    #[serde(rename = "asktool_request")]
+    AskToolRequest {
+        request: crate::ask::AskRequest,
+    },
     Error {
         code: String,
         message: String,

@@ -38,6 +38,7 @@ each phase is additive on `main`.
 | `memory_context` | per-turn recall rendered as one `<memory_context>` block in the user message | `memory-context.ts` |
 | `skill_overlap` | the procedure-versus-fact gate and the "which skill covers this" hint | `memory-skill-overlap.ts` |
 | `redaction` | credential vocabulary and the scrub applied on the way out (memory, outbound text) | `packages/shared/src/redaction.ts` |
+| `ask` | the `asktool` card: question validation (300 code points, ≤20 questions), duplicate-label collapse, `asktool_request` event, `asktool.resolve` validation, skipped answers on abort | `asktool` in `packages/shared/src/types/agent.ts`, spec `17-asktool-questions.md` |
 | `context` | window/hard-limit/trigger arithmetic, token estimate anchored on provider usage | `agent/context_compressor.py` |
 | `compaction` | cut point, summary request, retained tail, fallback selection | `agent/context_compressor.py`, `agent/conversation_compression.py` |
 
@@ -80,7 +81,8 @@ printf '%s\n' \
 | 3b-1 | context budget: window ceiling, `hardLimit`, headroom, trigger at half, retained-tail target, usage-anchored token estimate | **done** |
 | 3b-2 | compaction plan: cut point per mode, summary request sized the way it is sent, bounded reduction, chunk splitting, retained-tail fallback | **done** |
 | 3b-3 | loop integration (gate before every step, compact in place), provider-written summary with retry on transient failure, `agent.compact`, `compaction_start`/`compaction_end` events | **done** |
-| 4 | filesystem/shell/search tools, permissions, asktool | |
+| 4a | `asktool`: bounded questions asked of the user (Agent/Plan/Goal), `asktool_request` event and `asktool.resolve` RPC with the wire's error codes, every open card settled as skipped when its turn stops | **done** |
+| 4b | where the rest of phase 4 actually lives: file/shell/search tools execute in the host (`tools.execute`), their per-class result budgets are host-enforced (spec 16), and `permissions.request` never reaches the kernel — main forwards it to the renderer itself, so `Permission::Ask` here only covers kernel-registered tools | note |
 | 5a | skills: catalog parsing (sorted, deduplicated), 60-character index cap, 8k catalog budget gate, Skills prompt section, `Skill` tool with a kernel-answered listing and host-delegated body load | **done** |
 | 5b | memory: the `memory` tool over `memory.remember/update/forget/recall` (single and 50-item batch writes, scope coherence, procedure gate naming the skill to patch, credential masking), per-turn `<memory_context>` recall injected into the user message, `AgentError::Refused` for model-fixable tool refusals | **done** |
 | 6 | MCP client, cron/scheduled runs, subagent delegation | |

@@ -28,6 +28,7 @@
 //! Later phases add the sidecar RPC surface, the host-core tool bridge, the
 //! provider transports, compaction, memory, skills, MCP, cron and delegation.
 
+pub mod ask;
 pub mod cancel;
 pub mod compaction;
 pub mod context;
@@ -48,6 +49,7 @@ pub mod skills;
 pub mod tool;
 pub mod turn;
 
+pub use ask::{AskBroker, AskRequest, AskTool, ASK_TOOL_NAME};
 pub use cancel::CancelToken;
 pub use error::{AgentError, ProviderErrorKind, Result};
 pub use event::{

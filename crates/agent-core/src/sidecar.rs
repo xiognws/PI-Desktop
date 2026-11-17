@@ -235,12 +235,17 @@ pub struct Sidecar {
     bridge: Arc<HostBridge>,
     config: Mutex<RuntimeConfig>,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
+    /// The ask cards waiting for an answer. One broker per sidecar: a card is
+    /// resolved by session id, not by whichever turn happened to create it.
+    asks: Arc<crate::ask::AskBroker>,
 }
 
 impl Sidecar {
     pub fn new(out: Arc<dyn LineSink>, gate: Arc<dyn PermissionGate>) -> Self {
+        let sink: Arc<dyn crate::EventSink> = Arc::new(NotificationSink { out: out.clone() });
         Self {
             bridge: Arc::new(HostBridge::new(out.clone())),
+            asks: Arc::new(crate::ask::AskBroker::new(sink)),
             out,
             provider: Mutex::new(None),
             tools: Mutex::new(Arc::new(ToolRegistry::new(gate.clone()))),
@@ -287,6 +292,7 @@ impl Sidecar {
             "sidecar.configure" => self.configure(request),
             "agent.prompt" | "agent.turn" => self.prompt(request).await,
             "agent.compact" => self.compact(request).await,
+            "asktool.resolve" => self.resolve_ask(request),
             "agent.steer" => self.steer(request),
             "agent.steeringContext" => self.steering_context(request),
             "agent.abort" => self.abort(request),
@@ -564,6 +570,16 @@ impl Sidecar {
                 load,
             )));
         }
+        // `asktool` is available in Agent, Plan and Goal mode: asking is not an
+        // authorization, so a plan turn may ask what the user wants.
+        if matches!(
+            mode,
+            crate::prompt::SessionMode::Agent
+                | crate::prompt::SessionMode::Plan
+                | crate::prompt::SessionMode::Goal
+        ) {
+            extra.push(Arc::new(crate::ask::AskTool::new(self.asks.clone())));
+        }
         if matches!(mode, crate::prompt::SessionMode::Agent) {
             // Memory writes and reads are host RPCs; the store, the dedupe and
             // the scope filtering stay in one place.
@@ -600,6 +616,7 @@ impl Sidecar {
         let task_session = session.clone();
         let task_session_id = session_id.clone();
         let task_turn_id = turn_id.clone();
+        let task_asks = self.asks.clone();
         tokio::spawn(async move {
             let mut transcript = task_session.transcript.lock().await;
             let outcome = engine
@@ -619,6 +636,8 @@ impl Sidecar {
                 )
                 .await;
             drop(transcript);
+            // No card survives the turn that asked it, whatever ended the turn.
+            task_asks.cancel_session(&task_session_id);
             task_session.running.store(false, Ordering::SeqCst);
             if let Ok(mut current) = task_session.current_turn.lock() {
                 *current = None;
@@ -835,6 +854,21 @@ impl Sidecar {
         }))
     }
 
+    /// Answer one ask card. A malformed answer is rejected and the card stays
+    /// pending, so a bad click cannot silently skip a question.
+    fn resolve_ask(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let request_id = request.require_str("requestId")?;
+        let answers = request
+            .params
+            .get("answers")
+            .ok_or_else(|| RpcError::invalid_params("`answers` is required"))?;
+        self.asks
+            .resolve(session_id, request_id, answers)
+            .map_err(|error| RpcError::app(error.code(), error.message()))?;
+        Ok(json!({ "ok": true }))
+    }
+
     fn abort(&self, request: &Request) -> Result<Value, RpcError> {
         let session_id = request.require_str("sessionId")?;
         let sessions = self
@@ -865,6 +899,8 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("cancel lock poisoned"))?
             .cancel();
+        // A stopped turn settles every card it left open as skipped.
+        self.asks.cancel_session(session_id);
         Ok(json!({ "ok": running, "aborted": running }))
     }
 

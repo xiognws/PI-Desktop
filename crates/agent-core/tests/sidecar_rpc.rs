@@ -472,3 +472,183 @@ async fn memory_recall_is_requested_only_when_the_prompt_offers_it() {
         "no recall without the capability flag"
     );
 }
+
+#[tokio::test]
+async fn an_asktool_card_is_answered_through_the_rpc_and_lands_in_the_transcript() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "asktool", "arguments": {
+                    "questions": [{"question": "Color?", "options": ["Blue", "Green"]}]
+                }}},
+                {"text": "thanks"}
+            ]},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t1", "prompt": "pick one"}),
+    )
+    .await;
+
+    let ask = lines
+        .wait_for_event("asktool_request", Duration::from_secs(10))
+        .await
+        .expect("the card is emitted");
+    let request_id = ask["event"]["request"]["requestId"]
+        .as_str()
+        .expect("a request id")
+        .to_string();
+    assert_eq!(ask["event"]["request"]["sessionId"], "s1");
+    assert_eq!(
+        ask["event"]["request"]["questions"][0]["options"][0],
+        "Blue"
+    );
+
+    let resolved = call(
+        &sidecar,
+        3,
+        "asktool.resolve",
+        json!({"sessionId": "s1", "requestId": request_id, "answers": [["Green"]]}),
+    )
+    .await;
+    assert_eq!(resolved["result"]["ok"], true);
+
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn finishes after the answer");
+    let session = call(
+        &sidecar,
+        4,
+        "native.session.get",
+        json!({"sessionId": "s1"}),
+    )
+    .await;
+    let raw = session["result"].to_string();
+    assert!(
+        raw.contains("Color?：Green"),
+        "the answer reaches the transcript: {raw}"
+    );
+}
+
+#[tokio::test]
+async fn an_answer_that_does_not_fit_the_question_is_refused_and_the_card_stays() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "asktool", "arguments": {
+                    "questions": [{"question": "Color?", "options": ["Blue", "Green"]}]
+                }}},
+                {"text": "thanks"}
+            ]},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t1", "prompt": "pick one"}),
+    )
+    .await;
+    let ask = lines
+        .wait_for_event("asktool_request", Duration::from_secs(10))
+        .await
+        .expect("the card is emitted");
+    let request_id = ask["event"]["request"]["requestId"]
+        .as_str()
+        .expect("a request id")
+        .to_string();
+
+    // Two answers for a single-choice question: rejected, and the card survives
+    // so the user can answer it properly.
+    let refused = call(
+        &sidecar,
+        3,
+        "asktool.resolve",
+        json!({"sessionId": "s1", "requestId": request_id.clone(), "answers": [["Blue", "Green"]]}),
+    )
+    .await;
+    assert_eq!(
+        refused["error"]["data"]["errorCode"],
+        "ASKTOOL_INVALID_ARGUMENT"
+    );
+    assert!(refused["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("accepts one answer"));
+
+    let accepted = call(
+        &sidecar,
+        4,
+        "asktool.resolve",
+        json!({"sessionId": "s1", "requestId": request_id, "answers": [["Blue"]]}),
+    )
+    .await;
+    assert_eq!(accepted["result"]["ok"], true);
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn finishes");
+}
+
+#[tokio::test]
+async fn aborting_a_turn_settles_its_open_card_as_skipped() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "asktool", "arguments": {
+                    "questions": [{"question": "Color?", "options": ["Blue"]}]
+                }}},
+                {"text": "thanks"}
+            ]},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t1", "prompt": "pick one"}),
+    )
+    .await;
+    let ask = lines
+        .wait_for_event("asktool_request", Duration::from_secs(10))
+        .await
+        .expect("the card is emitted");
+    let request_id = ask["event"]["request"]["requestId"]
+        .as_str()
+        .expect("a request id")
+        .to_string();
+
+    call(&sidecar, 3, "agent.abort", json!({"sessionId": "s1"})).await;
+
+    // The card is gone, so a late answer is refused rather than swallowed.
+    let late = call(
+        &sidecar,
+        4,
+        "asktool.resolve",
+        json!({"sessionId": "s1", "requestId": request_id, "answers": [["Blue"]]}),
+    )
+    .await;
+    assert_eq!(late["error"]["data"]["errorCode"], "ASKTOOL_NOT_FOUND");
+}
