@@ -1,0 +1,18 @@
+apps/desktop/electron/main/python-runtime.ts
+  h_201ed4c689ac8b 270-273,276
+scripts/python-runtime.lock.json
+  h_201ed4c689ac8b 37,1807-1813,1919-1939,2619-2625
+scripts/python-tools/office.py
+  h_201ed4c689ac8b 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "17aecd58a8cba4b83dff52f38533d730911fec0b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
