@@ -1,0 +1,16 @@
+apps/desktop/electron/main/lsp/framing.ts
+  h_201ed4c689ac8b 1-68
+apps/desktop/electron/test/lsp-framing.test.mjs
+  h_201ed4c689ac8b 1-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "034e23d17c3bbe107906ce1fbdcef2be36dfd579",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
