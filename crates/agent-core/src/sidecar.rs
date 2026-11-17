@@ -602,6 +602,12 @@ impl Sidecar {
         // `Skill` exists only when a library exists, and only in the mode that may
         // write one — the same gate the desktop runtime uses. A tool whose only
         // honest answer is "there is nothing here" is noise in every request.
+        // Read the retry policy here: the spawned task cannot borrow `request`.
+        let infinite_provider_retry = request
+            .params
+            .get("infiniteProviderRetry")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         let subagents = parse_subagents(request);
         let mut extra: Vec<Arc<dyn crate::Tool>> = Vec::new();
         if !subagents.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
@@ -619,6 +625,7 @@ impl Sidecar {
                     model: config.model.clone(),
                     model_limits: model_limits_from(request),
                     guidance: Vec::new(),
+                    infinite_provider_retry,
                 }),
             ));
             extra.push(Arc::new(crate::delegate::TaskTool::new(hub.clone())));
@@ -693,6 +700,12 @@ impl Sidecar {
         let task_session = session.clone();
         let task_session_id = session_id.clone();
         let task_turn_id = turn_id.clone();
+        // Read the retry policy here: the spawned task cannot borrow `request`.
+        let infinite_provider_retry = request
+            .params
+            .get("infiniteProviderRetry")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         let task_asks = self.asks.clone();
         tokio::spawn(async move {
             let mut transcript = task_session.transcript.lock().await;
@@ -708,6 +721,7 @@ impl Sidecar {
                         temperature: config.temperature,
                         max_output_tokens: config.max_output_tokens,
                         thinking: crate::provider::ThinkingLevel::Off,
+                        infinite_provider_retry,
                     },
                     cancel,
                 )
@@ -811,6 +825,7 @@ impl Sidecar {
             temperature: config.temperature,
             max_output_tokens: config.max_output_tokens,
             thinking: ThinkingLevel::Off,
+            infinite_provider_retry: false,
         };
 
         let mut transcript: tokio::sync::MutexGuard<'_, Transcript> =
@@ -1303,6 +1318,7 @@ struct SidecarDelegateRunner {
     model: String,
     model_limits: Option<crate::context::ModelLimits>,
     guidance: Vec<String>,
+    infinite_provider_retry: bool,
 }
 
 impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
@@ -1336,6 +1352,9 @@ impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
                 temperature: None,
                 max_output_tokens: None,
                 thinking: ThinkingLevel::Off,
+                // A delegate inherits the session's policy: the same gateway can
+                // fail it, and the same retry that saves the parent saves it.
+                infinite_provider_retry: self.infinite_provider_retry,
             };
             let outcome = engine
                 .run_turn(

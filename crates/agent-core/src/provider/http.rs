@@ -173,6 +173,18 @@ impl Provider for HttpProvider {
 
             let status = response.status();
             if !status.is_success() {
+                // Read the delay before the body: `text()` consumes the response.
+                let retry_after = crate::retry::parse_retry_after_ms(
+                    response
+                        .headers()
+                        .get("retry-after-ms")
+                        .and_then(|value| value.to_str().ok()),
+                    response
+                        .headers()
+                        .get("retry-after")
+                        .and_then(|value| value.to_str().ok()),
+                    crate::retry::RATE_LIMIT_MAX_DELAY_MS,
+                );
                 let detail = response
                     .text()
                     .await
@@ -186,7 +198,8 @@ impl Provider for HttpProvider {
                     kind,
                     status.as_u16(),
                     truncate(&detail, 600),
-                ));
+                )
+                .with_retry_after(retry_after));
             }
 
             let (tx, rx) = mpsc::channel(64);

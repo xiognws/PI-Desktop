@@ -46,6 +46,12 @@ pub struct TurnConfig {
     pub temperature: Option<f32>,
     pub max_output_tokens: Option<u32>,
     pub thinking: ThinkingLevel,
+    /// Retry a transient provider failure without a budget.
+    ///
+    /// A session that opts in keeps waiting through an outage instead of ending
+    /// the turn; the default is bounded, because a turn that never gives up is
+    /// indistinguishable from a hung app.
+    pub infinite_provider_retry: bool,
 }
 
 impl TurnConfig {
@@ -57,6 +63,7 @@ impl TurnConfig {
             temperature: None,
             max_output_tokens: None,
             thinking: ThinkingLevel::Off,
+            infinite_provider_retry: false,
         }
     }
 }
@@ -244,18 +251,75 @@ impl TurnEngine {
             request.temperature = config.temperature;
             request.max_output_tokens = config.max_output_tokens;
             request.thinking = config.thinking;
-            let assembled = match self.run_step(session_id, turn_id, request, &cancel).await {
-                Ok(assembled) => assembled,
-                Err(error) => {
-                    self.emit(
-                        session_id,
-                        turn_id,
-                        AgentEvent::Error {
-                            code: error.code().into(),
-                            message: error.to_string(),
-                        },
-                    );
-                    return Err(error);
+            // A transient provider failure is not the end of the turn. Quota,
+            // auth, a malformed request and a cancellation are terminal; a 502,
+            // a dropped socket and a 429 are not, and re-sending the same request
+            // is the whole recovery.
+            let mut rate_limit_attempts: u32 = 0;
+            let mut transient_attempts: u32 = 0;
+            let assembled = loop {
+                match self
+                    .run_step(session_id, turn_id, request.clone(), &cancel)
+                    .await
+                {
+                    Ok(assembled) => break assembled,
+                    Err(error) => {
+                        let Some(budget) = crate::retry::budget_for(&error) else {
+                            self.emit(
+                                session_id,
+                                turn_id,
+                                AgentEvent::Error {
+                                    code: error.code().into(),
+                                    message: error.to_string(),
+                                },
+                            );
+                            return Err(error);
+                        };
+                        let used = match budget {
+                            crate::retry::RetryBudget::RateLimit => &mut rate_limit_attempts,
+                            crate::retry::RetryBudget::Transient => &mut transient_attempts,
+                        };
+                        if !config.infinite_provider_retry && *used >= budget.max_retries() {
+                            self.emit(
+                                session_id,
+                                turn_id,
+                                AgentEvent::Error {
+                                    code: error.code().into(),
+                                    message: error.to_string(),
+                                },
+                            );
+                            return Err(error);
+                        }
+                        *used += 1;
+                        let retry_after = match &error {
+                            AgentError::Provider { retry_after_ms, .. } => *retry_after_ms,
+                            _ => None,
+                        };
+                        let wait = crate::retry::delay_ms(budget, *used, retry_after, jitter());
+                        tracing::debug!(
+                            target: "agent_core::turn",
+                            attempt = *used,
+                            budget = ?budget,
+                            wait_ms = wait,
+                            %error,
+                            "retrying the provider request"
+                        );
+                        tokio::select! {
+                            biased;
+                            _ = cancel.cancelled() => {
+                                self.emit(
+                                    session_id,
+                                    turn_id,
+                                    AgentEvent::Error {
+                                        code: AgentError::Cancelled.code().into(),
+                                        message: AgentError::Cancelled.to_string(),
+                                    },
+                                );
+                                return Err(AgentError::Cancelled);
+                            }
+                            _ = tokio::time::sleep(std::time::Duration::from_millis(wait)) => {}
+                        }
+                    }
                 }
             };
 
@@ -769,4 +833,16 @@ pub fn assistant_text(transcript: &Transcript) -> Option<String> {
                 })
                 .collect()
         })
+}
+
+/// Jitter for the rate-limit curve, in `-1.0..=1.0`.
+///
+/// Wall-clock nanos rather than a random-number dependency: the point is only
+/// that two clients retrying at the same moment do not do it in lockstep.
+fn jitter() -> f64 {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.subsec_nanos())
+        .unwrap_or_default();
+    (f64::from(nanos % 2_000) / 1_000.0) - 1.0
 }

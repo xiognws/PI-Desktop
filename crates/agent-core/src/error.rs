@@ -14,6 +14,9 @@ pub enum AgentError {
         message: String,
         /// HTTP status when the failure came from a response, not the transport.
         status: Option<u16>,
+        /// What the response asked us to wait, when it said. A provider that
+        /// names its own delay knows its state better than a backoff curve.
+        retry_after_ms: Option<u64>,
     },
     #[error("tool `{tool}` failed: {message}")]
     Tool { tool: String, message: String },
@@ -94,6 +97,7 @@ impl AgentError {
             kind,
             message: message.into(),
             status: None,
+            retry_after_ms: None,
         }
     }
 
@@ -106,7 +110,20 @@ impl AgentError {
             kind,
             message: message.into(),
             status: Some(status),
+            retry_after_ms: None,
         }
+    }
+
+    /// Attach the delay the provider asked for, so the retry policy honours it.
+    pub fn with_retry_after(mut self, retry_after_ms: Option<u64>) -> Self {
+        if let Self::Provider {
+            retry_after_ms: slot,
+            ..
+        } = &mut self
+        {
+            *slot = retry_after_ms;
+        }
+        self
     }
 
     /// Whether the recovery policy may re-issue the same request.
