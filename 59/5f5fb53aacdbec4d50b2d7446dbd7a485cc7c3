@@ -1,0 +1,18 @@
+apps/desktop/electron/main/lsp/tools.ts
+  h_201ed4c689ac8b 1-192
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 1,621-632
+crates/host-core/src/permissions.rs
+  h_201ed4c689ac8b 128-130,132-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "595f5fb53aacdbec4d50b2d7446dbd7a485cc7c3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
