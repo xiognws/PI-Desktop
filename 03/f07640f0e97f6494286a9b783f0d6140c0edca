@@ -1,0 +1,30 @@
+crates/agent-core/README.md
+  h_201ed4c689ac8b 31-33,69-70,90-111
+crates/agent-core/src/error.rs
+  h_201ed4c689ac8b 34-35,42,53
+crates/agent-core/src/host_bridge.rs
+  h_201ed4c689ac8b 1-310
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 34,46
+crates/agent-core/src/main.rs
+  h_201ed4c689ac8b 217-218,220,233-237,244-245,249,255
+crates/agent-core/src/rpc.rs
+  h_201ed4c689ac8b 140-146,163-194,205,207,209
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 26,33,73-128,210-212,218,220,223-224,230-240,311-328,394-398,401,543-598
+crates/agent-core/tests/host_bridge.rs
+  h_201ed4c689ac8b 1-210
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 8,14,71-72,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "03f07640f0e97f6494286a9b783f0d6140c0edca",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
