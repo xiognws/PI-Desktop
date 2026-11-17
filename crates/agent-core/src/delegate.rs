@@ -51,6 +51,15 @@ const REPORT_TRUNCATION_MARKER: &str = "\n\n[subagent report truncated]\n\n";
 /// background.
 pub const SUBAGENT_MAX_STEPS: usize = 24;
 
+/// Budget of one resumed delegation report block.
+///
+/// Wider than a single report because several can settle together, and still
+/// bounded: the point of delegating was to keep this context small.
+pub const MAX_DELEGATION_RESULT_CHARS: usize = 50_000;
+
+/// Sent as the prompt that resumes the parent once delegates settle.
+pub const DELEGATION_RESUME_PROMPT: &str = "The following subagents have finished. Integrate their reports and continue the user's original task. Call TaskStop only if you have decided a still-running delegate should not continue.";
+
 /// Default and maximum wait windows, in seconds.
 pub const TASK_WAIT_DEFAULT_TIMEOUT_SECONDS: u64 = 600;
 pub const TASK_WAIT_MAX_TIMEOUT_SECONDS: u64 = 900;
@@ -391,6 +400,28 @@ impl DelegationRegistry {
         }
     }
 
+    /// Wait until every id has settled, with no deadline.
+    ///
+    /// Used when a delegate keeps the parent's turn open: there is nothing else
+    /// for the turn to do, and every delegate is bounded by its own step budget,
+    /// so cancellation is the only way out.
+    pub async fn wait_until_settled(&self, ids: &[String], cancel: &CancelToken) -> bool {
+        loop {
+            if cancel.is_cancelled() {
+                return false;
+            }
+            if self.settled_count(ids) >= ids.len() {
+                return true;
+            }
+            let wake = self.settled.notified();
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return false,
+                _ = wake => {}
+            }
+        }
+    }
+
     fn settled_count(&self, ids: &[String]) -> usize {
         self.handles()
             .into_iter()
@@ -426,6 +457,8 @@ pub struct DelegationView {
     pub completed_at_ms: Option<i64>,
     pub report: Option<String>,
     pub error: Option<DelegationError>,
+    /// True once some answer already carried this report to the parent.
+    pub report_delivered: bool,
 }
 
 impl From<&DelegationRecord> for DelegationView {
@@ -442,8 +475,90 @@ impl From<&DelegationRecord> for DelegationView {
             completed_at_ms: record.completed_at_ms,
             report: record.report.clone(),
             error: record.error.clone(),
+            report_delivered: record.report_delivered,
         }
     }
+}
+
+/// Join settled reports into the text that resumes the parent's turn.
+///
+/// Returns the text and the ids it actually carried: a report that did not fit
+/// the budget must stay undelivered so a later `TaskWait` can still read it.
+pub fn format_resume_text(
+    settled: &[DelegationView],
+    still_running: &[DelegationView],
+) -> (String, Vec<String>) {
+    let mut blocks: Vec<String> = Vec::new();
+    let mut delivered: Vec<String> = Vec::new();
+    let mut used = 0usize;
+    let mut omitted = 0usize;
+    for view in settled {
+        let report = view
+            .report
+            .clone()
+            .unwrap_or_else(|| format!("({} without a report)", view.status.as_str()));
+        let block = format!(
+            "## {} ({}) — {}\n{report}",
+            view.agent_name,
+            view.delegation_id,
+            view.status.as_str()
+        );
+        if used + block.chars().count() > MAX_DELEGATION_RESULT_CHARS {
+            omitted += 1;
+            continue;
+        }
+        used += block.chars().count() + 2;
+        delivered.push(view.delegation_id.clone());
+        blocks.push(block);
+    }
+    if omitted > 0 {
+        blocks.push(format!(
+            "[{omitted} more result{} omitted to protect this context; call TaskWait with their delegationIds to re-read one.]",
+            if omitted == 1 { "" } else { "s" }
+        ));
+    }
+    let heartbeat = if still_running.is_empty() {
+        String::new()
+    } else {
+        let lines: Vec<String> = still_running
+            .iter()
+            .map(|view| {
+                format!(
+                    "- {} ({}) — {} turn(s), {} tool call(s)",
+                    view.agent_name, view.delegation_id, view.turns, view.tool_calls
+                )
+            })
+            .collect();
+        format!("Still running:\n{}", lines.join("\n"))
+    };
+    let text = [
+        DELEGATION_RESUME_PROMPT.to_string(),
+        blocks.join("\n\n"),
+        heartbeat,
+    ]
+    .into_iter()
+    .filter(|part| !part.trim().is_empty())
+    .collect::<Vec<_>>()
+    .join("\n\n");
+    (text, delivered)
+}
+
+/// Delegations that should keep the parent's turn open: still running, or
+/// settled with a report nobody has read.
+///
+/// Stopped and aborted runs are excluded: the parent asked for them to end.
+pub fn pending_delegations(registry: &DelegationRegistry) -> Vec<DelegationView> {
+    registry
+        .snapshot()
+        .into_iter()
+        .filter(|view| {
+            !matches!(
+                view.status,
+                DelegationStatus::Stopped | DelegationStatus::Aborted
+            )
+        })
+        .filter(|view| !view.status.is_settled() || !view.report_delivered)
+        .collect()
 }
 
 fn now_ms() -> i64 {
@@ -486,13 +601,6 @@ impl DelegationHub {
             .collect::<Vec<_>>()
             .join(", ")
     }
-}
-
-fn record_of(handle: &Arc<Mutex<DelegationRecord>>) -> Option<DelegationView> {
-    handle
-        .lock()
-        .ok()
-        .map(|record| DelegationView::from(&*record))
 }
 
 /// `Task`: start one delegate and return immediately.
@@ -858,19 +966,10 @@ impl DelegationRegistry {
 
     /// Reports that settled but were never read by the parent.
     pub fn undelivered(&self) -> Vec<DelegationView> {
-        self.handles()
+        self.snapshot()
             .into_iter()
-            .filter_map(|handle| record_of(&handle))
             .filter(|view| view.status.is_settled() && view.report.is_some())
-            .filter(|view| {
-                !self
-                    .records
-                    .lock()
-                    .ok()
-                    .and_then(|records| records.get(&view.delegation_id).cloned())
-                    .and_then(|handle| handle.lock().ok().map(|record| record.report_delivered))
-                    .unwrap_or(false)
-            })
+            .filter(|view| !view.report_delivered)
             .collect()
     }
 }

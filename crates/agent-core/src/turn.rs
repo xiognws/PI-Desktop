@@ -25,6 +25,7 @@ use crate::compaction::{
     COMPACTION_SUMMARY_MAX_RETRIES, COMPACTION_SUMMARY_RETRY_BASE_MS, RETAINED_TAIL_NOTICE,
 };
 use crate::context::{estimate_context_tokens, BudgetDecision, ContextLimits, ModelLimits};
+use crate::delegate::{pending_delegations, DelegationRegistry};
 use crate::error::{AgentError, Result};
 use crate::event::{
     AgentEvent, AgentEventEnvelope, CompactionFailure, CompactionFallback, CompactionReason,
@@ -97,6 +98,10 @@ pub struct TurnEngine {
     /// message while a request is built, never written into the transcript: the
     /// row the UI shows stays exactly what the user typed.
     memory_prefix: Option<String>,
+    /// The session's delegations. When set, a delegate that is still working (or
+    /// whose report nobody read yet) keeps the turn open until its report has
+    /// been handed to the model.
+    delegations: Option<Arc<DelegationRegistry>>,
 }
 
 impl TurnEngine {
@@ -112,6 +117,7 @@ impl TurnEngine {
             steering: None,
             model_limits: None,
             memory_prefix: None,
+            delegations: None,
         }
     }
 
@@ -131,6 +137,13 @@ impl TurnEngine {
     /// Attach the recalled memory block for this turn.
     pub fn with_memory_prefix(mut self, prefix: Option<String>) -> Self {
         self.memory_prefix = prefix;
+        self
+    }
+
+    /// Attach the session's delegations, which lets a settled report resume the
+    /// turn instead of waiting for the model to ask.
+    pub fn with_delegations(mut self, delegations: Arc<DelegationRegistry>) -> Self {
+        self.delegations = Some(delegations);
         self
     }
 
@@ -252,6 +265,22 @@ impl TurnEngine {
 
             let calls = assembled.message.tool_calls();
             if calls.is_empty() {
+                // The model answered, but a delegate it started is still working
+                // — or settled with a report nobody read. Keeping the turn open
+                // is the difference between "the report arrives" and "the user
+                // has to ask for it again" (ADR 0089 / D328).
+                if self
+                    .resume_after_delegations(
+                        session_id,
+                        turn_id,
+                        transcript,
+                        &cancel,
+                        &mut added_ids,
+                    )
+                    .await?
+                {
+                    continue;
+                }
                 stop_reason = Some(assembled.stop_reason);
                 break;
             }
@@ -354,6 +383,76 @@ impl TurnEngine {
             steps: steps_taken,
             stop_reason: stop_reason.unwrap_or(StopReason::EndTurn),
         })
+    }
+
+    /// Wait for this session's pending delegations and hand their reports to the
+    /// model as one resumed user turn.
+    ///
+    /// Returns whether anything was delivered; `false` leaves the caller free to
+    /// end the turn.
+    async fn resume_after_delegations(
+        &self,
+        session_id: &str,
+        turn_id: &str,
+        transcript: &mut Transcript,
+        cancel: &CancelToken,
+        added_ids: &mut Vec<String>,
+    ) -> Result<bool> {
+        let Some(delegations) = &self.delegations else {
+            return Ok(false);
+        };
+        let pending = pending_delegations(delegations);
+        if pending.is_empty() {
+            return Ok(false);
+        }
+        let running: Vec<String> = pending
+            .iter()
+            .filter(|view| !view.status.is_settled())
+            .map(|view| view.delegation_id.clone())
+            .collect();
+        if !running.is_empty() {
+            delegations.wait_until_settled(&running, cancel).await;
+        }
+        // A user Stop ends the turn; the delegates were cancelled with it.
+        if cancel.is_cancelled() {
+            return Ok(false);
+        }
+        let after = pending_delegations(delegations);
+        let settled: Vec<_> = after
+            .iter()
+            .filter(|view| view.status.is_settled() && view.report.is_some())
+            .cloned()
+            .collect();
+        if settled.is_empty() {
+            return Ok(false);
+        }
+        let still_running: Vec<_> = after
+            .iter()
+            .filter(|view| !view.status.is_settled())
+            .cloned()
+            .collect();
+        let (text, delivered) = crate::delegate::format_resume_text(&settled, &still_running);
+        // Marked before the request goes out: a report carried in this text must
+        // never be delivered twice.
+        delegations.mark_delivered(&delivered);
+        let message = Message::user_text(text);
+        self.emit(
+            session_id,
+            turn_id,
+            AgentEvent::MessageStart {
+                message: message.clone(),
+            },
+        );
+        self.emit(
+            session_id,
+            turn_id,
+            AgentEvent::MessageEnd {
+                message: message.clone(),
+            },
+        );
+        added_ids.push(message.id.clone());
+        transcript.push(message);
+        Ok(!delivered.is_empty())
     }
 
     /// Compact the transcript in place.

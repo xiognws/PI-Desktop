@@ -638,7 +638,8 @@ impl Sidecar {
             Some(limits) => engine.with_model_limits(limits),
             None => engine,
         }
-        .with_memory_prefix(memory_prefix);
+        .with_memory_prefix(memory_prefix)
+        .with_delegations(session.delegations.clone());
 
         let task_session = session.clone();
         let task_session_id = session_id.clone();
