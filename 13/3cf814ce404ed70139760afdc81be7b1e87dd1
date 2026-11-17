@@ -1,0 +1,16 @@
+apps/desktop/electron/main/lsp/servers.ts
+  h_201ed4c689ac8b 1-120
+apps/desktop/electron/test/lsp-servers.test.mjs
+  h_201ed4c689ac8b 1-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "133cf814ce404ed70139760afdc81be7b1e87dd1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
