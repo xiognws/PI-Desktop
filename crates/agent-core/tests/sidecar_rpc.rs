@@ -240,3 +240,63 @@ async fn a_notification_gets_no_answer() {
     };
     assert!(sidecar.handle(request).await.is_none());
 }
+
+#[tokio::test]
+async fn a_manual_compaction_rewrites_the_session_the_next_prompt_reads() {
+    let (sidecar, lines) = sidecar();
+    // Two turns of text plus the summary the compaction will ask for.
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "text": "hello from the kernel", "turns": 3},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t1", "prompt": "remember: alpha is 1"}),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn reaches agent_end");
+
+    let response = call(&sidecar, 3, "agent.compact", json!({"sessionId": "s1"})).await;
+    assert_eq!(response["result"]["compacted"], true);
+    assert_eq!(
+        response["result"]["messageCount"], 1,
+        "the checkpoint replaced the two rows"
+    );
+
+    let event_types: Vec<String> = lines
+        .notifications("agent.event")
+        .iter()
+        .map(|params| params["event"]["type"].as_str().unwrap_or("").to_string())
+        .collect();
+    assert!(event_types.iter().any(|kind| kind == "compaction_start"));
+    assert!(event_types.iter().any(|kind| kind == "compaction_end"));
+
+    // The next prompt reads the compacted transcript, not the old rows.
+    let session = call(
+        &sidecar,
+        4,
+        "native.session.get",
+        json!({"sessionId": "s1"}),
+    )
+    .await;
+    let messages = session["result"]["messages"]
+        .as_array()
+        .expect("a message list");
+    assert_eq!(messages.len(), 1);
+    let text = messages[0]["parts"][0]["text"]
+        .as_str()
+        .expect("a text part");
+    assert!(text.starts_with("[context checkpoint]"), "got: {text}");
+    assert!(text.contains("hello from the kernel"));
+}

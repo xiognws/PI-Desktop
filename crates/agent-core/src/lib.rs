@@ -44,8 +44,11 @@ pub mod tool;
 pub mod turn;
 
 pub use cancel::CancelToken;
-pub use error::{AgentError, Result};
-pub use event::{AgentEvent, AgentEventEnvelope, EventSink, RecordingSink};
+pub use error::{AgentError, ProviderErrorKind, Result};
+pub use event::{
+    AgentEvent, AgentEventEnvelope, CompactionFailure, CompactionFallback, CompactionReason,
+    EventSink, RecordingSink,
+};
 pub use host_bridge::{HostBridge, HostError, HostTool};
 pub use message::{ContentPart, Message, Role, StopReason, ToolCall, ToolResult, Usage};
 pub use provider::{ChatRequest, Provider, ProviderStream, StreamEvent, ThinkingLevel};

@@ -74,7 +74,7 @@ printf '%s\n' \
 | 2d | remaining gap for a real session: `agent.compact` (needs 3b), persistence so `native.session.*` reads a store instead of live sessions, `sidecar.configure` network proxy actually applied to the HTTP client | next |
 | 3b-1 | context budget: window ceiling, `hardLimit`, headroom, trigger at half, retained-tail target, usage-anchored token estimate | **done** |
 | 3b-2 | compaction plan: cut point per mode, summary request sized the way it is sent, bounded reduction, chunk splitting, retained-tail fallback | **done** |
-| 3b-3 | loop integration (compact between steps), `agent.compact`, `compaction_start`/`compaction_end` events | next |
+| 3b-3 | loop integration (gate before every step, compact in place), provider-written summary with retry on transient failure, `agent.compact`, `compaction_start`/`compaction_end` events | **done** |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5 | memory store and skills | |
 | 6 | MCP client, cron/scheduled runs, subagent delegation | |

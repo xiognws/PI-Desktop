@@ -46,6 +46,15 @@ pub const COMPACTION_SUMMARY_MAX_CHUNKS: usize = 16;
 pub const COMPACTION_SUMMARY_CHUNK_MARGIN: f64 = 0.9;
 pub const SUMMARY_CHUNK_TRUNCATION_MARKER: &str =
     "\n\n[message truncated: the summary request budget could not carry it whole]";
+/// Header of the message installed as a checkpoint.
+pub const CHECKPOINT_HEADER: &str = "[context checkpoint]";
+/// The message a successful checkpoint installs in place of the summarized range.
+pub fn checkpoint_message(summary: &str) -> Message {
+    Message::user_text(format!("{CHECKPOINT_HEADER}\n\n{}", summary.trim()))
+}
+/// Installed ahead of a retained-tail fallback, so the model knows the earlier
+/// conversation was dropped without a summary rather than never existing.
+pub const RETAINED_TAIL_NOTICE: &str = "The earlier part of this conversation was compacted without a summary because the summary request failed. What follows is the most recent context; earlier decisions and file paths may be missing, so re-read anything you need.";
 /// pi's own cap when serializing a conversation for a summary request.
 pub const SERIALIZED_TOOL_RESULT_CAP_CHARS: usize = 2_000;
 

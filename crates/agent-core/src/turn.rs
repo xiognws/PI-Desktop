@@ -19,8 +19,17 @@
 use std::sync::Arc;
 
 use crate::cancel::CancelToken;
+use crate::compaction::{
+    build_summary_request, checkpoint_message, chunk_summary_input, plan_compaction,
+    reduce_summary_input, retained_tail_fallback, CompactionMode, SummaryInput,
+    COMPACTION_SUMMARY_MAX_RETRIES, COMPACTION_SUMMARY_RETRY_BASE_MS, RETAINED_TAIL_NOTICE,
+};
+use crate::context::{estimate_context_tokens, BudgetDecision, ContextLimits, ModelLimits};
 use crate::error::{AgentError, Result};
-use crate::event::{AgentEvent, AgentEventEnvelope, EventSink};
+use crate::event::{
+    AgentEvent, AgentEventEnvelope, CompactionFailure, CompactionFallback, CompactionReason,
+    EventSink,
+};
 use crate::message::{ContentPart, Message, Role, StopReason, Usage};
 use crate::provider::{ChatRequest, Provider, ResponseAssembler, StreamEvent, ThinkingLevel};
 use crate::session::Transcript;
@@ -67,11 +76,23 @@ pub trait SteeringSource: Send + Sync {
     fn drain(&self) -> Vec<Message>;
 }
 
+/// The ambient state one turn runs under: what to ask the provider for and how
+/// the caller stops it. They travel together through compaction, which needs
+/// both and nothing else from the turn.
+pub struct TurnRun<'a> {
+    pub config: &'a TurnConfig,
+    pub cancel: &'a CancelToken,
+}
+
 pub struct TurnEngine {
     provider: Arc<dyn Provider>,
     tools: Arc<ToolRegistry>,
     sink: Arc<dyn EventSink>,
     steering: Option<Arc<dyn SteeringSource>>,
+    /// Context budget for the model this turn targets. Without it the loop
+    /// never compacts: a caller that does not know the window cannot be told
+    /// its request was too large.
+    model_limits: Option<ModelLimits>,
 }
 
 impl TurnEngine {
@@ -85,6 +106,7 @@ impl TurnEngine {
             tools,
             sink,
             steering: None,
+            model_limits: None,
         }
     }
 
@@ -92,6 +114,12 @@ impl TurnEngine {
     /// entirely, which is what the self-check and the loop tests want.
     pub fn with_steering(mut self, source: Arc<dyn SteeringSource>) -> Self {
         self.steering = Some(source);
+        self
+    }
+
+    /// Attach the model's context facts, which enables automatic compaction.
+    pub fn with_model_limits(mut self, limits: ModelLimits) -> Self {
+        self.model_limits = Some(limits);
         self
     }
 
@@ -151,6 +179,32 @@ impl TurnEngine {
                     added_ids.push(message.id.clone());
                     transcript.push(message.clone());
                     self.emit(session_id, turn_id, AgentEvent::MessageEnd { message });
+                }
+            }
+
+            // Compaction gate: a request at or above the hard boundary must not
+            // be issued, and a session at the trigger compacts before it grows
+            // further. Both run here, between steps, never on a background path.
+            if let Some(model_limits) = self.model_limits {
+                let limits = ContextLimits::for_model(model_limits);
+                let decision = limits.decide(estimate_context_tokens(transcript.messages()).tokens);
+                if decision != BudgetDecision::Proceed {
+                    let reason = match decision {
+                        BudgetDecision::Overflow => CompactionReason::Overflow,
+                        _ => CompactionReason::Threshold,
+                    };
+                    self.compact(
+                        session_id,
+                        turn_id,
+                        transcript,
+                        &limits,
+                        reason,
+                        TurnRun {
+                            config,
+                            cancel: &cancel,
+                        },
+                    )
+                    .await?;
                 }
             }
 
@@ -283,6 +337,209 @@ impl TurnEngine {
             steps: steps_taken,
             stop_reason: stop_reason.unwrap_or(StopReason::EndTurn),
         })
+    }
+
+    /// Compact the transcript in place.
+    ///
+    /// Success installs the summary plus whatever the mode retains. A failed
+    /// summary installs the retained-tail fallback instead — the turn continues,
+    /// because a summary failure is not a reason to abandon the task — unless the
+    /// context is *still* at the hard boundary afterwards, in which case the
+    /// caller gets an error rather than a request the provider would reject.
+    pub async fn compact(
+        &self,
+        session_id: &str,
+        turn_id: &str,
+        transcript: &mut Transcript,
+        limits: &ContextLimits,
+        reason: CompactionReason,
+        run: TurnRun<'_>,
+    ) -> Result<()> {
+        self.emit(session_id, turn_id, AgentEvent::CompactionStart { reason });
+
+        // Overflow happens mid-turn, so the current task's goal has to survive;
+        // a threshold compaction at a turn boundary does not carry history.
+        let mode = match reason {
+            CompactionReason::Overflow => CompactionMode::ActiveTurn,
+            _ => CompactionMode::CompletedTurn,
+        };
+
+        let tokens_before = estimate_context_tokens(transcript.messages()).tokens;
+        let Some(plan) = plan_compaction(transcript.messages(), limits, mode) else {
+            self.emit(
+                session_id,
+                turn_id,
+                AgentEvent::CompactionEnd {
+                    reason,
+                    ok: false,
+                    tokens_before: Some(tokens_before),
+                    first_kept_message_id: None,
+                    will_retry: false,
+                    fallback: None,
+                    error: Some(CompactionFailure {
+                        code: "COMPACTION_NOTHING_TO_DO".into(),
+                        message: "the transcript has no history to compact".into(),
+                    }),
+                },
+            );
+            return Ok(());
+        };
+
+        match self
+            .run_summary(&plan.summary_input, limits, run.config, run.cancel)
+            .await
+        {
+            Ok(summary) => {
+                let mut messages = vec![checkpoint_message(&summary)];
+                messages.extend(plan.retained.iter().cloned());
+                let first_kept = messages.get(1).map(|message| message.id.clone());
+                *transcript = Transcript::from_messages(messages);
+                self.emit(
+                    session_id,
+                    turn_id,
+                    AgentEvent::CompactionEnd {
+                        reason,
+                        ok: true,
+                        tokens_before: Some(plan.tokens_before),
+                        first_kept_message_id: first_kept,
+                        will_retry: false,
+                        fallback: None,
+                        error: None,
+                    },
+                );
+                Ok(())
+            }
+            Err(error) => {
+                let tail = retained_tail_fallback(transcript.messages(), limits, mode);
+                let mut messages = vec![Message::user_text(RETAINED_TAIL_NOTICE)];
+                messages.extend(tail);
+                let recovered = Transcript::from_messages(messages);
+                let first_kept = recovered
+                    .messages()
+                    .get(1)
+                    .map(|message| message.id.clone());
+                let still_over = limits
+                    .decide(estimate_context_tokens(recovered.messages()).tokens)
+                    == BudgetDecision::Overflow;
+                *transcript = recovered;
+
+                self.emit(
+                    session_id,
+                    turn_id,
+                    AgentEvent::CompactionEnd {
+                        reason,
+                        ok: false,
+                        tokens_before: Some(tokens_before),
+                        first_kept_message_id: first_kept,
+                        // Only worth another attempt when the provider itself is
+                        // the problem rather than the amount of context.
+                        will_retry: !still_over,
+                        fallback: Some(CompactionFallback::RetainedTail),
+                        error: Some(CompactionFailure {
+                            code: error.code().into(),
+                            message: error.to_string(),
+                        }),
+                    },
+                );
+
+                if still_over {
+                    let fatal = AgentError::Invalid(
+                        "context is still above the hard limit after a retained-tail recovery"
+                            .into(),
+                    );
+                    self.emit(
+                        session_id,
+                        turn_id,
+                        AgentEvent::Error {
+                            code: fatal.code().into(),
+                            message: fatal.to_string(),
+                        },
+                    );
+                    return Err(fatal);
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Ask the provider for a summary: chunk first, reduce once if the chunks do
+    /// not fit, and refuse rather than send a request that cannot succeed.
+    async fn run_summary(
+        &self,
+        input: &SummaryInput,
+        limits: &ContextLimits,
+        config: &TurnConfig,
+        cancel: &CancelToken,
+    ) -> Result<String> {
+        let chunks = chunk_summary_input(input, limits)
+            .or_else(|| {
+                reduce_summary_input(input)
+                    .and_then(|reduced| chunk_summary_input(&reduced, limits))
+            })
+            .ok_or_else(|| {
+                AgentError::Invalid("the summary input cannot be split into chunks that fit".into())
+            })?;
+
+        let mut parts = Vec::with_capacity(chunks.len());
+        for chunk in &chunks {
+            parts.push(self.summarize_once(chunk, config, cancel).await?);
+        }
+        let summary = parts.join("\n\n");
+        if summary.trim().is_empty() {
+            return Err(AgentError::Invalid(
+                "the provider returned an empty summary".into(),
+            ));
+        }
+        Ok(summary)
+    }
+
+    async fn summarize_once(
+        &self,
+        input: &SummaryInput,
+        config: &TurnConfig,
+        cancel: &CancelToken,
+    ) -> Result<String> {
+        let request = build_summary_request(input);
+        let mut chat = ChatRequest::new(&config.model, vec![Message::user_text(request.user)]);
+        chat.system = Some(request.system);
+
+        let mut attempts = 0u32;
+        loop {
+            if cancel.is_cancelled() {
+                return Err(AgentError::Cancelled);
+            }
+            let attempt: Result<String> = async {
+                let mut stream = self.provider.stream(chat.clone(), cancel.clone()).await?;
+                let mut assembler = ResponseAssembler::new();
+                while let Some(event) = stream.next().await {
+                    assembler.push(event)?;
+                }
+                Ok(assembler.finish()?.message.text())
+            }
+            .await;
+
+            match attempt {
+                Ok(text) if !text.trim().is_empty() => return Ok(text),
+                Ok(_) => {
+                    return Err(AgentError::Invalid(
+                        "the provider returned an empty summary".into(),
+                    ))
+                }
+                // Transient provider trouble is worth another request; quota,
+                // auth and malformed requests are not.
+                Err(error) if error.is_retryable() && attempts < COMPACTION_SUMMARY_MAX_RETRIES => {
+                    attempts += 1;
+                    let delay = std::time::Duration::from_millis(
+                        COMPACTION_SUMMARY_RETRY_BASE_MS << (attempts - 1),
+                    );
+                    tokio::select! {
+                        _ = cancel.cancelled() => return Err(AgentError::Cancelled),
+                        _ = tokio::time::sleep(delay) => {}
+                    }
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     /// One provider request: stream deltas to the renderer, then return the

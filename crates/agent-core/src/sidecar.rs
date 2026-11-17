@@ -21,8 +21,9 @@ use std::sync::{Arc, Mutex};
 use serde_json::{json, Value};
 
 use crate::cancel::CancelToken;
+use crate::context::{ContextLimits, ModelLimits};
 use crate::error::Result;
-use crate::event::{AgentEventEnvelope, EventSink};
+use crate::event::{AgentEventEnvelope, CompactionReason, EventSink};
 use crate::host_bridge::{tool_spec_from_value, HostBridge, HostTool};
 use crate::message::Message;
 use crate::provider::http::{HttpProvider, HttpProviderConfig};
@@ -32,6 +33,7 @@ use crate::rpc::{self, Request, RpcError};
 use crate::session::Transcript;
 use crate::tool::{AllowAll, PermissionGate, ToolRegistry};
 use crate::turn::{TurnConfig, TurnEngine};
+use crate::ThinkingLevel;
 
 /// Destination for one encoded protocol line.
 pub trait LineSink: Send + Sync {
@@ -280,6 +282,7 @@ impl Sidecar {
             })),
             "sidecar.configure" => self.configure(request),
             "agent.prompt" | "agent.turn" => self.prompt(request).await,
+            "agent.compact" => self.compact(request).await,
             "agent.steer" => self.steer(request),
             "agent.steeringContext" => self.steering_context(request),
             "agent.abort" => self.abort(request),
@@ -512,6 +515,12 @@ impl Sidecar {
             }),
         )
         .with_steering(session.clone());
+        // Main stamps the session's model window on the prompt; without it the
+        // loop has no budget to enforce and would never compact.
+        let engine = match model_limits_from(request) {
+            Some(limits) => engine.with_model_limits(limits),
+            None => engine,
+        };
 
         let task_session = session.clone();
         let task_session_id = session_id.clone();
@@ -557,6 +566,103 @@ impl Sidecar {
         });
 
         Ok(json!({ "accepted": true, "sessionId": session_id, "turnId": turn_id }))
+    }
+
+    /// Compact a session on request, with the same engine the loop uses so the
+    /// manual path cannot drift from the automatic one.
+    async fn compact(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?.to_string();
+        let provider = match request
+            .params
+            .get("provider")
+            .filter(|value| !value.is_null())
+        {
+            Some(spec) => build_provider(spec)?,
+            None => self
+                .provider
+                .lock()
+                .map_err(|_| RpcError::internal("provider lock poisoned"))?
+                .clone()
+                .ok_or_else(|| {
+                    RpcError::app(
+                        "PROVIDER_NOT_CONFIGURED",
+                        "manual compaction needs a provider to write the summary",
+                    )
+                })?,
+        };
+
+        let session = self.session(&session_id)?;
+        // A summary needs a stable transcript; compacting under a running turn
+        // would summarize rows that are still being appended.
+        if session.running.load(Ordering::SeqCst) {
+            return Err(RpcError::app(
+                "TURN_IN_FLIGHT",
+                "this session has a running turn; compact after it finishes",
+            ));
+        }
+
+        let mut config = self
+            .config
+            .lock()
+            .map_err(|_| RpcError::internal("config lock poisoned"))?
+            .clone();
+        if let Some(model) = request.str_param("modelId").or_else(|| {
+            request
+                .params
+                .get("provider")
+                .and_then(|provider| provider.get("modelId"))
+                .and_then(Value::as_str)
+        }) {
+            config.model = model.to_string();
+        }
+        let limits = ContextLimits::for_model(model_limits_from(request).unwrap_or_default());
+        let turn_id = request
+            .str_param("turnId")
+            .map(str::to_string)
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        let tools = self
+            .tools
+            .lock()
+            .map_err(|_| RpcError::internal("tool lock poisoned"))?
+            .clone();
+        let engine = TurnEngine::new(
+            provider,
+            tools,
+            Arc::new(NotificationSink {
+                out: self.out.clone(),
+            }),
+        );
+        let cancel = CancelToken::new();
+        let turn_config = TurnConfig {
+            model: config.model.clone(),
+            system: config.system.clone(),
+            max_steps: config.max_steps,
+            temperature: config.temperature,
+            max_output_tokens: config.max_output_tokens,
+            thinking: ThinkingLevel::Off,
+        };
+
+        let mut transcript: tokio::sync::MutexGuard<'_, Transcript> =
+            session.transcript.lock().await;
+        engine
+            .compact(
+                &session_id,
+                &turn_id,
+                &mut transcript,
+                &limits,
+                CompactionReason::Manual,
+                crate::turn::TurnRun {
+                    config: &turn_config,
+                    cancel: &cancel,
+                },
+            )
+            .await
+            .map_err(|error| RpcError::app(error.code(), error.to_string()))?;
+        Ok(json!({
+            "compacted": true,
+            "messageCount": transcript.messages().len(),
+            "turnId": turn_id,
+        }))
     }
 
     /// Queue a message into the running turn. It reaches the model on the next
@@ -969,4 +1075,18 @@ fn snippet(text: &str, limit: usize) -> String {
     }
     let head: String = collapsed.chars().take(limit).collect();
     format!("{head}…")
+}
+
+/// The model window facts a prompt carries. Main stamps them per turn; without
+/// them the loop cannot tell a large context from a small one.
+fn model_limits_from(request: &Request) -> Option<ModelLimits> {
+    let context_window = request.params.get("contextWindow").and_then(Value::as_u64);
+    let max_tokens = request.params.get("maxTokens").and_then(Value::as_u64);
+    if context_window.is_none() && max_tokens.is_none() {
+        return None;
+    }
+    Some(ModelLimits {
+        context_window,
+        max_tokens,
+    })
 }

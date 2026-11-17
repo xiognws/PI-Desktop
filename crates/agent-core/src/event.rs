@@ -58,10 +58,49 @@ pub enum AgentEvent {
         #[serde(rename = "isError", skip_serializing_if = "std::ops::Not::not")]
         is_error: bool,
     },
+    CompactionStart {
+        reason: CompactionReason,
+    },
+    CompactionEnd {
+        reason: CompactionReason,
+        ok: bool,
+        #[serde(rename = "tokensBefore", skip_serializing_if = "Option::is_none")]
+        tokens_before: Option<u64>,
+        #[serde(rename = "firstKeptMessageId", skip_serializing_if = "Option::is_none")]
+        first_kept_message_id: Option<String>,
+        #[serde(rename = "willRetry")]
+        will_retry: bool,
+        /// Present when the summary failed and a retained tail was installed.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fallback: Option<CompactionFallback>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<CompactionFailure>,
+    },
     Error {
         code: String,
         message: String,
     },
+}
+
+/// Why compaction ran. Wire names match `ContextCompactionReason`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompactionReason {
+    Manual,
+    Threshold,
+    Overflow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompactionFallback {
+    RetainedTail,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompactionFailure {
+    pub code: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
