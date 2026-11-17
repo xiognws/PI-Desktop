@@ -34,6 +34,7 @@ each phase is additive on `main`.
 | `turn` | the loop: request → stream → tools → repeat | `agent/conversation_loop.py` |
 | `session` | transcript, tool-pair repair | `agent/turn_recovery.py` |
 | `context` | window/hard-limit/trigger arithmetic, token estimate anchored on provider usage | `agent/context_compressor.py` |
+| `compaction` | cut point, summary request, retained tail, fallback selection | `agent/context_compressor.py`, `agent/conversation_compression.py` |
 
 ## Running it
 
@@ -72,7 +73,7 @@ printf '%s\n' \
 | 3a | system prompt composition: persona (`SYSTEM.md` replaces it), `APPEND_SYSTEM.md`, host tool guidance, the `AGENTS.md`/`CLAUDE.md` chain with per-directory precedence and separate global/project byte budgets, verbatim mode prompts | **done** |
 | 2d | remaining gap for a real session: `agent.compact` (needs 3b), persistence so `native.session.*` reads a store instead of live sessions, `sidecar.configure` network proxy actually applied to the HTTP client | next |
 | 3b-1 | context budget: window ceiling, `hardLimit`, headroom, trigger at half, retained-tail target, usage-anchored token estimate | **done** |
-| 3b-2 | compaction: preflight, summary request, checkpoint cut point, retained tail | next |
+| 3b-2 | compaction plan: cut point per mode, summary request sized the way it is sent, bounded reduction, chunk splitting, retained-tail fallback | **done** |
 | 3b-3 | loop integration (compact between steps), `agent.compact`, `compaction_start`/`compaction_end` events | next |
 | 4 | filesystem/shell/search tools, permissions, asktool | |
 | 5 | memory store and skills | |

@@ -100,17 +100,20 @@ impl Transcript {
             }
 
             // Gather the results that belong to these calls, keeping each
-            // result's owning message id so a repair never renames a row the
-            // transcript already persisted.
-            let mut gathered: Vec<Option<(ToolResult, String)>> = vec![None; calls.len()];
+            // result's owning message id and timestamp so a repair never
+            // renames or re-dates a row the transcript already persisted.
+            let assistant_created_at = message.created_at_ms;
+            let mut gathered: Vec<Option<(ToolResult, String, i64)>> = vec![None; calls.len()];
             while index < self.messages.len() && self.messages[index].role == Role::Tool {
                 let tool_message = &self.messages[index];
                 let message_id = tool_message.id.clone();
+                let created_at = tool_message.created_at_ms;
                 for part in &tool_message.parts {
                     if let ContentPart::ToolResult(result) = part {
                         match calls.iter().position(|call| call.id == result.call_id) {
                             Some(slot) if gathered[slot].is_none() => {
-                                gathered[slot] = Some((result.clone(), message_id.clone()));
+                                gathered[slot] =
+                                    Some((result.clone(), message_id.clone(), created_at));
                             }
                             Some(_) => report.dropped_duplicate_results += 1,
                             None => report.dropped_orphan_results += 1,
@@ -123,7 +126,7 @@ impl Transcript {
             // One tool message per assistant call keeps the pairing explicit
             // and survives providers that only accept single-result turns.
             for (call, slot) in calls.iter().zip(gathered) {
-                let (result, message_id) = match slot {
+                let (result, message_id, created_at) = match slot {
                     Some(pair) => pair,
                     None => {
                         report.synthesized_results += 1;
@@ -138,13 +141,17 @@ impl Transcript {
                             // Deterministic, so a second repair pass emits the
                             // same row instead of a fresh one.
                             format!("synthetic-result-{}", call.id),
+                            // Dated from the assistant message that announced
+                            // the call, so repair never rewrites a timestamp.
+                            assistant_created_at,
                         )
                     }
                 };
-                let mut message = Message::new(Role::Tool);
-                message.id = message_id;
-                message.parts.push(ContentPart::ToolResult(result));
-                repaired.push(message);
+                let mut tool_row = Message::new(Role::Tool);
+                tool_row.id = message_id;
+                tool_row.created_at_ms = created_at;
+                tool_row.parts.push(ContentPart::ToolResult(result));
+                repaired.push(tool_row);
             }
         }
 
