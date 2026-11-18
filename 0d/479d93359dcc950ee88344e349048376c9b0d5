@@ -1,0 +1,26 @@
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 46
+crates/agent-core/src/restore.rs
+  h_201ed4c689ac8b 1-236
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 75-106,214-219,235-238,250,579-581,624-627,629,1160-1208
+crates/agent-core/tests/common/mod.rs
+  h_201ed4c689ac8b 1-45
+crates/agent-core/tests/host_bridge.rs
+  h_201ed4c689ac8b 18-19,23-27,30,83,137,199
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 11-12,14-24,429,442-443,452,458,460,470,476-481,491,852-972
+crates/agent-core/tests/steering.rs
+  h_201ed4c689ac8b 16-17,21-25,28,72,165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0d479d93359dcc950ee88344e349048376c9b0d5",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
