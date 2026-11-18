@@ -1,10 +1,10 @@
 //! Shared test support.
 //!
-//! The kernel asks the host for a session's history before a turn, exactly as
-//! the Node sidecar does, so a test that never answers that call stalls on a
-//! host that does not exist. This stands in for Electron main: it answers
-//! `session.get` with an empty session, which is what a brand-new conversation
-//! looks like. Tests that want to control the answer spawn no responder and
+//! The kernel talks to the host before a turn: it asks for the session's history
+//! and journals the system prompt. A test that never answers stalls on a host
+//! that does not exist, exactly as the Node sidecar would. This stands in for
+//! Electron main: history comes back empty (a brand-new conversation) and an
+//! append succeeds. Tests that want to control an answer spawn no responder and
 //! complete the call themselves.
 
 use std::collections::HashSet;

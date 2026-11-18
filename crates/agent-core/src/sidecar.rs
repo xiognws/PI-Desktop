@@ -223,11 +223,12 @@ impl RuntimeConfig {
     }
 }
 
-/// How long a prompt waits for the host's history before starting empty.
+/// How long a prompt waits for a pre-turn host call (history, journal write).
 ///
 /// Main answers in milliseconds; this bound exists so a host that never answers
-/// degrades to a fresh conversation instead of a prompt that never returns.
-const HISTORY_RESTORE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+/// degrades instead of holding the prompt open forever. A host that *answers*
+/// with a refusal is a different case and is never ignored.
+const HOST_PREPARE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 struct Session {
     transcript: Arc<tokio::sync::Mutex<Transcript>>,
@@ -244,6 +245,8 @@ struct Session {
     /// Delegations this session started. Kept per session so a report that
     /// settled after the parent stopped calling tools is still readable.
     delegations: Arc<crate::delegate::DelegationRegistry>,
+    /// The system prompts this session has already journaled.
+    journal: Mutex<crate::journal::SystemJournal>,
     /// Whether history has already been pulled from the host for this session.
     /// Once is enough: after that the kernel's transcript is the newer copy, and
     /// asking again would resurrect rows the user has since deleted.
@@ -260,6 +263,7 @@ impl Session {
             steering: Mutex::new(std::collections::VecDeque::new()),
             skills: Arc::new(crate::skills::SkillCatalog::new()),
             restored: AtomicBool::new(false),
+            journal: Mutex::new(crate::journal::SystemJournal::new()),
             delegations: Arc::new(crate::delegate::DelegationRegistry::new(session_id)),
         }
     }
@@ -459,7 +463,7 @@ impl Sidecar {
         config: &RuntimeConfig,
         mode: crate::prompt::SessionMode,
         skills: &[crate::skills::SkillDef],
-    ) -> String {
+    ) -> crate::prompt::ComposedPrompt {
         let fs: Arc<dyn crate::prompt::PromptFs> = Arc::new(crate::prompt::StdFs);
         let workspace_root = request
             .str_param("workspaceRoot")
@@ -478,7 +482,7 @@ impl Sidecar {
             .str_param("systemPrompt")
             .or(config.system.as_deref());
         inputs.skills = skills;
-        crate::prompt::build_system_prompt(&fs, &inputs).system
+        crate::prompt::build_system_prompt(&fs, &inputs)
     }
 
     fn session(&self, session_id: &str) -> Result<Arc<Session>, RpcError> {
@@ -618,9 +622,14 @@ impl Sidecar {
         // guidance, the project instruction chain, the skill catalog and the
         // mode's rules.
         let composed = self.compose_prompt(request, &config, mode.clone(), &catalog);
-        if !composed.trim().is_empty() {
-            config.system = Some(composed);
+        if !composed.system.trim().is_empty() {
+            config.system = Some(composed.system.clone());
         }
+        // The prompt the model receives is journaled before dispatch: nothing in
+        // the transcript shows it, so without this row a restored session cannot
+        // reproduce what it ran with, and a support bundle cannot show it.
+        self.journal_system_prompt(request, &session, &composed, session_id.as_str(), &turn_id)
+            .await?;
         if let Some(model) = request.str_param("modelId").or_else(|| {
             request
                 .params
@@ -1186,6 +1195,84 @@ impl Sidecar {
     /// wrapped in `status`, because `api.ts` destructures `{ status }` and reads
     /// `status.isRunning`. A flat object left the renderer with `undefined` and
     /// an idle session that never looked idle.
+    /// Record the system prompt for this turn, once per distinct prompt.
+    ///
+    /// A write that fails fails the request. The store would otherwise hold a
+    /// turn whose prompt it never saw, and retrying the provider cannot repair a
+    /// durable write that did not land.
+    async fn journal_system_prompt(
+        &self,
+        request: &Request,
+        session: &Arc<Session>,
+        composed: &crate::prompt::ComposedPrompt,
+        session_id: &str,
+        turn_id: &str,
+    ) -> Result<(), RpcError> {
+        if composed.system.trim().is_empty() {
+            return Ok(());
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_millis() as i64)
+            .unwrap_or_default();
+        let key = crate::journal::system_message_key(composed);
+        let message_json = crate::journal::system_message_json(composed, now);
+        let row = {
+            let mut journal = session
+                .journal
+                .lock()
+                .map_err(|_| RpcError::internal("journal lock poisoned"))?;
+            journal.row(&key, &message_json, request.str_param("userMessageId"), now)
+        };
+        let Some(message) = row else {
+            return Ok(());
+        };
+        match tokio::time::timeout(
+            HOST_PREPARE_TIMEOUT,
+            self.bridge.call(
+                "session.appendMessage",
+                json!({
+                    "sessionId": session_id,
+                    "turnId": turn_id,
+                    "message": message,
+                }),
+            ),
+        )
+        .await
+        {
+            Ok(Ok(_)) => Ok(()),
+            // The host said no. Fail before dispatch: retrying the provider
+            // cannot repair a durable write that did not land, and a turn the
+            // store never saw cannot be reproduced.
+            Ok(Err(crate::host_bridge::HostError::Rpc(_))) => Err(RpcError {
+                code: -32000,
+                message: "Local request preparation failed.".into(),
+                data: Some(json!({
+                    "errorCode": "LOCAL_REQUEST_ERROR",
+                    "phase": "request-preparation",
+                })),
+            }),
+            // The host is not there. A prompt that hangs on a dead host is worse
+            // than a turn without its journal row, and the row is retried the
+            // next time the prompt changes.
+            Ok(Err(error)) => {
+                tracing::warn!(
+                    target: "agent_core::sidecar",
+                    %error,
+                    "system prompt journal write skipped"
+                );
+                Ok(())
+            }
+            Err(_) => {
+                tracing::warn!(
+                    target: "agent_core::sidecar",
+                    "system prompt journal write timed out"
+                );
+                Ok(())
+            }
+        }
+    }
+
     /// Emit the session's current run state to the client.
     fn emit_status(&self, session_id: &str, turn_id: &str, session: &Arc<Session>) {
         let running = session.running.load(Ordering::SeqCst);
@@ -1232,7 +1319,7 @@ impl Sidecar {
             return Ok(());
         }
         let response = match tokio::time::timeout(
-            HISTORY_RESTORE_TIMEOUT,
+            HOST_PREPARE_TIMEOUT,
             self.bridge.call("session.get", json!({ "id": session_id })),
         )
         .await

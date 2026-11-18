@@ -96,7 +96,8 @@ printf '%s\n' \
 | 6d | cron/scheduled runs: **no kernel work**. Host-core owns the records, the cadence and the automation pass (`crates/host-core/src/scheduled.rs`, 741 lines + `automation`/`timing`/`project`), and a run is an ordinary prompt against a session — which the kernel already serves. Nothing here spawns the agent itself | verified |
 | 7a | packaging, measured on commit `0a4b56b02`: `cargo build -p agent-core --release --offline` → **6.34 MiB** `pi-desktop-agent-core.exe`; imports only Windows system libraries (KERNEL32, ADVAPI32, bcrypt, bcryptprimitives, ntdll, ws2_32, dbghelp, api-ms-win-core-synch) — no Node, Python, OpenSSL or VC++ redistributable; `self-check` 6/6; a scripted NDJSON session over real stdio returns 3 responses and the full `agent_start…agent_end` event sequence | **done** |
 | 7b | switchable launch: `agent-sidecar-launch.ts` picks this binary when `PI_AGENT_CORE=rust`, otherwise the Node sidecar, and falls back to Node when the binary is absent; `scripts/agent-core-differential.mjs` runs one identical conversation through both and diffs the result | **in progress** |
-| 7c | parity items the differential still reports: restore history through `session.get`, append the system row through `session.appendMessage`, recall memory on every prompt, `status`/`skill_review` events. Then delete `packages/agent-runtime` | next |
+| 7c | parity items the differential found and this crate now matches: history restore (`session.get`), the system-prompt journal (`session.appendMessage`), memory recall on every Agent prompt, `status` events | **done** |
+| 7d | what the differential still reports, all documented: the background `skill_review` pass, `tools.fileBatchCapabilities` read batching, and the kernel's incremental `message_update` (a superset). Then delete `packages/agent-runtime` | next |
 
 Sizes being ported are recorded per component in ADR 0402; use that table to
 scope a phase, not a guess.
@@ -113,6 +114,14 @@ Two shapes the Node sidecar has and this kernel did not, both found by
 - **`agent.getStatus`.** The answer is `{ status: { sessionId, isRunning,
   pendingToolConfirmations } }`. The renderer destructures `status`, so a flat
   object reads as `undefined` and an idle session never looks idle.
+
+Two host calls a turn makes before it dispatches, both learned from the same
+run: `session.get` (host-core owns history; a reopened session has none here) and
+`session.appendMessage` (the composed system prompt is journaled, once per
+distinct prompt, before the request goes out). A host that *refuses* the journal
+write fails the prompt — a turn the store never saw cannot be reproduced — while
+a host that does not answer at all degrades after ten seconds, because a prompt
+that never returns is worse than a missing row.
 
 Run the harness before claiming parity:
 
