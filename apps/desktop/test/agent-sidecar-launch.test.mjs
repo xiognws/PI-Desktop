@@ -12,6 +12,7 @@ import test from "node:test";
 import { join } from "node:path";
 
 import {
+  AGENT_CORE_DEFAULT_HOME,
   AGENT_CORE_PATH_ENV,
   AGENT_CORE_SWITCH_ENV,
   agentCoreBinaryCandidates,
@@ -98,13 +99,12 @@ test("an explicitly configured binary beats the packaged and checkout paths", ()
     candidates.some((path) => posix(path).includes("target/release")),
     "the development checkout is still searched last",
   );
-  // Cargo builds a workspace member into the workspace target directory, which
-  // is the repository root here — not the crate's own directory.
+  // The kernel is its own checkout with its own target directory.
   assert.ok(
-    candidates.some(
-      (path) => posix(path) === "C:/app/target/release/pi-desktop-agent-core.exe",
+    candidates.some((path) =>
+      posix(path).startsWith(posix(`${AGENT_CORE_DEFAULT_HOME}/target/`)),
     ),
-    "the workspace target directory is searched",
+    "the kernel's own checkout is searched",
   );
 });
 

@@ -331,7 +331,6 @@ const SCENARIOS = [
     // Node runtime ships its own built-ins.
     name: "tool",
     firstReply: "tool",
-    pending: "the runtime's built-in tools are declared by the Node runtime itself; the kernel declares none",
     frames: (port, scenario) => [
       CONFIGURE,
       { jsonrpc: "2.0", id: 2, method: "agent.prompt", params: baseParams(port, scenario) },
@@ -712,12 +711,15 @@ function compare(nodeRun, rustRun) {
 
 // ------------------------------------------------------------------- main --
 
+// The kernel is its own project, so its binary is not under this repository.
+const AGENT_CORE_HOME =
+  process.env.PI_AGENT_CORE_HOME?.trim() || "E:/103_Hermes_rust";
 const rustBinary = process.env.PI_AGENT_CORE_BIN?.trim()
   ? process.env.PI_AGENT_CORE_BIN.trim()
-  : join(ROOT, "target/release/pi-desktop-agent-core.exe");
+  : join(AGENT_CORE_HOME, "target/release/pi-desktop-agent-core.exe");
 if (!existsSync(rustBinary)) {
   console.error(
-    `missing Rust kernel: ${rustBinary}\nbuild it with: cargo build -p agent-core --release --offline`,
+    `missing Rust kernel: ${rustBinary}\nbuild it in ${AGENT_CORE_HOME}: cargo build --release --offline`,
   );
   process.exit(2);
 }

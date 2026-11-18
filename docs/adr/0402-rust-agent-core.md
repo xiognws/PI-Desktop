@@ -55,7 +55,9 @@ system library is introduced.
 
 ## Decision
 
-1. A new crate, `crates/agent-core`, is the home of the agent kernel. Its
+1. A new crate is the home of the agent kernel. It now lives in its own
+   repository (`E:C_Hermes_rust`), built independently of this one, so the
+   desktop keeps only the launch decision and the parity harness. Its
    modules claim the same responsibilities as the Hermes modules they port, so
    a reviewer can read one beside the other.
 2. The crate becomes the sidecar process. The executable is

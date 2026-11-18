@@ -3,8 +3,8 @@
  *
  * The desktop runs an out-of-process agent over stdio NDJSON JSON-RPC. Two
  * implementations answer that protocol: the Node sidecar this build has always
- * shipped, and the Rust kernel (`crates/agent-core`) that is being brought to
- * parity. Both speak the same methods, so the choice is a launch detail and not
+ * shipped, and the Rust kernel that is being brought to parity — its own project,
+ * checked out beside this one. Both speak the same methods, so the choice is a launch detail and not
  * a contract — which is why it is decided here, by one pure function, instead of
  * branching inside the transport.
  *
@@ -20,6 +20,14 @@ import { join } from "node:path";
 export const AGENT_CORE_SWITCH_ENV = "PI_AGENT_CORE";
 /** Explicit path to the kernel binary, for a machine that built it elsewhere. */
 export const AGENT_CORE_PATH_ENV = "PI_AGENT_CORE_BIN";
+/**
+ * Where the kernel's own checkout lives, for a build from source.
+ *
+ * The kernel is its own project (`E:\103_Hermes_rust`), not a crate of this
+ * repository, so its `target/` directory is not next to this source tree.
+ */
+export const AGENT_CORE_HOME_ENV = "PI_AGENT_CORE_HOME";
+export const AGENT_CORE_DEFAULT_HOME = "E:/103_Hermes_rust";
 
 export const AGENT_CORE_BINARY_NAME = "pi-desktop-agent-core";
 
@@ -61,7 +69,7 @@ export type ResolveAgentSidecarLaunchInput = {
 export function agentCoreBinaryCandidates(
   input: ResolveAgentSidecarLaunchInput,
 ): string[] {
-  const { env, moduleDir, resourcesPath } = input;
+  const { env, resourcesPath } = input;
   const explicit = env[AGENT_CORE_PATH_ENV];
   const candidates: string[] = [];
   if (explicit && explicit.trim()) candidates.push(explicit.trim());
@@ -69,18 +77,13 @@ export function agentCoreBinaryCandidates(
     candidates.push(join(resourcesPath, "agent-core", `${AGENT_CORE_BINARY_NAME}.exe`));
     candidates.push(join(resourcesPath, "agent-core", AGENT_CORE_BINARY_NAME));
   }
-  // Development checkout. Cargo builds a workspace member into the workspace
-  // target directory (this repository's root), so that comes first; a crate
-  // built on its own under `--target-dir` keeps its binary next to itself.
-  const checkedOut = join(moduleDir, "../../../..");
+  // A source build: the kernel has its own checkout and therefore its own
+  // target directory.
+  const home = env[AGENT_CORE_HOME_ENV]?.trim() || AGENT_CORE_DEFAULT_HOME;
   for (const profile of ["release", "debug"]) {
-    for (const target of [
-      join(checkedOut, "target"),
-      join(checkedOut, "crates/agent-core/target"),
-    ]) {
-      candidates.push(join(target, profile, `${AGENT_CORE_BINARY_NAME}.exe`));
-      candidates.push(join(target, profile, AGENT_CORE_BINARY_NAME));
-    }
+    const directory = join(home, "target", profile);
+    candidates.push(join(directory, `${AGENT_CORE_BINARY_NAME}.exe`));
+    candidates.push(join(directory, AGENT_CORE_BINARY_NAME));
   }
   return candidates;
 }
