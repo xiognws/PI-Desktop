@@ -4,6 +4,7 @@ import {
   AgentSidecar as RuntimeAgentSidecar,
   type StderrHandler,
 } from "@pi-workspace/host-runtime";
+import { resolveAgentSidecarLaunch } from "./agent-sidecar-launch.ts";
 import { redactValue } from "./logger";
 import { getModuleDirectory } from "./module-path";
 import { localTimestamp } from "./log-timestamp.ts";
@@ -54,34 +55,32 @@ function fallbackStderrLogger(text: string): void {
 
 /**
  * The desktop's agent sidecar: the shared stdio transport from
- * `@pi-workspace/host-runtime`, launched the only way Electron can run Node
- * code out of process — its own executable with `ELECTRON_RUN_AS_NODE` — on
- * the sidecar bundle this build ships.
+ * `@pi-workspace/host-runtime`, over whichever implementation this build is
+ * configured to run — the Node sidecar (its own executable with
+ * `ELECTRON_RUN_AS_NODE`) or the Rust kernel, on the same protocol.
+ *
+ * The launch decision lives in `agent-sidecar-launch.ts`; this class only hands
+ * it to the transport, so nothing above the transport knows the difference.
  */
 export class AgentSidecar extends RuntimeAgentSidecar {
   constructor(onStderr?: StderrHandler) {
-    super({
-      launch: {
-        command: process.execPath,
-        // Keep the OS trust store available to the sidecar. On macOS the
-        // Electron 43 build applies `--use-system-ca` by replacing the
-        // bundled roots instead of adding them (its keychain enumeration
-        // misses public anchors like GlobalSign Root CA - R3, issue #1187),
-        // so there the sidecar merges bundled + system + extra CAs itself
-        // (agent-runtime system-ca) and this launcher omits the flag. On
-        // Windows and Linux the flag behaves as documented and stays.
-        // Never bypass TLS verification.
-        args: [
-          "--max-old-space-size=2048",
-          ...(process.platform === "darwin" ? [] : ["--use-system-ca"]),
-          resolveSidecarEntry(),
-        ],
-        env: {
-          ...process.env,
-          ELECTRON_RUN_AS_NODE: "1",
-        },
+    const log = onStderr ?? fallbackStderrLogger;
+    const launch = resolveAgentSidecarLaunch(
+      {
+        env: process.env,
+        platform: process.platform,
+        execPath: process.execPath,
+        moduleDir: getModuleDirectory(import.meta.url),
+        ...(process.resourcesPath ? { resourcesPath: process.resourcesPath } : {}),
       },
-      onStderr: onStderr ?? fallbackStderrLogger,
-    });
+      { nodeEntry: resolveSidecarEntry() },
+    );
+    if (launch.fallbackReason) {
+      // Never fatal: a build without the kernel binary still has to run an
+      // agent, and the reason has to reach the log or the fallback is silent.
+      log(`[agent/runtime] ${launch.fallbackReason}; started the Node sidecar
+`);
+    }
+    super({ launch, onStderr: log });
   }
 }

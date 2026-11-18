@@ -286,11 +286,14 @@ impl Sidecar {
 
     async fn dispatch(&self, request: &Request) -> Result<Value, RpcError> {
         match request.method.as_str() {
+            // `ok`/`runtimes` are the Node sidecar's shape, and a caller that
+            // learned the protocol from it must keep working here. The rest is
+            // additive diagnostics this kernel can answer honestly.
             "sidecar.health" => Ok(json!({
-                "status": "ok",
+                "ok": true,
+                "runtimes": self.sessions.lock().map(|s| s.len()).unwrap_or(0),
                 "runtime": "rust",
                 "version": crate::VERSION,
-                "sessions": self.sessions.lock().map(|s| s.len()).unwrap_or(0),
                 "providerConfigured": self.provider.lock().map(|p| p.is_some()).unwrap_or(false),
             })),
             "sidecar.configure" => self.configure(request),
@@ -1104,6 +1107,10 @@ impl Sidecar {
         Ok(json!({ "results": results }))
     }
 
+    /// `agent.getStatus`, in the shape the renderer reads: the answer is
+    /// wrapped in `status`, because `api.ts` destructures `{ status }` and reads
+    /// `status.isRunning`. A flat object left the renderer with `undefined` and
+    /// an idle session that never looked idle.
     fn get_status(&self, request: &Request) -> Result<Value, RpcError> {
         let session_id = request.require_str("sessionId")?;
         let sessions = self
@@ -1112,26 +1119,33 @@ impl Sidecar {
             .map_err(|_| RpcError::internal("session lock poisoned"))?;
         let Some(session) = sessions.get(session_id) else {
             return Ok(json!({
-                "exists": false,
-                "isRunning": false,
-                "currentTurnId": Value::Null,
-                "messageCount": 0,
+                "status": {
+                    "sessionId": session_id,
+                    "isRunning": false,
+                    "pendingToolConfirmations": 0,
+                }
             }));
         };
-        Ok(json!({
-            "exists": true,
-            "isRunning": session.running.load(Ordering::SeqCst),
-            "currentTurnId": session
-                .current_turn
-                .lock()
-                .map(|turn| turn.clone())
-                .unwrap_or(None),
-            "messageCount": session
-                .transcript
-                .try_lock()
-                .map(|transcript| transcript.len())
-                .unwrap_or(0),
-        }))
+        let running = session.running.load(Ordering::SeqCst);
+        let current_turn = session
+            .current_turn
+            .lock()
+            .map(|turn| turn.clone())
+            .unwrap_or(None);
+        let mut status = json!({
+            "sessionId": session_id,
+            "isRunning": running,
+            // Every kernel tool either runs or fails; none waits for a person,
+            // so the count is always zero here. The field exists because the
+            // renderer reads it.
+            "pendingToolConfirmations": 0,
+        });
+        if running {
+            if let Some(turn_id) = current_turn {
+                status["currentTurnId"] = json!(turn_id);
+            }
+        }
+        Ok(json!({ "status": status }))
     }
 
     fn dispose_session(&self, request: &Request) -> Result<Value, RpcError> {
@@ -1168,105 +1182,165 @@ impl Sidecar {
     }
 }
 
-fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
-    let kind = spec
-        .get("kind")
-        .and_then(Value::as_str)
-        .ok_or_else(|| RpcError::invalid_params("`provider.kind` is required"))?;
-    match kind {
-        // Development and test only: replays a fixed response without a socket.
-        "scripted" => {
-            let responses = if let Some(script) = spec.get("script").and_then(Value::as_array) {
-                // Each entry is one provider response: either a tool call or
-                // text. Enough to drive a multi-step turn from a harness.
-                script
-                    .iter()
-                    .map(|step| {
-                        let mut events = Vec::new();
-                        if let Some(call) = step.get("toolCall") {
-                            events.push(StreamEvent::ToolCallStart {
-                                index: 0,
-                                id: call
-                                    .get("id")
-                                    .and_then(Value::as_str)
-                                    .unwrap_or("call_1")
-                                    .to_string(),
-                                name: call
-                                    .get("name")
-                                    .and_then(Value::as_str)
-                                    .unwrap_or("tool")
-                                    .to_string(),
-                            });
-                            events.push(StreamEvent::ToolCallDelta {
-                                index: 0,
-                                arguments_delta: call
-                                    .get("arguments")
-                                    .cloned()
-                                    .unwrap_or_else(|| json!({}))
-                                    .to_string(),
-                            });
-                            events.push(StreamEvent::Finish(crate::message::StopReason::ToolUse));
-                        } else {
-                            events.push(StreamEvent::TextDelta(
-                                step.get("text")
-                                    .and_then(Value::as_str)
-                                    .unwrap_or_default()
-                                    .to_string(),
-                            ));
-                            events.push(StreamEvent::Finish(crate::message::StopReason::EndTurn));
-                        }
-                        events
-                    })
-                    .collect::<Vec<_>>()
-            } else {
-                let text = spec
-                    .get("text")
-                    .and_then(Value::as_str)
-                    .unwrap_or("scripted response");
-                (0..spec.get("turns").and_then(Value::as_u64).unwrap_or(1))
-                    .map(|_| {
-                        vec![
-                            StreamEvent::TextDelta(text.to_string()),
-                            StreamEvent::Finish(crate::message::StopReason::EndTurn),
-                        ]
-                    })
-                    .collect::<Vec<_>>()
-            };
-            Ok(Arc::new(ScriptedProvider::new(responses)))
-        }
-        "openai" | "anthropic" => {
-            let base_url = spec
-                .get("baseUrl")
-                .and_then(Value::as_str)
-                .ok_or_else(|| RpcError::invalid_params("`provider.baseUrl` is required"))?;
-            let api_key = spec
-                .get("apiKey")
-                .and_then(Value::as_str)
-                .ok_or_else(|| RpcError::invalid_params("`provider.apiKey` is required"))?;
-            let name = spec.get("name").and_then(Value::as_str).unwrap_or(kind);
-            let mut config = if kind == "openai" {
-                HttpProviderConfig::openai(name, base_url, api_key)
-            } else {
-                HttpProviderConfig::anthropic(name, base_url, api_key)
-            };
-            if let Some(max_tokens) = spec.get("defaultMaxTokens").and_then(Value::as_u64) {
-                config.default_max_tokens = max_tokens as u32;
-            }
-            if let Some(headers) = spec.get("headers").and_then(Value::as_object) {
-                for (key, value) in headers {
-                    if let Some(value) = value.as_str() {
-                        config.extra_headers.push((key.clone(), value.to_string()));
-                    }
-                }
-            }
-            let provider = HttpProvider::new(config)
-                .map_err(|error| RpcError::app(error.code(), error.to_string()))?;
-            Ok(Arc::new(provider))
-        }
-        other => Err(RpcError::invalid_params(format!(
-            "unknown provider kind `{other}`"
-        ))),
+/// Wire styles this kernel can speak, keyed by the `apiStyle` main sends.
+///
+/// Main never sends `kind`: a prompt carries a `RuntimeProviderConfig` whose
+/// wire is `apiStyle` and whose model is `modelId`. Reading `kind` alone meant
+/// the kernel rejected every real prompt — the shape this port was verified
+/// against only ever came from its own tests.
+const API_STYLE_OPENAI_COMPLETIONS: &str = "openai-completions";
+const API_STYLE_ANTHROPIC_MESSAGES: &str = "anthropic_messages";
+/// Known wires this kernel does not implement yet. They fail loudly: silently
+/// falling back to Chat Completions would send a valid credential to an endpoint
+/// of a different shape and surface as an unexplained provider 400.
+const API_STYLES_NOT_MIGRATED: &[&str] = &["responses", "openai_codex_responses", "pi_messages"];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProviderWire {
+    OpenAiCompletions,
+    AnthropicMessages,
+}
+
+/// Which wire a provider spec asks for.
+///
+/// `kind` is this kernel's own spelling, kept for its tests and for a harness
+/// that wants to pin a wire explicitly. Production payloads carry `apiStyle`.
+/// An absent or unrecognised style falls back to Chat Completions, which is the
+/// documented behaviour of `apiBindingForStyle` upstream.
+fn provider_wire(spec: &Value) -> Result<ProviderWire, RpcError> {
+    if let Some(kind) = spec.get("kind").and_then(Value::as_str) {
+        return match kind {
+            "openai" => Ok(ProviderWire::OpenAiCompletions),
+            "anthropic" => Ok(ProviderWire::AnthropicMessages),
+            other => Err(RpcError::invalid_params(format!(
+                "unknown provider kind `{other}`"
+            ))),
+        };
     }
+    let Some(style) = spec.get("apiStyle").and_then(Value::as_str) else {
+        return Ok(ProviderWire::OpenAiCompletions);
+    };
+    if API_STYLES_NOT_MIGRATED.contains(&style) {
+        return Err(RpcError::invalid_params(format!(
+            "provider apiStyle `{style}` is not migrated to this kernel yet; supported: {}, {}",
+            API_STYLE_OPENAI_COMPLETIONS, API_STYLE_ANTHROPIC_MESSAGES
+        )));
+    }
+    Ok(match style {
+        API_STYLE_ANTHROPIC_MESSAGES => ProviderWire::AnthropicMessages,
+        _ => ProviderWire::OpenAiCompletions,
+    })
+}
+
+fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
+    if spec.get("kind").and_then(Value::as_str) == Some("scripted") {
+        return scripted_provider(spec);
+    }
+    match provider_wire(spec)? {
+        ProviderWire::OpenAiCompletions => http_provider(spec, ProviderWire::OpenAiCompletions),
+        ProviderWire::AnthropicMessages => http_provider(spec, ProviderWire::AnthropicMessages),
+    }
+}
+
+/// A provider that replays a fixed script. Development and tests only.
+fn scripted_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
+    let responses = if let Some(script) = spec.get("script").and_then(Value::as_array) {
+        // Each entry is one provider response: either a tool call or text.
+        // Enough to drive a multi-step turn from a harness.
+        script
+            .iter()
+            .map(|step| {
+                let mut events = Vec::new();
+                if let Some(call) = step.get("toolCall") {
+                    events.push(StreamEvent::ToolCallStart {
+                        index: 0,
+                        id: call
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("call_1")
+                            .to_string(),
+                        name: call
+                            .get("name")
+                            .and_then(Value::as_str)
+                            .unwrap_or("tool")
+                            .to_string(),
+                    });
+                    events.push(StreamEvent::ToolCallDelta {
+                        index: 0,
+                        arguments_delta: call
+                            .get("arguments")
+                            .cloned()
+                            .unwrap_or_else(|| json!({}))
+                            .to_string(),
+                    });
+                    events.push(StreamEvent::Finish(crate::message::StopReason::ToolUse));
+                } else {
+                    events.push(StreamEvent::TextDelta(
+                        step.get("text")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                    ));
+                    events.push(StreamEvent::Finish(crate::message::StopReason::EndTurn));
+                }
+                events
+            })
+            .collect::<Vec<_>>()
+    } else {
+        let text = spec
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or("scripted response");
+        (0..spec.get("turns").and_then(Value::as_u64).unwrap_or(1))
+            .map(|_| {
+                vec![
+                    StreamEvent::TextDelta(text.to_string()),
+                    StreamEvent::Finish(crate::message::StopReason::EndTurn),
+                ]
+            })
+            .collect::<Vec<_>>()
+    };
+    Ok(Arc::new(ScriptedProvider::new(responses)))
+}
+
+/// An HTTP provider over the requested wire.
+fn http_provider(spec: &Value, wire: ProviderWire) -> Result<Arc<dyn Provider>, RpcError> {
+    let base_url = spec
+        .get("baseUrl")
+        .and_then(Value::as_str)
+        .ok_or_else(|| RpcError::invalid_params("`provider.baseUrl` is required"))?;
+    // A provider row that authenticates elsewhere (`authKind: "none"`) has no
+    // key to send, and requiring one would reject a working configuration.
+    let authless = spec.get("authKind").and_then(Value::as_str) == Some("none");
+    let api_key = match spec.get("apiKey").and_then(Value::as_str) {
+        Some(key) => key.to_string(),
+        None if authless => String::new(),
+        None => return Err(RpcError::invalid_params("`provider.apiKey` is required")),
+    };
+    let label = spec
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or(match wire {
+            ProviderWire::OpenAiCompletions => "openai",
+            ProviderWire::AnthropicMessages => "anthropic",
+        });
+    let mut config = match wire {
+        ProviderWire::OpenAiCompletions => HttpProviderConfig::openai(label, base_url, &api_key),
+        ProviderWire::AnthropicMessages => HttpProviderConfig::anthropic(label, base_url, &api_key),
+    };
+    if let Some(max_tokens) = spec.get("defaultMaxTokens").and_then(Value::as_u64) {
+        config.default_max_tokens = max_tokens as u32;
+    }
+    if let Some(headers) = spec.get("headers").and_then(Value::as_object) {
+        for (key, value) in headers {
+            if let Some(value) = value.as_str() {
+                config.extra_headers.push((key.clone(), value.to_string()));
+            }
+        }
+    }
+    let provider = HttpProvider::new(config)
+        .map_err(|error| RpcError::app(error.code(), error.to_string()))?;
+    Ok(Arc::new(provider))
 }
 
 /// First `limit` characters of `text` with runs of whitespace collapsed, for
@@ -1495,4 +1569,103 @@ fn parse_subagents(request: &Request) -> Vec<crate::delegate::SubagentDefinition
         });
     }
     definitions
+}
+
+#[cfg(test)]
+mod provider_wire_tests {
+    use super::*;
+
+    /// The payload Electron main actually sends: a `RuntimeProviderConfig` with
+    /// `apiStyle` and `modelId`, and no `kind` field at all.
+    fn production_spec(api_style: Option<&str>) -> Value {
+        let mut spec = json!({
+            "id": "row-1",
+            "name": "Gateway",
+            "baseUrl": "https://gateway.example/v1",
+            "modelId": "gw-large",
+            "apiKey": "test-key",
+            "authKind": "api-key",
+            "supportsReasoning": true,
+            "supportedThinkingLevels": ["off", "low"],
+        });
+        if let Some(style) = api_style {
+            spec["apiStyle"] = json!(style);
+        }
+        spec
+    }
+
+    #[test]
+    fn a_production_payload_without_kind_builds_a_provider() {
+        // Regression: the kernel used to require `provider.kind`, which no real
+        // prompt carries, so every production prompt was rejected as invalid.
+        for style in [None, Some("openai-completions"), Some("opencode_go")] {
+            let provider = build_provider(&production_spec(style))
+                .unwrap_or_else(|error| panic!("style {style:?} rejected: {error}"));
+            assert!(!provider.name().is_empty());
+        }
+    }
+
+    #[test]
+    fn an_anthropic_style_selects_the_anthropic_wire() {
+        assert_eq!(
+            provider_wire(&production_spec(Some("anthropic_messages"))).unwrap(),
+            ProviderWire::AnthropicMessages
+        );
+        assert_eq!(
+            provider_wire(&production_spec(Some("openai-completions"))).unwrap(),
+            ProviderWire::OpenAiCompletions
+        );
+    }
+
+    #[test]
+    fn an_unmigrated_wire_fails_loudly_instead_of_using_the_wrong_endpoint() {
+        for style in ["responses", "openai_codex_responses", "pi_messages"] {
+            let error = provider_wire(&production_spec(Some(style)))
+                .expect_err("an unimplemented wire must not silently become Chat Completions");
+            let message = error.to_string();
+            assert!(message.contains(style), "{message}");
+            assert!(message.contains("not migrated"), "{message}");
+        }
+    }
+
+    #[test]
+    fn an_unrecognised_style_falls_back_to_chat_completions() {
+        // Matches `apiBindingForStyle` upstream: unknown styles are the
+        // pre-apiStyle behaviour, not an error.
+        assert_eq!(
+            provider_wire(&production_spec(Some("something_new"))).unwrap(),
+            ProviderWire::OpenAiCompletions
+        );
+    }
+
+    #[test]
+    fn an_explicit_kind_still_pins_the_wire() {
+        let mut spec = production_spec(None);
+        spec["kind"] = json!("anthropic");
+        assert_eq!(
+            provider_wire(&spec).unwrap(),
+            ProviderWire::AnthropicMessages
+        );
+        spec["kind"] = json!("openai");
+        assert_eq!(
+            provider_wire(&spec).unwrap(),
+            ProviderWire::OpenAiCompletions
+        );
+        spec["kind"] = json!("nonsense");
+        assert!(provider_wire(&spec).is_err());
+    }
+
+    #[test]
+    fn a_provider_that_authenticates_elsewhere_needs_no_key() {
+        let mut spec = production_spec(None);
+        spec["authKind"] = json!("none");
+        spec.as_object_mut().expect("object").remove("apiKey");
+        assert!(build_provider(&spec).is_ok());
+
+        spec["authKind"] = json!("api-key");
+        assert!(
+            build_provider(&spec).is_err(),
+            "a key-using provider without a key is a configuration error"
+        );
+    }
 }

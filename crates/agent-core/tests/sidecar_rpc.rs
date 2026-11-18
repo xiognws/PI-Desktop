@@ -38,9 +38,11 @@ async fn health_reports_the_rust_runtime() {
     let (sidecar, _) = sidecar();
     let response = call(&sidecar, 1, "sidecar.health", json!({})).await;
     assert_eq!(response["id"], 1);
-    assert_eq!(response["result"]["status"], "ok");
+    // `ok`/`runtimes` are the Node sidecar's fields: a caller written against
+    // it must read the same answer from this kernel.
+    assert_eq!(response["result"]["ok"], true);
+    assert_eq!(response["result"]["runtimes"], 0);
     assert_eq!(response["result"]["runtime"], "rust");
-    assert_eq!(response["result"]["sessions"], 0);
     assert_eq!(response["result"]["providerConfigured"], false);
 }
 
@@ -143,7 +145,7 @@ async fn the_same_session_answers_a_second_prompt_after_the_first_ends() {
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     loop {
         let status = call(&sidecar, 3, "agent.getStatus", json!({"sessionId": "s1"})).await;
-        if status["result"]["isRunning"] == false {
+        if status["result"]["status"]["isRunning"] == false {
             break;
         }
         assert!(std::time::Instant::now() < deadline, "turn never idled");
@@ -225,8 +227,10 @@ async fn status_and_dispose_track_the_session_table() {
     assert_eq!(disposal["result"]["disposed"], true);
 
     let status = call(&sidecar, 4, "agent.getStatus", json!({"sessionId": "s1"})).await;
-    assert_eq!(status["result"]["exists"], false);
-    assert_eq!(status["result"]["messageCount"], 0);
+    // The renderer destructures `{ status }`; a flat answer reads as `undefined`.
+    assert_eq!(status["result"]["status"]["sessionId"], "s1");
+    assert_eq!(status["result"]["status"]["isRunning"], false);
+    assert_eq!(status["result"]["status"]["pendingToolConfirmations"], 0);
 }
 
 #[tokio::test]

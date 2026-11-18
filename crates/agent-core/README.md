@@ -95,10 +95,31 @@ printf '%s\n' \
 | 6c | MCP selection: a composer's `mcpServerIds`/`mcpToolNames` resolve to the exact tool set those names authorize (exact identity, never a prefix match) and an unsatisfiable selection refuses the prompt with `COMPOSER_MCP_UNAVAILABLE`/`TOOL_DENIED`. The MCP *client* stays where it already is: host-core owns the server records (`crates/host-core/src/mcp_servers.rs`), Electron main owns the processes, handshakes and `callTool`, and the kernel only ever sees MCP tools as host-declared tools | **done** |
 | 6d | cron/scheduled runs: **no kernel work**. Host-core owns the records, the cadence and the automation pass (`crates/host-core/src/scheduled.rs`, 741 lines + `automation`/`timing`/`project`), and a run is an ordinary prompt against a session — which the kernel already serves. Nothing here spawns the agent itself | verified |
 | 7a | packaging, measured on commit `0a4b56b02`: `cargo build -p agent-core --release --offline` → **6.34 MiB** `pi-desktop-agent-core.exe`; imports only Windows system libraries (KERNEL32, ADVAPI32, bcrypt, bcryptprimitives, ntdll, ws2_32, dbghelp, api-ms-win-core-synch) — no Node, Python, OpenSSL or VC++ redistributable; `self-check` 6/6; a scripted NDJSON session over real stdio returns 3 responses and the full `agent_start…agent_end` event sequence | **done** |
-| 7b | switch `runtime/sidecar.ts` to spawn this binary, differential parity run against the Node sidecar, then delete `packages/agent-runtime` | next |
+| 7b | switchable launch: `agent-sidecar-launch.ts` picks this binary when `PI_AGENT_CORE=rust`, otherwise the Node sidecar, and falls back to Node when the binary is absent; `scripts/agent-core-differential.mjs` runs one identical conversation through both and diffs the result | **in progress** |
+| 7c | parity items the differential still reports: restore history through `session.get`, append the system row through `session.appendMessage`, recall memory on every prompt, `status`/`skill_review` events. Then delete `packages/agent-runtime` | next |
 
 Sizes being ported are recorded per component in ADR 0402; use that table to
 scope a phase, not a guess.
+
+## Parity notes
+
+Two shapes the Node sidecar has and this kernel did not, both found by
+`scripts/agent-core-differential.mjs` rather than by a user:
+
+- **Provider wire.** Main sends a `RuntimeProviderConfig`: the wire is
+  `apiStyle` (`openai-completions`, `anthropic_messages`, `responses`, …) and the
+  model is `modelId`. There is no `kind` field. A kernel that requires `kind`
+  rejects every real prompt, which is exactly what it did.
+- **`agent.getStatus`.** The answer is `{ status: { sessionId, isRunning,
+  pendingToolConfirmations } }`. The renderer destructures `status`, so a flat
+  object reads as `undefined` and an idle session never looks idle.
+
+Run the harness before claiming parity:
+
+```bash
+node scripts/agent-core-differential.mjs          # exits 1 on divergence
+node scripts/agent-core-differential.mjs --verbose
+```
 
 ## Packaging
 
