@@ -1,0 +1,26 @@
+apps/desktop/electron/main/agent-sidecar-launch.ts
+  h_201ed4c689ac8b 1-137
+apps/desktop/electron/main/agent-sidecar.ts
+  h_201ed4c689ac8b 7,58-63,67-74,76-84
+apps/desktop/test/agent-sidecar-launch.test.mjs
+  h_201ed4c689ac8b 1-131
+crates/agent-core/README.md
+  h_201ed4c689ac8b 98-99,104-123
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 289-291,293-294,1110-1113,1122-1126,1129-1148,1185-1234,1236-1284,1286-1337,1341-1343,1573-1671
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 41-44,148,230-233
+scripts/agent-core-differential.mjs
+  h_201ed4c689ac8b 1-393
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "95949c44a4864f26c9094503cbd783ace3359a6d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
