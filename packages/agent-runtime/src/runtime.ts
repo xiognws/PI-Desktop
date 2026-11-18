@@ -37,10 +37,16 @@ import {
 } from "./turn-verification.js";
 import { completeOneShot } from "./one-shot-complete.js";
 import { textToolCallDiagnostic } from "./text-tool-call.js";
-import { computerUseDescription, computerUseParameters } from "./computer-use/tool.js";
 import { imageGenerationDescription, imageGenerationParameters } from "./image-generation/tool.js";
 import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
 import { createMemoryTool } from "./memory-agent-tool.js";
+import {
+  COMPRESS_TOOL_NAME,
+  createCompressTool,
+  queueCompressionRequest,
+  type CompressionRequestOutcome,
+  type PendingCompression,
+} from "./compress-agent-tool.js";
 import { createSkillManageTool } from "./skill-manage-tool.js";
 import { SKILL_WRITING_RULES } from "./skill-authoring.js";
 import { createSkillTool } from "./skill-tool.js";
@@ -240,6 +246,7 @@ import {
   createToolCallIdentity,
   reportDuplicateToolCallDrop,
 } from "./tool-call-dedupe.js";
+import { elideStaleToolResults, toolResultElisionEnabled } from "./tool-result-elision.js";
 import {
   apiBindingForProviderModel,
   buildProviderModel,
@@ -253,11 +260,20 @@ import {
 } from "./provider-binding.js";
 import {
   contextBudgetFor,
-  automaticCompactionThresholdFor,
   contextBudgetLimitsFor,
   retainedUserMessageBudget,
   type ContextBudget,
 } from "./context-budget.js";
+import {
+  automaticCompactionGate,
+  type AutomaticCompactionGate,
+} from "./compaction-auto-gate.js";
+import { publishCompressionBranch } from "./compaction-branch.js";
+import {
+  CompressionFailureCooldownStore,
+  compressionCooldownDiagnostic,
+} from "./compaction-cooldown.js";
+import { TurnTokenLedger } from "./turn-token-ledger.js";
 import { PathMutex } from "./path-lock.js";
 import { DelegationChainRegistry } from "./delegation-chain.js";
 import {
@@ -994,6 +1010,17 @@ function resolveCompactionStrategy(
 }
 
 /**
+ * Rollback switch for stale tool-result elision (`tool-result-elision.ts`).
+ * On by default: the request carries a re-runnable marker instead of tool
+ * output the model has already used, which is the largest single saving in a
+ * long session. Setting `PI_DESKTOP_TOOL_RESULT_ELISION=0` sends full results
+ * again, without a code change.
+ *
+ * Not a user-facing setting: it exists so the change can be backed out of a
+ * shipped build, and it is read per request rather than at construction so a
+ * test can flip it without rebuilding the runtime.
+ */
+/**
  * Stands in for the summary a rollover deliberately does not generate. The
  * host rejects an empty checkpoint summary, and a silent placeholder would
  * leave the model guessing why its context changed, so the rollover says so.
@@ -1018,7 +1045,11 @@ function turnAbortedError(message: string): Error {
 
 const CONTEXT_COMPACTION_TOOL_NAME = "new_context";
 /** Tools the read-only contract level may execute, besides plan-safe plugins. */
-const CONTRACT_ALLOWED_TOOL_NAMES = new Set([...CONTRACT_CORE_TOOL_NAMES, CONTEXT_COMPACTION_TOOL_NAME]);
+const CONTRACT_ALLOWED_TOOL_NAMES = new Set([
+  ...CONTRACT_CORE_TOOL_NAMES,
+  CONTEXT_COMPACTION_TOOL_NAME,
+  COMPRESS_TOOL_NAME,
+]);
 const CONTEXT_COMPACTION_TOOL_DESCRIPTION =
   "Start a new context window. Does not clear, reset, or otherwise affect environment state.";
 /** Codex's `NEW_CONTEXT_WINDOW_MESSAGE`, one per family. */
@@ -1128,12 +1159,6 @@ export type AgentRuntimeOptions = {
   skillReview?: SkillReviewPolicy;
   /** TypeSafe Jev credential, resolved by Electron main only when enabled. */
   jevApiKey?: string;
-  /**
-   * Whether the `Computer` tool is offered at all (ADR 0342). Resolved by
-   * Electron main from settings, so a disabled feature is absent from the
-   * prompt rather than advertised and refused on every call.
-   */
-  computerUseEnabled?: boolean;
   systemPrompt?: string;
   /** pi-compatible SYSTEM.md / APPEND_SYSTEM.md resolved for the session (issue #542). */
   customSystemPrompt?: CustomSystemPrompt;
@@ -1225,7 +1250,6 @@ export type RuntimeMatchConfig = {
   provider: RuntimeProviderConfig;
   thinkingLevel: SessionThinkingLevel;
   jevApiKey?: string;
-  computerUseEnabled?: boolean;
   pluginTools?: PluginToolDef[];
   pluginSkills?: PluginSkillDef[];
   trustedExtensions?: TrustedExtensionSpec[];
@@ -2138,7 +2162,6 @@ export class DesktopAgentRuntime {
   private infiniteProviderRetry = false;
   private fastMode = false;
   private jevApiKey?: string;
-  private computerUseEnabled = false;
   private activeProviderRetryAttempt = 0;
   private providerRetryInProgress = false;
   private suppressProviderRetryRunEnd = false;
@@ -2224,8 +2247,30 @@ export class DesktopAgentRuntime {
   private readonly activeTurnSettlements = new Map<string, Promise<void>>();
   /** The in-flight checkpoint was cut short by Stop/dispose, not by a failure. */
   private compactionAborted = false;
-  /** Set by the `new_context` tool, consumed at the next turn boundary. */
-  private pendingModelCompaction = false;
+  /**
+   * One queued model request to compress the context, consumed at the next turn
+   * boundary.
+   *
+   * `compress` and `new_context` both write this one queue, and the boundary
+   * that already owns compaction is what acts on it: a tool call never compacts
+   * mid-batch, where the results it is still holding would be replaced by the
+   * summary. One queue rather than a flag per tool, so "is a checkpoint already
+   * asked for?" has a single answer.
+   */
+  private pendingCompression?: PendingCompression;
+  /**
+   * Boolean view of the queue, the way every existing caller writes it.
+   *
+   * `new_context`, the extension bridge and the settings reset only need "ask
+   * for one" / "forget the ask", and they carry no reason: a `true` written
+   * this way keeps the `threshold` report those paths have always produced.
+   */
+  private get pendingModelCompaction(): boolean {
+    return this.pendingCompression !== undefined;
+  }
+  private set pendingModelCompaction(value: boolean) {
+    this.pendingCompression = value ? { at: Date.now(), manual: false } : undefined;
+  }
   /** One-shot request to finish the current turn at the next boundary. */
   private gracefulStopRequested = false;
   /** Turn-verification state carried across turns within the current run. */
@@ -2250,10 +2295,19 @@ export class DesktopAgentRuntime {
     outputBudget: number;
     plannedChunks: number;
   };
+  /** Per-turn token accounting that drives the automatic compaction trigger. */
+  private readonly turnTokenLedger = new TurnTokenLedger();
+  /** Automatic-compaction failure cooldown. Manual compaction never arms it. */
+  private readonly compactionCooldowns = new CompressionFailureCooldownStore();
+  /** Live cooldown state, published with the next compaction-failure diagnostic. */
+  private compactionDiagnosticCooldown?: Record<string, unknown>;
+  /** Message of the last failed checkpoint, so arming the cooldown can name it. */
+  private lastCompactionFailureMessage?: string;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
     this.turnId = opts.turnId;
+    this.turnTokenLedger.beginTurn(opts.turnId ?? "");
     // A restored checkpoint already compacted the window: stage
     // `on.compaction` injects apply from the first run turn.
     this.modeState = new RuntimeModeState(opts.mode, opts.modeDefinition, { compacted: Boolean(opts.compaction) });
@@ -2264,7 +2318,6 @@ export class DesktopAgentRuntime {
     this.infiniteProviderRetry = opts.infiniteProviderRetry === true;
     this.fastMode = opts.fastMode === true;
     this.jevApiKey = opts.jevApiKey;
-    this.computerUseEnabled = opts.computerUseEnabled === true;
     this.host = opts.host;
     this.batchPlanner = new BatchPlanner(this.host, this.sessionId);
     this.onDiagnostic = opts.onDiagnostic ?? (() => undefined);
@@ -2339,6 +2392,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         : []),
       // Editing workflow.
       `Editing workflow: inside the advertised workspace, use Edit for small, uniquely anchored changes and Write for new files or intentional whole-file rewrites. Never modify the same path concurrently. Do not use shell apply_patch, git apply, patch, or hand-edited unified-diff files. On failure, diagnose the cause, refresh content or anchors with Read or a complete tool-provided reveal when needed, and correct the payload before retrying. After three failed edit attempts on the same path in one user turn, stop editing that path, report the exact error, and continue unblocked work. For an authorized worktree outside the advertised workspace, use a guarded, deterministic Bash edit that aborts on unexpected content, then verify the diff.`,
+      // Batch independent reads: one message is one request.
+      `Batching: when several reads, searches or lookups do not depend on each other, ask for them together in one assistant message — Read, Glob, Grep, Write, Edit and Task are declared parallel, so one message costs one request instead of one per call. A batch that also holds a sequential tool (Bash, skills, plugins) runs one call at a time, so keep those in their own message.`,
       // Shell dialect and scratch variable are selected by host-core.
       commandShellGuidance(this.commandShell),
       // Session scratch directory (D114).
@@ -2521,8 +2576,18 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             sessionId: this.sessionId, turnId: this.turnId, message,
           });
         });
+        // Stale tool output is replaced here, on the last view before the
+        // wire: the journal above already persisted the full messages, so the
+        // transcript, the compaction input, and every rendered result keep
+        // their text. Only a result's body changes — its role, `toolCallId`,
+        // position and `details` stay, so a call keeps its paired result.
         return alignRetainedReasoningIdentity(
-          convertToLlm(this.dropDuplicateToolCalls(messages)), this.reasoningReplayIdentity(),
+          convertToLlm(
+            elideStaleToolResults(this.dropDuplicateToolCalls(messages), {
+              enabled: toolResultElisionEnabled(),
+            }),
+          ),
+          this.reasoningReplayIdentity(),
         );
       },
       prepareRequest: ({ context }) => this.prepareToolDeclarations(context),
@@ -3278,9 +3343,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       ["disposed", !this.disposed],
       ["mode", this.mode === config.mode],
       ["jevApiKey", this.jevApiKey === config.jevApiKey],
-      // Turning computer use on or off changes the tool list, so the runtime
-      // is retired rather than left advertising a stale set.
-      ["computerUseEnabled", this.computerUseEnabled === (config.computerUseEnabled === true)],
       ["thinkingLevel", this.thinkingLevel === clampThinkingLevel(config.provider, config.thinkingLevel)],
       ["pluginTools", current === next],
       ["commandShell", safeJson(this.commandShell) === safeJson(config.commandShell)],
@@ -3858,7 +3920,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       " An explicit path outside the workspace and session scratch roots requires permission unless the effective mode is Auto.";
     const describe = (toolName: string): string => {
       if (toolName === "GenerateImages") return imageGenerationDescription;
-      if (toolName === "Computer") return computerUseDescription;
       if (scheduledToolDescriptions[toolName]) return scheduledToolDescriptions[toolName];
       switch (toolName) {
         case "BrowserPreview":
@@ -3958,7 +4019,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // stopped being readable.
     const parameters: Record<string, Parameters<typeof Type.Object>[0]> = {
       GenerateImages: imageGenerationParameters,
-      Computer: computerUseParameters,
       TodoWrite: todoWriteParameters,
       Read: {
         path: pathParam(
@@ -4257,10 +4317,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         // waiting on a blocking read/search. Mutating, MCP, and plugin calls
         // must settle before the turn is reported stopped. Bash and image
         // generation retain their host process-abort path and grace window.
-        // Computer use joins them: main owns a loop that must settle before
-        // the turn is reported stopped, not be abandoned mid-action.
         const hostAbortsProcess =
-          isBash || toolName === "GenerateImages" || toolName === "Computer";
+          isBash || toolName === "GenerateImages";
         const canAbandonWait = READ_ONLY_CORE_TOOLS.has(toolName);
         const abortedMarker = Symbol("tool-aborted");
         let resolveAborted: (marker: typeof abortedMarker) => void = () => undefined;
@@ -4365,6 +4423,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
               args: params,
               ...(this.batchPlanner.ticket(toolCallId) ? { fileBatchTicket: this.batchPlanner.ticket(toolCallId) } : {}),
               mode: this.mode,
+              // The Host sizes its tool-output budget from the model window
+              // (spec 03-runtime 16 §2a): a 128K window must not hand back a
+              // 128KB Read. `hardLimit` is the window minus the request
+              // headroom, which is the conservative form of the same fact.
+              contextWindowTokens: this.contextBudget(this.liveSessionContext().messages).hardLimit,
               // A staged mode's `run` exit gate (ADR mode-definitions): the
               // Host checks the command against the snapshot and records the
               // exit code under this call id for `modes.gateResult`.
@@ -4805,11 +4868,10 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             "OfficeWrite",
           ];
     if (agentLevel) tools.push("PluginScaffold", "PluginPack", "GenerateImages");
-    // Scheduled tasks and computer use belong to the builtin Agent mode
-    // itself; the Host refuses them in every other mode.
+    // Scheduled tasks belong to the builtin Agent mode itself; the Host
+    // refuses them in every other mode.
     if (agentLevel && this.modeState.offersAgentModeOnlyTools()) {
       tools.push(...Object.keys(scheduledToolParameters));
-      if (this.computerUseEnabled) tools.push("Computer");
     }
     const builtins = tools.map(exec);
     for (const tool of builtins) this.builtinTools.add(tool);
@@ -4927,8 +4989,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       }),
     ];
     for (const tool of subagentTools) this.builtinTools.add(tool);
+    // Both context tools exist only while a checkpoint does: with the setting
+    // off there is nothing for either to ask for, so a tool that could only
+    // return a promise the runtime does not keep is withdrawn.
     const contextTools = this.compactionEnabled
-      ? [this.buildContextCompactionTool()]
+      ? [
+          this.buildContextCompactionTool(),
+          createCompressTool({ requestCompression: (reason) => this.requestCompression(reason) }),
+        ]
       : [];
     // Trusted extension tools are non-core: the per-mode allowlist and
     // ToolSearch deferral treat them like plugin tools (spec 16 §7).
@@ -5150,6 +5218,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   private isCoreTool(name: string): boolean {
     return (
       name === CONTEXT_COMPACTION_TOOL_NAME ||
+      name === COMPRESS_TOOL_NAME ||
       retainModeToolDeclaration(name) ||
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
       // The whole delegation lifecycle stays in the core set rather than the
@@ -8049,6 +8118,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   ): void {
     const estimate = this.inFlightContextEstimate;
     this.inFlightContextEstimate = undefined;
+    // The turn ledger is the accounting the compaction trigger reads, so it is
+    // fed even when this request cannot calibrate the estimator.
+    if (usage) this.turnTokenLedger.recordUsage(usage);
     if (!estimate || unusable || !usage) return;
     const realRequestTokens =
       usage.inputTokens +
@@ -8071,16 +8143,77 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     }
   }
 
+  /**
+   * One tool result may claim at most most of the safe budget in the ledger.
+   *
+   * The host's own ceilings are byte-based (a 128KB Read is ~37k tokens), so the
+   * fixed 8k cap made the tool-result-share trigger read a quarter of reality and
+   * wait for seven results where two already exceeded half the budget.
+   */
+  private toolResultLedgerCeiling(): number {
+    const hardLimit = this.contextBudget(this.liveSessionContext().messages).hardLimit;
+    return Math.round(hardLimit * 0.9);
+  }
+
+  /**
+   * The automatic-compaction decision for one context: the per-turn ledger's
+   * view of the budget — the unchanged context threshold, or the earlier
+   * tool-result-share trigger — filtered by a live failure cooldown.
+   */
+  private automaticCompactionDecision(budget: ContextBudget): AutomaticCompactionGate {
+    return automaticCompactionGate({
+      ledger: this.turnTokenLedger,
+      budget,
+      cooldowns: this.compactionCooldowns,
+      sessionId: this.sessionId,
+      at: Date.now(),
+    });
+  }
+
+  /**
+   * Record the model's `compress` call. Nothing is compacted here.
+   *
+   * The tool runs mid-turn, where a checkpoint would replace the messages whose
+   * results the batch is still holding; the next boundary consumes the request
+   * instead (`prepareNextTurn`, or the prompt pre-flight). Disabled sessions
+   * refuse without queueing — there is no checkpoint behind the setting.
+   */
+  private requestCompression(reason?: unknown): CompressionRequestOutcome {
+    const queued = queueCompressionRequest({
+      pending: this.pendingCompression,
+      enabled: this.compactionEnabled,
+      reason,
+      at: Date.now(),
+    });
+    this.pendingCompression = queued.pending;
+    return queued.outcome;
+  }
+
+  /**
+   * Consume a queued model request and report which reason this boundary
+   * compacts for.
+   *
+   * The queue is cleared whether or not the attempt succeeds: a failed
+   * checkpoint that stayed queued would be retried at every following boundary,
+   * spending a summary request per turn. The automatic cooldown and the
+   * threshold trigger take over from the next boundary onwards.
+   */
+  private takePendingCompactionReason(): ContextCompactionReason {
+    const pending = this.pendingCompression;
+    this.pendingCompression = undefined;
+    return pending?.manual ? "manual" : "threshold";
+  }
+
   private automaticCompactionNeeded(
     additionalMessages: AgentMessage[] = [],
   ): boolean {
+    if (!this.compactionEnabled) return false;
+    // A queued model request asks for a checkpoint however full the window is:
+    // `compress` is there to act before the trigger, not to duplicate it.
+    if (this.pendingCompression) return true;
     const context = this.liveSessionContext();
     const messages = [...context.messages, ...additionalMessages];
-    const budget = this.contextBudget(messages);
-    return (
-      this.compactionEnabled &&
-      budget.tokens >= automaticCompactionThresholdFor(budget)
-    );
+    return this.automaticCompactionDecision(this.contextBudget(messages)).compact;
   }
 
   private automaticCompactionWouldExceedHardLimit(
@@ -8260,23 +8393,26 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       return { context };
     }
 
-    const automaticThresholdReached =
-      budget.tokens >= automaticCompactionThresholdFor(budget);
+    // The ledger's trigger, not the raw estimate on its own: a turn whose tool
+    // results already occupy half the safe budget compacts early, and a live
+    // failure cooldown holds an attempt back unless the hard limit forces it.
+    const automaticThresholdReached = this.automaticCompactionDecision(budget).compact;
     // Compact deterministically before the request approaches the hard limit.
-    // `new_context` remains an optional earlier model request.
-    const modelRequested = this.pendingModelCompaction;
-    this.pendingModelCompaction = false;
-    if (!automaticThresholdReached && !modelRequested) {
+    // `new_context` and `compress` remain an optional earlier model request.
+    if (!automaticThresholdReached && !this.pendingModelCompaction) {
       return { context: this.withContextBudgetReminder(context, budget) };
     }
 
+    // The queue is consumed here, before the attempt: a checkpoint that failed
+    // must not be re-requested at every following boundary.
+    const compactionReason = this.takePendingCompactionReason();
     const retentionMode: CompactionRetentionMode =
       (turn.toolResults?.length ?? 0) > 0 ||
       turn.message?.stopReason === "toolUse"
         ? "active_turn"
         : "completed_turn";
     const compacted = await this.runCompaction(
-      "threshold",
+      compactionReason,
       false,
       retentionMode,
     );
@@ -8309,7 +8445,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     context: AgentContext,
     budget: ContextBudget,
   ): AgentContext {
-    const trigger = automaticCompactionThresholdFor(budget);
+    // The ledger reports the same `context-budget.ts` threshold the gate
+    // compares against, so the reminder and the decision cannot disagree.
+    const trigger = this.automaticCompactionDecision(budget).view.thresholdTokens;
     // What the model is told is what is true: the space left *before compaction*,
     // not the space left before the hard boundary it will never reach.
     const remaining = Math.max(0, trigger - budget.tokens);
@@ -8367,6 +8505,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     if (this.compactionInProgress) return false;
     this.compactionInProgress = true;
     this.compactionAborted = false;
+    // What the next failure diagnostic may report about the cooldown that was
+    // already armed when this attempt was made.
+    this.compactionDiagnosticCooldown = compressionCooldownDiagnostic(
+      this.compactionCooldowns.active(this.sessionId, Date.now()),
+    );
     const previous = this.agentActivity;
     this.setAgentActivity({
       phase: "compacting",
@@ -8384,6 +8527,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         if (decision?.cancel) return false;
       }
       const compacted = await this.performCompaction(reason, willRetry, retentionMode);
+      // Arm or clear the automatic failure cooldown before anything else looks
+      // at the outcome: the next boundary's gate reads it.
+      this.recordCompactionOutcome(reason, compacted);
       // A run stage re-reads its `on.compaction` context into the prompt of
       // the new window (ADR mode-definitions).
       if (compacted && await this.modeState.afterCompaction(this.modeArtifactReader())) {
@@ -8410,6 +8556,35 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     }
   }
 
+  /**
+   * Arm the automatic-compaction failure cooldown, or clear it on success.
+   *
+   * Only a failed *automatic* attempt arms it: a Stop during the checkpoint is
+   * not a failure, and `compactManually` is the user asking once rather than the
+   * runtime retrying on its own. While the cooldown is live the gate holds
+   * automatic attempts back (unless the hard limit forces one), so a structural
+   * summary failure cannot spend a request on every turn; the streak escalates
+   * the deadline, and one successful compression clears both.
+   */
+  private recordCompactionOutcome(
+    reason: ContextCompactionReason,
+    compacted: boolean,
+  ): void {
+    const message = this.lastCompactionFailureMessage;
+    this.lastCompactionFailureMessage = undefined;
+    if (compacted) {
+      this.compactionCooldowns.clear(this.sessionId);
+      this.compactionDiagnosticCooldown = compressionCooldownDiagnostic(undefined);
+      return;
+    }
+    if (reason === "manual" || this.compactionAborted) return;
+    const cooldown = this.compactionCooldowns.recordFailure(this.sessionId, {
+      at: Date.now(),
+      ...(message ? { error: message } : {}),
+    });
+    this.compactionDiagnosticCooldown = compressionCooldownDiagnostic(cooldown);
+  }
+
   private emitCompactionFailure(
     reason: ContextCompactionReason,
     tokensBefore: number | undefined,
@@ -8418,6 +8593,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // A checkpoint cut short by the user's Stop is not a failed compaction;
     // it reports under the abort code so the turn reads as stopped.
     const aborted = this.compactionAborted;
+    this.lastCompactionFailureMessage = aborted ? undefined : message;
     this.emit({
       type: "compaction_end",
       reason,
@@ -8475,6 +8651,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         : {}),
       ...(tokensBefore !== undefined ? { tokensBefore } : {}),
       ...(this.compactionDiagnosticBudget ?? {}),
+      ...(this.compactionDiagnosticCooldown ?? {}),
       ...extra,
     });
   }
@@ -8805,6 +8982,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         contextTokens: compactedBudget.tokens,
       },
     };
+    // Lineage rides the checkpoint's opaque details, so the boundary stays
+    // walkable (`compressionChain`, `compressionBranchTip`) after a reload.
+    checkpoint = this.withCompressionBranch(checkpoint, reason);
     try {
       await this.host.call("session.appendCompaction", {
         sessionId: this.sessionId,
@@ -8836,6 +9016,38 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       mark: contextCompactionMark(checkpoint),
     });
     return "persisted";
+  }
+
+  /**
+   * Publish the checkpoint as the continuation of the session's current
+   * boundary, so a compression is a resumable branch and not a one-shot prune.
+   *
+   * Pi compacts in place: the boundary a checkpoint continues is the installed
+   * `activeCompaction`, which is also the lineage tip. The handoff count is what
+   * the new window carries — the summary itself plus the retained tail — and a
+   * boundary that carries neither is refused by `publishCompressionBranch`.
+   * A refusal is not a failed turn: the checkpoint is recorded exactly as built.
+   */
+  private withCompressionBranch(
+    checkpoint: ContextCompactionRecord,
+    reason: ContextCompactionReason,
+  ): ContextCompactionRecord {
+    const carriedTail = Array.isArray(checkpoint.retainedTail)
+      ? checkpoint.retainedTail.length
+      : 0;
+    const handoffMessageCount = carriedTail + (checkpoint.summary ? 1 : 0);
+    try {
+      return publishCompressionBranch({
+        checkpoint,
+        checkpoints: this.activeCompaction ? [this.activeCompaction] : [],
+        sessionId: this.sessionId,
+        handoffMessageCount,
+        kind: reason === "manual" ? "manual" : "compression",
+      });
+    } catch {
+      // Weak or absent lineage is a missing branch, never a broken compaction.
+      return checkpoint;
+    }
   }
 
   private fallbackPreparation(
@@ -9527,6 +9739,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           break;
         }
         if (event.message.role === "toolResult") {
+          // Tool output is re-sent on every later request, so the ledger has to
+          // see it: it is what makes the tool-result-share trigger possible.
+          if (this.compactionEnabled) {
+            this.turnTokenLedger.recordToolResult(
+              estimateTokens(event.message),
+              this.toolResultLedgerCeiling(),
+            );
+          }
           this.appendLiveEntry(event.message.toolCallId || randomUUID(), event.message);
           break;
         }
@@ -10153,6 +10373,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // created instruction files instead of reusing a previous chain.
     this.pathInstructionClaims.clear();
     this.turnId = durableTurnId;
+    this.turnTokenLedger.beginTurn(durableTurnId);
     this.acceptingSteering = true;
     this.pendingUserMessageId = undefined;
     this.gracefulStopRequested = false;
@@ -10214,7 +10435,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.setAgentMessages(this.liveSessionContext().messages);
     if (this.automaticCompactionNeeded()) {
       const compacted = await this.runCompaction(
-        "threshold",
+        this.takePendingCompactionReason(),
         false,
         "active_turn",
       );
@@ -10293,6 +10514,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     this.retainPendingSteering();
     const nextTurnId = durableTurnId;
     this.turnId = nextTurnId;
+    // One ledger per turn: the counters must never accumulate across prompts.
+    this.turnTokenLedger.beginTurn(nextTurnId);
     this.acceptingSteering = true;
     this.gracefulStopRequested = false;
     this.runCancelled = false;
@@ -10337,7 +10560,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         timestamp: Date.now(),
       };
       if (this.automaticCompactionNeeded([incomingUserMessage])) {
-        const compacted = await this.runCompaction("threshold", false);
+        const compacted = await this.runCompaction(this.takePendingCompactionReason(), false);
         if (!compacted) {
           if (this.compactionAborted) {
             // Stop landed during the pre-flight checkpoint. Keep the user's

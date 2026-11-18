@@ -9,6 +9,8 @@
   "//theme-plugins": "Retired 2026-11-06: a declarative theme plugin costs a whole host process (~30 MB) on every launch and needs none of it. Built-in color schemes cover appearance; see ADR 0412.",
   "//theme-plugins-extra": "Retired 2026-11-06: same host-process cost as //theme-plugins. Theme authoring belongs in the app; skins ship as data, not as plugins.",
   "//native-helper-terminals": "Retired 2026-11-06: both terminals launch an unsigned helper binary (fancy-pty-helper.exe / pi-conpty-helper.exe) from the app's own resource directory. On a host with behaviour-based endpoint protection, an unsigned app spawning unknown executables it shipped itself is indistinguishable from a dropper and gets the whole app flagged. local.terminal covers the same feature in pure JavaScript.",
+  "//pi.clipboard-history": "Retired 2026-11-17: the plugin's own capture service polls the host history every 2 s and mirrors it into a plaintext archive that is kept for 30 days, so the app spends its whole run reading clipboard content and writing it to disk - the exact shape behaviour-based endpoint protection calls a clipboard stealer, and this deployment's KES quarantined the app's binaries under PDM:Trojan.Win32.Generic while it was running. The host API stays: pi.clipboard.getHistory() records explicit writes and Composer pastes only, with no background sampling, which is the surface the app itself needs. Hermes parity: clipboard is read on an explicit request, never polled.",
+  "//cn.star.computer-use": "Retired 2026-11-17 with packages/computer-use: a desktop-automation surface that injects input, runs in a hidden context and mirrors the screen is indistinguishable from a remote-access tool to a behaviour engine, and it was quarantined as such in this deployment. Bundling it also required the native capture package and its own driver, so the plugin, the package and the release copy were all removed together.",
   "//development-harness-only": "Retired 2026-11-06: development fixtures. One is an offline-harness manifest, the other an API probe; neither is a user-facing feature.",
   "//duplicate-usage-views": "Retired 2026-11-06: io.github.new-beginner.session-usage is the tracked pick and covers the same accounting; shipping three more usage panels only adds host processes.",
   "//community.workbuddy-connect": "Retired 2026-11-14: WorkBuddy is a built-in provider now (ADR 0397). The app starts the very same bridge out of apps/desktop/resources/in-app-providers and registers the provider row itself, so the plugin is a second gateway for one account - it cannot bind the loopback port the app owns, and a user who still has it enabled gets a provider row pointing at a key that is not theirs. The plugin's dashboard and its credential directory (~/.pi-workbuddy-connect) stay in use by the in-app gateway.",
@@ -45,6 +47,8 @@
     "io.github.muzimu217.usage-dashboard",
     "io.github.ldzhouquan.fast-browser",
     "io.github.wenziji-hub.market-translator",
-    "community.workbuddy-connect"
+    "community.workbuddy-connect",
+    "pi.clipboard-history",
+    "cn.star.computer-use"
   ]
 }

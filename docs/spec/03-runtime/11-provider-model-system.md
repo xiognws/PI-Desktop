@@ -584,7 +584,12 @@ endpoint the application owns.
 
 1. At boot, after settings load and before any session can select a provider,
    the supervisor reads `inAppProvider.<id>.enabled` and
-   `inAppProvider.<id>.port`.
+   `inAppProvider.<id>.port`. The boot is a **refresh, never a resume**: any
+   gateway handle, port, registered row id, failure text and cached balance a
+   previous run left behind is discarded first, and the gateway is started from
+   scratch. Nothing inherited is trusted — an inherited gateway keeps the
+   previous run's session, and a model request against it fails in a way the
+   runtime answers by retrying.
 2. Enabled: it starts the gateway on that loopback port and probes
    `GET /healthz` until it answers. Only an answering probe makes the provider
    `ready`; the row is registered either way.
@@ -599,8 +604,11 @@ endpoint the application owns.
 
 The row registration is an idempotent upsert performed on every boot: create the
 row when it is absent, update the fields the application owns when it is
-present. Fields the user owns — the secret, the model choice, bindings, custom
-headers — are never rewritten, so an upgrade does not reset a session's model.
+present, and on the startup refresh re-assert the endpoint, the loopback key and
+the published model list — they describe the process that just started, not the
+one that was running when the row was stored. Fields the user owns — the model
+choice, limits marked `…Source: "user"`, capability overrides, custom headers —
+are never rewritten, so an upgrade does not reset a session's model.
 
 ### 8b.3 Reserved ownership
 
@@ -642,6 +650,16 @@ Main exposes `pi-desktop/in-app-providers/credits` with `{ id, refresh? }`. The
 answer is cached for 30 s and the upstream read times out at 10 s; a failure
 returns `{ ok: false, reason }` so the UI can show a state instead of a number.
 
+**A balance being spent is polled.** While the model selected for the session
+(or for the composer draft) is served by an in-app provider, the renderer
+re-reads the balance every 5 s with `refresh`, bypassing the cache — a gateway in
+use is also consuming credit, so a number read up to 30 s ago is a wrong answer.
+Polling stops as soon as the selection moves to a provider without an in-app
+gateway, and a read already in flight is shared rather than duplicated. A
+balance nobody is spending keeps the plain 30 s cache. The startup refresh drops
+every cached balance too, because a balance belongs to the gateway process that
+produced it.
+
 **Visibility is one rule: metered and positive → show, otherwise hide.** No
 indicator appears — no dash, no `0`, no reserved space — when the descriptor has
 no `creditsPath`, when the account is unlimited, or when the remaining total is
@@ -650,9 +668,9 @@ it opens a popover with the total, one row per package (name, remaining, size)
 when more than one package is reported, a relative "updated N minutes ago" line,
 a manual refresh that invalidates the shared cache, and a close affordance. The
 model picker's group header for that provider shows the same total. The
-provider's settings card reuses the same strings and states. There is no
-polling, no spend history and no currency conversion — the number is what the
-billing endpoint reported.
+provider's settings card reuses the same strings and states. There is no spend
+history and no currency conversion — the number is what the billing endpoint
+reported.
 
 Because the chip hides itself, the reasons live where a person can look for them:
 the settings card shows a state line — no remaining credit, unlimited, sign in

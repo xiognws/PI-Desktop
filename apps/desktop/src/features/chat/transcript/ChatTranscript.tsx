@@ -29,9 +29,9 @@ import { collectLiveDelegationEntries } from "../../../lib/live-delegation-entri
 import { reuseReadonlyMap } from "../../../lib/assistant-turns";
 import { liveHistoryTurnId } from "../../../lib/turn-process";
 import { useTranscriptScroll } from "./hooks/useTranscriptScroll";
-import { usePinnedPromptScrolledPast } from "./hooks/usePinnedPromptScrolledPast";
-import { PinnedPrompt } from "./PinnedPrompt";
-import { latestUserPrompt, pinnedPromptPreview, pinnedPromptSelector } from "../../../lib/pinned-prompt";
+import { usePinnedPromptAtTop } from "./hooks/usePinnedPromptAtTop";
+import { usePinnedPromptMarker } from "./hooks/usePinnedPromptMarker";
+import { latestUserPrompt } from "../../../lib/pinned-prompt";
 import { useTranscriptContinuation } from "../../../hooks/use-transcript-continuation";
 import type { TranscriptSearchTarget } from "../../../lib/transcript-reading";
 import type { RestoreTranscriptReading } from "../../../hooks/use-transcript-reading-position";
@@ -225,31 +225,22 @@ function TranscriptBody({
   const find = useTranscriptFind(contentRef, scrollRef, releaseFollow);
 
   /*
-    Pinned latest prompt. The answer pushes the newest prompt off the top of the
-    transcript, so while that row is out of view a strip repeats one line of it;
-    clicking the strip returns to the row. Agent deliveries are not the user
-    speaking, so they never pin. Find owns the top edge while it is open, so the
-    strip yields to it.
+    Pinned latest prompt. The newest prompt scrolls up like any other row until
+    its top edge reaches the top of the transcript; from there it stays stuck to
+    that edge, so the user keeps reading what they last asked while the answer
+    streams in underneath. Find owns the top edge while it is open, so the row
+    yields to it and stops pinning until the find bar closes. The next prompt
+    takes the slot over, and scrolling back down releases it. Agent deliveries
+    are not the user speaking, so they never pin.
   */
   const pinnedMessage = useMemo(() => latestUserPrompt(messages), [messages]);
-  const pinnedText = useMemo(() => pinnedPromptPreview(pinnedMessage), [pinnedMessage]);
-  const pinnedPast = usePinnedPromptScrolledPast({
+  const pinnedAtTop = usePinnedPromptAtTop({
     scrollRef,
     contentRef,
     messageId: pinnedMessage?.id,
-    enabled: !find.open && paneVisible,
+    enabled: paneVisible && !find.open,
   });
-  const jumpToPinnedPrompt = () => {
-    const scroller = scrollRef.current;
-    const content = contentRef.current;
-    const messageId = pinnedMessage?.id;
-    if (!scroller || !content || !messageId) return;
-    const row = content.querySelector<HTMLElement>(pinnedPromptSelector(messageId));
-    if (!row) return;
-    const offset =
-      row.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-    scroller.scrollTop = Math.max(0, offset - 12);
-  };
+  usePinnedPromptMarker(contentRef, pinnedAtTop ? pinnedMessage?.id : undefined);
 
   const continuationCursor = useAppStore((state) =>
     sessionId ? state.transcriptViews[sessionId]?.messageEnd : undefined,
@@ -489,12 +480,6 @@ function TranscriptBody({
           onClose={find.close}
         />
       ) : null}
-      <PinnedPrompt
-        text={pinnedText}
-        attachmentCount={pinnedMessage?.attachments?.length ?? 0}
-        visible={pinnedPast}
-        onJump={jumpToPinnedPrompt}
-      />
       {/* The minimap measures row positions against a rendered scroller. A
         * hidden pane has none, so measuring there would cache junk offsets and
         * reuse them on reveal. It is out of flow and re-measures on mount, so

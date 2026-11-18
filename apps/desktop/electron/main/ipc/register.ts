@@ -26,7 +26,6 @@ import { registerModelBenchmarksIpc } from "./model-benchmarks-ipc";
 import { registerPluginIpc } from "./plugin-ipc";
 import { registerPluginUiIpc } from "./plugin-ui-ipc";
 import { registerPluginLauncherIpc } from "./plugin-launcher-ipc";
-import { registerComputerIpc } from "./computer-ipc";
 import { registerJevIpc } from "./jev-ipc";
 import { registerModesIpc } from "./modes-ipc";
 import type { ModeServices } from "../runtime/mode-services";
@@ -60,8 +59,6 @@ export type RegisterIpcDependencies = {
   getHost: () => HostProcess | null;
   /** Supervisor that owns the in-app provider gateways (WorkBuddy). */
   inAppProviders: InAppProviders;
-  /** Push the live computer-use grant to the renderer's indicator. */
-  publishComputerGrant: (grant: import("@pi-workspace/shared").ComputerGrantView | null) => void;
   traySessions: ReturnType<typeof createTraySessions>;
   taskbarUnreadBadge: ReturnType<typeof createTaskbarUnreadBadge>;
   getSidecar: () => AgentSidecar | null;
@@ -114,7 +111,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getMainWindow,
     getHost,
     inAppProviders,
-    publishComputerGrant,
     getSidecar,
     getAgentHostBridge,
     getBackendRouter,
@@ -347,7 +343,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   registerJevIpc({ registrar, logger });
   registerModesIpc({ registrar, catalog: dependencies.modeServices.catalog, runs: dependencies.modeServices.runs });
   registerInAppProviderIpc({ registrar, supervisor: inAppProviders });
-  registerComputerIpc({ registrar, getHost, publishGrant: publishComputerGrant });
   registerWorktreeIpc({
     registrar,
     getHost,

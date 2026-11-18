@@ -19,7 +19,9 @@ const { IN_APP_PROVIDERS, inAppProviderIdFromVendorKey, inAppProviderVendorKey }
   "../electron/main/providers/types.ts"
 );
 const { IN_APP_PROVIDER_CHANNELS } = await import("../src/lib/in-app-provider-channels.ts");
-const { creditsVisibility } = await import("../src/lib/in-app-credits-visibility.ts");
+const { creditsVisibility, shouldPollCredits, CREDITS_POLL_INTERVAL_MS } = await import(
+  "../src/lib/in-app-credits-visibility.ts"
+);
 
 const read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf8");
 const WORKBUDDY = IN_APP_PROVIDERS[0];
@@ -499,4 +501,122 @@ test("main and renderer agree on the channel names", () => {
     credits: "pi-desktop/in-app-providers/credits",
     setEnabled: "pi-desktop/in-app-providers/set-enabled",
   });
+});
+
+test("a second start refreshes the gateway instead of resuming it", async () => {
+  // A second `start()` is the app's startup refresh: the inherited gateway is
+  // stopped, its port and row id are dropped, and the row is registered again
+  // from the process that just started. Resuming inherited state is what leaves
+  // a stale session behind, and the runtime answers those failures by retrying.
+  let stopped = 0;
+  const spawned = [];
+  const rows = [];
+  const calls = [];
+  const host = async (method, params) => {
+    calls.push({ method, params });
+    if (method === "providers.list") return { providers: rows.map((row) => ({ ...row })) };
+    if (method === "providers.create") {
+      const row = { id: "row-1", vendorKey: params.vendorKey };
+      rows.push(row);
+      return { provider: row };
+    }
+    if (method === "providers.update") {
+      Object.assign(rows[0], params);
+      return { provider: rows[0] };
+    }
+    return {};
+  };
+  const supervisor = new InAppProviders({
+    callHost: host,
+    startGateway: async ({ port }) => {
+      spawned.push(port);
+      return {
+        stop: async () => {
+          stopped += 1;
+        },
+      };
+    },
+    readSettings: async () => ({}),
+    readApiKey: async () => API_KEY,
+    fetchImpl: async (url) => {
+      if (String(url).endsWith(WORKBUDDY.healthPath)) {
+        return { ok: true, json: async () => ({ ok: true, service: "pi-workbuddy-connect" }) };
+      }
+      return { ok: true, json: async () => ({ object: "list", data: [{ id: "m-1" }] }) };
+    },
+    log: () => {},
+    healthPollMs: 1,
+    healthTimeoutMs: 50,
+  });
+
+  await supervisor.start();
+  const firstRowId = supervisor.status()[0].providerId;
+  await supervisor.start();
+
+  assert.deepEqual(spawned, [WORKBUDDY.defaultPort, WORKBUDDY.defaultPort]);
+  assert.equal(stopped, 1, "the inherited gateway is stopped before the refreshed one starts");
+  assert.equal(supervisor.status()[0].running, true);
+  assert.equal(supervisor.status()[0].providerId, firstRowId, "the row is reused, not duplicated");
+  assert.equal(calls.filter((call) => call.method === "providers.create").length, 1);
+  assert.equal(
+    calls.filter((call) => call.method === "providers.update").length,
+    1,
+    "the refreshed boot rewrites the existing row",
+  );
+  assert.equal(
+    calls.filter((call) => call.method === "providers.setSecret").length,
+    2,
+    "the loopback key is re-asserted on every refresh",
+  );
+});
+
+test("a startup refresh discards the balance the previous gateway reported", async () => {
+  const { supervisor } = harness();
+  await supervisor.start();
+
+  const first = await supervisor.readProviderCredits({ providerId: "workbuddy" });
+  assert.equal(first.ok, true);
+  // A second read inside the TTL is answered from the cache.
+  const cached = await supervisor.readProviderCredits({ providerId: "workbuddy" });
+  assert.deepEqual(cached, first);
+
+  await supervisor.start();
+  const afterRefresh = await supervisor.readProviderCredits({ providerId: "workbuddy" });
+  assert.equal(afterRefresh.ok, true);
+  assert.notEqual(
+    afterRefresh,
+    first,
+    "the refreshed boot re-reads instead of inheriting the cached reading",
+  );
+});
+
+test("the credit cache forgets every provider it held", async () => {
+  let reads = 0;
+  const cache = new CreditsCache(
+    async () => {
+      reads += 1;
+      return { ok: true, credits: { total: 5, accounts: [], free: false, fetchedAt: reads } };
+    },
+    { now: () => 1_000, ttlMs: 30_000 },
+  );
+  await cache.read("workbuddy");
+  await cache.read("workbuddy");
+  assert.equal(reads, 1);
+  cache.clear();
+  await cache.read("workbuddy");
+  assert.equal(reads, 2, "a cleared cache goes back to the gateway");
+});
+
+test("a balance is polled only while an in-app model is in use", () => {
+  assert.equal(CREDITS_POLL_INTERVAL_MS, 5_000);
+  const surfaces = [
+    { providerId: "row-1" },
+    { providerId: null },
+  ];
+  assert.equal(shouldPollCredits(surfaces, "row-1"), true);
+  // A model on another provider is not spending this balance.
+  assert.equal(shouldPollCredits(surfaces, "row-2"), false);
+  // A gateway that has not registered its row yet has no balance to poll.
+  assert.equal(shouldPollCredits(surfaces, undefined), false);
+  assert.equal(shouldPollCredits([], "row-1"), false);
 });

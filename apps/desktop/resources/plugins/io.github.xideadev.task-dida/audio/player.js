@@ -166,10 +166,9 @@ class NativeAudioPlayer {
                     proc.on('spawn', () => safeResolve(true));
                 }
                 else if (platform === 'win32') {
-                    // Windows PowerShell SoundPlayer with strictly escaped single quotes
-                    const escapedPath = soundPath.replace(/'/g, "''");
-                    const script = `(New-Object Media.SoundPlayer '${escapedPath}').PlaySync()`;
-                    const proc = (0, node_child_process_1.spawn)('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+                    // Static script on disk; the sound path is passed as an argument, never interpolated into code.
+                    const scriptPath = require('node:path').join(__dirname, 'play-sound.ps1');
+                    const proc = (0, node_child_process_1.spawn)('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, soundPath], {
                         stdio: 'ignore',
                         detached: true
                     });

@@ -70,11 +70,32 @@ export const EXTRAS_DIR = "python-extras";
 
 /** The extras `site-packages` directory, or null when the folder is not installed. */
 export function extrasSitePackages(): string | null {
-  const candidates = [
+  return firstExisting([
     process.env.PI_DESKTOP_PYTHON_EXTRAS ?? "",
     join(dirname(process.execPath), EXTRAS_DIR, SITE_PACKAGES_DIR),
-  ].filter((value) => value.length > 0);
-  for (const candidate of candidates) {
+  ]);
+}
+
+/**
+ * The autotest framework's own locked libraries, kept beside the extras.
+ *
+ * A separate directory rather than a merge into `site-packages`: the framework
+ * stack needs `numpy<2` while the bundled Office stack pins `numpy 2.5.4`, so one
+ * directory cannot satisfy both. It is appended to `PYTHONPATH` for the bundled
+ * interpreter by default, so a framework action runs without the package having
+ * to locate its own dependencies.
+ */
+export const FRAMEWORK_DEPS_DIR = "framework-deps";
+
+export function frameworkDepsSitePackages(): string | null {
+  return firstExisting([
+    process.env.PI_DESKTOP_PYTHON_FRAMEWORK_DEPS ?? "",
+    join(dirname(process.execPath), EXTRAS_DIR, FRAMEWORK_DEPS_DIR, SITE_PACKAGES_DIR),
+  ]);
+}
+
+function firstExisting(candidates: string[]): string | null {
+  for (const candidate of candidates.filter((value) => value.length > 0)) {
     if (existsSync(candidate)) return candidate;
   }
   return null;
@@ -499,8 +520,13 @@ export function pythonEnv(
   // only offered to that interpreter: pointing a customer's own 3.11 at 3.12
   // wheels would turn a working import into a confusing crash.
   const extras = runtime.source === "bundled" ? extrasSitePackages() : null;
+  // The framework stack is offered on the same terms and for the same reason:
+  // its wheels are built for the bundled CPython only. It comes before the
+  // Office stack so a framework import resolves against its own locked numpy.
+  const frameworkDeps = runtime.source === "bundled" ? frameworkDepsSitePackages() : null;
   const entries = [
     ...userSiteDirs.filter((dir) => dir.length > 0),
+    ...(frameworkDeps ? [frameworkDeps] : []),
     ...(extras ? [extras] : []),
     ...(runtime.sitePackages ? [runtime.sitePackages] : []),
   ];

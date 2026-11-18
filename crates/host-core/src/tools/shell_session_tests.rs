@@ -14,10 +14,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use super::shell;
 use super::shell_session::{
     cell_text, decode_cell_frame, encode_cell_frame, is_stale, marker_holdback,
-    persistent_enabled_for, run_session, session_args, CellFrame, CellScanner, Dialect, HeadStrip,
-    ScanOutcome,
+    persistent_enabled_for, run_session, session_args, start_session, CellFrame, CellScanner,
+    Dialect, HeadStrip, ScanOutcome,
 };
-use super::ToolRunnerStartConfig;
+use super::{BashExecutionOptions, ToolRunnerStartConfig};
 
 const NONCE: &str = "0123456789abcdef0123456789abcdef";
 
@@ -500,4 +500,76 @@ async fn powershell_session_runs_each_command_in_the_workspace() {
     let reported = std::fs::canonicalize(&reported).unwrap_or_else(|_| reported.into());
     assert_eq!(reported, expected, "cell starts in the workspace");
     assert_eq!(cells[2].1, 9, "the command's exit code reaches the host");
+}
+
+/// The host starts a session interpreter itself.
+///
+/// A live session used to be a second copy of the host binary in
+/// `--internal-tool-runner` mode relaying between the host and the interpreter.
+/// That copy is what endpoint protection scored as an unsigned binary spawning
+/// interpreters, and it bought the session nothing: this test drives the
+/// host-side path and asserts that each cell still starts in the workspace, that
+/// the interpreter survives between cells, and that the command's exit status
+/// reaches the host.
+#[tokio::test]
+async fn host_side_session_runs_cells_without_a_runner_copy() {
+    let program = shell::resolve_shell(shell::GIT_BASH_ID)
+        .or_else(|_| shell::resolve_shell(shell::BASH_ID))
+        .map(|resolved| resolved.program);
+    let Ok(program) = program else {
+        eprintln!("no posix shell installed; skipping the host session test");
+        return;
+    };
+    let workspace = tempfile::tempdir().expect("temp workspace");
+    let options = BashExecutionOptions {
+        session_id: "host-session-test".into(),
+        tool_call_id: "host-session-test".into(),
+        command_shell_id: shell::GIT_BASH_ID.to_string(),
+        timeout_ms: Some(20_000),
+        cancellation: None,
+        output_tx: None,
+        extra_env: Vec::new(),
+        run_in_background: false,
+        app_state: None,
+    };
+
+    let mut session = start_session(&program, workspace.path(), None, &options, Dialect::Posix)
+        .await
+        .expect("the host starts the session interpreter");
+
+    let first = session
+        .run_cell("echo first", workspace.path(), 20_000, &options, true)
+        .await;
+    assert_eq!(first.code, 0, "first cell exits 0");
+    assert_eq!(first.stdout.result().0, "first\n");
+
+    // The interpreter stays alive between cells, and the `cd` of the previous
+    // cell cannot leak into the next one.
+    let second = session
+        .run_cell("cd /; echo second", workspace.path(), 20_000, &options, true)
+        .await;
+    assert_eq!(second.code, 0, "second cell reuses the same interpreter");
+    assert_eq!(second.stdout.result().0, "second\n");
+
+    let escaped = session
+        .run_cell("pwd", workspace.path(), 20_000, &options, true)
+        .await;
+    assert_eq!(escaped.code, 0);
+    let reported = escaped.stdout.result().0.trim_end().to_string();
+    // Git Bash prints the POSIX spelling of the workspace while the fixture
+    // holds the Windows one, so compare the directory the cell reported rather
+    // than the text either side chose: it must be the workspace, not `/` where
+    // the previous cell's `cd` went.
+    let leaf = workspace
+        .path()
+        .file_name()
+        .expect("workspace has a name")
+        .to_string_lossy()
+        .to_string();
+    assert!(
+        reported.ends_with(&leaf),
+        "every cell starts in the workspace, got {reported:?}"
+    );
+
+    session.kill().await;
 }

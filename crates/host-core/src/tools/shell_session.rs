@@ -38,7 +38,7 @@ use tokio::sync::mpsc;
 use super::{
     bash_aborted_error, bash_success_result, bash_timeout_error, kill_and_reap, spawn_tool_runner,
     spawn_with_retries, wait_for_cancellation, BashExecutionOptions, CapturedOutput, OutputChunk,
-    OutputNotifier, OutputStream, SpawnedToolRunner, ToolRunnerStartConfig,
+    OutputNotifier, OutputStream, ShellBudgets, SpawnedToolRunner, ToolRunnerStartConfig,
     DEFAULT_BASH_TIMEOUT_MS, INTERNAL_RUNNER_ERROR_PREFIX, OUTPUT_NOTIFICATION_INTERVAL,
     PIPE_DRAIN_TIMEOUT,
 };
@@ -475,6 +475,7 @@ pub(crate) async fn attempt(
     scratch: Option<&Path>,
     command: &str,
     options: &BashExecutionOptions,
+    budgets: ShellBudgets,
 ) -> PersistentAttempt {
     let Some(dialect) = applicable_dialect(command, options) else {
         return PersistentAttempt::NotApplicable;
@@ -519,6 +520,7 @@ pub(crate) async fn attempt(
                 Some(run.code),
                 scratch,
                 &options.command_shell_id,
+                budgets,
             ))
         }
         CellStop::TimedOut => {
@@ -595,7 +597,7 @@ pub(crate) fn persistent_enabled_for(value: Option<&str>) -> bool {
 }
 
 /// A running session: one runner process, one interpreter, one carry buffer.
-struct LiveSession {
+pub(super) struct LiveSession {
     runner: SpawnedToolRunner,
     dialect: Dialect,
     stderr_rx: mpsc::Receiver<OutputChunk>,
@@ -624,7 +626,7 @@ impl LiveSession {
         }
     }
 
-    async fn run_cell(
+    pub(super) async fn run_cell(
         &mut self,
         command: &str,
         cwd: &Path,
@@ -647,9 +649,17 @@ impl LiveSession {
             notifications: OutputNotifier::new(options),
         };
         let nonce = new_nonce();
-        let frame = CellFrame::command(command, cwd, &nonce);
+        // Written straight into the interpreter's stdin: the relay process this
+        // used to talk to is gone (see `spawn_session_shell`).
+        let text = cell_text(*dialect, cwd, command, &nonce);
         let write_result = match runner.control.as_mut() {
-            Some(control) => write_cell_frame(control, &frame).await,
+            Some(control) => match control.write_all(text.as_bytes()).await {
+                Ok(()) => control
+                    .flush()
+                    .await
+                    .map_err(|error| format!("session write failed: {error}")),
+                Err(error) => Err(format!("session write failed: {error}")),
+            },
             None => Err("session control pipe is closed".to_string()),
         };
         if let Err(error) = write_result {
@@ -747,7 +757,7 @@ impl LiveSession {
     }
 
     /// Terminates the runner and everything it owns, and reaps it.
-    async fn kill(self) {
+    pub(super) async fn kill(self) {
         self.stderr_task.abort();
         let _ = self.stderr_task.await;
         let SpawnedToolRunner {
@@ -761,10 +771,10 @@ impl LiveSession {
     }
 }
 
-struct CellRun {
+pub(super) struct CellRun {
     stop: CellStop,
-    code: i32,
-    stdout: CapturedOutput,
+    pub(super) code: i32,
+    pub(super) stdout: CapturedOutput,
     stderr: CapturedOutput,
     notifications: OutputNotifier,
 }
@@ -814,35 +824,108 @@ fn consume(
     end
 }
 
+/// Starts the interpreter for a live session, owned by the host process.
+///
+/// A session needs a shell with piped stdio and nothing else, so the host starts
+/// it directly. The previous shape — a second copy of this executable in
+/// `--internal-tool-runner` mode relaying between the host and the interpreter —
+/// put an unsigned binary spawning interpreters on every turn, which is the
+/// behaviour shape endpoint protection scores as malicious (this deployment's
+/// KES quarantined the app for it), and the copy bought the session nothing: the
+/// relay's only job was to turn control frames into the same shell text the host
+/// can write itself.
+async fn spawn_session_shell(
+    program: &Path,
+    root: &Path,
+    scratch: Option<&Path>,
+    options: &BashExecutionOptions,
+    dialect: Dialect,
+) -> Result<SpawnedToolRunner, String> {
+    let mut command = Command::new(program);
+    command
+        .args(session_args(dialect))
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    // A session outlives one command, so a leaked PYTHONHOME would poison every
+    // later call in it.
+    super::strip_inherited_python_env(&mut command);
+    if let Some(scratch_dir) = scratch {
+        command.env(
+            "PI_SCRATCH_DIR",
+            super::shell::format_scratch_dir_for_shell(Some(dialect.name()), scratch_dir),
+        );
+    }
+    if let Some(path) = super::shell::user_login_path() {
+        command.env("PATH", path);
+    }
+    for (name, value) in &options.extra_env {
+        command.env(name, value);
+    }
+    #[cfg(unix)]
+    command.process_group(0);
+    #[cfg(windows)]
+    command.creation_flags(super::WINDOWS_CREATE_NO_WINDOW);
+
+    let mut child = spawn_with_retries(&mut command)
+        .await
+        .map_err(|(code, message)| format!("{code}: {message}"))?;
+    let pid = child.id().unwrap_or_default();
+    let mut ownership = match super::ProcessOwnership::assign(&child) {
+        Ok(ownership) => ownership,
+        Err(error) => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            return Err(format!("session shell process ownership failed: {error}"));
+        }
+    };
+    let mut control = child.stdin.take();
+    if control.is_none() {
+        let _ = ownership.terminate_fail_closed(pid);
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        return Err("session shell did not expose its stdin".into());
+    }
+    // The start-up script goes in before the first cell: cmd needs the code page
+    // and a bare prompt, PowerShell the UTF-8 console configuration.
+    if let Some(stdin) = control.as_mut() {
+        let prelude = prelude(dialect);
+        if !prelude.is_empty() {
+            stdin
+                .write_all(prelude.as_bytes())
+                .await
+                .map_err(|error| format!("session prelude write failed: {error}"))?;
+            stdin
+                .flush()
+                .await
+                .map_err(|error| format!("session prelude flush failed: {error}"))?;
+        }
+    }
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let wait_task = tokio::spawn(async move { child.wait().await });
+    Ok(SpawnedToolRunner {
+        pid,
+        ownership,
+        control,
+        stdout,
+        stderr,
+        wait_task,
+    })
+}
+
 /// Starts a session shell and proves it answers before a call depends on it.
-async fn start_session(
+pub(super) async fn start_session(
     program: &Path,
     root: &Path,
     scratch: Option<&Path>,
     options: &BashExecutionOptions,
     dialect: Dialect,
 ) -> Result<LiveSession, String> {
-    let config = ToolRunnerStartConfig {
-        program: program.to_path_buf(),
-        args: session_args(dialect),
-        workspace: root.to_path_buf(),
-        scratch_dir: scratch
-            .map(|path| super::shell::format_scratch_dir_for_shell(Some(dialect.name()), path)),
-        env_path: super::shell::user_login_path().map(str::to_string),
-        extra_env: options.extra_env.clone(),
-        persistent: Some(true),
-        session_key: Some(format!(
-            "{}|{}|{}",
-            options.session_id,
-            options.command_shell_id,
-            root.display()
-        )),
-        shell_dialect: Some(dialect.name().to_string()),
-    };
-    let runner = spawn_tool_runner(&config)
-        .await
-        .map_err(|(code, message)| format!("{code}: {message}"))?;
-    let mut session = LiveSession::new(runner, dialect);
+    let shell = spawn_session_shell(program, root, scratch, options, dialect).await?;
+    let mut session = LiveSession::new(shell, dialect);
     let init = session
         .run_cell(
             init_command(dialect),

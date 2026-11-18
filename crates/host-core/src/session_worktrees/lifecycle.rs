@@ -447,6 +447,7 @@ pub(super) async fn run_setup(
             // Worktree setup runs Bash and git only; nothing here needs Python.
             python_executable: None,
             python_tools_dir: None,
+            output_budget: crate::tools::OutputBudgetPlan::legacy(),
         },
     )
     .await;

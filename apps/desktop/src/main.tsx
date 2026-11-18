@@ -62,11 +62,6 @@ const PluginLauncher = React.lazy(() =>
     default: module.PluginLauncher,
   })),
 );
-const ComputerCursor = React.lazy(() =>
-  import("./features/computer-use/ComputerCursor").then((module) => ({
-    default: module.ComputerCursor,
-  })),
-);
 
 async function startRenderer(): Promise<void> {
   const root = ReactDOM.createRoot(rootContainer);
@@ -100,10 +95,6 @@ async function startRenderer(): Promise<void> {
           {rendererSurface === "plugin-launcher" ? (
             <ErrorBoundary>
               <PluginLauncher />
-            </ErrorBoundary>
-          ) : rendererSurface === "computer-cursor" ? (
-            <ErrorBoundary>
-              <ComputerCursor />
             </ErrorBoundary>
           ) : (
             <App />

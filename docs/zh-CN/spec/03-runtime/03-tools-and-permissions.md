@@ -110,7 +110,6 @@ ToolBudget 一次授予全部资源和容量；等待前驱或资源不占槽位
 | `Write` | 高 | Create/overwrite 文件；返回写入后的 `tag` |
 | `Edit` | 高 | 通过针对已校验 `tag` 的行锚定操作修改文件（[18](18-line-anchored-edit-contract.md)） |
 | `Bash` | 高 | 执行命令 |
-| `Computer` | 高 | 检查并操作用户授权的那一个原生窗口或应用；没有活动作用域授权时不可用（[computer-use](computer-use.md)，ADR 0342） |
 | `asktool` | 低 | 询问一个或多个用户问题并将提交的答案作为工具输出返回 |
 | `TodoWrite` | 低 | 替换当前 Agent 会话清单；由主机校验并持久化完整有序快照 |
 | `Skill` | 低 | 加载单个技能文档、它的路径以及同目录的 `references/*.md`；不传 `id` 时列出当前真实的技能库（[2.4](#24-技能目录与加载)） |
@@ -618,11 +617,6 @@ MCP 工具调用会显示审批卡片，原因为 "MCP server tool requires appr
 - `allow-session` 赠款继续在 `ask` 下运作，范围仅限于
   会议；在 `BrowserPreview`/`ask` 下，根本不需要它们。
 - 暂存目录写入 (D114) 在每种模式下都保持无提示。
-- `Computer` 由它的作用域授权治理，而不只由模式治理：创建授权始终是桌面 UI
-  的显式决定，`auto` 从不签发授权，该工具也不存在 `allow-session` 授权。
-  在活动授权内，检查类动作自动允许，输入遵循授权的 `confirm-each`（`ask`
-  下唯一可用的策略）或 `autonomous-in-scope` 策略。Plan 与 Goal 直接拒绝该
-  工具（[computer-use](computer-use.md)）。
 - UI：设置→分段全局默认；输入框在中显示每个会话的芯片
   Agent、Plan 和 Goal 的菜单提供了三种有效模式，无需
   单独的 global-default/inherit 条目。芯片和选定的菜单项
@@ -705,7 +699,7 @@ an orphan snapshot. Legacy callers without a snapshot keep their existing behavi
 - `contract` 在权限 UI 之前硬性拒绝 Write/Edit 和未声明 `planSafeActions` 的插件工具；直接调用 host 也无法绕过该矩阵。声明了非空列表的插件工具会被放行，但运行器仍会拒绝列表之外的操作（ADR 0211）。
 - `agent` 对 Write/Edit/Bash 和已注册插件工具使用权限卡片或所选的自动策略。
 - 用户选择 Auto 时，`contract` 下的 Bash 可能修改工作区或 scratch 状态；UI 必须让这一取舍可见。
-- `Computer` 和定时任务工具只在内置 Agent 模式中可用，用户自定义模式中永远不可用。
+- 定时任务工具只在内置 Agent 模式中可用，用户自定义模式中永远不可用。
 - Host 为分阶段运行自行发起的回合（loop 续跑、`onFail.goto`）会把 `auto` 按 `accept-edits` 处理。用户发起的回合，以及审批通过后的回合，保持会话的权限模式。
 - allow-session 只按 toolName 在当前会话内记住
 - 会话授权跟随 `sessionId` 跨项目标签页切换，不会被其他会话或临时会话继承

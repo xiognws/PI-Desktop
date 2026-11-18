@@ -31,14 +31,28 @@ pub const PACKAGES_DIR: &str = "widgets";
 const STATE_FILE: &str = "widgets/state.json";
 /// Manifest schema this build understands.
 const SCHEMA_VERSION: u32 = 1;
-/// Runtime API this build understands.
-const API_VERSION: u32 = 1;
+/// Newest runtime API this build understands.
+const API_VERSION: u32 = 2;
+/// Oldest runtime API this build still runs (ADR: python-widget-entry-kind).
+///
+/// `apiVersion` is a range, not an equality: raising `API_VERSION` must add a
+/// capability without stranding the packages already installed.
+const API_VERSION_MIN: u32 = 1;
 /// Most packages one data directory may hold; the scan stops after this many.
 pub const MAX_PACKAGES: usize = 64;
-/// Files one package may contain. A package is code, not a media bundle.
-const MAX_PACKAGE_FILES: usize = 512;
+/// Files one package may contain.
+///
+/// Raised from 512 for the autotest framework package: it carries the vendor CAN
+/// driver distribution and the firmware images its converter operates on, which
+/// together are ~640 files. A package is still meant to be code plus the data
+/// that code operates on, not a media bundle.
+const MAX_PACKAGE_FILES: usize = 4096;
 /// Total bytes one package may contain, before hashing stops reading.
-const MAX_PACKAGE_BYTES: u64 = 8 * 1024 * 1024;
+///
+/// Raised from 8 MiB in the same change: the firmware images alone are ~93 MiB.
+/// The cost is deliberate but real — trust hashing reads every byte, so a 154 MiB
+/// package is 154 MiB of I/O.
+const MAX_PACKAGE_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Permissions in escalating order. The order is the manifest's canonical order
 /// and the order the UI renders, so a package's spread never looks random.
@@ -197,9 +211,24 @@ fn digest_dir(root: &Path) -> Result<(String, usize, u64)> {
             .replace('\\', "/");
         hasher.update(relative.as_bytes());
         hasher.update([0u8]);
-        let bytes = std::fs::read(file).with_context(|| format!("read {}", file.display()))?;
-        hasher.update((bytes.len() as u64).to_le_bytes());
-        hasher.update(&bytes);
+        // Streamed rather than read whole: a package may now carry firmware
+        // images tens of megabytes each, and the digest only ever needs one
+        // buffer. The hashed layout is unchanged, so digests already recorded
+        // in `state.json` still match.
+        let metadata =
+            std::fs::metadata(file).with_context(|| format!("stat {}", file.display()))?;
+        hasher.update(metadata.len().to_le_bytes());
+        let mut handle =
+            std::fs::File::open(file).with_context(|| format!("open {}", file.display()))?;
+        let mut buffer = vec![0u8; 64 * 1024];
+        loop {
+            let read = std::io::Read::read(&mut handle, &mut buffer)
+                .with_context(|| format!("read {}", file.display()))?;
+            if read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read]);
+        }
     }
     Ok((hex::encode(hasher.finalize()), files.len(), total))
 }
@@ -288,12 +317,12 @@ fn read_package(dir: &Path, dir_name: &str, state: &WidgetState) -> WidgetSummar
             ),
         );
     }
-    if manifest.api_version != API_VERSION {
+    if manifest.api_version < API_VERSION_MIN || manifest.api_version > API_VERSION {
         return broken_row(
             dir_name,
             dir,
             format!(
-                "{MANIFEST_FILE}: unsupported apiVersion {} (this build runs {API_VERSION})",
+                "{MANIFEST_FILE}: unsupported apiVersion {} (this build runs {API_VERSION_MIN}..={API_VERSION})",
                 manifest.api_version
             ),
         );

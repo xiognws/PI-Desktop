@@ -569,7 +569,7 @@
 .statusbar-credits-dot {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--accent, currentColor);
 }
 
@@ -589,11 +589,11 @@
   min-width: 220px;
   padding: 10px 12px;
   border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--card, Canvas);
   color: var(--foreground, CanvasText);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .statusbar-credits-head {
@@ -620,7 +620,7 @@
 
 .statusbar-credits-total {
   margin-top: 6px;
-  font-size: 20px;
+  font-size: var(--text-xl);
   font-variant-numeric: tabular-nums;
 }
 

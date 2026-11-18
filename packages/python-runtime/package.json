@@ -1,0 +1,13 @@
+{
+  "name": "@pi-workspace/python-runtime",
+  "version": "3.12.13",
+  "private": true,
+  "type": "module",
+  "description": "The CPython tree the app ships, versioned independently of the product.",
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "verify": "node scripts/verify.mjs",
+    "test": "node --test test/*.test.mjs",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\""
+  }
+}

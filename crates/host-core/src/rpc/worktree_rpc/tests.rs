@@ -38,6 +38,7 @@ fn tool_options(
         visualization_root: None,
         python_executable: None,
         python_tools_dir: None,
+        output_budget: crate::tools::OutputBudgetPlan::legacy(),
     }
 }
 

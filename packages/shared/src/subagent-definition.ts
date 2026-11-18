@@ -116,6 +116,9 @@ export const SUBAGENT_INHERIT_DENY_TOOLS: readonly string[] = [
   "TodoWrite",
   "asktool",
   "new_context",
+  // A delegate shares the parent runtime, so a compression request made in a
+  // child would spend the parent's context: same reason `new_context` is here.
+  "compress",
   "ToolSearch",
 ];
 

@@ -1,4 +1,4 @@
-import { dialog, globalShortcut, shell, type BrowserWindow } from "electron";
+import { app, dialog, globalShortcut, shell, type BrowserWindow } from "electron";
 import { join } from "node:path";
 import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
 import { createPluginWorkspaceReader } from "../remote/plugin-workspace-files";
@@ -301,6 +301,22 @@ export function createPluginServices({
     readClipboardHistory: async () => clipboardHistory.getHistory(),
     getLocale: () => getUpdaterLocale(),
     getAppearance: () => getAppearance(),
+    // Both of these are host facts a plugin used to reach with a spawned
+    // PowerShell probe -- the shape antivirus behaviour detection reads as
+    // malicious. The window answers focus; Electron answers the icon.
+    isWindowFocused: () => {
+      const window = getMainWindow();
+      return (
+        window !== null &&
+        !window.isDestroyed() &&
+        window.isFocused() === true &&
+        window.isVisible() === true
+      );
+    },
+    getFileIcon: async (absPath) => {
+      const icon = await app.getFileIcon(stripWinLongPrefix(absPath), { size: "normal" });
+      return icon.isEmpty() ? null : `data:image/png;base64,${icon.toPNG().toString("base64")}`;
+    },
     openPanel: async (request) => {
       await pluginPanels.open({
         ...request,

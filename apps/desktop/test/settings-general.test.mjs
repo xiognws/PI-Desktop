@@ -175,7 +175,6 @@ test("settings destinations own one subject each", () => {
   assert.match(behaviorSource, /CommandShellRow/);
   assert.match(behaviorSource, /infiniteProviderRetry: settings\.infiniteProviderRetry !== true/);
   assert.match(behaviorSource, /scheduledTasksEnabled: settings\.scheduledTasksEnabled === false/);
-  assert.match(behaviorSource, /<ComputerUseSettings\b/);
   assert.doesNotMatch(behaviorSource, /settings\.defaultsTitle/);
   assert.doesNotMatch(behaviorSource, /<ShowThinkingRow /);
   assert.doesNotMatch(behaviorSource, /enterToSend: !settings\.enterToSend/);

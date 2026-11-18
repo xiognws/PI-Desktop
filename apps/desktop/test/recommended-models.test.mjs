@@ -41,7 +41,6 @@ test("only tool-capable chat models are candidates", () => {
       model("gpt-image-2", { family: "image", releaseDate: "2026-09-01" }),
       model("omni-moderation-latest", { family: "moderation", releaseDate: "2026-09-01" }),
       model("o3-deep-research", { family: "research", releaseDate: "2026-09-01" }),
-      model("computer-use-preview", { family: "cua", releaseDate: "2026-09-01" }),
       model("sora-2", {
         family: "video",
         releaseDate: "2026-09-01",

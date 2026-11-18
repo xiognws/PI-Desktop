@@ -32,16 +32,19 @@ mod image_dimensions;
 #[cfg(test)]
 mod inherited_python_env_tests;
 pub mod office;
+mod output_budget;
 #[cfg(any(unix, test))]
 mod process_group;
 pub mod shell;
 pub mod shell_session;
 #[cfg(test)]
 mod shell_session_tests;
+pub mod timeout_policy;
 #[cfg(windows)]
 mod windows_process_tree;
 
 pub use hashline::{HashlineContext, HashlineStore};
+pub use output_budget::{OutputBudgetPlan, ShellBudgets, TurnOutputLedger};
 
 /// Python variables the desktop injects for its bundled interpreter
 /// (`apps/desktop/electron/main/python-runtime.ts`).
@@ -72,10 +75,19 @@ pub fn strip_inherited_python_env(command: &mut Command) {
 /// line counts, which is why it sits well above `BUDGET_SHELL.max_lines`.
 pub const CAPTURE_MAX_BYTES: usize = SPILL_MAX_BYTES;
 pub const CAPTURE_MAX_LINES: usize = 200_000;
-pub const MAX_TIMEOUT_MS: u64 = 2_147_483_647;
-pub const MIN_BASH_TIMEOUT_MS: u64 = 1_000;
-pub const MAX_BASH_TIMEOUT_MS: u64 = 21_600_000;
-pub const DEFAULT_BASH_TIMEOUT_MS: u64 = 60_000;
+
+// Every timeout bound and default lives in `timeout_policy` so a class has one
+// definition. These are re-exported here because they are part of this module's
+// public surface and callers (and the RPC layer) already address them here.
+// The bash floor and ceiling stay addressable from here because the module's
+// tests (and any future caller outside `tools`) read them by name; the table in
+// `timeout_policy` is what actually decides a call's budget.
+#[allow(unused_imports)]
+pub use timeout_policy::{
+    policy, DEFAULT_BASH_TIMEOUT_MS, DESKTOP_TOOL_DISPATCH_TIMEOUT_MS, MAX_BASH_TIMEOUT_MS,
+    MAX_TIMEOUT_MS, MIN_BASH_TIMEOUT_MS, REMOTE_TOOL_WAIT_FALLBACK_MS,
+};
+use timeout_policy::{class_for_call, ToolTimeoutClass};
 pub const INTERNAL_TOOL_RUNNER_FLAG: &str = "--internal-tool-runner";
 // Windows inherits the parent process' Job Object unless the child is created
 // with CREATE_BREAKAWAY_FROM_JOB. The hidden runner is immediately assigned to
@@ -764,6 +776,14 @@ pub struct ToolsExecuteParams {
     #[serde(default)]
     pub run_in_background: bool,
     pub timeout_ms: Option<u64>,
+    /// Model context window in tokens, when the caller knows it.
+    ///
+    /// Absent (the default) keeps the per-tool byte constants exactly as they
+    /// were before output budgets scaled with the window. Present, host-core
+    /// derives a per-result and a per-turn allowance from it; see
+    /// `tools::output_budget`.
+    #[serde(default)]
+    pub context_window_tokens: Option<u64>,
     /// Action names that may run in Plan or Goal mode (ADR 0211). When
     /// set and non-empty, host-core admits this `plugin_*` tool in
     /// contract modes even though plugins are otherwise Plan-denied; the
@@ -1010,6 +1030,9 @@ pub struct ToolExecutionOptions<'a> {
     pub python_executable: Option<&'a Path>,
     /// Directory holding the Office worker script, next to that interpreter.
     pub python_tools_dir: Option<&'a Path>,
+    /// Allowances this call runs under. The default (`legacy`) is the per-tool
+    /// byte constants; a window-scaled plan tightens them and charges the turn.
+    pub output_budget: OutputBudgetPlan,
 }
 
 pub fn validate_timeout_ms(timeout_ms: Option<u64>) -> Result<(), (String, String)> {
@@ -1026,18 +1049,25 @@ pub fn validate_timeout_ms(timeout_ms: Option<u64>) -> Result<(), (String, Strin
 
 fn validate_bash_timeout_ms(timeout_ms: u64) -> Result<(), (String, String)> {
     validate_timeout_ms(Some(timeout_ms))?;
-    if !(MIN_BASH_TIMEOUT_MS..=MAX_BASH_TIMEOUT_MS).contains(&timeout_ms) {
+    // Bounds come from the policy row, not from a restated pair of constants.
+    let row = policy(ToolTimeoutClass::BashForeground);
+    if !(row.min_ms..=row.max_ms).contains(&timeout_ms) {
         return Err((
             "INVALID_ARGUMENT".into(),
-            format!("timeoutMs must be between {MIN_BASH_TIMEOUT_MS} and {MAX_BASH_TIMEOUT_MS}"),
+            format!("timeoutMs must be between {} and {}", row.min_ms, row.max_ms),
         ));
     }
     Ok(())
 }
 
 pub fn effective_timeout_ms(tool_name: &str, timeout_ms: Option<u64>) -> Option<u64> {
-    if tool_name == "Bash" {
-        Some(timeout_ms.unwrap_or(DEFAULT_BASH_TIMEOUT_MS))
+    // The class decides; only the Bash row carries a default. Every other class
+    // keeps whatever the caller sent, so an unbudgeted call never silently gains
+    // a deadline — that is what made per-class policy safe to introduce here.
+    let class = class_for_call(tool_name, false);
+    if class == ToolTimeoutClass::BashForeground {
+        let row = policy(class);
+        Some(timeout_ms.or(row.default_ms).unwrap_or(DEFAULT_BASH_TIMEOUT_MS))
     } else {
         timeout_ms
     }
@@ -1191,18 +1221,6 @@ pub fn is_desktop_dispatched(tool_name: &str) -> bool {
     tool_name.starts_with("plugin_") || tool_name.starts_with("mcp_")
 }
 
-/// How long host-core waits for Electron main to answer an approved
-/// desktop-dispatched tool. It must outlast every budget Electron enforces
-/// inside it — the plugin tool budget (110s), and the widest MCP leg: a lazy
-/// handshake (10s) plus the whole `tools/list` traversal (30s) plus the call
-/// (100s) — so the innermost layer reports its own timeout instead of being cut
-/// off here (`07-plugins/12-plugin-ipc-and-host-services.md`, ADR 0038).
-/// Mirrored by `DESKTOP_TOOL_DISPATCH_TIMEOUT_MS` in
-/// `packages/shared/src/rpc-timeouts.ts`, which sizes the transport deadline
-/// around it. The admission queue wait happens before this budget starts, so
-/// that transport deadline carries it instead of this constant.
-pub const DESKTOP_TOOL_DISPATCH_TIMEOUT_MS: u64 = 150_000;
-
 /// Dispatch deadline for a desktop-dispatched tool. The sidecar sends no
 /// `timeoutMs` for these tools, so the default is what normally applies.
 pub fn desktop_dispatch_timeout_ms(requested: Option<u64>) -> u64 {
@@ -1262,6 +1280,7 @@ pub async fn execute_tool_with_options(
             visualization_root: None,
             python_executable: None,
             python_tools_dir: None,
+            output_budget: OutputBudgetPlan::legacy(),
         },
     )
     .await
@@ -1276,6 +1295,7 @@ async fn run_file_tool(
     args: &Value,
     allow_external_paths: bool,
     hashline: Option<&HashlineContext<'_>>,
+    budget: OutputBudget,
     lease: Option<(
         Arc<crate::tool_budget::ToolPermit>,
         Arc<crate::file_resources::FileResources>,
@@ -1318,11 +1338,27 @@ async fn run_file_tool(
         let (workspace, roots, hashline) = (workspace.as_deref(), &roots, hashline.as_ref());
         let args = &args;
         match tool_name.as_str() {
-            "Read" => tool_read(workspace, roots, args, allow_external_paths, hashline)
-                .map_err(Into::into),
-            "Glob" => tool_glob(workspace, roots, args, allow_external_paths).map_err(Into::into),
-            "Grep" => tool_grep(workspace, roots, args, allow_external_paths, hashline)
-                .map_err(Into::into),
+            "Read" => tool_read(
+                workspace,
+                roots,
+                args,
+                allow_external_paths,
+                hashline,
+                budget,
+            )
+            .map_err(Into::into),
+            "Glob" => {
+                tool_glob(workspace, roots, args, allow_external_paths, budget).map_err(Into::into)
+            }
+            "Grep" => tool_grep(
+                workspace,
+                roots,
+                args,
+                allow_external_paths,
+                hashline,
+                budget,
+            )
+            .map_err(Into::into),
             "Write" => tool_write(workspace, roots, args, allow_external_paths, hashline)
                 .map_err(Into::into),
             // "Edit": the caller routes only these five file tools here.
@@ -1363,7 +1399,14 @@ pub async fn execute_tool_with_file_lease(
         skills_root,
         python_executable,
         python_tools_dir,
+        output_budget,
     } = options;
+    // One plan per call: the per-result share and whatever the turn has left.
+    let search_budget = output_budget.resolve(BUDGET_SEARCH);
+    let shell_budgets = ShellBudgets {
+        stdout: output_budget.resolve(BUDGET_SHELL),
+        stderr: output_budget.resolve(BUDGET_SHELL_ERR),
+    };
     let started = Instant::now();
     let timeout_ms = effective_timeout_ms(tool_name, requested_timeout_ms);
     let tool_call_id = bash_options
@@ -1414,6 +1457,7 @@ pub async fn execute_tool_with_file_lease(
                 args,
                 allow_external_paths,
                 hashline.as_ref(),
+                search_budget,
                 file_lease.zip(resources),
             )
             .await
@@ -1426,7 +1470,7 @@ pub async fn execute_tool_with_file_lease(
                     .unwrap_or_else(|| shell::default_shell_id().to_string());
                 BashExecutionOptions::local(id, timeout_ms)
             });
-            tool_bash(workspace, scratch, args, options)
+            tool_bash(workspace, scratch, args, options, shell_budgets)
                 .await
                 .map_err(Into::into)
         }
@@ -1463,6 +1507,14 @@ pub async fn execute_tool_with_file_lease(
             format!("unknown tool: {other}"),
         )),
     };
+
+    // Charge the turn for what this call is about to hand the model. Measured
+    // on the encoded result, because that is what reaches the transcript.
+    if let Ok(content) = &result {
+        if let Ok(encoded) = serde_json::to_string(content) {
+            output_budget.record(encoded.len());
+        }
+    }
 
     match result {
         Ok(content) => {
@@ -1680,6 +1732,7 @@ fn tool_read(
     args: &Value,
     allow_external_paths: bool,
     hashline: Option<&HashlineContext<'_>>,
+    budget: OutputBudget,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let path = args
@@ -1703,7 +1756,7 @@ fn tool_read(
         .map(|v| v.min(usize::MAX as u64) as usize)
         .filter(|v| *v > 0)
         .unwrap_or(DEFAULT_READ_LINES)
-        .min(BUDGET_SEARCH.max_lines);
+        .min(budget.max_lines);
 
     let meta = std::fs::metadata(&resolved).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -1766,7 +1819,7 @@ fn tool_read(
         offset,
         limit,
         MAX_LINE_CHARS,
-        BUDGET_SEARCH.max_bytes,
+        budget.max_bytes,
     );
     hashline::record_read(
         hashline,
@@ -1785,7 +1838,7 @@ fn tool_read(
     if window.budget_capped {
         notes.push(format!(
             "stopped at the {}KB result budget",
-            BUDGET_SEARCH.max_bytes / 1024
+            budget.max_bytes / 1024
         ));
     }
     if window.has_more {
@@ -2229,6 +2282,7 @@ fn tool_glob(
     roots: &ContainedRoots,
     args: &Value,
     allow_external_paths: bool,
+    budget: OutputBudget,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let pattern = args
@@ -2271,7 +2325,7 @@ fn tool_glob(
         }
         let shown = display_tool_path(root_kind, root, path);
         bytes += shown.len() + 8;
-        if bytes > BUDGET_SEARCH.max_bytes {
+        if bytes > budget.max_bytes {
             truncated = true;
             break;
         }
@@ -2297,6 +2351,7 @@ fn tool_grep(
     args: &Value,
     allow_external_paths: bool,
     hashline: Option<&HashlineContext<'_>>,
+    budget: OutputBudget,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let pattern = args
@@ -2339,7 +2394,7 @@ fn tool_grep(
     let head_limit = args
         .get("headLimit")
         .and_then(|v| v.as_u64())
-        .map(|v| v.min(BUDGET_SEARCH.max_lines as u64) as usize)
+        .map(|v| v.min(budget.max_lines as u64) as usize)
         .filter(|v| *v > 0)
         .unwrap_or(GREP_DEFAULT_HEAD_LIMIT);
     let include_pattern = args
@@ -2372,6 +2427,7 @@ fn tool_grep(
         mode,
         case_insensitive,
         head_limit,
+        budget,
     }) {
         return Ok(mint_grep_tags(
             root,
@@ -2425,7 +2481,7 @@ fn tool_grep(
                 "content" => {
                     // 48 bytes covers the JSON envelope of one hit.
                     bytes += shown.len() + line.text.len() + 48;
-                    if hits.len() >= head_limit || bytes > BUDGET_SEARCH.max_bytes {
+                    if hits.len() >= head_limit || bytes > budget.max_bytes {
                         truncated = true;
                         break 'files;
                     }
@@ -3139,6 +3195,7 @@ fn bash_success_result(
     exit_code: Option<i32>,
     scratch: Option<&Path>,
     command_shell_id: &str,
+    budgets: ShellBudgets,
 ) -> Result<Value, (String, String)> {
     let (stdout, stream_trunc_out) = stdout.result();
     let (stderr, stream_trunc_err) = stderr.result();
@@ -3158,9 +3215,9 @@ fn bash_success_result(
     // runner-error probe runs first: the marker must be found before the tail
     // budget can cut it away.
     let (stdout, budget_trunc_out) =
-        truncate_with_spill(&stdout, BUDGET_SHELL, scratch, "bash-stdout");
+        truncate_with_spill(&stdout, budgets.stdout, scratch, "bash-stdout");
     let (stderr, budget_trunc_err) =
-        truncate_with_spill(&stderr, BUDGET_SHELL_ERR, scratch, "bash-stderr");
+        truncate_with_spill(&stderr, budgets.stderr, scratch, "bash-stderr");
     let trunc_out = stream_trunc_out || budget_trunc_out;
     let trunc_err = stream_trunc_err || budget_trunc_err;
     Ok(json!({
@@ -3184,6 +3241,7 @@ async fn tool_bash(
     scratch: Option<&Path>,
     args: &Value,
     options: BashExecutionOptions,
+    budgets: ShellBudgets,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let command = args
@@ -3244,7 +3302,16 @@ async fn tool_bash(
     // background runs, missing session ids, a disabled kill switch, and command
     // shapes a shell's stdin reader cannot carry, and the one-shot path below
     // then behaves exactly as it always has.
-    match shell_session::attempt(&invocation.program, root, scratch, command, &options).await {
+    match shell_session::attempt(
+        &invocation.program,
+        root,
+        scratch,
+        command,
+        &options,
+        budgets,
+    )
+    .await
+    {
         shell_session::PersistentAttempt::NotApplicable => {}
         shell_session::PersistentAttempt::SessionDied => {
             // The kernel died before it produced any output, so nothing
@@ -3367,6 +3434,7 @@ async fn tool_bash(
                 status.code(),
                 scratch,
                 &options.command_shell_id,
+                budgets,
             )
         }
     }
@@ -3932,6 +4000,130 @@ mod tests {
         assert!(out.len() < BUDGET_SEARCH.max_bytes + 512);
     }
 
+    /// Options for one call under a given output-budget plan.
+    fn window_options(plan: OutputBudgetPlan) -> ToolExecutionOptions<'static> {
+        ToolExecutionOptions {
+            timeout_ms: Some(5_000),
+            bash_options: None,
+            allow_external_paths: false,
+            hashline: None,
+            skills_root: None,
+            visualization_root: None,
+            python_executable: None,
+            python_tools_dir: None,
+            output_budget: plan,
+        }
+    }
+
+    /// A body of whole lines wide enough to overflow a per-tool constant.
+    fn wide_body(lines: usize) -> String {
+        (1..=lines)
+            .map(|n| format!("line {n:05} of a body file that is wide enough to matter\n"))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_small_window_shrinks_one_tool_result() {
+        let dir = tempfile::tempdir().unwrap();
+        let body = wide_body(2_000);
+        // Inside the 128KB per-result constant, past a 32K window's share.
+        assert!(body.len() > 70_000 && body.len() < BUDGET_SEARCH.max_bytes);
+        std::fs::write(dir.path().join("body.txt"), &body).unwrap();
+
+        // 32K tokens: 15% of the window is 16,800 chars, not the 128KB constant.
+        let ledger = TurnOutputLedger::new();
+        let scaled = execute_tool_with_path_access(
+            Some(dir.path()),
+            None,
+            "Read",
+            &serde_json::json!({ "path": "body.txt" }),
+            window_options(ledger.plan("session", Some("turn-1"), Some(32_000))),
+        )
+        .await;
+        assert!(scaled.ok, "read failed: {:?}", scaled.content);
+        let kept = scaled.content["lineCount"].as_u64().unwrap();
+        assert!(kept > 0 && kept < 2_000, "kept {kept} lines");
+        assert_eq!(scaled.content["truncated"].as_bool(), Some(true));
+        assert!(
+            scaled.content["content"].as_str().unwrap().len() <= 16_800,
+            "the window's share bounds the result"
+        );
+
+        // The same file with no reported window keeps the per-tool constant:
+        // a 2,000-line window fits, so nothing is truncated.
+        let legacy = execute_tool_with_path_access(
+            Some(dir.path()),
+            None,
+            "Read",
+            &serde_json::json!({ "path": "body.txt" }),
+            window_options(OutputBudgetPlan::legacy()),
+        )
+        .await;
+        assert!(legacy.ok, "read failed: {:?}", legacy.content);
+        assert_eq!(legacy.content["lineCount"].as_u64(), Some(2_000));
+        assert_eq!(legacy.content["truncated"].as_bool(), Some(false));
+    }
+
+    #[tokio::test]
+    async fn a_spent_turn_squeezes_the_results_that_follow() {
+        let dir = tempfile::tempdir().unwrap();
+        // ~220KB: more than one result's share of a 128K window.
+        std::fs::write(dir.path().join("body.txt"), wide_body(4_000)).unwrap();
+
+        let ledger = TurnOutputLedger::new();
+        // 128K window: 67,200 chars per result, 134,400 for the whole turn.
+        let mut sizes = Vec::new();
+        for _ in 0..3 {
+            let read = execute_tool_with_path_access(
+                Some(dir.path()),
+                None,
+                "Read",
+                &serde_json::json!({ "path": "body.txt" }),
+                window_options(ledger.plan("session", Some("turn-1"), Some(128_000))),
+            )
+            .await;
+            assert!(read.ok, "read failed: {:?}", read.content);
+            sizes.push(read.content["content"].as_str().unwrap().len());
+        }
+        assert!(
+            sizes[0] <= 67_200,
+            "first result kept its share: {}",
+            sizes[0]
+        );
+        assert!(
+            sizes[0] > 60_000,
+            "first result is a full share: {}",
+            sizes[0]
+        );
+        // The second call gets what the first left, so it keeps nearly a full
+        // share (line boundaries make it a little smaller) rather than the floor.
+        assert!(
+            sizes[1] + 5_000 >= sizes[0] && sizes[1] > 50_000,
+            "second result still gets what is left: {sizes:?}"
+        );
+        // Two results spent the turn, so the third is squeezed to the floor.
+        assert!(
+            sizes[2] <= output_budget::TURN_RESULT_FLOOR_CHARS,
+            "third result is squeezed: {sizes:?}"
+        );
+        assert!(sizes[2] * 10 < sizes[0], "{sizes:?}");
+
+        // A new turn starts from a fresh allowance.
+        let next_turn = execute_tool_with_path_access(
+            Some(dir.path()),
+            None,
+            "Read",
+            &serde_json::json!({ "path": "body.txt" }),
+            window_options(ledger.plan("session", Some("turn-2"), Some(128_000))),
+        )
+        .await;
+        assert!(next_turn.ok, "read failed: {:?}", next_turn.content);
+        assert!(
+            next_turn.content["content"].as_str().unwrap().len() > 60_000,
+            "a fresh turn is not charged for the previous one"
+        );
+    }
+
     #[tokio::test]
     async fn read_paginates_instead_of_refusing_large_files() {
         let dir = tempfile::tempdir().unwrap();
@@ -4356,6 +4548,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: OutputBudgetPlan::legacy(),
             },
         )
         .await;
@@ -4519,6 +4712,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: OutputBudgetPlan::legacy(),
             },
         )
         .await;
@@ -4546,6 +4740,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: OutputBudgetPlan::legacy(),
             },
         )
         .await;
@@ -4573,6 +4768,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: OutputBudgetPlan::legacy(),
             },
         )
         .await;
@@ -4604,6 +4800,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: OutputBudgetPlan::legacy(),
             },
         )
         .await;
@@ -4635,6 +4832,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: OutputBudgetPlan::legacy(),
             },
         )
         .await;
@@ -4660,6 +4858,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: OutputBudgetPlan::legacy(),
             },
         )
         .await;

@@ -472,7 +472,9 @@ test("the plugin process owns service callables and forgets them on unload", () 
   // Starting an already-running service must be a no-op, not a second worker.
   assert.match(startCase, /alreadyRunning/);
   const unloadCase = hostSrc.slice(hostSrc.indexOf('case "lifecycle.unload"'));
-  assert.match(unloadCase, /services\.clear\(\)/);
+  // Unload drops this tenant's callables. One shared host serves every plugin,
+  // so teardown detaches the tenant instead of clearing process-wide tables.
+  assert.match(unloadCase, /detachTenant\(tenant, "Plugin unloaded"\)/);
   // Registration is local bookkeeping: the broker decides when a service runs.
   assert.doesNotMatch(hostSrc, /"services\.register"/);
 });

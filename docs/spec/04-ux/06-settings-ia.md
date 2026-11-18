@@ -347,7 +347,7 @@ so no row repeats it.
 ### Agent behavior (`behavior` tab)
 
 What a new conversation starts with, and what the agent may do while it runs.
-Card order is **Session defaults → Execution → Computer use**.
+Card order is **Session defaults → Execution**.
 
 - **Session defaults** card: the host-backed default operating mode (Agent /
   Plan / Goal), the global permission mode (ask / accept-edits / auto) that
@@ -375,9 +375,6 @@ Card order is **Session defaults → Execution → Computer use**.
   edits at the Host. Existing task enable states, schedules, and history remain
   unchanged; active runs can finish. Re-enabling restores access and resumes
   normal due-time admission without replaying missed occurrences.
-- **Computer use** card: last on the page. It omits card/row explanatory copy
-  and the static scope note; controls, platform and permission status, errors,
-  and the missing-model hint remain unchanged.
 - The **Command shell** row in Session defaults uses the host-discovered catalog of native
   PowerShell 5.1, PowerShell 7, cmd, Git Bash, and Bash with IDs
   `windows-powershell`, `windows-pwsh`, `cmd`, `git-bash`, and
@@ -1050,7 +1047,7 @@ system while preserving their different data ownership:
    load, enable, disable, and uninstall
 6. Appearance shows the host-backed Interface card; Conversation shows Display
    and Input & links; Behavior shows Session defaults — including the
-   permission mode and the Command shell row — then Execution and Computer use;
+   permission mode and the Command shell row — then Execution;
    the Shortcuts destination shows the Keyboard shortcuts card; Info shows the
    Developer card. Plugin-contributed destinations, when present, appear after
    every core group under Extensions. Each destination is a renderer-composited

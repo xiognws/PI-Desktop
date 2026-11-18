@@ -8672,3 +8672,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - Guards: `feedback.test.mjs`, `auto-update.test.mjs`, and
   `user-facing-copy.test.mjs` assert the removals, so the rows, channels, and
   copy cannot come back silently.
+
+## 2026-11-17 — Remove the built-in computer-use capability
+
+The built-in native application control (ADR 0342, ADR 0344) is removed
+entirely rather than defaulted off: the capture path, the cursor overlay, the
+scope-grant tool, the settings surface, the shared contracts, the Agent tool,
+and its E2E scenarios. The capability was per-window screen capture plus
+synthetic input plus a global overlay — exactly the behavior class an
+endpoint-security product flags, and the corporate KES build on the target
+machines quarantined the binary as `PDM:Trojan.Win32.Generic`.
+
+- Deleted: `apps/desktop/electron/main/computer-use/`,
+  `apps/desktop/src/features/computer-use/`, the settings card, `computer-ipc.ts`,
+  `packages/computer-use/`, `packages/shared/src/computer-use.ts`, the `Computer`
+  tool in the Agent runtime, and `03-runtime/computer-use.md`.
+- Retained: the `COMPUTER_*` error codes in `packages/shared/src/errors.ts`,
+  which host-core still emits as protocol constants, and the third-party
+  `cn.star.computer-use` plugin, which is a separately installed surface.
+- The desktop-automation non-goal returns: no built-in screen capture or
+  synthetic input into other applications.

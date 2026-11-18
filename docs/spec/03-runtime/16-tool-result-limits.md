@@ -37,6 +37,40 @@ copy could never be fuller than the excerpt it exists to back.
 | Bash timeout | 60s default; 1–21,600s override | kill process tree + error |
 | `Edit.ops` payload | 256 KB, 200 ops | `INVALID_ARGUMENT`; further Edit caps in [18](18-line-anchored-edit-contract.md) §12 |
 
+## 2a. Budgets scale with the model window
+
+The byte constants in §2 are per-result **ceilings**, and on their own they said
+nothing about the model that receives the result: a 32K window and a 1M window
+both received up to 128KB from one `Read`. At the repository's own 3.5
+chars/token estimate that is ~37,400 tokens — 67% of the point where a 128K
+session starts compacting, spent before the read answers anything.
+
+Host-core derives two allowances from the model window
+(`crates/host-core/src/tools/output_budget.rs`), each capped by the constant
+above, so scaling can only ever tighten a result:
+
+| allowance | share of the window | floor |
+|---|---|---|
+| one tool result | 15% | 8,000 chars |
+| one turn's builtin results, cumulative | 30% | 16,000 chars |
+
+A caller reports the window as `contextWindowTokens` in `tools.execute`. Absent
+— which is the behaviour of every caller that does not report one — the
+constants apply exactly as before and no turn is charged. Budgets are character
+counts applied as byte caps; UTF-8 never spends fewer bytes than characters, so
+a non-ASCII result is never looser than the stated estimate. A call that carries
+no turn id is charged to no turn: only the per-result share applies, because
+there is no boundary to reset on.
+
+The turn allowance is charged with the encoded size of every builtin result.
+Host-core hands each result over as it finishes, so a result already sent cannot
+be revisited: once the turn is spent, the result that would exceed it — and
+every result after it — is cut to what is left, down to a 4,000-char floor so
+the payload is never empty and the marker still names a spill file. Tool
+descriptions keep stating the ceiling, so a scaled call may return less than the
+number in its description; `truncated` and `notice` are what report the cut that
+actually happened.
+
 A clipped line is not a displayed line. `Read` excludes every line it cut at
 `MAX_LINE_CHARS` from the provenance set the `Edit` contract validates against
 ([18-line-anchored-edit-contract](18-line-anchored-edit-contract.md) §4.3), so a
@@ -205,3 +239,8 @@ counts are the stable signals. The UI truncated chip follows `truncated`.
 - [ ] timeout/abort stops the complete process tree and emits no later chunks
 - [ ] an oversized parallel result batch compacts to a bounded marked tail,
   survives restart, and leaves the original transcript results unchanged
+- [x] a reported model window tightens one result below the per-tool constant,
+  and a share above the constant never makes a result larger than it
+- [x] a spent turn squeezes the results that follow it in the same turn, and a
+  new turn starts with a fresh allowance
+- [x] a call without a reported window keeps every per-tool constant unchanged

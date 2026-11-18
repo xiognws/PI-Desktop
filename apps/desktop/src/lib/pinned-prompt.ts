@@ -46,9 +46,19 @@ export function pinnedPromptSelector(messageId: string): string {
 }
 
 /**
- * True when a row's bottom edge has left the top of the scrollport, which is
- * exactly when the strip takes over from the row itself.
+ * Marks the row that owns the top edge. The transcript writes it, CSS reads it;
+ * it is an attribute rather than a prop because the history wrappers memoize on
+ * their props and a per-row flag would defeat those comparisons.
  */
-export function isPinnedPromptScrolledPast(rowBottom: number, viewportTop: number): boolean {
-  return rowBottom <= viewportTop;
+export const PINNED_PROMPT_ATTR = "data-pinned-prompt";
+
+/**
+ * True when a row's top edge has reached the top of the scrollport, which is
+ * when the row sticks instead of scrolling away: from that offset the row is
+ * pinned to the top edge until a newer prompt takes the slot from it.
+ *
+ * The `+1` at the call site absorbs the sub-pixel gap a scaled display leaves.
+ */
+export function isPinnedPromptAtTop(rowTop: number, viewportTop: number): boolean {
+  return rowTop <= viewportTop;
 }

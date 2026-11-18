@@ -322,13 +322,12 @@ codes surface through the same error object as any other call.
 | `PAIRING_TOKEN_EXPIRED` | no | the single-use pairing token expired before pairing completed |
 | `CAPABILITY_UNAVAILABLE` | no | an operation was requested for a capability the host advertised as unavailable (e.g. attachments, tool relay) |
 
-### 3.10 Computer use (ADR 0342)
+### 3.10 Computer use — reserved (ADR 0342; capability removed 2026-11-17)
 
-Computer-use errors are returned as `Computer` tool failures and host
-`computer.*` responses. Each refusal is separately attributable: a missing
-capability is never a hang and never a no-op reported as success. Retriable
-means the same call may succeed after the stated condition clears — it never
-means the host will retry, and it never widens a scope.
+The capability was removed on 2026-11-17. These codes stay reserved because
+host-core already maps them and a client must keep recognising them rather than
+render an unknown code. Retriable means the same call may succeed after the
+stated condition clears — it never means the host will retry.
 
 | code | retriable | meaning |
 |---|---|---|

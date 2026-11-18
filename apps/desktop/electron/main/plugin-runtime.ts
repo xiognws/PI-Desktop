@@ -110,7 +110,6 @@ import {
   resolveRealPathWithinRoot,
   resolveWithinRoot,
 } from "@pi-workspace/host-runtime";
-import { pluginChildEnv } from "./child-process-env";
 import {
   readThemeAssetBytes,
   resolveAbsoluteThemeAssetPath,
@@ -127,6 +126,11 @@ import {
   rendererDescriptorFor,
   resolveRendererSourcePath,
 } from "./plugin-renderer-extension";
+import {
+  createSharedHostSpawner,
+  forkPluginHostProcess,
+  sharedPluginHostEnabled,
+} from "./plugin-shared-host";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 import { parseAllowedExternalUrl } from "./safe-open-external";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
@@ -360,6 +364,18 @@ export type PluginHostServices = {
    */
   getAppearance?: () => PluginAppearance;
   /**
+   * Whether the host's main window is focused and visible. `app.isFocused`
+   * reads it (`desktop.control`), so a plugin reacts to the user leaving Pi
+   * without asking the OS which window is in front.
+   */
+  isWindowFocused?: () => boolean;
+  /**
+   * The OS icon of one existing file, as a PNG `data:` URL, or `null` when the
+   * OS has none. `app.getFileIcon` reads it (`desktop.control`); the host owns
+   * the Electron call so a plugin never shells out to read an icon.
+   */
+  getFileIcon?: (absPath: string) => Promise<string | null>;
+  /**
    * Persist and apply `AppSettings.theme`. Used by `pi.app.setTheme` so a
    * plugin panel can switch the shell theme without opening Settings.
    */
@@ -579,6 +595,8 @@ const HOST_API_ALLOWLIST = new Set([
   "app.getLocale",
   "app.getAppearance",
   "app.setTheme",
+  "app.isFocused",
+  "app.getFileIcon",
   "themes.upsert",
   "themes.remove",
   "themes.list",
@@ -1393,27 +1411,34 @@ function resolveWindowCornerRadius(value: unknown): number | undefined {
     : undefined;
 }
 
-/** Default spawner: an Electron utilityProcess per plugin. */
-const spawnUtilityProcess: PluginProcessSpawner = async ({ pluginId, entry }) => {
-  const { utilityProcess } = await import("electron");
-  const child = utilityProcess.fork(entry, [], {
+/** Default spawner (kill switch): an Electron utilityProcess per plugin. */
+const spawnUtilityProcess: PluginProcessSpawner = async ({ pluginId, entry }) =>
+  forkPluginHostProcess(entry, {
     serviceName: `pi-plugin-${pluginId.replace(/[^a-zA-Z0-9._-]/g, "_")}`,
-    stdio: "pipe",
-    env: pluginChildEnv(pluginId),
+    pluginId,
   });
-  return {
-    postMessage: (message) => child.postMessage(message),
-    onMessage: (handler) => child.on("message", handler),
-    onExit: (handler) => child.on("exit", (code) => handler(code ?? 0)),
-    onLog: (handler) => {
-      child.stdout?.on("data", (chunk: Buffer | string) => handler("info", String(chunk).trimEnd()));
-      child.stderr?.on("data", (chunk: Buffer | string) => handler("error", String(chunk).trimEnd()));
-    },
-    kill: () => {
-      child.kill();
-    },
-  };
-};
+
+/**
+ * Default transport for a plugin host process.
+ *
+ * One shared host for every plugin is the default: a per-plugin process is a
+ * copy of the app's own executable, and a process tree full of those images is
+ * what endpoint protection flags. `PI_PLUGIN_SHARED_HOST=0` restores the
+ * per-plugin path, which is the fallback when the shared host misbehaves; it is
+ * read per load so a launch with the variable set needs no rebuild.
+ *
+ * The facade is created once per process: `createSharedHostSpawner()` owns the
+ * host handle and the tenant map, so building a second one per plugin load would
+ * hand every plugin its own host again — exactly the per-plugin copy this exists
+ * to remove.
+ */
+let sharedHostSpawner: PluginProcessSpawner | undefined;
+
+function defaultPluginProcessSpawner(): PluginProcessSpawner {
+  if (!sharedPluginHostEnabled()) return spawnUtilityProcess;
+  sharedHostSpawner ??= createSharedHostSpawner();
+  return sharedHostSpawner;
+}
 
 export class PluginRuntime {
   private commands = new Map<string, RegisteredCommand>();
@@ -2097,7 +2122,7 @@ export class PluginRuntime {
     const entry =
       this.services.hostEntry ??
       join(getModuleDirectory(import.meta.url), "plugin-host-process.js");
-    const spawn = this.services.spawnProcess ?? spawnUtilityProcess;
+    const spawn = this.services.spawnProcess ?? defaultPluginProcessSpawner();
     const child = await spawn({ pluginId: manifest.id, entry, pluginPath });
 
     const loaded: LoadedPlugin = {
@@ -2581,6 +2606,9 @@ export class PluginRuntime {
     if (!child) {
       return Promise.reject(apiError("NOT_FOUND", `plugin host process gone: ${loaded.manifest.id}`));
     }
+    // `pluginId` is on every frame, not just `init`: a shared host process
+    // routes by it, and a per-plugin one simply has a single tenant to match.
+    const pluginId = loaded.manifest.id;
     if (signal?.aborted) return Promise.reject(signal.reason);
     const id = `h${loaded.nextCallId++}`;
     return new Promise((resolvePromise, rejectPromise) => {
@@ -2589,7 +2617,7 @@ export class PluginRuntime {
           ? { invocationId: message.invocationId }
           : { callId: id };
         try {
-          child.postMessage({ t: "cancel", ...cancellation, reason: error.message });
+          child.postMessage({ t: "cancel", pluginId, ...cancellation, reason: error.message });
         } catch {
           // The process may already be gone; the host still revokes the call.
         }
@@ -2618,7 +2646,7 @@ export class PluginRuntime {
       });
       signal?.addEventListener("abort", abort, { once: true });
       try {
-        child.postMessage({ ...message, id });
+        child.postMessage({ ...message, id, pluginId });
       } catch (error) {
         loaded.pending.get(id)?.reject(error instanceof Error ? error : new Error(String(error)));
       }
@@ -2654,11 +2682,18 @@ export class PluginRuntime {
         return this.dispatchHostCall(loaded, String(message.api ?? ""), message.args ?? []);
       })
         .then((value) =>
-          loaded.child?.postMessage({ t: "res", id: message.id, ok: true, value: value ?? null }),
+          loaded.child?.postMessage({
+            t: "res",
+            pluginId: loaded.manifest.id,
+            id: message.id,
+            ok: true,
+            value: value ?? null,
+          }),
         )
         .catch((error: PluginApiError) =>
           loaded.child?.postMessage({
             t: "res",
+            pluginId: loaded.manifest.id,
             id: message.id,
             ok: false,
             error: {
@@ -3241,6 +3276,19 @@ export class PluginRuntime {
     }
   }
 
+  /**
+   * One plugin's host process ended.
+   *
+   * With the shared host, "one plugin's" is the fan-out of a process-level
+   * fault: every tenant in that process is gone, so the shared spawner calls
+   * this once per loaded plugin with the same exit code. Each plugin keeps its
+   * own crash record, audit entry, toast and restart backoff; the only thing
+   * that changed is the blast radius — a plugin without resident services used
+   * to survive a neighbour's crash and now dies with the host, so it needs the
+   * user (or a reload) to come back. Tenant-level isolation inside the process
+   * is what keeps the common failures — a throwing hook, a rejected call, a
+   * hung handler — from ever reaching this path.
+   */
   private handleChildExit(loaded: LoadedPlugin, code: number): void {
     this.toolInvocations.cancelOwner(loaded, "Plugin host process exited");
     if (loaded.disposing) return;
@@ -3286,6 +3334,11 @@ export class PluginRuntime {
    * A crashed host process takes its resident services down with it. Restart it
    * with exponential backoff, and after `MAX_SERVICE_RESTARTS` leave the plugin
    * down rather than spin forever — the failed state is what the user sees.
+   *
+   * Shared host: the restart re-forks whichever host is current, so a crash that
+   * took every plugin down brings them back into one process instead of one
+   * process each. Plugins restart on their own timers; the first one to fire
+   * forks the replacement host and the rest reuse it.
    */
   private superviseCrash(loaded: LoadedPlugin, code: number): void {
     const pluginId = loaded.manifest.id;
@@ -5411,6 +5464,50 @@ export class PluginRuntime {
             theme: raw,
             ts: Date.now(),
           });
+        },
+        /**
+         * Focus is host state, not OS state: the main window's own flags answer
+         * it, so a plugin can tell whether the user is looking at Pi without
+         * asking the platform for the foreground window (`desktop.control`).
+         */
+        isFocused: async () => {
+          this.assertPermission(loaded, "desktop.control");
+          if (!this.services.isWindowFocused) {
+            throw apiError("UNSUPPORTED", "host api not available: app.isFocused");
+          }
+          return this.services.isWindowFocused();
+        },
+        /**
+         * The OS icon of one existing file, as `data:image/png;base64,...`
+         * (`desktop.control`). A path that does not name a file is the caller's
+         * ordinary "no icon" case and answers `null`; only a malformed argument
+         * is an error.
+         */
+        getFileIcon: async (targetPath: string) => {
+          this.assertPermission(loaded, "desktop.control");
+          if (!this.services.getFileIcon) {
+            throw apiError("UNSUPPORTED", "host api not available: app.getFileIcon");
+          }
+          const requested = typeof targetPath === "string" ? targetPath.trim() : "";
+          if (!requested || requested.includes("\0")) {
+            throw apiError("INVALID_ARGUMENT", "app.getFileIcon requires a file path");
+          }
+          const absPath = isAbsolute(requested) ? requested : resolve(requested);
+          let info: ReturnType<typeof statSync>;
+          try {
+            info = statSync(absPath);
+          } catch {
+            return null;
+          }
+          if (!info.isFile()) return null;
+          const icon = await this.services.getFileIcon(absPath);
+          this.services.audit?.({
+            pluginId,
+            api: "app.getFileIcon",
+            ok: true,
+            ts: Date.now(),
+          });
+          return icon;
         },
       },
       themes: {

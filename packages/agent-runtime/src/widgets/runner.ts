@@ -15,13 +15,17 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
+  isSupportedWidgetApiVersion,
+  readWidgetRuntime,
   WIDGET_API_VERSION,
+  WIDGET_API_VERSION_MIN,
   WIDGET_INVOKE_TIMEOUT_MS,
   WIDGET_MANIFEST_FILE,
   WIDGET_SCHEMA_VERSION,
   normalizeWidgetPermissions,
   type WidgetAction,
   type WidgetPermission,
+  type WidgetRuntime,
   type WidgetRuntimeState,
   type WidgetSummary,
 } from "@pi-workspace/shared";
@@ -57,6 +61,8 @@ type ManifestShape = {
   author?: string;
   permissions?: string[];
   actions?: Array<{ name?: string; description?: string; params?: string[] }>;
+  /** v2: what the entry is written in. Absent means JavaScript. */
+  runtime?: unknown;
 };
 
 /** Narrow an unknown value to a manifest we are willing to execute. */
@@ -86,9 +92,11 @@ export function readWidgetManifest(dir: string): {
       error: `${WIDGET_MANIFEST_FILE}: unsupported schemaVersion ${String(manifest.schemaVersion)}`,
     };
   }
-  if (manifest.apiVersion !== WIDGET_API_VERSION) {
+  if (!isSupportedWidgetApiVersion(manifest.apiVersion)) {
     return {
-      error: `${WIDGET_MANIFEST_FILE}: unsupported apiVersion ${String(manifest.apiVersion)}`,
+      error:
+        `${WIDGET_MANIFEST_FILE}: unsupported apiVersion ${String(manifest.apiVersion)} ` +
+        `(this build runs ${WIDGET_API_VERSION_MIN}..=${WIDGET_API_VERSION})`,
     };
   }
   return { manifest };
@@ -101,6 +109,37 @@ export function resolveEntry(dir: string): string | undefined {
     if (existsSync(file)) return file;
   }
   return undefined;
+}
+
+/**
+ * Resolve the entry a v2 manifest names, for any runtime kind.
+ *
+ * The manifest's `runtime.entry` is authoritative when present, so a Python
+ * package does not have to be called `index.*`. A path that escapes the package
+ * directory is refused: a widget package is trusted only for its own files, and
+ * an entry elsewhere would let it run code the user never reviewed.
+ */
+export function resolveRuntimeEntry(
+  dir: string,
+  runtime: WidgetRuntime,
+): { entry?: string; error?: string } {
+  if (runtime.kind === "javascript" && !runtime.entry) {
+    const entry = resolveEntry(dir);
+    return entry ? { entry } : { error: `no entry module (${ENTRY_CANDIDATES.join(", ")})` };
+  }
+  if (runtime.kind === "python" && !runtime.entry) {
+    return { error: "runtime.entry is required when runtime.kind is python" };
+  }
+  if (runtime.kind === "python" && !runtime.entry.toLowerCase().endsWith(".py")) {
+    return { error: `runtime.entry must end in .py for python packages: ${runtime.entry}` };
+  }
+  const root = path.resolve(dir);
+  const entry = path.resolve(root, runtime.entry);
+  if (entry !== root && !entry.startsWith(root + path.sep)) {
+    return { error: `runtime.entry escapes the package directory: ${runtime.entry}` };
+  }
+  if (!existsSync(entry)) return { error: `runtime.entry not found: ${runtime.entry}` };
+  return { entry };
 }
 
 function declaredActions(manifest: ManifestShape): WidgetAction[] {

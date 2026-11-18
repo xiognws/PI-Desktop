@@ -199,6 +199,25 @@ export class AutotestService {
     return { status: this.status, port: this.port, error: this.error };
   }
 
+  /**
+   * Start only when something actually needs the workbench.
+   *
+   * The service used to spawn an unsigned interpreter and open a loopback
+   * listener during `app.whenReady`, before the window was even shown. Nothing
+   * about the feature needs that: the first turn, the first panel open, or the
+   * first workbench request are all early enough, and starting there keeps an
+   * idle launch free of an interpreter process.
+   */
+  async ensureStarted(): Promise<void> {
+    if (this.status === "ready") return;
+    this.starting ??= this.start().finally(() => {
+      this.starting = undefined;
+    });
+    await this.starting;
+  }
+
+  private starting?: Promise<void>;
+
   async start(): Promise<void> {
     if (this.child || this.status === "ready") return;
     const log = this.options.log ?? defaultLog;

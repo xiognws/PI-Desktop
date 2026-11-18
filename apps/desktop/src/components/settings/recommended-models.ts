@@ -50,7 +50,7 @@ export function canRecommendFrom(
 export const PREMIUM_OUTPUT_COST_PER_MILLION = 100;
 
 const NON_CHAT_MODEL_ID =
-  /(embed|rerank|moderation|whisper|tts|transcri|audio|realtime|\blive\b|speech|image|dall-e|imagen|ocr|guard|deep-research|computer-use)/i;
+  /(embed|rerank|moderation|whisper|tts|transcri|audio|realtime|\blive\b|speech|image|dall-e|imagen|ocr|guard|deep-research)/i;
 
 function isCandidate(model: ModelInfo): boolean {
   if (model.status === "deprecated") return false;

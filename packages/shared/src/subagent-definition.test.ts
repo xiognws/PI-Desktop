@@ -501,6 +501,7 @@ describe("resolveSubagentToolNames", () => {
     "asktool",
     "EnterPlanMode",
     "new_context",
+    "compress",
     "mcp-foo",
   ];
 

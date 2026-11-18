@@ -14,12 +14,10 @@
 6. Mobile clients
 7. Multi-user auth systems
 8. Billing/subscription modules
-9. Computer Use browser takeover *(amended by ADR 0342 and ADR 0344)* — browser
-   takeover and unattended desktop control with no user present remain
-   non-goals. Bounded native application control is an accepted capability: the
-   user enables it, the grant covers the windows the host does not refuse, the
-   model may move between them, and every action is revocable and audited; see
-   [03-runtime/computer-use](../03-runtime/computer-use.md)
+9. Native desktop automation — browser takeover, unattended desktop control,
+   screen capture for the model, and synthetic input into other applications
+   are out of scope. The former built-in capability (ADR 0342, ADR 0344) was
+   removed on 2026-11-17
 10. Unconfirmed full-disk high privilege mode
 11. Non-English as the primary source language
 12. A second planner Agent, planner service, planner model, or separate

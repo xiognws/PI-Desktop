@@ -6,7 +6,7 @@
 //! Spawn failures and `rg` exit 2 fall back to the in-process searcher so a
 //! missing or broken install never changes the tool's public shape.
 
-use super::{clip_chars, display_tool_path, grep_output, BUDGET_SEARCH, MAX_LINE_CHARS};
+use super::{clip_chars, display_tool_path, grep_output, OutputBudget, MAX_LINE_CHARS};
 use crate::workspace::ToolRoot;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -32,6 +32,9 @@ pub struct SystemGrep<'a> {
     pub mode: &'a str,
     pub case_insensitive: bool,
     pub head_limit: usize,
+    /// Same allowance the in-process searcher runs under, so the fast path
+    /// cannot hand back more than the slow one would.
+    pub budget: OutputBudget,
 }
 
 #[cfg(test)]
@@ -243,7 +246,7 @@ fn build_result(
                         clipped_lines += 1;
                     }
                     bytes += shown.len() + text.len() + 48;
-                    if hits.len() >= req.head_limit || bytes > BUDGET_SEARCH.max_bytes {
+                    if hits.len() >= req.head_limit || bytes > req.budget.max_bytes {
                         truncated = true;
                         break 'files;
                     }

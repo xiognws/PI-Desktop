@@ -11,10 +11,14 @@ import { api } from "./api";
 import { IN_APP_PROVIDER_CHANNELS } from "./in-app-provider-channels";
 import {
   creditsVisibility,
+  CREDITS_POLL_INTERVAL_MS,
+  shouldPollCredits,
   type CreditsFailureReason,
 } from "./in-app-credits-visibility";
 
-export { IN_APP_PROVIDER_CHANNELS, creditsVisibility };
+// `shouldPollCredits` is re-exported so a surface imports its credit rules from
+// one module, and the polling decision cannot drift from the hook that polls.
+export { IN_APP_PROVIDER_CHANNELS, creditsVisibility, CREDITS_POLL_INTERVAL_MS, shouldPollCredits };
 export type { CreditsFailureReason };
 
 export type InAppProviderCreditAccount = { name: string; remain: number; size: number };
@@ -123,11 +127,15 @@ function snapshotFor(providerId: string | null): CreditsSnapshot {
  * `providerId` is null when the current session is on a provider without a
  * credit surface: nothing is fetched and nothing is rendered.
  */
-export function useInAppProviderCredits(providerId: string | null): {
+export function useInAppProviderCredits(
+  providerId: string | null,
+  options: { polling?: boolean } = {},
+): {
   result: CreditsResult | null;
   pending: boolean;
   refresh: () => void;
 } {
+  const polling = options.polling === true;
   const snapshot = useSyncExternalStore(subscribe, () => snapshotFor(providerId));
   const refresh = useCallback(() => {
     if (!providerId) return;
@@ -136,6 +144,13 @@ export function useInAppProviderCredits(providerId: string | null): {
   useEffect(() => {
     if (providerId) void load(providerId, false);
   }, [providerId]);
+  useEffect(() => {
+    if (!providerId || !polling) return;
+    // The mount read was issued by the effect above; this only schedules the
+    // recurring reads, so the first interval does not double a request.
+    const timer = setInterval(() => void load(providerId, true), CREDITS_POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [providerId, polling]);
   return { result: snapshot.result, pending: snapshot.pending, refresh };
 }
 
@@ -221,6 +236,29 @@ export function refreshInAppProviderSurfaces(): void {
   surfaces = null;
   for (const listener of surfaceListeners) listener();
   loadSurfaces(true);
+}
+
+/**
+ * Drop everything cached about in-app providers.
+ *
+ * Called when the app has just refreshed its gateways: the previous surface
+ * list, the row ids it named and the balances those gateways reported all
+ * describe processes that no longer exist. Keeping any of them would leave a
+ * surface pointing at a dead endpoint — which the runtime answers by retrying —
+ * or a credit chip showing a number nothing produced.
+ */
+export function resetInAppProviderCaches(): void {
+  surfaces = null;
+  surfaceRetries = 0;
+  if (surfaceRetryTimer !== null) {
+    clearTimeout(surfaceRetryTimer);
+    surfaceRetryTimer = null;
+  }
+  fetchedAt.clear();
+  snapshots.clear();
+  inflight.clear();
+  for (const listener of surfaceListeners) listener();
+  emit();
 }
 
 /** Credits data for the composer chip of the session's provider. */

@@ -144,7 +144,7 @@ pub(super) async fn execute_remote_tool(
         }),
     )
     .await;
-    let timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms).unwrap_or(120_000);
+    let timeout_ms = tools::effective_timeout_ms(&p.tool_name, p.timeout_ms).unwrap_or(tools::REMOTE_TOOL_WAIT_FALLBACK_MS);
     let outcome = tokio::select! {
         outcome = tokio::time::timeout(Duration::from_millis(timeout_ms.saturating_add(15_000)), receiver) => match outcome {
             Ok(Ok(value)) => Ok(value), _ => Err("TOOL_TIMEOUT"),
@@ -359,6 +359,7 @@ pub(super) async fn handle(
         // shipped with this installation is not there to run.
         python_executable: None,
         python_tools_dir: None,
+        output_budget: crate::tools::OutputBudgetPlan::legacy(),
     };
     let mut result = tokio::select! {
         result = tools::execute_tool_with_path_access(Some(&root),None,&p.tool_name,&p.args,options) => result,

@@ -8,6 +8,9 @@ import {
   addSummaryUsage,
   compactionSummaryInputLimit,
   COMPACTION_REDUCED_TOOL_RESULT_CHARS,
+  COMPACTION_SUMMARY_CHUNK_MARGIN,
+  COMPACTION_SUMMARY_CHUNK_TARGET_SHARE,
+  COMPACTION_SUMMARY_COVERAGE_MAX_CHUNKS,
   COMPACTION_SUMMARY_MAX_CHUNKS,
   COMPACTION_SUMMARY_MAX_RETRIES,
   COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS,
@@ -73,6 +76,25 @@ function input(
     previousSummary: undefined,
     ...overrides,
   };
+}
+
+/** A user message whose text alone costs about `tokens` tokens. */
+function sizedUser(tokens: number, index = 0): AgentMessage {
+  return user(
+    `m${index} ${"x".repeat(Math.ceil(tokens * ESTIMATED_TEXT_CHARS_PER_TOKEN))}`,
+  );
+}
+
+/** Tokens the planner charges a chunk, so assertions use the planner's own sizing. */
+function plannedTokens(chunk: AgentMessage[]): number {
+  return chunk.reduce((sum, message) => sum + estimateTokens(message), 0);
+}
+
+/** The one-request budget planSummaryChunks derives from a request limit. */
+function singleRequestBudget(summaryInputLimit: number, reserveTokens = 0): number {
+  return Math.floor(
+    (summaryInputLimit - reserveTokens) * COMPACTION_SUMMARY_CHUNK_MARGIN,
+  );
 }
 
 describe("COMPACTION_SUMMARY_RETRY_POLICY", () => {
@@ -146,6 +168,25 @@ describe("reduceSummaryInput", () => {
       expect(text.startsWith("a".repeat(10)) || text.startsWith("b".repeat(10))).toBe(true);
       expect(text).toMatch(/truncated for the summary request\]$/);
       expect(text.length).toBeLessThan(COMPACTION_REDUCED_TOOL_RESULT_CHARS + 100);
+    }
+  });
+
+  it("bounds every tool result, including the newest ones", () => {
+    // No recency exemption: a summary only needs to know that the call
+    // happened, and tool output is what makes a tool-heavy range expensive to
+    // carry once per chunk.
+    const messages = Array.from({ length: 6 }, (_, index) =>
+      toolResult("t".repeat(10_000), `tool-${index}`),
+    );
+
+    const reduced = reduceSummaryInput(input(messages));
+
+    expect(reduced).toBeDefined();
+    expect(reduced!.messagesToSummarize).toHaveLength(messages.length);
+    for (const message of reduced!.messagesToSummarize) {
+      const text = (message as { content: Array<{ text: string }> }).content[0]!.text;
+      expect(text.length).toBeLessThanOrEqual(COMPACTION_REDUCED_TOOL_RESULT_CHARS + 100);
+      expect(text).toMatch(/truncated for the summary request\]$/);
     }
   });
 
@@ -259,13 +300,92 @@ describe("planSummaryChunks", () => {
     expect(planSummaryChunks(input([]), options)).toBeUndefined();
   });
 
-  it("refuses a range that would need more requests than the bound allows", () => {
+  it("refuses a range that would need more requests than the coverage ceiling allows", () => {
     const tiny = { summaryInputLimit: 100, reserveTokens: 0 };
-    const messages = Array.from({ length: COMPACTION_SUMMARY_MAX_CHUNKS + 4 }, (_, index) =>
-      user(`request ${index} ${"x".repeat(200)}`),
+    const messages = Array.from(
+      { length: COMPACTION_SUMMARY_COVERAGE_MAX_CHUNKS + 4 },
+      (_, index) => user(`request ${index} ${"x".repeat(200)}`),
     );
 
     expect(planSummaryChunks(input(messages), tiny)).toBeUndefined();
+  });
+
+  it("keeps a range that fills most of one request in a single chunk", () => {
+    // ~80k of a 90k one-request budget: nothing to gain from splitting, and a
+    // split would pay for an extra carried summary.
+    const messages = Array.from({ length: 10 }, (_, index) => sizedUser(8_000, index));
+
+    const chunks = planSummaryChunks(input(messages), {
+      summaryInputLimit: 100_000,
+      reserveTokens: 0,
+    });
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks![0]).toEqual(messages);
+  });
+
+  it("splits an oversized range at a quarter of the request budget", () => {
+    const summaryInputLimit = 100_000;
+    const fullBudget = singleRequestBudget(summaryInputLimit);
+    const targetBudget = Math.floor(fullBudget * COMPACTION_SUMMARY_CHUNK_TARGET_SHARE);
+    // 15 x ~8k: past the one-request budget, but eight target-sized chunks
+    // still cover it — the pre-change sizing would have sent two 80k prompts.
+    const messages = Array.from({ length: 15 }, (_, index) => sizedUser(8_000, index));
+
+    const chunks = planSummaryChunks(input(messages), {
+      summaryInputLimit,
+      reserveTokens: 0,
+    });
+
+    expect(chunks).toBeDefined();
+    expect(chunks!.length).toBeGreaterThan(1);
+    expect(chunks!.length).toBeLessThanOrEqual(COMPACTION_SUMMARY_MAX_CHUNKS);
+    // Complete and in order: every message is summarized by exactly one request.
+    expect(chunks!.flat()).toEqual(messages);
+    for (const chunk of chunks!) {
+      expect(plannedTokens(chunk)).toBeLessThanOrEqual(targetBudget);
+    }
+  });
+
+  it("falls back to whole messages when the target budget cannot cover the range", () => {
+    const summaryInputLimit = 100_000;
+    const fullBudget = singleRequestBudget(summaryInputLimit);
+    const targetBudget = Math.floor(fullBudget * COMPACTION_SUMMARY_CHUNK_TARGET_SHARE);
+    // 30 x ~10k is more target-sized chunks than the bound allows, so the
+    // planner has to carry bigger chunks — never fewer messages.
+    const messages = Array.from({ length: 30 }, (_, index) => sizedUser(10_000, index));
+
+    const chunks = planSummaryChunks(input(messages), {
+      summaryInputLimit,
+      reserveTokens: 0,
+    });
+
+    expect(chunks).toBeDefined();
+    expect(chunks!.length).toBeLessThanOrEqual(COMPACTION_SUMMARY_COVERAGE_MAX_CHUNKS);
+    expect(chunks!.flat()).toEqual(messages);
+    // Covered by the coverage budget, not the target budget, and without
+    // trimming a single message.
+    expect(plannedTokens(chunks![0]!)).toBeGreaterThan(targetBudget);
+    expect(JSON.stringify(chunks)).not.toContain(SUMMARY_CHUNK_TRUNCATION_MARKER.trim());
+    for (const chunk of chunks!) {
+      expect(plannedTokens(chunk)).toBeLessThanOrEqual(fullBudget);
+    }
+  });
+
+  it("does not trim a message that only exceeds the smaller target budget", () => {
+    const summaryInputLimit = 100_000;
+    // Both messages fit the one-request budget; together they do not. The first
+    // is larger than a target chunk, which must not cost it its tail.
+    const messages = [sizedUser(40_000, 0), sizedUser(60_000, 1)];
+
+    const chunks = planSummaryChunks(input(messages), {
+      summaryInputLimit,
+      reserveTokens: 0,
+    });
+
+    expect(chunks).toBeDefined();
+    expect(chunks!.flat()).toEqual(messages);
+    expect(JSON.stringify(chunks)).not.toContain(SUMMARY_CHUNK_TRUNCATION_MARKER.trim());
   });
 
   it("splits a range with known-token messages by the same budget the guard uses", () => {

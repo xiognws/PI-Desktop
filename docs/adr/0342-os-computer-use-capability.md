@@ -10,7 +10,7 @@
   [ADR 0310](0310-local-permission-approvals-without-deadline.md) ·
   ADR 0313 ·
   ADR 0315 ·
-  [03-runtime/computer-use](../spec/03-runtime/computer-use.md) ·
+  the former `03-runtime/computer-use` spec (removed 2026-11-17) ·
   [03-runtime/03-tools-and-permissions](../spec/03-runtime/03-tools-and-permissions.md) ·
   [05-security/01-security](../spec/05-security/01-security.md)
 

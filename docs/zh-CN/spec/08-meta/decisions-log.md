@@ -6036,3 +6036,18 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - 未改动：host RPC 协议、存储 schema、IPC 传输语义，以及 LICENSE / 第三方声明（合规需要，保留在仓库内）。
 - 守卫：`feedback.test.mjs`、`auto-update.test.mjs`、`user-facing-copy.test.mjs` 断言这些删除，
   防止行、通道与文案被悄悄加回来。
+
+## 2026-11-17 — 移除内置电脑操作能力
+
+内置原生应用操作（ADR 0342、ADR 0344）不是默认关闭，而是整体移除：截取路径、
+光标叠层、作用域授权工具、设置界面、共享契约、Agent 工具及其 E2E 场景。该能力
+由「逐窗口截屏 + 合成输入 + 全局叠层」组成，恰好属于终端安全产品行为检测命中
+的一类；目标机器上的企业版 KES 曾把二进制隔离为 `PDM:Trojan.Win32.Generic`。
+
+- 删除：`apps/desktop/electron/main/computer-use/`、
+  `apps/desktop/src/features/computer-use/`、设置卡片、`computer-ipc.ts`、
+  `packages/computer-use/`、`packages/shared/src/computer-use.ts`、Agent 运行时
+  中的 `Computer` 工具，以及 `03-runtime/computer-use.md`。
+- 保留：`packages/shared/src/errors.ts` 中的 `COMPUTER_*` 错误码（host-core 仍
+  作为协议常量返回），以及第三方插件 `cn.star.computer-use`（独立的安装面）。
+- 桌面自动化非目标回归：不再内置屏幕截取或向其他应用合成输入。

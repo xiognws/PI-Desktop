@@ -69,7 +69,6 @@ export * from "./attachment-formats.js";
 export * from "./image-dimensions.js";
 export * from "./gen-ui.js";
 export * from "./image-generation.js";
-export * from "./computer-use.js";
 export * from "./font-size.js";
 export * from "./chat-content-width.js";
 export * from "./format-bytes.js";

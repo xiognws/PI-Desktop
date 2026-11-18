@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 
-import { isPinnedPromptScrolledPast, pinnedPromptSelector } from "../../../../lib/pinned-prompt";
+import { isPinnedPromptAtTop, pinnedPromptSelector } from "../../../../lib/pinned-prompt";
 
 /**
- * Whether the pinned prompt's row has left the top of the transcript.
+ * Whether the pinned prompt's row has reached the top of the transcript.
  *
- * The row itself is the anchor: while any part of it is on screen the strip is
- * pointless, and once its bottom edge passes the scrollport's top edge the strip
- * takes over. Measurement rides the scroller's own scroll events, coalesced into
- * one frame, because the row's position changes with streaming layout too.
+ * The row itself is the anchor: it scrolls normally until its top edge meets the
+ * scrollport's top edge, and from that offset the row sticks there instead of
+ * scrolling away, so the user keeps reading what they last asked while the
+ * answer grows beneath it. Measurement rides the scroller's own scroll events,
+ * coalesced into one frame, because the row's position changes with streaming
+ * layout too.
  */
-export function usePinnedPromptScrolledPast({
+export function usePinnedPromptAtTop({
   scrollRef,
   contentRef,
   messageId,
@@ -21,13 +23,13 @@ export function usePinnedPromptScrolledPast({
   messageId: string | undefined;
   enabled?: boolean;
 }): boolean {
-  const [past, setPast] = useState(false);
+  const [atTop, setAtTop] = useState(false);
 
   useEffect(() => {
     const scroller = scrollRef.current;
     const content = contentRef.current;
     if (!enabled || !messageId || !scroller || !content) {
-      setPast(false);
+      setAtTop(false);
       return;
     }
     let frame = 0;
@@ -35,15 +37,15 @@ export function usePinnedPromptScrolledPast({
       frame = 0;
       const row = content.querySelector<HTMLElement>(pinnedPromptSelector(messageId));
       if (!row) {
-        setPast(false);
+        setAtTop(false);
         return;
       }
       // +1 absorbs the sub-pixel gap a scaled display can leave at the edge.
-      const next = isPinnedPromptScrolledPast(
-        row.getBoundingClientRect().bottom,
+      const next = isPinnedPromptAtTop(
+        row.getBoundingClientRect().top,
         scroller.getBoundingClientRect().top + 1,
       );
-      setPast((current) => (current === next ? current : next));
+      setAtTop((current) => (current === next ? current : next));
     };
     const schedule = () => {
       if (frame === 0) frame = requestAnimationFrame(measure);
@@ -58,5 +60,5 @@ export function usePinnedPromptScrolledPast({
     };
   }, [contentRef, enabled, messageId, scrollRef]);
 
-  return past;
+  return atTop;
 }

@@ -196,7 +196,7 @@ Completion handling is the final stage's `exit` gates. Compaction handling is
 - `contract` keeps today's Plan hard deny: the allowlist plus plan-safe plugin
   actions (ADR 0211). `agent` uses the Agent policy. Host writes of artifacts
   through `CompleteStage` are limited to the declared paths.
-- `Computer` and scheduled-task tools are available only in the builtin
+- Scheduled-task tools are available only in the builtin
   `agent` mode.
 - Turns that the user starts, or that follow a user approval in `ask: user`,
   keep the session permission mode. Turns that the Host starts by itself

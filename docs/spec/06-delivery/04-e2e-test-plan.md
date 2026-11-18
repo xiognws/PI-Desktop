@@ -11554,7 +11554,7 @@ This test plan spec is accepted when:
 - Appearance content: page header and an **Interface** card with working
   system/light/dark controls, then Sidebar, Radial context menu and Startup.
   Behavior holds Session defaults (default mode, permission mode, Command
-  shell), Execution and Computer use; Context management has no settings card.
+  shell) and Execution; Context management has no settings card.
   Conversation holds Display and Input & links. System holds Network, Storage,
   Power and, on Windows/Linux, Close behavior. Shortcuts holds
   the Keyboard shortcuts card.
@@ -18951,7 +18951,7 @@ the latest destination. These assertions measure work counts, not device FPS.
      visible caption saying presentation only, then Input & links (enter to
      send, paste threshold, link open destination).
   4. Visit Behavior: Session defaults (default mode, permission mode, command
-     shell), Execution (infinite retry, scheduled tasks), Computer use last.
+     shell) and Execution (infinite retry, scheduled tasks).
   5. Visit System: Network, Storage, Power, and on Windows/Linux Close
      behavior.
   6. Search the rail for `theme`, `主题`, `proxy`, `scheduled`, `paste`, and
@@ -19960,198 +19960,6 @@ their separate platform acceptance.
   rendered Electron journey above — grouped grid, content height, resize,
   restart, and the panel payload round trip — is Draft until a launcher E2E
   script exists.
-## Computer use (ADR 0342, ADR 0344)
-
-Native-control scenarios remain landing gates for
-[03-runtime/computer-use](../03-runtime/computer-use.md). The host half now has
-device evidence on macOS through
-`PI_DESKTOP_COMPUTER_USE_DEVICE=1 node scripts/e2e-computer-use-device.mjs`
-(opt-in: it reads the operator's screen, and with `--act-app` types into one of
-their windows). The Electron half — the automatic mint through the tool, the
-indicator, Stop aborting the turn, the drawn cursor, and the loop against a real
-model — is still `NOT RUN`, and so is anything needing Screen Recording. The
-permission-request UI below has isolated fixture automation.
-
-### E2E-COMPUTER-USE-request-accessibility-from-settings
-
-- **Layout regression**: Open Settings → Behavior. Computer use is the final card,
-  after Permissions and Defaults, without card/row explanations or a static
-  scope note. Its switch, platform/permission status, enabled model/capture
-  controls, missing-model hint, and permission error/retry path remain present.
-  `apps/desktop/test/computer-use-settings-surface.test.mjs` covers order and
-  compact rendering with the feature both disabled and enabled.
-
-- **Preconditions**: Isolated Electron fixture profile; OS calls mocked at IPC
-  and Electron boundaries; computer use disabled; no provider or real OS prompt.
-- **Steps**: Open Settings with missing Accessibility; focus and click its status
-  button twice. Complete the request while permission remains missing. Grant it
-  externally and return focus. Exercise denied permission, a failed request and
-  retry, a stale capabilities read, focus during a pending request, unsupported
-  platform, and unmount during a request.
-- **Expected**: Opening Settings or toggling the feature never requests OS
-  permission. Explicit click alone requests the app's own TCC trust in main;
-  while pending, the button is busy/disabled and duplicate clicks are ignored.
-  Missing app trust opens only the fixed macOS Accessibility pane and explains
-  that the user must enable it. Errors are visible and retryable. Focus and
-  visibility refreshes never prompt. Controlled one-second polling after a
-  request detects authorization without a focus event, stops on authorization
-  or unmount, and expires after 60 ticks. Stale reads cannot replace newer state.
-  An app-level grant updates the badge even when the Rust child still reports
-  denied: show a backend-permission diagnostic instead of another request.
-  Backend recovery clears the diagnostic without granting any authority from UI.
-  Granted/unsupported states are labels. Non-main senders are rejected before OS
-  calls; opening failure propagates; no grant, capture, or input is dispatched.
-- **Automation**: `node --test apps/desktop/test/computer-use-permission-user-path.test.mjs
-  apps/desktop/test/computer-use-permission-ipc.test.mjs`; shared capability
-  selection tests and host-core unsupported-backend tests cover platform gating.
-- **Specs**: [Computer Use](../03-runtime/computer-use.md), Settings and UX surface.
-- **Status**: Fixture automation PASS; actual macOS TCC prompt/switch NOT RUN.
-  Native OS approval remains a manual system decision.
-
-### E2E-COMPUTER-USE-desktop-grant-is-automatic-and-stoppable
-
-- **Preconditions**: Isolated desktop profile, computer use enabled with a model
-  bound, OS permissions granted on the platform under test, two fixture target
-  applications, one Pi-Workspace window in front, no provider account needed.
-- **Steps**: Ask the agent to operate an application with no grant in existence.
-  Watch the indicator, run `inspect` and one `act`. Press Stop mid-task and have
-  the agent immediately call `Computer` again. Wait out the cooldown and call
-  again. Ask from a second session while the first grant is active. Let a grant
-  idle past its expiry, and exhaust an action budget. Restart the app.
-- **Expected**: No picker appears and the user is never asked which window: the
-  first call mints a desktop grant bound to the frontmost window that is not
-  Pi-Workspace's, with no OS prompt and no capture under `a11y-only`. The
-  indicator names that window, shows budget and capture mode, follows every
-  rebind, and stays visible while the app is backgrounded. Stop revokes the
-  grant, aborts the owning turn, and the immediate re-call fails
-  `COMPUTER_STOPPED_BY_USER` without touching the screen; after the cooldown a
-  new grant is minted normally. The second session is refused
-  `COMPUTER_GRANT_IN_USE`. Idle expiry and budget exhaustion close the grant
-  with their own codes, and no grant survives the restart.
-- **Specs**: [Computer Use](../03-runtime/computer-use.md),
-  [03-tools-and-permissions](../03-runtime/03-tools-and-permissions.md).
-- **Automation**: `computer::tests::a_desktop_grant_binds_the_frontmost_usable_window`,
-  `a_desktop_grant_refuses_when_every_window_is_refused`,
-  `a_user_stop_blocks_the_agents_next_mint_but_not_the_users`,
-  `only_one_grant_is_active_per_instance`,
-  `another_session_cannot_use_the_active_grant`,
-  `an_idle_grant_expires_and_stays_expired`, and
-  `the_budget_closes_the_grant_and_refuses_the_next_action` in host-core;
-  `apps/desktop/test/computer-use-service.test.mjs` covers the automatic mint,
-  the Stop refusal, and the wrong-session refusal the agent would hit. Device:
-  `scripts/e2e-computer-use-device.mjs`.
-- **Status**: PARTIAL — the device probe confirmed the automatic desktop grant
-  binding the frontmost usable window (with our own window refused in front of
-  it), the settings defaults reaching the grant, the real tree, and the Stop
-  cooldown on macOS 15 with Stage Manager active. The indicator, Stop aborting
-  the owning turn, budget and idle closure in a running app, and the restart
-  case are NOT RUN.
-
-### E2E-COMPUTER-USE-window-switching-stays-inside-the-refusals
-
-- **Preconditions**: Isolated desktop profile with an active desktop grant, two
-  fixture applications, a Pi-Workspace window, a window from the built-in
-  credential denylist, and one fixture window that can be closed on demand.
-- **Steps**: Have the agent read the window list, switch to the second fixture
-  application, inspect it, and act. Attempt a switch to the Pi-Workspace window,
-  to the denylisted window, and to an id that no longer exists. Act using a
-  `uid` read before the switch. Close the bound window mid-task and act.
-- **Expected**: The observation lists the windows the host enumerated with
-  refusals attached, and no renderer surface enumerates anything. A permitted
-  switch rebinds the grant, moves the revision, re-frames the drawn cursor, and
-  spends a step but no action budget. The refused switches fail
-  `COMPUTER_SELF_TARGET_REFUSED`, `COMPUTER_TARGET_DENYLISTED`, and
-  `COMPUTER_SCOPE_VIOLATION`, leave the bound window unchanged, and are reported
-  to the model as steps rather than ending the run. A pre-switch `uid` fails
-  `COMPUTER_STALE_REVISION`. The closed window rebinds to the frontmost usable
-  window while the in-flight action is refused, and the audit log shows one
-  `computer.grant.rebound` per move with application identity only.
-- **Specs**: [Computer Use](../03-runtime/computer-use.md),
-  [05-security/01-security](../05-security/01-security.md) §13.
-- **Automation**: `computer::tests::binding_another_window_moves_the_revision`,
-  `a_rebind_re_applies_every_refusal`, `a_window_grant_refuses_a_rebind`, and
-  `a_desktop_grant_whose_window_closes_rebinds_and_refuses_the_action` in
-  host-core; `packages/computer-use` loop tests cover the switch step, the
-  refused-switch recovery, and the terminal-grant case;
-  `apps/desktop/test/computer-use-service.test.mjs` pins the host call shape.
-  Device: `scripts/e2e-computer-use-device.mjs`.
-- **Status**: PARTIAL — on device, switching between six real applications
-  worked, the revision moved on every bind, a pre-switch revision was refused,
-  and the self-target, denylist and unknown-window binds were refused by code.
-  Two defects were found and fixed there: the accessibility window could not be
-  matched to the window-server window under Stage Manager (now joined by window
-  id, D683), and a failed read left the grant on the unreadable window. The
-  closed-window fallback, the cursor re-frame, and the audit read-back are
-  NOT RUN.
-
-### E2E-COMPUTER-USE-self-target-and-secure-input-refused
-
-- **Preconditions**: Isolated desktop profile with an active grant, a Pi-Workspace
-  window with a pending approval card, and a fixture window containing a
-  password field.
-- **Steps**: Attempt to inspect, capture, and act on a Pi-Workspace window,
-  including its approval card, under every permission
-  mode including `auto` and under an `autonomous-in-scope` grant. Focus the
-  password field and attempt `inspect`, `screenshot`, and `set_value`. Attempt a
-  target on the built-in credential denylist and try to remove that entry.
-- **Expected**: Every self-target attempt fails `COMPUTER_SELF_TARGET_REFUSED`;
-  no synthetic event reaches any Pi-Workspace window and no approval card is
-  dismissed. Secure input refuses capture and synthesis with
-  `COMPUTER_SECURE_INPUT_REFUSED`, and no field content appears in a snapshot,
-  image, tool result, or log. The built-in denylist entry cannot be removed.
-- **Specs**: [Computer Use](../03-runtime/computer-use.md),
-  [05-security/01-security](../05-security/01-security.md) §13.
-- **Automation**: `computer::tests::our_own_windows_are_never_targetable`,
-  `a_renamed_self_process_is_still_refused`,
-  `built_in_credential_surfaces_cannot_be_allowlisted`, and
-  `secure_input_refuses_both_inspection_and_action` in host-core. Device:
-  `scripts/e2e-computer-use-device.mjs`.
-- **Status**: PARTIAL — on device, a Pi-Workspace window sat in front of every
-  other window and was refused `COMPUTER_SELF_TARGET_REFUSED` both as the
-  automatic grant's choice and as an explicit bind, and a denylisted window was
-  refused `COMPUTER_TARGET_DENYLISTED`. The approval card specifically, and the
-  secure-input and password-field refusals, are NOT RUN.
-
-### E2E-COMPUTER-USE-stale-basis-and-revision-fail-closed
-
-- **Preconditions**: Isolated desktop profile, an `a11y-and-pixels` grant, and a
-  fixture window that can be moved, resized, and re-stacked on demand.
-- **Steps**: Capture a `screenshot`, move the target, then act on the stale
-  basis. Resize the target between `inspect` and `act` on a `uid`. Act with a
-  coordinate outside the measured bounds. Act with a basis minted for a
-  different grant. Act under an `a11y-only` grant with coordinates.
-- **Expected**: `COMPUTER_STALE_BASIS`, `COMPUTER_STALE_REVISION`,
-  `COMPUTER_SCOPE_VIOLATION`, and `COMPUTER_CAPTURE_UNAVAILABLE` respectively;
-  no event is dispatched in any of them, nothing is clamped silently, and the
-  target application observes no input.
-- **Specs**: [Computer Use](../03-runtime/computer-use.md),
-  [08-error-codes](../03-runtime/08-error-codes.md) §3.10.
-- **Automation**: `computer::tests::a_moved_window_bumps_the_revision_and_invalidates_a_basis`,
-  `a_resized_window_with_the_same_revision_still_refuses_a_stale_basis`,
-  `coordinates_outside_the_measured_window_are_refused_not_clamped`, and
-  `a_coordinate_action_without_a_basis_is_refused` in host-core.
-- **Status**: NOT RUN — needs a real window that moves mid-step.
-
-### E2E-COMPUTER-USE-platform-support-is-explicit
-
-- **Preconditions**: One run per supported platform plus a Wayland session and a
-  platform with the OS permission denied.
-- **Steps**: Enable the feature and open the doctor view on each platform. Have
-  the agent call `Computer` so a grant is minted, and act. On Windows, bind a
-  window owned by a higher-integrity process. On Wayland, attempt input and then
-  capture. On a platform with Screen
-  Recording or Accessibility denied, attempt inspection and capture.
-- **Expected**: The doctor view distinguishes "not requested", "denied", and
-  "unsupported on this platform". Input on Wayland fails
-  `COMPUTER_PLATFORM_UNSUPPORTED` while portal capture still works; an elevated
-  Windows target fails `COMPUTER_TARGET_ELEVATED` rather than dropping events; a
-  denied OS permission fails `COMPUTER_OS_PERMISSION_MISSING`. No path hangs and
-  none reports success without acting.
-- **Specs**: [Computer Use](../03-runtime/computer-use.md).
-- **Automation**: `computer::tests::an_unsupported_platform_refuses_every_operation`
-  in host-core covers the fallback backend every unported platform uses.
-- **Status**: NOT RUN — needs one run per platform, including Wayland.
-
 ## Round review reader
 
 Scenario: E2E-REVIEW-ROUNDS (local desktop, implemented)

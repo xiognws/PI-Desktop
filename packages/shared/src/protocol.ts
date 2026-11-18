@@ -123,18 +123,6 @@ export const IPC = {
     notificationSetViewingSession: "pi-desktop/notification/setViewingSession",
     agentPrompt: "pi-desktop/agent/prompt",
     agentSteer: "pi-desktop/agent/steer",
-    /**
-     * Computer use (ADR 0342, ADR 0344). The renderer may read capabilities,
-     * read the live grant, and revoke it. It can neither mint nor act: the
-     * grant is minted by main's tool handler against the host's own rules, and
-     * `computer.act` is reachable only from that handler. Enumerating windows
-     * is not a renderer channel either — nothing in the UI picks a target.
-     */
-    computerCapabilities: "pi-desktop/computer/capabilities",
-    /** Ask the OS for the grant the platform needs; the user's click starts it. */
-    computerRequestPermission: "pi-desktop/computer/permission/request",
-    computerGrantRevoke: "pi-desktop/computer/grant/revoke",
-    computerGrantDescribe: "pi-desktop/computer/grant/describe",
     agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
     agentStopSubagents: "pi-desktop/agent/stop-subagents",
@@ -625,12 +613,6 @@ export const IPC = {
     providersOauth: "pi-desktop/providers/oauth/event",
     mcpOauth: "pi-desktop/mcp/oauth/event",
     updatesState: "pi-desktop/updates/event/state",
-    /** Active grant view for the indicator; `null` once the grant closes. */
-    computerGrantChanged: "pi-desktop/computer/event/grantChanged",
-    /** Draw commands for the click-through cursor overlay. Visualization only. */
-    computerCursor: "pi-desktop/computer/event/cursor",
-    /** One completed loop step, for the indicator's progress line. */
-    computerStep: "pi-desktop/computer/event/step",
   },
 } as const;
 

@@ -106,9 +106,12 @@ Snapshot {
 `workspace::resolve_tool_path`, so workspace, scratch, and approved external
 roots share one keyspace and a path spelled two ways resolves to one entry.
 
-`seen_lines == None` means "no provenance recorded" — the provenance gate is then
-skipped rather than failing closed, so an externally minted or aged-out tag
-degrades to version checking only.
+`seen_lines == None` means no provenance was recorded for that snapshot. When
+a matching snapshot exists but carries `None`, the gate fails closed: every
+anchor is treated as unseen, because the host cannot prove the model saw the
+lines it is about to edit. When no matching snapshot exists at all, the gate
+is skipped — there is nothing to validate against, so the tag degrades to
+version checking only.
 
 ### 4.2 Recording and read fusion
 
@@ -138,8 +141,10 @@ A line joins `seen_lines` only when the producer emitted it **in full**:
   lines seen: the session authored them.
 
 An empty `seen_lines` set is treated as "nothing seen", so every anchor is
-rejected. `None` is treated as "unknown", so no anchor is rejected. The
-distinction is deliberate and must not be collapsed.
+rejected. `None` on a matching snapshot is treated the same way — fail closed —
+because the host cannot prove the model saw those lines. When no matching
+snapshot exists at all, the gate is skipped: there is nothing to validate
+against, so the tag degrades to version checking only.
 
 ### 4.4 Bounds and lifecycle
 
@@ -430,7 +435,9 @@ tag and `live` the tag of the current file.
 On branch A only, every anchor line is checked against the `seen_lines` of the
 snapshot whose text equals the live content:
 
-- `seen_lines` absent (`None`) → gate skipped.
+- No matching snapshot → gate skipped (nothing to validate against).
+- `seen_lines` is `None` on a matching snapshot → fail closed: every anchor is
+  unseen, because the host cannot prove the model saw those lines.
 - All anchors seen → apply.
 - Otherwise → reject, and inline the real content of the unseen anchor lines.
 
@@ -466,6 +473,19 @@ warning is emitted. Requirements:
 
 An apply that produces text identical to the input is `EDIT_NO_CHANGE`, not
 success.
+
+### 9.4 Delta warning
+
+After a successful apply, every `PUT N.=M:` whose body line count differs from
+the deleted range (`M - N + 1`) emits a non-blocking warning:
+
+> `PUT N.=M: replaces D line(s) with I; verify the range and body match your intent`
+
+The warning is advisory: the edit still applies. It catches the most common
+silent-deletion mistake — a range that swallows or omits lines the model did not
+intend — without blocking intentional expansions or contractions. Pure inserts
+(`<N`, `>N`, `>$`), pure deletions (`CUT`), and equal-count replacements produce
+no warning.
 
 §4d's repeat guard still stops a prompt that keeps failing on one path, but it
 does not count every failure the same way. The three recoverable codes —
@@ -644,8 +664,8 @@ existing per-session mutation permit already excludes that.
 
 The Edit row renders from the review record's hunks — which ADR 0043 already
 produces — and shows the op headers verbatim as the model's stated intent.
-Resolved block spans and every warning from §8.4, §9.2, and §10 are surfaced on
-the row, not swallowed.
+Resolved block spans and every warning from §8.4, §9.2, §9.4, and §10 are
+surfaced on the row, not swallowed.
 
 ### 13.5 Subagents
 

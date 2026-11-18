@@ -51,7 +51,7 @@ two:
 |---|---|---|
 | Appearance | How the product looks | Interface · Sidebar · Radial context menu · Startup |
 | Conversation | How a transcript reads and the composer takes input | Display · Input & links |
-| Behavior | What a run starts with and may do | Session defaults · Execution · Computer use |
+| Behavior | What a run starts with and may do | Session defaults · Execution |
 | System | This installation | Network · Storage · Power · Close behavior (Windows/Linux) |
 
 The directory is fifteen destinations in the four existing clusters

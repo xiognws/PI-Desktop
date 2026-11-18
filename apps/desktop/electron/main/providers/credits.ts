@@ -150,6 +150,16 @@ export class CreditsCache {
     this.cache.delete(providerId);
   }
 
+  /**
+   * Forget every reading.
+   *
+   * A balance belongs to the gateway process that produced it, so a refreshed
+   * gateway must not inherit the number the previous one reported.
+   */
+  clear(): void {
+    this.cache.clear();
+  }
+
   async read(providerId: string, options: { refresh?: boolean } = {}): Promise<CreditsResult> {
     const cached = this.cache.get(providerId);
     if (!options.refresh && cached && this.now() - cached.at < this.ttlMs) {

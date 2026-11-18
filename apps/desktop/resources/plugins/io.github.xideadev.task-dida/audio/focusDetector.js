@@ -8,6 +8,16 @@ const node_child_process_1 = require("node:child_process");
  * In case of permission errors or platform unsupported, returns false (fail-safe).
  */
 async function isAppFocused() {
+    // Host-provided focus state first: it needs no child process at all, so it cannot be
+    // mistaken for a foreground-window probe by behavioural AV engines.
+    try {
+        if (typeof pi !== "undefined" && pi && pi.app && typeof pi.app.isFocused === "function") {
+            return (await pi.app.isFocused()) === true;
+        }
+    }
+    catch (error) {
+        // fall through to the platform probe below
+    }
     const platform = process.platform;
     return new Promise((resolve) => {
         try {
@@ -23,21 +33,10 @@ async function isAppFocused() {
                 });
             }
             else if (platform === 'win32') {
-                // Windows foreground window process check
-                const script = `
-          $fg = [System.IntPtr]::Zero
-          Add-Type -TypeDefinition '[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();' -Name Win32 -Namespace Native
-          $fg = [Native.Win32]::GetForegroundWindow()
-          $pi = Get-Process -Name "PI-Desktop" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -eq $fg }
-          if ($pi) { Write-Output "true" } else { Write-Output "false" }
-        `;
-                (0, node_child_process_1.execFile)('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { timeout: 1200 }, (err, stdout) => {
-                    if (err || !stdout) {
-                        resolve(false);
-                        return;
-                    }
-                    resolve(stdout.trim().toLowerCase() === 'true');
-                });
+                // No child process is spawned here: reading the foreground window requires an
+                // unsigned PowerShell Add-Type probe, whose shape is indistinguishable from a keylogger
+                // to behavioural AV engines. Report "not focused" and let the caller notify anyway.
+                resolve(false);
             }
             else {
                 // Linux / other platforms: default to false

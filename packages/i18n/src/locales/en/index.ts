@@ -3234,42 +3234,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     planApprovalBody: "A proposed plan is ready for your review.",
     actionFailed: "Couldn't update notifications.",
     justNow: "Just now",
-  },
-  computerUse: {
-    title: "Computer use",
-    description:
-      "Let the agent read and operate the applications on your computer. It is off until you enable it, and Stop ends a run at any time.",
-    enable: "Enable computer use",
-    enableDesc:
-      "Enabling it lets the agent start operating your computer on its own, without asking which window. It does not ask for a system permission yet.",
-    scopeNote:
-      "The agent works in one window at a time and may switch windows itself. It can never target Pi-Workspace's own windows, a password field, or a credential app, and Stop ends the run.",
-    platform: "This platform",
-    platformUnsupported: "No backend on this platform",
-    platformUnknown: "Checking this platform…",
-    requestPermission: "Request Accessibility permission",
-    requestingPermission: "Requesting Accessibility…",
-    permissionPending: "Enable Accessibility for Pi-Workspace in System Settings, then return here to refresh the status.",
-    backendPermissionMissing: "Pi-Workspace is authorized, but its native-control backend is not. Check the installed app’s signature and backend permissions; computer control remains blocked.",
-    permissionRequestFailed: "Could not request Accessibility or open System Settings. Try again. ({{code}})",
-    permission: {
-      granted: "Accessibility granted",
-      denied: "Accessibility denied",
-      "not-requested": "Accessibility not requested",
-      unsupported: "Accessibility unsupported",
-    },
-    model: "Computer-use model",
-    modelDesc: "The model that reads the window and performs the steps. The conversation model is never used for this.",
-    modelMissing: "Pick a model before the agent can operate your computer.",
-    chooseModel: "Choose a model",
-    capture: "What the model sees",
-    captureDesc: "Screenshots of the window being operated may be saved in the conversation.",
-    captureA11yOnly: "Accessibility only",
-    captureWithPixels: "Accessibility and screenshots",
-    stepsLeft: "{{count}} steps left",
-    stop: "Stop",
-  },
-  errors: {
+  },  errors: {
     COMPOSER_MCP_UNAVAILABLE: "The selected MCP server is disconnected or unavailable in this project. Reconnect it and select it again.",
     COMPOSER_MCP_REQUEST_REQUIRED: "Add task text or an attachment after selecting an MCP server or tool.",
     HOST_UNAVAILABLE: "The local service is unavailable",

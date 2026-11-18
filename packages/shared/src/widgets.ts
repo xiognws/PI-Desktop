@@ -100,14 +100,88 @@ export type WidgetInvokeResult = {
 
 /** Manifest schema this build understands. */
 export const WIDGET_SCHEMA_VERSION = 1;
-/** Runtime API a package entry is compiled against. */
-export const WIDGET_API_VERSION = 1;
+/**
+ * Newest runtime API a package entry may be compiled against.
+ *
+ * `apiVersion` is a **range**, not an equality: a build accepts anything from
+ * `WIDGET_API_VERSION_MIN` up to this value. Raising it therefore adds a
+ * capability without stranding every package already installed, which is what
+ * an equality check would do.
+ *
+ * v2 added `runtime` — a package may name a non-JavaScript entry kind.
+ */
+export const WIDGET_API_VERSION = 2;
+/** Oldest runtime API this build still runs (ADR: python-widget-entry-kind). */
+export const WIDGET_API_VERSION_MIN = 1;
 /** Manifest file name inside each package directory. */
 export const WIDGET_MANIFEST_FILE = "widget.json";
 /** Longest `widget.invoke` the sidecar will wait before failing the call. */
 export const WIDGET_INVOKE_TIMEOUT_MS = 30_000;
 /** Most packages the host will load from one data directory. */
 export const MAX_WIDGET_PACKAGES = 64;
+
+/**
+ * What a package's entry is written in.
+ *
+ * `javascript` is the original contract and stays the default when a manifest
+ * says nothing, so every v1 package keeps loading. `python` runs the entry in a
+ * child process instead of evaluating it in the sidecar.
+ */
+export type WidgetRuntimeKind = "javascript" | "python";
+
+/** The entry declaration a v2 manifest may carry under `runtime`. */
+export type WidgetRuntime = {
+  kind: WidgetRuntimeKind;
+  /** Entry file, relative to the package directory. Must end in `.py` for python. */
+  entry: string;
+  /**
+   * Package-relative directories put on `PYTHONPATH` ahead of the shared bundle.
+   * Only meaningful for `python`.
+   */
+  pythonPath?: string[];
+};
+
+/** Every runtime kind this build understands, in escalation order. */
+export const WIDGET_RUNTIME_KINDS: readonly WidgetRuntimeKind[] = ["javascript", "python"];
+
+/**
+ * True when this build can run a manifest claiming `version`.
+ *
+ * An unknown-in-the-future version is rejected, an old one is accepted: a
+ * package written for v1 must keep working after the product moves to v2.
+ */
+export function isSupportedWidgetApiVersion(version: unknown): boolean {
+  return (
+    typeof version === "number" &&
+    Number.isInteger(version) &&
+    version >= WIDGET_API_VERSION_MIN &&
+    version <= WIDGET_API_VERSION
+  );
+}
+
+/**
+ * Read `runtime` out of a raw manifest value.
+ *
+ * Absence means JavaScript, which is what every package written before v2 says
+ * by saying nothing. A malformed value is `null` so the caller can report it on
+ * the package's row instead of quietly downgrading the package to some other
+ * language.
+ */
+export function readWidgetRuntime(raw: unknown): WidgetRuntime | null {
+  if (raw === undefined || raw === null) return { kind: "javascript", entry: "" };
+  if (typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw as { kind?: unknown; entry?: unknown; pythonPath?: unknown };
+  const kind = typeof value.kind === "string" ? value.kind.trim().toLowerCase() : "javascript";
+  if (!(WIDGET_RUNTIME_KINDS as readonly string[]).includes(kind)) return null;
+  const entry = typeof value.entry === "string" ? value.entry.trim() : "";
+  const pythonPath = Array.isArray(value.pythonPath)
+    ? value.pythonPath
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    : undefined;
+  return { kind: kind as WidgetRuntimeKind, entry, pythonPath };
+}
 
 /**
  * Narrow a raw permission list to the ones this build implements, preserving

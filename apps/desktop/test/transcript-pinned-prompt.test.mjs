@@ -1,32 +1,25 @@
 /*
- * Pinned latest prompt.
+ * Sticky latest prompt.
  *
- * The newest prompt leaves the top of the transcript as soon as its answer gets
- * long, so the transcript repeats one line of it in a strip above the rows while
- * the row itself is out of view. These tests pin the three pieces that make that
- * work: which message pins, what the strip says, and when it is allowed to show.
+ * The newest prompt scrolls up like any other row; once its top edge reaches the
+ * top of the transcript it stays stuck to that edge, so the user keeps reading
+ * what they last asked while the answer streams in underneath. The next prompt
+ * takes the slot over.
+ *
+ * These tests pin the three pieces that make that work: which message pins, when
+ * the row counts as having reached the top, and how the transcript marks the row
+ * for CSS.
  */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createInstance } from "i18next";
-import { I18nextProvider } from "react-i18next";
-import { catalogs } from "@pi-workspace/i18n";
-import { createServer } from "vite";
-import { fileURLToPath } from "node:url";
 
 import {
-  isPinnedPromptScrolledPast,
+  isPinnedPromptAtTop,
   latestUserPrompt,
-  pinnedPromptPreview,
+  PINNED_PROMPT_ATTR,
   pinnedPromptSelector,
 } from "../src/lib/pinned-prompt.ts";
-
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
-
-const LOCALES = ["en", "de", "es", "fr", "ko", "pt-BR", "tr", "zh-CN", "zh-TW"];
 
 function message(overrides) {
   return {
@@ -38,7 +31,7 @@ function message(overrides) {
   };
 }
 
-test("the strip pins the newest prompt, not the newest row", () => {
+test("the pin follows the newest prompt, not the newest row", () => {
   const messages = [
     message({ id: "u1", content: "first" }),
     message({ id: "a1", role: "assistant", content: "answer" }),
@@ -62,92 +55,47 @@ test("an agent delivery is not the user speaking", () => {
   assert.equal(latestUserPrompt(messages)?.id, "u1", "pinning a relay would misquote the user");
 });
 
-test("the preview is one collapsed line, cut on a word boundary", () => {
-  assert.equal(
-    pinnedPromptPreview(message({ content: "  fix\n\n  the   parser\tplease " })),
-    "fix the parser please",
-  );
-  const long = "word ".repeat(80).trim();
-  const preview = pinnedPromptPreview(message({ content: long }), 40);
-  assert.ok(preview.length <= 41, `preview stays bounded: ${preview.length}`);
-  assert.ok(preview.endsWith("…"));
-  assert.ok(!preview.includes("  "), "the preview never keeps the source's spacing");
-  assert.equal(pinnedPromptPreview(undefined), "");
-});
-
-test("the row's own edge decides when the strip takes over", () => {
-  assert.equal(isPinnedPromptScrolledPast(100, 100), true, "touching the top counts as gone");
-  assert.equal(isPinnedPromptScrolledPast(101, 100), false);
-  assert.equal(isPinnedPromptScrolledPast(99, 100), true);
+test("the row sticks once its top edge reaches the scrollport top", () => {
+  assert.equal(isPinnedPromptAtTop(100, 100), true, "meeting the top edge pins the row");
+  assert.equal(isPinnedPromptAtTop(99, 100), true, "a row scrolled past stays pinned");
+  assert.equal(isPinnedPromptAtTop(101, 100), false, "a row still below the edge scrolls free");
 });
 
 test("the row selector survives quotes and backslashes in an id", () => {
-  assert.equal(pinnedPromptSelector("a\"b\\c"), '[data-message-id="a\\"b\\\\c"]');
+  assert.equal(pinnedPromptSelector('a"b\\c'), '[data-message-id="a\\"b\\\\c"]');
 });
 
-test("the strip renders one line, and nothing at all until the row is gone", async () => {
-  const server = await createServer({
-    root: ROOT,
-    configFile: false,
-    server: { middlewareMode: true, hmr: false, ws: false },
-    esbuild: { jsx: "automatic" },
-    appType: "custom",
-    optimizeDeps: { noDiscovery: true, include: [] },
-  });
-  try {
-    const { PinnedPrompt } = await server.ssrLoadModule("/src/features/chat/transcript/PinnedPrompt.tsx");
-    const i18n = createInstance();
-    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
-    const render = (props) =>
-      renderToStaticMarkup(
-        createElement(
-          I18nextProvider,
-          { i18n },
-          createElement(PinnedPrompt, { attachmentCount: 0, onJump: () => {}, ...props }),
-        ),
-      );
-
-    assert.equal(render({ text: "why is the parser slow", visible: false }), "");
-
-    const shown = render({ text: "why is the parser slow", visible: true });
-    assert.match(shown, /data-pinned-prompt="true"/);
-    assert.match(shown, /why is the parser slow/);
-    assert.match(shown, /aria-label="Back to your latest message"/);
-
-    // A prompt that was only an attachment still names itself instead of
-    // rendering an empty pill.
-    const attachments = render({ text: "", attachmentCount: 2, visible: true });
-    assert.match(attachments, /2 attachment\(s\)/);
-  } finally {
-    await server.close();
-  }
-});
-
-test("the transcript owns the pin, yields the top edge to find, and rides the row", async () => {
+test("the transcript marks the pinned row instead of passing a flag down", async () => {
   const transcript = await readFile(
     new URL("../src/features/chat/transcript/ChatTranscript.tsx", import.meta.url),
     "utf8",
   );
   assert.match(transcript, /const pinnedMessage = useMemo\(\(\) => latestUserPrompt\(messages\)/);
   assert.match(transcript, /messageId: pinnedMessage\?\.id/);
-  assert.match(transcript, /enabled: !find\.open && paneVisible/);
-  assert.match(transcript, /<PinnedPrompt[\s\S]{0,200}visible=\{pinnedPast\}/);
-  // Jumping back is a scroll to the row itself, not a jump to the bottom.
-  assert.match(transcript, /pinnedPromptSelector\(messageId\)/);
-  assert.match(transcript, /scroller\.scrollTop = Math\.max\(0, offset - 12\)/);
+  assert.match(transcript, /enabled: paneVisible && !find\.open/, "find owns the top edge while open");
+  assert.match(
+    transcript,
+    /usePinnedPromptMarker\(contentRef, pinnedAtTop \? pinnedMessage\?\.id : undefined\)/,
+  );
+  // The old floating strip is gone: the row itself sticks now.
+  assert.doesNotMatch(transcript, /<PinnedPrompt/);
+
+  const marker = await readFile(
+    new URL("../src/features/chat/transcript/hooks/usePinnedPromptMarker.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(marker, /removeAttribute\(PINNED_PROMPT_ATTR\)/, "a stale mark is cleared first");
+  assert.match(marker, /setAttribute\(PINNED_PROMPT_ATTR, "true"\)/);
 
   const styles = await readFile(new URL("../src/styles/chat-shell.css", import.meta.url), "utf8");
-  assert.match(styles, /\.transcript-pinned-prompt \{[\s\S]{0,300}position: absolute/);
-  assert.match(styles, /\.transcript-pinned-prompt-text \{[\s\S]{0,200}text-overflow: ellipsis/);
+  assert.match(styles, /\.message-row\[data-pinned-prompt\] \{[\s\S]{0,200}position: sticky/);
+  assert.match(styles, /\.message-row\[data-pinned-prompt\] \{[\s\S]{0,260}top: 0/);
+  // `content-visibility: auto` would give the sticky box a containment context
+  // and stop it tracking the scrollport, so the pinned row must opt out.
+  assert.match(styles, /\.message-row\[data-pinned-prompt\] \{[\s\S]{0,260}content-visibility: visible/);
+  assert.doesNotMatch(styles, /\.transcript-pinned-prompt/);
 });
 
-test("every locale names the jump target and the attachment-only case", async () => {
-  for (const locale of LOCALES) {
-    const catalog = await readFile(
-      new URL(`../../../packages/i18n/src/locales/${locale}/index.ts`, import.meta.url),
-      "utf8",
-    );
-    assert.match(catalog, /"?pinnedPromptJump"?:/, `${locale} names the jump`);
-    assert.match(catalog, /"?pinnedPromptAttachments"?:/, `${locale} names the attachment case`);
-  }
+test("the marker attribute is the one CSS selects on", () => {
+  assert.equal(PINNED_PROMPT_ATTR, "data-pinned-prompt");
 });

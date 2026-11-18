@@ -65,6 +65,7 @@ import { clampThinkingLevel } from "./thinking-level.js";
 import { subagentModelBinding, type SubagentProviderRetryState } from "./subagent-model-binding.js";
 import { contextBudgetFor } from "./context-budget.js";
 import { convertToLlm } from "./pi-runtime-messages.js";
+import { elideStaleToolResults, toolResultElisionEnabled } from "./tool-result-elision.js";
 import {
   delegateRetentionMode,
   delegateSummaryModels,
@@ -296,8 +297,15 @@ export class SubagentRun {
       identity: DESKTOP_AGENT_IDENTITY,
       streamFn: binding.streamFn,
       getApiKey: binding.getApiKey,
+      // A delegate pays the same per-request cost as the session it serves, and
+      // its history is never persisted as a transcript, so stale tool output is
+      // cleared on the wire view only — same pure function, same pairing rules.
       convertToLlm: (messages) =>
-        convertToLlm(this.dedupeToolCalls(messages)),
+        convertToLlm(
+          elideStaleToolResults(this.dedupeToolCalls(messages), {
+            enabled: toolResultElisionEnabled(),
+          }),
+        ),
       // The same turn-boundary context protection the session has (ADR 0299):
       // re-estimate at each boundary, compact before the next request, degrade
       // before failing. The budget derives from this run's resolved model.

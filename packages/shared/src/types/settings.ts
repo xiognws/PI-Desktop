@@ -66,8 +66,6 @@ export type AppSettings = {
   updatePreference?: UpdatePreference;
   /** Last manually announced release; kept local to avoid repeating notices. */
   lastNotifiedUpdateVersion?: string;
-  /** Granted native application control (ADR 0342); off and unbound by default. */
-  computerUse?: import("../computer-use.js").ComputerUseSettings;
   defaultMode: Mode;
   /**
    * Budget a new builtin Goal run starts with. Absent or null keeps the

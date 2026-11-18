@@ -1,0 +1,14 @@
+{
+  "name": "@pi-workspace/autotest-framework",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Python test framework the autotest capability is built on, versioned and released on its own schedule.",
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "verify": "node scripts/verify.mjs",
+    "deps": "node scripts/install-deps.mjs",
+    "test": "node --test test/*.test.mjs",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\""
+  }
+}

@@ -28,7 +28,6 @@ import {
   type AgentEventEnvelope,
   type AppSettings,
   type CloseBehavior,
-  type ComputerGrantView,
   type KeybindingOverrides,
   type PlanExecutionFinishStatus,
 } from "@pi-workspace/shared";
@@ -79,7 +78,6 @@ import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
 import { createSidecarRuntime } from "./runtime/sidecar";
-import { createComputerCursorOverlay } from "./computer-use/cursor-overlay";
 import { createEventPersistence } from "./runtime/event-persistence";
 import { catalogs, resolveLocale } from "@pi-workspace/i18n";
 import { createPlanRuntime } from "./runtime/plans";
@@ -699,6 +697,10 @@ const sessionCoordination = createSessionCoordination({
     // A new turn owns the composer now, so a suggestion about the previous one
     // stops being shown and stops being showable (ADR 0333).
     pluginServices.composerSuggestion.noteTurnStarted(sessionId, turnId);
+    // The workbench service is what an agent turn may reach next, so this is the
+    // earliest honest moment to have it up — and the latest one that still keeps
+    // an idle launch free of an interpreter process.
+    startAutotestForFirstUse();
   },
 });
 const {
@@ -846,21 +848,6 @@ function announceSkillReview(envelope: AgentEventEnvelope): void {
   sendToRenderer(IPC.event.toast, { message: notice });
 }
 
-/**
- * The agent's drawn cursor and the indicator feed (ADR 0342 §10).
- *
- * The overlay is created lazily by its own module on the first draw command,
- * and it closes with the grant: a window that outlived the authority it was
- * drawn for would tell the user an action is still possible when it is not.
- */
-const computerCursorOverlay = createComputerCursorOverlay({
-  log: (message, data) => logger.app("runtime", "warn", message, data),
-});
-function publishComputerGrant(grant: ComputerGrantView | null): void {
-  sendToRenderer(IPC.event.computerGrantChanged, { grant });
-  if (!grant || grant.state !== "active") computerCursorOverlay.close();
-}
-
 const sidecarRuntime = createSidecarRuntime({
   runtimeState,
   steeringReplies,
@@ -892,8 +879,6 @@ const sidecarRuntime = createSidecarRuntime({
   disabledBuiltinSkills: runtimeDisabledBuiltinSkills,
   pluginActiveInProject,
   currentNetworkProxy,
-  computerCursorOverlay,
-  publishComputerGrant,
 });
 emitAgentEvent = (envelope: AgentEventEnvelope) => {
   announceSkillReview(envelope);
@@ -985,7 +970,6 @@ function registerIpc() {
     getMainWindow,
     getHost,
     inAppProviders,
-    publishComputerGrant,
     getSidecar,
     getAgentHostBridge: () => mainState.agentHostBridge,
     getBackendRouter: () => startupState.backendRouter,
@@ -1113,15 +1097,28 @@ void app.whenReady().then(() => {
 });
 
 // Autotest 服务：独立进程跑 uvicorn，只监听 loopback。启动成功后把端口写进
-// `<dataDir>/autotest/runtime.json`；sidecar 内的扩展工具读该文件直连，
-// 不经 main 转发，也没有 MCP/工具网关这一层。
+// `<dataDir>/autotest/runtime.json`；sidecar 内的扩展工具读该文件直连，不
+// 经 main 转发，也没有 MCP/工具网关这一层。
+//
+// It is started lazily (`ensureStarted`) rather than at `whenReady`: an idle
+// launch must not spawn an interpreter or open a listener, because that shape
+// (unsigned host → interpreter → loopback port, before any user action) is what
+// behavioural AV engines score as a dropped payload.
 const autotestService = new AutotestService({
   dataDir,
   resourcesPath: process.resourcesPath,
   log: (message) => logger.app("runtime", "info", `[autotest] ${message}`),
 });
-void app.whenReady().then(() => autotestService.start());
 app.once("will-quit", () => void autotestService.stop());
+
+/**
+ * Hoisted on purpose: the first turn starts the workbench long before this line
+ * runs, and a `function` declaration keeps that reference legal without moving
+ * the service construction above the session wiring it depends on.
+ */
+function startAutotestForFirstUse(): void {
+  void autotestService.ensureStarted();
+}
 // The in-app gateways hold loopback ports; a quit that leaves them listening
 // would make the next launch look like a port conflict.
 app.once("will-quit", () => void inAppProviders.stop());
@@ -1214,6 +1211,17 @@ registerAutotestWorkbenchOpener(() => {
   const url = autotestWorkbenchUrl(snapshot.port);
   if (snapshot.status === "ready" && url) {
     focusOrCreateAutotestWindow(url);
+    return;
+  }
+  // Opening the workbench is itself the first use: bring the service up instead
+  // of reporting it unavailable, then focus the window once the port is known.
+  if (snapshot.status === "stopped") {
+    void autotestService.ensureStarted().then(() => {
+      const started = autotestService.state();
+      const readyUrl = autotestWorkbenchUrl(started.port);
+      if (started.status === "ready" && readyUrl) focusOrCreateAutotestWindow(readyUrl);
+      else void promptAutotestUnavailable(started);
+    });
     return;
   }
   logger.app(

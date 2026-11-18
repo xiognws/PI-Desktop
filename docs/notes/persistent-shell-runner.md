@@ -23,42 +23,44 @@ behaviour-based endpoint protection scores as malicious.
 
 ## Target shape
 
-One runner and one interpreter per shell session, reused by every call:
+One runner and one interpreter per shell session, reused by every call. The
+runner copy is gone: the host starts the interpreter itself and writes cells
+straight into its stdin, so a session adds exactly one process and that process
+is a signed interpreter.
 
 ```
 pi-desktop-host-core.exe
-  └─ pi-desktop-host-core.exe --internal-tool-runner   (long-lived, one per session)
-       └─ cmd.exe / powershell.exe                     (long-lived, stdin piped)
-            └─ the command (one process per call, unavoidable)
+  └─ cmd.exe / powershell.exe / bash.exe              (long-lived, stdin piped)
+       └─ the command (one process per call, unavoidable)
 ```
 
-Per call the count drops from "2 + interpreter + command" to "command only".
+The intermediate copy (`pi-desktop-host-core.exe --internal-tool-runner`, a
+second unsigned binary that spawned the interpreter and relayed between the two)
+was removed on 2026-11-17: this deployment's endpoint agent kept scoring it as
+`PDM:Trojan.Win32.Generic` — an unsigned executable spawning interpreters in a
+loop — and quarantined the app's binaries for it. It bought the session nothing,
+because the relay only turned control frames into the shell text the host can
+write itself (`shell_session::spawn_session_shell`).
+
+The one-shot path (`--internal-tool-runner` config without `persistent`) is
+unchanged and still spawns the copy: it exists for background tasks and for
+calls a session cannot carry.
 
 ## Protocol
 
-Same framing style as Hermes' session kernel (`tools/code_kernel.py`): one child
-per session, length-prefixed JSON control frames in, a nonce sentinel on the
-output stream marking the end of each cell.
+A cell is one shell snippet built by `cell_text`: it changes into the command's
+working directory, runs the command with the interpreter's stdin isolated, then
+prints `<nonce> <exitCode>`. The host writes that snippet straight into the
+interpreter's stdin and scans its stdout for the marker, so a live session needs
+no framing layer between the two.
 
-Host → runner (stdin), existing frame format kept:
+The length-prefixed JSON frames (`u32 LE length | JSON {kind, command, cwd,
+timeoutMs, nonce}`) remain the protocol of `--internal-tool-runner` session
+mode. That mode still works and the one-shot/background paths still use it, but
+the host no longer starts a runner for a live session.
 
-```
-u32 LE length | JSON { kind: "command", command, cwd, timeoutMs, nonce }
-```
-
-The first frame is still the existing `ToolRunnerStartConfig`; a config with
-`persistent: true` puts the runner in session mode instead of one-shot mode.
-
-Runner → host (stdout): raw command output bytes, unframed, exactly like today,
-terminated by one control line:
-
-```
-<nonce> <exitCode>\n
-```
-
-The nonce is a random 128-bit hex string generated per runner instance, so
-command output cannot forge an end-of-cell marker by accident. `stderr` keeps
-flowing to the runner's stderr as today.
+The first cell is a start-up cell whose output the host discards, so the session
+is known to answer before a real command depends on it.
 
 ## Behaviour that must not change
 

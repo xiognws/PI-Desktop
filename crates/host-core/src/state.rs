@@ -69,6 +69,10 @@ pub struct AppState {
     /// Lives with the host process; `shutdown` stops every running task.
     pub background_tasks: crate::background_tasks::BackgroundTaskRegistry,
     pub tool_budget: ToolBudget,
+    /// Cumulative tool output charged per turn, so one turn cannot spend the
+    /// window on tool results. Process-local and bounded; see
+    /// `crate::tools::TurnOutputLedger`.
+    pub output_ledger: crate::tools::TurnOutputLedger,
     /// (session_id, tool_call_id) -> cancellation signal for an active Bash
     /// process. The signal is removed by the execution owner in all outcomes.
     pub active_bash_cancellations: HashMap<(String, String), tokio::sync::watch::Sender<bool>>,
@@ -191,6 +195,7 @@ impl AppState {
             plugin_delete_rates: HashMap::new(),
             plugin_message_write_rates: HashMap::new(),
             tool_budget: ToolBudget::new(),
+            output_ledger: crate::tools::TurnOutputLedger::new(),
             active_bash_cancellations: HashMap::new(),
             active_tool_cancellations: HashMap::new(),
             pending_permissions: HashMap::new(),

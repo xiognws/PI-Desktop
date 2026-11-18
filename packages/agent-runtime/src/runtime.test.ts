@@ -16,6 +16,7 @@ import {
 import { formatSessionMessage, type SessionMessageOrigin } from "@pi-workspace/shared";
 import { estimateContextTokens as estimateTranscriptTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { buildSessionContext } from "./session-context.js";
+import { TOOL_RESULT_ELISION_PREFIX } from "./tool-result-elision.js";
 import { estimateContextTokens as estimateAgentContextTokens, estimateTokens } from "./pi-runtime-estimates.js";
 import {
   COMPACTION_FALLBACK_MARKER,
@@ -516,6 +517,13 @@ describe("ordered read preparation", () => {
       expect(host.call).toHaveBeenCalledWith("tools.execute", expect.objectContaining({
         toolCallId: "child-prepared", args: { path: "child/file.ts" },
       }));
+      // The Host sizes its tool-output budget from the window (spec 16 §2a), so
+      // every dispatch must carry it; without the field the Host keeps its old
+      // byte constants and a fat Read still eats the context.
+      const dispatched = host.call.mock.calls.find(([method]) => method === "tools.execute")?.[1] as
+        | { contextWindowTokens?: number }
+        | undefined;
+      expect(dispatched?.contextWindowTokens).toBeGreaterThan(0);
     } finally { await runtime.dispose(); }
   });
 });
@@ -1541,6 +1549,11 @@ describe("custom system prompt files (issue #542)", () => {
     expect(prompt).toContain("do not use ranges or GitHub #L anchors");
     expect(prompt).toContain("Do not wrap links in backticks or use file://, vscode://, or https://");
     expect(prompt).toContain("Editing workflow: inside the advertised workspace");
+    // Token cost: one batched message is one provider request, so the prompt has
+    // to say that independent reads belong together, and that a sequential tool
+    // (Bash, skills, plugins) would drag the whole batch back to one at a time.
+    expect(prompt).toContain("Batching: when several reads, searches or lookups do not depend on each other");
+    expect(prompt).toContain("A batch that also holds a sequential tool (Bash, skills, plugins) runs one call at a time");
     expect(prompt).toContain("You are operating in Agent mode.");
 
     await runtime.dispose();
@@ -3969,6 +3982,7 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       "TaskList",
       "TaskStop",
       "new_context",
+      "compress",
       "ToolSearch",
     ]);
     expect((runtime as any).deferredToolNames.has("Glob")).toBe(false);
@@ -8172,6 +8186,90 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
+  it("queues a `compress` request and compacts for it as a manual checkpoint", async () => {
+    const runtime = createRuntime();
+    const tool = (runtime as any).agent.state.tools.find(
+      (candidate: any) => candidate.name === "compress",
+    );
+    expect(tool).toBeDefined();
+
+    const runCompaction = vi
+      .spyOn(runtime as any, "runCompaction")
+      .mockResolvedValue(true);
+    const first = await tool.execute("call-1", { reason: "history is mostly build logs" });
+    // Safety: the call records the request and compacts nothing, so the results
+    // this batch is holding survive until the boundary.
+    expect(runCompaction).not.toHaveBeenCalled();
+    expect(first.content[0].text).toContain("Compression queued");
+    expect((runtime as any).pendingCompression).toMatchObject({
+      manual: true,
+      note: "history is mostly build logs",
+    });
+
+    // A second call reports the queue instead of adding a second compression.
+    const second = await tool.execute("call-2", {});
+    expect(second.content[0].text).toContain("already queued");
+    expect(second.details?.alreadyQueued).toBe(true);
+
+    // Well under the hard limit, so only the model's request drives this.
+    vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
+      tokens: 10_000,
+      hardLimit: 224_000,
+      requestHeadroom: 32_000,
+      keepRecentTokens: 44_800,
+    });
+    await (runtime as any).prepareNextTurn(nextTurn);
+    expect(runCompaction).toHaveBeenCalledWith("manual", false, "active_turn");
+    expect((runtime as any).pendingCompression).toBeUndefined();
+
+    await runtime.dispose();
+  });
+
+  it("does not leave a failed `compress` request queued for the next boundary", async () => {
+    const runtime = createRuntime();
+    const tool = (runtime as any).agent.state.tools.find(
+      (candidate: any) => candidate.name === "compress",
+    );
+    await tool.execute("call-1", {});
+    vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
+      tokens: 10_000,
+      hardLimit: 224_000,
+      requestHeadroom: 32_000,
+      keepRecentTokens: 44_800,
+    });
+    const runCompaction = vi
+      .spyOn(runtime as any, "runCompaction")
+      .mockResolvedValue(false);
+
+    // The attempt fails, the turn continues, and the request is spent: a failed
+    // checkpoint must not spend a summary request at every following boundary.
+    await (runtime as any).prepareNextTurn(nextTurn);
+    expect(runCompaction).toHaveBeenCalledOnce();
+    expect((runtime as any).pendingCompression).toBeUndefined();
+
+    await (runtime as any).prepareNextTurn(nextTurn);
+    expect(runCompaction).toHaveBeenCalledOnce();
+
+    await runtime.dispose();
+  });
+
+  it("refuses a `compress` request when this session cannot compact", async () => {
+    const runtime = createRuntime({
+      compactionSettings: {
+        enabled: false,
+        reserveTokens: 16_384,
+        keepRecentTokens: 20_000,
+      },
+    });
+
+    // No checkpoint exists to ask for, so nothing is queued and the model is
+    // told the truth instead of being handed a boundary that never comes.
+    expect((runtime as any).requestCompression("no room left")).toBe("disabled");
+    expect((runtime as any).pendingCompression).toBeUndefined();
+
+    await runtime.dispose();
+  });
+
   it("does not fail the turn when a model-requested compaction fails", async () => {
     const runtime = createRuntime();
     (runtime as any).pendingModelCompaction = true;
@@ -9185,9 +9283,13 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const after = (runtime as any).agent.state.tools.map(
       (tool: any) => tool.name,
     );
-    // With protection off there is no checkpoint to ask for, so the tool would
-    // only ever return a promise the host does not keep.
-    expect(after).toEqual(before.filter((name: string) => name !== "new_context"));
+    // With protection off there is no checkpoint to ask for, so both context
+    // tools would only ever return a promise the host does not keep.
+    expect(after).toEqual(
+      before.filter(
+        (name: string) => name !== "new_context" && name !== "compress",
+      ),
+    );
     await runtime.dispose();
   });
 
@@ -15068,6 +15170,122 @@ describe("background Bash job waits in the production runtime", () => {
       finish({ state: "running" });
     } finally {
       await runtime.dispose();
+    }
+  });
+});
+
+describe("stale tool-result elision on the provider request", () => {
+  /** One restored Grep call/result pair, both rows adjacent. */
+  const historyWith = (pairs: number): UiMessage[] => {
+    const history: UiMessage[] = [
+      {
+        id: "user-1",
+        role: "user",
+        content: "read the form code",
+        createdAt: new Date().toISOString(),
+        status: "complete",
+      },
+    ];
+    for (let index = 0; index < pairs; index += 1) {
+      history.push({
+        id: `assistant-${index}`,
+        role: "assistant",
+        content: `Looking at part ${index}.`,
+        createdAt: new Date().toISOString(),
+        status: "complete",
+      });
+      history.push({
+        id: `tool-${index}`,
+        role: "tool",
+        content: "",
+        createdAt: new Date().toISOString(),
+        status: "complete",
+        toolName: "Grep",
+        toolCallId: `call-${index}`,
+        toolStatus: "success",
+        toolArgs: { pattern: `needle${index}` },
+        toolResult: {
+          content: [{ type: "text", text: `index.html:${index} ${"match ".repeat(80)}` }],
+          details: { count: 1 },
+        },
+      });
+    }
+    return history;
+  };
+
+  /** Run one prompt and hand back the messages the provider actually got. */
+  async function firstRequest(history: UiMessage[]) {
+    const runtime = createRuntime({ history, subagents: [] });
+    const requests: AgentMessage[][] = [];
+    (runtime as unknown as { models: unknown }).models = {
+      streamSimple: (_model: unknown, context: { messages: AgentMessage[] }) => {
+        requests.push([...context.messages]);
+        const message = assistantMessage({
+          content: [{ type: "text", text: "Done." }],
+        }) as unknown as AssistantMessage;
+        const stream = createAssistantMessageEventStream();
+        queueMicrotask(() => {
+          stream.push({ type: "start", partial: message });
+          stream.push({ type: "done", reason: "stop", message });
+          stream.end(message);
+        });
+        return stream;
+      },
+    };
+    await runtime.prompt("keep going", "user", "turn-1");
+    await runtime.dispose();
+    expect(requests.length).toBeGreaterThan(0);
+    return requests[0];
+  }
+
+  const resultsOf = (messages: AgentMessage[]) =>
+    messages.filter((message) => message.role === "toolResult") as {
+      toolCallId: string;
+      toolName: string;
+      content: { type: string; text?: string }[];
+    }[];
+
+  it("clears the stale results of a long session, keeps the newest four, and pairs every call", async () => {
+    const sent = await firstRequest(historyWith(8));
+    const results = resultsOf(sent);
+
+    expect(results).toHaveLength(8);
+    const cleared = results.filter((result) =>
+      result.content[0]?.text?.startsWith(TOOL_RESULT_ELISION_PREFIX),
+    );
+    expect(cleared).toHaveLength(4);
+    // The newest four are still the real output.
+    for (const result of results.slice(-4)) {
+      expect(result.content[0]?.text).toContain("match match match");
+    }
+    // The marker names the tool that produced it.
+    for (const result of cleared) expect(result.content[0]?.text).toContain("Grep");
+
+    // Pairing: every call id is present once, in order, on both sides.
+    const callIds = sent.flatMap((message) =>
+      message.role === "assistant"
+        ? (message.content as { type: string; id?: string }[])
+            .filter((block) => block.type === "toolCall")
+            .map((block) => block.id ?? "")
+        : [],
+    );
+    expect(callIds).toEqual(["call-0", "call-1", "call-2", "call-3", "call-4", "call-5", "call-6", "call-7"]);
+    expect(results.map((result) => result.toolCallId)).toEqual(callIds);
+  });
+
+  it("sends every result whole when PI_DESKTOP_TOOL_RESULT_ELISION=0", async () => {
+    const previous = process.env.PI_DESKTOP_TOOL_RESULT_ELISION;
+    process.env.PI_DESKTOP_TOOL_RESULT_ELISION = "0";
+    try {
+      const results = resultsOf(await firstRequest(historyWith(8)));
+      expect(results).toHaveLength(8);
+      for (const result of results) {
+        expect(result.content[0]?.text?.startsWith(TOOL_RESULT_ELISION_PREFIX)).toBe(false);
+        expect(result.content[0]?.text).toContain("match match match");
+      }
+    } finally {
+      if (previous === undefined) delete process.env.PI_DESKTOP_TOOL_RESULT_ELISION;
+      else process.env.PI_DESKTOP_TOOL_RESULT_ELISION = previous;
     }
   });
 });

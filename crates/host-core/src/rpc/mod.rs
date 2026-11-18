@@ -4751,7 +4751,7 @@ async fn handle_request(
                 // runner, and bookkeeping so every accepted call is bounded.
                 // A subagent working in its own worktree (ADR 0329) is not
                 // stopped while its session's worktree is held for a merge.
-                let (tool_budget, own_worktree) = {
+                let (tool_budget, own_worktree, output_ledger) = {
                     let st = state.lock().await;
                     let own = if remote_workspace.is_none()
                         && crate::file_resources::is_file_tool(&p.tool_name)
@@ -4767,8 +4767,15 @@ async fn handle_request(
                             Ok(Some(_))
                         )
                     };
-                    (st.tool_budget.clone(), own)
+                    (st.tool_budget.clone(), own, st.output_ledger.clone())
                 };
+                // A caller that knows the model window gets budgets scaled to
+                // it; one that does not keeps the per-tool constants.
+                let output_budget = output_ledger.plan(
+                    &p.session_id,
+                    p.turn_id.as_deref(),
+                    p.context_window_tokens,
+                );
                 let file_resources = if remote_workspace.is_none()
                     && crate::file_resources::is_file_tool(&p.tool_name)
                 {
@@ -5042,6 +5049,7 @@ async fn handle_request(
                             visualization_root: visualization_path.as_deref(),
                             python_executable: python_executable.as_deref(),
                             python_tools_dir: python_tools_dir.as_deref(),
+                            output_budget: output_budget.clone(),
                         },
                         Some(tool_permit.clone()),
                         file_resources.clone(),
@@ -9236,6 +9244,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: crate::tools::OutputBudgetPlan::legacy(),
             },
         )
         .await;
@@ -9260,6 +9269,7 @@ mod tests {
                 visualization_root: None,
                 python_executable: None,
                 python_tools_dir: None,
+                output_budget: crate::tools::OutputBudgetPlan::legacy(),
             },
         )
         .await;

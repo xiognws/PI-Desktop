@@ -57,10 +57,21 @@ const REDUCED_TOOL_RESULT_SUFFIX = "\n\n[... tool output truncated for the summa
  */
 export const COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS = 2_048;
 /**
- * Upper bound on the summary requests one checkpoint may issue. A range needing
- * more than this is not a compaction any more; it falls back.
+ * Upper bound on the summary requests one checkpoint may issue on the target
+ * path (see {@link COMPACTION_SUMMARY_CHUNK_TARGET_SHARE}). A range that needs
+ * more than this is planned again at the full request budget
+ * ({@link COMPACTION_SUMMARY_COVERAGE_MAX_CHUNKS}) rather than dropped, so the
+ * request cap never costs a message its coverage.
  */
-export const COMPACTION_SUMMARY_MAX_CHUNKS = 16;
+export const COMPACTION_SUMMARY_MAX_CHUNKS = 8;
+/**
+ * Coverage ceiling for a split summary, kept at the pre-change bound. It is
+ * only reached by a range too large for {@link COMPACTION_SUMMARY_MAX_CHUNKS}
+ * chunks at the target size — a checkpoint that would otherwise fall back to
+ * retained-tail recovery and lose the summary entirely. Coverage wins over cost
+ * there; every other range stays on the cheaper target path.
+ */
+export const COMPACTION_SUMMARY_COVERAGE_MAX_CHUNKS = 16;
 /**
  * Share of a chunk's budget the planner fills. A chunk is sized from
  * `estimateTokens`, while the request carries pi's serialized form — per-message
@@ -68,6 +79,18 @@ export const COMPACTION_SUMMARY_MAX_CHUNKS = 16;
  * keeps every planned request inside the window it was planned for.
  */
 export const COMPACTION_SUMMARY_CHUNK_MARGIN = 0.9;
+/**
+ * Share of the request budget one chunk of a split summary targets. The
+ * pre-change sizing filled ~84% of the window in every chunk (measured at a
+ * 200k-token request budget: 168k per chunk), so a split summary issued a
+ * handful of near-window prompts, each carrying the running summary, and the
+ * cap of 16 reached ~3.9M prompt tokens for one checkpoint on a 256k window.
+ * A quarter of the budget keeps every request of the common case small and
+ * bounds the target path at one half window of prompt per checkpoint. Ranges
+ * the target size cannot cover in {@link COMPACTION_SUMMARY_MAX_CHUNKS} requests
+ * are re-planned at the full budget instead of being dropped.
+ */
+export const COMPACTION_SUMMARY_CHUNK_TARGET_SHARE = 0.25;
 /** Appended when a single message alone exceeds one chunk's budget. */
 export const SUMMARY_CHUNK_TRUNCATION_MARKER =
   "\n\n[message truncated: the summary request budget could not carry it whole]";
@@ -102,6 +125,13 @@ export function estimateSummaryPromptTokens(input: CompactionSummaryInput): numb
  * arguments survive intact, so the summary still covers every message the
  * checkpoint will file behind its boundary. Returns undefined when nothing was
  * reducible, so the caller can fall back without a pointless second request.
+ *
+ * The tool-result cut is the cheapest thing in this file: a summary only has to
+ * know that a call happened and roughly what it returned, so every result is
+ * bounded regardless of age — including the newest ones, and including both
+ * sides of a split turn. Tool output is what makes a tool-heavy range large, and
+ * the summary request pays for it once per chunk, so a recency exemption would
+ * put the whole cost of a fresh result back on every chunk it lands in.
  */
 export function reduceSummaryInput<T extends CompactionSummaryInput>(
   input: T,
@@ -209,10 +239,22 @@ export function compactionSummaryReserveTokens(input: {
  * ends on one summary covering the whole range. `reserveTokens` is the room the
  * running summary and the previous summary may take in a chunk's prompt.
  *
- * Returns undefined when the range cannot be split: it is empty, or it would
- * need more than {@link COMPACTION_SUMMARY_MAX_CHUNKS} requests. A single
- * message larger than the budget is truncated rather than dropped, so no message
- * ever leaves the summary's scope.
+ * Three plans, cheapest first:
+ *
+ * 1. the whole range in one chunk when it fits the request budget — one request
+ *    is always the cheapest checkpoint, and the range is not split for its own
+ *    sake;
+ * 2. chunks at {@link COMPACTION_SUMMARY_CHUNK_TARGET_SHARE} of that budget,
+ *    at most {@link COMPACTION_SUMMARY_MAX_CHUNKS} requests;
+ * 3. chunks at the full budget, at most
+ *    {@link COMPACTION_SUMMARY_COVERAGE_MAX_CHUNKS} requests.
+ *
+ * Plan 2 leaves plan 3 for a range it cannot cover intact, and plan 3 is the
+ * pre-change sizing, so a smaller chunk never costs a message its place in the
+ * summary. Returns undefined only when even plan 3 cannot cover the range: it
+ * is empty, or it would need more requests than the coverage ceiling allows. A
+ * single message larger than the chunk budget is truncated rather than dropped,
+ * so no message ever leaves the summary's scope.
  */
 export function planSummaryChunks(
   input: CompactionSummaryInput,
@@ -223,34 +265,78 @@ export function planSummaryChunks(
     ...(input.isSplitTurn ? input.turnPrefixMessages : []),
   ];
   if (range.length === 0) return undefined;
-  const budget = Math.max(
+  const costs = range.map((message) => Math.max(1, Math.ceil(estimateTokens(message))));
+  const fullBudget = Math.max(
     1,
     Math.floor(
       (options.summaryInputLimit - Math.max(0, options.reserveTokens)) *
         COMPACTION_SUMMARY_CHUNK_MARGIN,
     ),
   );
+  // One request is cheaper than any split: fewer carried summaries and no
+  // repeated prompt overhead. Only a range that does not fit is planned apart.
+  if (costs.reduce((sum, cost) => sum + cost, 0) <= fullBudget) return [range];
+  const targetBudget = Math.max(
+    1,
+    Math.floor(fullBudget * COMPACTION_SUMMARY_CHUNK_TARGET_SHARE),
+  );
+  const targeted = planSummaryChunksAtBudget(
+    range,
+    costs,
+    targetBudget,
+    COMPACTION_SUMMARY_MAX_CHUNKS,
+    false,
+  );
+  if (targeted) return targeted;
+  // The cheaper plan cannot cover this range: fall back to the pre-change
+  // sizing, which carries whole messages and reaches further, instead of
+  // dropping history out of the summary.
+  return planSummaryChunksAtBudget(
+    range,
+    costs,
+    fullBudget,
+    COMPACTION_SUMMARY_COVERAGE_MAX_CHUNKS,
+    true,
+  );
+}
+
+/**
+ * Pack `range` into contiguous chunks of at most `budgetTokens`. With
+ * `truncateOversized` a message larger than the budget keeps a bounded prefix
+ * instead of leaving the range uncovered; without it such a message makes the
+ * whole plan fail, which is how the target pass hands the range to the coverage
+ * pass rather than silently trimming a message the cheaper budget cannot carry.
+ */
+function planSummaryChunksAtBudget(
+  range: AgentMessage[],
+  costs: number[],
+  budgetTokens: number,
+  maxChunks: number,
+  truncateOversized: boolean,
+): AgentMessage[][] | undefined {
   const chunks: AgentMessage[][] = [];
   let current: AgentMessage[] = [];
   let tokens = 0;
-  for (const message of range) {
-    const cost = Math.max(1, Math.ceil(estimateTokens(message)));
-    if (current.length > 0 && tokens + cost > budget) {
+  for (const [index, message] of range.entries()) {
+    const cost = costs[index] ?? 1;
+    if (cost > budgetTokens && !truncateOversized) return undefined;
+    const fit = Math.min(cost, budgetTokens);
+    if (current.length > 0 && tokens + fit > budgetTokens) {
       chunks.push(current);
-      if (chunks.length >= COMPACTION_SUMMARY_MAX_CHUNKS) return undefined;
+      if (chunks.length >= maxChunks) return undefined;
       current = [];
       tokens = 0;
     }
     current.push(
-      cost > budget
+      cost > budgetTokens
         ? truncateMessageText(
             message,
-            Math.floor(budget * ESTIMATED_TEXT_CHARS_PER_TOKEN),
+            Math.floor(budgetTokens * ESTIMATED_TEXT_CHARS_PER_TOKEN),
             SUMMARY_CHUNK_TRUNCATION_MARKER,
           )
         : message,
     );
-    tokens += Math.min(cost, budget);
+    tokens += fit;
   }
   if (current.length > 0) chunks.push(current);
   return chunks.length > 0 ? chunks : undefined;

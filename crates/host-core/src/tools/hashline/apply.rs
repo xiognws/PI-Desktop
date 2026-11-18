@@ -542,11 +542,15 @@ pub fn apply_edit(
         }
     } else if let Some((session, store)) = session_id.zip(store) {
         let snap = store.latest_matching_text(session, canonical_path, &live.text);
-        match check_provenance(
-            &live_lines,
-            &plan,
-            snap.as_ref().and_then(|s| s.seen_lines.as_ref()),
-        ) {
+        // When a snapshot exists but has no seen_lines (None), treat it as an
+        // empty set so every anchor is rejected — fail closed, not silently.
+        // An absent snapshot (snap is None) still skips the gate, because
+        // without a matching text record there is nothing to validate against.
+        let empty_seen = BTreeSet::new();
+        let seen = snap
+            .as_ref()
+            .map(|s| s.seen_lines.as_ref().unwrap_or(&empty_seen));
+        match check_provenance(&live_lines, &plan, seen) {
             Ok(_) => {}
             Err(err) if err.code == "EDIT_LINES_UNSEEN" => {
                 let merged = err
@@ -599,6 +603,12 @@ pub fn apply_edit(
             "apply produced identical text; widen or shrink the range so it names changed lines only",
         ));
     }
+
+    // Surface a non-blocking delta warning when a PUT range replaces a different
+    // number of lines than its body provides — the most common silent-deletion
+    // signal. Only checked after the no-op guard so a genuine no-op (already an
+    // error) does not also emit warnings.
+    warnings.extend(delta_warnings(&parsed));
     let next_tag = tag_of_lf_text(&next_text);
     let next_file = NormalizedFile {
         text: next_text.clone(),
@@ -618,6 +628,32 @@ pub fn apply_edit(
     ))
 }
 
+/// Warn when a `PUT N.=M:` replaces a different number of lines than its body
+/// provides. A mismatch is not always wrong — replacing one line with three is
+/// a normal expansion — but a large or unexpected delta is the most common way
+/// a miscounted range silently deletes or duplicates code. The warning is
+/// non-blocking: the edit still applies, but the model and the user can see the
+/// delta and catch a mistake before it propagates.
+fn delta_warnings(ops: &ParsedOps) -> Vec<String> {
+    let mut warnings = Vec::new();
+    for op in &ops.ops {
+        if let ParsedOp::Put {
+            locator: Locator::Range { start, end },
+            body,
+            ..
+        } = op
+        {
+            let deleted = (*end - *start + 1) as usize;
+            let inserted = body.len();
+            if deleted != inserted {
+                warnings.push(format!(
+                    "PUT {start}.={end}: replaces {deleted} line(s) with {inserted}; verify the range and body match your intent"
+                ));
+            }
+        }
+    }
+    warnings
+}
 pub fn encode_success(file: &NormalizedFile) -> Vec<u8> {
     encode_bytes(&file.text, file.ending, file.bom, file.utf16)
 }
@@ -762,5 +798,122 @@ mod tests {
         )
         .unwrap();
         assert_eq!(ok.text, "a\nb\nC\nd\n");
+    }
+    #[test]
+    fn delta_warning_on_unequal_range() {
+        let bytes = b"one\ntwo\nthree\nfour\n";
+        let tag = tag_of_bytes(bytes);
+        let (_ok, success) = apply_edit(
+            "f.txt",
+            "/ws/f.txt",
+            &tag,
+            "PUT 2.=3:\n+TWO\n",
+            bytes,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(success.warnings.len(), 1);
+        assert!(
+            success.warnings[0].contains("replaces 2 line(s) with 1"),
+            "got: {:?}",
+            success.warnings
+        );
+    }
+    #[test]
+    fn no_delta_warning_when_range_matches_body() {
+        let bytes = b"one\ntwo\nthree\n";
+        let tag = tag_of_bytes(bytes);
+        let (_ok, success) = apply_edit(
+            "f.txt",
+            "/ws/f.txt",
+            &tag,
+            "PUT 2.=2:\n+TWO\n",
+            bytes,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(success.warnings.is_empty(), "got: {:?}", success.warnings);
+    }
+    #[test]
+    fn no_delta_warning_on_pure_insert_or_cut() {
+        let bytes = b"a\nb\n";
+        let tag = tag_of_bytes(bytes);
+        let (_ok, success) = apply_edit(
+            "f.txt",
+            "/ws/f.txt",
+            &tag,
+            "PUT <1:\n+x\n",
+            bytes,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(
+            success.warnings.is_empty(),
+            "insert got: {:?}",
+            success.warnings
+        );
+        let bytes2 = b"a\nb\nc\n";
+        let tag2 = tag_of_bytes(bytes2);
+        let (_ok, success) = apply_edit(
+            "f.txt",
+            "/ws/f.txt",
+            &tag2,
+            "CUT 1.=1\n",
+            bytes2,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(
+            success.warnings.is_empty(),
+            "cut got: {:?}",
+            success.warnings
+        );
+    }
+    #[test]
+    fn delta_warning_on_multi_line_expansion() {
+        let bytes = b"a\nb\n";
+        let tag = tag_of_bytes(bytes);
+        let (_ok, success) = apply_edit(
+            "f.txt",
+            "/ws/f.txt",
+            &tag,
+            "PUT 1.=1:\n+x\n+y\n+z\n",
+            bytes,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(success.warnings.len(), 1);
+        assert!(
+            success.warnings[0].contains("replaces 1 line(s) with 3"),
+            "got: {:?}",
+            success.warnings
+        );
+    }
+    #[test]
+    fn provenance_fail_closed_when_seen_lines_none() {
+        let store = HashlineStore::new();
+        let bytes = b"a\nb\nc\nd\n";
+        let file = normalize_file(bytes);
+        let tag = tag_of_lf_text(&file.text);
+        // Record with seen_lines = None: a snapshot exists but no lines were
+        // displayed. Every anchor must be rejected — fail closed.
+        store.record("s", "/ws/f.txt", &file, &tag, None);
+        let err = apply_edit(
+            "f.txt",
+            "/ws/f.txt",
+            &tag,
+            "PUT 1.=1:\n+A\n",
+            bytes,
+            Some("s"),
+            Some(&store),
+        )
+        .unwrap_err();
+        assert_eq!(err.code, "EDIT_LINES_UNSEEN");
+        assert_eq!(err.extra["unseenCount"], json!(1));
     }
 }

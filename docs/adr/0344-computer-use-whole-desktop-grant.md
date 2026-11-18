@@ -6,7 +6,7 @@
 - Deciders: PI-Desktop core
 - Related: [ADR 0342](0342-os-computer-use-capability.md) ·
   [ADR 0310](0310-local-permission-approvals-without-deadline.md) ·
-  [03-runtime/computer-use](../spec/03-runtime/computer-use.md) ·
+  the former `03-runtime/computer-use` spec (removed 2026-11-17) ·
   [05-security/01-security](../spec/05-security/01-security.md) ·
   [03-runtime/08-error-codes](../spec/03-runtime/08-error-codes.md)
 

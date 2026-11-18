@@ -1,22 +1,31 @@
 /**
  * Plugin host process (ADR 0008).
  *
- * One instance runs exactly one plugin's main module, outside the Electron main
+ * One process hosts one or more plugins' main modules, outside the Electron main
  * process. It owns no host capability: every `pi.*` call is proxied back to the
  * broker in `plugin-runtime.ts`, where the permission gateway and the host API
  * allowlist live. Plain ESM JS (not TS) so the same file can be forked directly
  * by tests and bundled to `out/main/plugin-host-process.js` for the app.
  *
- * Wire protocol (both directions, one JSON message per frame):
+ * Multi-tenant: the process is shared, so `init` creates a tenant per plugin and
+ * every frame names the tenant it belongs to. Each tenant owns its own module,
+ * registrations, subscriptions and in-flight calls; a failure in one tenant is
+ * answered to that tenant and never ends the process. Only a process-level fault
+ * (OOM, an access violation, `process.exit` in plugin code) is shared.
+ *
+ * Wire protocol (both directions, one JSON message per frame). `pluginId` routes
+ * a frame to its tenant on both sides and is required on every frame except the
+ * `init` that creates the tenant; a host holding exactly one tenant accepts a
+ * frame without it, which is what a per-plugin process always did.
  *   parent -> child  { t: "init", id, pluginId, pluginPath, main, manifest }
- *   parent -> child  { t: "call", id, method, payload, invocationId? } command.run | tool.execute |
+ *   parent -> child  { t: "call", id, pluginId, method, payload, invocationId? } command.run | tool.execute |
  *                                                        service.start | service.stop |
  *                                                        lifecycle.unload
- *   child  -> parent { t: "call", id, api, args, invocationId? } host API request
- *   parent -> child  { t: "cancel", invocationId, reason } abort one tool invocation
- *   *      -> *      { t: "res", id, ok, value } | { t: "res", id, ok: false, error: { code, message } }
- *   parent -> child  { t: "event", event, ... }           push, no reply (bus.message, host events)
- *   child  -> parent { t: "log", level, message }         diagnostics, fire and forget
+ *   child  -> parent { t: "call", id, pluginId, api, args, invocationId? } host API request
+ *   parent -> child  { t: "cancel", pluginId, invocationId | callId, reason } abort one call
+ *   *      -> *      { t: "res", id, pluginId, ok, value } | { t: "res", id, ok: false, error: { code, message } }
+ *   parent -> child  { t: "event", pluginId, event, ... }  push, no reply (bus.message, host events)
+ *   child  -> parent { t: "log", pluginId, level, message } diagnostics, fire and forget
  */
 import Module from "node:module";
 import { pathToFileURL } from "node:url";
@@ -37,31 +46,70 @@ function onHostMessage(handler) {
   else process.on("message", handler);
 }
 
-function log(level, message) {
-  send({ t: "log", level, message: String(message) });
+function log(pluginId, level, message) {
+  send({ t: "log", pluginId, level, message: String(message) });
 }
 
-let pluginId = "";
-let pluginPath = "";
-let manifest = { id: "", name: "", version: "", main: "", schemaVersion: 1 };
-let pluginModule = null;
+/**
+ * One tenant per plugin id: everything a plugin registers, awaits or subscribes
+ * to lives here, never at module scope. A second `init` for the same id replaces
+ * the tenant, which is what a reload expects.
+ */
+const tenants = new Map();
 
+/** Host API calls awaiting the broker's answer, keyed by the id we handed out. */
 const pending = new Map();
-const invocations = new Map();
+/** Tool/panel invocations currently running, per tenant (see `tenant.invocations`). */
 const invocationContext = new AsyncLocalStorage();
+/** The tenant whose code is running, so the shared `pi` global resolves to it. */
+const tenantContext = new AsyncLocalStorage();
 let nextCallId = 1;
 
+function createTenant(message) {
+  const pluginId = String(message.pluginId ?? "");
+  return {
+    pluginId,
+    pluginPath: String(message.pluginPath ?? ""),
+    manifest: message.manifest ?? { id: pluginId, name: pluginId, version: "", main: "", schemaVersion: 1 },
+    module: null,
+    /** Built in `handleInit`, before the plugin module is evaluated. */
+    pi: null,
+    commands: new Map(),
+    tools: new Map(),
+    speechHandles: new Map(),
+    services: new Map(),
+    busHandlers: new Map(),
+    eventListeners: new Map(),
+    /** Parent initiated OAuth callbacks, keyed by the parent's call id. */
+    parentCallControllers: new Map(),
+    /** Tool invocations in flight, keyed by the host's invocation id. */
+    invocations: new Map(),
+  };
+}
+
+/**
+ * The tenant a frame belongs to. An untagged frame is only unambiguous when one
+ * tenant exists — the per-plugin process case, and the only case that ever sent
+ * untagged frames.
+ */
+function resolveTenant(message) {
+  const pluginId = typeof message.pluginId === "string" ? message.pluginId : "";
+  if (pluginId) return tenants.get(pluginId);
+  if (tenants.size === 1) return [...tenants.values()][0];
+  return undefined;
+}
+
 /** Proxy a host API call to the broker and await its verdict. */
-function call(api, args = []) {
+function tenantCall(tenant, api, args = []) {
   const invocation = invocationContext.getStore();
-  if (invocation && (invocation.controller.signal.aborted || invocations.get(invocation.id) !== invocation)) {
+  if (invocation && (invocation.controller.signal.aborted || tenant.invocations.get(invocation.id) !== invocation)) {
     return Promise.reject(invocation.controller.signal.reason ?? toolAbortedError("Plugin tool invocation finished"));
   }
   const id = `c${nextCallId++}`;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject, invocationId: invocation?.id });
+    pending.set(id, { resolve, reject, invocationId: invocation?.id, tenant });
     try {
-      send({ t: "call", id, api, args, ...(invocation ? { invocationId: invocation.id } : {}) });
+      send({ t: "call", pluginId: tenant.pluginId, id, api, args, ...(invocation ? { invocationId: invocation.id } : {}) });
     } catch (error) {
       pending.delete(id);
       reject(error);
@@ -91,12 +139,36 @@ function rejectInvocationCalls(invocationId, error) {
   }
 }
 
-function cancelInvocation(invocationId, reason) {
-  const invocation = invocations.get(invocationId);
+function cancelInvocation(tenant, invocationId, reason) {
+  const invocation = tenant.invocations.get(invocationId);
   if (!invocation || invocation.controller.signal.aborted) return;
   const error = toolAbortedError(reason || "Plugin tool execution aborted");
   invocation.controller.abort(error);
   rejectInvocationCalls(invocationId, error);
+}
+
+/**
+ * Drop everything one tenant owns: in-flight tool invocations, OAuth callbacks
+ * and host calls still waiting for an answer.
+ *
+ * This is the tenant-level stand-in for what killing a per-plugin process used
+ * to do. The rest of the process keeps running, and the abandoned promises fail
+ * with the same `PLUGIN_TOOL_ABORTED` / `PLUGIN_UNLOADED` codes the caller saw
+ * before, so plugin code does not have to learn a new failure mode.
+ */
+function detachTenant(tenant, reason) {
+  const error = toolAbortedError(reason);
+  for (const id of [...tenant.invocations.keys()]) cancelInvocation(tenant, id, reason);
+  for (const [id, controller] of tenant.parentCallControllers) {
+    controller.abort(error);
+    tenant.parentCallControllers.delete(id);
+  }
+  for (const [id, entry] of [...pending]) {
+    if (entry.tenant !== tenant) continue;
+    pending.delete(id);
+    entry.reject(error);
+  }
+  if (tenants.get(tenant.pluginId) === tenant) tenants.delete(tenant.pluginId);
 }
 
 function settle(message) {
@@ -147,29 +219,49 @@ function normalizeBytes(value) {
   );
 }
 
-// Contribution points registered by this plugin. The callable half stays here;
-// the broker only ever holds the descriptor plus a proxy back into this process.
-const commands = new Map();
-const tools = new Map();
-const speechHandles = new Map();
-// Parent initiated OAuth callbacks can outlive the UI prompt. Their own
-// cancellation signal lets the plugin stop polling or clean up local state.
-const parentCallControllers = new Map();
-// Resident services declared in the manifest. The broker decides when they run;
-// this map only holds the callables and whether they are currently up.
-const services = new Map();
-// Bus subscriptions keyed by the id the broker handed out, plus the `pi.events`
-// listeners. Both are driven by the parent's push frames.
-const busHandlers = new Map();
-const eventListeners = new Map();
+// Contribution points, callables, host-call promises and subscriptions live on
+// the tenant (`createTenant`), never here: two plugins in one process must not
+// share a command table any more than they shared a process before.
 
-function buildApi() {
+/**
+ * The `pi` global is process-wide; a plugin module reads it while it evaluates
+ * and cannot be handed a private copy of the global. It resolves the tenant from
+ * the running context instead, so `const pi = globalThis.pi` captured by one
+ * plugin still reaches that plugin's own registrations and broker calls.
+ * `AsyncLocalStorage` carries the tenant through timers and promises, which is
+ * why a service loop started in `onLoad` keeps its own identity too.
+ */
+function currentTenant() {
+  const active = tenantContext.getStore();
+  if (active) return active;
+  if (tenants.size === 1) return [...tenants.values()][0];
+  const error = new Error("plugin host has no active plugin context");
+  error.code = "PLUGIN_CONTEXT_MISSING";
+  throw error;
+}
+
+globalThis.pi = new Proxy(
+  {},
+  {
+    get(_target, group) {
+      const api = currentTenant().pi;
+      return api ? api[group] : undefined;
+    },
+  },
+);
+
+function buildApi(tenant) {
+  const { commands, tools, speechHandles, services, busHandlers, eventListeners } = tenant;
+  /** Every `pi.*` call crosses here, tagged with this tenant's id. */
+  const call = (api, args) => tenantCall(tenant, api, args);
   return {
     app: {
       getVersion: () => call("app.getVersion"),
       getLocale: () => call("app.getLocale"),
       getAppearance: () => call("app.getAppearance"),
       setTheme: (themeId) => call("app.setTheme", [themeId]),
+      isFocused: () => call("app.isFocused"),
+      getFileIcon: (targetPath) => call("app.getFileIcon", [targetPath]),
     },
     themes: {
       upsert: (input) => call("themes.upsert", [input]),
@@ -178,8 +270,11 @@ function buildApi() {
       setVariables: (themeId, values) => call("themes.setVariables", [themeId, values]),
     },
     plugin: {
-      getId: () => pluginId,
-      getManifest: () => manifest,
+      // Tenant-scoped: the module no longer holds a single plugin's identity,
+      // so reading a bare `pluginId` here threw for every plugin after the
+      // shared-host refactor.
+      getId: () => tenant.pluginId,
+      getManifest: () => tenant.manifest,
       getSettings: () => call("plugin.getSettings"),
       setSettings: (partial) => call("plugin.setSettings", [partial]),
       getDataPath: () => call("plugin.getDataPath"),
@@ -489,7 +584,8 @@ function buildApi() {
 }
 
 /** Dispatch one parent push frame; a throwing handler must not kill the plugin. */
-function handleHostEvent(message) {
+function handleHostEvent(tenant, message) {
+  const { busHandlers, eventListeners } = tenant;
   const event = String(message.event ?? "");
   if (event === "bus.message") {
     const handler = busHandlers.get(String(message.subscriptionId ?? ""));
@@ -497,7 +593,7 @@ function handleHostEvent(message) {
       try {
         handler(message.message);
       } catch (error) {
-        log("warn", `bus handler failed for ${message.message?.topic}: ${error?.message ?? error}`);
+        log(tenant.pluginId, "warn", `bus handler failed for ${message.message?.topic}: ${error?.message ?? error}`);
       }
     }
   }
@@ -506,7 +602,7 @@ function handleHostEvent(message) {
     try {
       listener(...args);
     } catch (error) {
-      log("warn", `event handler failed for ${event}: ${error?.message ?? error}`);
+      log(tenant.pluginId, "warn", `event handler failed for ${event}: ${error?.message ?? error}`);
     }
   }
 }
@@ -573,28 +669,55 @@ async function loadPluginModule(entry) {
   return mod?.default && typeof mod.default === "object" ? mod.default : mod;
 }
 
+/**
+ * Create (or replace) one tenant and run its `onLoad`.
+ *
+ * Everything a plugin does while loading — module evaluation, `pi.*` calls,
+ * `onLoad` — runs inside this tenant's context, so the shared `pi` global and the
+ * broker see the right owner. A failure here drops this tenant only: the
+ * `init` frame is answered with the error, and every other tenant in the process
+ * keeps running.
+ */
 async function handleInit(message) {
-  pluginId = String(message.pluginId ?? "");
-  pluginPath = String(message.pluginPath ?? "");
-  manifest = message.manifest ?? manifest;
-  const entry = join(pluginPath, String(message.main ?? manifest.main ?? ""));
-
-  globalThis.pi = buildApi();
-  ensureCommonJsPackage(entry, pluginPath);
-  pluginModule = await loadPluginModule(entry);
-  const oauthProviders = Array.isArray(manifest?.contributes?.providers)
-    ? manifest.contributes.providers.filter((provider) => provider?.authKind === "oauth")
-    : [];
-  if (oauthProviders.length > 0 && typeof pluginModule?.onProviderOAuth !== "function") {
-    const error = new Error("OAuth providers require an onProviderOAuth hook");
+  const pluginId = String(message.pluginId ?? "");
+  if (!pluginId) {
+    const error = new Error("plugin host init requires a plugin id");
     error.code = "PLUGIN_INVALID";
     throw error;
   }
-  if (pluginModule?.onLoad) await pluginModule.onLoad();
+  const previous = tenants.get(pluginId);
+  if (previous) detachTenant(previous, "Plugin reloaded");
+
+  const tenant = createTenant(message);
+  tenants.set(pluginId, tenant);
+  const entry = join(tenant.pluginPath, String(message.main ?? tenant.manifest.main ?? ""));
+  tenant.pi = buildApi(tenant);
+  try {
+    await tenantContext.run(tenant, async () => {
+      ensureCommonJsPackage(entry, tenant.pluginPath);
+      tenant.module = await loadPluginModule(entry);
+      const oauthProviders = Array.isArray(tenant.manifest?.contributes?.providers)
+        ? tenant.manifest.contributes.providers.filter((provider) => provider?.authKind === "oauth")
+        : [];
+      if (oauthProviders.length > 0 && typeof tenant.module?.onProviderOAuth !== "function") {
+        const error = new Error("OAuth providers require an onProviderOAuth hook");
+        error.code = "PLUGIN_INVALID";
+        throw error;
+      }
+      if (tenant.module?.onLoad) await tenant.module.onLoad();
+    });
+  } catch (error) {
+    detachTenant(tenant, "Plugin failed to load");
+    throw error;
+  }
   return { pluginId };
 }
 
-async function handleParentCall(method, payload, invocationId, callId) {
+async function handleParentCall(tenant, method, payload, invocationId, callId) {
+  // Aliases only: the dispatch below is the same switch it always was, now
+  // reading this tenant's tables instead of the process's.
+  const { commands, tools, speechHandles, services, parentCallControllers, invocations } = tenant;
+  const pluginModule = tenant.module;
   switch (method) {
     case "panel.invoke": {
       const invoke = pluginModule?.onPanelInvoke;
@@ -664,7 +787,7 @@ async function handleParentCall(method, payload, invocationId, callId) {
           modelKey: payload?.modelKey,
           thinkingLevel: payload?.thinkingLevel,
           signal: invocation.controller.signal,
-          log: (msg) => log("info", msg),
+          log: (msg) => log(tenant.pluginId, "info", msg),
         }));
         return result ?? null;
       } finally {
@@ -683,7 +806,7 @@ async function handleParentCall(method, payload, invocationId, callId) {
       // Idempotent: a restart of the host process re-runs start, but a second
       // start inside one process must not spawn a duplicate worker.
       if (entry.running) return { ok: true, alreadyRunning: true };
-      await entry.start({ log: (msg) => log("info", msg) });
+      await entry.start({ log: (msg) => log(tenant.pluginId, "info", msg) });
       entry.running = true;
       return { ok: true };
     }
@@ -738,7 +861,7 @@ async function handleParentCall(method, payload, invocationId, callId) {
       return answer;
     }
     case "lifecycle.unload": {
-      for (const id of invocations.keys()) cancelInvocation(id, "Plugin unloaded");
+      for (const id of [...invocations.keys()]) cancelInvocation(tenant, id, "Plugin unloaded");
       for (const [id, controller] of parentCallControllers) {
         controller.abort(toolAbortedError("Plugin unloaded"));
         parentCallControllers.delete(id);
@@ -747,14 +870,12 @@ async function handleParentCall(method, payload, invocationId, callId) {
       try {
         if (pluginModule?.onUnload) await pluginModule.onUnload();
       } catch (error) {
-        log("warn", `onUnload failed: ${error?.message ?? error}`);
+        log(tenant.pluginId, "warn", `onUnload failed: ${error?.message ?? error}`);
       }
-      commands.clear();
-      tools.clear();
-      speechHandles.clear();
-      services.clear();
-      busHandlers.clear();
-      eventListeners.clear();
+      // Tenant teardown, not process teardown: whatever this plugin still had in
+      // flight fails now (the same codes a killed process produced), its
+      // registrations go with it, and the other tenants never notice.
+      detachTenant(tenant, "Plugin unloaded");
       return { ok: true };
     }
     default: {
@@ -765,64 +886,90 @@ async function handleParentCall(method, payload, invocationId, callId) {
   }
 }
 
+/**
+ * Route one parent frame to its tenant.
+ *
+ * Routing is by `pluginId` — the only field that says whose frame this is. `id`
+ * is the correlation id *inside* a tenant and repeats across tenants (`h1` is
+ * the first call of every plugin), so it can never be the routing key. A frame
+ * for a tenant this process does not hold is answered with `PLUGIN_NOT_LOADED`
+ * rather than applied to somebody else's tables.
+ */
+function replyTo(message, pluginId, error, value) {
+  if (error) {
+    send({
+      t: "res",
+      id: message.id,
+      pluginId,
+      ok: false,
+      error: {
+        code: error?.code || "PLUGIN_CALL_FAILED",
+        message: error?.message ? String(error.message) : String(error),
+      },
+    });
+    return;
+  }
+  send({ t: "res", id: message.id, pluginId, ok: true, value: value ?? null });
+}
+
 onHostMessage((message) => {
   if (!message || typeof message !== "object") return;
   if (message.t === "res") {
     settle(message);
     return;
   }
+  if (message.t === "init") {
+    void handleInit(message)
+      .then((value) => replyTo(message, value.pluginId, null, value))
+      .catch((error) => replyTo(message, String(message.pluginId ?? ""), error));
+    return;
+  }
+  const tenant = resolveTenant(message);
+  if (!tenant) {
+    // An event has no answer to give; anything else gets the coded refusal its
+    // sender is waiting for.
+    if (message.t !== "event") {
+      replyTo(message, String(message.pluginId ?? ""), Object.assign(
+        new Error(`no plugin tenant for: ${message.pluginId ?? "(unset pluginId)"}`),
+        { code: "PLUGIN_NOT_LOADED" },
+      ));
+    }
+    return;
+  }
   if (message.t === "event") {
-    handleHostEvent(message);
+    handleHostEvent(tenant, message);
     return;
   }
   if (message.t === "cancel") {
     if (typeof message.callId === "string") {
-      const controller = parentCallControllers.get(message.callId);
+      const controller = tenant.parentCallControllers.get(message.callId);
       if (controller && !controller.signal.aborted) {
         controller.abort(toolAbortedError(String(message.reason ?? "Plugin call cancelled")));
       }
     }
-    cancelInvocation(message.invocationId, String(message.reason ?? ""));
-    return;
-  }
-  if (message.t === "init") {
-    void handleInit(message)
-      .then((value) => send({ t: "res", id: message.id, ok: true, value }))
-      .catch((error) =>
-        send({
-          t: "res",
-          id: message.id,
-          ok: false,
-          error: {
-            code: error?.code || "PLUGIN_LOAD_FAILED",
-            message: error?.message ? String(error.message) : String(error),
-          },
-        }),
-      );
+    cancelInvocation(tenant, message.invocationId, String(message.reason ?? ""));
     return;
   }
   if (message.t === "call") {
-    void invocationContext.run(undefined, () => handleParentCall(message.method, message.payload, message.invocationId, message.id))
-      .then((value) => send({ t: "res", id: message.id, ok: true, value: value ?? null }))
-      .catch((error) =>
-        send({
-          t: "res",
-          id: message.id,
-          ok: false,
-          error: {
-            code: error?.code || "PLUGIN_CALL_FAILED",
-            message: error?.message ? String(error.message) : String(error),
-          },
-        }),
-      );
+    // One tenant's failure is answered to that tenant and stops there: the
+    // process keeps serving every other plugin, which is the whole point of the
+    // shared host. Only a process-level fault (OOM, an access violation,
+    // `process.exit` in plugin code) reaches every tenant at once.
+    void tenantContext.run(tenant, () =>
+      invocationContext.run(undefined, () =>
+        handleParentCall(tenant, message.method, message.payload, message.invocationId, message.id),
+      ),
+    )
+      .then((value) => replyTo(message, tenant.pluginId, null, value))
+      .catch((error) => replyTo(message, tenant.pluginId, error));
   }
 });
 
 // A misbehaving plugin must not take down its own host process silently, and it
 // can never take down the app: the broker owns teardown decisions.
 process.on("uncaughtException", (error) => {
-  log("error", `uncaught exception: ${error?.stack || error}`);
+  log(undefined, "error", `uncaught exception: ${error?.stack || error}`);
 });
 process.on("unhandledRejection", (reason) => {
-  log("error", `unhandled rejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
+  log(undefined, "error", `unhandled rejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
 });

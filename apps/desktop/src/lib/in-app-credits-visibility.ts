@@ -35,3 +35,24 @@ export function creditsVisibility(input: {
   if (typeof total !== "number" || !Number.isFinite(total) || total <= 0) return "hide";
   return "show";
 }
+
+/** How often a balance is re-read while an in-app model is in use. */
+export const CREDITS_POLL_INTERVAL_MS = 5_000;
+
+/** The minimum an in-app surface has to say for the polling decision. */
+export type InAppPollSurface = { providerId: string | null };
+
+/**
+ * Whether a balance should be polled right now.
+ *
+ * One rule, and it is the user's own situation: the model selected for this
+ * session (or for the draft) is served by an in-app gateway. A balance nobody is
+ * spending is read once per cache window instead of every five seconds.
+ */
+export function shouldPollCredits(
+  surfaces: readonly InAppPollSurface[],
+  providerId: string | undefined,
+): boolean {
+  if (typeof providerId !== "string" || providerId === "") return false;
+  return surfaces.some((surface) => surface.providerId === providerId);
+}

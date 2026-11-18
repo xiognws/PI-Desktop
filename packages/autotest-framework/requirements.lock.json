@@ -1,0 +1,492 @@
+{
+    "//":  "Dependency lock for the autotest framework, derived from the resolved ComTestTool venv (D:/Code/ComTestTool/.venv). Versions are the ones that environment actually runs; every wheel was re-resolved for cp312/win_amd64 because the artifact ships CPython 3.12 while the venv is 3.11.",
+    "//where":  "\u003capp dir\u003e/python-extras/framework-deps/site-packages, appended to PYTHONPATH for the bundled interpreter by default (apps/desktop/electron/main/python-runtime.ts, frameworkDepsSitePackages).",
+    "//whySeparate":  "This stack pins numpy 2.x with opencv\u003c4.12 so paddlepaddle-era code keeps working, while the bundled Office stack pins numpy 2.5.4 for its own wheels. One site-packages cannot satisfy both, so they are installed separately and both reach the interpreter through PYTHONPATH.",
+    "//excluded":  "Dev tooling only (pytest, coverage, mypy, ruff and their transitive helpers), the project itself, and uptime (no cp312 wheel, and no reference anywhere in core/libs/hal/utils). setuptools, wheel and setuptools-cpp stay: pyxcp requires setuptools-cpp at import time.",
+    "platform":  "windows-x86_64",
+    "python":  "3.12",
+    "//scope":  "The framework package itself ships source, its vendor CAN driver distribution and its firmware images. Python libraries live here, not in the package.",
+    "wheels":  [
+                   {
+                       "name":  "adbutils",
+                       "version":  "2.12.0",
+                       "file":  "adbutils-2.12.0-py3-none-win_amd64.whl",
+                       "sha256":  "e7629bb5783f4aa40942889da1455c879b21f9d1cc057596003b42f3371543be"
+                   },
+                   {
+                       "name":  "ast_serialize",
+                       "version":  "0.13.1",
+                       "file":  "ast_serialize-0.13.1-cp39-abi3-win_amd64.whl",
+                       "sha256":  "ddf7cbc9c8abf70102c4a088efe154bb86bfb825b0a10e556d2b15972cf99bd7"
+                   },
+                   {
+                       "name":  "attrs",
+                       "version":  "26.1.0",
+                       "file":  "attrs-26.1.0-py3-none-any.whl",
+                       "sha256":  "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309"
+                   },
+                   {
+                       "name":  "bcrypt",
+                       "version":  "5.0.0",
+                       "file":  "bcrypt-5.0.0-cp39-abi3-win_amd64.whl",
+                       "sha256":  "64ee8434b0da054d830fa8e89e1c8bf30061d539044a39524ff7dec90481e5c2"
+                   },
+                   {
+                       "name":  "can-isotp",
+                       "version":  "2.0.7",
+                       "file":  "can_isotp-2.0.7-py3-none-any.whl",
+                       "sha256":  "28d155dec1c640bf32771fb4e271323d777158ab130372724a8b7b82aca66a7c"
+                   },
+                   {
+                       "name":  "certifi",
+                       "version":  "2026.10.23",
+                       "file":  "certifi-2026.10.23-py3-none-any.whl",
+                       "sha256":  "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1"
+                   },
+                   {
+                       "name":  "cffi",
+                       "version":  "2.1.1",
+                       "file":  "cffi-2.1.1-cp312-cp312-win_amd64.whl",
+                       "sha256":  "f53e442b08449d42821fa4a4fba000095af9f62742a500f978a9f557ec44339a"
+                   },
+                   {
+                       "name":  "chardet",
+                       "version":  "7.7.0",
+                       "file":  "chardet-7.7.0-cp312-cp312-win_amd64.whl",
+                       "sha256":  "e3fa9ea40e766b26b10360edbb4742cfef9e52728b644b39aae7fa39e89df767"
+                   },
+                   {
+                       "name":  "charset-normalizer",
+                       "version":  "3.5.2",
+                       "file":  "charset_normalizer-3.5.2-cp312-cp312-win_amd64.whl",
+                       "sha256":  "780fbe7cab297b81dad9fb8dc5eb003c0468ffb0d9e5f65068c53a34661a96bc"
+                   },
+                   {
+                       "name":  "click",
+                       "version":  "8.5.0",
+                       "file":  "click-8.5.0-py3-none-any.whl",
+                       "sha256":  "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360"
+                   },
+                   {
+                       "name":  "colorama",
+                       "version":  "0.4.6",
+                       "file":  "colorama-0.4.6-py2.py3-none-any.whl",
+                       "sha256":  "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"
+                   },
+                   {
+                       "name":  "comtypes",
+                       "version":  "1.4.17",
+                       "file":  "comtypes-1.4.17-py3-none-any.whl",
+                       "sha256":  "4e0a221dde2c589b82977bed802efd71cd5eb67a380347b732e02735e597f586"
+                   },
+                   {
+                       "name":  "construct",
+                       "version":  "2.10.70",
+                       "file":  "construct-2.10.70-py3-none-any.whl",
+                       "sha256":  "c80be81ef595a1a821ec69dc16099550ed22197615f4320b57cc9ce2a672cb30"
+                   },
+                   {
+                       "name":  "cryptography",
+                       "version":  "50.0.2",
+                       "file":  "cryptography-50.0.2-cp311-abi3-win_amd64.whl",
+                       "sha256":  "7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c"
+                   },
+                   {
+                       "name":  "darkdetect",
+                       "version":  "0.8.0",
+                       "file":  "darkdetect-0.8.0-py3-none-any.whl",
+                       "sha256":  "a7509ccf517eaad92b31c214f593dbcf138ea8a43b2935406bbd565e15527a85"
+                   },
+                   {
+                       "name":  "decorator",
+                       "version":  "5.3.1",
+                       "file":  "decorator-5.3.1-py3-none-any.whl",
+                       "sha256":  "f47fe6fdbd2edd623ecfe36875d37aba411624e2670dd395dddae1358689bb3c"
+                   },
+                   {
+                       "name":  "deprecation",
+                       "version":  "2.1.0",
+                       "file":  "deprecation-2.1.0-py2.py3-none-any.whl",
+                       "sha256":  "a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"
+                   },
+                   {
+                       "name":  "et_xmlfile",
+                       "version":  "2.0.0",
+                       "file":  "et_xmlfile-2.0.0-py3-none-any.whl",
+                       "sha256":  "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa"
+                   },
+                   {
+                       "name":  "h11",
+                       "version":  "0.16.0",
+                       "file":  "h11-0.16.0-py3-none-any.whl",
+                       "sha256":  "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86"
+                   },
+                   {
+                       "name":  "idna",
+                       "version":  "3.20",
+                       "file":  "idna-3.20-py3-none-any.whl",
+                       "sha256":  "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c"
+                   },
+                   {
+                       "name":  "invoke",
+                       "version":  "3.0.3",
+                       "file":  "invoke-3.0.3-py3-none-any.whl",
+                       "sha256":  "f11327165e5cbb89b2ad1d88d3292b5113332c43b8553b494da435d6ec6f5053"
+                   },
+                   {
+                       "name":  "Jinja2",
+                       "version":  "3.1.6",
+                       "file":  "jinja2-3.1.6-py3-none-any.whl",
+                       "sha256":  "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67"
+                   },
+                   {
+                       "name":  "librt",
+                       "version":  "0.16.0",
+                       "file":  "librt-0.16.0-cp312-cp312-win_amd64.whl",
+                       "sha256":  "25a58a19ea8d83b68209f04912df765e9260635ef77646542ed4b4abe6bc7940"
+                   },
+                   {
+                       "name":  "loguru",
+                       "version":  "0.7.3",
+                       "file":  "loguru-0.7.3-py3-none-any.whl",
+                       "sha256":  "31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c"
+                   },
+                   {
+                       "name":  "lxml",
+                       "version":  "6.1.3",
+                       "file":  "lxml-6.1.3-cp312-cp312-win_amd64.whl",
+                       "sha256":  "3e9a00d1c2c30936f7add097c41afc5da6556c580909104aafd382cac92a855c"
+                   },
+                   {
+                       "name":  "Mako",
+                       "version":  "1.4.3",
+                       "file":  "mako-1.4.3-py3-none-any.whl",
+                       "sha256":  "723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f"
+                   },
+                   {
+                       "name":  "MarkupSafe",
+                       "version":  "3.0.4",
+                       "file":  "markupsafe-3.0.4-cp312-cp312-win_amd64.whl",
+                       "sha256":  "11935df9bf455ed0c04eb87bcd720f02b1fe5e02128a9430f23aed6f93336fc7"
+                   },
+                   {
+                       "name":  "numpy",
+                       "version":  "2.4.6",
+                       "file":  "numpy-2.4.6-cp312-cp312-win_amd64.whl",
+                       "sha256":  "d8e8286dd7cea7895157318d1b91cdacac64c479f3cbc8dce548331728484751"
+                   },
+                   {
+                       "name":  "opencv-contrib-python",
+                       "version":  "4.11.0.86",
+                       "file":  "opencv_contrib_python-4.11.0.86-cp37-abi3-win_amd64.whl",
+                       "sha256":  "654758a9ae8ca9a75fca7b64b19163636534f0eedffe1e14c3d7218988625c8d"
+                   },
+                   {
+                       "name":  "openpyxl",
+                       "version":  "3.1.5",
+                       "file":  "openpyxl-3.1.5-py2.py3-none-any.whl",
+                       "sha256":  "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2"
+                   },
+                   {
+                       "name":  "outcome",
+                       "version":  "1.3.0.post0",
+                       "file":  "outcome-1.3.0.post0-py2.py3-none-any.whl",
+                       "sha256":  "e771c5ce06d1415e356078d3bdd68523f284b4ce5419828922b6871e65eda82b"
+                   },
+                   {
+                       "name":  "packaging",
+                       "version":  "26.3",
+                       "file":  "packaging-26.3-py3-none-any.whl",
+                       "sha256":  "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+                   },
+                   {
+                       "name":  "pandas",
+                       "version":  "3.1.0",
+                       "file":  "pandas-3.1.0-cp312-cp312-win_amd64.whl",
+                       "sha256":  "b8c75dbb27c7d170b25c13dd35515da4bb92d40fe8bb3bd2c69a95de2218889b"
+                   },
+                   {
+                       "name":  "parameterized",
+                       "version":  "0.9.0",
+                       "file":  "parameterized-0.9.0-py2.py3-none-any.whl",
+                       "sha256":  "4e0758e3d41bea3bbd05ec14fc2c24736723f243b28d702081aef438c9372b1b"
+                   },
+                   {
+                       "name":  "paramiko",
+                       "version":  "5.1.0",
+                       "file":  "paramiko-5.1.0-py3-none-any.whl",
+                       "sha256":  "d9fe6d67a9d0bbf3eb85b051d26ab850b678c02d060f32915b944e5ca6d0d9e1"
+                   },
+                   {
+                       "name":  "pillow",
+                       "version":  "13.0.0",
+                       "file":  "pillow-13.0.0-cp312-cp312-win_amd64.whl",
+                       "sha256":  "ff3fe9eb621fbb9db4c4be33ab946f6bac5f98ab50ca8d3260503653656c961b"
+                   },
+                   {
+                       "name":  "psutil",
+                       "version":  "7.2.2",
+                       "file":  "psutil-7.2.2-cp37-abi3-win_amd64.whl",
+                       "sha256":  "eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988"
+                   },
+                   {
+                       "name":  "pybind11",
+                       "version":  "3.1.0",
+                       "file":  "pybind11-3.1.0-py3-none-any.whl",
+                       "sha256":  "b8488090f8acffbcb6b5d6a85571a6827a0a2981ffb75e5a0b27b87c4a6b7dd0"
+                   },
+                   {
+                       "name":  "pycparser",
+                       "version":  "3.12",
+                       "file":  "pycparser-3.12-py3-none-any.whl",
+                       "sha256":  "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e"
+                   },
+                   {
+                       "name":  "pyelftools",
+                       "version":  "0.33",
+                       "file":  "pyelftools-0.33-py3-none-any.whl",
+                       "sha256":  "f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036"
+                   },
+                   {
+                       "name":  "PyNaCl",
+                       "version":  "1.6.2",
+                       "file":  "pynacl-1.6.2-cp38-abi3-win_amd64.whl",
+                       "sha256":  "62985f233210dee6548c223301b6c25440852e13d59a8b81490203c3227c5ba0"
+                   },
+                   {
+                       "name":  "pypiwin32",
+                       "version":  "223",
+                       "file":  "pypiwin32-223-py3-none-any.whl",
+                       "sha256":  "67adf399debc1d5d14dffc1ab5acacb800da569754fafdc576b2a039485aa775"
+                   },
+                   {
+                       "name":  "PyQt5",
+                       "version":  "5.15.11",
+                       "file":  "PyQt5-5.15.11-cp38-abi3-win_amd64.whl",
+                       "sha256":  "bdde598a3bb95022131a5c9ea62e0a96bd6fb28932cc1619fd7ba211531b7517"
+                   },
+                   {
+                       "name":  "PyQt5_sip",
+                       "version":  "12.20.0",
+                       "file":  "pyqt5_sip-12.20.0-cp312-cp312-win_amd64.whl",
+                       "sha256":  "6bcf4b28693b8bf22ff038ad60cb1aa7bb461bb469b39f0f8d4d85aea34506bc"
+                   },
+                   {
+                       "name":  "PyQt5-Frameless-Window",
+                       "version":  "0.8.2",
+                       "file":  "pyqt5_frameless_window-0.8.2-py3-none-any.whl",
+                       "sha256":  "e46291d4ef22aa670a757c8433c95710759dad2f49f9d4a45d72587bb3b001c1"
+                   },
+                   {
+                       "name":  "PyQt5-Qt5",
+                       "version":  "5.15.2",
+                       "file":  "PyQt5_Qt5-5.15.2-py3-none-win_amd64.whl",
+                       "sha256":  "750b78e4dba6bdf1607febedc08738e318ea09e9b10aea9ff0d73073f11f6962"
+                   },
+                   {
+                       "name":  "PyQt-Fluent-Widgets",
+                       "version":  "1.11.3",
+                       "file":  "pyqt_fluent_widgets-1.11.3-py3-none-any.whl",
+                       "sha256":  "99f08ab165067f313ecfca14ab3459d3eb75101e04f0dfbc543060e4c9dabf8b"
+                   },
+                   {
+                       "name":  "pyserial",
+                       "version":  "3.5",
+                       "file":  "pyserial-3.5-py2.py3-none-any.whl",
+                       "sha256":  "c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0"
+                   },
+                   {
+                       "name":  "PySocks",
+                       "version":  "1.7.1",
+                       "file":  "PySocks-1.7.1-py3-none-any.whl",
+                       "sha256":  "2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5"
+                   },
+                   {
+                       "name":  "python-can",
+                       "version":  "4.6.1",
+                       "file":  "python_can-4.6.1-py3-none-any.whl",
+                       "sha256":  "17f95255868a95108dcfcb90565a684dad32d5a3ebb35afd14f739e18c84ff6c"
+                   },
+                   {
+                       "name":  "python-dateutil",
+                       "version":  "4.0.0",
+                       "file":  "python_dateutil-4.0.0-py3-none-any.whl",
+                       "sha256":  "a5e246f79eb80475e691bf93862cead98decd8a498cf53ba0516fcdc0f50dc1c"
+                   },
+                   {
+                       "name":  "python-dotenv",
+                       "version":  "1.2.4",
+                       "file":  "python_dotenv-1.2.4-py3-none-any.whl",
+                       "sha256":  "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc"
+                   },
+                   {
+                       "name":  "pyttsx3",
+                       "version":  "2.99",
+                       "file":  "pyttsx3-2.99-py3-none-any.whl",
+                       "sha256":  "ff3e4ff756c24d72b9f3f2f304e0edaafd0f58adb0e6f4b90d930440cda8b207"
+                   },
+                   {
+                       "name":  "pyusb",
+                       "version":  "1.3.1",
+                       "file":  "pyusb-1.3.1-py3-none-any.whl",
+                       "sha256":  "bf9b754557af4717fe80c2b07cc2b923a9151f5c08d17bdb5345dac09d6a0430"
+                   },
+                   {
+                       "name":  "pywin32",
+                       "version":  "312",
+                       "file":  "pywin32-312-cp312-cp312-win_amd64.whl",
+                       "sha256":  "b457f6d628a47e8a7346ce22acb7e1a46a4a78b52e1d17e1af56871bd19a93bc"
+                   },
+                   {
+                       "name":  "pyxcp",
+                       "version":  "0.21.11",
+                       "file":  "pyxcp-0.21.11-cp312-cp312-win_amd64.whl",
+                       "sha256":  "e072323788d03758d2db3d9194ce697e41b40b9b9ea595c1617614b0ee44c99b"
+                   },
+                   {
+                       "name":  "PyYAML",
+                       "version":  "6.0.3",
+                       "file":  "pyyaml-6.0.3-cp312-cp312-win_amd64.whl",
+                       "sha256":  "5fcd34e47f6e0b794d17de1b4ff496c00986e1c83f7ab2fb8fcfe9616ff7477b"
+                   },
+                   {
+                       "name":  "requests",
+                       "version":  "2.34.2",
+                       "file":  "requests-2.34.2-py3-none-any.whl",
+                       "sha256":  "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0"
+                   },
+                   {
+                       "name":  "retry2",
+                       "version":  "0.9.5",
+                       "file":  "retry2-0.9.5-py2.py3-none-any.whl",
+                       "sha256":  "f7fee13b1e15d0611c462910a6aa72a8919823988dd0412152bc3719c89a4e55"
+                   },
+                   {
+                       "name":  "selenium",
+                       "version":  "4.52.0",
+                       "file":  "selenium-4.52.0-py3-none-any.whl",
+                       "sha256":  "caa2860d486f71cdeb21fee3248c2f604bba590120dfb4d3d18c4d7cf97c6f1f"
+                   },
+                   {
+                       "name":  "setuptools",
+                       "version":  "84.2.1",
+                       "file":  "setuptools-84.2.1-py3-none-any.whl",
+                       "sha256":  "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2"
+                   },
+                   {
+                       "name":  "setuptools_cpp",
+                       "version":  "0.1.0",
+                       "file":  "setuptools_cpp-0.1.0-py3-none-any.whl",
+                       "sha256":  "cd8179c038a12dbf2914999928f193f54d4713fd11715efdc5d6f450f663c8bd"
+                   },
+                   {
+                       "name":  "sniffio",
+                       "version":  "1.3.1",
+                       "file":  "sniffio-1.3.1-py3-none-any.whl",
+                       "sha256":  "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2"
+                   },
+                   {
+                       "name":  "sortedcontainers",
+                       "version":  "2.4.0",
+                       "file":  "sortedcontainers-2.4.0-py2.py3-none-any.whl",
+                       "sha256":  "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0"
+                   },
+                   {
+                       "name":  "toml",
+                       "version":  "0.10.2",
+                       "file":  "toml-0.10.2-py2.py3-none-any.whl",
+                       "sha256":  "806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"
+                   },
+                   {
+                       "name":  "traitlets",
+                       "version":  "5.16.1",
+                       "file":  "traitlets-5.16.1-py3-none-any.whl",
+                       "sha256":  "f775618166caa0396c8e337099240f2bd3e5e917d203b2e6fbe21a58d3cb1f6b"
+                   },
+                   {
+                       "name":  "trio",
+                       "version":  "0.35.0",
+                       "file":  "trio-0.35.0-py3-none-any.whl",
+                       "sha256":  "9a062a029487c1bdbcc1b2543b729a0bde857ce478b1512c84f391f628e0c5c9"
+                   },
+                   {
+                       "name":  "trio-websocket",
+                       "version":  "0.12.2",
+                       "file":  "trio_websocket-0.12.2-py3-none-any.whl",
+                       "sha256":  "df605665f1db533f4a386c94525870851096a223adcb97f72a07e8b4beba45b6"
+                   },
+                   {
+                       "name":  "typing_extensions",
+                       "version":  "4.16.0",
+                       "file":  "typing_extensions-4.16.0-py3-none-any.whl",
+                       "sha256":  "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+                   },
+                   {
+                       "name":  "tzdata",
+                       "version":  "2026.6",
+                       "file":  "tzdata-2026.6-py2.py3-none-any.whl",
+                       "sha256":  "0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec"
+                   },
+                   {
+                       "name":  "udsoncan",
+                       "version":  "1.26.1",
+                       "file":  "udsoncan-1.26.1-py3-none-any.whl",
+                       "sha256":  "c1bd6cc54d6c1124c0eafeff2ffaab48bfeb7d0d2576959f21840c37e96dfb9a"
+                   },
+                   {
+                       "name":  "uiautomator2",
+                       "version":  "3.7.1",
+                       "file":  "uiautomator2-3.7.1-py3-none-any.whl",
+                       "sha256":  "55ccc16f7c52d3035dbc14e1400524e76510dc353f9fc4a0bfa85bf58c51cc67"
+                   },
+                   {
+                       "name":  "uptime",
+                       "version":  "3.0.1",
+                       "file":  "uptime-3.0.1.tar.gz",
+                       "sha256":  "7c300254775b807ce46e3dcbcda30aa3b9a204b9c57a7ac1e79ee6dbe3942973",
+                       "sdist":  true
+                   },
+                   {
+                       "name":  "urllib3",
+                       "version":  "2.8.0",
+                       "file":  "urllib3-2.8.0-py3-none-any.whl",
+                       "sha256":  "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3"
+                   },
+                   {
+                       "name":  "webdriver-manager",
+                       "version":  "4.1.2",
+                       "file":  "webdriver_manager-4.1.2-py3-none-any.whl",
+                       "sha256":  "552bbb4e6f95e6e8b772565d2023e7c0ec5ff1736db0b186922d0466fc78c3de"
+                   },
+                   {
+                       "name":  "websocket-client",
+                       "version":  "1.9.2",
+                       "file":  "websocket_client-1.9.2-py3-none-any.whl",
+                       "sha256":  "e1a673830a9c7bfa47b1cd3d5e4178f4c9651d80a4eab02c9c23a1c3ec6250ce"
+                   },
+                   {
+                       "name":  "wheel",
+                       "version":  "0.48.0",
+                       "file":  "wheel-0.48.0-py3-none-any.whl",
+                       "sha256":  "3217dcc807155e45db462d7ef2431f5ddda0d7273b700d05a67b271ceb1287ab"
+                   },
+                   {
+                       "name":  "win32_setctime",
+                       "version":  "1.2.1",
+                       "file":  "win32_setctime-1.2.1-py3-none-any.whl",
+                       "sha256":  "a9edc685b35414bec69392c866ed82456ad125ac4a6a4b703ec1d8b462d4f477"
+                   },
+                   {
+                       "name":  "wrapt",
+                       "version":  "1.17.3",
+                       "file":  "wrapt-1.17.3-cp312-cp312-win_amd64.whl",
+                       "sha256":  "e71d5c6ebac14875668a1e90baf2ea0ef5b7ac7918355850c0908ae82bcb297c"
+                   },
+                   {
+                       "name":  "wsproto",
+                       "version":  "1.3.2",
+                       "file":  "wsproto-1.3.2-py3-none-any.whl",
+                       "sha256":  "61eea322cdf56e8cc904bd3ad7573359a242ba65688716b0710a5eb12beab584"
+                   }
+               ]
+}

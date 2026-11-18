@@ -27,7 +27,6 @@ const ROOTS = [
   "packages/host-runtime/src",
   "packages/plugin-sdk/src",
   "packages/racp/src",
-  "packages/computer-use/src",
   "packages/agent-host/src",
   "packages/plugin-devkit/src",
   "packages/i18n/src",

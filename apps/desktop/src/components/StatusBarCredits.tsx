@@ -5,6 +5,8 @@ import { inheritedSessionModelBinding } from "../lib/session-model";
 import {
   creditsVisibility,
   inAppProviderSurfaceFor,
+  resetInAppProviderCaches,
+  shouldPollCredits,
   useInAppProviderCredits,
   useInAppProviderSurfaces,
   refreshInAppProviderSurfaces,
@@ -186,7 +188,24 @@ export function StatusBarCredits() {
     if (surfaceProviderId && !surfaceProviderKnown) void refreshProviders();
   }, [surfaceProviderId, surfaceProviderKnown, refreshProviders]);
 
-  const { result, pending, refresh } = useInAppProviderCredits(surface?.id ?? null);
+  // The first read after launch must not come from what an earlier launch left
+  // behind: its surfaces, its row ids and its balances all describe gateways
+  // the startup refresh has since replaced.
+  const resynced = useRef(false);
+  useEffect(() => {
+    if (resynced.current) return;
+    resynced.current = true;
+    resetInAppProviderCaches();
+    refreshInAppProviderSurfaces();
+    void refreshProviders();
+  }, [refreshProviders]);
+
+  // An in-app model in use is a balance being spent, so it is re-read every
+  // five seconds instead of once per cache window.
+  const inUse = shouldPollCredits(surfaces, binding.providerId);
+  const { result, pending, refresh } = useInAppProviderCredits(surface?.id ?? null, {
+    polling: inUse,
+  });
 
   return (
     <StatusBarCreditsView

@@ -229,7 +229,7 @@
 .tools-widget-count {
   min-width: 16px;
   padding: 0 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   background: var(--ds-tile);
   color: var(--ds-text-muted);
   font-family: var(--font-mono);
@@ -416,7 +416,7 @@
 }
 
 .widgets-result-status {
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 .widgets-result-duration {

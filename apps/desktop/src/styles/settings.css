@@ -1996,7 +1996,7 @@
   flex-wrap: wrap;
   gap: 12px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .learning-map-legend-item {
@@ -2008,17 +2008,17 @@
 .learning-map-swatch {
   width: 9px;
   height: 9px;
-  border-radius: 50%;
+  border-radius: var(--radius-round);
   background: var(--accent);
 }
 
 .learning-map-swatch.is-memory {
-  border-radius: 2px;
+  border-radius: var(--radius-3xs);
   background: var(--muted-foreground);
 }
 
 .learning-map-swatch.is-user {
-  border-radius: 2px;
+  border-radius: var(--radius-3xs);
   background: var(--foreground);
 }
 

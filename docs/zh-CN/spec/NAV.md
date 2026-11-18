@@ -45,7 +45,6 @@
 - [17-asktool-questions.md](/zh-CN/spec/03-runtime/17-asktool-questions)
 - [18-line-anchored-edit-contract.md](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract)
 - [19-remote-agent-control-protocol.md](/zh-CN/spec/03-runtime/19-remote-agent-control-protocol)
-- [computer-use.md](/zh-CN/spec/03-runtime/computer-use)
 - [21-image-generation.md](/zh-CN/spec/03-runtime/21-image-generation)
 - [21-memory-store.md](/zh-CN/spec/03-runtime/21-memory-store)
 - [22-config-sync.md](/zh-CN/spec/03-runtime/22-config-sync)

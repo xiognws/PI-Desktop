@@ -68,6 +68,14 @@ paste events without background polling. Plugin authors should use this API for
 clipboard-history features instead of polling `readText()` and maintaining a
 second store.
 
+The bundled `pi.clipboard-history` plugin did the opposite — its own capture
+service re-synced the history every two seconds into a plaintext archive kept
+for 30 days — and is retired in `scripts/bundled-plugins-excluded.json`. A
+runtime that reads clipboard content for its whole life and writes it to disk
+is what behaviour-based endpoint protection calls a clipboard stealer, and this
+deployment's endpoint agent quarantined the app for it. The host API above is
+unaffected: it already provides on-demand history for anything that needs it.
+
 `@pi-workspace/plugin-devkit` is tooling, not runtime, and may use Node. It owns
 `scaffold` / `check` / `pack` / `publish` and the `pi-plugin` CLI. All three developer
 surfaces (CLI, agent tools, plugins page) call it, so a rule enforced once holds

@@ -13,10 +13,15 @@ const runtimeSrc = readFileSync(join(desktopRoot, "electron/main/plugin-runtime.
 const viteConfigSrc = readFileSync(join(desktopRoot, "electron.vite.config.ts"), "utf8");
 
 test("plugin runtime never loads plugin code inside the Electron main process", () => {
+  // The single fork point moved into plugin-shared-host.ts when every plugin began
+  // sharing one host process. A call site is `utilityProcess.fork(`; the module also
+  // mentions the API in prose, which must not be counted.
+  const sharedHostSrc = readFileSync(join(desktopRoot, "electron", "main", "plugin-shared-host.ts"), "utf8");
   assert.doesNotMatch(runtimeSrc, /createRequire/);
   assert.doesNotMatch(runtimeSrc, /globalThis as any\)\.pi/);
-  assert.match(runtimeSrc, /utilityProcess\.fork/);
-  assert.match(runtimeSrc, /plugin-host-process\.js/);
+  assert.doesNotMatch(runtimeSrc, /utilityProcess\.fork\(/);
+  assert.equal((sharedHostSrc.match(/utilityProcess\.fork\(/g) ?? []).length, 1);
+  assert.match(sharedHostSrc, /plugin-host-process\.m?js/);
 });
 
 test("plugin host calls pass an allowlist and time out", () => {

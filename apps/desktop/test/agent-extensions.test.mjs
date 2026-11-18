@@ -4,7 +4,7 @@ import { register } from "node:module";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const {
@@ -464,13 +464,21 @@ test("the default dependency runner isolates npm config sources and proxies", as
   assert.equal(result.code, 0);
   const childEnv = JSON.parse(result.stderr);
   assert.notEqual(childEnv.npm_config_userconfig, childEnv.npm_config_globalconfig);
-  assert.ok(childEnv.npm_config_userconfig.startsWith(tmpdir()));
-  assert.ok(childEnv.npm_config_globalconfig.startsWith(tmpdir()));
+  // Isolation is the invariant: both configs are private absolute paths outside
+  // the checkout, and neither is the user's own npmrc. They live under the app's
+  // data-directory tmp (AGENTS.md §8), never in the OS temp directory. The files
+  // themselves are inert unless npm reads them, so nothing is written here.
+  for (const configPath of [childEnv.npm_config_userconfig, childEnv.npm_config_globalconfig]) {
+    assert.ok(isAbsolute(configPath), `an isolated config is an absolute path: ${configPath}`);
+    assert.ok(!configPath.startsWith(tmpdir()), "runtime temp files do not land in %TEMP%");
+    assert.ok(!configPath.startsWith(process.cwd()), "an install never writes into the checkout");
+  }
   assert.equal(childEnv.npm_config_registry, "https://registry.npmjs.org/");
   assert.equal(childEnv.npm_config_proxy, "");
   assert.equal(childEnv.npm_config_https_proxy, "");
   assert.equal(childEnv.npm_config_noproxy, "*");
-  assert.ok(childEnv.npm_config_git.startsWith(tmpdir()));
+  assert.ok(isAbsolute(childEnv.npm_config_git), "the isolated git config is an absolute path");
+  assert.ok(!childEnv.npm_config_git.startsWith(tmpdir()), "runtime temp files do not land in %TEMP%");
   assert.equal(childEnv.npm_config_cache, join(process.cwd(), ".npm-cache"));
   assert.equal(childEnv.NPM_TOKEN, undefined);
   assert.equal(childEnv.NODE_AUTH_TOKEN, undefined);

@@ -181,7 +181,6 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.infiniteProviderRetryDesc",
       "settings.scheduledTasks",
       "settings.scheduledTasksDesc",
-      "computerUse.title",
     ],
   },
   {

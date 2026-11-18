@@ -13,6 +13,12 @@
  * Step 4 is idempotent: the row is found by its reserved vendor key
  * (`builtin:<id>`, see `./types.ts`), so a second boot updates instead of
  * creating a second WorkBuddy next to the first.
+ *
+ * A boot is a **refresh**, never a resume: whatever a previous run left behind
+ * (a gateway process, its port, the row it registered) is discarded before the
+ * new gateway starts. Nothing this process inherits is trusted — an inherited
+ * gateway keeps the previous run's session, and a model request against it
+ * fails in a way the runtime answers by retrying.
  */
 import {
   IN_APP_PROVIDERS,
@@ -241,11 +247,21 @@ export class InAppProviders {
     );
   }
 
-  /** Start every enabled provider. Never throws. */
+  /**
+   * Refresh every provider at startup. Never throws.
+   *
+   * This is the app's only startup path: it discards whatever a previous run
+   * left in this supervisor — a gateway handle, its port, the row it registered,
+   * the failure text, the credit cache — and then starts the gateway from
+   * scratch. Resuming an inherited gateway is what lets a stale session survive
+   * a restart; the runtime answers the resulting model failures by retrying, so
+   * the state is replaced rather than trusted.
+   */
   async start(): Promise<void> {
+    this.reset();
     for (const provider of this.providers) {
       try {
-        await this.startOne(provider);
+        await this.startOne(provider, { refresh: true });
       } catch (error) {
         this.failureReasons.set(provider.id, describeError(error));
         this.log("warn", `[in-app] ${provider.id}: gateway start failed`, {
@@ -253,6 +269,27 @@ export class InAppProviders {
         });
       }
     }
+  }
+
+  /**
+   * Drop everything a previous run established, stopping any gateway still held
+   * so its loopback port is free for the refreshed one.
+   */
+  private reset(): void {
+    const handles = [...this.handles.values()];
+    this.handles.clear();
+    this.ports.clear();
+    this.rowIds.clear();
+    this.failureReasons.clear();
+    this.modelCounts.clear();
+    for (const handle of handles) {
+      void handle.stop().catch((error: unknown) => {
+        this.log("warn", "[in-app] gateway stop during refresh failed", {
+          error: describeError(error),
+        });
+      });
+    }
+    this.credits.clear();
   }
 
   /** Stop every gateway this supervisor owns. Never throws. */
@@ -373,7 +410,18 @@ export class InAppProviders {
     });
   }
 
-  private async startOne(provider: InAppProvider): Promise<void> {
+  /**
+   * Bring one gateway up and re-register its row.
+   *
+   * `refresh` marks the startup path: the row is rewritten even when it already
+   * looks current, because the endpoint and secret it carries belong to the
+   * process that just started, not to the one that was running when it was
+   * stored.
+   */
+  private async startOne(
+    provider: InAppProvider,
+    options: { refresh?: boolean } = {},
+  ): Promise<void> {
     const settings = resolveProviderSettings(provider, await this.readSettings());
     this.enabledById.set(provider.id, settings.enabled);
     if (!settings.enabled) {
@@ -399,7 +447,9 @@ export class InAppProviders {
       this.log("warn", `[in-app] ${provider.id}: gateway published no models`);
       return;
     }
-    const rowId = await this.upsertProviderRow(provider, port, models, apiKey);
+    const rowId = await this.upsertProviderRow(provider, port, models, apiKey, {
+      refresh: options.refresh === true,
+    });
     this.rowIds.set(provider.id, rowId);
     this.modelCounts.set(provider.id, models.length);
     this.failureReasons.delete(provider.id);
@@ -535,11 +585,19 @@ export class InAppProviders {
     }
   }
 
+  /**
+   * Write the row this gateway backs, or create it.
+   *
+   * `refresh` is the startup path: it rewrites the fields a later run must not
+   * inherit, so a row stored by an earlier launch cannot keep pointing at an
+   * endpoint, secret or model list this launch did not just verify.
+   */
   private async upsertProviderRow(
     provider: InAppProvider,
     port: number,
     models: readonly InAppModel[],
     apiKey: string,
+    options: { refresh?: boolean } = {},
   ): Promise<string> {
     const vendorKey = inAppProviderVendorKey(provider.id);
     const listed = await this.callHost<{ providers: RuntimeProviderRow[] }>("providers.list", {
@@ -563,6 +621,13 @@ export class InAppProviders {
       // `providers.update` keeps the stored credential when no new value is
       // given; the loopback key is ours to (re)assert on every boot.
       await this.callHost("providers.setSecret", { id: existing.id, secretValue: apiKey });
+      if (options.refresh === true) {
+        this.log("info", `[in-app] ${provider.id}: row refreshed`, {
+          providerId: existing.id,
+          port,
+          models: models.length,
+        });
+      }
       return existing.id;
     }
     const created = await this.callHost<{ provider: RuntimeProviderRow }>(
