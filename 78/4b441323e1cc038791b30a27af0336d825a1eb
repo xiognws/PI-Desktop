@@ -1,0 +1,22 @@
+Cargo.toml
+  h_201ed4c689ac8b 2
+apps/desktop/electron/main/agent-sidecar-launch.ts
+  h_201ed4c689ac8b 6-7,23-30,72,80-82,84-86
+apps/desktop/test/agent-sidecar-launch.test.mjs
+  h_201ed4c689ac8b 15,102,104-105,107
+docs/adr/0402-rust-agent-core.md
+  h_201ed4c689ac8b 58-60
+scripts/agent-core-differential.mjs
+  h_201ed4c689ac8b 714-716,719,722
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "784b441323e1cc038791b30a27af0336d825a1eb",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
