@@ -1,0 +1,22 @@
+crates/agent-core/src/event.rs
+  h_201ed4c689ac8b 86-94
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 75-86,761-764,768,802-813,1189-1216
+crates/agent-core/tests/common/mod.rs
+  h_201ed4c689ac8b 27-34
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 973-1022
+scripts/agent-core-differential.mjs
+  h_201ed4c689ac8b 289-317,372-408,411-423,432-439,462-468,470,473
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b7e724011f1ee7f126ff8fe27a5650e09405352d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
