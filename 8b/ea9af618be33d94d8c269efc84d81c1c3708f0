@@ -1,0 +1,21 @@
+apps/desktop/package.json
+  s_64f9b3c01ed37b::t_0c2ab7af2e4f15 26-28
+docs/spec/03-runtime/03-tools-and-permissions.md
+  s_64f9b3c01ed37b::t_b3dbf730e513d4 106,109,1035-1036
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8bea9af618be33d94d8c269efc84d81c1c3708f0",
+  "prompts": {},
+  "sessions": {
+    "s_64f9b3c01ed37b": {
+      "agent_id": {
+        "tool": "dsh",
+        "id": "session-d790956b-609e-481a-953d-0547f5a7b1a3",
+        "model": "8859"
+      },
+      "human_author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
