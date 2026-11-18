@@ -1,0 +1,22 @@
+crates/agent-core/README.md
+  h_201ed4c689ac8b 99-100,118-125
+crates/agent-core/src/journal.rs
+  h_201ed4c689ac8b 1-263
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 39
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 226,229-231,248-249,266,466,485,625-626,628-632,1198-1275,1322
+crates/agent-core/tests/common/mod.rs
+  h_201ed4c689ac8b 3-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c61579b9364f00ecde17d1fd4736ddf6861a2a0d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
