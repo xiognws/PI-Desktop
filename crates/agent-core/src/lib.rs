@@ -43,6 +43,7 @@ pub mod message;
 pub mod prompt;
 pub mod provider;
 pub mod redaction;
+pub mod restore;
 pub mod retry;
 pub mod rpc;
 pub mod session;

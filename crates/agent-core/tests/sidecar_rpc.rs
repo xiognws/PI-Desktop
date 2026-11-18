@@ -8,7 +8,20 @@ use agent_core::sidecar::{RecordingLines, Sidecar};
 use agent_core::LineSink;
 use serde_json::{json, Value};
 
+mod common;
+
 fn sidecar() -> (Arc<Sidecar>, RecordingLines) {
+    let lines = RecordingLines::new();
+    let sink: Arc<dyn LineSink> = Arc::new(lines.clone());
+    let sidecar = Arc::new(Sidecar::with_default_gate(sink));
+    // Stand in for Electron main: a test that ignored the history request would
+    // stall on a host that does not exist.
+    common::answer_empty_history(&sidecar, &lines);
+    (sidecar, lines)
+}
+
+/// A sidecar whose history answer this test supplies itself.
+fn sidecar_manual() -> (Arc<Sidecar>, RecordingLines) {
     let lines = RecordingLines::new();
     let sink: Arc<dyn LineSink> = Arc::new(lines.clone());
     (Arc::new(Sidecar::with_default_gate(sink)), lines)
@@ -413,7 +426,7 @@ async fn without_a_catalog_the_skill_tool_is_not_offered() {
 }
 
 #[tokio::test]
-async fn memory_recall_is_requested_only_when_the_prompt_offers_it() {
+async fn every_agent_prompt_recalls_memory_and_the_opt_out_is_honoured() {
     let (sidecar, lines) = sidecar();
     call(
         &sidecar,
@@ -426,8 +439,8 @@ async fn memory_recall_is_requested_only_when_the_prompt_offers_it() {
     )
     .await;
 
-    // A prompt that says the host has memory: the kernel asks once, before the
-    // turn's first request.
+    // A plain prompt recalls: the Node sidecar does this for every Agent turn,
+    // so a switch that only recalled when asked would quietly lose memory.
     call(
         &sidecar,
         2,
@@ -436,16 +449,15 @@ async fn memory_recall_is_requested_only_when_the_prompt_offers_it() {
             "sessionId": "s1",
             "turnId": "t1",
             "prompt": "how long is the build",
-            "projectPath": "D:/repo",
-            "memoryRecall": true
+            "projectPath": "D:/repo"
         }),
     )
     .await;
     // The host never answers here, so recall times out and the turn proceeds.
     let host_call = lines
-        .wait_for_message("host.proxy", Duration::from_secs(5))
+        .wait_for_host_call("memory.recall", Duration::from_secs(5))
         .await
-        .expect("a host call");
+        .expect("a recall call");
     assert_eq!(host_call["params"]["method"], "memory.recall");
     assert_eq!(host_call["params"]["params"]["projectPath"], "D:/repo");
     assert_eq!(host_call["params"]["params"]["sessionId"], "s1");
@@ -455,15 +467,18 @@ async fn memory_recall_is_requested_only_when_the_prompt_offers_it() {
         .await
         .expect("the turn finishes without memory");
 
-    // A prompt that does not offer it: no further recall request, and the same
-    // session still answers. An older host therefore sees the request sequence
-    // it always saw.
+    // An explicit opt-out is honoured: some hosts keep memory off entirely.
     let before = lines.notifications("host.proxy").len();
     call(
         &sidecar,
         3,
         "agent.prompt",
-        json!({"sessionId": "s1", "turnId": "t2", "prompt": "and the tests?"}),
+        json!({
+            "sessionId": "s1",
+            "turnId": "t2",
+            "prompt": "and the tests?",
+            "memoryRecall": false
+        }),
     )
     .await;
     lines
@@ -473,7 +488,7 @@ async fn memory_recall_is_requested_only_when_the_prompt_offers_it() {
     assert_eq!(
         lines.notifications("host.proxy").len(),
         before,
-        "no recall without the capability flag"
+        "no recall when the host opts out"
     );
 }
 
@@ -833,4 +848,125 @@ async fn the_agent_can_write_its_own_skill_library() {
         raw.contains("`name` is required to create"),
         "skill_manage is offered and refuses a nameless create: {raw}"
     );
+}
+
+/// A reopened session must arrive with its history.
+///
+/// Host-core owns persistence, so the kernel's transcript starts empty and the
+/// model would otherwise see only the newest message. `agent.prompt` waits for
+/// the host to answer `session.get` — exactly as the Node sidecar does — so the
+/// prompt call is driven on a task while the host's answer is supplied here.
+#[tokio::test]
+async fn a_reopened_session_restores_its_history_before_the_turn() {
+    let (sidecar, lines) = sidecar_manual();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "text": "noted", "turns": 2},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+
+    let prompting = {
+        let sidecar = sidecar.clone();
+        tokio::spawn(async move {
+            call(
+                &sidecar,
+                2,
+                "agent.prompt",
+                json!({"sessionId": "reopened", "turnId": "t1", "prompt": "and then?"}),
+            )
+            .await
+        })
+    };
+
+    let restore = lines
+        .wait_for_message("host.proxy", Duration::from_secs(10))
+        .await
+        .expect("the kernel asks for history");
+    assert_eq!(restore["params"]["method"], "session.get");
+    assert_eq!(restore["params"]["params"]["id"], "reopened");
+    let call_id = restore["id"].as_str().expect("call id").to_string();
+    sidecar.bridge().complete(
+        &call_id,
+        Ok(json!({
+            "session": {
+                "messages": [
+                    {"id": "u1", "role": "user", "content": "build the thing"},
+                    {"id": "a1", "role": "assistant", "content": "built it"},
+                    {"id": "s1", "role": "system", "content": "", "modelSystem": {"version": 1, "messageJson": "{}"}}
+                ]
+            }
+        })),
+    );
+
+    let response = prompting.await.expect("the prompt task finishes");
+    assert_eq!(response["result"]["accepted"], true);
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(15))
+        .await
+        .expect("the turn completes");
+
+    let session = call(
+        &sidecar,
+        3,
+        "native.session.get",
+        json!({"sessionId": "reopened"}),
+    )
+    .await;
+    let messages = session["result"]["messages"].as_array().expect("messages");
+    assert_eq!(
+        messages.len(),
+        4,
+        "two restored rows, the new prompt, the answer"
+    );
+    assert_eq!(messages[0]["id"], "u1");
+    assert_eq!(messages[1]["id"], "a1");
+    assert_eq!(messages[2]["role"], "user");
+    assert_eq!(messages[3]["role"], "assistant");
+}
+
+/// A host that says the session does not exist must be believed.
+#[tokio::test]
+async fn prompting_a_deleted_session_is_refused_by_name() {
+    let (sidecar, lines) = sidecar_manual();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "text": "unused", "turns": 1},
+            "model": "scripted-model"
+        }),
+    )
+    .await;
+
+    let prompting = {
+        let sidecar = sidecar.clone();
+        tokio::spawn(async move {
+            call(
+                &sidecar,
+                2,
+                "agent.prompt",
+                json!({"sessionId": "deleted", "turnId": "t1", "prompt": "hello?"}),
+            )
+            .await
+        })
+    };
+
+    let restore = lines
+        .wait_for_message("host.proxy", Duration::from_secs(10))
+        .await
+        .expect("the kernel asks for history");
+    let call_id = restore["id"].as_str().expect("call id").to_string();
+    sidecar
+        .bridge()
+        .complete(&call_id, Ok(json!({ "session": null })));
+
+    let response = prompting.await.expect("the prompt task finishes");
+    assert_eq!(response["error"]["code"], -32000);
+    assert_eq!(response["error"]["data"]["errorCode"], "SESSION_NOT_FOUND");
 }

@@ -72,6 +72,38 @@ impl RecordingLines {
             .collect()
     }
 
+    /// Wait for a `host.proxy` call carrying `method`, and return its frame.
+    ///
+    /// A proxy notification's own method is always `host.proxy`; the method the
+    /// host is asked to run is inside the params. Tests that care about one call
+    /// need this, because several now share the channel (history restore runs
+    /// before the turn asks for a tool).
+    pub async fn wait_for_host_call(
+        &self,
+        method: &str,
+        timeout: std::time::Duration,
+    ) -> Option<Value> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let found = self
+                .lines()
+                .iter()
+                .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+                .find(|value| {
+                    value.get("method").and_then(Value::as_str) == Some("host.proxy")
+                        && value.pointer("/params/method").and_then(Value::as_str) == Some(method)
+                });
+            if found.is_some() {
+                return found;
+            }
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+            let _ = tokio::time::timeout(remaining, self.notify.notified()).await;
+        }
+    }
+
     /// Wait until a message with `method` has arrived and return the whole
     /// frame (id included), for tests that must answer a host call.
     pub async fn wait_for_message(
@@ -179,6 +211,12 @@ impl RuntimeConfig {
     }
 }
 
+/// How long a prompt waits for the host's history before starting empty.
+///
+/// Main answers in milliseconds; this bound exists so a host that never answers
+/// degrades to a fresh conversation instead of a prompt that never returns.
+const HISTORY_RESTORE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 struct Session {
     transcript: Arc<tokio::sync::Mutex<Transcript>>,
     cancel: Mutex<CancelToken>,
@@ -194,6 +232,10 @@ struct Session {
     /// Delegations this session started. Kept per session so a report that
     /// settled after the parent stopped calling tools is still readable.
     delegations: Arc<crate::delegate::DelegationRegistry>,
+    /// Whether history has already been pulled from the host for this session.
+    /// Once is enough: after that the kernel's transcript is the newer copy, and
+    /// asking again would resurrect rows the user has since deleted.
+    restored: AtomicBool,
 }
 
 impl Session {
@@ -205,6 +247,7 @@ impl Session {
             current_turn: Mutex::new(None),
             steering: Mutex::new(std::collections::VecDeque::new()),
             skills: Arc::new(crate::skills::SkillCatalog::new()),
+            restored: AtomicBool::new(false),
             delegations: Arc::new(crate::delegate::DelegationRegistry::new(session_id)),
         }
     }
@@ -533,6 +576,9 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("turn lock poisoned"))? = Some(turn_id.clone());
 
+        // A reopened session starts with the history host-core kept for it.
+        self.restore_history(&session, session_id.as_str()).await?;
+
         {
             let mut transcript = session.transcript.lock().await;
             // The transcript keeps the user's own text; the recall query below
@@ -575,12 +621,12 @@ impl Sidecar {
         // Durable memory: only when this prompt says the host offers it. A host
         // without memory gets no recall round trip, which is what keeps the
         // request sequence of an older host unchanged.
+        // Every Agent turn recalls, which is what the Node sidecar does; a host
+        // that wants to skip it says `memoryRecall: false`. Gating recall behind
+        // an opt-in flag meant memory silently stopped working the moment this
+        // kernel started serving prompts, because main never sends the flag.
         let memory_prefix = if matches!(mode, crate::prompt::SessionMode::Agent)
-            && request
-                .params
-                .get("memoryRecall")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
+            && request.params.get("memoryRecall").and_then(Value::as_bool) != Some(false)
         {
             let project_path = request
                 .str_param("projectPath")
@@ -1111,6 +1157,55 @@ impl Sidecar {
     /// wrapped in `status`, because `api.ts` destructures `{ status }` and reads
     /// `status.isRunning`. A flat object left the renderer with `undefined` and
     /// an idle session that never looked idle.
+    /// Load this session's history from the host, once.
+    ///
+    /// Host-core owns persistence, so a session the kernel has never seen — a
+    /// restart, a rebuilt runtime, a window reopened on an old conversation —
+    /// has no transcript here until it asks. A host that does not implement
+    /// `session.get` is not an error: the session simply starts empty, which is
+    /// what a brand-new conversation looks like anyway. A host that answers "no
+    /// such session" *is* an error, because prompting a deleted session is a
+    /// state the caller has to see.
+    async fn restore_history(
+        &self,
+        session: &Arc<Session>,
+        session_id: &str,
+    ) -> Result<(), RpcError> {
+        if session.restored.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+        let response = match tokio::time::timeout(
+            HISTORY_RESTORE_TIMEOUT,
+            self.bridge.call("session.get", json!({ "id": session_id })),
+        )
+        .await
+        {
+            Ok(Ok(response)) => response,
+            // Older host, remote workspace mid-upgrade, or a host that never
+            // answers: start empty rather than hold the prompt open forever.
+            Ok(Err(_)) | Err(_) => return Ok(()),
+        };
+        let Some(detail) = response.get("session") else {
+            return Ok(());
+        };
+        if detail.is_null() {
+            return Err(RpcError::app(
+                "SESSION_NOT_FOUND",
+                "session not found while restoring history",
+            ));
+        }
+        let Some(rows) = detail.get("messages").and_then(Value::as_array) else {
+            return Ok(());
+        };
+        let messages = crate::restore::messages_from_history(rows);
+        if messages.is_empty() {
+            return Ok(());
+        }
+        let mut transcript = session.transcript.lock().await;
+        transcript.extend(messages);
+        Ok(())
+    }
+
     fn get_status(&self, request: &Request) -> Result<Value, RpcError> {
         let session_id = request.require_str("sessionId")?;
         let sessions = self

@@ -15,11 +15,18 @@ use agent_core::sidecar::{RecordingLines, Sidecar};
 use agent_core::LineSink;
 use serde_json::{json, Value};
 
+mod common;
+
 fn sidecar() -> (Arc<Sidecar>, RecordingLines) {
     let lines = RecordingLines::new();
     let sink: Arc<dyn LineSink> = Arc::new(lines.clone());
-    (Arc::new(Sidecar::with_default_gate(sink)), lines)
+    let sidecar = Arc::new(Sidecar::with_default_gate(sink));
+    // Stand in for Electron main: a test that ignored the history request would
+    // stall on a host that does not exist.
+    common::answer_empty_history(&sidecar, &lines);
+    (sidecar, lines)
 }
+
 
 async fn call(sidecar: &Sidecar, id: i64, method: &str, params: Value) -> Value {
     let request = Request {
@@ -73,7 +80,7 @@ async fn a_tool_call_round_trips_through_the_host() {
 
     // The kernel asked the host to run the tool, stamped with the turn identity.
     let request = lines
-        .wait_for_message("host.proxy", Duration::from_secs(10))
+        .wait_for_host_call("tools.execute", Duration::from_secs(10))
         .await
         .expect("the host call reaches the peer");
     assert_eq!(request["params"]["method"], "tools.execute");
@@ -127,7 +134,7 @@ async fn a_refused_call_becomes_an_error_result_and_the_turn_continues() {
     .await;
 
     let request = lines
-        .wait_for_message("host.proxy", Duration::from_secs(10))
+        .wait_for_host_call("tools.execute", Duration::from_secs(10))
         .await
         .expect("the host call reaches the peer");
     let call_id = request["id"].as_str().unwrap().to_string();
@@ -189,7 +196,7 @@ async fn closing_the_channel_fails_every_waiter() {
     };
     // Wait until the call is actually pending, without a fixed sleep.
     lines
-        .wait_for_message("host.proxy", Duration::from_secs(5))
+        .wait_for_host_call("tools.execute", Duration::from_secs(5))
         .await
         .expect("the call was issued");
 

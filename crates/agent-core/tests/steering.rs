@@ -13,11 +13,18 @@ use agent_core::sidecar::{RecordingLines, Sidecar};
 use agent_core::LineSink;
 use serde_json::{json, Value};
 
+mod common;
+
 fn sidecar() -> (Arc<Sidecar>, RecordingLines) {
     let lines = RecordingLines::new();
     let sink: Arc<dyn LineSink> = Arc::new(lines.clone());
-    (Arc::new(Sidecar::with_default_gate(sink)), lines)
+    let sidecar = Arc::new(Sidecar::with_default_gate(sink));
+    // Stand in for Electron main: a test that ignored the history request would
+    // stall on a host that does not exist.
+    common::answer_empty_history(&sidecar, &lines);
+    (sidecar, lines)
 }
+
 
 async fn call(sidecar: &Sidecar, id: i64, method: &str, params: Value) -> Value {
     let request = Request {
@@ -62,7 +69,7 @@ async fn a_steer_reaches_the_next_step_of_the_running_turn() {
 
     // The turn is parked on the host call: steer now.
     let host_call = lines
-        .wait_for_message("host.proxy", Duration::from_secs(10))
+        .wait_for_host_call("tools.execute", Duration::from_secs(10))
         .await
         .expect("the turn asked the host for the tool");
 
@@ -155,7 +162,7 @@ async fn a_steer_addressed_at_a_stale_turn_is_refused() {
     let (sidecar, lines) = sidecar();
     call(&sidecar, 1, "agent.prompt", slow_turn_prompt("s1", "t1")).await;
     lines
-        .wait_for_message("host.proxy", Duration::from_secs(10))
+        .wait_for_host_call("tools.execute", Duration::from_secs(10))
         .await
         .expect("the turn is running");
 
