@@ -248,7 +248,30 @@ impl Tool for HostTool {
                 "toolName": self.spec.name,
                 "args": call.arguments,
             });
-            match self.bridge.call("tools.execute", params).await {
+            // A stopped turn must stop the work the host is doing, not just this
+            // kernel's wait. The host runs the tool in its own process; without
+            // `tools.abort` a long command keeps running after the user pressed
+            // Stop, and its output has nowhere to go.
+            let execute = self.bridge.call("tools.execute", params);
+            tokio::pin!(execute);
+            let outcome = tokio::select! {
+                biased;
+                _ = ctx.cancel.cancelled() => {
+                    self.bridge
+                        .call(
+                            "tools.abort",
+                            json!({
+                                "sessionId": ctx.session_id,
+                                "toolCallId": ctx.tool_call_id,
+                            }),
+                        )
+                        .await
+                        .ok();
+                    return Err(AgentError::Cancelled);
+                }
+                outcome = &mut execute => outcome,
+            };
+            match outcome {
                 Ok(value) => self.interpret(call, &value),
                 Err(HostError::Rpc(error)) => Err(map_host_rpc_error(error)),
                 Err(other) => Err(AgentError::Transport(other.to_string())),
@@ -276,6 +299,14 @@ fn map_host_rpc_error(error: RpcError) -> AgentError {
 
 /// Parse a tool declaration sent by main.
 pub fn tool_spec_from_value(value: &Value) -> std::result::Result<ToolSpec, String> {
+    // Two spellings mean the same thing: a host may forward a declaration as it
+    // stores it (`{name, description, parameters}`) or as a provider expects it
+    // (`{type: "function", function: {...}}`). Reading only one of them turns a
+    // perfectly good declaration into an invalid-params error at the prompt.
+    let value = match value.get("function").filter(|inner| inner.is_object()) {
+        Some(inner) => inner,
+        None => value,
+    };
     let name = value
         .get("name")
         .and_then(Value::as_str)
@@ -306,5 +337,47 @@ pub fn tool_result_from_host(call: &ToolCall, value: &Value) -> ToolResult {
         content,
         is_error: !ok,
         truncated: false,
+    }
+}
+
+#[cfg(test)]
+mod declaration_shape_tests {
+    use super::*;
+
+    #[test]
+    fn a_flat_declaration_reads_as_itself() {
+        let spec = tool_spec_from_value(&json!({
+            "name": "Bash",
+            "description": "Run a command",
+            "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}
+        }))
+        .expect("a flat declaration");
+        assert_eq!(spec.name, "Bash");
+        assert_eq!(spec.description, "Run a command");
+        assert_eq!(spec.parameters["properties"]["command"]["type"], "string");
+    }
+
+    #[test]
+    fn a_provider_wrapped_declaration_reads_the_same() {
+        // A host that forwards `{type: "function", function: {...}}` is not
+        // making a mistake, and refusing it would look like a broken prompt.
+        let spec = tool_spec_from_value(&json!({
+            "type": "function",
+            "function": {
+                "name": "Read",
+                "description": "Read a file",
+                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}
+            }
+        }))
+        .expect("a wrapped declaration");
+        assert_eq!(spec.name, "Read");
+        assert_eq!(spec.description, "Read a file");
+        assert_eq!(spec.parameters["properties"]["path"]["type"], "string");
+    }
+
+    #[test]
+    fn a_declaration_without_a_name_is_refused() {
+        assert!(tool_spec_from_value(&json!({"description": "nothing"})).is_err());
+        assert!(tool_spec_from_value(&json!({"type": "function", "function": {}})).is_err());
     }
 }

@@ -1637,8 +1637,22 @@ fn snippet(text: &str, limit: usize) -> String {
 /// The model window facts a prompt carries. Main stamps them per turn; without
 /// them the loop cannot tell a large context from a small one.
 fn model_limits_from(request: &Request) -> Option<ModelLimits> {
-    let context_window = request.params.get("contextWindow").and_then(Value::as_u64);
-    let max_tokens = request.params.get("maxTokens").and_then(Value::as_u64);
+    // The window is a property of the model, and main stamps it on the provider
+    // (`provider.modelConfig`). Reading only top-level params meant the kernel
+    // never learned the window from a real prompt and therefore never compacted.
+    let model_config = request
+        .params
+        .get("provider")
+        .and_then(|provider| provider.get("modelConfig"));
+    let from_model = |key: &str| {
+        model_config
+            .and_then(|config| config.get(key))
+            .and_then(Value::as_u64)
+    };
+    let context_window = from_model("contextWindow")
+        .or_else(|| request.params.get("contextWindow").and_then(Value::as_u64));
+    let max_tokens =
+        from_model("maxTokens").or_else(|| request.params.get("maxTokens").and_then(Value::as_u64));
     if context_window.is_none() && max_tokens.is_none() {
         return None;
     }

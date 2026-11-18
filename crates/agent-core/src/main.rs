@@ -219,6 +219,26 @@ async fn serve() -> ExitCode {
     let sink: Arc<dyn agent_core::sidecar::LineSink> = Arc::new(writer_tx.clone());
     let sidecar = Arc::new(agent_core::sidecar::Sidecar::with_default_gate(sink));
 
+    // Requests are answered in the order they arrive — `sidecar.configure` must
+    // land before the prompt that depends on it — but on their own task, so the
+    // reader below is free to deliver the answer to a reverse host call while a
+    // handler is still waiting for it. Reading and handling on one task
+    // deadlocks any handler that asks the host something: the answer arrives on
+    // this same stdin, behind the handler that is waiting for it.
+    let (request_tx, mut request_rx) =
+        tokio::sync::mpsc::unbounded_channel::<agent_core::rpc::Request>();
+    let worker_writer = writer_tx.clone();
+    let worker_sidecar = sidecar.clone();
+    let worker = tokio::spawn(async move {
+        while let Some(request) = request_rx.recv().await {
+            if let Some(answer) = worker_sidecar.handle(request).await {
+                let _ = worker_writer.send(answer);
+            }
+        }
+        worker_sidecar.bridge().fail_all("peer closed stdin");
+        drop(worker_writer);
+    });
+
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     loop {
         match lines.next_line().await {
@@ -230,15 +250,15 @@ async fn serve() -> ExitCode {
                         error,
                     ));
                 }
+                // A reverse host call's answer goes straight to the bridge, so a
+                // waiting handler is released even while another request runs.
                 agent_core::rpc::Incoming::Response { id, outcome } => {
                     if let Some(id) = id.as_str() {
                         sidecar.bridge().complete(id, outcome);
                     }
                 }
                 agent_core::rpc::Incoming::Request(request) => {
-                    if let Some(answer) = sidecar.handle(request).await {
-                        let _ = writer_tx.send(answer);
-                    }
+                    let _ = request_tx.send(request);
                 }
             },
             // The peer closed stdin: shut down like a well-behaved child, and
@@ -252,7 +272,12 @@ async fn serve() -> ExitCode {
         }
     }
 
-    sidecar.bridge().fail_all("peer closed stdin");
+    // Closing the queue lets the worker finish what it already accepted, then it
+    // fails every host call still waiting and drops its writer clone. The sink
+    // inside this sidecar holds one too: without dropping it the writer task
+    // never sees the channel close and the process outlives its stdin.
+    drop(request_tx);
+    let _ = worker.await;
     drop(sidecar);
     drop(writer_tx);
     let _ = writer.await;

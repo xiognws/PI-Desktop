@@ -98,7 +98,8 @@ printf '%s\n' \
 | 7b | switchable launch: `agent-sidecar-launch.ts` picks this binary when `PI_AGENT_CORE=rust`, otherwise the Node sidecar, and falls back to Node when the binary is absent; `scripts/agent-core-differential.mjs` runs one identical conversation through both and diffs the result | **in progress** |
 | 7c | parity items the differential found and this crate now matches: history restore (`session.get`), the system-prompt journal (`session.appendMessage`), memory recall on every Agent prompt, `status` events | **done** |
 | 7d | the background `skill_review` pass: a forked run with a restricted tool set, gated on tool calls and a cooldown, reporting its writes as a `skill_review` event | **done** |
-| 7e | what the differential still reports, both documented: `tools.fileBatchCapabilities` read batching (a Node-side optimisation) and the kernel's incremental `message_update` (a superset). Then delete `packages/agent-runtime` | next |
+| 7e | differential harness over six scenarios (plain, tool, tool-declared, steer, asktool, compaction): event presence, turn-phase order, result shapes, host calls and tool outcomes. It found the `serve` deadlock, the missing `message_start` for tool-only messages, the model window being read from a field main never sends, and the missing `tools.abort` | **done** |
+| 7f | the runtime's built-in tool declarations (Bash, Read, Write, Edit, Glob, Grep): the Node runtime ships them, main sends none, so the kernel currently offers the model no built-in tool at all. Then delete `packages/agent-runtime` | next |
 
 Sizes being ported are recorded per component in ADR 0402; use that table to
 scope a phase, not a guess.

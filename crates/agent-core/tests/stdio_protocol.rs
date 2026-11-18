@@ -63,10 +63,6 @@ fn the_binary_speaks_the_sidecar_protocol_on_stdio() {
         })),
         // A malformed frame must be answered, not crash the process.
         "{not json\n".to_string(),
-        line(
-            json!({"jsonrpc": "2.0", "id": 4, "method": "native.session.get",
-                    "params": {"sessionId": "pipe-session"}}),
-        ),
     ];
     for request in &requests {
         stdin.write_all(request.as_bytes()).expect("write request");
@@ -76,6 +72,7 @@ fn the_binary_speaks_the_sidecar_protocol_on_stdio() {
     let deadline = Instant::now() + Duration::from_secs(30);
     let mut responses: Vec<Value> = Vec::new();
     let mut saw_agent_end = false;
+    let mut asked_for_transcript = false;
     while !(saw_agent_end && responses.iter().any(|value| value["id"] == 4)) {
         let remaining = deadline.saturating_duration_since(Instant::now());
         assert!(
@@ -87,12 +84,52 @@ fn the_binary_speaks_the_sidecar_protocol_on_stdio() {
             .recv_timeout(remaining)
             .expect("a line before the timeout");
         let value: Value = serde_json::from_str(&raw).expect("every output line is JSON");
+        if std::env::var("PROBE").is_ok() {
+            println!(
+                "frame id={:?} method={:?} event={:?}",
+                value.get("id"),
+                value.get("method"),
+                value.pointer("/params/event/type")
+            );
+        }
+        // Stand in for Electron main. A turn asks the host for its history and
+        // journals its prompt; without an answer those calls wait out their
+        // timeout and the turn is slow, which would look like a protocol fault.
+        if value.get("method").and_then(Value::as_str) == Some("host.proxy") {
+            let method = value["params"]["method"].as_str().unwrap_or("");
+            let result = if method == "session.get" {
+                json!({ "session": { "messages": [] } })
+            } else {
+                json!({ "ok": true })
+            };
+            stdin
+                .write_all(
+                    line(json!({ "jsonrpc": "2.0", "id": value["id"], "result": result }))
+                        .as_bytes(),
+                )
+                .expect("answer the host call");
+            stdin.flush().expect("flush the answer");
+            continue;
+        }
         // A malformed input line is answered with a parse error carrying a null
         // id; it is a response like any other.
         if value.get("method").and_then(Value::as_str) == Some("agent.event")
             && value["params"]["event"]["type"] == "agent_end"
+            && !asked_for_transcript
         {
             saw_agent_end = true;
+            asked_for_transcript = true;
+            // The transcript is complete only now; asking earlier races the turn.
+            stdin
+                .write_all(
+                    line(
+                        json!({"jsonrpc": "2.0", "id": 4, "method": "native.session.get",
+                                "params": {"sessionId": "pipe-session"}}),
+                    )
+                    .as_bytes(),
+                )
+                .expect("ask for the transcript");
+            stdin.flush().expect("flush the transcript request");
         }
         responses.push(value);
     }

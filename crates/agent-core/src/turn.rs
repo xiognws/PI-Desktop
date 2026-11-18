@@ -810,6 +810,18 @@ impl TurnEngine {
         // stored message must be the same id, or the renderer keeps a ghost.
         if started {
             assembled.message.id = live.id.clone();
+        } else {
+            // Nothing streamed, so the lazy `message_start` above never fired.
+            // A message that only calls a tool is still a row the client has to
+            // insert — the renderer creates it from this event, and without it
+            // the tool call has no visible parent.
+            self.emit(
+                session_id,
+                turn_id,
+                AgentEvent::MessageStart {
+                    message: assembled.message.clone(),
+                },
+            );
         }
         self.emit(
             session_id,
