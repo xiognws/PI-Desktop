@@ -97,7 +97,8 @@ printf '%s\n' \
 | 7a | packaging, measured on commit `0a4b56b02`: `cargo build -p agent-core --release --offline` → **6.34 MiB** `pi-desktop-agent-core.exe`; imports only Windows system libraries (KERNEL32, ADVAPI32, bcrypt, bcryptprimitives, ntdll, ws2_32, dbghelp, api-ms-win-core-synch) — no Node, Python, OpenSSL or VC++ redistributable; `self-check` 6/6; a scripted NDJSON session over real stdio returns 3 responses and the full `agent_start…agent_end` event sequence | **done** |
 | 7b | switchable launch: `agent-sidecar-launch.ts` picks this binary when `PI_AGENT_CORE=rust`, otherwise the Node sidecar, and falls back to Node when the binary is absent; `scripts/agent-core-differential.mjs` runs one identical conversation through both and diffs the result | **in progress** |
 | 7c | parity items the differential found and this crate now matches: history restore (`session.get`), the system-prompt journal (`session.appendMessage`), memory recall on every Agent prompt, `status` events | **done** |
-| 7d | what the differential still reports, all documented: the background `skill_review` pass, `tools.fileBatchCapabilities` read batching, and the kernel's incremental `message_update` (a superset). Then delete `packages/agent-runtime` | next |
+| 7d | the background `skill_review` pass: a forked run with a restricted tool set, gated on tool calls and a cooldown, reporting its writes as a `skill_review` event | **done** |
+| 7e | what the differential still reports, both documented: `tools.fileBatchCapabilities` read batching (a Node-side optimisation) and the kernel's incremental `message_update` (a superset). Then delete `packages/agent-runtime` | next |
 
 Sizes being ported are recorded per component in ADR 0402; use that table to
 scope a phase, not a guess.

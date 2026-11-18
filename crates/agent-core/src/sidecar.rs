@@ -245,6 +245,12 @@ struct Session {
     /// Delegations this session started. Kept per session so a report that
     /// settled after the parent stopped calling tools is still readable.
     delegations: Arc<crate::delegate::DelegationRegistry>,
+    /// The background skill review's gate: tool calls since the last pass, and
+    /// the floor between passes.
+    review_gate: Mutex<crate::skill_review::ReviewGate>,
+    /// One review at a time: a second fork would read a library the first is
+    /// still writing to.
+    review_running: AtomicBool,
     /// The system prompts this session has already journaled.
     journal: Mutex<crate::journal::SystemJournal>,
     /// Whether history has already been pulled from the host for this session.
@@ -264,6 +270,8 @@ impl Session {
             skills: Arc::new(crate::skills::SkillCatalog::new()),
             restored: AtomicBool::new(false),
             journal: Mutex::new(crate::journal::SystemJournal::new()),
+            review_gate: Mutex::new(crate::skill_review::ReviewGate::new()),
+            review_running: AtomicBool::new(false),
             delegations: Arc::new(crate::delegate::DelegationRegistry::new(session_id)),
         }
     }
@@ -750,6 +758,10 @@ impl Sidecar {
         } else {
             Arc::new(tools.extended(extra))
         };
+        // Keep the pieces the background review needs: the engine takes
+        // ownership of the provider and the tool set below.
+        let review_provider = provider.clone();
+        let review_tools = tools.clone();
         let engine = TurnEngine::new(
             provider,
             tools,
@@ -782,6 +794,16 @@ impl Sidecar {
             .and_then(Value::as_bool)
             .unwrap_or(false);
         let task_asks = self.asks.clone();
+        // A background skill review runs after this turn, in the same task: the
+        // client has already been told the turn ended, so nothing is held back.
+        let review_policy =
+            crate::skill_review::SkillReviewPolicy::from_params(request.params.get("skillReview"));
+        let review_model = config.model.clone();
+        let review_system = config.system.clone();
+        let review_mode = mode.clone();
+        let review_out = self.out.clone();
+        let review_turn_id = turn_id.clone();
+        let review_session_id = session_id.clone();
         tokio::spawn(async move {
             let mut transcript = task_session.transcript.lock().await;
             let outcome = engine
@@ -808,8 +830,42 @@ impl Sidecar {
             if let Ok(mut current) = task_session.current_turn.lock() {
                 *current = None;
             }
-            // Idle again, announced after the turn's own end event so a client
-            // that reacts to both never sees "idle" before "agent_end".
+            match outcome {
+                Ok(outcome) => {
+                    tracing::debug!(
+                        target: "agent_core::sidecar",
+                        steps = outcome.steps,
+                        tool_calls = outcome.tool_calls,
+                        input = outcome.usage.input_tokens,
+                        output = outcome.usage.output_tokens,
+                        "turn finished"
+                    );
+                    skill_review_pass(SkillReviewInput {
+                        provider: review_provider,
+                        tools: review_tools,
+                        model: review_model,
+                        system: review_system,
+                        policy: review_policy,
+                        mode: review_mode,
+                        session: task_session.clone(),
+                        out: review_out,
+                        session_id: review_session_id,
+                        turn_id: review_turn_id,
+                        tool_calls: outcome.tool_calls,
+                    })
+                    .await;
+                }
+                Err(error) => tracing::debug!(
+                    target: "agent_core::sidecar",
+                    code = error.code(),
+                    %error,
+                    "turn failed"
+                ),
+            }
+            // Idle last, after everything the turn caused — the end event, the
+            // review's notice. A client that treats this as the authoritative
+            // "nothing is happening" must not be told that while the review is
+            // still writing to the library.
             let idle = json!({
                 "sessionId": task_session_id,
                 "isRunning": false,
@@ -820,21 +876,6 @@ impl Sidecar {
                 task_turn_id.clone(),
                 crate::AgentEvent::Status { status: idle },
             ));
-            match outcome {
-                Ok(outcome) => tracing::debug!(
-                    target: "agent_core::sidecar",
-                    steps = outcome.steps,
-                    input = outcome.usage.input_tokens,
-                    output = outcome.usage.output_tokens,
-                    "turn finished"
-                ),
-                Err(error) => tracing::debug!(
-                    target: "agent_core::sidecar",
-                    code = error.code(),
-                    %error,
-                    "turn failed"
-                ),
-            }
         });
 
         Ok(json!({ "accepted": true, "sessionId": session_id, "turnId": turn_id }))
@@ -1621,6 +1662,240 @@ impl crate::EventSink for DelegateSink {
         self.inner
             .emit(envelope.with_delegate(&self.parent_tool_call_id, &self.agent_name));
     }
+}
+
+/// Collects a review fork's tool calls without showing them to the client.
+///
+/// The review's writes are ordinary `skill_manage` calls; the transcript never
+/// shows them, so the summary the `skill_review` event carries is the only place
+/// a person learns what changed.
+struct ReviewSink {
+    collector: std::sync::Mutex<crate::skill_review::ReviewActionCollector>,
+}
+
+impl ReviewSink {
+    fn new() -> Self {
+        Self {
+            collector: std::sync::Mutex::new(crate::skill_review::ReviewActionCollector::new()),
+        }
+    }
+
+    fn snapshot(&self) -> (usize, Vec<String>) {
+        match self.collector.lock() {
+            Ok(collector) => (collector.tool_call_count(), collector.action_lines()),
+            Err(_) => (0, Vec::new()),
+        }
+    }
+}
+
+impl crate::EventSink for ReviewSink {
+    fn emit(&self, envelope: crate::AgentEventEnvelope) {
+        let Ok(mut collector) = self.collector.lock() else {
+            return;
+        };
+        match &envelope.event {
+            crate::AgentEvent::ToolStart {
+                tool_call_id,
+                tool_name,
+                arguments,
+            } => collector.start(tool_call_id, tool_name, arguments),
+            crate::AgentEvent::ToolEnd {
+                tool_call_id,
+                is_error,
+                ..
+            } => collector.end(tool_call_id, *is_error),
+            _ => {}
+        }
+    }
+}
+
+/// Everything one review pass needs, grouped so the pass itself stays readable.
+struct SkillReviewInput {
+    provider: Arc<dyn Provider>,
+    tools: Arc<ToolRegistry>,
+    model: String,
+    system: Option<String>,
+    policy: crate::skill_review::SkillReviewPolicy,
+    mode: crate::prompt::SessionMode,
+    session: Arc<Session>,
+    out: Arc<dyn LineSink>,
+    session_id: String,
+    turn_id: String,
+    tool_calls: usize,
+}
+
+/// One background skill-review pass, for a turn that just ended.
+///
+/// The review is a fork with tools, not a model asked for a plan: it reads the
+/// library through `Skill`, writes through the same `skill_manage` path the
+/// foreground uses, and every write is a validated tool call.
+async fn skill_review_pass(input: SkillReviewInput) {
+    let SkillReviewInput {
+        provider,
+        tools,
+        model,
+        system,
+        policy,
+        mode,
+        session,
+        out,
+        session_id,
+        turn_id,
+        tool_calls,
+    } = input;
+
+    let emit_notice = |notice: &crate::skill_review::ReviewNotice| {
+        if !notice.is_visible(policy) {
+            return;
+        }
+        NotificationSink { out: out.clone() }.emit(crate::AgentEventEnvelope::new(
+            &session_id,
+            turn_id.clone(),
+            crate::AgentEvent::SkillReview {
+                outcome: notice.outcome.as_str().to_string(),
+                reason: notice.reason.clone(),
+                actions: notice.actions.clone(),
+            },
+        ));
+    };
+
+    if mode != crate::prompt::SessionMode::Agent {
+        // Plan and Goal negotiate a contract first; there is no work in them to
+        // learn from.
+        emit_notice(&crate::skill_review::ReviewNotice::skipped(
+            crate::skill_review::ReviewSkip::Mode.reason(),
+        ));
+        return;
+    }
+    if session.review_running.swap(true, Ordering::SeqCst) {
+        emit_notice(&crate::skill_review::ReviewNotice::skipped(
+            crate::skill_review::ReviewSkip::AlreadyRunning.reason(),
+        ));
+        return;
+    }
+    // The guard must not outlive this statement: the pass awaits network work
+    // below, and a `MutexGuard` held across an await makes the future `!Send`.
+    let qualified = {
+        let gate = session.review_gate.lock();
+        match gate {
+            Ok(mut gate) => gate.qualify(policy, tool_calls, std::time::Instant::now()),
+            Err(_) => {
+                session.review_running.store(false, Ordering::SeqCst);
+                return;
+            }
+        }
+    };
+    match Ok::<_, ()>(qualified) {
+        Ok(Ok(())) => {}
+        Ok(Err(skip)) => {
+            session.review_running.store(false, Ordering::SeqCst);
+            emit_notice(&crate::skill_review::ReviewNotice::skipped(skip.reason()));
+            return;
+        }
+        Err(()) => {
+            session.review_running.store(false, Ordering::SeqCst);
+            return;
+        }
+    }
+
+    let names: Vec<String> = crate::skill_review::REVIEW_TOOL_ALLOWLIST
+        .iter()
+        .map(|name| (*name).to_string())
+        .collect();
+    let review_tools = Arc::new(tools.restricted(&names));
+    if !review_tools.contains("Skill") || !review_tools.contains("skill_manage") {
+        // A fork without these would pay a full completion and could not land a
+        // single change; naming what is missing is what makes it actionable.
+        session.review_running.store(false, Ordering::SeqCst);
+        let present = review_tools
+            .specs()
+            .into_iter()
+            .map(|spec| spec.name)
+            .collect::<Vec<_>>()
+            .join(",");
+        emit_notice(&crate::skill_review::ReviewNotice::skipped(format!(
+            "no-skill-tools:{present}"
+        )));
+        return;
+    }
+
+    let history = {
+        let transcript = session.transcript.lock().await;
+        transcript.messages().to_vec()
+    };
+    let mut transcript =
+        crate::session::Transcript::from_messages(crate::skill_review::review_transcript(&history));
+    let sink = Arc::new(ReviewSink::new());
+    let engine = TurnEngine::new(
+        provider,
+        review_tools,
+        sink.clone() as Arc<dyn crate::EventSink>,
+    );
+    let config = TurnConfig {
+        model,
+        system,
+        max_steps: crate::skill_review::REVIEW_MAX_ITERATIONS as usize,
+        temperature: None,
+        max_output_tokens: None,
+        thinking: crate::provider::ThinkingLevel::Off,
+        infinite_provider_retry: false,
+    };
+    let review_session_id = format!("{session_id}#skill-review");
+    let review_turn_id = format!("{turn_id}#skill-review");
+    let cancel = CancelToken::new();
+    let mut outcome = engine
+        .run_turn(
+            &review_session_id,
+            &review_turn_id,
+            &mut transcript,
+            &config,
+            cancel.clone(),
+        )
+        .await;
+
+    // A pass that answered without reading anything has not seen what the
+    // library already covers. Correct it once, then accept the answer.
+    if outcome.is_ok() && sink.snapshot().0 == 0 {
+        transcript.push(Message::user_text(
+            crate::skill_review::SKILL_REVIEW_NO_LOOK_RETRY,
+        ));
+        outcome = engine
+            .run_turn(
+                &review_session_id,
+                &format!("{review_turn_id}#retry"),
+                &mut transcript,
+                &config,
+                cancel,
+            )
+            .await;
+    }
+
+    session.review_running.store(false, Ordering::SeqCst);
+    let notice = match outcome {
+        Ok(_) => {
+            if let Ok(mut gate) = session.review_gate.lock() {
+                gate.record_review(std::time::Instant::now());
+            }
+            let (tool_calls, actions) = sink.snapshot();
+            if tool_calls == 0 {
+                crate::skill_review::ReviewNotice {
+                    outcome: crate::skill_review::ReviewOutcome::Failed,
+                    reason: Some("no-tool-calls".to_string()),
+                    actions: Vec::new(),
+                }
+            } else if actions.is_empty() {
+                crate::skill_review::ReviewNotice::skipped("nothing-to-save")
+            } else {
+                crate::skill_review::ReviewNotice {
+                    outcome: crate::skill_review::ReviewOutcome::Applied,
+                    reason: None,
+                    actions,
+                }
+            }
+        }
+        Err(error) => crate::skill_review::ReviewNotice::failed(error.code()),
+    };
+    emit_notice(&notice);
 }
 
 /// Runs one delegate turn: its own transcript, its own prompt, only its own tools.

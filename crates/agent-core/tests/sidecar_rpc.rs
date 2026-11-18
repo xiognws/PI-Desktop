@@ -1020,3 +1020,107 @@ async fn a_turn_announces_its_run_state_before_and_after() {
         "idle must be announced after the turn ends, not before: {types:?}"
     );
 }
+
+/// A turn that used tools earns a background review, and its writes are reported.
+///
+/// The review is a forked run on the same provider: the script below answers the
+/// session's turn first (one tool call, then an answer) and the fork after it
+/// (list the library, create a skill, then answer). What a person sees is the
+/// notice, because the fork's own writes never enter the transcript.
+#[tokio::test]
+async fn a_turn_that_used_tools_earns_a_skill_review() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "Bash", "arguments": {"command": "echo hi"}}},
+                {"text": "the turn is done"},
+                // The review fork's own turn.
+                {"toolCall": {"id": "call_2", "name": "Skill", "arguments": {}}},
+                {"toolCall": {"id": "call_3", "name": "skill_manage", "arguments": {
+                    "action": "create",
+                    "name": "learned-skill",
+                    "description": "A skill the review wrote."
+                }}},
+                {"text": "Nothing to save."}
+            ]},
+            "model": "scripted-model",
+            "tools": [{
+                "name": "Bash",
+                "description": "Run a shell command",
+                "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}
+            }]
+        }),
+    )
+    .await;
+
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "reviewed",
+            "turnId": "t1",
+            "prompt": "do the thing",
+            "mode": "agent",
+            "pluginSkills": [{"id": "existing", "name": "Existing", "description": "A skill"}]
+        }),
+    )
+    .await;
+
+    let review = lines
+        .wait_for_event("skill_review", Duration::from_secs(30))
+        .await
+        .expect("the review reports");
+    assert_eq!(review["event"]["outcome"], "applied");
+    assert_eq!(review["event"]["actions"][0], "created 'learned-skill'");
+}
+
+/// A session can turn the review off, and then nothing forks.
+#[tokio::test]
+async fn a_disabled_review_says_so_and_does_not_fork() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "Bash", "arguments": {"command": "echo hi"}}},
+                {"text": "done"},
+                {"text": "this must never be requested"}
+            ]},
+            "model": "scripted-model",
+            "tools": [{
+                "name": "Bash",
+                "description": "Run a shell command",
+                "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}
+            }]
+        }),
+    )
+    .await;
+
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "no-review",
+            "turnId": "t1",
+            "prompt": "do the thing",
+            "mode": "agent",
+            "skillReview": {"enabled": false}
+        }),
+    )
+    .await;
+
+    let review = lines
+        .wait_for_event("skill_review", Duration::from_secs(20))
+        .await
+        .expect("the skip is reported");
+    assert_eq!(review["event"]["outcome"], "skipped");
+    assert_eq!(review["event"]["reason"], "disabled");
+}

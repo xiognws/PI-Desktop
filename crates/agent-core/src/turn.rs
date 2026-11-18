@@ -74,6 +74,9 @@ pub struct TurnOutcome {
     pub message_ids: Vec<String>,
     pub usage: Usage,
     pub steps: usize,
+    /// Tool calls this turn executed. The background skill review is gated on
+    /// this: a turn that only talked taught nothing worth a completion.
+    pub tool_calls: usize,
     pub stop_reason: StopReason,
 }
 
@@ -183,6 +186,7 @@ impl TurnEngine {
         self.emit(session_id, turn_id, AgentEvent::TurnStart);
 
         let mut total_usage = Usage::default();
+        let mut tool_calls = 0usize;
         let mut added_ids: Vec<String> = Vec::new();
         let mut stop_reason: Option<StopReason> = None;
         let mut steps_taken = 0usize;
@@ -359,6 +363,7 @@ impl TurnEngine {
 
             for call in calls {
                 let call = call.clone();
+                tool_calls += 1;
                 self.emit(
                     session_id,
                     turn_id,
@@ -443,6 +448,7 @@ impl TurnEngine {
 
         Ok(TurnOutcome {
             message_ids: added_ids,
+            tool_calls,
             usage: total_usage,
             steps: steps_taken,
             stop_reason: stop_reason.unwrap_or(StopReason::EndTurn),

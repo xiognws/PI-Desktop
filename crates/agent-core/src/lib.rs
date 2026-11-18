@@ -51,6 +51,7 @@ pub mod session;
 pub mod sidecar;
 pub mod skill_manage;
 pub mod skill_overlap;
+pub mod skill_review;
 pub mod skills;
 pub mod tool;
 pub mod turn;

@@ -27,22 +27,29 @@ pub fn answer_empty_history(sidecar: &Arc<Sidecar>, lines: &RecordingLines) {
             // Whole frames: the response is matched by the frame's id, which a
             // `notifications("host.proxy")` params object does not carry.
             for frame in lines.host_calls() {
-                if frame
+                let method = frame
                     .pointer("/params/method")
                     .and_then(|value| value.as_str())
-                    != Some("session.get")
-                {
-                    continue;
-                }
+                    .unwrap_or("");
+                let answer = match method {
+                    "session.get" => json!({ "session": { "messages": [] } }),
+                    "session.appendMessage" => json!({ "ok": true }),
+                    "skills.create" => json!({ "ok": true }),
+                    "skills.update" => json!({ "ok": true }),
+                    "skills.writeFile" => json!({ "ok": true }),
+                    "skills.removeFile" => json!({ "ok": true }),
+                    "skills.remove" => json!({ "ok": true }),
+                    "skills.read" => json!({ "body": "# skill" }),
+                    "tools.execute" => json!({ "ok": true, "content": "tool output" }),
+                    _ => continue,
+                };
                 let Some(id) = frame["id"].as_str().map(str::to_string) else {
                     continue;
                 };
                 if !handled.insert(id.clone()) {
                     continue;
                 }
-                sidecar
-                    .bridge()
-                    .complete(&id, Ok(json!({ "session": { "messages": [] } })));
+                sidecar.bridge().complete(&id, Ok(answer));
             }
             drop(sidecar);
             tokio::time::sleep(Duration::from_millis(2)).await;

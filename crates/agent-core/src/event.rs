@@ -83,6 +83,21 @@ pub enum AgentEvent {
     AskToolRequest {
         request: crate::ask::AskRequest,
     },
+    /// A background skill review finished.
+    ///
+    /// The review's writes are ordinary `skill_manage` calls inside a forked
+    /// run, so the transcript never shows them: this event carries the summary a
+    /// person would otherwise never see. A write and a failure always report; a
+    /// pass that looked and found nothing stays quiet unless the reader asked for
+    /// quiet passes too.
+    #[serde(rename = "skill_review")]
+    SkillReview {
+        outcome: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        actions: Vec<String>,
+    },
     /// The session's run state changed.
     ///
     /// The payload is the same object `agent.getStatus` answers with, so a
