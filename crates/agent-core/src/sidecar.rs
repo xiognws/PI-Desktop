@@ -72,6 +72,18 @@ impl RecordingLines {
             .collect()
     }
 
+    /// Every `host.proxy` frame, whole — id included, so a test can answer it.
+    ///
+    /// `notifications` returns a notification's params; a reverse RPC's params
+    /// are the proxied method, and the id that completes it is on the frame.
+    pub fn host_calls(&self) -> Vec<Value> {
+        self.lines()
+            .iter()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .filter(|value| value.get("method").and_then(Value::as_str) == Some("host.proxy"))
+            .collect()
+    }
+
     /// Wait for a `host.proxy` call carrying `method`, and return its frame.
     ///
     /// A proxy notification's own method is always `host.proxy`; the method the
@@ -746,9 +758,14 @@ impl Sidecar {
         .with_memory_prefix(memory_prefix)
         .with_delegations(session.delegations.clone());
 
+        // The turn task announces the state it is about to run in, then the one
+        // it settled in. Both carry the same shape `agent.getStatus` answers.
+        self.emit_status(&session_id, &turn_id, &session);
+
         let task_session = session.clone();
         let task_session_id = session_id.clone();
         let task_turn_id = turn_id.clone();
+        let status_out = self.out.clone();
         // Read the retry policy here: the spawned task cannot borrow `request`.
         let infinite_provider_retry = request
             .params
@@ -782,6 +799,18 @@ impl Sidecar {
             if let Ok(mut current) = task_session.current_turn.lock() {
                 *current = None;
             }
+            // Idle again, announced after the turn's own end event so a client
+            // that reacts to both never sees "idle" before "agent_end".
+            let idle = json!({
+                "sessionId": task_session_id,
+                "isRunning": false,
+                "pendingToolConfirmations": 0,
+            });
+            NotificationSink { out: status_out }.emit(crate::AgentEventEnvelope::new(
+                &task_session_id,
+                task_turn_id.clone(),
+                crate::AgentEvent::Status { status: idle },
+            ));
             match outcome {
                 Ok(outcome) => tracing::debug!(
                     target: "agent_core::sidecar",
@@ -1157,6 +1186,34 @@ impl Sidecar {
     /// wrapped in `status`, because `api.ts` destructures `{ status }` and reads
     /// `status.isRunning`. A flat object left the renderer with `undefined` and
     /// an idle session that never looked idle.
+    /// Emit the session's current run state to the client.
+    fn emit_status(&self, session_id: &str, turn_id: &str, session: &Arc<Session>) {
+        let running = session.running.load(Ordering::SeqCst);
+        let mut status = json!({
+            "sessionId": session_id,
+            "isRunning": running,
+            "pendingToolConfirmations": 0,
+        });
+        if running {
+            if let Some(turn) = session
+                .current_turn
+                .lock()
+                .map(|current| current.clone())
+                .unwrap_or(None)
+            {
+                status["currentTurnId"] = json!(turn);
+            }
+        }
+        NotificationSink {
+            out: self.out.clone(),
+        }
+        .emit(crate::AgentEventEnvelope::new(
+            session_id,
+            turn_id,
+            crate::AgentEvent::Status { status },
+        ));
+    }
+
     /// Load this session's history from the host, once.
     ///
     /// Host-core owns persistence, so a session the kernel has never seen — a

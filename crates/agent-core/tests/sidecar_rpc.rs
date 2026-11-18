@@ -970,3 +970,53 @@ async fn prompting_a_deleted_session_is_refused_by_name() {
     assert_eq!(response["error"]["code"], -32000);
     assert_eq!(response["error"]["data"]["errorCode"], "SESSION_NOT_FOUND");
 }
+
+/// Run state reaches the client as events, not only through a status poll.
+///
+/// The renderer drives its busy indicator from the stream; a client that only
+/// watched events would otherwise never learn that a turn started or ended.
+#[tokio::test]
+async fn a_turn_announces_its_run_state_before_and_after() {
+    let (sidecar, lines) = sidecar();
+    call(&sidecar, 1, "sidecar.configure", scripted_configure()).await;
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t1", "prompt": "go"}),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(15))
+        .await
+        .expect("the turn ends");
+
+    let statuses: Vec<Value> = lines
+        .notifications("agent.event")
+        .into_iter()
+        .filter(|frame| frame["event"]["type"] == "status")
+        .map(|frame| frame["event"]["status"].clone())
+        .collect();
+    assert_eq!(
+        statuses.len(),
+        2,
+        "one before the turn, one after: {statuses:?}"
+    );
+    assert_eq!(statuses[0]["sessionId"], "s1");
+    assert_eq!(statuses[0]["isRunning"], true);
+    assert_eq!(statuses[0]["currentTurnId"], "t1");
+    assert_eq!(statuses[1]["isRunning"], false);
+
+    let types: Vec<String> = lines
+        .notifications("agent.event")
+        .into_iter()
+        .filter_map(|frame| frame["event"]["type"].as_str().map(str::to_string))
+        .collect();
+    assert_eq!(types.first().map(String::as_str), Some("status"));
+    assert_eq!(types.last().map(String::as_str), Some("status"));
+    assert!(
+        types.iter().position(|kind| kind == "agent_end")
+            < types.iter().rposition(|kind| kind == "status"),
+        "idle must be announced after the turn ends, not before: {types:?}"
+    );
+}

@@ -83,6 +83,15 @@ pub enum AgentEvent {
     AskToolRequest {
         request: crate::ask::AskRequest,
     },
+    /// The session's run state changed.
+    ///
+    /// The payload is the same object `agent.getStatus` answers with, so a
+    /// renderer can drive a busy indicator from the event stream instead of
+    /// polling — and a client that only watches events still learns when a turn
+    /// starts and ends.
+    Status {
+        status: serde_json::Value,
+    },
     Error {
         code: String,
         message: String,

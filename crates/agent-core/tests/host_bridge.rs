@@ -27,7 +27,6 @@ fn sidecar() -> (Arc<Sidecar>, RecordingLines) {
     (sidecar, lines)
 }
 
-
 async fn call(sidecar: &Sidecar, id: i64, method: &str, params: Value) -> Value {
     let request = Request {
         jsonrpc: "2.0".into(),

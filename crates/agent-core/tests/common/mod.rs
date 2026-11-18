@@ -24,8 +24,14 @@ pub fn answer_empty_history(sidecar: &Arc<Sidecar>, lines: &RecordingLines) {
             let Some(sidecar) = weak.upgrade() else {
                 return;
             };
-            for frame in lines.notifications("host.proxy") {
-                if frame["method"].as_str() != Some("session.get") {
+            // Whole frames: the response is matched by the frame's id, which a
+            // `notifications("host.proxy")` params object does not carry.
+            for frame in lines.host_calls() {
+                if frame
+                    .pointer("/params/method")
+                    .and_then(|value| value.as_str())
+                    != Some("session.get")
+                {
                     continue;
                 }
                 let Some(id) = frame["id"].as_str().map(str::to_string) else {
