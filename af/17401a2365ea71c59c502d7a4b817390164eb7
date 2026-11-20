@@ -1,0 +1,24 @@
+Cargo.lock
+  h_201ed4c689ac8b 44
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 60-62,140-146,199-205
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 95-115,135
+crates/agent-core/Cargo.toml
+  h_201ed4c689ac8b 18,24
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 920,2828-2833,2836-2842,2848-2852,2859,2862-2863,2865-2880,2897-2899,2910-2954
+crates/agent-core/tests/attachments.rs
+  h_201ed4c689ac8b 3-6,12-20,22,25,27,30,35-36,40,43-45,47-51,53,56-61,64,67-69,71,73-75,78,80-90,92-93,95,98-99,101,103,111-133,135-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "af17401a2365ea71c59c502d7a4b817390164eb7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
