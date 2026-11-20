@@ -164,6 +164,16 @@ try {
   check("usage is reported", types.includes("usage"));
   check("every frame was addressable", kernel.dropped.length === 0, `${kernel.dropped.length} dropped`);
 
+  // The turn installed the kernel's built-in declarations. Asking for the count
+  // is what proves the desktop's model sees the same tool surface the Node
+  // runtime offered — a set that silently emptied would still stream a reply.
+  const declared = await kernel.sidecar.call("sidecar.configure", { dataDir });
+  check(
+    "the kernel declares its built-in tool set",
+    typeof declared?.tools === "number" && declared.tools >= 24,
+    `tools=${declared?.tools}`,
+  );
+
   const assistantEnd = kernel.events.find(
     (event) => event.event.type === "message_end" && event.event.message?.role === "assistant",
   );

@@ -125,12 +125,20 @@ impl ShellIdentity {
 /// Byte ceiling for the whole built-in declaration set.
 ///
 /// Every request carries these, so this is a budget, not a preference: it fails
-/// the build's tests when a description grows back into a paragraph. Raised twice
-/// as tools landed — 1 250 → 1 500 for `VisionAnalyze`, → 1 750 for `ExecuteCode`
-/// (the set measures 1 676). Adding a tool is the one change allowed to raise it;
-/// buying room by deleting another tool's parameter hints is not, because those
-/// hints are what keep a model from calling the tool wrongly.
-pub const DECLARATION_BUDGET_BYTES: usize = 2_300;
+/// the build's tests when a description grows back into a paragraph. Raised as
+/// tools landed — 1 250 → 1 500 for `VisionAnalyze`, → 1 750 for `ExecuteCode`,
+/// → 1 950 for `GenerateImages` (the set measures 1 883 with it declared), and
+/// → 3 250 when the six host-executed tools the Node runtime already declared
+/// joined the set (`AstEdit`, `AstEditApply`, the three `Lsp*`, `BrowserPreview`).
+/// → 6 650 for the rest of the Node tool surface: `AstSearch`, `OfficeRead`,
+/// `OfficeWrite`, `PluginCheck`, `TodoWrite` and the four `ScheduledTask*` tools.
+/// Those carry real nested schemas (spreadsheet rows, document blocks, slides, a
+/// weekly schedule), so the growth is shape, not prose: every description in the
+/// set is still a verb phrase under forty characters. → 6 850 with `BrowserExec`
+/// declared beside them (the set measures 6 791). Adding a tool is the one
+/// change allowed to raise it; buying room by deleting another tool's parameter
+/// hints is not, because those hints are what keep a model from calling wrongly.
+pub const DECLARATION_BUDGET_BYTES: usize = 6_850;
 
 fn read() -> Value {
     json!({
@@ -221,10 +229,11 @@ fn execute_code() -> Value {
     })
 }
 
-/// A browser is the only way to see a page after it ran: a fetcher gets the shell a
-/// single-page app starts from. The description says it is slow because it is — a
-/// model that reaches for this when a plain fetch would do pays half a minute for
-/// text that was already there.
+/// A real browser, one visit per call: the only way to read a page whose content
+/// arrives with JavaScript. `web_extract` answers an ordinary article in one
+/// request, so the description says both what it does and that it is slow — a
+/// model that reads only "render a page" reaches for it on every URL and pays
+/// half a minute for text a fetcher already had.
 fn browser_exec() -> Value {
     json!({
         "name": "BrowserExec",
@@ -312,6 +321,293 @@ fn bash(shell: Option<&ShellIdentity>) -> Value {
     })
 }
 
+/// Read-only symbol intelligence, served by the session's language server.
+///
+/// Declared here for the same reason `Read` is: the kernel owns the declaration
+/// and the host owns the run. Electron main registers the handler as a local
+/// tool, so a call travels `host.proxy` → `tools.execute` → that handler, and
+/// the kernel never touches a file to answer it.
+fn lsp_definition() -> Value {
+    json!({
+        "name": "LspDefinition",
+        "description": "Find where a symbol is declared.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "number"},
+                "column": {"type": "number"}
+            },
+            "required": ["file", "line", "column"]
+        }
+    })
+}
+
+fn lsp_references() -> Value {
+    json!({
+        "name": "LspReferences",
+        "description": "Find every reference to a symbol.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "number"},
+                "column": {"type": "number"},
+                "includeDeclaration": {"type": "boolean"}
+            },
+            "required": ["file", "line", "column"]
+        }
+    })
+}
+
+fn lsp_diagnostics() -> Value {
+    json!({
+        "name": "LspDiagnostics",
+        "description": "Report a file's LSP diagnostics.",
+        "parameters": {
+            "type": "object",
+            "properties": {"file": {"type": "string"}},
+            "required": ["file"]
+        }
+    })
+}
+
+/// A two-step codemod: `AstEdit` stages a proposal, `AstEditApply` writes it.
+///
+/// Agent-mode only. Both end in a write, and a contract mode proposes before it
+/// touches anything — the same rule that withholds `Write` and `Edit`.
+fn ast_edit() -> Value {
+    json!({
+        "name": "AstEdit",
+        "description": "Propose an ast-grep pattern rewrite.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string"},
+                "rewrite": {"type": "string"},
+                "path": {"type": "string"},
+                "limit": {"type": "number"}
+            },
+            "required": ["pattern", "rewrite"]
+        }
+    })
+}
+
+fn ast_edit_apply() -> Value {
+    json!({
+        "name": "AstEditApply",
+        "description": "Apply a staged AstEdit proposal.",
+        "parameters": {
+            "type": "object",
+            "properties": {"proposalId": {"type": "string"}},
+            "required": ["proposalId"]
+        }
+    })
+}
+
+/// Opens a page in the work panel's browser view, which only main can drive.
+fn browser_preview() -> Value {
+    json!({
+        "name": "BrowserPreview",
+        "description": "Open an HTML file in the browser panel.",
+        "parameters": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"]
+        }
+    })
+}
+
+/// Syntax-tree search, the read half of the ast-grep pair.
+fn ast_search() -> Value {
+    json!({
+        "name": "AstSearch",
+        "description": "Search code by syntax tree, not text.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string"},
+                "path": {"type": "string"},
+                "limit": {"type": "number"}
+            },
+            "required": ["pattern"]
+        }
+    })
+}
+
+/// Office and PDF documents. `OfficeRead` inspects, `OfficeWrite` replaces.
+///
+/// Both parameter objects follow the host's own editor schema: a field the host
+/// requires and the declaration omits is a parameter the model never sends.
+fn office_read() -> Value {
+    json!({
+        "name": "OfficeRead",
+        "description": "Read an Office or PDF document.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "format": {"type": "string", "enum": ["xlsx", "docx", "pptx", "pdf"]},
+                "path": {"type": "string"},
+                "sheet": {"type": "string"},
+                "maxRows": {"type": "number"},
+                "maxCols": {"type": "number"},
+                "valuesOnly": {"type": "boolean"}
+            },
+            "required": ["format", "path"]
+        }
+    })
+}
+
+fn office_write() -> Value {
+    let rows = json!({"type": "array", "items": {"type": "array", "items": {}}});
+    json!({
+        "name": "OfficeWrite",
+        "description": "Create or update an Office or PDF file.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "format": {"type": "string", "enum": ["xlsx", "docx", "pptx", "pdf"]},
+                "path": {"type": "string"},
+                "mode": {"type": "string", "enum": ["overwrite", "append"]},
+                "sheet": {"type": "string"},
+                "rows": rows,
+                "blocks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string"},
+                            "text": {"type": "string"},
+                            "level": {"type": "number"},
+                            "style": {"type": "string"},
+                            "rows": rows
+                        },
+                        "required": ["type"]
+                    }
+                },
+                "slides": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "body": {"type": "string"}
+                        }
+                    }
+                },
+                "layout": {"type": "number"},
+                "sources": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["format", "path"]
+        }
+    })
+}
+
+/// Reads a plugin directory and reports what its manifest is missing.
+fn plugin_check() -> Value {
+    json!({
+        "name": "PluginCheck",
+        "description": "Validate a plugin directory's manifest.",
+        "parameters": {
+            "type": "object",
+            "properties": {"directory": {"type": "string"}},
+            "required": ["directory"]
+        }
+    })
+}
+
+/// The session checklist the user watches; host-core owns the normalization.
+fn todo_write() -> Value {
+    json!({
+        "name": "TodoWrite",
+        "description": "Write the session task checklist.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "todos": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "content": {"type": "string"},
+                            "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "cancelled"]},
+                            "priority": {"type": "string", "enum": ["high", "medium", "low"]}
+                        },
+                        "required": ["content", "status"]
+                    }
+                }
+            },
+            "required": ["todos"]
+        }
+    })
+}
+
+/// The four scheduled-automation tools.
+///
+/// They belong to the builtin Agent mode: a Plan or Goal session negotiates a
+/// contract instead of arranging work that outlives it, and host-core refuses
+/// them there anyway.
+fn scheduled_tasks() -> Vec<Value> {
+    let schedule = json!({
+        "type": "object",
+        "properties": {
+            "hour": {"type": "integer"},
+            "minute": {"type": "integer"},
+            "weekday": {"type": "integer"},
+            "weekdays": {"type": "array", "items": {"type": "integer"}}
+        },
+        "required": ["hour", "minute", "weekday"]
+    });
+    let cadence = json!({"type": "string", "enum": ["manual", "hourly", "daily", "weekly"]});
+    vec![
+        json!({
+            "name": "ScheduledTaskList",
+            "description": "List scheduled automations.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }),
+        json!({
+            "name": "ScheduledTaskCreate",
+            "description": "Create a scheduled automation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "prompt": {"type": "string"},
+                    "cadence": cadence.clone(),
+                    "schedule": schedule.clone(),
+                    "enabled": {"type": "boolean"}
+                },
+                "required": ["title", "prompt", "cadence"]
+            }
+        }),
+        json!({
+            "name": "ScheduledTaskUpdate",
+            "description": "Update a scheduled automation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "prompt": {"type": "string"},
+                    "cadence": cadence.clone(),
+                    "schedule": schedule.clone(),
+                    "enabled": {"type": "boolean"}
+                },
+                "required": ["id"]
+            }
+        }),
+        json!({
+            "name": "ScheduledTaskDelete",
+            "description": "Delete a scheduled automation.",
+            "parameters": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"]
+            }
+        }),
+    ]
+}
+
 /// The built-in declarations for a mode.
 ///
 /// Writes are withheld from Plan and Goal: those modes propose a contract before
@@ -320,19 +616,37 @@ pub fn declarations(mode: SessionMode, shell: Option<&ShellIdentity>) -> Vec<Val
     // Vision reads a file and asks the provider the turn already talks to, so it is
     // offered in every mode: refusing it in a read-only session would hide the one
     // tool that answers "what is in this picture?" without touching anything.
-    let mut tools = vec![read(), glob(), grep(), vision(), bash(shell)];
+    let mut tools = vec![read(), glob(), grep(), ast_search()];
     if mode == SessionMode::Agent {
-        tools.insert(3, write());
-        tools.insert(4, edit());
+        tools.push(write());
+        tools.push(edit());
         // Arbitrary code execution: an Agent-mode tool only. Plan and Goal
         // negotiate before touching anything, and this tool runs whatever a
         // model writes.
-        tools.insert(5, execute_code());
-        // Both land files in the workspace (objects drawn, or a rendered page), so
-        // they belong where Write does, not in a mode that proposes first.
-        tools.insert(6, generate_images());
-        tools.insert(7, browser_exec());
+        tools.push(execute_code());
+        // A browser process and a network fetch, so Agent mode only: it is the
+        // tool that is slowest and hardest to undo.
+        tools.push(browser_exec());
+        // Drawing lands in the workspace, next to the project it was drawn for.
+        tools.push(generate_images());
+        // Both halves of the codemod end in a write, so they follow Write/Edit.
+        tools.push(ast_edit());
+        tools.push(ast_edit_apply());
+        tools.push(office_write());
+        tools.push(plugin_check());
+        tools.push(todo_write());
+        // Automations outlive the turn; a contract mode arranges nothing.
+        tools.extend(scheduled_tasks());
     }
+    // Read-only intelligence and the browser panel are offered in every mode: none
+    // of them changes a file, and Plan legitimately needs to look a symbol up.
+    tools.push(lsp_definition());
+    tools.push(lsp_references());
+    tools.push(lsp_diagnostics());
+    tools.push(browser_preview());
+    tools.push(office_read());
+    tools.push(vision());
+    tools.push(bash(shell));
     tools
 }
 
@@ -357,11 +671,26 @@ mod tests {
                 "Read",
                 "Glob",
                 "Grep",
+                "AstSearch",
                 "Write",
                 "Edit",
                 "ExecuteCode",
-                "GenerateImages",
                 "BrowserExec",
+                "GenerateImages",
+                "AstEdit",
+                "AstEditApply",
+                "OfficeWrite",
+                "PluginCheck",
+                "TodoWrite",
+                "ScheduledTaskList",
+                "ScheduledTaskCreate",
+                "ScheduledTaskUpdate",
+                "ScheduledTaskDelete",
+                "LspDefinition",
+                "LspReferences",
+                "LspDiagnostics",
+                "BrowserPreview",
+                "OfficeRead",
                 "VisionAnalyze",
                 "Bash"
             ]
@@ -386,13 +715,51 @@ mod tests {
                 .filter_map(|tool| tool["name"].as_str().map(str::to_string))
                 .collect();
             assert!(
-                !names.iter().any(|name| matches!(
-                    name.as_str(),
-                    "Write" | "Edit" | "ExecuteCode" | "GenerateImages" | "BrowserExec"
-                )),
+                !names.iter().any(|name| name == "Write"
+                    || name == "Edit"
+                    || name == "ExecuteCode"
+                    || name == "BrowserExec"
+                    || name == "GenerateImages"
+                    || name == "AstEdit"
+                    || name == "AstEditApply"
+                    || name == "OfficeWrite"
+                    || name == "PluginCheck"
+                    || name == "TodoWrite"
+                    || name.starts_with("ScheduledTask")),
                 "{label}: {names:?}"
             );
             assert!(names.iter().any(|name| name == "Read"));
+            // Reading by syntax tree and inspecting a document are both reads; a
+            // contract mode may still look something up.
+            assert!(
+                names.iter().any(|name| name == "AstSearch"),
+                "{label}: {names:?}"
+            );
+            assert!(
+                names.iter().any(|name| name == "OfficeRead"),
+                "{label}: {names:?}"
+            );
+            assert!(
+                names.iter().any(|name| name == "LspDefinition"),
+                "{label}: {names:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_declaration_parses_as_a_host_tool() {
+        // The kernel registers declared tools through `tool_spec_from_value`, so a
+        // declaration it cannot parse is a tool the model never sees. This catches a
+        // malformed shape (a missing `parameters`, a name in the wrong place) before
+        // it reaches a turn.
+        for mode in [SessionMode::Agent, SessionMode::Plan, SessionMode::Goal] {
+            // `SessionMode` is not `Copy`: name it before `declarations` consumes it.
+            let label = format!("{mode:?}");
+            for tool in declarations(mode, Some(&shell())) {
+                let spec = crate::host_bridge::tool_spec_from_value(&tool)
+                    .unwrap_or_else(|error| panic!("{label} {tool:?}: {error}"));
+                assert_eq!(spec.name, tool["name"].as_str().unwrap_or_default());
+            }
         }
     }
 
