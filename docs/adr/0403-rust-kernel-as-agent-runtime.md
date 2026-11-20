@@ -118,11 +118,15 @@ the kernel, not a reason to change the UI.
   the turn's instruction and runs the ordinary prompt path, and `SubmitPlan` exists
   in Plan mode — the mode prompt named a tool that was not registered. Both follow
   the Node runtime's argument names and instruction text, because a second
-  execution path beside the first is a second set of bugs. Two differences remain:
+  execution path beside the first is a second set of bugs. One difference remains:
   the kernel's `Tool` trait has no `terminate` flag, so an accepted submission does
-  not end the turn the way Node's does, and the kernel keeps its checklist in
-  `PlanState` (`Todo`) while the checklist the user sees is host-core's `TodoWrite`
-  rows — one concept, two owners, still to be merged.
+  not end the turn the way Node's does.
+* The session checklist has one owner again: host-core. `TodoWrite` carries the Node
+  runtime's name and argument shape and is relayed through `tools.execute` in Agent
+  mode only, so the list the user sees is the list the host wrote, and a Plan or
+  Goal turn cannot write one. The kernel keeps at most a receipt of the host's last
+  accepted write — never a second copy — which is also why `agent.plan` no longer
+  answers `steps` (nothing read them).
 * `planning_state` is emitted; `tool_update` needs nothing, because this app has no
   partial tool-result channel for it to report: tools run as one `tools.execute`
   round trip, so the Node runtime only emitted it from an executor this product does
@@ -138,6 +142,28 @@ the kernel, not a reason to change the UI.
   handles and the kernel never sees (`electron/main/runtime/host.ts`). Verified in
   the packaged app: a `Bash` call raised the card, the click released the call, and
   the command ran.
+* Tool-surface parity moved: the kernel now declares the six host-executed tools
+  the Node runtime already had — `AstEdit`, `AstEditApply`, the three `Lsp*`
+  tools and `BrowserPreview`. They are declarations only: each one is a
+  `HostTool`, so a call travels `host.proxy` → `tools.execute` → the handler
+  Electron main registered as a local tool, and the permission gate in host-core
+  is unchanged. `AstEdit`/`AstEditApply` stay Agent-mode only, because both end
+  in a write and a contract mode proposes before it touches anything.
+  `DECLARATION_BUDGET_BYTES` rose 1 950 → 3 250 for them (the set measures 3 163
+  bytes). `Skill` is deliberately *not* declared: it exists only once a plugin
+  has taught one, so a static declaration would offer the model a tool with
+  nothing behind it — that one needs a declarations channel that changes after
+  boot.
+* The rest of the Node tool surface is declared as well: `AstSearch`,
+  `OfficeRead`, `OfficeWrite`, `PluginCheck`, `TodoWrite` and the four
+  `ScheduledTask*` tools. `AstSearch` and `OfficeRead` join the contract modes
+  because both only read; the two writes, the plugin check, the checklist and the
+  automations stay Agent-mode. `DECLARATION_BUDGET_BYTES` rose 3 250 → 6 650 for
+  them, and the growth is nested schema — spreadsheet rows, document blocks,
+  slides, a weekly schedule — not prose: every description in the set is still a
+  verb phrase under forty characters. The only tool still undeclared is `Skill`,
+  which exists only after a plugin has taught one and therefore needs a
+  declarations channel that changes after boot.
 * Upstream's newer tools (browser, image generation, code execution, vision) live in
   its `agent-host` crate, which owns a second SQLite store and six sibling crates.
   Vendoring it would give this app two persistence owners, so those tools are ported

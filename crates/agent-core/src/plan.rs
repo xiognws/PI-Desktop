@@ -1,15 +1,29 @@
-//! The plan the agent keeps for itself: a todo list it writes and reads back.
+//! The plan lane, and the session checklist the host owns.
 //!
-//! Practice taken from the coding agents that hold up under long tasks (Claude
-//! Code's `TodoWrite`, Codex's plan updates, the `writing-plans` discipline): a
-//! task that spans many steps needs its shape written down somewhere the model
-//! re-reads, because the middle of a long turn is exactly where a model forgets
-//! what it was doing. The list is *short by construction* — a plan with twenty
-//! items is a log, not a plan — and it holds one invariant that makes it useful:
-//! **at most one step is in progress**, so "what am I doing now" has one answer.
+//! Two different things used to share this module, and keeping them apart is the
+//! point of it:
 //!
-//! The list lives in the kernel, not in the host: it is context, and it is
-//! rendered into the request the kernel composes.
+//! * `SubmitPlan` is the kernel's. A Plan turn submits a contract, the host
+//!   writes the artifact and the approval row, and the kernel keeps a copy of
+//!   what is pending so `agent.plan` can answer without re-reading the
+//!   transcript.
+//! * The session checklist is **the host's**. `TodoWrite` is the Node runtime's
+//!   tool name and argument shape (`packages/agent-runtime/src/todo-tool.ts`);
+//!   the kernel declares it and relays the call over `tools.execute`, exactly as
+//!   it relays `Read` or `Bash`. host-core normalizes the list (trims content,
+//!   truncates over-long content with a warning, demotes a second `in_progress`
+//!   item), replaces `session_todo` in one transaction and announces
+//!   `todos.changed`. The kernel keeps only the receipt of the last accepted
+//!   write, for `agent.plan`: a read-only snapshot, never a second list to
+//!   validate, truncate or render.
+//!
+//! The practice — a short checklist rewritten whole, with at most one item in
+//! progress — is taken from the coding agents that hold up under long tasks
+//! (Claude Code's `TodoWrite`, Codex's plan updates): the middle of a long turn
+//! is where a model forgets what it was doing, so the list is written down where
+//! it re-reads it. Only the tool name is protocol here: a model told to call a
+//! tool the kernel does not register is a model whose checklist never moves, and
+//! a list held in kernel memory dies with the process.
 
 use std::sync::Mutex;
 
@@ -18,13 +32,21 @@ use serde_json::{json, Value};
 
 use crate::error::{AgentError, Result};
 use crate::event::{AgentEvent, AgentEventEnvelope, EventSink};
-use crate::host_bridge::HostError;
+use crate::host_bridge::{HostBridge, HostError};
 use crate::message::ToolCall;
 use crate::provider::BoxFuture;
 use crate::tool::{Tool, ToolContext, ToolSpec};
 
-/// The tool the model calls to rewrite its plan.
-pub const TODO_TOOL_NAME: &str = "Todo";
+/// The tool the model calls to rewrite the session checklist.
+///
+/// The name is protocol, not taste: it is the Node runtime's tool name
+/// (`packages/agent-runtime/src/todo-tool.ts`), host-core keys its low-risk
+/// permission rule and its `tools.execute` branch on it
+/// (`crates/host-core/src/permissions.rs`, `crates/host-core/src/rpc/todos.rs`),
+/// and the renderer's checklist panel is built from the `todos.changed`
+/// notification that branch emits. A kernel-only spelling would be a second
+/// vocabulary for one list.
+pub const TODO_TOOL_NAME: &str = "TodoWrite";
 
 /// The tool a Plan turn calls to submit its plan for approval.
 ///
@@ -50,73 +72,124 @@ pub const PLAN_SUBMIT_FAILED: &str = "PLAN_SUBMIT_FAILED";
 /// told before.
 const SUBMIT_PLAN_DESCRIPTION: &str = "Submit one new complete Markdown implementation plan for user approval. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the plan and submit a new full snapshot in this turn. Do not use this until the plan is concrete.";
 
-/// A plan longer than this is a log. The bound is what keeps the rendered section
-/// cheap enough to carry in every request.
-pub const MAX_PLAN_ITEMS: usize = 20;
+/// The `TodoWrite` description, verbatim from the Node runtime
+/// (`packages/agent-runtime/src/todo-tool.ts`, `todoWriteDescription`).
+///
+/// Product policy, not prose this kernel gets to improve: the model has been
+/// told exactly this before, and the last sentence is what tells it to expect a
+/// truncation warning rather than a refusal for a paragraph-long item.
+pub const TODO_WRITE_DESCRIPTION: &str = "Write the task checklist for the current session so the user can see progress on multi-step work. Use for work that needs 3+ distinct steps or spans multiple files/subsystems; do not use for a single-step action, a question, a read, or a review. Every call replaces the full list in display order. States are pending, in_progress, completed, and cancelled; only one item may be in_progress. Keep items short and concrete, update the list as work starts and finishes, and never leave pending items when the task is done. Content longer than 500 Unicode characters is truncated by the host with a warning.";
 
-/// One line of a plan may not be a paragraph.
-pub const MAX_PLAN_ITEM_CHARS: usize = 200;
+/// The statuses host-core accepts, in the order the declaration lists them
+/// (`crates/host-core/src/todos.rs`, `TODO_STATUSES`).
+pub const TODO_WRITE_STATUSES: [&str; 4] = ["pending", "in_progress", "completed", "cancelled"];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StepStatus {
-    Pending,
-    InProgress,
-    Completed,
+/// The declaration, argument for argument what `todoWriteParameters` produces
+/// in `packages/agent-runtime/src/todo-tool.ts`:
+///
+/// * `todos` — required, at most 50 items (the bound the host enforces);
+/// * `content` — required, `minLength: 1`; the host trims it and truncates at
+///   500 characters, so the kernel neither trims nor counts;
+/// * `status` — required, one of the four the host stores;
+/// * `priority` — optional, one of `high | medium | low`; the host defaults a
+///   missing one to `medium`.
+///
+/// Nothing else is declared, because host-core refuses an argument it did not
+/// ask for (`todos.rs` `normalize_input`): a `sessionId` invented here would turn
+/// every call into a refusal.
+pub fn todo_write_spec() -> ToolSpec {
+    ToolSpec::new(
+        TODO_TOOL_NAME,
+        TODO_WRITE_DESCRIPTION,
+        json!({
+            "type": "object",
+            "properties": {
+                "todos": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "content": {"type": "string", "minLength": 1},
+                            "status": {"type": "string", "enum": TODO_WRITE_STATUSES},
+                            "priority": {"type": "string", "enum": ["high", "medium", "low"]}
+                        },
+                        "required": ["content", "status"]
+                    }
+                }
+            },
+            "required": ["todos"]
+        }),
+    )
 }
 
-impl StepStatus {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Pending => "pending",
-            Self::InProgress => "in_progress",
-            Self::Completed => "completed",
-        }
-    }
-
-    pub fn parse(raw: &str) -> Option<Self> {
-        match raw.trim().to_ascii_lowercase().replace('-', "_").as_str() {
-            "pending" | "todo" => Some(Self::Pending),
-            "in_progress" | "inprogress" | "active" | "doing" => Some(Self::InProgress),
-            "completed" | "done" => Some(Self::Completed),
-            _ => None,
-        }
-    }
-
-    pub fn is_done(&self) -> bool {
-        matches!(self, Self::Completed)
-    }
-}
-
+/// What host-core said it committed, as it said it.
+///
+/// This is the *only* checklist state the kernel holds, and it is read-only: the
+/// rows, the revision and the normalization are the host's, so this is the last
+/// answer it gave (`crates/host-core/src/rpc/todos.rs` `success`), kept so
+/// `agent.plan` can report where the list stands without a second round trip.
+/// It is never re-validated, re-truncated or rendered — a second copy that could
+/// disagree with the database is the bug this module no longer has.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PlanStep {
-    pub content: String,
-    pub status: StepStatus,
+pub struct TodoReceipt {
+    /// Monotonic per-session counter the host advances on every write.
+    pub revision: u64,
+    pub completed: u64,
+    /// Items that still matter: cancelled ones are neither done nor outstanding.
+    pub total: u64,
+    pub in_progress: u64,
+    pub cancelled: u64,
+    /// The host's bounded notes about what it changed about the input —
+    /// truncation, a demoted second `in_progress`. Empty when it changed nothing.
+    pub warnings: Vec<String>,
+    /// The host's one-line result text, verbatim.
+    pub text: String,
 }
 
-impl PlanStep {
-    pub fn pending(content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            status: StepStatus::Pending,
-        }
+impl TodoReceipt {
+    /// Read the host's `tools.execute` answer.
+    ///
+    /// `None` means the answer was not a checklist receipt at all; the model
+    /// still gets the text, so a host that reshapes its answer cannot cost it the
+    /// result — only `agent.plan`'s snapshot.
+    pub fn from_content(content: &Value) -> Option<Self> {
+        let summary = content.get("summary")?;
+        let count = |key: &str| summary.get(key).and_then(Value::as_u64).unwrap_or(0);
+        Some(Self {
+            revision: content.get("revision").and_then(Value::as_u64)?,
+            completed: count("completed"),
+            total: count("total"),
+            in_progress: count("inProgress"),
+            cancelled: count("cancelled"),
+            warnings: content
+                .get("warnings")
+                .and_then(Value::as_array)
+                .map(|warnings| {
+                    warnings
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            text: content
+                .get("text")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        })
     }
 
-    pub fn in_progress(content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            status: StepStatus::InProgress,
-        }
-    }
-
-    pub fn completed(content: impl Into<String>) -> Self {
-        Self {
-            content: content.into(),
-            status: StepStatus::Completed,
-        }
+    /// One line of status, for `agent.plan`. Deliberately the same shape the
+    /// kernel used to compute from its own list, so a reader of that RPC sees no
+    /// change in meaning.
+    pub fn summary(&self) -> String {
+        format!("{}/{} done", self.completed, self.total)
     }
 }
+
 
 /// The plan/goal negotiation a session is in.
 ///
@@ -226,11 +299,17 @@ impl SubmittedPlan {
     }
 }
 
-/// The plan, shared by whatever holds it: the session that renders it and the
-/// tool that rewrites it.
+/// The plan lane's own state: the contract awaiting approval, and the receipt of
+/// the checklist the host last accepted.
+///
+/// It holds no checklist rows. The rows, the revision and the normalization are
+/// host-core's (`session_todo`); what lives here is the last answer it gave, so
+/// `agent.plan` can report where the list stands without a second round trip —
+/// and so two processes can never disagree about what the user's list says.
 #[derive(Debug, Default)]
 pub struct PlanState {
-    steps: Mutex<Vec<PlanStep>>,
+    /// The last `TodoWrite` the host accepted, exactly as it answered.
+    todos: Mutex<Option<TodoReceipt>>,
     /// The plan last submitted for approval, if any.
     submitted: Mutex<Option<SubmittedPlan>>,
     /// The planning state this session last announced on the event stream. A
@@ -244,52 +323,28 @@ impl PlanState {
         Self::default()
     }
 
-    pub fn snapshot(&self) -> Vec<PlanStep> {
-        self.steps
-            .lock()
-            .map(|steps| steps.clone())
-            .unwrap_or_default()
+    /// The host's last accepted write, if one ever landed.
+    pub fn todos(&self) -> Option<TodoReceipt> {
+        self.todos.lock().ok().and_then(|todos| todos.clone())
     }
 
-    pub fn len(&self) -> usize {
-        self.steps.lock().map(|steps| steps.len()).unwrap_or(0)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// The step being worked on, if the plan is being followed.
-    pub fn current(&self) -> Option<PlanStep> {
-        self.snapshot()
-            .into_iter()
-            .find(|step| step.status == StepStatus::InProgress)
-    }
-
-    pub fn done_count(&self) -> usize {
-        self.snapshot()
-            .iter()
-            .filter(|step| step.status.is_done())
-            .count()
-    }
-
-    pub fn clear(&self) {
-        if let Ok(mut steps) = self.steps.lock() {
-            steps.clear();
+    /// Keep what the host said it committed. Overwrites: the newest write is the
+    /// list, and the older receipt describes a revision that no longer exists.
+    pub fn record_todos(&self, receipt: TodoReceipt) {
+        if let Ok(mut slot) = self.todos.lock() {
+            *slot = Some(receipt);
         }
     }
 
-    /// Replace the plan, enforcing the invariants that make it readable.
+    /// One line for `agent.plan`.
     ///
-    /// A refusal is written for the model: it can fix the call by answering again.
-    pub fn replace(&self, steps: Vec<PlanStep>) -> Result<Vec<PlanStep>> {
-        validate_plan(&self.snapshot(), &steps)?;
-        let mut guard = self
-            .steps
-            .lock()
-            .map_err(|_| AgentError::Invalid("the plan state is poisoned".into()))?;
-        *guard = steps.clone();
-        Ok(steps)
+    /// `no plan` is the answer this RPC gave for a session that had written
+    /// nothing before the host owned the list, kept verbatim: the caller that
+    /// reads it has no way to tell which store produced the words.
+    pub fn checklist_summary(&self) -> String {
+        self.todos()
+            .map(|receipt| receipt.summary())
+            .unwrap_or_else(|| "no plan".to_string())
     }
 
     /// Remember the contract the host accepted, replacing any earlier one: an
@@ -325,182 +380,121 @@ impl PlanState {
     }
 }
 
-/// The rules a plan has to satisfy. Kept as a free function so the same rules
-/// apply to a plan read back from anywhere.
-pub fn validate_plan(previous: &[PlanStep], next: &[PlanStep]) -> Result<()> {
-    if next.len() > MAX_PLAN_ITEMS {
-        return Err(AgentError::Refused(format!(
-            "a plan holds at most {MAX_PLAN_ITEMS} steps; this one has {}. Merge related steps instead of listing every action.",
-            next.len()
-        )));
-    }
-    let in_progress: Vec<&PlanStep> = next
-        .iter()
-        .filter(|step| step.status == StepStatus::InProgress)
-        .collect();
-    if in_progress.len() > 1 {
-        return Err(AgentError::Refused(format!(
-            "at most one step may be `in_progress`; {} are. Finish or park the others first — two steps in progress means the plan does not say what you are doing.",
-            in_progress.len()
-        )));
-    }
-    for step in next {
-        let trimmed = step.content.trim();
-        if trimmed.is_empty() {
-            return Err(AgentError::Refused(
-                "every step needs `content`: a blank line in a plan is a step nobody can do."
-                    .into(),
-            ));
-        }
-        if trimmed.chars().count() > MAX_PLAN_ITEM_CHARS {
-            return Err(AgentError::Refused(format!(
-                "a step is {} characters; keep it under {MAX_PLAN_ITEM_CHARS} and put the detail in the work, not the plan.",
-                trimmed.chars().count()
-            )));
-        }
-    }
-    // Completed work may not silently become pending again: either it was done
-    // and stays done, or the plan needs a new step that says what broke.
-    for step in next {
-        if step.status != StepStatus::Pending {
-            continue;
-        }
-        let was_done = previous
-            .iter()
-            .any(|old| old.content.trim() == step.content.trim() && old.status.is_done());
-        if was_done {
-            return Err(AgentError::Refused(format!(
-                "`{}` was completed and cannot go back to pending. Add a new step for the follow-up work instead.",
-                step.content.trim()
-            )));
-        }
-    }
-    Ok(())
-}
-
-/// Render the plan as the section a request carries. An empty plan renders to
-/// nothing: a section that says "no plan" costs tokens on every request.
-pub fn render_plan(steps: &[PlanStep]) -> String {
-    if steps.is_empty() {
-        return String::new();
-    }
-    let mut lines = vec![format!(
-        "## plan ({} of {} done)",
-        steps.iter().filter(|step| step.status.is_done()).count(),
-        steps.len()
-    )];
-    for step in steps {
-        let marker = match step.status {
-            StepStatus::Pending => "[ ]",
-            StepStatus::InProgress => "[~]",
-            StepStatus::Completed => "[x]",
-        };
-        lines.push(format!("{marker} {}", step.content.trim()));
-    }
-    lines.join("\n")
-}
-
-/// The plan as one line of status, for a panel or a report.
-pub fn plan_summary(steps: &[PlanStep]) -> String {
-    match steps
-        .iter()
-        .find(|step| step.status == StepStatus::InProgress)
-    {
-        Some(current) => format!(
-            "{}/{} done · now: {}",
-            steps.iter().filter(|step| step.status.is_done()).count(),
-            steps.len(),
-            current.content.trim()
-        ),
-        None if steps.is_empty() => "no plan".to_string(),
-        None => format!(
-            "{}/{} done",
-            steps.iter().filter(|step| step.status.is_done()).count(),
-            steps.len()
-        ),
-    }
-}
-
-/// The `Todo` tool: one call replaces the whole plan.
+/// The `TodoWrite` tool: one call replaces the whole checklist, in the host.
 ///
-/// A whole-list rewrite rather than per-item edits is deliberate — it is what
-/// makes the call one atomic statement of intent, and it is what the record shows
-/// afterwards: the plan at each point in the task, not a diff of it.
-pub struct TodoTool {
+/// The kernel declares it and relays it; it does not interpret, trim or validate
+/// it. That is the division of labour `Read` and `Bash` already have
+/// (`host_bridge::HostTool`), and it is why a restart cannot lose the list:
+/// host-core's `session_todo` rows are the only copy, and the `todos.changed`
+/// notification it emits after the commit is what moves the panel.
+pub struct TodoWriteTool {
+    bridge: std::sync::Arc<HostBridge>,
     plan: std::sync::Arc<PlanState>,
 }
 
-impl TodoTool {
-    pub fn new(plan: std::sync::Arc<PlanState>) -> Self {
-        Self { plan }
+impl TodoWriteTool {
+    pub fn new(bridge: std::sync::Arc<HostBridge>, plan: std::sync::Arc<PlanState>) -> Self {
+        Self { bridge, plan }
     }
 }
 
-impl Tool for TodoTool {
+/// The host's `tools.execute` answer, in the ordinary shapes the loop turns into
+/// a tool result.
+///
+/// The failure rules are `host_bridge::HostTool::interpret`'s, on purpose: the
+/// model must see one shape of failure whichever tool it called, and a denial
+/// must stay a denial. The difference is that a success is read *before* it is
+/// flattened into text, so [`TodoReceipt`] survives.
+fn interpret(name: &str, value: &Value) -> Result<(String, Option<TodoReceipt>)> {
+    let ok = value.get("ok").and_then(Value::as_bool).unwrap_or(true);
+    let is_error = value
+        .get("isError")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let content = value.get("content").cloned().unwrap_or(Value::Null);
+    // An object is forwarded as it arrived, laid out for reading — the Node
+    // runtime's `JSON.stringify(content, null, 2)` — so the `text` the host wrote
+    // and the `warnings` it attached are both in the result the model sees.
+    let text = match &content {
+        Value::String(text) => text.clone(),
+        Value::Null => String::new(),
+        other => serde_json::to_string_pretty(other).unwrap_or_else(|_| other.to_string()),
+    };
+
+    if ok && !is_error {
+        return Ok((text, TodoReceipt::from_content(&content)));
+    }
+
+    let error_code = value
+        .get("errorCode")
+        .and_then(Value::as_str)
+        .unwrap_or("TOOL_FAILED");
+    let message = if text.is_empty() {
+        format!("`{name}` failed ({error_code})")
+    } else {
+        text
+    };
+    let denied = value.get("denied").and_then(Value::as_bool).unwrap_or(false)
+        || error_code == "PERMISSION_DENIED";
+    Err(if denied {
+        AgentError::ToolDenied {
+            tool: name.to_string(),
+            reason: message,
+        }
+    } else {
+        AgentError::Tool {
+            tool: name.to_string(),
+            message,
+        }
+    })
+}
+
+impl Tool for TodoWriteTool {
     fn spec(&self) -> ToolSpec {
-        ToolSpec::new(
-            TODO_TOOL_NAME,
-            "Replace the task plan.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "steps": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "content": {"type": "string"},
-                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}
-                            },
-                            "required": ["content", "status"]
-                        }
-                    }
-                },
-                "required": ["steps"]
-            }),
-        )
+        todo_write_spec()
     }
 
     fn call<'a>(
         &'a self,
         call: &'a ToolCall,
-        _ctx: &'a ToolContext,
+        ctx: &'a ToolContext,
     ) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
-            let items = call
-                .arguments
-                .get("steps")
-                .and_then(Value::as_array)
-                .ok_or_else(|| {
-                    AgentError::Refused(
-                        "`steps` is required: pass the whole plan as an array of {content, status}.".into(),
-                    )
+            // The owner session and turn travel as trusted-transport fields, never
+            // as arguments: host-core refuses a `sessionId` inside `args`, and it
+            // re-authorizes the write against the running turn of the session named
+            // here (`crates/host-core/src/todos.rs`).
+            let answer = self
+                .bridge
+                .call(
+                    "tools.execute",
+                    json!({
+                        "sessionId": ctx.session_id,
+                        "turnId": ctx.turn_id,
+                        "toolCallId": ctx.tool_call_id,
+                        "toolName": TODO_TOOL_NAME,
+                        // Forwarded untouched. Trimming, the 500-character
+                        // truncation and the one-in-progress rule are the host's;
+                        // a kernel-side copy of them would be the second authority
+                        // this change removed.
+                        "args": call.arguments,
+                        // `TodoWrite` is an Agent-mode tool in host-core's policy and
+                        // in the Node runtime alike: `mode-tool-access.ts` keeps it
+                        // out of every contract mode.
+                        "mode": "agent",
+                    }),
+                )
+                .await
+                .map_err(|error| AgentError::Tool {
+                    tool: TODO_TOOL_NAME.into(),
+                    message: error.to_string(),
                 })?;
-            let mut steps = Vec::with_capacity(items.len());
-            for item in items {
-                let content = item
-                    .get("content")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string();
-                let status = item
-                    .get("status")
-                    .and_then(Value::as_str)
-                    .and_then(StepStatus::parse)
-                    .ok_or_else(|| {
-                        AgentError::Refused(format!(
-                            "status must be `pending`, `in_progress` or `completed`; got {:?}",
-                            item.get("status").and_then(Value::as_str).unwrap_or("")
-                        ))
-                    })?;
-                steps.push(PlanStep { content, status });
+
+            let (text, receipt) = interpret(TODO_TOOL_NAME, &answer)?;
+            if let Some(receipt) = receipt {
+                self.plan.record_todos(receipt);
             }
-            let steps = self.plan.replace(steps)?;
-            Ok(format!(
-                "{}\n\n{}",
-                plan_summary(&steps),
-                render_plan(&steps)
-            ))
+            Ok(text)
         })
     }
 }
@@ -646,10 +640,10 @@ impl Tool for SubmitPlanTool {
 /// `packages/agent-runtime/src/runtime.ts`: same sections, same order, same
 /// "do not renegotiate" rule. `execution` is main's `PlanExecution` descriptor.
 ///
-/// One deliberate difference: the work-list line names the tool this kernel
-/// registers (`Todo`), not the Node runtime's `TodoWrite`. Pointing a model at a
-/// tool that does not exist is the exact failure this change is fixing — a plan
-/// turn told to call `SubmitPlan` while nothing answered it.
+/// One deliberate difference from `executeApprovedPlanTurn`: it names `TodoWrite`,
+/// which is this kernel's registered checklist tool *and* the Node runtime's, so
+/// the sentence points at a tool that exists here instead of at the kernel-only
+/// spelling (`Todo`) it used to have.
 pub fn approved_execution_instruction(
     execution: &Value,
 ) -> std::result::Result<String, String> {
@@ -718,6 +712,7 @@ pub fn approved_execution_instruction(
 mod tests {
     use super::*;
     use crate::event::RecordingSink;
+    use crate::message::ToolResult;
     use crate::tool::{AllowAll, ToolRegistry};
     use std::sync::Arc;
 
@@ -740,103 +735,222 @@ mod tests {
         }
     }
 
-    fn registry(plan: Arc<PlanState>) -> ToolRegistry {
+    /// Drive one `TodoWrite` call as far as its `tools.execute` frame, answer it
+    /// with the reply host-core would give, and hand back both the result the
+    /// model sees and the frame the kernel actually put on the wire.
+    async fn execute(plan: Arc<PlanState>, arguments: Value, answer: Value) -> (ToolResult, Value) {
+        let lines = crate::sidecar::RecordingLines::new();
+        let bridge = Arc::new(HostBridge::new(Arc::new(lines.clone())));
         let mut registry = ToolRegistry::new(Arc::new(AllowAll));
-        registry.register(Arc::new(TodoTool::new(plan)));
-        registry
+        registry.register(Arc::new(TodoWriteTool::new(bridge.clone(), plan)));
+        let tool_call = call(arguments);
+        let ctx = context();
+        let running = tokio::spawn(async move { registry.call(&tool_call, &ctx).await });
+
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        let frame = loop {
+            let found = lines.host_calls().into_iter().find(|frame| {
+                frame.pointer("/params/method").and_then(Value::as_str) == Some("tools.execute")
+            });
+            if let Some(frame) = found {
+                break frame;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "the kernel never sent `tools.execute`"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        };
+
+        let id = frame
+            .get("id")
+            .and_then(Value::as_str)
+            .expect("the frame's id")
+            .to_string();
+        let payload = frame
+            .pointer("/params/params")
+            .cloned()
+            .expect("the proxied params");
+        // Answer, so the call ends here instead of waiting out the bridge timeout.
+        bridge.complete(&id, Ok(answer));
+        (running.await.expect("the call task"), payload)
     }
 
-    #[tokio::test]
-    async fn a_plan_is_replaced_and_rendered() {
-        let plan = Arc::new(PlanState::new());
-        let result = registry(plan.clone())
-            .call(
-                &call(json!({"steps": [
-                    {"content": "read the failing test", "status": "completed"},
-                    {"content": "fix the parser", "status": "in_progress"},
-                    {"content": "run the suite", "status": "pending"}
-                ]})),
-                &context(),
-            )
-            .await;
-        assert!(!result.is_error, "{}", result.content);
-        assert!(result.content.contains("1/3 done · now: fix the parser"));
-        let rendered = render_plan(&plan.snapshot());
-        assert!(rendered.contains("[x] read the failing test"));
-        assert!(rendered.contains("[~] fix the parser"));
-        assert!(rendered.contains("[ ] run the suite"));
-        assert_eq!(plan.current().unwrap().content, "fix the parser");
-        assert_eq!(plan.done_count(), 1);
+    /// What host-core's `tools.execute` answers for one `TodoWrite`
+    /// (`crates/host-core/src/rpc/todos.rs` `success`): the one-line text, the
+    /// committed revision, the counts and the normalization warnings.
+    fn host_receipt() -> Value {
+        json!({
+            "ok": true,
+            "content": {
+                "text": "Checklist updated: 0/2 completed; current: read the failing test [1 item(s) were truncated to 500 characters]",
+                "revision": 7,
+                "summary": {"completed": 0, "total": 2, "inProgress": 1, "cancelled": 0},
+                "warnings": ["1 item(s) were truncated to 500 characters"]
+            }
+        })
     }
 
-    #[tokio::test]
-    async fn two_steps_in_progress_are_refused_with_a_reason() {
-        let plan = Arc::new(PlanState::new());
-        let result = registry(plan.clone())
-            .call(
-                &call(json!({"steps": [
-                    {"content": "a", "status": "in_progress"},
-                    {"content": "b", "status": "in_progress"}
-                ]})),
-                &context(),
-            )
-            .await;
-        assert!(result.is_error);
+    #[test]
+    fn todo_write_declares_the_node_runtime_tool_verbatim() {
+        let spec = todo_write_spec();
+        // The name host-core's permission rule, its `tools.execute` branch and the
+        // renderer's checklist panel are all keyed on.
+        assert_eq!(spec.name, "TodoWrite");
+        assert_eq!(spec.name, TODO_TOOL_NAME);
+        assert!(spec
+            .description
+            .starts_with("Write the task checklist for the current session"));
         assert!(
-            result.content.contains("at most one step"),
+            spec.description
+                .ends_with("Content longer than 500 Unicode characters is truncated by the host with a warning."),
+            "the truncation policy is part of the contract, not a surprise"
+        );
+
+        // `todoWriteParameters` in `packages/agent-runtime/src/todo-tool.ts`.
+        let properties = spec.parameters["properties"].as_object().expect("properties");
+        assert_eq!(properties.len(), 1, "no invented arguments");
+        let required: Vec<&str> = spec.parameters["required"]
+            .as_array()
+            .expect("required list")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(required, vec!["todos"]);
+
+        let todos = &spec.parameters["properties"]["todos"];
+        assert_eq!(todos["type"], "array");
+        assert_eq!(todos["maxItems"], 50, "the bound host-core enforces");
+
+        let item = &todos["items"];
+        let item_required: Vec<&str> = item["required"]
+            .as_array()
+            .expect("item required list")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(item_required, vec!["content", "status"]);
+        assert_eq!(item["properties"]["content"]["type"], "string");
+        assert_eq!(item["properties"]["content"]["minLength"], 1);
+        let statuses: Vec<&str> = item["properties"]["status"]["enum"]
+            .as_array()
+            .expect("status enum")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(
+            statuses,
+            vec!["pending", "in_progress", "completed", "cancelled"],
+            "the four states host-core stores"
+        );
+        let priorities: Vec<&str> = item["properties"]["priority"]["enum"]
+            .as_array()
+            .expect("priority enum")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(priorities, vec!["high", "medium", "low"]);
+    }
+
+    #[tokio::test]
+    async fn todo_write_forwards_the_call_to_the_host_and_returns_its_answer() {
+        let plan = Arc::new(PlanState::new());
+        // 501 characters: the host truncates, and the kernel must not — a kernel
+        // that clipped first would hide the warning from the model.
+        let overlong = "日".repeat(501);
+        let (result, payload) = execute(
+            plan.clone(),
+            json!({"todos": [
+                {"content": overlong, "status": "in_progress"},
+                {"content": "run the suite", "status": "pending", "priority": "high"}
+            ]}),
+            host_receipt(),
+        )
+        .await;
+
+        // The frame host-core's `TodoWrite` body reads: owner session and turn from
+        // the trusted transport, the arguments as the model wrote them, Agent mode.
+        assert_eq!(payload["toolName"], "TodoWrite");
+        assert_eq!(payload["sessionId"], "s1");
+        assert_eq!(payload["turnId"], "t1");
+        assert_eq!(payload["toolCallId"], "call_1");
+        assert_eq!(payload["mode"], "agent");
+        assert_eq!(
+            payload["args"]["todos"][0]["content"],
+            json!(overlong),
+            "the kernel neither trims nor truncates: the host does"
+        );
+        assert_eq!(payload["args"]["todos"][1]["priority"], "high");
+        assert!(
+            payload.get("planSafeActions").is_none(),
+            "not a plugin tool: {payload}"
+        );
+
+        // The host's own words come back to the model, warning included.
+        assert!(!result.is_error, "{}", result.content);
+        assert!(
+            result.content.contains("truncated to 500 characters"),
             "{}",
             result.content
         );
-        assert!(plan.is_empty(), "a refused plan changed nothing");
+        assert!(result.content.contains("\"revision\": 7"), "{}", result.content);
+        assert!(
+            result.content.contains("Checklist updated: 0/2 completed"),
+            "{}",
+            result.content
+        );
+
+        // And what the host said it committed is the snapshot `agent.plan` reports.
+        let receipt = plan.todos().expect("the host's receipt");
+        assert_eq!(receipt.revision, 7);
+        assert_eq!(receipt.total, 2);
+        assert_eq!(receipt.in_progress, 1);
+        assert_eq!(receipt.completed, 0);
+        assert_eq!(receipt.warnings.len(), 1);
+        assert_eq!(plan.checklist_summary(), "0/2 done");
     }
 
     #[tokio::test]
-    async fn completed_work_cannot_go_back_to_pending() {
+    async fn a_write_the_host_refuses_is_a_tool_error_and_leaves_no_snapshot() {
         let plan = Arc::new(PlanState::new());
-        plan.replace(vec![PlanStep::completed("write the fix")])
-            .unwrap();
-        let result = registry(plan.clone())
-            .call(
-                &call(json!({"steps": [
-                    {"content": "write the fix", "status": "pending"}
-                ]})),
-                &context(),
-            )
-            .await;
-        assert!(result.is_error);
-        assert!(result.content.contains("cannot go back to pending"));
-        assert_eq!(plan.done_count(), 1, "the plan is unchanged");
-    }
+        let (result, payload) = execute(
+            plan.clone(),
+            json!({"todos": [{"content": "x", "status": "pending"}]}),
+            json!({
+                "ok": false,
+                "isError": true,
+                "denied": true,
+                "errorCode": "TOOL_DISABLED_IN_PLAN",
+                "content": {"error": "TodoWrite requires Agent mode", "code": "TOOL_DISABLED_IN_PLAN"}
+            }),
+        )
+        .await;
 
-    #[test]
-    fn the_plan_is_short_and_its_lines_are_short() {
-        let long: Vec<PlanStep> = (0..(MAX_PLAN_ITEMS + 1))
-            .map(|index| PlanStep::pending(format!("step {index}")))
-            .collect();
-        assert!(validate_plan(&[], &long).is_err());
-        let paragraph = PlanStep::pending("x".repeat(MAX_PLAN_ITEM_CHARS + 1));
-        assert!(validate_plan(&[], &[paragraph]).is_err());
-        assert!(validate_plan(&[], &[PlanStep::pending("   ")]).is_err());
-    }
-
-    #[test]
-    fn an_empty_plan_renders_to_nothing() {
-        assert!(render_plan(&[]).is_empty());
-        assert_eq!(plan_summary(&[]), "no plan");
-    }
-
-    #[test]
-    fn statuses_accept_the_spellings_a_model_actually_writes() {
-        assert_eq!(
-            StepStatus::parse("in_progress"),
-            Some(StepStatus::InProgress)
+        assert_eq!(payload["toolName"], "TodoWrite");
+        assert!(result.is_error, "{}", result.content);
+        assert!(
+            result.content.contains("TodoWrite requires Agent mode"),
+            "the host's refusal reaches the model: {}",
+            result.content
         );
-        assert_eq!(
-            StepStatus::parse("in-progress"),
-            Some(StepStatus::InProgress)
-        );
-        assert_eq!(StepStatus::parse("Done"), Some(StepStatus::Completed));
-        assert_eq!(StepStatus::parse("later"), None);
+        assert!(plan.todos().is_none(), "a refused write changed nothing");
+        assert_eq!(plan.checklist_summary(), "no plan");
+    }
+
+    #[tokio::test]
+    async fn a_host_that_answers_without_a_receipt_still_answers_the_model() {
+        // Nothing here is the kernel's to insist on: the text the host wrote is the
+        // tool result, and only `agent.plan`'s snapshot goes without.
+        let plan = Arc::new(PlanState::new());
+        let (result, _) = execute(
+            plan.clone(),
+            json!({"todos": []}),
+            json!({"ok": true, "content": "Checklist cleared"}),
+        )
+        .await;
+        assert!(!result.is_error, "{}", result.content);
+        assert_eq!(result.content, "Checklist cleared");
+        assert!(plan.todos().is_none());
     }
 
     /// Stands in for Electron main: records the call, answers with a proposal.
@@ -1118,9 +1232,11 @@ mod tests {
         assert!(instruction.contains("Approved plan title: Fix the parser"));
         assert!(instruction.contains("Approval question: Run this plan?"));
         assert!(instruction.contains("<approved-plan-markdown>\n# Plan\n1. read the test\n2. fix the parser\n</approved-plan-markdown>"));
-        // The work-list line names the tool this kernel actually registers.
-        assert!(instruction.contains(&format!("call {TODO_TOOL_NAME} with the steps")));
-        assert!(!instruction.contains("TodoWrite"));
+        // The work-list line names the tool the model can actually call: the Node
+        // runtime's `TodoWrite`, which host-core executes. A kernel-only spelling
+        // here was a model calling into the void.
+        assert!(instruction.contains("call TodoWrite with the steps"));
+        assert_eq!(TODO_TOOL_NAME, "TodoWrite");
         assert!(instruction.ends_with("Leave no todo pending or in_progress when you report."));
     }
 

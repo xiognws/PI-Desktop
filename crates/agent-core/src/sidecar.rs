@@ -260,8 +260,9 @@ struct Session {
     /// Once is enough: after that the kernel's transcript is the newer copy, and
     /// asking again would resurrect rows the user has since deleted.
     restored: AtomicBool,
-    /// The task plan the model keeps for itself. Rendered into every request and
-    /// rewritten by the `Todo` tool, so it lives beside the transcript.
+    /// The plan lane's state: the approval awaiting an answer, and the receipt of
+    /// the host's last accepted checklist write. The checklist itself lives in
+    /// host-core, beside the transcript it belongs to.
     plan: Arc<crate::plan::PlanState>,
     /// Turn-boundary snapshots, so a wrong turn can be rewound.
     checkpoints: Mutex<crate::checkpoint::CheckpointStore>,
@@ -1139,17 +1140,11 @@ impl Sidecar {
         } else {
             None
         };
-        // The plan is volatile — the model rewrites it mid-task — so it travels in
-        // the user message beside the recalled memory, never in the system prompt.
-        // That is what keeps the provider's prompt cache hitting across turns of an
-        // otherwise unchanged session.
-        let plan_section = crate::plan::render_plan(&session.plan.snapshot());
-        let memory_prefix = match (memory_prefix, plan_section.is_empty()) {
-            (Some(prefix), false) => Some(format!("{prefix}\n\n{plan_section}")),
-            (Some(prefix), true) => Some(prefix),
-            (None, false) => Some(plan_section),
-            (None, true) => None,
-        };
+        // The session checklist is not rendered here. It belongs to host-core —
+        // `TodoWrite` writes `session_todo`, announces `todos.changed`, and the
+        // panel draws that — so the kernel has no copy to paste into the request.
+        // The model's own `TodoWrite` call and its result are already in the
+        // transcript it re-reads, which is how the Node runtime keeps it too.
         let tools = self
             .tools
             .lock()
@@ -1202,15 +1197,17 @@ impl Sidecar {
                 load,
             )));
         }
-        // The plan is the model's own checklist. A plan or goal turn may write one
-        // too: planning is what those modes are for, and the tool touches no files.
-        if matches!(
-            mode,
-            crate::prompt::SessionMode::Agent
-                | crate::prompt::SessionMode::Plan
-                | crate::prompt::SessionMode::Goal
-        ) {
-            extra.push(Arc::new(crate::plan::TodoTool::new(session.plan.clone())));
+        // The session checklist is the host's tool, not the kernel's: `TodoWrite`
+        // is the Node runtime's name and argument shape, host-core normalizes the
+        // list and writes it, and the kernel only relays the call — the same path
+        // `Read` and `Bash` take. Agent mode only: host-core refuses a write from
+        // a Plan or Goal session, and the Node runtime withholds the tool there
+        // too (`mode-tool-access.ts`, `RETAINED_MODE_TOOLS`).
+        if matches!(mode, crate::prompt::SessionMode::Agent) {
+            extra.push(Arc::new(crate::plan::TodoWriteTool::new(
+                self.bridge.clone(),
+                session.plan.clone(),
+            )));
         }
         // A Plan turn's whole purpose is to hand its plan over. The host owns the
         // `.pi/plan` artifact and the review, so `SubmitPlan` — forwarding
@@ -2153,19 +2150,19 @@ impl Sidecar {
         Ok(json!({ "status": status }))
     }
 
-    /// The plan the model keeps: the checklist a long task is worked from.
+    /// The plan lane's state: what is awaiting approval, and where the host's
+    /// checklist stood at its last accepted write.
+    ///
+    /// The checklist itself is host-core's (`todos.get`, `todos.changed`); this
+    /// reports the receipt of the last `TodoWrite`, never a second copy of the
+    /// list, so the two can never disagree.
     fn plan_status(&self, request: &Request) -> Result<Value, RpcError> {
         let session_id = request.require_str("sessionId")?;
         let session = self.session(session_id)?;
-        let steps = session.plan.snapshot();
-        let done = steps.iter().filter(|step| step.status.is_done()).count();
         Ok(json!({
             "plan": {
-                "summary": crate::plan::plan_summary(&steps),
-                "rendered": crate::plan::render_plan(&steps),
-                "done": done,
-                "total": steps.len(),
-                "steps": steps,
+                "summary": session.plan.checklist_summary(),
+                "todos": session.plan.todos(),
                 // What the session is negotiating, and the contract it last
                 // submitted, so a client can tell "an approval is open" from
                 // "the model is still planning" without reading the transcript.

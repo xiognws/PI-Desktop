@@ -34,6 +34,20 @@ async fn call(sidecar: &Sidecar, id: i64, method: &str, params: Value) -> Value 
     serde_json::from_str(&line).expect("a JSON response")
 }
 
+/// The answer host-core's `TodoWrite` body gives (`crates/host-core/src/rpc/todos.rs`
+/// `success`): one line of text, the committed revision, the counts, the warnings.
+fn todo_receipt() -> Value {
+    json!({
+        "ok": true,
+        "content": {
+            "text": "Checklist updated: 0/1 completed; current: read the failing test",
+            "revision": 3,
+            "summary": {"completed": 0, "total": 1, "inProgress": 1, "cancelled": 0},
+            "warnings": []
+        }
+    })
+}
+
 /// Stand in for Electron main: history is empty, the submission is accepted,
 /// recall finds nothing.
 fn answer_host(sidecar: &Arc<Sidecar>, lines: &RecordingLines, submitted: Value) {
@@ -55,7 +69,13 @@ fn answer_host(sidecar: &Arc<Sidecar>, lines: &RecordingLines, submitted: Value)
                     "session.appendMessage" => json!({ "ok": true }),
                     "memory.recall" => json!({ "memories": [] }),
                     "plans.submit" => submitted.clone(),
-                    "tools.execute" => json!({ "ok": true, "content": "tool output" }),
+                    "tools.execute" => match frame
+                        .pointer("/params/params/toolName")
+                        .and_then(Value::as_str)
+                    {
+                        Some("TodoWrite") => todo_receipt(),
+                        _ => json!({ "ok": true, "content": "tool output" }),
+                    },
                     _ => continue,
                 };
                 let Some(id) = frame["id"].as_str().map(str::to_string) else {
@@ -137,6 +157,21 @@ fn scripted(call_name: Option<&str>) -> Value {
     }
     script.push(json!({ "text": "done" }));
     json!({ "kind": "scripted", "script": script })
+}
+
+/// A turn that keeps a checklist: one `TodoWrite` call, then a closing sentence.
+fn scripted_todo() -> Value {
+    json!({ "kind": "scripted", "script": [
+        {"toolCall": {
+            "id": "todo_1",
+            "name": "TodoWrite",
+            "arguments": {"todos": [
+                {"content": "read the failing test", "status": "in_progress"},
+                {"content": "fix the parser", "status": "pending"}
+            ]}
+        }},
+        {"text": "done"}
+    ]})
 }
 
 fn planning_states(lines: &RecordingLines) -> Vec<Value> {
@@ -359,5 +394,122 @@ async fn an_approved_execution_without_a_descriptor_or_a_turn_is_refused() {
     assert_eq!(
         no_plan["error"]["data"]["errorCode"],
         "PLAN_EXECUTION_NOT_FOUND"
+    );
+}
+
+#[tokio::test]
+async fn an_agent_turn_relays_the_session_checklist_to_the_host() {
+    // The checklist the user sees is host-core's, so this is the whole chain that
+    // makes the panel move: the model calls `TodoWrite`, the kernel forwards
+    // `tools.execute` with the caller's identity, its arguments untouched and Agent
+    // mode, and the host's own answer comes back as the tool result.
+    let (sidecar, lines) = sidecar();
+    answer_host(&sidecar, &lines, pending_proposal());
+
+    let response = call(
+        &sidecar,
+        1,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1",
+            "content": "track the work",
+            "mode": "agent",
+            "provider": scripted_todo()
+        }),
+    )
+    .await;
+    assert!(response.get("error").is_none(), "got: {response}");
+
+    let frame = lines
+        .wait_for_host_call("tools.execute", Duration::from_secs(10))
+        .await
+        .expect("the checklist call reaches the host");
+    let params = &frame["params"]["params"];
+    assert_eq!(params["toolName"], "TodoWrite");
+    assert_eq!(params["sessionId"], "s1");
+    assert_eq!(params["turnId"], "t1");
+    assert_eq!(params["toolCallId"], "todo_1");
+    assert_eq!(params["mode"], "agent");
+    // Nothing the host must own travels from the kernel as a decision.
+    assert_eq!(params["args"]["todos"][0]["content"], "read the failing test");
+    assert_eq!(params["args"]["todos"][1]["status"], "pending");
+
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn ends");
+
+    // The host's normalization answer is what the model reads back.
+    let session = call(
+        &sidecar,
+        2,
+        "native.session.get",
+        json!({ "sessionId": "s1" }),
+    )
+    .await;
+    let transcript = session["result"].to_string();
+    assert!(
+        transcript.contains("Checklist updated: 0/1 completed"),
+        "the model sees the host's answer: {transcript}"
+    );
+
+    // And its receipt is what `agent.plan` reports — the kernel keeps no second list.
+    let plan = call(&sidecar, 3, "agent.plan", json!({ "sessionId": "s1" })).await;
+    assert_eq!(plan["result"]["plan"]["summary"], "0/1 done");
+    assert_eq!(plan["result"]["plan"]["todos"]["revision"], 3);
+    assert!(
+        plan["result"]["plan"].get("steps").is_none(),
+        "the kernel holds no checklist rows: {plan}"
+    );
+}
+
+#[tokio::test]
+async fn a_plan_turn_is_not_offered_the_session_checklist() {
+    // host-core refuses a write from a Plan session (`todos.rs`
+    // `TodoSessionNotAgent`) and the Node runtime does not declare the tool there
+    // (`mode-tool-access.ts` `RETAINED_MODE_TOOLS`), so the kernel must not offer
+    // it either: a tool whose only answer is a refusal is noise in the request.
+    let (sidecar, lines) = sidecar();
+    answer_host(&sidecar, &lines, pending_proposal());
+
+    call(
+        &sidecar,
+        1,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1",
+            "content": "plan this change",
+            "mode": "plan",
+            "provider": scripted_todo()
+        }),
+    )
+    .await;
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the plan turn ends");
+
+    assert!(
+        !lines.host_calls().iter().any(|frame| {
+            frame
+                .pointer("/params/params/toolName")
+                .and_then(Value::as_str)
+                == Some("TodoWrite")
+        }),
+        "a Plan turn never relays a checklist write"
+    );
+    let session = call(
+        &sidecar,
+        2,
+        "native.session.get",
+        json!({ "sessionId": "s1" }),
+    )
+    .await;
+    let transcript = session["result"].to_string();
+    assert!(
+        transcript.contains("no tool named `TodoWrite` is registered"),
+        "{transcript}"
     );
 }

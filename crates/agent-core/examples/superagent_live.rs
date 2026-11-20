@@ -223,9 +223,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //    the mission the router wrote, the inline thread context and the worker's own
     //    cancel token.
     let mut tools = ToolRegistry::new(Arc::new(AllowAll));
-    tools.register(Arc::new(agent_core::plan::TodoTool::new(Arc::new(
-        agent_core::plan::PlanState::new(),
-    ))));
+    // No `TodoWrite` here: the session checklist is host-core's now, and this demo
+    // makes no host calls (see the module doc). A kernel-side list would be the
+    // second owner the kernel no longer has.
     tools.register(Arc::new(ReadTool {
         root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
     }));
