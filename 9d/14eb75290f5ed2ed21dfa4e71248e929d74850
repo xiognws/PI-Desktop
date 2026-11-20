@@ -1,0 +1,14 @@
+scripts/e2e-attachment-vision.mjs
+  h_201ed4c689ac8b 1-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9d14eb75290f5ed2ed21dfa4e71248e929d74850",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
