@@ -276,9 +276,39 @@ fn truncate(text: &str, limit: usize) -> String {
     format!("{head}…")
 }
 
+/// The local gateway classifies a request as *image generation* when it carries an
+/// image part and the conversation is otherwise empty (`hasImagePart && msgs.len()
+/// <= 1`): it answers `{data:[{url}]}` with no `choices`, which surfaces as "the
+/// stream ended before the provider finished". A real turn always has a system
+/// message, so an image travelling on its own is the one shape that trips it —
+/// give it one and the same model answers about the picture instead.
+const VISION_ONLY_SYSTEM_PROMPT: &str =
+    "You are looking at an image the user attached. Answer strictly about what is visible in it; \
+     if something cannot be determined from the image, say so.";
+
+/// The system message a request actually sends: what the caller set, or — when an
+/// image is the only other content — the guard above.
+fn effective_system(request: &ChatRequest) -> Option<String> {
+    if let Some(system) = request
+        .system
+        .as_deref()
+        .map(str::trim)
+        .filter(|system| !system.is_empty())
+    {
+        return Some(system.to_string());
+    }
+    let has_image = request.messages.iter().any(|message| {
+        message
+            .parts
+            .iter()
+            .any(|part| matches!(part, crate::message::ContentPart::Image { .. }))
+    });
+    has_image.then(|| VISION_ONLY_SYSTEM_PROMPT.to_string())
+}
+
 fn openai_body(config: &HttpProviderConfig, request: &ChatRequest) -> Value {
     let mut messages: Vec<Value> = Vec::new();
-    if let Some(system) = &request.system {
+    if let Some(system) = effective_system(request) {
         messages.push(json!({"role": "system", "content": system}));
     }
     for message in &request.messages {
@@ -386,7 +416,7 @@ fn openai_body(config: &HttpProviderConfig, request: &ChatRequest) -> Value {
 
 fn anthropic_body(config: &HttpProviderConfig, request: &ChatRequest) -> Value {
     let mut messages: Vec<Value> = Vec::new();
-    let mut system = request.system.clone();
+    let mut system = effective_system(request);
     // The prefix of a turn is re-sent every request; a breakpoint here is what
     // makes the provider charge a fraction for the part it has already seen.
     let cache = request.cache.breakpoint();
@@ -693,6 +723,46 @@ mod tests {
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0]["type"], json!("text"));
         assert_eq!(blocks[0]["text"], json!("hi"));
+    }
+
+    #[test]
+    fn an_image_alone_gets_a_system_message_so_the_gateway_answers_about_it() {
+        // Measured against the local gateway: an image part with nothing else in the
+        // conversation is classified as image generation and answers `{data:[{url}]}`
+        // with no `choices`. One system message makes it a normal vision request.
+        let mut message = Message::user_text("what colour is this");
+        message.parts.push(crate::message::ContentPart::Image {
+            mime_type: "image/png".into(),
+            data: "QUJD".into(),
+        });
+        let request = ChatRequest::new("m", vec![message]);
+        assert!(request.system.is_none());
+
+        let body = openai_body(&config(WireApi::OpenAiCompatible), &request);
+        assert_eq!(body["messages"][0]["role"], json!("system"));
+        assert!(body["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("image the user attached"));
+        let blocks = body["messages"][1]["content"]
+            .as_array()
+            .expect("a user turn with an image sends a multimodal array");
+        assert!(blocks.iter().any(|block| block["type"] == json!("image_url")));
+
+        let anthropic = anthropic_body(&config(WireApi::AnthropicMessages), &request);
+        // The system field is a block array so the caching breakpoint can ride on it.
+        assert!(anthropic["system"]
+            .to_string()
+            .contains("image the user attached"));
+    }
+
+    #[test]
+    fn a_turn_without_an_image_gets_no_invented_system_message() {
+        let request = ChatRequest::new("m", vec![Message::user_text("hi")]);
+        let body = openai_body(&config(WireApi::OpenAiCompatible), &request);
+        assert_eq!(body["messages"][0]["role"], json!("user"));
+        let anthropic = anthropic_body(&config(WireApi::AnthropicMessages), &request);
+        assert!(anthropic.get("system").map_or(true, Value::is_null));
     }
 
     #[test]
