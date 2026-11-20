@@ -1,0 +1,14 @@
+scripts/e2e-agent-kernel-parity.mjs
+  h_201ed4c689ac8b 1-381
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e5867bd7881a344f37a046f89c170316fa8350ca",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
