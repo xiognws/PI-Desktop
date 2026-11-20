@@ -659,6 +659,43 @@ mod tests {
     }
 
     #[test]
+    fn anthropic_body_sends_an_attached_image_as_a_base64_block() {
+        let mut message = Message::user_text("what is this");
+        message.parts.push(crate::message::ContentPart::Image {
+            mime_type: "image/png".into(),
+            data: "QUJD".into(),
+        });
+        let mut request = ChatRequest::new("claude", vec![message]);
+        request.system = Some("sys".into());
+        let body = anthropic_body(&config(WireApi::AnthropicMessages), &request);
+        let content = &body["messages"][0]["content"];
+        assert_eq!(content[0]["type"], json!("text"));
+        assert_eq!(content[0]["text"], json!("what is this"));
+        // The prompt-caching pass marks the last user block, so assert the image
+        // block's own fields rather than an exact object.
+        assert_eq!(content[1]["type"], json!("image"));
+        assert_eq!(content[1]["source"]["type"], json!("base64"));
+        assert_eq!(content[1]["source"]["media_type"], json!("image/png"));
+        assert_eq!(content[1]["source"]["data"], json!("QUJD"));
+    }
+
+    #[test]
+    fn anthropic_body_keeps_a_text_only_turn_a_plain_string() {
+        let request = ChatRequest::new("claude", vec![Message::user_text("hi")]);
+        let body = anthropic_body(&config(WireApi::AnthropicMessages), &request);
+        // A turn without images stays text: the caching pass may still wrap it in a
+        // block array, but no image block appears and nothing is lost.
+        let content = &body["messages"][0]["content"];
+        let blocks = content
+            .as_array()
+            .cloned()
+            .unwrap_or_else(|| vec![content.clone()]);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0]["type"], json!("text"));
+        assert_eq!(blocks[0]["text"], json!("hi"));
+    }
+
+    #[test]
     fn anthropic_body_folds_system_and_uses_content_blocks() {
         let mut assistant = Message::new(Role::Assistant);
         assistant.push_tool_call(ToolCall {
