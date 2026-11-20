@@ -135,8 +135,12 @@ impl PermissionManager {
             "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
             | "memory" | "skill_manage" | "Skill" | "LspDefinition" | "LspReferences"
             | "LspDiagnostics" | "VisionAnalyze" | "vision_analyze" => Risk::Low,
+            // Runs arbitrary code through an interpreter: the same grant `Bash`
+            // needs, and for the same reason. A missing entry here would not fail
+            // the call — it would leave it waiting on an approval card that the
+            // Medium path never raises, which reads as a hang.
             "Write" | "Edit" | "AstEdit" | "AstEditApply" | "Bash" | "GenerateImages"
-            | "Computer" => Risk::High,
+            | "Computer" | "ExecuteCode" | "execute_code" => Risk::High,
             name if name.starts_with("plugin_") => match declared {
                 Some("low") => Risk::Low,
                 Some("high") => Risk::High,
@@ -467,7 +471,10 @@ mod tests {
     #[test]
     fn ask_mode_prompts_for_high_risk() {
         let pm = PermissionManager::default();
-        for tool in ["Write", "Edit", "Bash"] {
+        // ExecuteCode runs arbitrary code, so it belongs to the same group as
+        // Bash; a Medium classification here would leave the call waiting on a
+        // card nobody raises.
+        for tool in ["Write", "Edit", "Bash", "ExecuteCode", "execute_code"] {
             let d = pm.evaluate_auto_with_permission_mode("s", tool, "agent", "ask", &no_grants());
             assert!(d.is_none(), "{tool} should prompt under ask");
         }

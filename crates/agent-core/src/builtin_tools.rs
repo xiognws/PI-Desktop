@@ -125,11 +125,12 @@ impl ShellIdentity {
 /// Byte ceiling for the whole built-in declaration set.
 ///
 /// Every request carries these, so this is a budget, not a preference: it fails
-/// the build's tests when a description grows back into a paragraph. Raised once
-/// from 1 250 to make room for `VisionAnalyze`, which is the price of the model
-/// being able to ask about a picture at all; the guard still fails on any
-/// description that grows into a paragraph.
-pub const DECLARATION_BUDGET_BYTES: usize = 1_500;
+/// the build's tests when a description grows back into a paragraph. Raised twice
+/// as tools landed — 1 250 → 1 500 for `VisionAnalyze`, → 1 750 for `ExecuteCode`
+/// (the set measures 1 676). Adding a tool is the one change allowed to raise it;
+/// buying room by deleting another tool's parameter hints is not, because those
+/// hints are what keep a model from calling the tool wrongly.
+pub const DECLARATION_BUDGET_BYTES: usize = 1_750;
 
 fn read() -> Value {
     json!({
@@ -184,11 +185,38 @@ fn vision() -> Value {
         "description": "Ask a vision model about an image",
         "parameters": {
             "type": "object",
+            // `question` is not required: the host falls back to a description
+            // request, so the declaration must not claim otherwise.
             "properties": {
                 "image_url": {"type": "string", "description": "path or URL"},
                 "question": {"type": "string"}
             },
-            "required": ["image_url", "question"]
+            "required": ["image_url"]
+        }
+    })
+}
+
+/// A snippet runner rather than a shell, so it is declared as its own tool: the
+/// caller writes source and never has to quote it.
+///
+/// The description carries the one boundary a model would otherwise discover by
+/// failing: there is no tool bridge in v1, so a program that needs another tool
+/// becomes two calls.
+fn execute_code() -> Value {
+    json!({
+        "name": "ExecuteCode",
+        "description": "Run python/node; no tools.",
+        // `language` is declared even though it costs bytes: without it a model
+        // writes JavaScript, the host runs it as python, and the turn fails for a
+        // reason the schema could have prevented. `timeoutMs` is not declared — the
+        // default is right for almost every snippet and the error names it.
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {"type": "string"},
+                "language": {"type": "string", "enum": ["python", "node"]}
+            },
+            "required": ["code"]
         }
     })
 }
@@ -256,6 +284,10 @@ pub fn declarations(mode: SessionMode, shell: Option<&ShellIdentity>) -> Vec<Val
     if mode == SessionMode::Agent {
         tools.insert(3, write());
         tools.insert(4, edit());
+        // Arbitrary code execution: an Agent-mode tool only. Plan and Goal
+        // negotiate before touching anything, and this tool runs whatever a
+        // model writes.
+        tools.insert(5, execute_code());
     }
     tools
 }
@@ -283,6 +315,7 @@ mod tests {
                 "Grep",
                 "Write",
                 "Edit",
+                "ExecuteCode",
                 "VisionAnalyze",
                 "Bash"
             ]
@@ -307,7 +340,9 @@ mod tests {
                 .filter_map(|tool| tool["name"].as_str().map(str::to_string))
                 .collect();
             assert!(
-                !names.iter().any(|name| name == "Write" || name == "Edit"),
+                !names.iter().any(|name| name == "Write"
+                    || name == "Edit"
+                    || name == "ExecuteCode"),
                 "{label}: {names:?}"
             );
             assert!(names.iter().any(|name| name == "Read"));
@@ -321,6 +356,8 @@ mod tests {
         let size = serde_json::to_string(&declarations(SessionMode::Agent, Some(&shell())))
             .expect("serializes")
             .len();
+        // Printed so a growing set reports its real size, not just a red test.
+        println!("declarations: {size} bytes of {DECLARATION_BUDGET_BYTES}");
         assert!(
             size <= DECLARATION_BUDGET_BYTES,
             "declarations grew to {size} bytes (budget {DECLARATION_BUDGET_BYTES})"

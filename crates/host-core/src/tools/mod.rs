@@ -26,6 +26,7 @@ use crate::workspace::{
 #[cfg(test)]
 mod file_lease_tests;
 mod grep_rg;
+pub mod execute_code;
 pub mod hashline;
 pub mod ignore_rules;
 mod image_dimensions;
@@ -1576,6 +1577,13 @@ pub async fn execute_tool_with_file_lease(
         // so it is not gated like the file tools.
         name if vision::recognizes(name) => {
             vision::execute(args, workspace, vision::host_providers()).await
+        }
+        // A snippet runs under an interpreter instead of a shell, so it is a
+        // separate tool rather than a Bash spelling: the caller writes source,
+        // not a command line. The host owns the script file and the timeout; the
+        // snippet itself calls back into nothing (no tool bridge in v1).
+        name if execute_code::recognizes(name) => {
+            execute_code::execute(args, scratch, python_executable).await
         }
         other if is_desktop_dispatched(other) => Err(hashline::ToolError::new(
             "TOOL_NOT_FOUND",
