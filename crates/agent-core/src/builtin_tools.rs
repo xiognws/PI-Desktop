@@ -130,7 +130,7 @@ impl ShellIdentity {
 /// (the set measures 1 676). Adding a tool is the one change allowed to raise it;
 /// buying room by deleting another tool's parameter hints is not, because those
 /// hints are what keep a model from calling the tool wrongly.
-pub const DECLARATION_BUDGET_BYTES: usize = 1_750;
+pub const DECLARATION_BUDGET_BYTES: usize = 2_300;
 
 fn read() -> Value {
     json!({
@@ -221,6 +221,46 @@ fn execute_code() -> Value {
     })
 }
 
+/// A browser is the only way to see a page after it ran: a fetcher gets the shell a
+/// single-page app starts from. The description says it is slow because it is — a
+/// model that reaches for this when a plain fetch would do pays half a minute for
+/// text that was already there.
+fn browser_exec() -> Value {
+    json!({
+        "name": "BrowserExec",
+        "description": "Render JS page in browser; slow, ~30s.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "http(s) or file://"},
+                "mode": {"type": "string", "enum": ["dom", "text", "screenshot"]}
+            },
+            "required": ["url"]
+        }
+    })
+}
+
+/// Images are written into the workspace, so this is an Agent-mode tool like
+/// `Write`: a contract mode proposes before it touches anything.
+///
+/// `model` is not declared. The host's default is the image model the configured
+/// gateway serves, and a model id in the schema would be billed on every turn of
+/// every session for the rare caller that wants another one.
+fn generate_images() -> Value {
+    json!({
+        "name": "GenerateImages",
+        "description": "Draw images from a prompt.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string"},
+                "n": {"type": "integer", "description": "1-4"}
+            },
+            "required": ["prompt"]
+        }
+    })
+}
+
 fn write() -> Value {
     json!({
         "name": "Write",
@@ -288,6 +328,10 @@ pub fn declarations(mode: SessionMode, shell: Option<&ShellIdentity>) -> Vec<Val
         // negotiate before touching anything, and this tool runs whatever a
         // model writes.
         tools.insert(5, execute_code());
+        // Both land files in the workspace (objects drawn, or a rendered page), so
+        // they belong where Write does, not in a mode that proposes first.
+        tools.insert(6, generate_images());
+        tools.insert(7, browser_exec());
     }
     tools
 }
@@ -316,6 +360,8 @@ mod tests {
                 "Write",
                 "Edit",
                 "ExecuteCode",
+                "GenerateImages",
+                "BrowserExec",
                 "VisionAnalyze",
                 "Bash"
             ]
@@ -340,9 +386,10 @@ mod tests {
                 .filter_map(|tool| tool["name"].as_str().map(str::to_string))
                 .collect();
             assert!(
-                !names.iter().any(|name| name == "Write"
-                    || name == "Edit"
-                    || name == "ExecuteCode"),
+                !names.iter().any(|name| matches!(
+                    name.as_str(),
+                    "Write" | "Edit" | "ExecuteCode" | "GenerateImages" | "BrowserExec"
+                )),
                 "{label}: {names:?}"
             );
             assert!(names.iter().any(|name| name == "Read"));
