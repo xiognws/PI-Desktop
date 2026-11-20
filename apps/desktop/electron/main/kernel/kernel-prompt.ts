@@ -53,6 +53,10 @@ export const FORWARDED_PROMPT_PARAMS = [
   // Bash tool hands to `tools.execute`.
   "thinkingLevel",
   "commandShell",
+  // Attachment payloads: an image becomes a `ContentPart::Image` the provider can
+  // send, and the reference kinds become text blocks, so nothing the user attached
+  // is dropped.
+  "attachments",
 ] as const;
 
 /** Launch parameters this app still sends that the kernel has no reader for. */
@@ -60,7 +64,6 @@ export const KNOWN_UNSUPPORTED_PROMPT_PARAMS = [
   "mode",
   "modeTurn",
   "fastMode",
-  "attachments",
   "attachmentsDir",
   "scratchDir",
   "visualizationsDir",

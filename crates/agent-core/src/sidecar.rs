@@ -912,6 +912,12 @@ impl Sidecar {
             // The transcript keeps the user's own text; the recall query below
             // reads the same string, so the row and the query cannot drift.
             let mut message = Message::user_text(text.clone());
+            // Attachments travel with the turn: Electron main resolved the picker
+            // and sent base64 payloads, a conversation excerpt, or a bare
+            // reference. An image is the only kind the provider can actually see;
+            // the rest become text references so the model is never silently told
+            // less than the user attached.
+            message.parts.extend(attachment_parts(&request.params));
             // The renderer already drew this row optimistically; keeping its id
             // is what lets main reconcile instead of duplicating it.
             if let Some(id) = request.str_param("userMessageId") {
@@ -2819,8 +2825,73 @@ fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
     }
 }
 
-/// The repeat policy for the tool names a host actually declares.
+/// A turn's attachments as content parts.
 ///
+/// Electron main resolves the picker and sends what the provider can use: a
+/// base64 payload with its mime type for an image, a bounded excerpt for a
+/// referenced conversation, or a bare reference for older callers. An image is the
+/// only kind the model can actually see, so the rest become text references — the
+/// model must never be told less than the user attached, and nothing is dropped in
+/// silence.
+pub fn attachment_parts(params: &Value) -> Vec<crate::message::ContentPart> {
+    use crate::message::ContentPart;
+    let mut parts = Vec::new();
+    let Some(items) = params.get("attachments").and_then(Value::as_array) else {
+        return parts;
+    };
+    for item in items {
+        let kind = item.get("kind").and_then(Value::as_str).unwrap_or("");
+        let name = item
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("attachment");
+        match kind {
+            "image" => {
+                let data = item.get("data").and_then(Value::as_str).unwrap_or("");
+                let mime = item
+                    .get("mimeType")
+                    .and_then(Value::as_str)
+                    .unwrap_or("image/png");
+                if data.is_empty() {
+                    // A reference without a payload: the model still learns that an
+                    // image was attached.
+                    parts.push(ContentPart::Text {
+                        text: format!("\n\n[image attached: {name}]"),
+                    });
+                } else {
+                    parts.push(ContentPart::Image {
+                        mime_type: mime.to_string(),
+                        data: data.to_string(),
+                    });
+                }
+            }
+            "session" => {
+                if let Some(text) = item.get("text").and_then(Value::as_str) {
+                    if !text.trim().is_empty() {
+                        parts.push(ContentPart::Text {
+                            text: format!("\n\n[{name}]\n{text}"),
+                        });
+                    }
+                }
+            }
+            _ => {
+                let reference = item
+                    .get("ref")
+                    .and_then(Value::as_str)
+                    .or_else(|| item.get("inlinePath").and_then(Value::as_str))
+                    .or_else(|| item.get("path").and_then(Value::as_str));
+                if let Some(reference) = reference {
+                    parts.push(ContentPart::Text {
+                        text: format!("\n\n[{name}: {reference}]"),
+                    });
+                }
+            }
+        }
+    }
+    parts
+}
+
+/// The repeat policy for the tool names a host actually declares.
 /// This crate's names (`Read`, `Glob`, `Grep`) are the desktop's, but a host may
 /// ship `read_file`/`grep`/`glob`/`list_files` instead. Passing the default policy
 /// there would silently mean *no suppression at all*, which looks like a model that

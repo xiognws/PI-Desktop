@@ -74,7 +74,6 @@ test("launch parameters the kernel cannot read are reported, not dropped", () =>
   const { unsupported } = adaptKernelPrompt(LAUNCH);
   for (const key of [
     "mode",
-    "attachments",
     "customSystemPrompt",
     "projectInstructions",
     "projectMemory",
@@ -83,7 +82,7 @@ test("launch parameters the kernel cannot read are reported, not dropped", () =>
   ]) {
     assert.ok(unsupported.includes(key), `${key} is reported as unsupported`);
   }
-  for (const key of ["thinkingLevel", "commandShell"]) {
+  for (const key of ["thinkingLevel", "commandShell", "attachments"]) {
     assert.equal(unsupported.includes(key), false, `${key} now has a kernel reader`);
   }
   assert.deepEqual(
@@ -99,6 +98,7 @@ test("every forwarded key is one the kernel actually reads", () => {
   assert.deepEqual(
     [...FORWARDED_PROMPT_PARAMS].sort(),
     [
+      "attachments",
       "commandShell",
       "content",
       "contextWindow",

@@ -419,7 +419,37 @@ fn anthropic_body(config: &HttpProviderConfig, request: &ChatRequest) -> Value {
                         .collect();
                     messages.push(json!({"role": "user", "content": blocks}));
                 } else {
-                    messages.push(json!({"role": "user", "content": message.text()}));
+                    // A user turn that carries images must send content blocks:
+                    // Anthropic has no way to place an image in a plain string, so
+                    // text-only would silently drop the picture the user attached.
+                    let has_images = message
+                        .parts
+                        .iter()
+                        .any(|part| matches!(part, crate::message::ContentPart::Image { .. }));
+                    if !has_images {
+                        messages.push(json!({"role": "user", "content": message.text()}));
+                    } else {
+                        let mut blocks: Vec<Value> = Vec::new();
+                        for part in &message.parts {
+                            match part {
+                                crate::message::ContentPart::Text { text } if !text.is_empty() => {
+                                    blocks.push(json!({"type": "text", "text": text}));
+                                }
+                                crate::message::ContentPart::Image { mime_type, data } => {
+                                    blocks.push(json!({
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": mime_type,
+                                            "data": data,
+                                        },
+                                    }));
+                                }
+                                _ => {}
+                            }
+                        }
+                        messages.push(json!({"role": "user", "content": blocks}));
+                    }
                 }
             }
             Role::Tool => {
