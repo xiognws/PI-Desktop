@@ -102,6 +102,7 @@ import { createLauncher } from "./bootstrap/launcher";
 import { createWorkPanelRuntime } from "./bootstrap/work-panel";
 import { createCloseBehaviorRuntime } from "./bootstrap/close-behavior";
 import { registerShutdownHandlers } from "./bootstrap/shutdown";
+import { disposeLspServers } from "./lsp/tools";
 import { stripWinLongPrefix } from "./path-utils";
 import { getModuleDirectory } from "./module-path";
 
@@ -1288,6 +1289,7 @@ registerShutdownHandlers({
   mcpOAuth,
   browserHost,
   pluginViews,
+  lspServers: { dispose: disposeLspServers },
   composerSuggestion: pluginServices.composerSuggestion,
   updater,
   logger,

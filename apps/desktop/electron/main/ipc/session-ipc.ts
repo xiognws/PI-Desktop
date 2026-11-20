@@ -27,6 +27,7 @@ import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PersistenceOutbox } from "../persistence-outbox";
 import type { PluginRuntime } from "../plugin-runtime";
+import { shutdownLspSessions } from "../lsp/tools";
 import { readSessionCollaboration } from "../services/session-collaboration";
 import { localNativeProjectPaths, searchSessionsAcrossSources } from "../services/session-search";
 import type { IpcRegistrar } from "./types";
@@ -438,6 +439,9 @@ export function registerSessionIpc({
         .call("agent.disposeSession", { sessionId: id })
         .catch(() => undefined);
     }
+    // A language server holds an index of the workspace and belongs to the
+    // session that asked for it; a deleted session leaves it no owner.
+    await shutdownLspSessions(id).catch(() => undefined);
     sessionProjects.delete(id);
     logger.app("session", "info", "session deleted", { sessionId: id });
     return res;

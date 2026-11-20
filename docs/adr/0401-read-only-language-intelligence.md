@@ -74,8 +74,12 @@ content of stages 1 and 2; their language is an implementation detail.
   error: the tool reports which server it looked for and where, and the agent falls
   back to grep. Nothing is downloaded at runtime.
 * A server indexes the workspace, which costs CPU and memory for as long as the
-  session lives. One server per language, reused across turns, shut down with the
-  session — never one per query.
+  process runs. One server per language, reused across turns — never one per
+  query. The pool in `apps/desktop/electron/main/lsp/pool.ts` bounds that cost:
+  an idle server is shut down after ten minutes and the live count is held at
+  four, so a day of sessions does not accumulate one indexing process per
+  session. A server with a call in flight is never reclaimed, and both bounds
+  yield rather than kill a server mid-request.
 * Diagnostics are pushed, not pulled, and arrive on the server's schedule. The tool
   asks for a file's diagnostics with a bounded wait and reports "not ready yet"
   rather than hanging the turn.

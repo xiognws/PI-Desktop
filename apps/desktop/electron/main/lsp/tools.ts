@@ -20,6 +20,7 @@ import { relative, resolve } from "node:path";
 import type { LocalToolHandler } from "@pi-workspace/host-runtime";
 
 import { DEFAULT_TIMEOUTS, LspClient, pathToUri } from "./client.ts";
+import { LspServerPool } from "./pool.ts";
 import { discoverServer } from "./servers.ts";
 
 export type LspToolOptions = {
@@ -37,8 +38,13 @@ type Location = {
 
 type Position = { file: string; line: number; column: number };
 
-/** Sessions and their servers, keyed by session so shutdown can be deterministic. */
-const clients = new Map<string, LspClient>();
+/**
+ * Sessions and their servers, in a pool that reclaims idle ones (see `pool.ts`).
+ *
+ * ADR 0401 still holds — one server per language per session, reused across
+ * turns — but a server no longer outlives its usefulness until the session ends.
+ */
+const pool = new LspServerPool<LspClient>();
 
 async function rootFor(options: LspToolOptions, sessionId: string): Promise<string> {
   return (await options.getProjectRoot(sessionId)) ?? process.cwd();
@@ -48,7 +54,7 @@ async function clientFor(
   sessionId: string,
   filePath: string,
   projectRoot: string,
-): Promise<{ client: LspClient; languageId: string } | { error: string }> {
+): Promise<{ client: LspClient; languageId: string; key: string } | { error: string }> {
   const discovery = discoverServer(filePath, projectRoot);
   if (!discovery.ok) {
     // The directories are part of the message: "not installed" alone leaves the reader
@@ -56,24 +62,24 @@ async function clientFor(
     return { error: `${discovery.reason}. Looked in: ${discovery.lookedFor.join(", ")}` };
   }
   const key = `${sessionId}::${projectRoot}::${discovery.spec.label}`;
-  const existing = clients.get(key);
-  if (existing && !existing.isClosed) return { client: existing, languageId: discovery.spec.languageId };
-  const client = await LspClient.start(
-    { command: discovery.executable, args: discovery.spec.args, label: discovery.spec.label },
-    projectRoot,
-    DEFAULT_TIMEOUTS,
+  const client = await pool.acquire(key, () =>
+    LspClient.start(
+      { command: discovery.executable, args: discovery.spec.args, label: discovery.spec.label },
+      projectRoot,
+      DEFAULT_TIMEOUTS,
+    ),
   );
-  clients.set(key, client);
-  return { client, languageId: discovery.spec.languageId };
+  return { client, languageId: discovery.spec.languageId, key };
 }
 
 /** Shut every server down; called when the session ends. */
 export async function shutdownLspSessions(sessionId: string): Promise<void> {
-  for (const [key, client] of [...clients]) {
-    if (!key.startsWith(`${sessionId}::`)) continue;
-    clients.delete(key);
-    await client.shutdown().catch(() => undefined);
-  }
+  await pool.shutdownSession(sessionId);
+}
+
+/** Stop every language server; called on quit, before the process tree goes. */
+export function disposeLspServers(): Promise<void> {
+  return pool.dispose();
 }
 
 function formatLocation(root: string, location: Location): string {
@@ -106,6 +112,7 @@ export function createLspDefinitionTool(options: LspToolOptions): LocalToolHandl
     const root = await rootFor(options, sessionId);
     const ready = await clientFor(sessionId, input.file, root);
     if ("error" in ready) return { ok: false, content: ready.error, isError: true };
+    pool.begin(ready.key);
     try {
       const result = await ready.client.request("textDocument/definition", positionOf(root, input));
       const locations = (Array.isArray(result) ? result : result ? [result] : []) as Location[];
@@ -115,6 +122,8 @@ export function createLspDefinitionTool(options: LspToolOptions): LocalToolHandl
       return { ok: true, content: locations.map((location) => formatLocation(root, location)).join("\n") };
     } catch (error) {
       return { ok: false, content: message(error), isError: true };
+    } finally {
+      pool.end(ready.key);
     }
   };
 }
@@ -126,6 +135,7 @@ export function createLspReferencesTool(options: LspToolOptions): LocalToolHandl
     const root = await rootFor(options, sessionId);
     const ready = await clientFor(sessionId, input.file, root);
     if ("error" in ready) return { ok: false, content: ready.error, isError: true };
+    pool.begin(ready.key);
     try {
       const result = await ready.client.request("textDocument/references", {
         ...positionOf(root, input),
@@ -139,6 +149,8 @@ export function createLspReferencesTool(options: LspToolOptions): LocalToolHandl
       return { ok: true, content: `${lines.length} reference(s):\n${lines.join("\n")}` };
     } catch (error) {
       return { ok: false, content: message(error), isError: true };
+    } finally {
+      pool.end(ready.key);
     }
   };
 }
@@ -158,6 +170,7 @@ export function createLspDiagnosticsTool(options: LspToolOptions): LocalToolHand
     } catch (error) {
       return { ok: false, content: `could not read ${input.file}: ${message(error)}`, isError: true };
     }
+    pool.begin(ready.key);
     try {
       // Opening the document is what makes a server publish diagnostics for it.
       ready.client.notify("textDocument/didOpen", {
@@ -187,6 +200,8 @@ export function createLspDiagnosticsTool(options: LspToolOptions): LocalToolHand
       };
     } catch (error) {
       return { ok: false, content: message(error), isError: true };
+    } finally {
+      pool.end(ready.key);
     }
   };
 }

@@ -47,6 +47,8 @@ export type ShutdownDependencies = {
   mcpOAuth?: Pick<McpOAuthManager, "disposeAll">;
   browserHost: Pick<BrowserHost, "dispose">;
   pluginViews: Pick<PluginViewHost, "dispose">;
+  /** Language servers are child processes of their own (ADR 0401). */
+  lspServers?: { dispose(): Promise<void> };
   /** Composer suggestions still waiting for an answer at quit (ADR 0333). */
   composerSuggestion?: Pick<ComposerSuggestionRelay, "dispose">;
   updater: Pick<AppUpdaterController, "dispose" | "isInstallingUpdate">;
@@ -73,6 +75,7 @@ export function registerShutdownHandlers({
   mcpOAuth,
   browserHost,
   pluginViews,
+  lspServers,
   composerSuggestion,
   updater,
   logger,
@@ -220,6 +223,10 @@ export function registerShutdownHandlers({
       userMcp.disposeAll();
       mcpOAuth?.disposeAll();
       browserHost.dispose();
+      // A language server is a child process that outlives its session by design
+      // (ADR 0401). Its own teardown is a shutdown, not an exit, so the quit does
+      // not look to the supervisor like a crash.
+      const lspShutdown = lspServers?.dispose();
       composerSuggestion?.dispose();
       inflightCheckpointer.dispose();
 
@@ -233,6 +240,7 @@ export function registerShutdownHandlers({
         sidecarShutdown,
         mcpShutdown,
         remoteHostsShutdown,
+        lspShutdown,
       ]);
       await disposeSystemProxyRelay?.();
     })();
