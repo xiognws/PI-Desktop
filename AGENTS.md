@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Policy-Sync: 2026-11-13.2
+Policy-Sync: 2026-11-20.1
 
 Mandatory rules for AI coding agents working in Pi-Workspace.
 
@@ -106,6 +106,39 @@ different case: write those as UTF-8 **without** BOM.
 
 Enforced by `pnpm check:powershell-encoding`. Details and generating code
 snippets: skill `plugins/repo-conventions/skills/powershell-encoding.md`.
+
+### Reference before you write
+
+This product is a port, not a green field. Before writing any agent behaviour —
+a tool, an argument name, a prompt section, an event, a loop rule — go read how
+it is already done, in this order, and port that:
+
+1. **This repository's own Node runtime** (`packages/agent-runtime`,
+   `packages/shared`) for everything on the wire: method names, event payloads,
+   prompt parameter shapes, tool declarations, and their argument names. It is
+   the contract the renderer, the persistence outbox and the transcript already
+   consume.
+2. **The Hermes agent** (Nous Research — the checkout and behaviour notes kept
+   outside this repository) for agent-loop semantics no type can express:
+   compaction thresholds, when memory is recalled, delegation and step ceilings,
+   approval grading, tool-result ageing, what a sub-agent may see.
+3. **Upstream pi libraries and other leading agent products** (Claude Code,
+   Codex, OpenCode) for provider wire details, and for surfaces this product has
+   no precedent for at all.
+
+Rules that follow from this:
+
+* Do not invent a tool name, an argument name, an event type or a prompt section
+  that the reference already defines. `Todo` is not `TodoWrite`, and a tool the
+  host cannot execute is worse than no tool.
+* Say where the behaviour came from: the file you read, and what you
+  deliberately changed and why — in the commit body or the ADR, not only in
+  chat.
+* When porting is genuinely impossible (a second store, a second vocabulary, an
+  incompatible transport), report that as a finding with the reason. Do not
+  quietly design a parallel implementation next to the reference one.
+* "Nothing to reference here" is a claim that needs evidence: name where you
+  looked before you write something new.
 
 ---
 

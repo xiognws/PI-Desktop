@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Policy-Sync: 2026-11-13.2
+Policy-Sync: 2026-11-20.1
 
 Instructions for Claude Code CLI and Claude Cowork on Pi-Workspace.
 
@@ -226,6 +226,12 @@ Before coding, decide "direct change" vs "refactor first". Refactor (or make it 
 At the end of a task briefly state: observable behavior/contract that changed; main files modified; tests and checks actually run with results; verifications skipped and why; known risks, compatibility impact, and remaining user decisions. Never claim a test, build, or manual verification passed when it was not actually executed.
 
 Never commit API keys, tokens, credentials, local DBs, logs, `node_modules/`, build artifacts, or machine-specific paths.
+
+### Reference before you write
+
+This product is a port, not a green field. Before writing any agent behaviour — a tool, an argument name, a prompt section, an event, a loop rule — read how it is already done and port that, in this order: (1) this repository's own Node runtime (`packages/agent-runtime`, `packages/shared`) for everything on the wire — method names, event payloads, prompt parameter shapes, tool declarations and argument names; (2) the Hermes agent (Nous Research, checkout kept outside this repository) for agent-loop semantics no type can express — compaction thresholds, when memory is recalled, delegation and step ceilings, approval grading, tool-result ageing, what a sub-agent may see; (3) upstream pi libraries and other leading agent products (Claude Code, Codex, OpenCode) for provider wire details and for surfaces with no precedent here.
+
+Do not invent a tool name, argument name, event type or prompt section the reference already defines (`Todo` is not `TodoWrite`; a tool the host cannot execute is worse than no tool). Say where the behaviour came from — the file you read, and what you deliberately changed and why — in the commit body or the ADR. When porting is genuinely impossible, report it as a finding with the reason instead of quietly designing a parallel implementation. "Nothing to reference here" needs evidence: name where you looked.
 
 ---
 
