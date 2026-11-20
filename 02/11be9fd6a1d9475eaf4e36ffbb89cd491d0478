@@ -1,0 +1,14 @@
+docs/adr/0403-rust-kernel-as-agent-runtime.md
+  h_201ed4c689ac8b 98-115,121-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0211be9fd6a1d9475eaf4e36ffbb89cd491d0478",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
