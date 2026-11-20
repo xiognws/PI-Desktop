@@ -23,6 +23,7 @@ use crate::workspace::{
     resolve_tool_path_with_external, simple_canonicalize, ContainedRoots, ToolRoot,
 };
 
+pub mod browser_exec;
 #[cfg(test)]
 mod file_lease_tests;
 mod grep_rg;
@@ -1609,6 +1610,16 @@ pub async fn execute_tool_with_file_lease(
         // snippet itself calls back into nothing (no tool bridge in v1).
         name if execute_code::recognizes(name) => {
             execute_code::execute(args, scratch, python_executable).await
+        }
+        // A real browser, once per call: the only way to see a page that renders
+        // its content with script. It is slow by nature (29-31 s warm, 102 s cold
+        // on this host), which is why the name says so — the profile directory it
+        // reuses lives in the data directory, and a screenshot is adopted into
+        // `<workspace>/screenshots` by rename so a half-written PNG never appears
+        // in the project.
+        name if browser_exec::recognizes(name) => {
+            let data_dir = crate::pi_home::data_dir();
+            browser_exec::execute(args, workspace, data_dir.as_deref()).await
         }
         other if is_desktop_dispatched(other) => Err(hashline::ToolError::new(
             "TOOL_NOT_FOUND",

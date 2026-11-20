@@ -139,8 +139,13 @@ impl PermissionManager {
             // needs, and for the same reason. A missing entry here would not fail
             // the call — it would leave it waiting on an approval card that the
             // Medium path never raises, which reads as a hang.
+            // `BrowserExec` starts a real browser — a process tree plus a network
+            // fetch — so it belongs with the tools that run things, not with the
+            // readers. A Medium classification here would leave the call waiting
+            // on a card nothing raises, which reads as a hang.
             "Write" | "Edit" | "AstEdit" | "AstEditApply" | "Bash" | "GenerateImages"
-            | "Computer" | "ExecuteCode" | "execute_code" => Risk::High,
+            | "Computer" | "ExecuteCode" | "execute_code" | "BrowserExec"
+            | "browser_exec" => Risk::High,
             name if name.starts_with("plugin_") => match declared {
                 Some("low") => Risk::Low,
                 Some("high") => Risk::High,
@@ -474,7 +479,15 @@ mod tests {
         // ExecuteCode runs arbitrary code, so it belongs to the same group as
         // Bash; a Medium classification here would leave the call waiting on a
         // card nobody raises.
-        for tool in ["Write", "Edit", "Bash", "ExecuteCode", "execute_code"] {
+        for tool in [
+            "Write",
+            "Edit",
+            "Bash",
+            "ExecuteCode",
+            "execute_code",
+            "BrowserExec",
+            "browser_exec",
+        ] {
             let d = pm.evaluate_auto_with_permission_mode("s", tool, "agent", "ask", &no_grants());
             assert!(d.is_none(), "{tool} should prompt under ask");
         }
