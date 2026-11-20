@@ -128,18 +128,15 @@ pub fn mime_for_image_path(path: &str) -> &'static str {
 }
 
 /// The ceiling, applied to one measured length. Kept separate from the read so
-/// the refusal can be tested without producing an 8 MB file.
+/// the refusal can be tested without producing an 8 MB file; the check itself is
+/// the shared one, so both image tools refuse with the same shape of error.
 pub fn ensure_within_limit(bytes: usize, description: &str) -> Result<(), ToolError> {
-    if bytes > MAX_IMAGE_BYTES {
-        return Err(ToolError::new(
-            "IMAGE_TOO_LARGE",
-            format!(
-                "{description} is {bytes} bytes, over the {MAX_IMAGE_BYTES} byte limit for one image"
-            ),
-        )
-        .with_extra(json!({ "bytes": bytes, "limit": MAX_IMAGE_BYTES })));
-    }
-    Ok(())
+    crate::tools::provider_store::ensure_within_limit(
+        bytes,
+        MAX_IMAGE_BYTES,
+        "IMAGE_TOO_LARGE",
+        description,
+    )
 }
 
 /// Resolve and read the image argument.
@@ -221,114 +218,14 @@ pub fn build_request_body(model: &str, question: &str, image: &ImageSource) -> V
     })
 }
 
-/// One provider, resolved far enough to make the call. The API key never leaves
-/// this struct except as an `Authorization` header.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProviderCredentials {
-    pub base_url: String,
-    pub api_key: String,
-    pub model: String,
-}
+/// Provider resolution is shared with `GenerateImages` (`provider_store`): both
+/// tools read the same store, and must answer "which provider is configured" the
+/// same way. Only the trait is named here — the dispatcher asks the store for the
+/// directory itself.
+use crate::tools::provider_store::ProviderDirectory;
 
-impl ProviderCredentials {
-    /// `POST {base}/chat/completions`. A stored base URL may or may not already
-    /// carry the path, so it is normalised rather than concatenated blindly.
-    pub fn endpoint(&self) -> String {
-        let base = self.base_url.trim().trim_end_matches('/');
-        if base.ends_with("/chat/completions") {
-            base.to_string()
-        } else {
-            format!("{base}/chat/completions")
-        }
-    }
-}
-
-/// Where a vision call gets its provider from. A trait so the body constructor
-/// and the error paths can be exercised without a provider store or a network.
-pub trait ProviderDirectory: Send + Sync {
-    fn resolve(&self, model: Option<&str>) -> Result<ProviderCredentials, ToolError>;
-}
-
-/// The real directory: host-core's provider store.
-pub struct StoredProviders;
-
-impl ProviderDirectory for StoredProviders {
-    fn resolve(&self, model: Option<&str>) -> Result<ProviderCredentials, ToolError> {
-        resolve_from_store(model)
-    }
-}
-
-/// The directory the dispatcher uses. Resolving opens the store per call on
-/// purpose: a vision call is rare, and a cached connection would be a second,
-/// silently stale owner of the same SQLite file.
-pub fn host_providers() -> &'static dyn ProviderDirectory {
-    &StoredProviders
-}
-
-fn not_configured(detail: &str) -> ToolError {
-    // Never echo the credential itself — only whether one exists.
-    ToolError::new("PROVIDER_NOT_CONFIGURED", detail.to_string())
-}
-
-fn resolve_from_store(model: Option<&str>) -> Result<ProviderCredentials, ToolError> {
-    let data_dir = crate::pi_home::data_dir().ok_or_else(|| {
-        not_configured("no provider is configured: this host has no data directory")
-    })?;
-    let db = crate::db::Database::open_in_dir(&data_dir)
-        .map_err(|error| not_configured(&format!("the provider store could not be opened: {error}")))?;
-    let secrets = crate::secrets::SecretStore::open(&data_dir)
-        .map_err(|error| not_configured(&format!("the provider store could not be opened: {error}")))?;
-    let providers = crate::providers::list_providers(&db, &secrets, false)
-        .map_err(|error| not_configured(&format!("the provider list could not be read: {error}")))?;
-
-    // Only a provider that could actually answer is a candidate: an OpenAI
-    // compatible base URL and a stored credential.
-    let usable: Vec<_> = providers
-        .iter()
-        .filter(|provider| {
-            provider.has_secret
-                && provider
-                    .base_url
-                    .as_deref()
-                    .map(|url| !url.trim().is_empty())
-                    .unwrap_or(false)
-        })
-        .collect();
-    if usable.is_empty() {
-        return Err(not_configured(
-            "no enabled provider has both a base URL and a stored credential",
-        ));
-    }
-    // An explicit model wins, but it has to come from a provider that lists it —
-    // otherwise the name would be sent to a vendor that never published it.
-    let chosen = model
-        .and_then(|wanted| {
-            usable
-                .iter()
-                .find(|provider| provider.models.iter().any(|binding| binding.id == wanted))
-        })
-        .copied()
-        .unwrap_or(usable[0]);
-    let model_id = model
-        .map(str::to_string)
-        .or_else(|| chosen.default_model_id.clone())
-        .or_else(|| chosen.models.first().map(|binding| binding.id.clone()))
-        .ok_or_else(|| not_configured("the chosen provider declares no model"))?;
-    let api_key = crate::providers::get_secret_for_provider(&db, &secrets, &chosen.id)
-        .map_err(|error| not_configured(&format!("the stored credential could not be read: {error}")))?
-        .filter(|key| !key.trim().is_empty())
-        .ok_or_else(|| not_configured("the chosen provider has no stored API key"))?;
-    let base_url = chosen
-        .base_url
-        .clone()
-        .ok_or_else(|| not_configured("the chosen provider has no base URL"))?;
-    Ok(ProviderCredentials {
-        base_url,
-        api_key,
-        model: model_id,
-    })
-}
-
+/// Cut `text` to `limit` characters, marking the cut so a shortened body never
+/// reads as a whole one.
 fn truncate(text: &str, limit: usize) -> String {
     if text.chars().count() <= limit {
         return text.to_string();
@@ -396,7 +293,7 @@ pub async fn execute(
         )
     })?;
     let response = client
-        .post(provider.endpoint())
+        .post(provider.chat_endpoint())
         .header(
             reqwest::header::AUTHORIZATION,
             format!("Bearer {}", provider.api_key),
@@ -460,6 +357,7 @@ pub async fn execute(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::provider_store::{not_configured, ProviderCredentials};
 
     fn local_image() -> ImageSource {
         ImageSource::Local {
@@ -601,15 +499,15 @@ mod tests {
             model: "m".into(),
         };
         assert_eq!(
-            base("https://api.example.test/v1/").endpoint(),
+            base("https://api.example.test/v1/").chat_endpoint(),
             "https://api.example.test/v1/chat/completions"
         );
         assert_eq!(
-            base("https://api.example.test/v1").endpoint(),
+            base("https://api.example.test/v1").chat_endpoint(),
             "https://api.example.test/v1/chat/completions"
         );
         assert_eq!(
-            base("https://api.example.test/v1/chat/completions").endpoint(),
+            base("https://api.example.test/v1/chat/completions").chat_endpoint(),
             "https://api.example.test/v1/chat/completions"
         );
     }

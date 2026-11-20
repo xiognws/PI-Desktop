@@ -30,12 +30,14 @@ pub mod execute_code;
 pub mod hashline;
 pub mod ignore_rules;
 mod image_dimensions;
+pub mod image_generate;
 #[cfg(test)]
 mod inherited_python_env_tests;
 pub mod office;
 mod output_budget;
 #[cfg(any(unix, test))]
 mod process_group;
+pub mod provider_store;
 pub mod shell;
 pub mod shell_session;
 #[cfg(test)]
@@ -1512,11 +1514,16 @@ pub async fn execute_tool_with_file_lease(
         }
     }
     let result: Result<Value, hashline::ToolError> = match tool_name {
-        // Authorize the desktop-owned image request through the normal host gate.
-        // Only the trusted desktop runner performs the external call.
-        // Both run in Electron main after the host authorises them:
-        // image generation needs a provider SDK, and computer use needs
-        // a provider plus Chromium capture (ADR 0342).
+        // Authorize the desktop-owned request through the normal host gate. Only
+        // the trusted desktop runner performs the external call: image generation
+        // needs the provider session Electron holds (its SDK, its OAuth login),
+        // and computer use needs a provider plus Chromium capture (ADR 0342).
+        //
+        // `GenerateImages` stays here on purpose. The runner sends the same
+        // `tools.execute` params as the call it will then run, so host-side
+        // drawing cannot tell a permission check from a request to draw — and
+        // running both would bill one prompt twice. Host-side drawing is reached
+        // through the `image_generate` spelling, which the runner never sends.
         "GenerateImages" | "Computer" => Ok(serde_json::json!({ "authorized": true })),
         "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
             run_file_tool(
@@ -1576,8 +1583,26 @@ pub async fn execute_tool_with_file_lease(
         // workspace is required — an absolute path or an http(s) URL is enough —
         // so it is not gated like the file tools.
         name if vision::recognizes(name) => {
-            vision::execute(args, workspace, vision::host_providers()).await
+            vision::execute(args, workspace, provider_store::host_providers()).await
         }
+        // Drawing writes files, so it is gated like the file tools: the pictures
+        // belong to the project, and a session with no workspace open has nowhere
+        // to put them. A picture is downloaded here rather than handed over as a
+        // URL — the provider's link is signed and expires within hours.
+        //
+        // Reached through `image_generate` only: `GenerateImages` is still the
+        // desktop runner's (see the authorisation arm above), and both spellings
+        // resolving to the same branch would take that call away from the runner
+        // that draws it with the provider session Electron holds.
+        name if image_generate::recognizes(name) => match workspace {
+            None => Err(hashline::ToolError::new(
+                "WORKSPACE_REQUIRED",
+                "No workspace is open",
+            )),
+            Some(workspace_root) => {
+                image_generate::execute(args, workspace_root, image_generate::host_backend()).await
+            }
+        },
         // A snippet runs under an interpreter instead of a shell, so it is a
         // separate tool rather than a Bash spelling: the caller writes source,
         // not a command line. The host owns the script file and the timeout; the
