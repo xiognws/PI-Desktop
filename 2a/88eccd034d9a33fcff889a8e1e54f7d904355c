@@ -1,0 +1,20 @@
+crates/host-core/src/permissions.rs
+  h_201ed4c689ac8b 142-145,147-148,482-490
+crates/host-core/src/tools/browser_exec.rs
+  h_201ed4c689ac8b 1-1288
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 26,1614-1623
+scripts/e2e-browser-exec.mjs
+  h_201ed4c689ac8b 1-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2a88eccd034d9a33fcff889a8e1e54f7d904355c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
