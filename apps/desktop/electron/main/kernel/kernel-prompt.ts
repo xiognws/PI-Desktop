@@ -57,6 +57,9 @@ export const FORWARDED_PROMPT_PARAMS = [
   // send, and the reference kinds become text blocks, so nothing the user attached
   // is dropped.
   "attachments",
+  // Whether the model can see, derived from the provider's model config: the kernel
+  // inlines an attached image only when told, otherwise it names it in text.
+  "supportsVision",
 ] as const;
 
 /** Launch parameters this app still sends that the kernel has no reader for. */
@@ -134,6 +137,13 @@ export function adaptKernelProvider(raw: unknown): {
   };
 }
 
+function visionOf(provider: unknown): boolean | undefined {
+  if (!isWire(provider)) return undefined;
+  const modelConfig = isWire(provider.modelConfig) ? provider.modelConfig : undefined;
+  const value = modelConfig?.supportsVision;
+  return typeof value === "boolean" ? value : undefined;
+}
+
 function contextWindowOf(provider: unknown): number | undefined {
   if (!isWire(provider)) return undefined;
   const modelConfig = isWire(provider.modelConfig) ? provider.modelConfig : undefined;
@@ -185,6 +195,13 @@ export function adaptKernelPrompt(raw: unknown): {
   const contextWindow = contextWindowOf(providerInput);
   if (contextWindow !== undefined && params.contextWindow === undefined) {
     params.contextWindow = contextWindow;
+  }
+  // Whether the model can see. The kernel inlines an attached image only when it is
+  // told the model accepts one; without this the picture is named in text instead of
+  // being sent, which is what a vision model's user would notice first.
+  const supportsVision = visionOf(providerInput);
+  if (supportsVision !== undefined && params.supportsVision === undefined) {
+    params.supportsVision = supportsVision;
   }
   if (provider.provider) params.provider = provider.provider;
 

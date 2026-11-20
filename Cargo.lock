@@ -41,6 +41,7 @@ dependencies = [
 name = "agent-core"
 version = "0.21.0"
 dependencies = [
+ "base64 0.22.1",
  "regex",
  "reqwest",
  "serde",

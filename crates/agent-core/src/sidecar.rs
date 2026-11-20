@@ -917,7 +917,7 @@ impl Sidecar {
             // reference. An image is the only kind the provider can actually see;
             // the rest become text references so the model is never silently told
             // less than the user attached.
-            message.parts.extend(attachment_parts(&request.params));
+            message.parts.extend(attachment_parts(&request.params).await);
             // The renderer already drew this row optimistically; keeping its id
             // is what lets main reconcile instead of duplicating it.
             if let Some(id) = request.str_param("userMessageId") {
@@ -2825,44 +2825,59 @@ fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
     }
 }
 
+/// Per-image and per-turn ceilings for inlining an attached image, matching the
+/// renderer's limits so a picture the composer accepted is not silently withheld
+/// from the model.
+const MAX_INLINE_IMAGE_BYTES: u64 = 10_000_000;
+const MAX_INLINED_IMAGE_BYTES: u64 = 30_000_000;
+
 /// A turn's attachments as content parts.
 ///
-/// Electron main resolves the picker and sends what the provider can use: a
-/// base64 payload with its mime type for an image, a bounded excerpt for a
-/// referenced conversation, or a bare reference for older callers. An image is the
-/// only kind the model can actually see, so the rest become text references — the
-/// model must never be told less than the user attached, and nothing is dropped in
-/// silence.
-pub fn attachment_parts(params: &Value) -> Vec<crate::message::ContentPart> {
+/// The payload names a path rather than carrying bytes: the renderer records the
+/// selection and reading it is this process's job. An image becomes
+/// `ContentPart::Image` when the launch says the model can see and the file fits the
+/// ceilings; everything else — a file, an oversized image, a model without vision, a
+/// path that vanished — becomes a text reference, so the model is told what the user
+/// attached and where it is, and nothing is dropped in silence.
+pub async fn attachment_parts(params: &Value) -> Vec<crate::message::ContentPart> {
     use crate::message::ContentPart;
     let mut parts = Vec::new();
     let Some(items) = params.get("attachments").and_then(Value::as_array) else {
         return parts;
     };
+    let vision = params
+        .get("supportsVision")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let mut budget = MAX_INLINED_IMAGE_BYTES;
     for item in items {
         let kind = item.get("kind").and_then(Value::as_str).unwrap_or("");
         let name = item
             .get("name")
             .and_then(Value::as_str)
             .unwrap_or("attachment");
+        let path = item.get("path").and_then(Value::as_str).unwrap_or("");
         match kind {
             "image" => {
-                let data = item.get("data").and_then(Value::as_str).unwrap_or("");
-                let mime = item
-                    .get("mimeType")
-                    .and_then(Value::as_str)
-                    .unwrap_or("image/png");
-                if data.is_empty() {
-                    // A reference without a payload: the model still learns that an
-                    // image was attached.
-                    parts.push(ContentPart::Text {
-                        text: format!("\n\n[image attached: {name}]"),
-                    });
+                let inlined = if vision {
+                    read_image_as_base64(path, budget).await
                 } else {
-                    parts.push(ContentPart::Image {
-                        mime_type: mime.to_string(),
-                        data: data.to_string(),
-                    });
+                    None
+                };
+                match inlined {
+                    Some((data, size)) => {
+                        budget = budget.saturating_sub(size);
+                        parts.push(ContentPart::Image {
+                            mime_type: image_mime_type(
+                                item.get("mimeType").and_then(Value::as_str),
+                                path,
+                            ),
+                            data,
+                        });
+                    }
+                    None => parts.push(ContentPart::Text {
+                        text: format!("\n\n[image attached: {name} ({path})]"),
+                    }),
                 }
             }
             "session" => {
@@ -2879,8 +2894,9 @@ pub fn attachment_parts(params: &Value) -> Vec<crate::message::ContentPart> {
                     .get("ref")
                     .and_then(Value::as_str)
                     .or_else(|| item.get("inlinePath").and_then(Value::as_str))
-                    .or_else(|| item.get("path").and_then(Value::as_str));
-                if let Some(reference) = reference {
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or(path);
+                if !reference.is_empty() {
                     parts.push(ContentPart::Text {
                         text: format!("\n\n[{name}: {reference}]"),
                     });
@@ -2889,6 +2905,51 @@ pub fn attachment_parts(params: &Value) -> Vec<crate::message::ContentPart> {
         }
     }
     parts
+}
+
+/// The mime type to declare for an attached image: the picker's answer when it gave
+/// one, otherwise the file extension, so a base64 block is never labelled `octet`.
+fn image_mime_type(declared: Option<&str>, path: &str) -> String {
+    if let Some(mime) = declared.filter(|mime| !mime.is_empty()) {
+        return mime.to_string();
+    }
+    let extension = std::path::Path::new(path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        _ => "image/png",
+    }
+    .to_string()
+}
+
+/// Read one attached image as base64 for the wire.
+///
+/// `None` means "keep it as a reference": the file is gone, empty, larger than the
+/// remaining budget, or larger than one image may be. A turn must not fail because a
+/// picture is big.
+async fn read_image_as_base64(path: &str, budget: u64) -> Option<(String, u64)> {
+    if path.is_empty() {
+        return None;
+    }
+    let metadata = tokio::fs::metadata(path).await.ok()?;
+    if !metadata.is_file() {
+        return None;
+    }
+    let size = metadata.len();
+    if size == 0 || size > budget.min(MAX_INLINE_IMAGE_BYTES) {
+        return None;
+    }
+    let bytes = tokio::fs::read(path).await.ok()?;
+    use base64::Engine as _;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Some((encoded, size))
 }
 
 /// The repeat policy for the tool names a host actually declares.

@@ -92,6 +92,27 @@ test("launch parameters the kernel cannot read are reported, not dropped", () =>
   );
 });
 
+test("the model's vision capability reaches the kernel", () => {
+  // Without this the kernel names an attached image in text instead of sending it,
+  // which is exactly what a vision model's user would notice first.
+  const seen = adaptKernelPrompt({
+    ...LAUNCH,
+    provider: {
+      ...LAUNCH.provider,
+      modelConfig: { contextWindow: 128000, supportsVision: true },
+    },
+  });
+  assert.equal(seen.params.supportsVision, true);
+
+  // Undeclared stays undeclared: the kernel then keeps the image as a reference
+  // rather than sending a payload an endpoint might reject.
+  const silent = adaptKernelPrompt({
+    ...LAUNCH,
+    provider: { ...LAUNCH.provider, modelConfig: { contextWindow: 128000 } },
+  });
+  assert.equal(silent.params.supportsVision, undefined);
+});
+
 test("every forwarded key is one the kernel actually reads", () => {
   // Pinned deliberately: adding a field to the launch path means adding it here
   // and giving the kernel a reader, in the same change.
@@ -111,6 +132,7 @@ test("every forwarded key is one the kernel actually reads", () => {
       "skillReview",
       "stepBudget",
       "subagents",
+      "supportsVision",
       "systemPrompt",
       "thinkingLevel",
       "tools",
