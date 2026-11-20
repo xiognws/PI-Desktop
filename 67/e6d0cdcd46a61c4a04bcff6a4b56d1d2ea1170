@@ -1,0 +1,30 @@
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 87-99,107-110,252-297,332-338,344-350
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 158,173-174,372-474
+crates/agent-core/examples/superagent_live.rs
+  h_201ed4c689ac8b 244
+crates/agent-core/src/aging.rs
+  h_201ed4c689ac8b 235
+crates/agent-core/src/context.rs
+  h_201ed4c689ac8b 44-55,59-71,79,82-87,115-121,179,184-189,193,387-418
+crates/agent-core/src/delegate.rs
+  h_201ed4c689ac8b 63-73,250-253,659-662,675,679-718,761-788,792,796,842-862,871,895,1398-1531
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 932-955,957-959,3693-3733,3744-3751,3754,4015-4016,4022-4045,4064-4066,4072,4403-4473,4632-4900
+crates/agent-core/tests/compaction_loop.rs
+  h_201ed4c689ac8b 228-286
+crates/agent-core/tests/turn_loop.rs
+  h_201ed4c689ac8b 457,493
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "67e6d0cdcd46a61c4a04bcff6a4b56d1d2ea1170",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
