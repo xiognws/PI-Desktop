@@ -1,0 +1,16 @@
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 12,18-21,33,37-38,44-50,81-87,108-119,184-220,260-287,303-309
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 6-7,55-71,102,152,171-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f31bbd26217295f5f438b12ff7e5645564b7d384",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
