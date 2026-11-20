@@ -1,0 +1,16 @@
+crates/agent-core/src/delegate.rs
+  h_201ed4c689ac8b 277-298,352-397,1156-1167,1474-1520
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 470,1800-1844
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "36d9b2501d1d6fe662d8c5e32c831ccbe8c8b96a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
