@@ -1,0 +1,26 @@
+crates/agent-core/src/builtin_tools.rs
+  h_201ed4c689ac8b 9-15,131-134
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 72,92
+crates/agent-core/src/prompt/mod.rs
+  h_201ed4c689ac8b 100-106,123,219-233
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 34,273-280,323,356-370,375-380,436,704-708,731-737,739,747-763,767-768,772-779,781-816,826,850-866,904-1032,1043,1063,1348-1350,1394-1407,1410,1412-1447,1462-1463,3376-3386
+crates/agent-core/src/tool_activation.rs
+  h_201ed4c689ac8b 1-804
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 139-143,164,168-177,417-421,757-771
+crates/agent-core/tests/tool_activation.rs
+  h_201ed4c689ac8b 1-361
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d38e6ba7b6673327b129238c07f388e342ab448c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
