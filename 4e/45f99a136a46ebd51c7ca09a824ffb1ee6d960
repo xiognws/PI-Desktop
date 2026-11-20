@@ -1,0 +1,22 @@
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 12,79-86,92-95,199-209,222-226,234
+apps/desktop/test/kernel-methods.test.mjs
+  h_201ed4c689ac8b 67-69
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 20-29,48,164,204-206,212-214,223-240,288-308
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 268-294,313,500-503,930-934,1034-1049,1666-1740,2137-2152,3854-4032
+crates/agent-core/tests/mode_run_notice.rs
+  h_201ed4c689ac8b 1-340
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4e45f99a136a46ebd51c7ca09a824ffb1ee6d960",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
