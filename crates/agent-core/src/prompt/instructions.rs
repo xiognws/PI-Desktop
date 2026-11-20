@@ -29,19 +29,21 @@ pub const MAX_PROMPT_BYTES: usize = 64 * 1024;
 pub const GLOBAL_INSTRUCTION_FILE: &str = "AGENTS.md";
 pub const GLOBAL_INSTRUCTION_SOURCE: &str = "~/.pi/agent/AGENTS.md";
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct InstructionEntry {
     /// Stable, workspace-relative label shown to the model.
     pub source: String,
     pub content: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(default)]
 pub struct ProjectInstructions {
     pub entries: Vec<InstructionEntry>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Deserialize)]
+#[serde(default)]
 pub struct CustomSystemPrompt {
     /// `SYSTEM.md`: replaces the persona block.
     pub replace: Option<String>,

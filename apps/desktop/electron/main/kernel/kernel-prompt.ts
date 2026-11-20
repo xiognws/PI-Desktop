@@ -60,6 +60,10 @@ export const FORWARDED_PROMPT_PARAMS = [
   // Whether the model can see, derived from the provider's model config: the kernel
   // inlines an attached image only when told, otherwise it names it in text.
   "supportsVision",
+  // Resolved prompt inputs. The host reads the files and applies the byte caps, so
+  // the kernel receives the finished text and must not re-read the workspace.
+  "customSystemPrompt",
+  "projectInstructions",
 ] as const;
 
 /** Launch parameters this app still sends that the kernel has no reader for. */
@@ -71,8 +75,6 @@ export const KNOWN_UNSUPPORTED_PROMPT_PARAMS = [
   "scratchDir",
   "visualizationsDir",
   "compactionSettings",
-  "customSystemPrompt",
-  "projectInstructions",
   "projectMemory",
   "pluginTools",
   "permissionMode",

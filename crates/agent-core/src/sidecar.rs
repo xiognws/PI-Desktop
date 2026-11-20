@@ -774,6 +774,12 @@ impl Sidecar {
             .str_param("systemPrompt")
             .or(config.system.as_deref());
         inputs.skills = skills;
+        // The host resolves both of these — it reads the files, applies its byte caps
+        // and knows the workspace — so the kernel must not re-read them; it only has to
+        // stop dropping what it was handed.
+        let (custom, project) = host_prompt_inputs(&request.params);
+        inputs.custom = custom.as_ref();
+        inputs.project = project.as_ref();
         crate::prompt::build_system_prompt(&fs, &inputs)
     }
 
@@ -2869,6 +2875,28 @@ fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
         ProviderWire::OpenAiCompletions => http_provider(spec, ProviderWire::OpenAiCompletions),
         ProviderWire::AnthropicMessages => http_provider(spec, ProviderWire::AnthropicMessages),
     }
+}
+
+/// The two prompt inputs the host resolves for us: the custom `SYSTEM.md` /
+/// `APPEND_SYSTEM.md` pair and the workspace instruction chain.
+///
+/// Both are parsed rather than trusted. A payload the kernel cannot read is dropped
+/// instead of failing the turn, because missing instructions must degrade to "no
+/// extra rules", never to "no reply". Without this the model answers with the
+/// product prompt alone and never sees the project's `AGENTS.md` chain.
+pub fn host_prompt_inputs(
+    params: &Value,
+) -> (
+    Option<crate::prompt::CustomSystemPrompt>,
+    Option<crate::prompt::ProjectInstructions>,
+) {
+    let custom = params
+        .get("customSystemPrompt")
+        .and_then(|value| serde_json::from_value(value.clone()).ok());
+    let project = params
+        .get("projectInstructions")
+        .and_then(|value| serde_json::from_value(value.clone()).ok());
+    (custom, project)
 }
 
 /// Per-image and per-turn ceilings for inlining an attached image, matching the
