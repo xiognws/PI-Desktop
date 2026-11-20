@@ -29,6 +29,19 @@ pub struct ToolSpec {
     pub name: String,
     pub description: String,
     pub parameters: Value,
+    /// Action names this `plugin_*` tool may run in a contract mode (Plan/Goal).
+    ///
+    /// Upstream counterpart: `PluginToolDef.planSafeActions`
+    /// (`packages/agent-runtime/src/runtime.ts`), the same list the Node runtime
+    /// forwards to host-core (ADR 0211). It never reaches the provider — the
+    /// request bodies in `provider::http` build their declarations field by field
+    /// — so it is a kernel-to-host detail carried on `tools.execute`.
+    ///
+    /// `None` is the fail-closed default: host-core denies a plugin tool in a
+    /// contract mode unless it declares a non-empty list. An empty list means the
+    /// same there, so the two spellings are collapsed into `None` on the way in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan_safe_actions: Option<Vec<String>>,
 }
 
 impl ToolSpec {
@@ -37,7 +50,27 @@ impl ToolSpec {
             name: name.into(),
             description: description.into(),
             parameters,
+            plan_safe_actions: None,
         }
+    }
+
+    /// The same declaration, carrying host-core's Plan/Goal carve-out list.
+    ///
+    /// An empty list is stored as `None`: host-core treats "declared but empty"
+    /// and "not declared" identically, and one spelling keeps every downstream
+    /// `is_some` check honest.
+    pub fn with_plan_safe_actions<I, S>(mut self, actions: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let actions: Vec<String> = actions.into_iter().map(Into::into).collect();
+        self.plan_safe_actions = if actions.is_empty() {
+            None
+        } else {
+            Some(actions)
+        };
+        self
     }
 }
 

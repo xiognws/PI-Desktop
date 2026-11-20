@@ -319,6 +319,15 @@ impl Tool for HostTool {
                 // there.
                 "mode": self.mode,
             });
+            // A plugin tool's Plan/Goal carve-out travels with the call, not with
+            // the session: host-core admits a `plugin_*` tool in a contract mode
+            // only when this list is present and non-empty (ADR 0211), so the key
+            // is sent when the declaration had one and left out otherwise — a
+            // present-but-null or present-but-empty list reads as "declared and
+            // withheld", which is a denial this tool never asked for.
+            if let Some(actions) = &self.spec.plan_safe_actions {
+                params["planSafeActions"] = json!(actions);
+            }
             if self.spec.name == "Bash" {
                 if let Some(shell) = &self.shell {
                     // The identity is what the host compares against the shell it
@@ -399,6 +408,28 @@ fn map_host_rpc_error(error: RpcError) -> AgentError {
     }
 }
 
+/// The Plan/Goal carve-out list a declaration may carry (ADR 0211).
+///
+/// Two spellings, because a declaration arrives either as main stores it
+/// (`plan_safe_actions`, the Rust field name) or as the Node runtime forwards it
+/// (`planSafeActions`, the wire name on `tools.execute`). Anything that is not a
+/// string in the list is dropped rather than failing the declaration — the host's
+/// own reader at `crates/host-core/src/rpc/mod.rs` filters the same way — and a
+/// list that ends up empty is `None`, because host-core denies a plugin tool in a
+/// contract mode on both: "declared and withheld" is not an admission.
+fn plan_safe_actions_from(value: &Value) -> Option<Vec<String>> {
+    ["plan_safe_actions", "planSafeActions"]
+        .iter()
+        .filter_map(|key| value.get(*key).and_then(Value::as_array))
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(str::to_string))
+                .collect::<Vec<String>>()
+        })
+        .find(|actions| !actions.is_empty())
+}
+
 /// Parse a tool declaration sent by main.
 pub fn tool_spec_from_value(value: &Value) -> std::result::Result<ToolSpec, String> {
     // Two spellings mean the same thing: a host may forward a declaration as it
@@ -422,7 +453,9 @@ pub fn tool_spec_from_value(value: &Value) -> std::result::Result<ToolSpec, Stri
         .get("parameters")
         .cloned()
         .unwrap_or_else(|| json!({"type": "object"}));
-    Ok(ToolSpec::new(name, description, parameters))
+    let spec = ToolSpec::new(name, description, parameters);
+    // The same list the Node runtime forwards to host-core on `tools.execute`.
+    Ok(spec.with_plan_safe_actions(plan_safe_actions_from(value).unwrap_or_default()))
 }
 
 /// Helper for tests and the self-check: a tool result built from a host answer.
@@ -481,5 +514,149 @@ mod declaration_shape_tests {
     fn a_declaration_without_a_name_is_refused() {
         assert!(tool_spec_from_value(&json!({"description": "nothing"})).is_err());
         assert!(tool_spec_from_value(&json!({"type": "function", "function": {}})).is_err());
+    }
+}
+
+/// The Plan/Goal carve-out list (ADR 0211): read from a declaration, carried on
+/// `tools.execute`, and absent when the declaration had none.
+#[cfg(test)]
+mod plan_safe_action_tests {
+    use super::*;
+
+    use crate::cancel::CancelToken;
+    use crate::sidecar::RecordingLines;
+
+    fn context() -> ToolContext {
+        ToolContext {
+            session_id: "s1".into(),
+            turn_id: "turn-1".into(),
+            tool_call_id: "call-1".into(),
+            steering: None,
+            cancel: CancelToken::new(),
+        }
+    }
+
+    /// Drive one `HostTool` call as far as its `tools.execute` frame, then answer
+    /// it, and hand back the payload the kernel actually put on the wire.
+    async fn execute_payload(declaration: Value) -> Value {
+        let spec = tool_spec_from_value(&declaration).expect("a plugin declaration");
+        let lines = RecordingLines::new();
+        let bridge = Arc::new(HostBridge::new(Arc::new(lines.clone())));
+        let tool = HostTool::new(spec, bridge.clone()).with_mode("plan");
+        let call = ToolCall {
+            id: "call-1".into(),
+            name: "plugin_acme_notes".into(),
+            arguments: json!({"action": "read"}),
+            raw_arguments: None,
+        };
+        let ctx = context();
+        let running = tokio::spawn(async move { tool.call(&call, &ctx).await });
+
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let frame = loop {
+            let found = lines.host_calls().into_iter().find(|frame| {
+                frame.pointer("/params/method").and_then(Value::as_str) == Some("tools.execute")
+            });
+            if let Some(frame) = found {
+                break frame;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "the kernel never sent `tools.execute`"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        };
+
+        let id = frame
+            .get("id")
+            .and_then(Value::as_str)
+            .expect("the frame's id")
+            .to_string();
+        let payload = frame
+            .pointer("/params/params")
+            .cloned()
+            .expect("the proxied params");
+        // Answer, so the call ends here instead of waiting out the bridge timeout.
+        bridge.complete(&id, Ok(json!({"ok": true, "content": "done"})));
+        assert!(running.await.expect("the call task").is_ok());
+        payload
+    }
+
+    #[test]
+    fn either_spelling_of_the_list_is_read_and_an_empty_one_is_dropped() {
+        // main stores the field as `plan_safe_actions`; the Node runtime sends the
+        // same list as `planSafeActions`. Both are the same declaration.
+        let snake = tool_spec_from_value(&json!({
+            "name": "plugin_acme_notes",
+            "plan_safe_actions": ["read", "search"],
+        }))
+        .expect("a snake_case declaration");
+        assert_eq!(
+            snake.plan_safe_actions,
+            Some(vec!["read".to_string(), "search".to_string()])
+        );
+
+        let camel = tool_spec_from_value(&json!({
+            "name": "plugin_acme_notes",
+            "planSafeActions": ["read", "search"],
+        }))
+        .expect("a camelCase declaration");
+        assert_eq!(camel.plan_safe_actions, snake.plan_safe_actions);
+
+        // An empty list is no list: host-core denies on both, and a declaration
+        // made of nothing but non-strings is the same declaration made of nothing.
+        for declaration in [
+            json!({"name": "p", "planSafeActions": []}),
+            json!({"name": "p", "planSafeActions": [1, null, {"a": 1}]}),
+            json!({"name": "p", "planSafeActions": "read"}),
+            json!({"name": "p"}),
+        ] {
+            let spec = tool_spec_from_value(&declaration).expect("a declaration");
+            assert_eq!(spec.plan_safe_actions, None, "{declaration}");
+        }
+    }
+
+    #[tokio::test]
+    async fn plan_safe_actions_reach_tools_execute_verbatim() {
+        // Without this list on the call, host-core denies a `plugin_*` tool in a
+        // contract mode (permissions.rs, ADR 0211) — the tool the plugin declared
+        // Plan-safe never runs.
+        let payload = execute_payload(json!({
+            "name": "plugin_acme_notes",
+            "description": "Notes",
+            "parameters": {"type": "object"},
+            "planSafeActions": ["read", "search"],
+        }))
+        .await;
+
+        assert_eq!(
+            payload.get("planSafeActions"),
+            Some(&json!(["read", "search"])),
+            "the list must travel byte for byte: {payload}"
+        );
+        // Everything else about the call is unchanged.
+        assert_eq!(payload["toolName"], "plugin_acme_notes");
+        assert_eq!(payload["mode"], "plan");
+        assert_eq!(payload["args"]["action"], "read");
+        assert_eq!(payload["turnId"], "turn-1");
+    }
+
+    #[tokio::test]
+    async fn a_declaration_without_plan_safe_actions_sends_no_key() {
+        // Absent, not null: the host reads a present-but-empty list as "declared
+        // and withheld", and a null one as a malformed declaration.
+        let payload = execute_payload(json!({
+            "name": "plugin_acme_notes",
+            "description": "Notes",
+            "parameters": {"type": "object"},
+        }))
+        .await;
+
+        assert!(
+            payload.get("planSafeActions").is_none(),
+            "a declaration with no list must not send the key: {payload}"
+        );
+        assert_eq!(payload["toolName"], "plugin_acme_notes");
+        assert_eq!(payload["mode"], "plan");
     }
 }
