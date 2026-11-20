@@ -97,6 +97,13 @@ pub struct PromptInputs<'a> {
     /// The skill catalog the session was launched with. Only the id, name and
     /// description travel here; a body is loaded through the `Skill` tool.
     pub skills: &'a [crate::skills::SkillDef],
+    /// The on-demand tool catalog and what is activated, as one block of prose.
+    ///
+    /// Composed by [`crate::tool_activation::ToolActivation::activation_section`]
+    /// and rendered under [`crate::tool_activation::TOOL_ACTIVATION_SECTION`]:
+    /// a tool that is deferred but unlisted is a tool the model will never call,
+    /// so the list is part of the prompt, not an appendix to it.
+    pub tool_activation: Option<&'a str>,
 }
 
 impl PromptInputs<'_> {
@@ -113,6 +120,7 @@ impl PromptInputs<'_> {
             custom: None,
             project: None,
             skills: &[],
+            tool_activation: None,
         }
     }
 }
@@ -206,6 +214,21 @@ pub fn compose_system_prompt(inputs: &PromptInputs<'_>) -> ComposedPrompt {
         sections.push(PromptSection {
             name: "mode",
             text: mode_text.trim().to_string(),
+        });
+    }
+    // Last, deliberately: activation changes while the rest of the prompt does
+    // not, and a block that moves would invalidate the cached prefix of every
+    // section before it. Node appends its activation state for the same reason
+    // (`fixed-tool-declarations.ts`: "Activation is appended ... never inserted
+    // into old instructions").
+    if let Some(activation) = inputs
+        .tool_activation
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    {
+        sections.push(PromptSection {
+            name: crate::tool_activation::TOOL_ACTIVATION_SECTION,
+            text: activation.to_string(),
         });
     }
 

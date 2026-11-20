@@ -6,9 +6,13 @@
 //! nothing to call — so this module owns the declarations, and the host stays the
 //! only place a tool actually runs.
 //!
-//! These bytes are re-sent with **every** request, before the model has read a
-//! single word of the conversation, so the set is held to the smallest form that
-//! still lets the model choose correctly:
+//! These declarations are the *catalog*, not the per-request set: what a request
+//! carries is the core subset plus whatever the session has activated, chosen in
+//! [`crate::tool_activation`] (measured there: 25 declarations / 1 943 tokens
+//! become 7 core / 470 + `ToolSearch` 136 + a 320-token catalogue section). Every
+//! declaration is still held to the smallest form that lets the model choose
+//! correctly, because the core ones are re-sent with **every** request and the
+//! rest are re-read every time one is activated:
 //!
 //! - A description is a verb phrase — what the tool does — and nothing else. *When*
 //!   to use a tool is the model's judgement; restating it in prose is paid for on
@@ -124,8 +128,10 @@ impl ShellIdentity {
 
 /// Byte ceiling for the whole built-in declaration set.
 ///
-/// Every request carries these, so this is a budget, not a preference: it fails
-/// the build's tests when a description grows back into a paragraph. Raised as
+/// The catalog is what gets paid for one tool at a time — core on every request,
+/// the rest when activated — but the ceiling is still a budget, not a preference:
+/// it fails the build's tests when a description grows back into a paragraph, and
+/// a tool that joins the set has to be worth its price in either tier. Raised as
 /// tools landed — 1 250 → 1 500 for `VisionAnalyze`, → 1 750 for `ExecuteCode`,
 /// → 1 950 for `GenerateImages` (the set measures 1 883 with it declared), and
 /// → 3 250 when the six host-executed tools the Node runtime already declared

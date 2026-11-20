@@ -136,6 +136,11 @@ pub struct TurnEngine {
     /// approves calls one by one wants them one at a time, and a log read in call
     /// order is easier to follow.
     parallel_tool_calls: bool,
+    /// Which declarations each request carries, and which of them the model has
+    /// activated. `None` declares the whole registry, which is what the
+    /// self-check, the compaction turn and a subagent want: none of them is in
+    /// the on-demand business.
+    activation: Option<Arc<crate::tool_activation::ToolActivation>>,
 }
 
 impl TurnEngine {
@@ -156,7 +161,18 @@ impl TurnEngine {
             completion: None,
             repeats: None,
             parallel_tool_calls: false,
+            activation: None,
         }
+    }
+
+    /// Declare only the core tools plus whatever this session has activated.
+    ///
+    /// The declarations are re-read on every step, not once per turn: the model
+    /// activates a tool mid-turn with `ToolSearch`, and the next request in the
+    /// same turn has to carry it or the activation did nothing.
+    pub fn with_tool_activation(mut self, activation: Arc<crate::tool_activation::ToolActivation>) -> Self {
+        self.activation = Some(activation);
+        self
     }
 
     /// Attach the queue a steer lands in. Without it the turn ignores steering
@@ -398,7 +414,11 @@ impl TurnEngine {
             }
             let mut request = ChatRequest::new(&config.model, aged.messages);
             request.system = config.system.clone();
-            request.tools = self.tools.specs();
+            // Re-read every step: `ToolSearch` changes this set mid-turn.
+            request.tools = match &self.activation {
+                Some(activation) => activation.declared(),
+                None => self.tools.specs(),
+            };
             request.temperature = config.temperature;
             request.max_output_tokens = config.max_output_tokens;
             request.thinking = config.thinking;
@@ -734,6 +754,21 @@ impl TurnEngine {
         let mut pending: Vec<(usize, ToolCall)> = Vec::new();
 
         for (index, call) in calls.iter().enumerate() {
+            // A declaration is not activation: a tool the prompt listed as
+            // on-demand, and the model did not switch on, is refused here rather
+            // than executed. Node applies the same rule (`runtime.ts:3241`).
+            if let Some(activation) = &self.activation {
+                if activation.blocks(&call.name) {
+                    slots[index] = Some(ToolResult {
+                        call_id: call.id.clone(),
+                        name: call.name.clone(),
+                        content: crate::tool_activation::ToolActivation::refusal(&call.name),
+                        is_error: true,
+                        truncated: false,
+                    });
+                    continue;
+                }
+            }
             let cached = repeats
                 .as_mut()
                 .and_then(|guard| guard.previous(call).map(str::to_string));

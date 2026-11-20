@@ -31,7 +31,7 @@ use crate::provider::scripted::ScriptedProvider;
 use crate::provider::{BoxFuture, Provider, StreamEvent};
 use crate::rpc::{self, Request, RpcError};
 use crate::session::Transcript;
-use crate::tool::{AllowAll, PermissionGate, ToolRegistry};
+use crate::tool::{AllowAll, PermissionGate, ToolRegistry, ToolSpec};
 use crate::turn::{TurnConfig, TurnEngine};
 use crate::ThinkingLevel;
 
@@ -270,6 +270,14 @@ struct Session {
     /// main has since said about it. Written by `agent.prompt` (`modeTurn`) and by
     /// `agent.modeTurnNotice`; the run itself belongs to host-core.
     mode_run: Mutex<ModeRun>,
+    /// The on-demand tools this session has switched on with `ToolSearch`.
+    ///
+    /// Sticky for the session, as in the Node runtime (`resetDeferredToolsForPrompt`,
+    /// #1225): activation that resets on every prompt leaves the model calling
+    /// tools the next request no longer declares. Names are intersected with the
+    /// live catalog when they are read, so a mode switch cannot resurrect a tool
+    /// that mode withholds.
+    active_tools: Arc<Mutex<std::collections::BTreeSet<String>>>,
 }
 
 /// The run turn one prompt claimed: which run, and which stage of it.
@@ -312,6 +320,7 @@ impl Session {
             plan: Arc::new(crate::plan::PlanState::new()),
             checkpoints: Mutex::new(crate::checkpoint::CheckpointStore::default()),
             mode_run: Mutex::new(ModeRun::default()),
+            active_tools: crate::tool_activation::ToolActivation::empty_active(),
         }
     }
 }
@@ -344,10 +353,31 @@ impl EventSink for NotificationSink {
     }
 }
 
+/// What a session's own tools are built from.
+///
+/// Named rather than passed as seven positional arguments: `agent.prompt` and
+/// `agent.tokenReport` build the same set, and a caller that swapped two
+/// `&Arc<…>` parameters would still compile.
+struct SessionToolInputs<'a> {
+    request: &'a Request,
+    mode: &'a crate::prompt::SessionMode,
+    catalog: &'a [crate::skills::SkillDef],
+    session: &'a Arc<Session>,
+    provider: Arc<dyn Provider>,
+    config: &'a RuntimeConfig,
+    tools: &'a Arc<ToolRegistry>,
+}
+
 pub struct Sidecar {
     out: Arc<dyn LineSink>,
     provider: Mutex<Option<Arc<dyn Provider>>>,
     tools: Mutex<Arc<ToolRegistry>>,
+    /// What the host declared, apart from what this kernel installed.
+    ///
+    /// `agent.tokenReport` answers "what would a prompt in this mode declare",
+    /// and a built-in this kernel added for some *other* mode must not be counted
+    /// there — which is exactly what reading the live registry did.
+    host_specs: Mutex<Vec<ToolSpec>>,
     gate: Arc<dyn PermissionGate>,
     bridge: Arc<HostBridge>,
     config: Mutex<RuntimeConfig>,
@@ -403,6 +433,7 @@ impl Sidecar {
             tools: Mutex::new(Arc::new(
                 ToolRegistry::new(gate.clone()).with_exec_policy(exec_policy.clone()),
             )),
+            host_specs: Mutex::new(Vec::new()),
             gate,
             config: Mutex::new(RuntimeConfig::new()),
             sessions: Mutex::new(HashMap::new()),
@@ -670,6 +701,11 @@ impl Sidecar {
             ));
         }
         let count = declarations.len();
+        // This registry holds the host's declarations and nothing else, so it is
+        // also the record of what the host declared.
+        if let Ok(mut host) = self.host_specs.lock() {
+            *host = registry.specs();
+        }
         *self
             .tools
             .lock()
@@ -692,8 +728,15 @@ impl Sidecar {
     /// Read-only and side-effect free: it composes the prompt this session would
     /// send and prices it. Nothing here trims or reorders — the report is what
     /// makes the next change defensible.
+    ///
+    /// Both halves are priced as they *would* be if the caller sent a prompt in
+    /// `mode` now. `mode` used to change only the prompt text while the tools came
+    /// from the live registry, which holds whatever the previous prompt installed:
+    /// a Plan report after an Agent turn counted `Write` and `Edit`, tools Plan
+    /// never declares. The declarations are rebuilt here from the same three
+    /// sources `prompt` installs, and split the same way the turn splits them.
     fn token_report(&self, request: &Request) -> Result<Value, RpcError> {
-        let session_id = request.require_str("sessionId")?;
+        let session_id = request.require_str("sessionId")?.to_string();
         let config = self
             .config
             .lock()
@@ -701,20 +744,76 @@ impl Sidecar {
             .clone();
         let catalog = crate::skills::parse_catalog(request.params.get("pluginSkills"));
         let mode = crate::prompt::SessionMode::parse(request.str_param("mode"));
-        let composed = self.compose_prompt(request, &config, mode, &catalog);
-        let tools = self
+        // What the host declared...
+        let mut specs = self
+            .host_specs
+            .lock()
+            .map_err(|_| RpcError::internal("tool lock poisoned"))?
+            .clone();
+        // ...plus this mode's built-ins...
+        let shell = crate::builtin_tools::ShellIdentity::from_params(&request.params)
+            .or_else(|| self.shell_identity());
+        for declaration in crate::builtin_tools::declarations(mode.clone(), shell.as_ref()) {
+            push_unique_spec(
+                &mut specs,
+                tool_spec_from_value(&declaration).map_err(RpcError::invalid_params)?,
+            );
+        }
+        // ...plus this session's own tools.
+        let registry = self
             .tools
             .lock()
             .map_err(|_| RpcError::internal("tool lock poisoned"))?
-            .specs();
-        // A turn in flight holds the transcript; the report then says what it can
-        // rather than blocking the question behind the work being measured.
-        let history = match self
+            .clone();
+        let session = self
             .sessions
             .lock()
             .map_err(|_| RpcError::internal("session lock poisoned"))?
-            .get(session_id)
+            .get(&session_id)
+            .cloned();
+        // The previous prompt's provider is the fallback: a report priced without
+        // one would miss the delegation tools the same prompt declares.
+        let provider = match request
+            .params
+            .get("provider")
+            .filter(|value| !value.is_null())
         {
+            Some(spec) => Some(build_provider(spec)?),
+            None => self
+                .provider
+                .lock()
+                .ok()
+                .and_then(|provider| provider.clone()),
+        };
+        if let (Some(session), Some(provider)) = (&session, provider) {
+            for tool in self.session_tools(SessionToolInputs {
+                request,
+                mode: &mode,
+                catalog: &catalog,
+                session,
+                provider,
+                config: &config,
+                tools: &registry,
+            }) {
+                push_unique_spec(&mut specs, tool.spec());
+            }
+        }
+        let activation = crate::tool_activation::ToolActivation::new(
+            &mode,
+            specs,
+            session
+                .as_ref()
+                .map(|session| session.active_tools.clone())
+                .unwrap_or_else(crate::tool_activation::ToolActivation::empty_active),
+        );
+        let section = activation.activation_section();
+        let composed = self.compose_prompt(request, &config, mode, &catalog, section.as_deref());
+        // What one request in this mode carries: core, the activated tools, and
+        // `ToolSearch` when anything is deferred.
+        let declared = activation.declared();
+        // A turn in flight holds the transcript; the report then says what it can
+        // rather than blocking the question behind the work being measured.
+        let history = match &session {
             Some(session) => session
                 .transcript
                 .try_lock()
@@ -724,7 +823,7 @@ impl Sidecar {
         };
         let cost = crate::token_report::RequestCost {
             system: crate::token_report::system_cost(&composed),
-            tools: crate::token_report::tools_cost(&tools),
+            tools: crate::token_report::tools_cost(&declared),
             history: crate::token_report::history_cost(&history),
             memory: None,
         };
@@ -747,6 +846,23 @@ impl Sidecar {
                 "agedResults": aged.aged,
                 "charsElided": aged.chars_elided,
             },
+        });
+        // The tools an activation would add, priced but not charged: this is the
+        // headroom the split buys, and it has to be visible or the saving is a
+        // claim rather than a measurement.
+        let deferred = activation.deferred_specs().to_vec();
+        let deferred_cost = crate::token_report::RequestCost {
+            system: Vec::new(),
+            tools: crate::token_report::tools_cost(&deferred),
+            history: Vec::new(),
+            memory: None,
+        };
+        report["onDemand"] = deferred_cost.to_json()["tools"].clone();
+        report["declarations"] = serde_json::json!({
+            "declared": declared.len(),
+            "core": activation.core_specs().len(),
+            "onDemand": deferred.len(),
+            "active": activation.active_names().len(),
         });
         Ok(report)
     }
@@ -785,6 +901,135 @@ impl Sidecar {
         Ok(())
     }
 
+    /// The tools a session exists for: delegation, the skill library, the
+    /// checklist, the plan hand-off, asking, and memory.
+    ///
+    /// One builder for two callers — [`Self::prompt`], which registers them, and
+    /// [`Self::token_report`], which prices them. Two builders would drift, and a
+    /// report that priced a set the prompt never installs is the bug this path
+    /// exists to fix.
+    fn session_tools(&self, inputs: SessionToolInputs<'_>) -> Vec<Arc<dyn crate::Tool>> {
+        let SessionToolInputs {
+            request,
+            mode,
+            catalog,
+            session,
+            provider,
+            config,
+            tools,
+        } = inputs;
+        // A delegate reruns this session's model, so it needs the retry policy
+        // the prompt was launched with.
+        let infinite_provider_retry = request
+            .params
+            .get("infiniteProviderRetry")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let mut extra: Vec<Arc<dyn crate::Tool>> = Vec::new();
+        let subagents = parse_subagents(request);
+        if !subagents.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
+            // A delegate runs its own turn with the session's provider and only
+            // the tools its definition declares.
+            let hub = Arc::new(crate::delegate::DelegationHub::new(
+                session.delegations.clone(),
+                subagents,
+                Arc::new(SidecarDelegateRunner {
+                    provider,
+                    tools: tools.clone(),
+                    sink: Arc::new(NotificationSink {
+                        out: self.out.clone(),
+                    }),
+                    model: config.model.clone(),
+                    model_limits: model_limits_from(request),
+                    guidance: Vec::new(),
+                    infinite_provider_retry,
+                    cache: crate::provider::CacheRetention::resolve(
+                        request.str_param("cacheRetention"),
+                        std::env::var("PI_CACHE_RETENTION").ok().as_deref(),
+                    ),
+                }),
+            ));
+            extra.push(Arc::new(crate::delegate::TaskTool::new(hub.clone())));
+            extra.push(Arc::new(crate::delegate::TaskWaitTool::new(hub.clone())));
+            extra.push(Arc::new(crate::delegate::TaskListTool::new(hub.clone())));
+            extra.push(Arc::new(crate::delegate::TaskStopTool::new(hub)));
+        }
+        // `Skill` exists only when a library exists, and only in the mode that may
+        // write one — the same gate the desktop runtime uses. A tool whose only
+        // honest answer is "there is nothing here" is noise in every request.
+        if !catalog.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
+            // An id lookup is forwarded to the host's own `Skill` handler when
+            // main declared one; the listing is answered here.
+            let load = tools.get(crate::skills::SKILL_TOOL_NAME);
+            extra.push(Arc::new(crate::skills::SkillTool::new(
+                session.skills.clone(),
+                load,
+            )));
+        }
+        // The session checklist is the host's tool, not the kernel's: `TodoWrite`
+        // is the Node runtime's name and argument shape, host-core normalizes the
+        // list and writes it, and the kernel only relays the call — the same path
+        // `Read` and `Bash` take. Agent mode only: host-core refuses a write from
+        // a Plan or Goal session, and the Node runtime withholds the tool there
+        // too (`mode-tool-access.ts`, `RETAINED_MODE_TOOLS`).
+        if matches!(mode, crate::prompt::SessionMode::Agent) {
+            extra.push(Arc::new(crate::plan::TodoWriteTool::new(
+                self.bridge.clone(),
+                session.plan.clone(),
+            )));
+        }
+        // A Plan turn's whole purpose is to hand its plan over. The host owns the
+        // `.pi/plan` artifact and the review, so `SubmitPlan` — forwarding
+        // `plans.submit` — is the only path that opens the approval gate. It is
+        // registered in Plan mode alone, the same gate the Node runtime applies:
+        // an Agent turn that could submit would reopen an approval the user
+        // already gave.
+        if matches!(mode, crate::prompt::SessionMode::Plan) {
+            let host: Arc<dyn crate::plan::PlanHost> = self.bridge.clone();
+            extra.push(Arc::new(crate::plan::SubmitPlanTool::new(
+                host,
+                session.plan.clone(),
+                Arc::new(NotificationSink {
+                    out: self.out.clone(),
+                }),
+            )));
+        }
+        // `asktool` is available in Agent, Plan and Goal mode: asking is not an
+        // authorization, so a plan turn may ask what the user wants.
+        if matches!(
+            mode,
+            crate::prompt::SessionMode::Agent
+                | crate::prompt::SessionMode::Plan
+                | crate::prompt::SessionMode::Goal
+        ) {
+            extra.push(Arc::new(crate::ask::AskTool::new(self.asks.clone())));
+        }
+        if matches!(mode, crate::prompt::SessionMode::Agent) {
+            // The skill library's writer: every action is a `skills.*` RPC, so
+            // the runtime, the UI and a background review share one path rule.
+            extra.push(Arc::new(crate::skill_manage::SkillManageTool::new(
+                self.bridge.clone(),
+                request
+                    .str_param("projectPath")
+                    .or_else(|| request.str_param("workspaceRoot"))
+                    .map(str::to_string),
+            )));
+        }
+        if matches!(mode, crate::prompt::SessionMode::Agent) {
+            // Memory writes and reads are host RPCs; the store, the dedupe and
+            // the scope filtering stay in one place.
+            extra.push(Arc::new(crate::memory::MemoryTool::new(
+                self.bridge.clone(),
+                request
+                    .str_param("projectPath")
+                    .or_else(|| request.str_param("workspaceRoot"))
+                    .map(str::to_string),
+                session.skills.clone(),
+            )));
+        }
+        extra
+    }
+
     /// Build the system prompt for one turn from the request's session inputs.
     ///
     /// The real product prompt, the instruction chain and the mode rules are
@@ -795,6 +1040,7 @@ impl Sidecar {
         config: &RuntimeConfig,
         mode: crate::prompt::SessionMode,
         skills: &[crate::skills::SkillDef],
+        tool_activation: Option<&str>,
     ) -> crate::prompt::ComposedPrompt {
         let fs: Arc<dyn crate::prompt::PromptFs> = Arc::new(crate::prompt::StdFs);
         let workspace_root = request
@@ -814,6 +1060,7 @@ impl Sidecar {
             .str_param("systemPrompt")
             .or(config.system.as_deref());
         inputs.skills = skills;
+        inputs.tool_activation = tool_activation;
         // The host resolves both of these — it reads the files, applies its byte caps
         // and knows the workspace — so the kernel must not re-read them; it only has to
         // stop dropping what it was handed.
@@ -1098,18 +1345,9 @@ impl Sidecar {
         let catalog = crate::skills::parse_catalog(request.params.get("pluginSkills"));
         session.skills.replace(catalog.clone());
         let mode = crate::prompt::SessionMode::parse(request.str_param("mode"));
-        // Compose the system prompt for this turn: persona, custom append, tool
-        // guidance, the project instruction chain, the skill catalog and the
-        // mode's rules.
-        let composed = self.compose_prompt(request, &config, mode.clone(), &catalog);
-        if !composed.system.trim().is_empty() {
-            config.system = Some(composed.system.clone());
-        }
-        // The prompt the model receives is journaled before dispatch: nothing in
-        // the transcript shows it, so without this row a restored session cannot
-        // reproduce what it ran with, and a support bundle cannot show it.
-        self.journal_system_prompt(request, &session, &composed, session_id.as_str(), &turn_id)
-            .await?;
+        // The system prompt is composed further down: the on-demand tool
+        // catalogue is a section of it, and that catalogue is only known once
+        // this session's own tools have been registered.
         if let Some(model) = request.str_param("modelId").or_else(|| {
             request
                 .params
@@ -1153,119 +1391,60 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("tool lock poisoned"))?
             .clone();
-        // `Skill` exists only when a library exists, and only in the mode that may
-        // write one — the same gate the desktop runtime uses. A tool whose only
-        // honest answer is "there is nothing here" is noise in every request.
-        // Read the retry policy here: the spawned task cannot borrow `request`.
-        let infinite_provider_retry = request
-            .params
-            .get("infiniteProviderRetry")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let subagents = parse_subagents(request);
-        let mut extra: Vec<Arc<dyn crate::Tool>> = Vec::new();
-        if !subagents.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
-            // A delegate runs its own turn with the session's provider and only
-            // the tools its definition declares.
-            let hub = Arc::new(crate::delegate::DelegationHub::new(
-                session.delegations.clone(),
-                subagents,
-                Arc::new(SidecarDelegateRunner {
-                    provider: provider.clone(),
-                    tools: tools.clone(),
-                    sink: Arc::new(NotificationSink {
-                        out: self.out.clone(),
-                    }),
-                    model: config.model.clone(),
-                    model_limits: model_limits_from(request),
-                    guidance: Vec::new(),
-                    infinite_provider_retry,
-                    cache: crate::provider::CacheRetention::resolve(
-                        request.str_param("cacheRetention"),
-                        std::env::var("PI_CACHE_RETENTION").ok().as_deref(),
-                    ),
-                }),
-            ));
-            extra.push(Arc::new(crate::delegate::TaskTool::new(hub.clone())));
-            extra.push(Arc::new(crate::delegate::TaskWaitTool::new(hub.clone())));
-            extra.push(Arc::new(crate::delegate::TaskListTool::new(hub.clone())));
-            extra.push(Arc::new(crate::delegate::TaskStopTool::new(hub)));
-        }
-        if !catalog.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
-            // An id lookup is forwarded to the host's own `Skill` handler when
-            // main declared one; the listing is answered here.
-            let load = tools.get(crate::skills::SKILL_TOOL_NAME);
-            extra.push(Arc::new(crate::skills::SkillTool::new(
-                session.skills.clone(),
-                load,
-            )));
-        }
-        // The session checklist is the host's tool, not the kernel's: `TodoWrite`
-        // is the Node runtime's name and argument shape, host-core normalizes the
-        // list and writes it, and the kernel only relays the call — the same path
-        // `Read` and `Bash` take. Agent mode only: host-core refuses a write from
-        // a Plan or Goal session, and the Node runtime withholds the tool there
-        // too (`mode-tool-access.ts`, `RETAINED_MODE_TOOLS`).
-        if matches!(mode, crate::prompt::SessionMode::Agent) {
-            extra.push(Arc::new(crate::plan::TodoWriteTool::new(
-                self.bridge.clone(),
-                session.plan.clone(),
-            )));
-        }
-        // A Plan turn's whole purpose is to hand its plan over. The host owns the
-        // `.pi/plan` artifact and the review, so `SubmitPlan` — forwarding
-        // `plans.submit` — is the only path that opens the approval gate. It is
-        // registered in Plan mode alone, the same gate the Node runtime applies:
-        // an Agent turn that could submit would reopen an approval the user
-        // already gave.
-        if matches!(mode, crate::prompt::SessionMode::Plan) {
-            let host: Arc<dyn crate::plan::PlanHost> = self.bridge.clone();
-            extra.push(Arc::new(crate::plan::SubmitPlanTool::new(
-                host,
-                session.plan.clone(),
-                Arc::new(NotificationSink {
-                    out: self.out.clone(),
-                }),
-            )));
-        }
-        // `asktool` is available in Agent, Plan and Goal mode: asking is not an
-        // authorization, so a plan turn may ask what the user wants.
-        if matches!(
-            mode,
-            crate::prompt::SessionMode::Agent
-                | crate::prompt::SessionMode::Plan
-                | crate::prompt::SessionMode::Goal
-        ) {
-            extra.push(Arc::new(crate::ask::AskTool::new(self.asks.clone())));
-        }
-        if matches!(mode, crate::prompt::SessionMode::Agent) {
-            // The skill library's writer: every action is a `skills.*` RPC, so
-            // the runtime, the UI and a background review share one path rule.
-            extra.push(Arc::new(crate::skill_manage::SkillManageTool::new(
-                self.bridge.clone(),
-                request
-                    .str_param("projectPath")
-                    .or_else(|| request.str_param("workspaceRoot"))
-                    .map(str::to_string),
-            )));
-        }
-        if matches!(mode, crate::prompt::SessionMode::Agent) {
-            // Memory writes and reads are host RPCs; the store, the dedupe and
-            // the scope filtering stay in one place.
-            extra.push(Arc::new(crate::memory::MemoryTool::new(
-                self.bridge.clone(),
-                request
-                    .str_param("projectPath")
-                    .or_else(|| request.str_param("workspaceRoot"))
-                    .map(str::to_string),
-                session.skills.clone(),
-            )));
-        }
-        let tools = if extra.is_empty() {
+        // This session's own tools: delegation, the skill library, the checklist,
+        // the plan hand-off, asking, and memory. Registered before the prompt is
+        // composed, because the declaration policy below has to see the whole
+        // catalog to say which of it is core.
+        let extras = self.session_tools(SessionToolInputs {
+            request,
+            mode: &mode,
+            catalog: &catalog,
+            session: &session,
+            provider: provider.clone(),
+            config: &config,
+            tools: &tools,
+        });
+        let tools = if extras.is_empty() {
             tools
         } else {
-            Arc::new(tools.extended(extra))
+            Arc::new(tools.extended(extras))
         };
+        // Core declarations on every request, the rest on demand. The object is
+        // also what refuses a call to a tool the model never activated, so the
+        // turn below gets it too.
+        let activation = Arc::new(crate::tool_activation::ToolActivation::new(
+            &mode,
+            tools.specs(),
+            session.active_tools.clone(),
+        ));
+        // `ToolSearch` is the only way a deferred tool becomes declared, and the
+        // kernel answers it itself: it changes this session's set, not a file.
+        let tools = if activation.deferred_specs().is_empty() {
+            tools
+        } else {
+            Arc::new(tools.extended(vec![Arc::new(
+                crate::tool_activation::ToolSearchTool::new(activation.clone()),
+            )]))
+        };
+        let activation_section = activation.activation_section();
+        // Compose the system prompt for this turn: persona, custom append, tool
+        // guidance, the project instruction chain, the skill catalog, the mode's
+        // rules and the on-demand tool catalogue.
+        let composed = self.compose_prompt(
+            request,
+            &config,
+            mode.clone(),
+            &catalog,
+            activation_section.as_deref(),
+        );
+        if !composed.system.trim().is_empty() {
+            config.system = Some(composed.system.clone());
+        }
+        // The prompt the model receives is journaled before dispatch: nothing in
+        // the transcript shows it, so without this row a restored session cannot
+        // reproduce what it ran with, and a support bundle cannot show it.
+        self.journal_system_prompt(request, &session, &composed, session_id.as_str(), &turn_id)
+            .await?;
         // Keep the pieces the background review needs: the engine takes
         // ownership of the provider and the tool set below.
         let review_provider = provider.clone();
@@ -1280,7 +1459,8 @@ impl Sidecar {
                 out: self.out.clone(),
             }),
         )
-        .with_steering(session.clone());
+        .with_steering(session.clone())
+        .with_tool_activation(activation);
         // Main stamps the session's model window on the prompt; without it the
         // loop has no budget to enforce and would never compact.
         let engine = match model_limits_from(request) {
@@ -3191,6 +3371,17 @@ fn provider_wire(spec: &Value) -> Result<ProviderWire, RpcError> {
         API_STYLE_ANTHROPIC_MESSAGES => ProviderWire::AnthropicMessages,
         _ => ProviderWire::OpenAiCompletions,
     })
+}
+
+/// Add `spec` unless a declaration of that name is already in the set.
+///
+/// Two sources declare the same name when the host describes a tool this kernel
+/// also ships; the host's wins (`prompt` installs it first), so the second copy
+/// is dropped rather than billed twice.
+fn push_unique_spec(specs: &mut Vec<ToolSpec>, spec: ToolSpec) {
+    if !specs.iter().any(|existing| existing.name == spec.name) {
+        specs.push(spec);
+    }
 }
 
 fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {

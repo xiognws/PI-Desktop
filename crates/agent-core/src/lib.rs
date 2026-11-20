@@ -69,6 +69,7 @@ pub mod steering;
 pub mod super_agent;
 pub mod token_report;
 pub mod tool;
+pub mod tool_activation;
 pub mod tool_use;
 pub mod turn;
 pub mod verify;
@@ -88,6 +89,7 @@ pub use skills::{SkillCatalog, SkillDef, SkillTool, SKILL_TOOL_NAME};
 pub use tool::{
     AllowAll, DenyList, Permission, PermissionGate, Tool, ToolContext, ToolRegistry, ToolSpec,
 };
+pub use tool_activation::{ToolActivation, ToolSearchTool, TOOL_SEARCH_NAME};
 pub use turn::{SteeringSource, TurnConfig, TurnEngine, TurnOutcome};
 
 /// Crate version, surfaced by the sidecar handshake.
