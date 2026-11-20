@@ -1,7 +1,7 @@
 import type { BrowserWindow, WebContents } from "electron";
 import type { BrowserState } from "@pi-workspace/shared";
-import type { BrowserPane } from "./browser-view";
-import { BrowserCdp } from "./browser-cdp";
+import type { BrowserPane } from "./browser-view.ts";
+import { BrowserCdp } from "./browser-cdp.ts";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -11,6 +11,17 @@ export const BROWSER_VIEW_ID = "browser";
 const BROWSER_REVEAL_TIMEOUT_MS = 5_000;
 const BROWSER_CDP_TIMEOUT_MS = 30_000;
 const DEFAULT_BROWSER_TAB_ID = "plugin:pi.browser/browser";
+/**
+ * How many guest pages keep a live `WebContents`.
+ *
+ * Pages are keyed by `(session, tab)` and nothing used to evict them, so a user
+ * who browses across sessions and previews accumulated one renderer process per
+ * tab for the whole app run. A tab that is evicted keeps its place in the tab
+ * list and its last location: only the `WebContents` (and the renderer behind
+ * it) goes, and switching back re-navigates the way a restored tab does. The
+ * plugin view host bounds its cached views the same way (`MAX_LIVE_VIEWS`).
+ */
+const MAX_LIVE_GUEST_PAGES = 4;
 
 export type BrowserRect = {
   x: number;
@@ -118,6 +129,15 @@ type BrowserPage = {
   started: boolean;
   navigationVersion: number;
   navigating: boolean;
+  /** Recency marker for guest eviction; monotonic, not a wall clock. */
+  lastUsedAt: number;
+};
+
+/** A tab whose guest was evicted: the tab remains, its renderer process does not. */
+type SuspendedPage = {
+  sessionId: string;
+  tabId: string | null;
+  state: BrowserState | null;
 };
 
 /**
@@ -167,6 +187,10 @@ function captureScreenshotWithDeadline<T>(
 export class BrowserHost {
   private readonly deps: BrowserHostDeps;
   private readonly pages = new Map<string, BrowserPage>();
+  /** Tabs whose guest was evicted, keeping their place in the tab list. */
+  private readonly suspended = new Map<string, SuspendedPage>();
+  /** Monotonic recency cursor for guest eviction. */
+  private useCursor = 0;
   private readonly locations = new Map<string, string>();
   private readonly selectedTabs = new Map<string, string | null>();
   private readonly connectedTabs = new Map<string, string | null>();
@@ -293,10 +317,19 @@ export class BrowserHost {
   private pageFor(sessionId: string, tabId: string | null): BrowserPage {
     const key = this.key(sessionId, tabId);
     const existing = this.pages.get(key);
-    if (existing) return existing;
+    if (existing) {
+      existing.lastUsedAt = ++this.useCursor;
+      return existing;
+    }
+    this.evictBeyondLimit(key);
+    // A tab coming back from eviction keeps the state the user last saw, so the
+    // panel does not flash empty before the restore navigation lands.
+    const resumed = this.suspended.get(key);
+    this.suspended.delete(key);
     const page: BrowserPage = {
-      key, sessionId, tabId, cdp: new BrowserCdp(), state: null,
+      key, sessionId, tabId, cdp: new BrowserCdp(), state: resumed?.state ?? null,
       started: false, navigationVersion: 0, navigating: false,
+      lastUsedAt: ++this.useCursor,
       pane: this.deps.createPane(
         (state) => {
           if (this.pages.get(key) !== page) return;
@@ -312,6 +345,45 @@ export class BrowserHost {
     page.pane.setWindow(this.window);
     this.pages.set(key, page);
     return page;
+  }
+
+  /**
+   * Free a guest slot before a new page takes one.
+   *
+   * The visible page and the tab its session is connected to are never
+   * candidates: the first is on screen, and the second is the page the agent's
+   * browser calls resolve to. A tab that is neither keeps its place in the tab
+   * list — only its `WebContents`, and the renderer process behind it, goes.
+   */
+  private evictBeyondLimit(keepKey: string): void {
+    while (this.pages.size >= MAX_LIVE_GUEST_PAGES) {
+      const candidates = [...this.pages.values()]
+        .filter((page) =>
+          page.key !== keepKey &&
+          page !== this.active &&
+          this.connectedTabs.get(page.sessionId) !== page.tabId)
+        .sort((a, b) => a.lastUsedAt - b.lastUsedAt);
+      const oldest = candidates[0];
+      // Everything left is on screen or connected to its session; the bound
+      // yields rather than dropping a page someone is looking at or using.
+      if (!oldest) return;
+      this.suspendPage(oldest);
+    }
+  }
+
+  /** Drop one guest, keeping the tab and the state it last reported. */
+  private suspendPage(page: BrowserPage): void {
+    if (this.pages.get(page.key) !== page) return;
+    this.pages.delete(page.key);
+    this.suspended.set(page.key, {
+      sessionId: page.sessionId,
+      tabId: page.tabId,
+      state: page.state,
+    });
+    page.navigationVersion += 1;
+    page.cdp.detach(page.pane.getWebContents() ?? undefined);
+    page.pane.dispose();
+    if (this.active === page) this.active = null;
   }
 
   private publishPage(page: BrowserPage): void {
@@ -496,11 +568,40 @@ export class BrowserHost {
   /** Rehydrate side-panel tabs after a renderer reload; DOM stays in Main. */
   getPages(sessionId: string): BrowserState[] {
     if (!this.deps.isPluginLoaded(BROWSER_PLUGIN_ID)) return [];
-    return [...this.pages.values()].filter((page) => page.sessionId === sessionId && page.tabId !== null)
-      .map((page) => this.stateFor(page) ?? {
-        url: "", title: "", isLoading: page.navigating, canGoBack: false, canGoForward: false,
-        ...this.contextFor(page),
+    // Ordered by first creation (`locations`), so an evicted tab keeps its slot
+    // in the panel instead of jumping to the end of the list.
+    const ordered: string[] = [];
+    for (const key of this.locations.keys()) {
+      if (this.pages.has(key) || this.suspended.has(key)) ordered.push(key);
+    }
+    for (const key of [...this.pages.keys(), ...this.suspended.keys()]) {
+      if (!ordered.includes(key)) ordered.push(key);
+    }
+    const states: BrowserState[] = [];
+    for (const key of ordered) {
+      const page = this.pages.get(key);
+      if (page) {
+        if (page.sessionId !== sessionId || page.tabId === null) continue;
+        states.push(this.stateFor(page) ?? {
+          url: "", title: "", isLoading: page.navigating, canGoBack: false, canGoForward: false,
+          ...this.contextFor(page),
+        });
+        continue;
+      }
+      const parked = this.suspended.get(key);
+      if (!parked || parked.sessionId !== sessionId || parked.tabId === null) continue;
+      states.push({
+        url: parked.state?.url ?? this.locations.get(key) ?? "",
+        title: parked.state?.title ?? "",
+        isLoading: false,
+        canGoBack: parked.state?.canGoBack ?? false,
+        canGoForward: parked.state?.canGoForward ?? false,
+        ...(parked.state?.loadError ? { loadError: parked.state.loadError } : {}),
+        sessionId,
+        tabId: parked.tabId ?? undefined,
       });
+    }
+    return states;
   }
 
   openExternal(sessionId?: string, tabId?: string): void {
@@ -594,6 +695,7 @@ export class BrowserHost {
       if (this.active === page) this.active = null;
     }
     this.locations.delete(key);
+    this.suspended.delete(key);
     if (this.selectedTabs.get(sessionId) === tabId) this.selectedTabs.delete(sessionId);
     if (this.connectedTabs.get(sessionId) === tabId) this.connectedTabs.delete(sessionId);
   }
@@ -607,6 +709,9 @@ export class BrowserHost {
     this.connectedTabs.delete(sessionId);
     for (const key of this.locations.keys()) {
       if (JSON.parse(key)[0] === sessionId) this.locations.delete(key);
+    }
+    for (const [key, parked] of this.suspended) {
+      if (parked.sessionId === sessionId) this.suspended.delete(key);
     }
   }
 
@@ -634,6 +739,7 @@ export class BrowserHost {
       page.pane.dispose();
     }
     this.pages.clear();
+    this.suspended.clear();
     this.locations.clear();
     this.selectedTabs.clear();
     this.connectedTabs.clear();
