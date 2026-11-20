@@ -8692,3 +8692,34 @@ machines quarantined the binary as `PDM:Trojan.Win32.Generic`.
   `cn.star.computer-use` plugin, which is a separately installed surface.
 - The desktop-automation non-goal returns: no built-in screen capture or
   synthetic input into other applications.
+
+## 2026-11-20 — The Rust kernel replaces the Node agent runtime (D701)
+
+The agent is now `crates/agent-core` — the Nubo kernel, copied into this
+repository and built by the same cargo workspace as host-core — shipped as
+`<resources>/agent-core/nubo-proto[.exe]` and started with `serve` over the
+stdio NDJSON JSON-RPC transport the Node sidecar already used. See ADR 0403.
+
+- Ownership does not move. The kernel is a turn engine: host-core keeps the
+  session store, tool execution, permissions, approval and filesystem leases, and
+  the kernel reaches them only through `host.proxy` (`session.get`,
+  `tools.execute`, `tools.abort`). Electron main keeps persisting `agent.event`
+  frames into host-core, so a tool call still cannot skip the permission gate and
+  a reopened session still gets its transcript back.
+- Adaptation lives in `apps/desktop/electron/main/kernel/`: `kernel-adapter.ts`
+  turns the kernel's message and event vocabulary into `AgentEventEnvelope` at the
+  single notification choke point, and `kernel-prompt.ts` maps the launch payload
+  onto the kernel's own `agent.prompt` parameters inside `AgentSidecar.call`, so no
+  call site branches on the runtime. Unaddressable frames are logged and counted;
+  parameters without a kernel reader are reported by name once per turn and pinned
+  by a test.
+- `PI_AGENT_CORE=node` is the rollback; the default is the kernel, and a build
+  that cannot find the binary falls back to Node with a logged reason.
+- The renderer contract is unchanged. Remaining gaps are tracked as data — the
+  RPC methods, event types and prompt parameters listed in ADR 0403 §Consequences —
+  and each one is closed by teaching the kernel the parameter and removing it from
+  the reported list in the same change.
+- Verification: `cargo test -p agent-core` (590+ cases), the desktop typecheck, and
+  `node scripts/e2e-agent-kernel.mjs`, which drives host-core + kernel + adapter
+  end to end (12 checks: events, persistence, history restore) without starting
+  Electron and without a provider key.

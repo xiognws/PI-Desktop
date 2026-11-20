@@ -1,0 +1,278 @@
+/**
+ * Translate the Rust kernel's wire vocabulary into this app's agent contract.
+ *
+ * The kernel is a separate program with its own message and event shapes
+ * (snake_case fields, `parts` instead of `content`, epoch-ms timestamps). The
+ * renderer, the persistence outbox and the transcript all consume
+ * `AgentEventEnvelope` from `@pi-workspace/shared`, and none of them should
+ * learn a second vocabulary. This module is the one place that knows both.
+ *
+ * It is a pure function layer on purpose: every rule below can be tested
+ * against a recorded kernel frame, without spawning anything.
+ *
+ * Field mapping (kernel -> here):
+ *
+ *   message.parts[{type:"text"}]        -> content
+ *   message.parts[{type:"thinking"}]    -> thinking
+ *   message.created_at_ms               -> createdAt (ISO string)
+ *   message.stop_reason                 -> status / outputTruncated
+ *   message.usage (camelCase, no total) -> MessageUsage (totalTokens computed)
+ *   event.type                          -> unchanged (the vocabularies match by design)
+ */
+import type {
+  AgentEvent,
+  AgentEventEnvelope,
+  AgentStatus,
+  ContextCompactionReason,
+  MessageUsage,
+  UiMessage,
+} from "@pi-workspace/shared";
+
+type Wire = Record<string, unknown>;
+
+const isWire = (value: unknown): value is Wire =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const text = (value: unknown): string | undefined =>
+  typeof value === "string" && value.length > 0 ? value : undefined;
+
+const count = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+/** `stop_reason` decides how the row renders after a reload. */
+function statusForStopReason(
+  stopReason: string | undefined,
+): { status?: UiMessage["status"]; outputTruncated?: boolean } {
+  switch (stopReason) {
+    case undefined:
+    case "end_turn":
+    case "tool_use":
+      return { status: "complete" };
+    case "max_tokens":
+    case "length":
+      return { status: "complete", outputTruncated: true };
+    case "aborted":
+    case "abort":
+      return { status: "aborted" };
+    case "error":
+      return { status: "error" };
+    default:
+      return {};
+  }
+}
+
+/**
+ * The kernel reports the four provider counters; the app's `MessageUsage` also
+ * carries `totalTokens`, which the usage ring and cost rollups read directly.
+ * Reasoning tokens are billed inside output tokens, so they are not added.
+ */
+export function adaptKernelUsage(raw: unknown): MessageUsage | null {
+  if (!isWire(raw)) return null;
+  const inputTokens = count(raw.inputTokens) ?? 0;
+  const outputTokens = count(raw.outputTokens) ?? 0;
+  const cacheReadTokens = count(raw.cacheReadTokens);
+  const cacheWriteTokens = count(raw.cacheWriteTokens);
+  const reasoningTokens = count(raw.reasoningTokens);
+  const reportedTotal = count(raw.totalTokens);
+  return {
+    inputTokens,
+    outputTokens,
+    ...(cacheReadTokens === undefined ? {} : { cacheReadTokens }),
+    ...(cacheWriteTokens === undefined ? {} : { cacheWriteTokens }),
+    ...(reasoningTokens === undefined ? {} : { reasoningTokens }),
+    totalTokens: reportedTotal ?? inputTokens + outputTokens,
+  };
+}
+
+function partText(parts: unknown[], kinds: string[]): string | undefined {
+  const joined = parts
+    .filter((part) => isWire(part) && kinds.includes(String(part.type)))
+    .map((part) => (isWire(part) ? text(part.text) ?? "" : ""))
+    .join("");
+  return joined.length > 0 ? joined : undefined;
+}
+
+/**
+ * One kernel message as a `UiMessage`.
+ *
+ * `null` means the frame carried no id or no role: a row the transcript cannot
+ * address is worse than a dropped frame, and the caller reports the drop.
+ */
+export function adaptKernelMessage(raw: unknown): UiMessage | null {
+  if (!isWire(raw)) return null;
+  const id = text(raw.id);
+  const role = text(raw.role);
+  if (!id || !role) return null;
+  if (!["user", "assistant", "system", "tool"].includes(role)) return null;
+
+  const parts = Array.isArray(raw.parts) ? raw.parts : [];
+  const content = partText(parts, ["text"]) ?? (typeof raw.content === "string" ? raw.content : "");
+  const thinking = partText(parts, ["thinking", "reasoning"]);
+  const createdAtMs = count(raw.created_at_ms) ?? count(raw.createdAtMs) ?? Date.now();
+  const usage = adaptKernelUsage(raw.usage) ?? undefined;
+  const stop = statusForStopReason(text(raw.stop_reason));
+
+  return {
+    id,
+    role: role as UiMessage["role"],
+    content,
+    ...(thinking ? { thinking } : {}),
+    createdAt: new Date(createdAtMs).toISOString(),
+    ...(stop.status ? { status: stop.status } : {}),
+    ...(stop.outputTruncated ? { outputTruncated: true } : {}),
+    ...(usage ? { usage } : {}),
+  };
+}
+
+function compactionReason(raw: unknown): ContextCompactionReason {
+  const value = String(raw ?? "threshold");
+  // The kernel names the same three triggers; an unknown one is reported as the
+  // automatic path so the transcript row still renders a reason.
+  return value === "manual" || value === "overflow" || value === "threshold" ? value : "threshold";
+}
+
+function adaptStatus(raw: unknown, sessionId: string): AgentStatus | null {
+  if (!isWire(raw)) return null;
+  return {
+    sessionId: text(raw.sessionId) ?? sessionId,
+    isRunning: raw.isRunning === true || raw.is_running === true,
+    ...(text(raw.currentTurnId) ?? text(raw.current_turn_id)
+      ? { currentTurnId: text(raw.currentTurnId) ?? text(raw.current_turn_id) }
+      : {}),
+    ...(text(raw.modelId) ? { modelId: text(raw.modelId) } : {}),
+    pendingToolConfirmations: count(raw.pendingToolConfirmations) ?? 0,
+  };
+}
+
+function adaptEvent(raw: unknown, envelope: { sessionId: string }): AgentEvent | null {
+  if (!isWire(raw)) return null;
+  const type = text(raw.type);
+  if (!type) return null;
+  switch (type) {
+    case "agent_start":
+      return { type: "agent_start" };
+    case "turn_start":
+      return { type: "turn_start" };
+    case "turn_end":
+      return { type: "turn_end" };
+    case "agent_end": {
+      const ids = Array.isArray(raw.messageIds) ? raw.messageIds.filter((id): id is string => typeof id === "string") : [];
+      return { type: "agent_end", messageIds: ids };
+    }
+    case "message_start": {
+      const message = adaptKernelMessage(raw.message);
+      return message ? { type: "message_start", message } : null;
+    }
+    case "message_update": {
+      const message = adaptKernelMessage(raw.message);
+      if (!message) return null;
+      const deltaText = typeof raw.deltaText === "string" ? raw.deltaText : undefined;
+      const deltaThinking = typeof raw.deltaThinking === "string" ? raw.deltaThinking : undefined;
+      return {
+        type: "message_update",
+        message,
+        ...(deltaText === undefined ? {} : { deltaText }),
+        ...(deltaThinking === undefined ? {} : { deltaThinking }),
+        ...(raw.stream === "delta" ? { stream: "delta" as const } : {}),
+      };
+    }
+    case "message_end": {
+      const message = adaptKernelMessage(raw.message);
+      return message ? { type: "message_end", message } : null;
+    }
+    case "tool_start":
+      return {
+        type: "tool_start",
+        toolCallId: text(raw.toolCallId) ?? "",
+        toolName: text(raw.toolName) ?? "unknown",
+        args: raw.args ?? null,
+      };
+    case "tool_end":
+      return {
+        type: "tool_end",
+        toolCallId: text(raw.toolCallId) ?? "",
+        result: raw.result ?? null,
+        ...(raw.isError === true ? { isError: true } : {}),
+      };
+    case "usage": {
+      const usage = adaptKernelUsage(raw.usage);
+      return usage ? { type: "usage", usage } : null;
+    }
+    case "error": {
+      const error = isWire(raw.error) ? raw.error : {};
+      const code = text(error.code) ?? "RUNTIME_ERROR";
+      const message = text(error.message) ?? "agent runtime error";
+      return {
+        type: "error",
+        error: {
+          code,
+          message,
+          ...(error.details === undefined ? {} : { details: error.details }),
+          ...(error.retriable === true ? { retriable: true } : {}),
+        },
+      };
+    }
+    case "skill_review": {
+      const outcome = text(raw.outcome);
+      if (outcome !== "applied" && outcome !== "skipped" && outcome !== "failed") return null;
+      return {
+        type: "skill_review",
+        outcome,
+        ...(text(raw.reason) ? { reason: text(raw.reason) } : {}),
+        ...(Array.isArray(raw.actions)
+          ? { actions: raw.actions.filter((a): a is string => typeof a === "string") }
+          : {}),
+      };
+    }
+    case "status": {
+      const status = adaptStatus(raw.status, envelope.sessionId);
+      return status ? { type: "status", status } : null;
+    }
+    case "compaction_start":
+      return { type: "compaction_start", reason: compactionReason(raw.reason) };
+    case "compaction_end":
+      return {
+        type: "compaction_end",
+        reason: compactionReason(raw.reason),
+        ok: raw.ok !== false,
+        willRetry: raw.willRetry === true || raw.will_retry === true,
+        ...(count(raw.tokensBefore) === undefined ? {} : { tokensBefore: count(raw.tokensBefore) }),
+        ...(text(raw.firstKeptMessageId) ? { firstKeptMessageId: text(raw.firstKeptMessageId) } : {}),
+      };
+    case "asktool_request": {
+      const request = isWire(raw.request) ? raw.request : null;
+      return request ? ({ type: "asktool_request", request } as AgentEvent) : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * One `agent.event` notification from the kernel as this app's envelope.
+ *
+ * `null` means the frame is not addressable (no session, unknown event type) or
+ * carries a message the transcript cannot store; the caller counts it so a
+ * kernel-side vocabulary drift is visible instead of silently shrinking the
+ * transcript.
+ */
+export function adaptKernelEvent(params: unknown): AgentEventEnvelope | null {
+  if (!isWire(params)) return null;
+  const sessionId = text(params.sessionId) ?? text((isWire(params.event) ? params.event.sessionId : undefined));
+  if (!sessionId) return null;
+  const event = adaptEvent(params.event, { sessionId });
+  if (!event) return null;
+  const turnId = text(params.turnId);
+  const ts = count(params.ts) ?? Date.now();
+  return {
+    sessionId,
+    ...(turnId ? { turnId } : {}),
+    ts,
+    event,
+    ...(text(params.parentToolCallId) ? { parentToolCallId: text(params.parentToolCallId) } : {}),
+    ...(text(params.nestedParentToolCallId)
+      ? { nestedParentToolCallId: text(params.nestedParentToolCallId) }
+      : {}),
+    ...(text(params.agentName) ? { agentName: text(params.agentName) } : {}),
+  };
+}

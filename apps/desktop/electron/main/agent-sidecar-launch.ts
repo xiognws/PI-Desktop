@@ -8,28 +8,32 @@
  * a contract — which is why it is decided here, by one pure function, instead of
  * branching inside the transport.
  *
- * The Rust kernel stays opt-in until the parity run is green: a build that
- * silently changed the thing running a user's session would be a failure this
- * whole port exists to avoid. `PI_AGENT_CORE=rust` opts in, anything else keeps
- * Node.
+ * The Rust kernel is the runtime. It is this repository's `crates/agent-core`
+ * (copied from the kernel project), built by the same cargo workspace, and
+ * shipped as `<resources>/agent-core/nubo-proto[.exe]`. `PI_AGENT_CORE=node`
+ * keeps the Node sidecar reachable as a rollback while the remaining surfaces
+ * (plans, widgets, native sessions) are still being aligned.
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-/** Opt-in switch. Only the literal `rust` selects the Rust kernel. */
+/**
+ * Kernel selection. `node` is the rollback; anything else — including unset —
+ * selects the Rust kernel.
+ */
 export const AGENT_CORE_SWITCH_ENV = "PI_AGENT_CORE";
 /** Explicit path to the kernel binary, for a machine that built it elsewhere. */
 export const AGENT_CORE_PATH_ENV = "PI_AGENT_CORE_BIN";
 /**
  * Where the kernel's own checkout lives, for a build from source.
  *
- * The kernel is its own project (`E:\103_Hermes_rust`), not a crate of this
- * repository, so its `target/` directory is not next to this source tree.
+ * The crates are copied into this repository, so the primary source-build path is
+ * this workspace's `target/`; the environment variable stays for a machine that
+ * still points at the standalone kernel checkout.
  */
 export const AGENT_CORE_HOME_ENV = "PI_AGENT_CORE_HOME";
-export const AGENT_CORE_DEFAULT_HOME = "E:/103_Hermes_rust";
 
-export const AGENT_CORE_BINARY_NAME = "pi-desktop-agent-core";
+export const AGENT_CORE_BINARY_NAME = "nubo-proto";
 
 export type AgentSidecarRuntime = "node" | "rust";
 
@@ -77,13 +81,19 @@ export function agentCoreBinaryCandidates(
     candidates.push(join(resourcesPath, "agent-core", `${AGENT_CORE_BINARY_NAME}.exe`));
     candidates.push(join(resourcesPath, "agent-core", AGENT_CORE_BINARY_NAME));
   }
-  // A source build: the kernel has its own checkout and therefore its own
-  // target directory.
-  const home = env[AGENT_CORE_HOME_ENV]?.trim() || AGENT_CORE_DEFAULT_HOME;
-  for (const profile of ["release", "debug"]) {
-    const directory = join(home, "target", profile);
-    candidates.push(join(directory, `${AGENT_CORE_BINARY_NAME}.exe`));
-    candidates.push(join(directory, AGENT_CORE_BINARY_NAME));
+  // A source build: this workspace builds the kernel into its own `target/`.
+  // `moduleDir` is `<repo>/apps/desktop/out/main`, so four levels up is the
+  // workspace root that holds `target/`.
+  const workspaceTarget = join(input.moduleDir, "..", "..", "..", "..", "target");
+  // A machine that still points at the standalone kernel checkout says so.
+  const home = env[AGENT_CORE_HOME_ENV]?.trim();
+  const roots = [home ? join(home, "target") : "", workspaceTarget].filter((root) => root.length > 0);
+  for (const root of roots) {
+    for (const profile of ["release", "debug"]) {
+      const directory = join(root, profile);
+      candidates.push(join(directory, `${AGENT_CORE_BINARY_NAME}.exe`));
+      candidates.push(join(directory, AGENT_CORE_BINARY_NAME));
+    }
   }
   return candidates;
 }
@@ -114,8 +124,10 @@ export function resolveAgentSidecarLaunch(
   input: ResolveAgentSidecarLaunchInput,
   options: { nodeEntry: string },
 ): ResolvedAgentSidecarLaunch {
-  const requested = (input.env[AGENT_CORE_SWITCH_ENV] ?? "").trim();
-  if (requested !== "rust") {
+  // The Rust kernel is the runtime; `node` is the rollback an operator asks for
+  // explicitly while the remaining surfaces are still being aligned.
+  const requested = (input.env[AGENT_CORE_SWITCH_ENV] ?? "").trim().toLowerCase();
+  if (requested === "node") {
     return nodeLaunch(input, options.nodeEntry);
   }
   const exists = input.exists ?? existsSync;

@@ -120,6 +120,27 @@ function resolveBuiltinToolsDir(): string | null {
 }
 
 /**
+ * The `rg` this build ships, or null when the tree predates it.
+ *
+ * Grep searches with the shipped binary and only with it: a machine-wide `rg` is
+ * no longer consulted, so the same query answers the same way on every install.
+ * `scripts/bundle-ripgrep.mjs` assembles the file from `scripts/ripgrep.lock.json`
+ * and electron-builder copies `resources/bin` to `<resources>/bin`.
+ */
+function resolveBundledRipgrep(): string | null {
+  const name = process.platform === "win32" ? "rg.exe" : "rg";
+  const candidates = [
+    join(process.resourcesPath || "", "bin", name),
+    join(getModuleDirectory(import.meta.url), "../../resources/bin", name),
+    join(getModuleDirectory(import.meta.url), "../../../resources/bin", name),
+  ];
+  for (const candidate of candidates) {
+    if (candidate && existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
  * The desktop's host-core child: the shared stdio transport from
  * `@pi-workspace/host-runtime` plus the two things only Electron knows — where
  * this build keeps the binary and its bundled plugins, and how to name the
@@ -130,10 +151,18 @@ export class HostProcess extends RuntimeHostProcess {
     const preinstalledPlugins = resolvePreinstalledPluginsDirs();
     const extraPlugins = resolveExtraPluginDirs(dataDir);
     const builtinTools = resolveBuiltinToolsDir();
+    const ripgrep = resolveBundledRipgrep();
     // Every Bash/Core tool command inherits host-core's environment, so the
     // Python path is set here rather than per call: the runtime is a property of
     // the installation, not of the session that happens to run a script.
     const python = resolvePythonRuntime({ dataDir });
+    // The agent sidecar runs widget packages, and a `runtime.kind: "python"`
+    // package needs an interpreter. It is resolved once here - this is the only
+    // place that knows the bundled runtime and the user's preference - and the
+    // sidecar inherits it through the environment.
+    if (python.state === "present") {
+      process.env.PI_DESKTOP_WIDGET_PYTHON = python.runtime.executable;
+    }
     const pythonPath = python.state === "present" ? pythonEnv(python.runtime, [
       join(dataDir, USER_SITE_DIR),
     ]) : null;
@@ -156,6 +185,9 @@ export class HostProcess extends RuntimeHostProcess {
         // Same split for the bundled tool packages (D681): the host scans the
         // directory, Electron only says where it is.
         ...(builtinTools ? { PI_DESKTOP_BUILTIN_TOOLS_DIR: builtinTools } : {}),
+        // The shipped searcher. Absent (a tree that never ran bundle:ripgrep),
+        // Grep reports RG_NOT_FOUND instead of quietly searching more slowly.
+        ...(ripgrep ? { PI_DESKTOP_RG: ripgrep } : {}),
         // A build without a pinned runtime (a checkout that never ran
         // `bundle:python`) simply exports nothing, and the tools that need it
         // report the absence instead of a half-set PYTHONPATH.

@@ -102,6 +102,11 @@ const HOST_PROXY_ALLOWED = new Set([
   "skills.writeFile",
   "skills.removeFile",
   "skills.remove",
+  // `skill_manage`'s absorb action merges one skill document into another. The
+  // kernel calls it from `skill_manage.rs` and the host answers it in
+  // `rpc/mod.rs`; without this entry the call is refused as
+  // "host method not allowed from sidecar", which reads like a kernel bug.
+  "skills.absorb",
   // Trusted extensions (D387): answered by the embedding host, plus the
   // session methods the ExtensionAPI reaches (spec 16 §10.1).
   "extensions.commands.publish",

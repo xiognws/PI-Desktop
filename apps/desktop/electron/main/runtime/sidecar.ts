@@ -19,6 +19,7 @@ import { createAstSearchTool } from "../ast-search-tool";
 import { resolveLocalFile } from "../browser-view";
 import { catalogModelConfigFor } from "../models-dev-catalog";
 import { AgentSidecar } from "../agent-sidecar";
+import { adaptKernelEvent } from "../kernel/kernel-adapter.ts";
 import { relaxedNetworkPolicyEnabled } from "../endpoint-policy";
 import { shellCommandShape, type ShellCommandShape } from "./tool-log-shape";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
@@ -199,7 +200,20 @@ export function createSidecarRuntime({
       return;
     }
     if (method === "agent.event") {
-      const envelope = params as AgentEventEnvelope;
+      // Two runtimes answer this protocol with two vocabularies: the Node
+      // sidecar already speaks this app's envelope, the Rust kernel sends its
+      // own message shape (snake_case, `parts`, epoch-ms). Everything below —
+      // persistence, transcript, tool log — reads one contract, so the
+      // translation happens here and a frame it cannot address is reported
+      // rather than silently shrinking the transcript.
+      const envelope =
+        s.runtime === "rust" ? adaptKernelEvent(params) : (params as AgentEventEnvelope);
+      if (!envelope) {
+        logger.app("runtime", "warn", "dropped an agent event the contract cannot address", {
+          data: { runtime: s.runtime },
+        });
+        return;
+      }
       const event = envelope.event;
       if (event.type === "tool_start") {
         activeToolCalls.set(toolKey(envelope.sessionId, event.toolCallId), {

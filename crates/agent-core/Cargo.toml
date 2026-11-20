@@ -1,0 +1,26 @@
+[package]
+name = "agent-core"
+version = "0.21.0"
+edition = "2021"
+license = "LGPL-3.0-or-later"
+description = "Rust agent core (kernel) for the desktop workspace"
+
+
+[lib]
+name = "agent_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nubo-proto"
+path = "src/main.rs"
+
+[dependencies]
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "io-util", "io-std"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+

@@ -5,6 +5,12 @@ import {
   type StderrHandler,
 } from "@pi-workspace/host-runtime";
 import { resolveAgentSidecarLaunch } from "./agent-sidecar-launch.ts";
+import type { AgentSidecarRuntime } from "./agent-sidecar-launch.ts";
+import { adaptKernelPrompt } from "./kernel/kernel-prompt.ts";
+import {
+  isKernelUnsupportedMethod,
+  kernelUnsupportedMethodError,
+} from "./kernel/kernel-methods.ts";
 import { redactValue } from "./logger";
 import { getModuleDirectory } from "./module-path";
 import { localTimestamp } from "./log-timestamp.ts";
@@ -63,6 +69,12 @@ function fallbackStderrLogger(text: string): void {
  * it to the transport, so nothing above the transport knows the difference.
  */
 export class AgentSidecar extends RuntimeAgentSidecar {
+  /** Which implementation answers this transport; callers adapt by vocabulary. */
+  readonly runtime: AgentSidecarRuntime;
+  private readonly log: StderrHandler;
+  /** Prompt parameters the kernel has no reader for, reported once per turn. */
+  private reportedUnsupported = new Set<string>();
+
   constructor(onStderr?: StderrHandler) {
     const log = onStderr ?? fallbackStderrLogger;
     const launch = resolveAgentSidecarLaunch(
@@ -82,5 +94,47 @@ export class AgentSidecar extends RuntimeAgentSidecar {
 `);
     }
     super({ launch, onStderr: log });
+    this.runtime = launch.runtime;
+    this.log = log;
+  }
+
+  /**
+   * The kernel's `agent.prompt` takes its own parameter set, not this app's
+   * launch payload. Translating here — at the one place that knows which runtime
+   * answered — keeps every call site unchanged and keeps the mapping testable.
+   */
+  override async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+    if (this.runtime !== "rust") {
+      return super.call<T>(method, params);
+    }
+    // A surface the kernel does not answer yet fails here, with a reason, instead
+    // of a bare JSON-RPC `-32601` reaching the UI as an unknown error.
+    if (isKernelUnsupportedMethod(method)) {
+      throw kernelUnsupportedMethodError(method);
+    }
+    if (method !== "agent.prompt") {
+      return super.call<T>(method, params);
+    }
+    let adapted: ReturnType<typeof adaptKernelPrompt>;
+    try {
+      adapted = adaptKernelPrompt(params);
+    } catch (error) {
+      // Classified like any other turn error so main records a failed turn
+      // instead of a crashed request.
+      const message = error instanceof Error ? error.message : String(error);
+      throw Object.assign(new Error(message), { errorCode: "KERNEL_PROMPT_INVALID" });
+    }
+    this.reportUnsupported(adapted.unsupported);
+    return super.call<T>(method, adapted.params);
+  }
+
+  /** One line per newly-dropped parameter: a parity gap has to be visible. */
+  private reportUnsupported(keys: string[]): void {
+    const fresh = keys.filter((key) => !this.reportedUnsupported.has(key));
+    if (fresh.length === 0) return;
+    for (const key of fresh) this.reportedUnsupported.add(key);
+    this.log(
+      `[agent/kernel] ${JSON.stringify({ event: "prompt.params.unsupported", params: fresh })}\n`,
+    );
   }
 }

@@ -12,7 +12,7 @@
   "type": "module",
   "scripts": {
     "build:deps": "pnpm --filter '@pi-workspace/desktop^...' build",
-    "predev": "pnpm run build:deps && cargo build --manifest-path ../../Cargo.toml -p host-core",
+    "predev": "pnpm run build:deps && pnpm run bundle:ripgrep && cargo build --manifest-path ../../Cargo.toml -p host-core -p agent-core",
     "dev": "node ../../scripts/dev-electron.mjs",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
@@ -22,16 +22,18 @@
     "lint": "node ../../scripts/check-style-tokens.mjs",
     "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
     "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
+    "build:agent-release": "cargo build --release --manifest-path ../../Cargo.toml -p agent-core --bin nubo-proto",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "bundle:python": "pnpm --filter @pi-workspace/python-runtime bundle && node ../../scripts/sync-python-runtime.mjs",
+    "bundle:ripgrep": "node ../../scripts/bundle-ripgrep.mjs",
     "bundle:autotest-framework": "pnpm --filter @pi-workspace/autotest-framework bundle",
     "bundle:python:extras": "node ../../scripts/bundle-python-extras.mjs && pnpm --filter @pi-workspace/autotest-framework deps",
     "stage:manual": "node ../../scripts/stage-desktop-manual.mjs",
-    "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && electron-builder --dir -c.extraMetadata.piDistribution=zip && pnpm run bundle:python:extras",
-    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
-    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
-    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --linux --publish never",
+    "pack": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && electron-builder --dir -c.extraMetadata.piDistribution=zip && pnpm run bundle:python:extras",
+    "dist": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
+    "dist:mac": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --mac --publish never",
+    "dist:win": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
+    "dist:linux": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --linux --publish never",
     "bundle:autotest-ui": "npm --prefix ../../services/autotest/ui ci --no-audit --no-fund && npm --prefix ../../services/autotest/ui run build"
   },
   "dependencies": {
@@ -128,6 +130,10 @@
         "to": "tray-icon.png"
       },
       {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      },
+      {
         "from": "../../packages/agent-runtime/dist-bundle",
         "to": "agent-runtime"
       },
@@ -146,6 +152,10 @@
       {
         "from": "resources/tools",
         "to": "tools"
+      },
+      {
+        "from": "resources/bin",
+        "to": "bin"
       },
       {
         "from": "resources/models.dev",
@@ -214,6 +224,10 @@
           "to": "bin/pi-desktop-host-core"
         },
         {
+          "from": "../../target/release/nubo-proto",
+          "to": "agent-core/nubo-proto"
+        },
+        {
           "from": "build/tray-icon-mac.png",
           "to": "tray-icon-mac.png"
         }
@@ -272,6 +286,10 @@
           "to": "bin/pi-desktop-host-core.exe"
         },
         {
+          "from": "../../target/release/nubo-proto.exe",
+          "to": "agent-core/nubo-proto.exe"
+        },
+        {
           "from": "build/icon.ico",
           "to": "app-icon.ico"
         },
@@ -323,6 +341,10 @@
         {
           "from": "../../target/release/pi-desktop-host-core",
           "to": "bin/pi-desktop-host-core"
+        },
+        {
+          "from": "../../target/release/nubo-proto",
+          "to": "agent-core/nubo-proto"
         }
       ]
     },

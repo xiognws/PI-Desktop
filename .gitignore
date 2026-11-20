@@ -136,6 +136,13 @@ worktrees
 __pycache__/
 *.pyc
 
+# The ripgrep binary this build ships (`resources/bin`, next to host-core).
+# Pinned by scripts/ripgrep.lock.json and assembled by scripts/bundle-ripgrep.mjs;
+# same reasoning as the Python runtime tree below — the repository carries the
+# pin and the license files, never the megabytes.
+/apps/desktop/resources/bin/*
+!/apps/desktop/resources/bin/README.md
+
 # The Python runtime this build ships: a full CPython tree plus the pinned
 # wheel stack, regenerated on the build machine by
 # scripts/bundle-python-runtime.mjs from scripts/python-runtime.lock.json.
