@@ -42,10 +42,11 @@ use crate::tools::hashline::ToolError;
 /// have to wait for a host release.
 pub const TOOL_NAME: &str = "BrowserExec";
 
-/// Two minutes. Measured on this host: 29–31 s for a warm profile, so this is
-/// four times the normal cost — enough for a slow page, short enough that a
-/// blocked launch reports back inside one wait rather than after a session.
-pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
+/// Three minutes. Measured on this host: 29–31 s for a warm profile, but a cold one
+/// costs 102 s and a run under load has been seen at 123 s — so a two-minute default
+/// cut real calls off. Three minutes clears the worst case measured here and still
+/// reports a blocked launch inside one call.
+pub const DEFAULT_TIMEOUT_MS: u64 = 180_000;
 
 /// The ceiling a caller can ask for. Past five minutes the browser is not slow,
 /// it is stuck, and the profile lock it holds blocks the next call too.
