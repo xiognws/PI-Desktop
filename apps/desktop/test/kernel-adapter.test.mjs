@@ -174,3 +174,98 @@ test("frames the contract cannot address are refused instead of guessed", () => 
   assert.equal(adaptKernelMessage({ id: "m1", role: "narrator" }), null, "unknown role");
   assert.equal(adaptKernelUsage(undefined), null);
 });
+
+/*
+ * `planning_state` is the plan/goal negotiation the renderer draws. The payload
+ * comes from the kernel as the host's own proposal, so the mapping is field for
+ * field against `PlanningStateEvent` in `@pi-workspace/shared`: a renamed field
+ * means the review panel silently never opens.
+ */
+test("an accepted submission becomes a planning_state the renderer can open", () => {
+  const adapted = adaptKernelEvent(
+    envelope({
+      type: "planning_state",
+      state: "awaiting_approval",
+      kind: "plan",
+      proposalId: "proposal-1",
+      title: "Fix the parser",
+      markdown: "# Plan\n1. read the test",
+      question: "Run this plan?",
+      artifact: { relativePath: ".pi/plan/proposal-1.md", sha256: "abc123", sizeBytes: 42 },
+      version: 1,
+      plan: "# Plan\n1. read the test",
+      proposal: {
+        id: "proposal-1",
+        sessionId: "probe-session",
+        turnId: "turn-1",
+        toolCallId: "call_1",
+        kind: "plan",
+        title: "Fix the parser",
+        markdown: "# Plan\n1. read the test",
+        question: "Run this plan?",
+        version: 1,
+        status: "pending",
+        plan: "# Plan\n1. read the test",
+      },
+    })
+  );
+  assert.ok(adapted);
+  assert.equal(adapted.sessionId, "probe-session");
+  assert.equal(adapted.event.type, "planning_state");
+  assert.equal(adapted.event.state, "awaiting_approval");
+  assert.equal(adapted.event.kind, "plan");
+  assert.equal(adapted.event.proposalId, "proposal-1");
+  assert.equal(adapted.event.title, "Fix the parser");
+  assert.equal(adapted.event.markdown, "# Plan\n1. read the test");
+  assert.equal(adapted.event.question, "Run this plan?");
+  assert.deepEqual(adapted.event.artifact, {
+    relativePath: ".pi/plan/proposal-1.md",
+    sha256: "abc123",
+    sizeBytes: 42,
+  });
+  assert.equal(adapted.event.version, 1);
+  assert.equal(adapted.event.plan, "# Plan\n1. read the test");
+  assert.equal(adapted.event.proposal.id, "proposal-1");
+  // Fields the kernel left unset stay absent: the renderer reads presence.
+  assert.equal(adapted.event.action, undefined);
+  assert.equal(adapted.event.executionId, undefined);
+  assert.equal(adapted.event.executionState, undefined);
+});
+
+test("a mode transition carries the state and nothing invented", () => {
+  const planning = adaptKernelEvent(envelope({ type: "planning_state", state: "planning", kind: "plan" }));
+  assert.deepEqual(planning.event, { type: "planning_state", state: "planning", kind: "plan" });
+  const inactive = adaptKernelEvent(envelope({ type: "planning_state", state: "inactive" }));
+  assert.deepEqual(inactive.event, { type: "planning_state", state: "inactive" });
+});
+
+test("a planning_state this contract cannot address is dropped, not guessed", () => {
+  // An unknown state would drive a mode the renderer has no branch for.
+  assert.equal(adaptKernelEvent(envelope({ type: "planning_state", state: "thinking" })), null);
+  assert.equal(adaptKernelEvent(envelope({ type: "planning_state" })), null, "no state");
+  // A half-parsed artifact points at a file the review cannot open.
+  const noArtifact = adaptKernelEvent(
+    envelope({
+      type: "planning_state",
+      state: "awaiting_approval",
+      artifact: { relativePath: ".pi/plan/x.md" },
+    })
+  );
+  assert.equal(noArtifact.event.artifact, undefined);
+  // A proposal without an id cannot be keyed by the checkpoint store.
+  const noProposal = adaptKernelEvent(
+    envelope({ type: "planning_state", state: "awaiting_approval", proposal: { title: "t" } })
+  );
+  assert.equal(noProposal.event.proposal, undefined);
+  // Unknown permission modes and execution states are not passed through.
+  const unknown = adaptKernelEvent(
+    envelope({
+      type: "planning_state",
+      state: "awaiting_approval",
+      targetPermissionMode: "yolo",
+      executionState: "exploded",
+    })
+  );
+  assert.equal(unknown.event.targetPermissionMode, undefined);
+  assert.equal(unknown.event.executionState, undefined);
+});

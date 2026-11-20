@@ -15,7 +15,6 @@ const {
  */
 
 const EXPECTED_GAPS = [
-  "agent.executeApprovedPlan",
   "agent.modeTurnNotice",
   "agent.stop",
   "extensions.command.run",
@@ -63,6 +62,9 @@ test("methods the kernel does answer are not in the table", () => {
     "agent.steeringContext",
     "agent.compact",
     "agent.getStatus",
+    // Approved-plan execution is answered by the kernel now: main's
+    // `agent.executeApprovedPlan` call must reach it instead of UNSUPPORTED.
+    "agent.executeApprovedPlan",
     "asktool.resolve",
     "sidecar.configure",
     "sidecar.health",

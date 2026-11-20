@@ -25,8 +25,13 @@ import type {
   AgentStatus,
   ContextCompactionReason,
   MessageUsage,
+  PlanArtifact,
+  PlanExecutionState,
+  PlanProposal,
+  PlanningState,
   UiMessage,
 } from "@pi-workspace/shared";
+import { isGlobalPermissionMode } from "@pi-workspace/shared";
 
 type Wire = Record<string, unknown>;
 
@@ -144,6 +149,71 @@ function adaptStatus(raw: unknown, sessionId: string): AgentStatus | null {
   };
 }
 
+/**
+ * The plan artifact the renderer shows beside an approval.
+ *
+ * `undefined` means the frame carried no artifact this contract can address: a
+ * review opened on a half-parsed artifact would point at a file that is not
+ * there. The kernel forwards the host's own object, so the three fields are the
+ * `PlanArtifact` shape from `@pi-workspace/shared`.
+ */
+function planArtifact(raw: unknown): PlanArtifact | undefined {
+  if (!isWire(raw)) return undefined;
+  const relativePath = text(raw.relativePath);
+  const sha256 = text(raw.sha256);
+  const sizeBytes = count(raw.sizeBytes);
+  if (!relativePath || !sha256 || sizeBytes === undefined) return undefined;
+  return { relativePath, sha256, sizeBytes };
+}
+
+/** The kernel emits these four; anything else is a frame to drop, not to guess. */
+function planExecutionState(raw: string | undefined): PlanExecutionState | undefined {
+  return raw === "queued" || raw === "running" || raw === "completed" || raw === "interrupted"
+    ? raw
+    : undefined;
+}
+
+/**
+ * `planning_state`: the plan/goal negotiation this session is in.
+ *
+ * Payload is `PlanningStateEvent` from `@pi-workspace/shared`, field for field —
+ * `apps/desktop/src/stores/slices/events-slice.ts` reads `state`, `kind`,
+ * `proposalId` and `proposal` off the event itself, so a nested or renamed field
+ * is silently not drawn.
+ */
+function adaptPlanningState(raw: Wire): AgentEvent | null {
+  const state = text(raw.state);
+  if (state !== "inactive" && state !== "planning" && state !== "awaiting_approval") return null;
+  const kind = text(raw.kind);
+  const action = text(raw.action);
+  const targetPermissionMode = text(raw.targetPermissionMode);
+  const executionState = planExecutionState(text(raw.executionState));
+  const artifact = planArtifact(raw.artifact);
+  // A proposal is the host's row forwarded whole: it is only usable when it
+  // still names itself, and the renderer keys checkpoints by that id.
+  const proposal =
+    isWire(raw.proposal) && text(raw.proposal.id) && text(raw.proposal.sessionId)
+      ? (raw.proposal as unknown as PlanProposal)
+      : undefined;
+  return {
+    type: "planning_state",
+    state: state as PlanningState,
+    ...(kind === "plan" || kind === "goal" ? { kind } : {}),
+    ...(text(raw.proposalId) ? { proposalId: text(raw.proposalId) } : {}),
+    ...(text(raw.title) ? { title: text(raw.title) } : {}),
+    ...(text(raw.markdown) ? { markdown: text(raw.markdown) } : {}),
+    ...(text(raw.question) ? { question: text(raw.question) } : {}),
+    ...(artifact ? { artifact } : {}),
+    ...(count(raw.version) === undefined ? {} : { version: count(raw.version) }),
+    ...(text(raw.plan) ? { plan: text(raw.plan) } : {}),
+    ...(action === "approve" || action === "reject" ? { action } : {}),
+    ...(isGlobalPermissionMode(targetPermissionMode) ? { targetPermissionMode } : {}),
+    ...(text(raw.executionId) ? { executionId: text(raw.executionId) } : {}),
+    ...(executionState ? { executionState } : {}),
+    ...(proposal ? { proposal } : {}),
+  };
+}
+
 function adaptEvent(raw: unknown, envelope: { sessionId: string }): AgentEvent | null {
   if (!isWire(raw)) return null;
   const type = text(raw.type);
@@ -239,6 +309,8 @@ function adaptEvent(raw: unknown, envelope: { sessionId: string }): AgentEvent |
         ...(count(raw.tokensBefore) === undefined ? {} : { tokensBefore: count(raw.tokensBefore) }),
         ...(text(raw.firstKeptMessageId) ? { firstKeptMessageId: text(raw.firstKeptMessageId) } : {}),
       };
+    case "planning_state":
+      return adaptPlanningState(raw);
     case "asktool_request": {
       const request = isWire(raw.request) ? raw.request : null;
       return request ? ({ type: "asktool_request", request } as AgentEvent) : null;

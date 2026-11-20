@@ -107,10 +107,109 @@ pub enum AgentEvent {
     Status {
         status: serde_json::Value,
     },
+    /// The session's plan/goal negotiation changed.
+    ///
+    /// Payload is `PlanningStateEvent` from
+    /// `packages/shared/src/types/plans.ts` field for field: the tag plus flat
+    /// optional fields, which is the shape
+    /// `apps/desktop/src/stores/slices/events-slice.ts` already consumes. The
+    /// kernel emits it when a turn starts in Plan mode, when `SubmitPlan` is
+    /// accepted by the host, and when the session leaves the negotiation — the
+    /// same three transitions the Node runtime's `setPlanningState` announces.
+    #[serde(rename = "planning_state")]
+    PlanningState {
+        state: crate::plan::PlanningStatus,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        kind: Option<String>,
+        #[serde(rename = "proposalId", skip_serializing_if = "Option::is_none")]
+        proposal_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        markdown: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        question: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        artifact: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        version: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        plan: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        action: Option<String>,
+        #[serde(
+            rename = "targetPermissionMode",
+            skip_serializing_if = "Option::is_none"
+        )]
+        target_permission_mode: Option<String>,
+        #[serde(rename = "executionId", skip_serializing_if = "Option::is_none")]
+        execution_id: Option<String>,
+        #[serde(
+            rename = "executionState",
+            skip_serializing_if = "Option::is_none"
+        )]
+        execution_state: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        proposal: Option<serde_json::Value>,
+    },
     Error {
         code: String,
         message: String,
     },
+}
+
+impl AgentEvent {
+    /// A planning-state transition that carries nothing but the state.
+    ///
+    /// `planning` is a Plan turn starting; `inactive` is any turn that is not
+    /// negotiating a contract, including the Agent turn an approved plan runs as.
+    pub fn planning(state: crate::plan::PlanningStatus, kind: Option<&str>) -> Self {
+        Self::PlanningState {
+            state,
+            kind: kind.map(str::to_string),
+            proposal_id: None,
+            title: None,
+            markdown: None,
+            question: None,
+            artifact: None,
+            version: None,
+            plan: None,
+            action: None,
+            target_permission_mode: None,
+            execution_id: None,
+            execution_state: None,
+            proposal: None,
+        }
+    }
+
+    /// The transition an accepted submission produces: the whole proposal, so a
+    /// renderer that only watches events can open the review.
+    pub fn plan_submitted(submitted: &crate::plan::SubmittedPlan) -> Self {
+        let from_proposal = |key: &str| {
+            submitted
+                .proposal
+                .as_ref()
+                .and_then(|proposal| proposal.get(key))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        };
+        Self::PlanningState {
+            state: crate::plan::PlanningStatus::AwaitingApproval,
+            kind: Some(submitted.kind.clone()),
+            proposal_id: Some(submitted.proposal_id.clone()),
+            title: Some(submitted.title.clone()),
+            markdown: Some(submitted.markdown.clone()),
+            question: Some(submitted.question.clone()),
+            artifact: submitted.artifact.clone(),
+            version: submitted.version,
+            plan: Some(submitted.markdown.clone()),
+            action: None,
+            target_permission_mode: from_proposal("targetPermissionMode"),
+            execution_id: from_proposal("executionId"),
+            execution_state: from_proposal("executionState"),
+            proposal: submitted.proposal.clone(),
+        }
+    }
 }
 
 /// Why compaction ran. Wire names match `ContextCompactionReason`.
@@ -258,5 +357,86 @@ mod tests {
         sink.emit(AgentEventEnvelope::new("s", "t", AgentEvent::TurnEnd));
         let events = sink.events();
         assert_eq!(events, vec![AgentEvent::TurnStart, AgentEvent::TurnEnd]);
+    }
+
+    /// The wire shape the renderer reads (`PlanningStateEvent` in
+    /// `packages/shared/src/types/plans.ts`, consumed by
+    /// `apps/desktop/src/stores/slices/events-slice.ts`): the tag plus flat
+    /// fields. A nested object or a renamed field is silently not drawn.
+    #[test]
+    fn planning_state_matches_the_shared_payload_field_for_field() {
+        let submitted = crate::plan::SubmittedPlan {
+            proposal_id: "proposal-1".into(),
+            kind: "plan".into(),
+            title: "Fix the parser".into(),
+            markdown: "# Plan".into(),
+            question: "Run it?".into(),
+            artifact: Some(serde_json::json!({
+                "relativePath": ".pi/plan/proposal-1.md",
+                "sha256": "abc",
+                "sizeBytes": 42
+            })),
+            version: Some(1),
+            proposal: Some(serde_json::json!({
+                "id": "proposal-1",
+                "kind": "plan",
+                "executionId": "execution-1",
+                "executionState": "queued"
+            })),
+        };
+        let value = serde_json::to_value(AgentEvent::plan_submitted(&submitted)).unwrap();
+        assert_eq!(value["type"], "planning_state");
+        assert_eq!(value["state"], "awaiting_approval");
+        assert_eq!(value["kind"], "plan");
+        assert_eq!(value["proposalId"], "proposal-1");
+        assert_eq!(value["title"], "Fix the parser");
+        assert_eq!(value["markdown"], "# Plan");
+        assert_eq!(value["question"], "Run it?");
+        assert_eq!(value["plan"], "# Plan");
+        assert_eq!(value["artifact"]["relativePath"], ".pi/plan/proposal-1.md");
+        assert_eq!(value["version"], 1);
+        assert_eq!(value["executionId"], "execution-1");
+        assert_eq!(value["executionState"], "queued");
+        assert_eq!(value["proposal"]["id"], "proposal-1");
+        assert!(
+            value.get("action").is_none(),
+            "an unset field is absent, not null: {value}"
+        );
+
+        // A transition with nothing else to say carries nothing else.
+        let idle = serde_json::to_value(AgentEvent::planning(
+            crate::plan::PlanningStatus::Inactive,
+            None,
+        ))
+        .unwrap();
+        assert_eq!(
+            idle,
+            serde_json::json!({"type": "planning_state", "state": "inactive"})
+        );
+        let planning = serde_json::to_value(AgentEvent::planning(
+            crate::plan::PlanningStatus::Planning,
+            Some("plan"),
+        ))
+        .unwrap();
+        assert_eq!(
+            planning,
+            serde_json::json!({"type": "planning_state", "state": "planning", "kind": "plan"})
+        );
+    }
+
+    /// The envelope forwards the event unchanged, so the adapter in main sees
+    /// `event.state` where the renderer expects it.
+    #[test]
+    fn a_planning_transition_survives_the_envelope() {
+        let envelope = AgentEventEnvelope::new(
+            "s1",
+            "t1",
+            AgentEvent::planning(crate::plan::PlanningStatus::Planning, Some("plan")),
+        );
+        let value = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(value["sessionId"], "s1");
+        assert_eq!(value["turnId"], "t1");
+        assert_eq!(value["event"]["type"], "planning_state");
+        assert_eq!(value["event"]["state"], "planning");
     }
 }

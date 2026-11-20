@@ -460,6 +460,10 @@ impl Sidecar {
             })),
             "sidecar.configure" => self.configure(request),
             "agent.prompt" | "agent.turn" => self.prompt(request).await,
+            // An approved plan runs as one ordinary Agent turn: main has already
+            // claimed the execution and begun the durable turn, and all that is
+            // missing is the instruction that says what is being executed.
+            "agent.executeApprovedPlan" => self.execute_approved_plan(request).await,
             "agent.compact" => self.compact(request).await,
             "agent.tokenReport" => self.token_report(request),
             "asktool.resolve" => self.resolve_ask(request),
@@ -794,6 +798,93 @@ impl Sidecar {
             .clone())
     }
 
+    /// `agent.executeApprovedPlan`: run a plan the user approved.
+    ///
+    /// Upstream counterparts: `executeApprovedPlan` / `executeApprovedPlanTurn`
+    /// in `packages/agent-runtime/src/runtime.ts`, and the handler in
+    /// `packages/agent-runtime/src/sidecar.ts`. Main has already claimed the
+    /// execution, begun the durable turn and launched this session in Agent mode
+    /// (`apps/desktop/electron/main/runtime/plans.ts`), so the only thing missing
+    /// is the instruction that names the approved snapshot. That instruction
+    /// becomes this turn's user message and the turn runs through the normal
+    /// prompt path: an approved plan is an ordinary Agent turn, and a second
+    /// execution path beside the first is a second set of bugs.
+    async fn execute_approved_plan(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.str_param("sessionId").unwrap_or("").to_string();
+        let turn_id = request.str_param("turnId").unwrap_or("").trim().to_string();
+        let execution = request
+            .params
+            .get("execution")
+            .filter(|value| value.is_object())
+            .cloned();
+        let (Some(execution), false) = (execution, session_id.is_empty() || turn_id.is_empty())
+        else {
+            return Err(RpcError::app(
+                "PLAN_EXECUTION_NOT_FOUND",
+                "approved plan execution parameters required",
+            ));
+        };
+        // The descriptor names its own session, and an approval granted in one
+        // conversation must never run in another.
+        if let Some(owner) = execution.get("sessionId").and_then(Value::as_str) {
+            if owner != session_id {
+                return Err(RpcError::app(
+                    "PLAN_EXECUTION_NOT_FOUND",
+                    "approved plan belongs to another session",
+                ));
+            }
+        }
+        let instruction = crate::plan::approved_execution_instruction(&execution)
+            .map_err(|reason| RpcError::app("PLAN_EXECUTION_NOT_FOUND", reason))?;
+        let mut params = request.params.clone();
+        if let Some(map) = params.as_object_mut() {
+            map.insert("content".into(), json!(instruction));
+            // Approved plans always execute as the builtin Agent, whatever mode
+            // the launch parameters carried.
+            map.insert("mode".into(), json!("agent"));
+            map.insert("turnId".into(), json!(turn_id));
+            // The descriptor is not a prompt input and its Markdown is already
+            // inside the instruction; forwarding it would send the plan twice.
+            map.remove("execution");
+            // No optimistic row was drawn for this turn, so there is no renderer
+            // id to reconcile with.
+            map.remove("userMessageId");
+            // The Node runtime's approved-execution turn appends the instruction
+            // and continues: it runs no recall round trip, and the instruction is
+            // not a query. Recalling on it would spend a host call to inject
+            // memories that have nothing to do with the approved plan.
+            map.insert("memoryRecall".into(), json!(false));
+        }
+        let prompt = Request {
+            jsonrpc: request.jsonrpc.clone(),
+            id: request.id.clone(),
+            method: "agent.prompt".into(),
+            params,
+        };
+        self.prompt(&prompt).await
+    }
+
+    /// Publish one planning-state transition, at most once per distinct state.
+    ///
+    /// A prompt declares its mode on every turn; the renderer needs the
+    /// transitions, not a heartbeat.
+    fn announce_planning(
+        &self,
+        session: &Session,
+        session_id: &str,
+        turn_id: &str,
+        update: crate::AgentEvent,
+        status: crate::plan::PlanningStatus,
+    ) {
+        if !session.plan.notice_planning(status) {
+            return;
+        }
+        NotificationSink {
+            out: self.out.clone(),
+        }
+        .emit(crate::AgentEventEnvelope::new(session_id, turn_id, update));
+    }
+
     async fn prompt(&self, request: &Request) -> Result<Value, RpcError> {
         let session_id = request.require_str("sessionId")?.to_string();
         // Main sends `content`; `prompt`/`text` stay accepted so a harness does
@@ -1068,6 +1159,22 @@ impl Sidecar {
         ) {
             extra.push(Arc::new(crate::plan::TodoTool::new(session.plan.clone())));
         }
+        // A Plan turn's whole purpose is to hand its plan over. The host owns the
+        // `.pi/plan` artifact and the review, so `SubmitPlan` — forwarding
+        // `plans.submit` — is the only path that opens the approval gate. It is
+        // registered in Plan mode alone, the same gate the Node runtime applies:
+        // an Agent turn that could submit would reopen an approval the user
+        // already gave.
+        if matches!(mode, crate::prompt::SessionMode::Plan) {
+            let host: Arc<dyn crate::plan::PlanHost> = self.bridge.clone();
+            extra.push(Arc::new(crate::plan::SubmitPlanTool::new(
+                host,
+                session.plan.clone(),
+                Arc::new(NotificationSink {
+                    out: self.out.clone(),
+                }),
+            )));
+        }
         // `asktool` is available in Agent, Plan and Goal mode: asking is not an
         // authorization, so a plan turn may ask what the user wants.
         if matches!(
@@ -1173,6 +1280,23 @@ impl Sidecar {
                 engine.with_budget(run_budget)
             }
         };
+
+        // The mode this turn runs in *is* the planning state the renderer draws:
+        // only Plan mode negotiates a contract (`proposalKindForMode` upstream),
+        // and every other mode — including the Agent turn an approved plan runs as
+        // — is `inactive`. Announced on change, never per turn.
+        let planning = if matches!(mode, crate::prompt::SessionMode::Plan) {
+            (crate::plan::PlanningStatus::Planning, Some("plan"))
+        } else {
+            (crate::plan::PlanningStatus::Inactive, None)
+        };
+        self.announce_planning(
+            &session,
+            &session_id,
+            &turn_id,
+            crate::AgentEvent::planning(planning.0, planning.1),
+            planning.0,
+        );
 
         // The turn task announces the state it is about to run in, then the one
         // it settled in. Both carry the same shape `agent.getStatus` answers.
@@ -1898,6 +2022,11 @@ impl Sidecar {
                 "done": done,
                 "total": steps.len(),
                 "steps": steps,
+                // What the session is negotiating, and the contract it last
+                // submitted, so a client can tell "an approval is open" from
+                // "the model is still planning" without reading the transcript.
+                "planning": session.plan.planning().as_str(),
+                "submitted": session.plan.submitted(),
             }
         }))
     }
