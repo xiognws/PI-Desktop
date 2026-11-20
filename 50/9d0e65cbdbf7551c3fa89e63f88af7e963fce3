@@ -1,0 +1,26 @@
+apps/desktop/electron/main/bootstrap/shutdown.ts
+  h_201ed4c689ac8b 50-51,78,226-229,243
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 105,1292
+apps/desktop/electron/main/ipc/session-ipc.ts
+  h_201ed4c689ac8b 30,442-444
+apps/desktop/electron/main/lsp/pool.ts
+  h_201ed4c689ac8b 1-187
+apps/desktop/electron/main/lsp/tools.ts
+  h_201ed4c689ac8b 23,41-47,57,65-70,72,77-82,115,125-126,138,152-153,173,203-204
+apps/desktop/electron/test/lsp-pool.test.mjs
+  h_201ed4c689ac8b 1-159
+docs/adr/0401-read-only-language-intelligence.md
+  h_201ed4c689ac8b 77-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "509d0e65cbdbf7551c3fa89e63f88af7e963fce3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
