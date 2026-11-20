@@ -1,0 +1,220 @@
+.gitignore
+  h_201ed4c689ac8b 139-145
+Cargo.lock
+  h_201ed4c689ac8b 40-53
+Cargo.toml
+  h_201ed4c689ac8b 2
+apps/desktop/electron/main/agent-sidecar-launch.ts
+  h_201ed4c689ac8b 11-15,20-23,30-32,36,84-96,127-130
+apps/desktop/electron/main/agent-sidecar.ts
+  h_201ed4c689ac8b 8-13,72-77,97-138
+apps/desktop/electron/main/host-process.ts
+  h_201ed4c689ac8b 122-142,154,159-165,188-190
+apps/desktop/electron/main/kernel/kernel-adapter.ts
+  h_201ed4c689ac8b 1-278
+apps/desktop/electron/main/kernel/kernel-methods.ts
+  h_201ed4c689ac8b 1-106
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 1-196
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 22,203-216
+apps/desktop/package.json
+  h_201ed4c689ac8b 15,25,28,32-36,132-135,156-159,226-229,288-291,344-347
+apps/desktop/resources/bin/README.md
+  h_201ed4c689ac8b 1-30
+apps/desktop/test/agent-sidecar-launch.test.mjs
+  h_201ed4c689ac8b 40-49,54,58-59,61-72,78-79,83,91,93,96,99,105-106,108-116,118-119,126,129,133,137
+apps/desktop/test/kernel-adapter.test.mjs
+  h_201ed4c689ac8b 1-176
+apps/desktop/test/kernel-methods.test.mjs
+  h_201ed4c689ac8b 1-73
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 1-167
+crates/agent-core/Cargo.toml
+  h_201ed4c689ac8b 1-26
+crates/agent-core/examples/superagent_live.rs
+  h_201ed4c689ac8b 1-333
+crates/agent-core/src/aging.rs
+  h_201ed4c689ac8b 1-418
+crates/agent-core/src/approval.rs
+  h_201ed4c689ac8b 1-740
+crates/agent-core/src/ask.rs
+  h_201ed4c689ac8b 1-835
+crates/agent-core/src/budget.rs
+  h_201ed4c689ac8b 1-301
+crates/agent-core/src/builtin_tools.rs
+  h_201ed4c689ac8b 1-389
+crates/agent-core/src/cancel.rs
+  h_201ed4c689ac8b 1-109
+crates/agent-core/src/checkpoint.rs
+  h_201ed4c689ac8b 1-221
+crates/agent-core/src/compaction.rs
+  h_201ed4c689ac8b 1-965
+crates/agent-core/src/context.rs
+  h_201ed4c689ac8b 1-477
+crates/agent-core/src/delegate.rs
+  h_201ed4c689ac8b 1-1504
+crates/agent-core/src/delivery.rs
+  h_201ed4c689ac8b 1-530
+crates/agent-core/src/edit_format.rs
+  h_201ed4c689ac8b 1-367
+crates/agent-core/src/error.rs
+  h_201ed4c689ac8b 1-145
+crates/agent-core/src/event.rs
+  h_201ed4c689ac8b 1-262
+crates/agent-core/src/exec.rs
+  h_201ed4c689ac8b 1-806
+crates/agent-core/src/exec_policy.rs
+  h_201ed4c689ac8b 1-766
+crates/agent-core/src/hooks.rs
+  h_201ed4c689ac8b 1-308
+crates/agent-core/src/host_bridge.rs
+  h_201ed4c689ac8b 1-485
+crates/agent-core/src/journal.rs
+  h_201ed4c689ac8b 1-263
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 1-94
+crates/agent-core/src/main.rs
+  h_201ed4c689ac8b 1-307
+crates/agent-core/src/mcp.rs
+  h_201ed4c689ac8b 1-355
+crates/agent-core/src/memory.rs
+  h_201ed4c689ac8b 1-1198
+crates/agent-core/src/memory_context.rs
+  h_201ed4c689ac8b 1-325
+crates/agent-core/src/message.rs
+  h_201ed4c689ac8b 1-340
+crates/agent-core/src/plan.rs
+  h_201ed4c689ac8b 1-459
+crates/agent-core/src/prompt/instructions.rs
+  h_201ed4c689ac8b 1-623
+crates/agent-core/src/prompt/mod.rs
+  h_201ed4c689ac8b 1-428
+crates/agent-core/src/prompt/modes.rs
+  h_201ed4c689ac8b 1-141
+crates/agent-core/src/provider/anthropic.rs
+  h_201ed4c689ac8b 1-333
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 1-981
+crates/agent-core/src/provider/mod.rs
+  h_201ed4c689ac8b 1-683
+crates/agent-core/src/provider/openai.rs
+  h_201ed4c689ac8b 1-278
+crates/agent-core/src/provider/scripted.rs
+  h_201ed4c689ac8b 1-71
+crates/agent-core/src/provider/sse.rs
+  h_201ed4c689ac8b 1-147
+crates/agent-core/src/redaction.rs
+  h_201ed4c689ac8b 1-179
+crates/agent-core/src/restore.rs
+  h_201ed4c689ac8b 1-236
+crates/agent-core/src/retry.rs
+  h_201ed4c689ac8b 1-244
+crates/agent-core/src/rpc.rs
+  h_201ed4c689ac8b 1-333
+crates/agent-core/src/schedule.rs
+  h_201ed4c689ac8b 1-729
+crates/agent-core/src/session.rs
+  h_201ed4c689ac8b 1-291
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1-3598
+crates/agent-core/src/skill_manage.rs
+  h_201ed4c689ac8b 1-829
+crates/agent-core/src/skill_overlap.rs
+  h_201ed4c689ac8b 1-291
+crates/agent-core/src/skill_review.rs
+  h_201ed4c689ac8b 1-650
+crates/agent-core/src/skills.rs
+  h_201ed4c689ac8b 1-578
+crates/agent-core/src/steering.rs
+  h_201ed4c689ac8b 1-25
+crates/agent-core/src/super_agent/async_task.rs
+  h_201ed4c689ac8b 1-512
+crates/agent-core/src/super_agent/mod.rs
+  h_201ed4c689ac8b 1-1147
+crates/agent-core/src/super_agent/recall.rs
+  h_201ed4c689ac8b 1-492
+crates/agent-core/src/super_agent/router.rs
+  h_201ed4c689ac8b 1-879
+crates/agent-core/src/super_agent/runtime.rs
+  h_201ed4c689ac8b 1-562
+crates/agent-core/src/super_agent/trigger.rs
+  h_201ed4c689ac8b 1-691
+crates/agent-core/src/super_agent/watchdog.rs
+  h_201ed4c689ac8b 1-488
+crates/agent-core/src/super_agent/worker.rs
+  h_201ed4c689ac8b 1-843
+crates/agent-core/src/token_report.rs
+  h_201ed4c689ac8b 1-320
+crates/agent-core/src/tool.rs
+  h_201ed4c689ac8b 1-541
+crates/agent-core/src/tool_use.rs
+  h_201ed4c689ac8b 1-248
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 1-1195
+crates/agent-core/src/verify.rs
+  h_201ed4c689ac8b 1-262
+crates/agent-core/tests/agent_practices.rs
+  h_201ed4c689ac8b 1-400
+crates/agent-core/tests/common/mod.rs
+  h_201ed4c689ac8b 1-58
+crates/agent-core/tests/compaction_loop.rs
+  h_201ed4c689ac8b 1-323
+crates/agent-core/tests/delegation_resume.rs
+  h_201ed4c689ac8b 1-335
+crates/agent-core/tests/delivery_rpc.rs
+  h_201ed4c689ac8b 1-311
+crates/agent-core/tests/host_bridge.rs
+  h_201ed4c689ac8b 1-341
+crates/agent-core/tests/http_transport.rs
+  h_201ed4c689ac8b 1-473
+crates/agent-core/tests/memory_flow.rs
+  h_201ed4c689ac8b 1-139
+crates/agent-core/tests/schedule_rpc.rs
+  h_201ed4c689ac8b 1-338
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 1-1347
+crates/agent-core/tests/stdio_host.rs
+  h_201ed4c689ac8b 1-180
+crates/agent-core/tests/stdio_protocol.rs
+  h_201ed4c689ac8b 1-167
+crates/agent-core/tests/steering.rs
+  h_201ed4c689ac8b 1-326
+crates/agent-core/tests/superagent_rpc.rs
+  h_201ed4c689ac8b 1-790
+crates/agent-core/tests/turn_loop.rs
+  h_201ed4c689ac8b 1-544
+crates/agent-core/tests/turn_retry.rs
+  h_201ed4c689ac8b 1-187
+docs/adr/0403-rust-kernel-as-agent-runtime.md
+  h_201ed4c689ac8b 1-128
+docs/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 8694-8725
+packages/host-runtime/src/agent-sidecar.ts
+  h_201ed4c689ac8b 105-109
+scripts/bundle-ripgrep.mjs
+  h_201ed4c689ac8b 1-224
+scripts/e2e-agent-kernel-stress.mjs
+  h_201ed4c689ac8b 1-282
+scripts/e2e-agent-kernel.mjs
+  h_201ed4c689ac8b 1-276
+scripts/ripgrep.lock.json
+  h_201ed4c689ac8b 1-20
+scripts/seed-kernel-test-profile.mjs
+  h_201ed4c689ac8b 1-70
+scripts/shell-cdp-probe.mjs
+  h_201ed4c689ac8b 1-132
+scripts/shell-chat-drive.mjs
+  h_201ed4c689ac8b 1-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "24a2ef73e8d4603124eddd8345b0bc070a8af139",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
