@@ -3,12 +3,20 @@
  * spec 07-plugins/16 §9 to §11).
  *
  * ExtensionAPI modules are contributed by plugins (`contributes.agentExtensions`)
- * and run inside the agent sidecar. This bridge holds what the sidecar reports
- * back per session (registered commands, load reports, diagnostics) and brokers
- * the modal prompts between the sidecar and the renderer. Discovery and
- * enablement are the plugin system's job. Import generation stays here, while
- * dependency installation lives in the dedicated npm installer so its trust
- * boundary and lifecycle can be tested independently.
+ * and run inside the agent sidecar while the Node runtime answers turns. This
+ * bridge holds what that runtime reports back per session (registered commands,
+ * load reports, diagnostics) and brokers the modal prompts between it and the
+ * renderer. Discovery and enablement are the plugin system's job. Import
+ * generation stays here, while dependency installation lives in the dedicated
+ * npm installer so its trust boundary and lifecycle can be tested independently.
+ *
+ * A command has no such luxury under the Rust kernel: an extension is
+ * JavaScript, the kernel has no JS runner and should not grow one, so
+ * {@link AgentExtensionBridge.runCommand} runs the command here, from the same
+ * trust set the sidecar load would have used. Both hosts run the same modules
+ * through the same `TrustedExtensionRunner`, so a command's contract — the
+ * `{ handled }` answer, what a missing command does, how a throwing handler is
+ * recorded — does not depend on which runtime answers turns.
  */
 import { createHash, randomUUID } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -20,7 +28,7 @@ import {
   IMPORTED_PLUGIN_MAIN,
   IMPORTED_PLUGIN_WRAPPER_SOURCE,
 } from "./imported-plugin-wrapper";
-import { discoverManualPath } from "@pi-workspace/agent-runtime";
+import { discoverManualPath, type TrustedExtensionBridge } from "@pi-workspace/agent-runtime";
 export { defaultDependencyRunner, installExtensionDependencies } from "./npm-installer";
 export type { DependencyCommandRunner, ExtensionDependencyInstallResult } from "./npm-installer";
 import {
@@ -30,6 +38,7 @@ import {
   type TrustedExtensionCommand,
   type TrustedExtensionDiagnostic,
   type TrustedExtensionLoadReport,
+  type TrustedExtensionSpec,
   type TrustedExtensionStatusEvent,
   type TrustedExtensionUiPrompt,
   type TrustedExtensionUiRequestEnvelope,
@@ -58,7 +67,38 @@ export type AgentExtensionBridgeOptions = {
   onToast: (message: string, level: "info" | "warning" | "error") => void;
   onStatus: (event: TrustedExtensionStatusEvent) => void;
   promptTimeoutMs?: number;
+  /** Overrides the Runner built for {@link AgentExtensionBridge.runCommand}. */
+  runnerFactory?: ExtensionCommandRunnerFactory;
 };
+
+/** The slice of `TrustedExtensionRunner` main needs to run one command. */
+export type ExtensionCommandRunner = {
+  load(): Promise<unknown>;
+  runCommand(name: string, args: string): Promise<boolean>;
+  dispose(): Promise<void>;
+  /** Load reports, published beside diagnostics the way the sidecar does. */
+  getLoadReports?(): TrustedExtensionLoadReport[];
+};
+
+export type ExtensionCommandRunnerFactory = (options: {
+  specs: TrustedExtensionSpec[];
+  bridge: TrustedExtensionBridge;
+}) => ExtensionCommandRunner | Promise<ExtensionCommandRunner>;
+
+/**
+ * The shipped Runner, loaded on first use.
+ *
+ * The dynamic import is the point: the loader it reaches pulls `jiti`, and main
+ * must not pay for that on the startup path. Only a command with no other JS
+ * host — a Rust-kernel session — ever asks for it.
+ */
+async function loadTrustedExtensionRunner(options: {
+  specs: TrustedExtensionSpec[];
+  bridge: TrustedExtensionBridge;
+}): Promise<ExtensionCommandRunner> {
+  const { TrustedExtensionRunner } = await import("@pi-workspace/agent-runtime");
+  return new TrustedExtensionRunner(options);
+}
 
 function dismissedResponse(kind: PendingPrompt["kind"]): TrustedExtensionUiResponse {
   return kind === "confirm" ? { kind, value: false, cancelled: true } : { kind, value: undefined, cancelled: true };
@@ -71,6 +111,8 @@ export class AgentExtensionBridge {
   /** One interactive prompt per session at a time (spec §9). */
   private readonly promptQueues = new Map<string, Promise<unknown>>();
   private readonly uiRequests = new Map<string, { sessionId: string; controller: AbortController }>();
+  /** One JavaScript Runner per session, but only for sessions main must run itself. */
+  private readonly commandRunners = new Map<string, { key: string; ready: Promise<ExtensionCommandRunner> }>();
 
   constructor(options: AgentExtensionBridgeOptions) {
     this.options = options;
@@ -109,8 +151,50 @@ export class AgentExtensionBridge {
     return this.sessions.get(sessionId)?.commands ?? [];
   }
 
+  // --- commands run by main ---------------------------------------------------
+
+  /**
+   * Run a trusted extension's slash command in this process.
+   *
+   * The caller passes the specs: main keeps the trust decision — enabled plugins
+   * holding `agent.extension`, scoped to the session's project — beside the
+   * plugin registry that makes it, exactly where it builds the sidecar's
+   * `trustedExtensions`. This method only loads and runs what it is handed, so
+   * the trust set cannot drift between the two hosts.
+   *
+   * Answers `{ handled: false }` for a command no loaded extension registered,
+   * which the IPC layer reports as `NOT_FOUND` — the same answer the sidecar
+   * runner gives. A handler that throws is a diagnostic, not a failure of the
+   * call: the command ran, and the row shows what it reported.
+   */
+  async runCommand(input: {
+    sessionId: string;
+    name: string;
+    args?: string;
+    specs: TrustedExtensionSpec[];
+  }): Promise<{ handled: boolean }> {
+    const sessionId = String(input?.sessionId ?? "").trim();
+    const name = String(input?.name ?? "").trim().replace(/^\//, "");
+    if (!sessionId || !name) {
+      throw Object.assign(new Error("session and command name required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    const specs = input.specs ?? [];
+    if (specs.length === 0) {
+      // Nothing is trusted for this session any more: a runner from an earlier
+      // trusted set must not stay loaded, or disabling a plugin would not stop
+      // its commands in a session that had already run one.
+      this.disposeCommandRunner(sessionId);
+      return { handled: false };
+    }
+    const runner = await this.commandRunner(sessionId, specs);
+    return { handled: await runner.runCommand(name, String(input.args ?? "")) };
+  }
+
   clearSession(sessionId: string): void {
     this.cancelPrompts(sessionId);
+    this.disposeCommandRunner(sessionId);
     if (this.sessions.delete(sessionId)) this.options.onChanged();
   }
 
@@ -280,6 +364,111 @@ export class AgentExtensionBridge {
       this.sessions.set(sessionId, state);
     }
     return state;
+  }
+
+  /**
+   * The Runner for one session, rebuilt when the trusted set changes — the same
+   * rule the sidecar applies, where the set is part of the runtime match.
+   */
+  private commandRunner(sessionId: string, specs: TrustedExtensionSpec[]): Promise<ExtensionCommandRunner> {
+    const key = specs.map((spec) => `${spec.id}\0${spec.entry}`).sort().join("\n");
+    const cached = this.commandRunners.get(sessionId);
+    if (cached?.key === key) return cached.ready;
+    if (cached) void cached.ready.then((runner) => runner.dispose()).catch(() => undefined);
+    const factory = this.options.runnerFactory ?? loadTrustedExtensionRunner;
+    const built: { current?: ExtensionCommandRunner } = {};
+    const ready = Promise.resolve(factory({ specs, bridge: this.commandBridge(sessionId, built) }))
+      .then(async (runner) => {
+        built.current = runner;
+        await runner.load();
+        return runner;
+      });
+    // A load failure must not poison the cache: the next command retries it.
+    ready.catch(() => {
+      if (this.commandRunners.get(sessionId)?.ready === ready) this.commandRunners.delete(sessionId);
+    });
+    this.commandRunners.set(sessionId, { key, ready });
+    return ready;
+  }
+
+  private disposeCommandRunner(sessionId: string): void {
+    const cached = this.commandRunners.get(sessionId);
+    if (!cached) return;
+    this.commandRunners.delete(sessionId);
+    void cached.ready.then((runner) => runner.dispose()).catch(() => undefined);
+  }
+
+  /**
+   * What a command sees while main runs it (spec 16 §8).
+   *
+   * The UI half is real: prompts, toasts and status go through this bridge, so a
+   * command asks the same window the sidecar would. The turn half is not —
+   * there is no runtime here to abort, compact, or queue a message into — and
+   * the members that need one say so instead of quietly doing nothing: the
+   * Runner records the throw as a diagnostic on the plugin row.
+   */
+  private commandBridge(
+    sessionId: string,
+    built: { current?: ExtensionCommandRunner },
+  ): TrustedExtensionBridge {
+    const needsTurn = (member: string) => () => {
+      throw new Error(`${member} needs a live agent turn and is not available while the kernel runs the session`);
+    };
+    return {
+      sessionId,
+      cwd: process.cwd(),
+      getModel: () => undefined,
+      setModel: async () => false,
+      getThinkingLevel: () => "off",
+      setThinkingLevel: () => {},
+      isIdle: () => true,
+      abort: () => {},
+      hasPendingMessages: () => false,
+      getContextUsage: () => undefined,
+      compact: () => {},
+      getSystemPrompt: () => "",
+      getActiveTools: () => [],
+      getAllTools: () => [],
+      setActiveTools: () => {},
+      getSessionName: () => undefined,
+      setSessionName: needsTurn("ctx.setSessionName"),
+      sendUserMessage: needsTurn("ctx.sendUserMessage"),
+      waitForIdle: async () => {},
+      newSession: async () => ({ cancelled: true }),
+      fork: async () => ({ cancelled: true }),
+      requestUi: (spec, request, signal) =>
+        this.requestExtensionUi(sessionId, spec, request, signal),
+      publishCommands: (commands) => this.publishCommands(sessionId, commands),
+      publishDiagnostics: (diagnostics) =>
+        this.publishDiagnostics(sessionId, diagnostics, built.current?.getLoadReports?.() ?? []),
+    };
+  }
+
+  /**
+   * One UI request from a main-run command, cancelled with the handler that
+   * asked for it (spec §9): the signal is the handler's, not the session's.
+   */
+  private requestExtensionUi(
+    sessionId: string,
+    spec: TrustedExtensionSpec,
+    request: TrustedExtensionUiRequestEnvelope["request"],
+    signal?: AbortSignal,
+  ): Promise<TrustedExtensionUiResponse> {
+    const requestId = randomUUID();
+    const envelope: TrustedExtensionUiRequestEnvelope = {
+      requestId,
+      sessionId,
+      extensionId: spec.id,
+      extensionLabel: spec.label,
+      request,
+    };
+    const pending = this.requestUi(envelope);
+    if (!signal) return pending;
+    const cancel = () => {
+      void this.requestUi({ ...envelope, request: { kind: "cancel", requestId } });
+    };
+    signal.addEventListener("abort", cancel, { once: true });
+    return pending.finally(() => signal.removeEventListener("abort", cancel));
   }
 }
 

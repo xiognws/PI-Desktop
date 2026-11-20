@@ -85,6 +85,12 @@ pub struct TurnOutcome {
     /// this: a turn that only talked taught nothing worth a completion.
     pub tool_calls: usize,
     pub stop_reason: StopReason,
+    /// The turn ended at a boundary the user asked for (`agent.stop`), not
+    /// because the model finished. `stop_reason` still reports what the last
+    /// assistant message said — usually `ToolUse` — so this flag is what tells a
+    /// graceful stop apart from a completed answer, and from a failed turn
+    /// (`Err`), which is what `agent.abort` produces.
+    pub graceful_stop: bool,
 }
 
 /// Where a running turn looks for messages the user sent while it was working.
@@ -244,6 +250,7 @@ impl TurnEngine {
         let mut tool_calls = 0usize;
         let mut added_ids: Vec<String> = Vec::new();
         let mut stop_reason: Option<StopReason> = None;
+        let mut graceful_stop = false;
         let mut steps_taken = 0usize;
         // The definition-of-done tracker and the repeat cache live for exactly one
         // turn: both are about "what did this turn already do", and carrying either
@@ -618,6 +625,27 @@ impl TurnEngine {
                 );
                 return Err(error);
             }
+
+            // `agent.stop` boundary: the assistant message that asked for these
+            // calls is on the transcript and every call it asked for has its
+            // result, so the step is finished — a boundary is exactly this point,
+            // after the results and before the next request. Stopping here is what
+            // makes the stop graceful: the tool that was already running ran to
+            // completion (a cancel would have cut it off inside the registry), and
+            // no further provider request is issued. The turn ends as an ordinary
+            // turn with a distinguishable outcome rather than an error, because
+            // nothing failed.
+            if cancel.stop_requested() {
+                tracing::debug!(
+                    target: "agent_core::turn",
+                    step,
+                    tool_calls,
+                    "stopping at the requested assistant boundary"
+                );
+                stop_reason = Some(assembled.stop_reason);
+                graceful_stop = true;
+                break;
+            }
         }
 
         // A provider that answers with nothing at all is not a completed turn:
@@ -656,6 +684,7 @@ impl TurnEngine {
             usage: total_usage,
             steps: steps_taken,
             stop_reason: stop_reason.unwrap_or(StopReason::EndTurn),
+            graceful_stop,
         })
     }
 

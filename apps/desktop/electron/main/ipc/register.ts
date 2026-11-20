@@ -1,8 +1,9 @@
 import { join } from "node:path";
 import { dialog, shell, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
-import { err, ErrorCodes, IPC, ok, type LifecycleDialogChoice, type Result } from "@pi-workspace/shared";
+import { err, ErrorCodes, IPC, ok, type LifecycleDialogChoice, type Result, type TrustedExtensionSpec } from "@pi-workspace/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { AgentSidecar } from "../agent-sidecar";
+import type { PluginRuntime } from "../plugin-runtime";
 import type { HostProcess } from "../host-process";
 import { ROUTE_LOCAL, type BackendRouter } from "../remote/backend-router";
 import { registerAgentExtensionIpc } from "../agent-extensions-ipc";
@@ -412,6 +413,28 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   registerToolPackagesIpc({ registrar, getHost });
   registerWidgetsIpc({ registrar, getHost, getSidecar });
 
+  /**
+   * Extensions trusted for one session's project (spec 16 §3.2), in the shape
+   * the loader takes.
+   *
+   * Same filter and same fields as the set main hands the sidecar in
+   * `session-launch`: a plugin that is not enabled for this project is not in
+   * either set, so which host runs a command never widens what may run.
+   */
+  const trustedAgentExtensionSpecs = (sessionId: string): TrustedExtensionSpec[] =>
+    (plugins as PluginRuntime)
+      .getAgentExtensions()
+      .filter((extension) =>
+        pluginActiveInProject(extension.pluginId, sessionProjects.get(sessionId) ?? null),
+      )
+      .map((extension) => ({
+        id: extension.id,
+        entry: extension.entry,
+        label: extension.pluginName,
+        source: "plugin" as const,
+        root: extension.root,
+      }));
+
   registerAgentExtensionIpc({
     handle,
     bridge: agentExtensions,
@@ -433,7 +456,19 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     runCommand: async (input) => {
       const currentSidecar = getSidecar();
       if (!currentSidecar) throw new Error("agent sidecar unavailable");
-      return currentSidecar.call<{ handled: boolean }>("extensions.command.run", input);
+      // An extension command is JavaScript. The Node sidecar is a JS host and
+      // owns the turn the command belongs to, so its runtime keeps running it.
+      // The Rust kernel has no JS runner and should not grow one: main runs the
+      // command itself, from the same trusted set and through the same Runner.
+      if (currentSidecar.runtime !== "rust") {
+        return currentSidecar.call<{ handled: boolean }>("extensions.command.run", input);
+      }
+      return agentExtensions.runCommand({
+        sessionId: input.sessionId,
+        name: input.name,
+        args: input.args,
+        specs: trustedAgentExtensionSpecs(input.sessionId),
+      });
     },
   });
   registerAgentIpc({

@@ -27,10 +27,6 @@ export type KernelMethodGap = {
  * `-32601` surfaces as before, which is the signal that the table is stale.
  */
 export const KERNEL_UNSUPPORTED_METHODS: Readonly<Record<string, KernelMethodGap>> = {
-  "agent.stop": {
-    surface: "stop the turn at the next completed assistant boundary (graceful stop)",
-    pending: "kernel: graceful stop shares the cancel path with agent.abort",
-  },
   "widget.invoke": {
     surface: "run a widget package action from the Tools page",
     pending: "kernel: widget runner (host-core owns discovery/trust already)",
@@ -51,10 +47,10 @@ export const KERNEL_UNSUPPORTED_METHODS: Readonly<Record<string, KernelMethodGap
     surface: "drop a widget package's cached state",
     pending: "kernel: widget runner",
   },
-  "extensions.command.run": {
-    surface: "run a trusted extension's command",
-    pending: "kernel: extension hooks",
-  },
+  // `extensions.command.run` is deliberately absent: an extension command is
+  // JavaScript, so when the kernel is the runtime main runs it itself instead of
+  // forwarding a method no JS-less process could answer. It is not a kernel gap
+  // waiting to be filled, so listing it here would be a false to-do.
   "native.session.list": {
     surface: "list sessions stored in the legacy pi JSONL format",
     pending: "kernel: the kernel keeps no pi-format session store; this surface retires with it",

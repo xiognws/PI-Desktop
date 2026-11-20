@@ -503,6 +503,9 @@ impl Sidecar {
             // was applied to the turn and run it names.
             "agent.modeTurnNotice" => self.mode_turn_notice(request),
             "agent.abort" => self.abort(request),
+            // `agent.stop`: the same turn-addressed path as `agent.abort`, with
+            // the opposite effect on the work in flight — see `stop`.
+            "agent.stop" => self.stop(request),
             "agent.getStatus" => self.get_status(request),
             "agent.stopSubagents" => self.stop_subagents(request),
             "agent.disposeSession" => self.dispose_session(request),
@@ -1417,6 +1420,9 @@ impl Sidecar {
                         tool_calls = outcome.tool_calls,
                         input = outcome.usage.input_tokens,
                         output = outcome.usage.output_tokens,
+                        // A turn the user stopped ends like any other; this flag
+                        // is what tells the log which boundary ended it.
+                        graceful_stop = outcome.graceful_stop,
                         "turn finished"
                     );
                     skill_review_pass(SkillReviewInput {
@@ -1783,6 +1789,56 @@ impl Sidecar {
         // A stopped turn settles every card it left open as skipped.
         self.asks.cancel_session(session_id);
         Ok(json!({ "ok": running, "aborted": running }))
+    }
+
+    /// `agent.stop`: end the turn at the next completed assistant boundary.
+    ///
+    /// The Node sidecar's `requestGracefulStop` is the reference: the answer is
+    /// `{ requested: boolean }`, never an error — a stop that arrives for a turn
+    /// that already ended (the common race: the user's Stop and the turn's own
+    /// finish) is `requested: false`, exactly as an unknown session is. Identity
+    /// is checked the same way `agent.abort` checks it, on the session and the
+    /// turn id, because both are addressed at a turn and both must not act on the
+    /// wrong one.
+    ///
+    /// What it deliberately does *not* do, unlike `agent.abort`: it never calls
+    /// `cancel`, so the tool the model already asked for keeps its token and runs
+    /// to completion, and it leaves the ask cards alone — a pending question is
+    /// not an abandoned turn. The loop reads the flag between steps and ends the
+    /// turn there, once.
+    fn stop(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?;
+        let Some(session) = sessions.get(session_id) else {
+            return Ok(json!({ "requested": false }));
+        };
+        if let Some(expected) = request
+            .str_param("turnId")
+            .filter(|value| !value.is_empty())
+        {
+            let current = session
+                .current_turn
+                .lock()
+                .map_err(|_| RpcError::internal("turn lock poisoned"))?
+                .clone();
+            if current.as_deref() != Some(expected) {
+                return Ok(json!({ "requested": false }));
+            }
+        }
+        // Nothing is streaming, so there is no boundary to stop at. The Node
+        // runtime answers the same way for an idle runtime.
+        if !session.running.load(Ordering::SeqCst) {
+            return Ok(json!({ "requested": false }));
+        }
+        session
+            .cancel
+            .lock()
+            .map_err(|_| RpcError::internal("cancel lock poisoned"))?
+            .request_stop();
+        Ok(json!({ "requested": true }))
     }
 
     /// Sessions this process owns. Until the kernel gains persistence these are

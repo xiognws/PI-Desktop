@@ -15,8 +15,6 @@ const {
  */
 
 const EXPECTED_GAPS = [
-  "agent.stop",
-  "extensions.command.run",
   "native.session.fork",
   "native.session.get",
   "native.session.list",
@@ -40,10 +38,10 @@ test("every gap says what the surface is and where it is being closed", () => {
 });
 
 test("a gap fails as UNSUPPORTED with a message a person can act on", () => {
-  const error = kernelUnsupportedMethodError("agent.stop");
+  const error = kernelUnsupportedMethodError("widget.invoke");
   assert.equal(error.errorCode, "UNSUPPORTED");
-  assert.match(error.message, /^agent\.stop is not available on the Rust agent kernel yet/);
-  assert.match(error.message, /graceful stop/);
+  assert.match(error.message, /^widget\.invoke is not available on the Rust agent kernel yet/);
+  assert.match(error.message, /widget package action/);
   assert.match(error.message, /kernel: /);
 });
 
@@ -57,6 +55,10 @@ test("methods the kernel does answer are not in the table", () => {
   for (const method of [
     "agent.prompt",
     "agent.abort",
+    // The graceful stop is answered by the kernel: main forwards the renderer's
+    // and the MCP client's `agent.stop` straight through, so this table must not
+    // turn it into UNSUPPORTED.
+    "agent.stop",
     "agent.steer",
     "agent.steeringContext",
     "agent.compact",

@@ -95,17 +95,26 @@ the kernel, not a reason to change the UI.
 * The kernel is forked into this repository. Upstream improvements must be ported
   deliberately; there is no shared dependency to pull from.
 * Parity is measurable and currently incomplete: part of the RPC surface
-  (`agent.stop`, `agent.modeTurnNotice`, `widget.*`, `native.session.*`,
-  `extensions.command.run`) and a set of prompt parameters (`scratchDir`,
+  (`widget.*`, `native.session.*`) and a set of prompt parameters (`scratchDir`,
   `projectMemory`, `permissionMode`, `subagentProviders`, …) still have no kernel
   reader. Each is closed by teaching the kernel the parameter and deleting it from
   the reported list in the same change.
 * `agent.stopSubagents` is closed: the renderer's subagent stop button reaches it.
   The rule lives in one place — `DelegationRegistry::stop` — and both the `TaskStop`
-  tool and the RPC phrase its outcomes for their own reader. The remaining RPC gaps
-  have no renderer caller today, so they are surface parity, not user-visible
-  breakage; `agent.stop` in particular is dead surface, because the stop button
-  sends `agent.abort`, which the kernel already answers.
+  tool and the RPC phrase its outcomes for their own reader. What is left in the
+  table has no renderer caller today, so it is surface parity rather than
+  user-visible breakage.
+* `agent.stop` is closed, and it was not dead surface: an external MCP client
+  reaches it through `mcp-control`'s `agent/stop`. The kernel now distinguishes a
+  graceful stop from an abort — the running tool finishes, the turn ends at the
+  next assistant boundary, and no further provider request is made — because a
+  stop that truncates a tool result is a different request from a stop that waits
+  for one.
+* `extensions.command.run` left the table without the kernel learning anything, on
+  purpose: an extension command is JavaScript, and the process that owns the
+  extensions is Electron main, not a JS-less kernel. Under the Node runtime the
+  sidecar still runs it; under the kernel main runs it from the same trusted set
+  through the same `TrustedExtensionRunner`.
 * `mode` and `pluginTools` are closed. Dropping `mode` had the kernel run a Plan or
   Goal session as Agent — the wrong rules in the prompt, and Write/Edit still in its
   own declarations; the adapter now forwards it. `pluginTools` is the one renamed

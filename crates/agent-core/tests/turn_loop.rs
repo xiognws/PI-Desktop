@@ -4,6 +4,7 @@
 //! (`TurnEngine::run_turn`) rather than from an extracted helper, so the
 //! ordering the renderer depends on is actually covered.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -541,4 +542,269 @@ async fn old_tool_output_is_aged_for_the_request_and_kept_in_the_transcript() {
             assert_eq!(old.content, new.content, "the transcript keeps every byte");
         }
     }
+}
+
+// --- `agent.stop` against `agent.abort` --------------------------------------
+//
+// Both are addressed at a running turn and both share the same token, so the
+// difference has to be observable rather than documented: the cases below hold
+// one tool open on a gate only the test can open. A cancelled turn abandons that
+// gate; a gracefully stopped turn waits for it, records the result, and ends
+// without asking the model for another step.
+
+/// Watches whether the tool's own future was abandoned before it answered.
+///
+/// `abort` drops the running future inside `ToolRegistry::dispatch`, which a
+/// test reading only the transcript could not tell from a tool that answered
+/// "cancelled" by itself.
+struct CutOffWatch {
+    completed: Arc<AtomicBool>,
+    cut_off: Arc<AtomicBool>,
+}
+
+impl Drop for CutOffWatch {
+    fn drop(&mut self) {
+        if !self.completed.load(Ordering::SeqCst) {
+            self.cut_off.store(true, Ordering::SeqCst);
+        }
+    }
+}
+
+/// A tool that reports when it has started and then waits for the test.
+struct GatedTool {
+    started: tokio::sync::mpsc::UnboundedSender<()>,
+    release: Mutex<Option<tokio::sync::oneshot::Receiver<String>>>,
+    cut_off: Arc<AtomicBool>,
+    completed: Arc<AtomicBool>,
+}
+
+impl GatedTool {
+    fn new(
+        started: tokio::sync::mpsc::UnboundedSender<()>,
+        release: tokio::sync::oneshot::Receiver<String>,
+    ) -> Self {
+        Self {
+            started,
+            release: Mutex::new(Some(release)),
+            cut_off: Arc::new(AtomicBool::new(false)),
+            completed: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+impl Tool for GatedTool {
+    fn spec(&self) -> ToolSpec {
+        ToolSpec::new(
+            "gated",
+            "Wait until the test lets go",
+            serde_json::json!({"type": "object", "properties": {}}),
+        )
+    }
+
+    fn call<'a>(
+        &'a self,
+        _call: &'a ToolCall,
+        _ctx: &'a ToolContext,
+    ) -> agent_core::provider::BoxFuture<'a, Result<String>> {
+        let watch = CutOffWatch {
+            completed: self.completed.clone(),
+            cut_off: self.cut_off.clone(),
+        };
+        let release = self
+            .release
+            .lock()
+            .expect("release slot poisoned")
+            .take()
+            .expect("one gated call per tool");
+        let started = self.started.clone();
+        Box::pin(async move {
+            let watch = watch;
+            let _ = started.send(());
+            let text = release.await.unwrap_or_default();
+            watch.completed.store(true, Ordering::SeqCst);
+            Ok(text)
+        })
+    }
+}
+
+/// One running fixture: the engine, the provider (for its request log), the sink,
+/// and the two ends of the gate the test holds the tool on.
+struct GatedHarness {
+    engine: TurnEngine,
+    provider: Arc<ScriptedProvider>,
+    sink: Arc<RecordingSink>,
+    cut_off: Arc<AtomicBool>,
+    started: tokio::sync::mpsc::UnboundedReceiver<()>,
+    release: tokio::sync::oneshot::Sender<String>,
+}
+
+/// One model step that asks for the gated tool, then an answer that must stay
+/// unrequested when the turn stops at the boundary.
+fn gated_engine() -> GatedHarness {
+    let provider = Arc::new(ScriptedProvider::new(vec![
+        tool_call_events("call_1", "gated", "{}"),
+        answer_events("this answer must never be requested"),
+    ]));
+    let (started_tx, started_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+    let tool = GatedTool::new(started_tx, release_rx);
+    let cut_off = tool.cut_off.clone();
+    let mut registry = ToolRegistry::new(Arc::new(AllowAll));
+    registry.register(Arc::new(tool));
+    let sink = Arc::new(RecordingSink::new());
+    let engine = TurnEngine::new(
+        provider.clone(),
+        Arc::new(registry),
+        sink.clone() as Arc<dyn EventSink>,
+    );
+    GatedHarness {
+        engine,
+        provider,
+        sink,
+        cut_off,
+        started: started_rx,
+        release: release_tx,
+    }
+}
+
+#[tokio::test]
+async fn abort_cuts_the_running_tool_off_and_fails_the_turn() {
+    let GatedHarness {
+        engine,
+        provider,
+        sink,
+        cut_off,
+        mut started,
+        release,
+    } = gated_engine();
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("run the gated tool"));
+    let cancel = CancelToken::new();
+    let token = cancel.clone();
+
+    let turn = tokio::spawn(async move {
+        let outcome = engine
+            .run_turn(
+                "s1",
+                "t1",
+                &mut transcript,
+                &TurnConfig::new("test-model"),
+                cancel,
+            )
+            .await;
+        (outcome, transcript)
+    });
+
+    // Only once the tool is actually running does the user's Stop land, so the
+    // case cannot pass by cancelling before anything started.
+    tokio::time::timeout(Duration::from_secs(5), started.recv())
+        .await
+        .expect("the tool must start")
+        .expect("a start signal");
+    token.cancel();
+
+    let (outcome, transcript) = tokio::time::timeout(Duration::from_secs(5), turn)
+        .await
+        .expect("an aborted turn must not wait for the tool")
+        .expect("the turn task must not panic");
+    let error = outcome.expect_err("an aborted turn is an error, not a graceful stop");
+    assert!(matches!(error, AgentError::Cancelled), "got: {error:?}");
+
+    // The tool never answered: its future was dropped while it waited.
+    assert!(
+        cut_off.load(Ordering::SeqCst),
+        "abort abandons the running tool"
+    );
+    // Its call still owes the model a result, and that result says so.
+    let tool_result = &transcript.messages()[2].tool_results()[0];
+    assert!(tool_result.is_error);
+    assert_eq!(tool_result.content, "cancelled while running");
+    // And no further request was issued.
+    assert_eq!(provider.requests().len(), 1);
+    assert!(sink.events().iter().any(|event| matches!(
+        event,
+        AgentEvent::Error { code, .. } if code == "TURN_CANCELLED"
+    )));
+    drop(release);
+}
+
+#[tokio::test]
+async fn a_graceful_stop_lets_the_tool_finish_and_ends_at_the_boundary() {
+    let GatedHarness {
+        engine,
+        provider,
+        sink,
+        cut_off,
+        mut started,
+        release,
+    } = gated_engine();
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("run the gated tool"));
+    let cancel = CancelToken::new();
+    let token = cancel.clone();
+
+    let turn = tokio::spawn(async move {
+        let outcome = engine
+            .run_turn(
+                "s1",
+                "t1",
+                &mut transcript,
+                &TurnConfig::new("test-model"),
+                cancel,
+            )
+            .await;
+        (outcome, transcript)
+    });
+
+    tokio::time::timeout(Duration::from_secs(5), started.recv())
+        .await
+        .expect("the tool must start")
+        .expect("a start signal");
+    // The user stops while the tool runs; main's `agent.stop` sets exactly this.
+    token.request_stop();
+    // The work the user asked for finishes anyway, and its output is what the
+    // transcript records.
+    release.send("finished the build".to_string()).ok();
+
+    let (outcome, transcript) = tokio::time::timeout(Duration::from_secs(5), turn)
+        .await
+        .expect("a stopped turn ends at the boundary")
+        .expect("the turn task must not panic");
+    let outcome = outcome.expect("a graceful stop is a finished turn, not a failure");
+
+    assert!(outcome.graceful_stop, "the turn reports why it ended");
+    assert_eq!(outcome.steps, 1, "one step, then the boundary");
+    // Distinguishable from a completed answer: the last message asked for tools.
+    assert_eq!(outcome.stop_reason, StopReason::ToolUse);
+    // The whole point: the tool ran to completion instead of being cut off.
+    assert!(
+        !cut_off.load(Ordering::SeqCst),
+        "a graceful stop must not abandon the running tool"
+    );
+    let tool_result = &transcript.messages()[2].tool_results()[0];
+    assert!(!tool_result.is_error);
+    assert_eq!(tool_result.content, "finished the build");
+    // No second model request: the answer is still in the script.
+    assert_eq!(
+        provider.requests().len(),
+        1,
+        "a stopped turn issues no further request"
+    );
+    assert_eq!(provider.remaining(), 1, "the answer was never asked for");
+    let roles: Vec<Role> = transcript.messages().iter().map(|m| m.role).collect();
+    assert_eq!(roles, vec![Role::User, Role::Assistant, Role::Tool]);
+    // The turn ends as a turn, not as an error.
+    let events = sink.events();
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, AgentEvent::TurnEnd)));
+    assert!(events
+        .iter()
+        .any(|event| matches!(event, AgentEvent::AgentEnd { .. })));
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, AgentEvent::Error { .. })),
+        "nothing failed, so nothing is reported as an error"
+    );
 }
