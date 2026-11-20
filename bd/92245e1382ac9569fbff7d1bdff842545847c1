@@ -1,0 +1,22 @@
+crates/agent-core/src/builtin_tools.rs
+  h_201ed4c689ac8b 128-132,181-195,252-255,278-289
+crates/host-core/src/permissions.rs
+  h_201ed4c689ac8b 131-134,137
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 43,575-646,1574-1579,3364,3379-3398,6448-6473
+crates/host-core/src/tools/vision.rs
+  h_201ed4c689ac8b 1-669
+scripts/e2e-vision-analyze.mjs
+  h_201ed4c689ac8b 1-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bd92245e1382ac9569fbff7d1bdff842545847c1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
