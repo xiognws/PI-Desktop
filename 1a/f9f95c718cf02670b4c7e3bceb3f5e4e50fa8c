@@ -1,0 +1,26 @@
+apps/desktop/electron/main/kernel/kernel-adapter.ts
+  h_201ed4c689ac8b 28-31,34,152-216,312-313
+apps/desktop/test/kernel-adapter.test.mjs
+  h_201ed4c689ac8b 177-271
+apps/desktop/test/kernel-methods.test.mjs
+  h_201ed4c689ac8b 65-67
+crates/agent-core/src/event.rs
+  h_201ed4c689ac8b 110-154,161-214,361-441
+crates/agent-core/src/plan.rs
+  h_201ed4c689ac8b 20-21,29-52,121-228,234-239,294-325,508-716,720,841-1167
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 463-466,801-887,1162-1177,1284-1300,2025-2029
+crates/agent-core/tests/plan_flow.rs
+  h_201ed4c689ac8b 1-363
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1af9f95c718cf02670b4c7e3bceb3f5e4e50fa8c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
