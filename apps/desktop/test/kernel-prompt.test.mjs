@@ -3,6 +3,8 @@ import test from "node:test";
 
 const {
   FORWARDED_PROMPT_PARAMS,
+  KNOWN_UNSUPPORTED_PROMPT_PARAMS,
+  RENAMED_PROMPT_PARAMS,
   adaptKernelPrompt,
   adaptKernelProvider,
 } = await import("../electron/main/kernel/kernel-prompt.ts");
@@ -50,6 +52,23 @@ const LAUNCH = {
   },
 };
 
+/** `launch.sidecarParams.pluginTools`: plugin agent tools plus the user's MCP tools. */
+const PLUGIN_TOOLS = [
+  {
+    name: "plugin_demo_probe",
+    description: "Probe a URL",
+    parameters: { type: "object", properties: { url: { type: "string" } } },
+    risk: "low",
+    planSafeActions: ["inspect"],
+  },
+  {
+    name: "mcp__filesystem__read_file",
+    mcpServerId: "srv-1",
+    description: "Read a file through the MCP server",
+    parameters: { type: "object", properties: { path: { type: "string" } } },
+  },
+];
+
 test("a launch payload reaches the kernel with its endpoint, model and identity", () => {
   const { params } = adaptKernelPrompt(LAUNCH);
   assert.equal(params.sessionId, "session-1");
@@ -73,7 +92,6 @@ test("a launch payload reaches the kernel with its endpoint, model and identity"
 test("launch parameters the kernel cannot read are reported, not dropped", () => {
   const { unsupported } = adaptKernelPrompt(LAUNCH);
   for (const key of [
-    "mode",
     "projectMemory",
     "attachmentsDir",
     "scratchDir",
@@ -81,6 +99,7 @@ test("launch parameters the kernel cannot read are reported, not dropped", () =>
     assert.ok(unsupported.includes(key), `${key} is reported as unsupported`);
   }
   for (const key of [
+    "mode",
     "thinkingLevel",
     "commandShell",
     "attachments",
@@ -130,6 +149,7 @@ test("every forwarded key is one the kernel actually reads", () => {
       "customSystemPrompt",
       "mcpServerIds",
       "mcpToolNames",
+      "mode",
       "modelId",
       "pluginSkills",
       "projectInstructions",
@@ -145,6 +165,105 @@ test("every forwarded key is one the kernel actually reads", () => {
       "turnId",
       "workspaceRoot",
     ].sort(),
+  );
+});
+
+test("the session mode reaches the kernel instead of being reported as a gap", () => {
+  // The kernel parses `mode` into its mode rules, withholds Write/Edit from its
+  // own declarations when the mode cannot write, and stamps the name on every
+  // `tools.execute`. Dropped, a Plan session ran as Agent with the write tools
+  // still declared.
+  for (const mode of ["agent", "plan", "goal"]) {
+    const { params, unsupported } = adaptKernelPrompt({ ...LAUNCH, mode });
+    assert.equal(params.mode, mode, `${mode} reaches the kernel under its own name`);
+    assert.equal(unsupported.includes("mode"), false, `${mode} is not reported as a gap`);
+  }
+});
+
+test("plugin tools and MCP tools reach the kernel as `tools` declarations", () => {
+  const { params, unsupported } = adaptKernelPrompt({
+    ...LAUNCH,
+    tools: undefined,
+    pluginTools: PLUGIN_TOOLS,
+  });
+  assert.equal("pluginTools" in params, false, "the kernel's name is `tools`");
+  assert.equal(unsupported.includes("pluginTools"), false);
+  // Exactly what the kernel's reader consumes: `name`, `description`,
+  // `parameters`, plus `mcpServerId`, which authorizes an MCP selection. `risk`
+  // and `planSafeActions` are host-core's knowledge of the plugin and are not
+  // part of a declaration the model sees.
+  assert.deepEqual(params.tools, [
+    {
+      name: "plugin_demo_probe",
+      description: "Probe a URL",
+      parameters: { type: "object", properties: { url: { type: "string" } } },
+    },
+    {
+      name: "mcp__filesystem__read_file",
+      mcpServerId: "srv-1",
+      description: "Read a file through the MCP server",
+      parameters: { type: "object", properties: { path: { type: "string" } } },
+    },
+  ]);
+});
+
+test("declarations keep one entry per name, host declarations first", () => {
+  // The kernel's registry is keyed by name, so a duplicate installs last-wins
+  // without a word. The adapter sends one entry per name instead.
+  const { params } = adaptKernelPrompt({
+    ...LAUNCH,
+    tools: [{ name: "plugin_demo_probe", description: "host version", parameters: { type: "object" } }],
+    pluginTools: PLUGIN_TOOLS,
+  });
+  assert.deepEqual(
+    params.tools.map((tool) => tool.name),
+    ["plugin_demo_probe", "mcp__filesystem__read_file"],
+  );
+  assert.equal(params.tools[0].description, "host version", "the host's declaration wins");
+
+  // Nothing declared means nothing to replace: the kernel installs its built-ins.
+  const nothing = adaptKernelPrompt({ ...LAUNCH, tools: undefined, pluginTools: [] });
+  assert.equal("tools" in nothing.params, false);
+  assert.equal(nothing.unsupported.includes("pluginTools"), false);
+});
+
+test("the parameter lists never overlap", () => {
+  const forwarded = new Set(FORWARDED_PROMPT_PARAMS);
+  for (const key of KNOWN_UNSUPPORTED_PROMPT_PARAMS) {
+    assert.equal(forwarded.has(key), false, `${key} is both forwarded and reported as a gap`);
+  }
+  assert.equal(
+    KNOWN_UNSUPPORTED_PROMPT_PARAMS.length,
+    new Set(KNOWN_UNSUPPORTED_PROMPT_PARAMS).size,
+    "a gap is listed once",
+  );
+  for (const [from, to] of Object.entries(RENAMED_PROMPT_PARAMS)) {
+    assert.equal(forwarded.has(from), false, `${from} is mapped, not passed through`);
+    assert.equal(
+      KNOWN_UNSUPPORTED_PROMPT_PARAMS.includes(from),
+      false,
+      `${from} is renamed, not dropped`,
+    );
+    assert.equal(
+      forwarded.has(to),
+      true,
+      `${to} is the kernel's side of the mapping and must be a name it reads`,
+    );
+  }
+});
+
+test("an unsupported wire refuses the turn even with a mode and tools to declare", () => {
+  // A usable mode and a full tool list must not let a turn past a provider the
+  // kernel cannot speak.
+  assert.throws(
+    () =>
+      adaptKernelPrompt({
+        ...LAUNCH,
+        mode: "plan",
+        pluginTools: PLUGIN_TOOLS,
+        provider: { ...LAUNCH.provider, apiStyle: "responses" },
+      }),
+    /provider\.apiStyle\(responses\)/,
   );
 });
 
