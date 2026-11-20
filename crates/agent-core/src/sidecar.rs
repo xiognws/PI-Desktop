@@ -467,6 +467,7 @@ impl Sidecar {
             "agent.steeringContext" => self.steering_context(request),
             "agent.abort" => self.abort(request),
             "agent.getStatus" => self.get_status(request),
+            "agent.stopSubagents" => self.stop_subagents(request),
             "agent.disposeSession" => self.dispose_session(request),
             "native.session.get" => self.session_get(request).await,
             "native.session.list" => self.session_list(request),
@@ -1794,6 +1795,51 @@ impl Sidecar {
         let mut transcript = session.transcript.lock().await;
         transcript.extend(messages);
         Ok(())
+    }
+
+    /// `agent.stopSubagents`: cancel this session's running delegates.
+    ///
+    /// The renderer's subagent stop button is the caller: one id from a transcript
+    /// row, or no ids from the activity group's header to stop all of them. The
+    /// reply is the list of what the stop actually reached, so a button that was
+    /// pressed against a delegation that had already finished reports nothing
+    /// instead of pretending to have stopped it.
+    fn stop_subagents(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let ids = match request.params.get("delegationIds") {
+            None => None,
+            Some(Value::Array(values)) => {
+                if values.is_empty() || values.len() > 100 {
+                    return Err(RpcError::invalid_params("Invalid delegation IDs"));
+                }
+                let mut ids = Vec::with_capacity(values.len());
+                for value in values {
+                    match value.as_str().map(str::trim).filter(|id| !id.is_empty()) {
+                        Some(id) => ids.push(id.to_string()),
+                        None => return Err(RpcError::invalid_params("Invalid delegation IDs")),
+                    }
+                }
+                Some(ids)
+            }
+            Some(_) => return Err(RpcError::invalid_params("Invalid delegation IDs")),
+        };
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?;
+        let Some(session) = sessions.get(session_id) else {
+            return Ok(json!({ "pending": Vec::<String>::new() }));
+        };
+        let pending: Vec<String> = session
+            .delegations
+            .stop(ids.as_deref())
+            .into_iter()
+            .filter_map(|outcome| match outcome {
+                crate::delegate::StopOutcome::Requested { id, .. } => Some(id),
+                _ => None,
+            })
+            .collect();
+        Ok(json!({ "pending": pending }))
     }
 
     fn get_status(&self, request: &Request) -> Result<Value, RpcError> {

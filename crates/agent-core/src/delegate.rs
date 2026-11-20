@@ -274,6 +274,28 @@ impl DelegationRecord {
     }
 }
 
+/// What a stop did to one delegation, so each caller can phrase it for its reader.
+pub enum StopOutcome {
+    /// Asked to stop; the delegate settles itself as `stopped`.
+    Requested { id: String, agent: String },
+    /// Already finished, so nothing was cancelled.
+    AlreadySettled {
+        id: String,
+        agent: String,
+        status: &'static str,
+    },
+    /// No delegation by that id exists in this session.
+    Unknown { id: String },
+}
+
+impl StopOutcome {
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Requested { id, .. } | Self::AlreadySettled { id, .. } | Self::Unknown { id } => id,
+        }
+    }
+}
+
 /// The delegations of one session.
 ///
 /// Kept per session rather than per turn: a report that settled after the parent
@@ -325,6 +347,52 @@ impl DelegationRegistry {
                     .map(|record| DelegationView::from(&*record))
             })
             .collect()
+    }
+
+    /// Cancel delegations the caller asked to stop.
+    ///
+    /// One rule for both callers: the `TaskStop` tool reports per id (including the
+    /// ones it could not stop), and `agent.stopSubagents` reports only what the stop
+    /// reached. A delegation that already settled is never re-cancelled — that would
+    /// rewrite a record the parent may already have read. `ids` of `None` means the
+    /// activity group's stop button: every live delegate, with no noise about the
+    /// ones that were already done.
+    pub fn stop(&self, ids: Option<&[String]>) -> Vec<StopOutcome> {
+        let mut outcomes = Vec::new();
+        for handle in self.handles() {
+            let Ok(mut record) = handle.lock() else {
+                continue;
+            };
+            let id = record.delegation_id.clone();
+            let agent = record.agent_name.clone();
+            if let Some(ids) = ids {
+                if !ids.iter().any(|wanted| wanted == &id) {
+                    continue;
+                }
+            } else if record.status.is_settled() {
+                continue;
+            }
+            if record.status.is_settled() {
+                outcomes.push(StopOutcome::AlreadySettled {
+                    id,
+                    agent,
+                    status: record.status.as_str(),
+                });
+                continue;
+            }
+            // The delegate notices through its own token and settles itself as
+            // `stopped`; the parent turn is never aborted by this.
+            record.abort();
+            outcomes.push(StopOutcome::Requested { id, agent });
+        }
+        if let Some(ids) = ids {
+            for id in ids {
+                if !outcomes.iter().any(|outcome| outcome.id() == id) {
+                    outcomes.push(StopOutcome::Unknown { id: id.clone() });
+                }
+            }
+        }
+        outcomes
     }
 
     fn settle(&self, handle: &Arc<Mutex<DelegationRecord>>, outcome: DelegateOutcome) {
@@ -1085,33 +1153,18 @@ impl Tool for TaskStopTool {
                 ));
             }
             let mut lines: Vec<String> = Vec::new();
-            for id in &ids {
-                let handle = self
-                    .hub
-                    .registry
-                    .records
-                    .lock()
-                    .ok()
-                    .and_then(|records| records.get(id).cloned());
-                let Some(handle) = handle else {
-                    lines.push(format!("- {id}: no such delegation in this session"));
-                    continue;
-                };
-                let Ok(record) = handle.lock() else {
-                    continue;
-                };
-                if record.status.is_settled() {
-                    lines.push(format!(
-                        "- {id}: already {} ({})",
-                        record.status.as_str(),
-                        record.agent_name
-                    ));
-                    continue;
-                }
-                // The delegate notices through its own token, and settles itself
-                // as `stopped` — the parent is never aborted by this.
-                record.abort();
-                lines.push(format!("- {id}: stop requested ({})", record.agent_name));
+            for outcome in self.hub.registry.stop(Some(&ids)) {
+                lines.push(match outcome {
+                    StopOutcome::Requested { id, agent } => {
+                        format!("- {id}: stop requested ({agent})")
+                    }
+                    StopOutcome::AlreadySettled { id, agent, status } => {
+                        format!("- {id}: already {status} ({agent})")
+                    }
+                    StopOutcome::Unknown { id } => {
+                        format!("- {id}: no such delegation in this session")
+                    }
+                });
             }
             Ok(lines.join("\n"))
         })
@@ -1416,6 +1469,53 @@ mod tests {
             !parent_cancel.is_cancelled(),
             "a delegate's stop never cancels the parent turn"
         );
+    }
+
+    #[tokio::test]
+    async fn stopping_by_id_reports_what_it_reached_and_what_it_did_not() {
+        let gate = Arc::new(Notify::new());
+        let hub = hub(Arc::new(ManualRunner {
+            started: Arc::new(AtomicUsize::new(0)),
+            gate,
+        }));
+        let task = TaskTool::new(hub.clone());
+        for brief in ["first", "second"] {
+            task.call(
+                &call(TASK_TOOL_NAME, json!({"agent": "explorer", "task": brief})),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect("started");
+        }
+        let ids: Vec<String> = hub
+            .registry
+            .snapshot()
+            .iter()
+            .map(|view| view.delegation_id.clone())
+            .collect();
+        assert_eq!(ids.len(), 2);
+
+        // One known id and one that never existed: the caller learns both, and the
+        // delegate it did not name keeps running.
+        let outcomes = hub
+            .registry
+            .stop(Some(&[ids[0].clone(), "ghost".to_string()]));
+        assert!(matches!(
+            &outcomes[0],
+            StopOutcome::Requested { id, .. } if id == &ids[0]
+        ));
+        assert!(matches!(&outcomes[1], StopOutcome::Unknown { id } if id == "ghost"));
+        assert_eq!(hub.registry.snapshot()[1].status, DelegationStatus::Running);
+
+        // No ids means the activity group's stop button: every delegate still live,
+        // including the one already asked to stop — asking twice is harmless because
+        // the delegate settles itself exactly once.
+        let all = hub.registry.stop(None);
+        assert_eq!(all.len(), 2);
+        assert!(all.iter().all(|outcome| matches!(
+            outcome,
+            StopOutcome::Requested { .. }
+        )));
     }
 
     #[tokio::test]

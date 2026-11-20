@@ -18,7 +18,6 @@ const EXPECTED_GAPS = [
   "agent.executeApprovedPlan",
   "agent.modeTurnNotice",
   "agent.stop",
-  "agent.stopSubagents",
   "extensions.command.run",
   "native.session.fork",
   "native.session.get",

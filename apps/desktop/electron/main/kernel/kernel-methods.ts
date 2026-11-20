@@ -31,10 +31,6 @@ export const KERNEL_UNSUPPORTED_METHODS: Readonly<Record<string, KernelMethodGap
     surface: "stop the turn at the next completed assistant boundary (graceful stop)",
     pending: "kernel: graceful stop shares the cancel path with agent.abort",
   },
-  "agent.stopSubagents": {
-    surface: "cancel running delegates without ending the parent turn",
-    pending: "kernel: needs the delegation registry surfaced over RPC",
-  },
   "agent.executeApprovedPlan": {
     surface: "run a plan the user approved",
     pending: "kernel: plan execution entry point",
