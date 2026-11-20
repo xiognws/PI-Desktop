@@ -1,0 +1,14 @@
+crates/agent-core/src/builtin_tools.rs
+  h_201ed4c689ac8b 133,224-263,331-334,363-364,389-392
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "454ff5cf59681fc3958878eef5749c4e2551032f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
