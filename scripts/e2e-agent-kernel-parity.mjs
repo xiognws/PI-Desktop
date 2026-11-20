@@ -143,20 +143,20 @@ async function rpcOutcome(promise) {
 }
 
 /**
- * The tool names the kernel currently has declared.
+ * The tool names the kernel would declare for a mode.
  *
- * `agent.execPolicy` answers with the live registry's `{name, class}` rows, and
- * the turn loop sends exactly `toolRegistry.specs()` as the request's `tools`
- * (`crates/agent-core/src/turn.rs`: `request.tools = self.tools.specs()`). So the
- * registry read back after a turn is the declaration set that turn's request
- * carried. `agent.tokenReport` prices the same registry, and is read as a second,
- * independent witness.
+ * `agent.tokenReport` answers with the declarations a request in that mode would
+ * carry, so it is the witness for what the model actually sees. `agent.execPolicy`
+ * is kept as a second, wider witness: it reports the live registry, which also
+ * holds the tools that are available but deferred, so the registry is a superset
+ * of the declarations and must never be the thing a declaration assertion reads.
  */
-async function declaredToolNames(sidecar, sessionId) {
+async function declaredToolNames(sidecar, sessionId, mode) {
   const policy = await rpcOutcome(sidecar.call("agent.execPolicy", {}));
   const report = await rpcOutcome(
     sidecar.call("agent.tokenReport", {
       sessionId,
+      mode,
       provider: { kind: "scripted", script: [{ text: "unused" }] },
     }),
   );
@@ -167,10 +167,10 @@ async function declaredToolNames(sidecar, sessionId) {
     ? (report.value?.tools ?? []).map((row) => row?.name).filter(Boolean)
     : [];
   return {
-    names: policyNames,
-    reportNames,
-    detail: `agent.execPolicy=${policy.ok ? short(policyNames) : short(policy.error)}` +
-      ` agent.tokenReport=${report.ok ? short(reportNames) : short(report.error)}`,
+    names: reportNames,
+    registryNames: policyNames,
+    detail: `agent.tokenReport=${report.ok ? short(reportNames) : short(report.error)}` +
+      ` agent.execPolicy(registry)=${policy.ok ? short(policyNames) : short(policy.error)}`,
   };
 }
 
@@ -258,7 +258,7 @@ try {
       () => kernel.events.some((event) => event.event.type === "agent_end"),
       { label: "plan agent_end" },
     );
-    const planTools = await declaredToolNames(kernel.sidecar, sessionId);
+    const planTools = await declaredToolNames(kernel.sidecar, sessionId, "plan");
     console.log(`plan turn : [${planTools.names.join(", ")}]`);
     check(
       "plan mode declares no Write/Edit",
@@ -294,7 +294,7 @@ try {
         () => kernel.events.filter((event) => event.event.type === "agent_end").length >= 2,
         { label: "agent agent_end" },
       );
-      const agentTools = await declaredToolNames(kernel.sidecar, sessionId);
+      const agentTools = await declaredToolNames(kernel.sidecar, sessionId, "agent");
       console.log(`agent turn: [${agentTools.names.join(", ")}]`);
       check(
         "the same read-out shows Write/Edit in agent mode",
