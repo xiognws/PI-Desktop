@@ -40,6 +40,7 @@ pub mod shell_session;
 #[cfg(test)]
 mod shell_session_tests;
 pub mod timeout_policy;
+pub mod vision;
 #[cfg(windows)]
 mod windows_process_tree;
 
@@ -569,6 +570,78 @@ pub async fn run_internal_tool_runner() -> Result<i32> {
         return shell_session::run_persistent_runner(config, control).await;
     }
     run_one_shot_runner(config, control).await
+}
+
+/// A script file written for one command, removed when the call returns.
+///
+/// Deleting it on drop covers every exit path (success, timeout, abort, early
+/// return) without threading a cleanup through each one.
+#[derive(Default)]
+struct BashScriptFile {
+    path: Option<std::path::PathBuf>,
+}
+
+impl BashScriptFile {
+    fn adopt(&mut self, path: std::path::PathBuf) {
+        self.path = Some(path);
+    }
+}
+
+impl Drop for BashScriptFile {
+    fn drop(&mut self) {
+        if let Some(path) = self.path.take() {
+            // Already gone is success: a crashed run is cleaned by the next start.
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+/// Write the command to a script file and build the invocation that runs it.
+///
+/// `None` means "carry this command inline": the command is short, the shell has
+/// no file carrier, or the file could not be written.
+fn script_file_carrier(
+    command_shell_id: &str,
+    program: &std::path::Path,
+    command: &str,
+) -> Option<(std::path::PathBuf, shell::ShellInvocation)> {
+    if !shell::wants_script_file(command) {
+        return None;
+    }
+    let (extension, contents) =
+        shell::script_file_contents(shell::current_platform(), command_shell_id, command)?;
+    // `scratch_path` concatenates the extension verbatim, and PowerShell refuses a
+    // script whose name does not end in `.ps1`.
+    let dotted = format!(".{extension}");
+    let path = crate::runtime_tmp::scratch_path("bash", &dotted).ok()?;
+    // The root is process-global and created on demand; a caller that pointed it
+    // at a directory which has since been removed (a test fixture, a cleaned
+    // profile) must not leave this call with a path whose parent is gone, because
+    // the shell would then fail to find the script it was told to run.
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let written = if extension == "ps1" {
+        // Windows PowerShell 5.1 decodes a BOM-less script with the ANSI code
+        // page, so a non-ASCII command would be mangled before it is parsed.
+        let mut bytes = Vec::with_capacity(contents.len() + 3);
+        bytes.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+        bytes.extend_from_slice(contents.as_bytes());
+        std::fs::write(&path, bytes)
+    } else {
+        std::fs::write(&path, contents.as_bytes())
+    };
+    if written.is_err() || !path.is_file() {
+        return None;
+    }
+    let invocation = shell::build_file_invocation_for_platform(
+        shell::current_platform(),
+        command_shell_id,
+        program.to_path_buf(),
+        &path,
+    )
+    .ok()?;
+    Some((path, invocation))
 }
 
 async fn run_one_shot_runner(
@@ -1498,6 +1571,12 @@ pub async fn execute_tool_with_file_lease(
                 .await
             }
         },
+        // The host makes this call itself: one image in, one answer out. No
+        // workspace is required — an absolute path or an http(s) URL is enough —
+        // so it is not gated like the file tools.
+        name if vision::recognizes(name) => {
+            vision::execute(args, workspace, vision::host_providers()).await
+        }
         other if is_desktop_dispatched(other) => Err(hashline::ToolError::new(
             "TOOL_NOT_FOUND",
             format!("{other} requires the desktop runner (dispatched via plugins.execute)"),
@@ -3282,7 +3361,7 @@ async fn tool_bash(
 
     let resolved = shell::resolve_shell(&options.command_shell_id)
         .map_err(|message| ("SHELL_NOT_FOUND".to_string(), message))?;
-    let invocation = shell::build_invocation_for_platform(
+    let inline_invocation = shell::build_invocation_for_platform(
         shell::current_platform(),
         &options.command_shell_id,
         resolved.program,
@@ -3296,6 +3375,26 @@ async fn tool_bash(
         };
         (code.into(), message)
     })?;
+
+    // Long or multi-line commands are carried by a script file instead of the
+    // command line. Two reasons, one of them the reason this exists: a quoted
+    // interpreter blob is the shape behaviour engines score hardest, and the
+    // inline carrier is also what makes a command hit the Windows command-line
+    // limit. A failure to write the file is not an error - the inline carrier
+    // still runs the command, it just looks like it used to.
+    let mut script_file = BashScriptFile::default();
+    let invocation = match script_file_carrier(
+        &options.command_shell_id,
+        &inline_invocation.program,
+        command,
+    ) {
+        Some(materialised) => {
+            let (path, invocation) = materialised;
+            script_file.adopt(path);
+            invocation
+        }
+        None => inline_invocation,
+    };
 
     // Session fast path: reuse one runner and one interpreter per session
     // instead of spawning both per call. It declines (NotApplicable) for
@@ -6344,5 +6443,31 @@ mod tests {
             msg.contains("no-such-file.txt"),
             "diagnostic should name the path: {msg}"
         );
+    }
+}
+
+#[cfg(test)]
+mod script_file_guard_tests {
+    use super::BashScriptFile;
+
+    #[test]
+    fn the_guard_removes_the_script_file_it_adopted() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("bash-1-1.ps1");
+        std::fs::write(&path, b"Write-Output hi").expect("write");
+        assert!(path.exists());
+
+        {
+            let mut guard = BashScriptFile::default();
+            guard.adopt(path.clone());
+        }
+
+        assert!(!path.exists(), "the script file outlives the call it served");
+    }
+
+    #[test]
+    fn a_guard_that_adopted_nothing_is_harmless() {
+        let guard = BashScriptFile::default();
+        drop(guard);
     }
 }

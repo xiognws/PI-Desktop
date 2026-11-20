@@ -128,9 +128,13 @@ impl PermissionManager {
             // Language-server queries read the workspace and never write: the client
             // declares no edit capability, so they belong with Read and Grep rather
             // than behind a card the user has to dismiss on every navigation.
+            // Vision reads the one image the user points at and asks the provider the
+            // session already talks to; it never writes and never runs anything, so it
+            // sits with Read rather than behind a card the user dismisses every time a
+            // screenshot is the subject of the question.
             "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
             | "memory" | "skill_manage" | "Skill" | "LspDefinition" | "LspReferences"
-            | "LspDiagnostics" => Risk::Low,
+            | "LspDiagnostics" | "VisionAnalyze" | "vision_analyze" => Risk::Low,
             "Write" | "Edit" | "AstEdit" | "AstEditApply" | "Bash" | "GenerateImages"
             | "Computer" => Risk::High,
             name if name.starts_with("plugin_") => match declared {

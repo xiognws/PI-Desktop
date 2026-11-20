@@ -125,8 +125,11 @@ impl ShellIdentity {
 /// Byte ceiling for the whole built-in declaration set.
 ///
 /// Every request carries these, so this is a budget, not a preference: it fails
-/// the build's tests when a description grows back into a paragraph.
-pub const DECLARATION_BUDGET_BYTES: usize = 1_250;
+/// the build's tests when a description grows back into a paragraph. Raised once
+/// from 1 250 to make room for `VisionAnalyze`, which is the price of the model
+/// being able to ask about a picture at all; the guard still fails on any
+/// description that grows into a paragraph.
+pub const DECLARATION_BUDGET_BYTES: usize = 1_500;
 
 fn read() -> Value {
     json!({
@@ -171,6 +174,21 @@ fn grep() -> Value {
                 "caseInsensitive": {"type": "boolean"}
             },
             "required": ["pattern"]
+        }
+    })
+}
+
+fn vision() -> Value {
+    json!({
+        "name": "VisionAnalyze",
+        "description": "Ask a vision model about an image",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "image_url": {"type": "string", "description": "path or URL"},
+                "question": {"type": "string"}
+            },
+            "required": ["image_url", "question"]
         }
     })
 }
@@ -231,7 +249,10 @@ fn bash(shell: Option<&ShellIdentity>) -> Value {
 /// Writes are withheld from Plan and Goal: those modes propose a contract before
 /// anything is touched, and a tool the mode cannot use is pure cost.
 pub fn declarations(mode: SessionMode, shell: Option<&ShellIdentity>) -> Vec<Value> {
-    let mut tools = vec![read(), glob(), grep(), bash(shell)];
+    // Vision reads a file and asks the provider the turn already talks to, so it is
+    // offered in every mode: refusing it in a read-only session would hide the one
+    // tool that answers "what is in this picture?" without touching anything.
+    let mut tools = vec![read(), glob(), grep(), vision(), bash(shell)];
     if mode == SessionMode::Agent {
         tools.insert(3, write());
         tools.insert(4, edit());
@@ -254,7 +275,18 @@ mod tests {
             .iter()
             .filter_map(|tool| tool["name"].as_str())
             .collect();
-        assert_eq!(names, ["Read", "Glob", "Grep", "Write", "Edit", "Bash"]);
+        assert_eq!(
+            names,
+            [
+                "Read",
+                "Glob",
+                "Grep",
+                "Write",
+                "Edit",
+                "VisionAnalyze",
+                "Bash"
+            ]
+        );
         for tool in &tools {
             assert!(
                 tool["parameters"]["required"].is_array(),
