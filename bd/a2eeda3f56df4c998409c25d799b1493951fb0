@@ -1,0 +1,16 @@
+crates/agent-core/src/host_bridge.rs
+  h_201ed4c689ac8b 322-330,411-432,456-458,519-662
+crates/agent-core/src/tool.rs
+  h_201ed4c689ac8b 32-44,53,56-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bda2eeda3f56df4c998409c25d799b1493951fb0",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
