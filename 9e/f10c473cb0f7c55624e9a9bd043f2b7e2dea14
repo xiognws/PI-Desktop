@@ -1,0 +1,16 @@
+crates/agent-core/src/builtin_tools.rs
+  h_201ed4c689ac8b 128-141,232-236,324-610,619,621-622,626-639,641-649,674,679-693,718-728,732-762
+scripts/e2e-agent-kernel.mjs
+  h_201ed4c689ac8b 167-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9ef10c473cb0f7c55624e9a9bd043f2b7e2dea14",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
