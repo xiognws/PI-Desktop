@@ -95,21 +95,33 @@ the kernel, not a reason to change the UI.
 * The kernel is forked into this repository. Upstream improvements must be ported
   deliberately; there is no shared dependency to pull from.
 * Parity is measurable and currently incomplete: part of the RPC surface
-  (`agent.stop`, `agent.stopSubagents`, `agent.executeApprovedPlan`,
-  `agent.modeTurnNotice`, `widget.*`, `native.session.*`, `extensions.command.run`),
-  two event types (`tool_update`, `planning_state`) and a set of prompt
-  parameters (`attachments`, `scratchDir`, `customSystemPrompt`,
-  `projectInstructions`, `projectMemory`, `modeTurn`, …) still have no kernel
-  reader. Each is closed by teaching the kernel the parameter and deleting it from
-  the reported list in the same change.
+  (`agent.stop`, `agent.executeApprovedPlan`, `agent.modeTurnNotice`, `widget.*`,
+  `native.session.*`, `extensions.command.run`), two event types (`tool_update`,
+  `planning_state`) and a set of prompt parameters (`scratchDir`,
+  `customSystemPrompt`, `projectInstructions`, `projectMemory`, `modeTurn`, …) still
+  have no kernel reader. Each is closed by teaching the kernel the parameter and
+  deleting it from the reported list in the same change.
+* `agent.stopSubagents` is closed: the renderer's subagent stop button reaches it.
+  The rule lives in one place — `DelegationRegistry::stop` — and both the `TaskStop`
+  tool and the RPC phrase its outcomes for their own reader. The remaining RPC gaps
+  have no renderer caller today, so they are surface parity, not user-visible
+  breakage; `agent.stop` in particular is dead surface, because the stop button
+  sends `agent.abort`, which the kernel already answers.
+* Prompt `attachments` are closed. The payload carries a path, not bytes: the kernel
+  reads the file, inlines it as base64 when the launch declares the model can see it,
+  and keeps a text reference otherwise (no vision, missing file, or past the
+  per-image and per-turn ceilings). An image that travels alone also gets a system
+  message, because the local gateway classifies `hasImagePart && msgs.len() <= 1` as
+  image generation and answers with no `choices`.
 * Approval does not need a kernel event: the permission card is driven by
   host-core's `permissions.request` notification, which Electron main already
   handles and the kernel never sees (`electron/main/runtime/host.ts`). Verified in
   the packaged app: a `Bash` call raised the card, the click released the call, and
   the command ran.
-* `attachments` is the next prompt parameter with real user impact: the provider
-  layer now serialises image parts (source commit `cc42b1e`), so the remaining work
-  is turning the prompt's base64 attachments into `ContentPart::Image`.
+* Upstream's newer tools (browser, image generation, code execution, vision) live in
+  its `agent-host` crate, which owns a second SQLite store and six sibling crates.
+  Vendoring it would give this app two persistence owners, so those tools are ported
+  one at a time into `host-core`, which is where tools execute here.
 * The Node sidecar stays in the tree until the port is closed, then follows the
   usual removal path (surface, settings, tests, spec) rather than being left as a
   half-wired alternative.
