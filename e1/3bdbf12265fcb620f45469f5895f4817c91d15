@@ -1,0 +1,22 @@
+crates/host-core/src/tools/image_generate.rs
+  h_201ed4c689ac8b 1-1076
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 33,40,1517-1526,1586,1588-1605
+crates/host-core/src/tools/provider_store.rs
+  h_201ed4c689ac8b 1-216
+crates/host-core/src/tools/vision.rs
+  h_201ed4c689ac8b 131-132,134-139,221-225,227-228,296,360,502,506,510
+scripts/e2e-image-generate.mjs
+  h_201ed4c689ac8b 1-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e13bdbf12265fcb620f45469f5895f4817c91d15",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
