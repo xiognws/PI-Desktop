@@ -41,12 +41,34 @@ pub const IMAGE_EQUIVALENT_CHARS: u64 = 4_800;
 pub const DEFAULT_CONTEXT_WINDOW: u64 = 128_000;
 pub const DEFAULT_MAX_TOKENS: u64 = 32_768;
 
-/// The only model facts the budget needs. A catalog entry that never reported a
-/// window falls back to the package defaults instead of producing nonsense.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// The model facts the budget needs, plus the turn's compaction switch.
+///
+/// A catalog entry that never reported a window falls back to the package
+/// defaults instead of producing nonsense.
+///
+/// `compaction_enabled` is not a model fact; it rides here because this struct
+/// is what the engine turns into [`ContextLimits`] (`TurnEngine::with_model_limits`
+/// → [`ContextLimits::for_model`]), and that conversion is where the trigger is
+/// computed. It carries the user's `compactionSettings.enabled`: the Node runtime
+/// reads the same field and nothing else from those settings
+/// (`compactionEnabled` in `packages/agent-runtime/src/runtime.ts`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModelLimits {
     pub context_window: Option<u64>,
     pub max_tokens: Option<u64>,
+    /// Whether this turn auto-compacts at the trigger. Defaults to on: the
+    /// reference turns automatic protection on unless a caller disables it.
+    pub compaction_enabled: bool,
+}
+
+impl Default for ModelLimits {
+    fn default() -> Self {
+        Self {
+            context_window: None,
+            max_tokens: None,
+            compaction_enabled: true,
+        }
+    }
 }
 
 impl ModelLimits {
@@ -54,7 +76,14 @@ impl ModelLimits {
         Self {
             context_window: Some(context_window),
             max_tokens: Some(max_tokens),
+            compaction_enabled: true,
         }
+    }
+
+    /// Apply the launch's compaction switch (`compactionSettings.enabled`).
+    pub fn with_compaction_enabled(mut self, enabled: bool) -> Self {
+        self.compaction_enabled = enabled;
+        self
     }
 }
 
@@ -83,6 +112,13 @@ pub struct ContextLimits {
     pub trigger: u64,
     /// Cap on the user message a checkpoint carries forward.
     pub retained_user_message_budget: u64,
+    /// Whether reaching [`Self::trigger`] starts a compaction. `false` is the
+    /// user's `compactionSettings.enabled: false`: automatic protection is off,
+    /// so a request above the trigger is sent as it is. The hard boundary is
+    /// unaffected — a request at it is still classified
+    /// [`BudgetDecision::Overflow`], which is a safety limit rather than a
+    /// compaction preference.
+    pub compaction_enabled: bool,
 }
 
 impl ContextLimits {
@@ -140,14 +176,21 @@ impl ContextLimits {
             keep_recent_tokens,
             trigger,
             retained_user_message_budget,
+            compaction_enabled: model.compaction_enabled,
         }
     }
 
     /// Classify a request of `tokens` estimated size.
+    ///
+    /// `decide` is where the user's compaction switch takes effect: with
+    /// automatic compaction disabled, the trigger classifies as `Proceed` and no
+    /// summary is requested. The hard boundary keeps classifying as `Overflow`
+    /// regardless — a turned-off preference must not turn off the limit that
+    /// keeps a request the provider would reject from being sent.
     pub fn decide(&self, tokens: u64) -> BudgetDecision {
         if tokens >= self.hard_limit {
             BudgetDecision::Overflow
-        } else if tokens >= self.trigger {
+        } else if self.compaction_enabled && tokens >= self.trigger {
             BudgetDecision::Compact
         } else {
             BudgetDecision::Proceed
@@ -339,6 +382,38 @@ mod tests {
             limits.decide(limits.hard_limit + 1_000),
             BudgetDecision::Overflow
         );
+    }
+
+    /// The user's `compactionSettings.enabled` is the one field of those settings
+    /// the reference reads (`compactionEnabled`), and it has to be the one this
+    /// budget reads too: `false` means the trigger never starts a compaction.
+    #[test]
+    fn a_disabled_compaction_switch_moves_the_trigger_without_moving_the_hard_limit() {
+        let enabled = ContextLimits::for_model(ModelLimits::default());
+        let disabled =
+            ContextLimits::for_model(ModelLimits::default().with_compaction_enabled(false));
+
+        assert_eq!(enabled.decide(enabled.trigger), BudgetDecision::Compact);
+        assert_eq!(
+            disabled.decide(disabled.trigger),
+            BudgetDecision::Proceed,
+            "a disabled session must not compact at the trigger"
+        );
+        assert_eq!(
+            disabled.decide(disabled.trigger + 20_000),
+            BudgetDecision::Proceed,
+            "nor anywhere between the trigger and the hard boundary"
+        );
+        // The safety boundary is not a preference.
+        assert_eq!(
+            disabled.decide(disabled.hard_limit),
+            BudgetDecision::Overflow
+        );
+        assert_eq!(
+            disabled.trigger, enabled.trigger,
+            "the trigger itself is unchanged"
+        );
+        assert_eq!(disabled.hard_limit, enabled.hard_limit);
     }
 
     #[test]

@@ -454,6 +454,7 @@ async fn old_tool_output_is_aged_for_the_request_and_kept_in_the_transcript() {
     let context = agent_core::context::ContextLimits::for_model(ModelLimits {
         context_window: Some(60_000),
         max_tokens: Some(8_000),
+        ..ModelLimits::default()
     });
     let target = (context.trigger as f64 * (policy.trigger_share + 1.0) / 2.0) as u64;
     let per_result = (target as f64 * agent_core::context::ESTIMATED_TEXT_CHARS_PER_TOKEN
@@ -489,6 +490,7 @@ async fn old_tool_output_is_aged_for_the_request_and_kept_in_the_transcript() {
     let engine = engine(provider.clone(), sink.clone()).with_model_limits(ModelLimits {
         context_window: Some(60_000),
         max_tokens: Some(8_000),
+        ..ModelLimits::default()
     });
 
     engine

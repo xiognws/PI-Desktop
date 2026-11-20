@@ -225,6 +225,65 @@ async fn a_transcript_past_the_trigger_is_summarized_before_the_next_request() {
     assert_eq!(transcript.messages().len(), 2, "checkpoint plus the answer");
 }
 
+/// The user's compaction switch, measured on the loop the sidecar actually runs:
+/// a session that turned automatic compaction off is not summarized even though
+/// its transcript is past the trigger.
+///
+/// The case above is the other half of the contract — no setting means the kernel
+/// compacts exactly as before this parameter had a reader.
+#[tokio::test]
+async fn a_session_that_turned_compaction_off_is_not_summarized() {
+    let (model, context, chars) = limits();
+    FILLER_CHARS.with(|value| *value.borrow_mut() = chars);
+    let provider = Arc::new(BehaviorProvider::new());
+    let sink = Arc::new(RecordingSink::new());
+    let engine = engine(provider.clone(), sink.clone())
+        .with_model_limits(model.with_compaction_enabled(false));
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("compact me"));
+
+    let outcome = engine
+        .run_turn(
+            "s1",
+            "t1",
+            &mut transcript,
+            &TurnConfig::new("test-model"),
+            CancelToken::new(),
+        )
+        .await
+        .expect("the turn finishes without compacting");
+
+    assert_eq!(outcome.stop_reason, StopReason::EndTurn);
+    assert_eq!(
+        provider.summaries(),
+        0,
+        "a session with compaction off must not spend a summary request"
+    );
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 2, "tool step, then the answer step");
+    assert!(
+        requests
+            .iter()
+            .flat_map(|request| request.messages.iter())
+            .all(|message| !message.text().starts_with(CHECKPOINT_HEADER)),
+        "no checkpoint may be installed"
+    );
+    // The fixture has to have crossed the trigger, or this case proves nothing.
+    let tokens = agent_core::context::estimate_context_tokens(&requests[1].messages).tokens;
+    assert!(
+        tokens >= context.trigger,
+        "the later request must be past the trigger: {tokens} < {}",
+        context.trigger
+    );
+    assert!(
+        !sink
+            .events()
+            .iter()
+            .any(|event| matches!(event, AgentEvent::CompactionStart { .. })),
+        "the gate must not even open"
+    );
+}
+
 /// Fails only the summary request, so the test can drive the fallback path
 /// without also breaking the turn's own requests.
 struct FailingSummaryProvider {

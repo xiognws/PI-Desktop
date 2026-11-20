@@ -60,6 +60,17 @@ pub const MAX_DELEGATION_RESULT_CHARS: usize = 50_000;
 /// Sent as the prompt that resumes the parent once delegates settle.
 pub const DELEGATION_RESUME_PROMPT: &str = "The following subagents have finished. Integrate their reports and continue the user's original task. Call TaskStop only if you have decided a still-running delegate should not continue.";
 
+/// What `model` on `Task` means, for the tool description and for a refusal.
+///
+/// Both sentences are the Node runtime's (`DELEGATION_DEFAULT_MODEL_GUIDANCE`,
+/// `DELEGATION_MODEL_OPT_IN_GUIDANCE` in `packages/agent-runtime/src/runtime.ts`):
+/// the model reads the same instruction whichever runtime is executing.
+pub const TASK_MODEL_DEFAULT_GUIDANCE: &str = "Omit the `model` parameter on Task to use the definition's default model, or inherit the parent conversation's selected model when no default is pinned. Repeating the definition's own Default model key is the same as omitting `model`.";
+pub const TASK_MODEL_OPT_IN_GUIDANCE: &str = "To authorize a model override, open Settings → Models, edit the service or account, expand its model Advanced settings, enable \"Available for AI delegation\", and save. Use an exact key from the delegation catalog; never guess a provider/model key.";
+
+/// The one line of advice the Node runtime appends under the catalog.
+pub const TASK_MODEL_CHOICE_HINT: &str = "Pick cheaper/faster models for simple searches and read-only reviews. Reserve expensive reasoning models for complex multi-step analysis.";
+
 /// Default and maximum wait windows, in seconds.
 pub const TASK_WAIT_DEFAULT_TIMEOUT_SECONDS: u64 = 600;
 pub const TASK_WAIT_MAX_TIMEOUT_SECONDS: u64 = 900;
@@ -236,6 +247,10 @@ pub struct DelegateRunRequest {
     pub delegation_id: String,
     pub definition: SubagentDefinition,
     pub task: String,
+    /// The delegation model key `Task.model` named, already checked against the
+    /// catalog. `None` runs the delegate on the session's own model, which is
+    /// what the reference does when the definition pins nothing.
+    pub model_key: Option<String>,
     pub cancel: CancelToken,
 }
 
@@ -641,6 +656,10 @@ pub struct DelegationHub {
     pub registry: Arc<DelegationRegistry>,
     pub definitions: Vec<SubagentDefinition>,
     runner: Arc<dyn DelegateRunner>,
+    /// Delegation model override keys this turn may use (`subagentModelKeys`
+    /// that also had a `subagentProviders` binding). Empty means delegation runs
+    /// on the session's own model, which is the reference default.
+    models: Vec<String>,
 }
 
 impl DelegationHub {
@@ -653,7 +672,48 @@ impl DelegationHub {
             registry,
             definitions,
             runner,
+            models: Vec::new(),
         }
+    }
+
+    /// The model keys `Task.model` may name, in the order main authorized them.
+    pub fn with_models(mut self, models: Vec<String>) -> Self {
+        self.models = models;
+        self
+    }
+
+    fn has_model(&self, key: &str) -> bool {
+        self.models.iter().any(|available| available == key)
+    }
+
+    /// What to tell the model when the key it named is not usable: the keys it
+    /// may pick from, or — when the session has none — how to authorize one. The
+    /// wording is the Node runtime's (`availableSubagentModelKeys`).
+    fn model_hint(&self) -> String {
+        if self.models.is_empty() {
+            format!(
+                " No delegation model overrides are configured. {TASK_MODEL_DEFAULT_GUIDANCE} {TASK_MODEL_OPT_IN_GUIDANCE}"
+            )
+        } else {
+            format!(" Available: {}.", self.models.join(", "))
+        }
+    }
+
+    /// The delegation catalog as the `Task` description carries it, so the model
+    /// can choose a model before calling. Empty when nothing was authorized.
+    fn models_prompt(&self) -> Option<String> {
+        if self.models.is_empty() {
+            return None;
+        }
+        let lines = self
+            .models
+            .iter()
+            .map(|key| format!("- `{key}`"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        Some(format!(
+            "Available models for delegation (pass as `model` parameter on Task):\n{lines}\n\n{TASK_MODEL_CHOICE_HINT}"
+        ))
     }
 
     fn definition(&self, name: &str) -> Option<&SubagentDefinition> {
@@ -698,27 +758,42 @@ impl Tool for TaskTool {
             })
             .collect::<Vec<_>>()
             .join("\n");
+        // The delegation model catalog, when the user authorized one. It belongs
+        // in the declaration rather than in the system prompt: it is this tool's
+        // argument, and the model can only pick a key it was shown.
+        let models = self.hub.models_prompt();
+        let mut properties = json!({
+            "agent": {
+                "type": "string",
+                "description": format!("Name of the subagent to run: {}.", self.hub.names())
+            },
+            "task": {
+                "type": "string",
+                "description": "The complete brief: goal, context the delegate cannot infer, and the exact report you want back."
+            },
+            "description": {
+                "type": "string",
+                "description": "Short label for this delegation (3-6 words), shown to the user."
+            }
+        });
+        if models.is_some() {
+            properties["model"] = json!({
+                "type": "string",
+                "description": "Delegation model key, from the available-models list. Omit to run the delegate on the session's own model."
+            });
+        }
+        let catalog_section = match &models {
+            Some(models) => format!("{catalog}\n\n{models}"),
+            None => catalog,
+        };
         ToolSpec::new(
             TASK_TOOL_NAME,
             format!(
-                "Start one subagent in the background and return immediately; you keep working while it runs, then converge with TaskWait when you need its report.\n\nPrefer doing the work yourself. Only delegate when it saves significant context or enables genuine parallelism — not for tasks you can finish in a few tool calls.\n\n`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.\n\nTo run delegates concurrently, emit several Task calls in one assistant message. Call TaskStop only to cancel.\n\nAvailable subagents:\n{catalog}"
+                "Start one subagent in the background and return immediately; you keep working while it runs, then converge with TaskWait when you need its report.\n\nPrefer doing the work yourself. Only delegate when it saves significant context or enables genuine parallelism — not for tasks you can finish in a few tool calls.\n\n`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.\n\nTo run delegates concurrently, emit several Task calls in one assistant message. Call TaskStop only to cancel.\n\nAvailable subagents:\n{catalog_section}"
             ),
             json!({
                 "type": "object",
-                "properties": {
-                    "agent": {
-                        "type": "string",
-                        "description": format!("Name of the subagent to run: {}.", self.hub.names())
-                    },
-                    "task": {
-                        "type": "string",
-                        "description": "The complete brief: goal, context the delegate cannot infer, and the exact report you want back."
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Short label for this delegation (3-6 words), shown to the user."
-                    }
-                },
+                "properties": properties,
                 "required": ["agent", "task"],
                 "additionalProperties": false
             }),
@@ -764,6 +839,27 @@ impl Tool for TaskTool {
                 .map(str::trim)
                 .filter(|text| !text.is_empty())
                 .map(str::to_string);
+            // Model override, the reference's `Task.model`: a key from the
+            // delegation catalog this turn was launched with. A key outside the
+            // catalog is refused here — the Node runtime answers the same call
+            // with a tool error rather than quietly running on the parent's
+            // model, because a delegate on an expensive model the user did not
+            // authorize is a spend decision, not a fallback.
+            let model_key = call
+                .arguments
+                .get("model")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
+                .map(str::to_string);
+            if let Some(key) = &model_key {
+                if !self.hub.has_model(key) {
+                    return Err(AgentError::Refused(format!(
+                        "Model \"{key}\" is not available for delegation.{}",
+                        self.hub.model_hint()
+                    )));
+                }
+            }
             let delegation_id = uuid::Uuid::new_v4().to_string();
             let delegate_cancel = ctx.cancel.child();
             let handle = self.hub.registry.insert(DelegationRecord {
@@ -772,7 +868,7 @@ impl Tool for TaskTool {
                 agent_name: definition.name.clone(),
                 task: task.clone(),
                 label: label.clone(),
-                model_id: String::new(),
+                model_id: model_key.clone().unwrap_or_default(),
                 started_at_ms: now_ms(),
                 completed_at_ms: None,
                 status: DelegationStatus::Running,
@@ -796,6 +892,7 @@ impl Tool for TaskTool {
                 delegation_id: delegation_id.clone(),
                 definition,
                 task,
+                model_key,
                 cancel: delegate_cancel,
             };
             tokio::spawn(async move {
@@ -1296,6 +1393,140 @@ mod tests {
             MAX_SUBAGENT_REPORT_CHARS,
             "three-byte characters must not be cut three times shorter"
         );
+    }
+
+    /// A runner that only records which model key it was asked for.
+    struct ModelKeyRunner {
+        seen: Arc<Mutex<Vec<Option<String>>>>,
+    }
+
+    impl DelegateRunner for ModelKeyRunner {
+        fn run<'a>(&'a self, request: DelegateRunRequest) -> BoxFuture<'a, DelegateOutcome> {
+            let seen = self.seen.clone();
+            Box::pin(async move {
+                if let Ok(mut seen) = seen.lock() {
+                    seen.push(request.model_key.clone());
+                }
+                DelegateOutcome::completed("done")
+            })
+        }
+    }
+
+    fn hub_with_models(runner: Arc<dyn DelegateRunner>, models: Vec<&str>) -> Arc<DelegationHub> {
+        Arc::new(
+            DelegationHub::new(
+                Arc::new(DelegationRegistry::new("s1")),
+                vec![definition()],
+                runner,
+            )
+            .with_models(models.into_iter().map(str::to_string).collect()),
+        )
+    }
+
+    /// `Task.model` is the reference's own argument: the key the parent picks is
+    /// what the delegate runs on, and it reaches the runner unchanged.
+    #[tokio::test]
+    async fn a_delegation_carries_the_model_key_it_was_started_with() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let hub = hub_with_models(
+            Arc::new(ModelKeyRunner { seen: seen.clone() }),
+            vec!["cheap/model-x", "fast/model-y"],
+        );
+        let tool = TaskTool::new(hub.clone());
+        tool.call(
+            &call(
+                TASK_TOOL_NAME,
+                json!({"agent": "explorer", "task": "find it", "model": "cheap/model-x"}),
+            ),
+            &context(CancelToken::new()),
+        )
+        .await
+        .expect("started");
+        for _ in 0..200 {
+            if seen.lock().map(|seen| !seen.is_empty()).unwrap_or(false) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(
+            seen.lock().expect("lock").clone(),
+            vec![Some("cheap/model-x".to_string())],
+            "the key travels to the runner instead of being dropped"
+        );
+        // The record names the model the delegation runs on, so TaskList and the
+        // transcript can show it.
+        assert_eq!(hub.registry.snapshot()[0].model_id, "cheap/model-x");
+    }
+
+    /// A key outside the catalog is refused, not silently replaced by the session
+    /// model: the Node runtime answers `Task` with the same tool error.
+    #[tokio::test]
+    async fn an_unauthorized_model_key_is_refused_with_the_catalog() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let hub = hub_with_models(
+            Arc::new(ModelKeyRunner { seen: seen.clone() }),
+            vec!["cheap/model-x"],
+        );
+        let error = TaskTool::new(hub.clone())
+            .call(
+                &call(
+                    TASK_TOOL_NAME,
+                    json!({"agent": "explorer", "task": "find it", "model": "expensive/model-z"}),
+                ),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect_err("a model nobody authorized is not a fallback");
+        let message = error.to_string();
+        assert!(
+            message.contains("\"expensive/model-z\" is not available for delegation"),
+            "{message}"
+        );
+        assert!(message.contains("Available: cheap/model-x"), "{message}");
+        assert!(hub.registry.snapshot().is_empty(), "nothing was started");
+        assert!(seen.lock().expect("lock").is_empty());
+    }
+
+    /// With no catalog the parameter is not offered at all, and the refusal says
+    /// how to authorize one — the reference's guidance, verbatim.
+    #[tokio::test]
+    async fn without_a_catalog_the_task_declaration_offers_no_model() {
+        let hub = hub(Arc::new(InstantRunner));
+        let spec = TaskTool::new(hub.clone()).spec();
+        assert!(
+            spec.parameters["properties"].get("model").is_none(),
+            "a parameter with no possible value is noise in every request"
+        );
+        assert!(!spec.description.contains("Available models for delegation"));
+
+        let error = TaskTool::new(hub)
+            .call(
+                &call(
+                    TASK_TOOL_NAME,
+                    json!({"agent": "explorer", "task": "find it", "model": "cheap/model-x"}),
+                ),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect_err("no catalog, no override");
+        assert!(
+            error
+                .to_string()
+                .contains("No delegation model overrides are configured."),
+            "{error}"
+        );
+    }
+
+    /// With a catalog the keys are on the declaration, so the model can only pick
+    /// one it was shown.
+    #[test]
+    fn the_task_declaration_lists_the_authorized_models() {
+        let hub = hub_with_models(Arc::new(InstantRunner), vec!["cheap/model-x", "fast/model-y"]);
+        let spec = TaskTool::new(hub).spec();
+        assert_eq!(spec.parameters["properties"]["model"]["type"], "string");
+        assert!(spec.description.contains("- `cheap/model-x`"));
+        assert!(spec.description.contains("- `fast/model-y`"));
+        assert!(spec.description.contains(TASK_MODEL_CHOICE_HINT));
     }
 
     #[tokio::test]

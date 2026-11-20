@@ -241,6 +241,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_model_limits(agent_core::context::ModelLimits {
         context_window: Some(60_000),
         max_tokens: Some(8_000),
+        ..Default::default()
     });
     let task = agent
         .claim_worker_turn(None)

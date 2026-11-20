@@ -84,6 +84,19 @@ export const FORWARDED_PROMPT_PARAMS = [
   // Dropped, every notice reached a kernel that had never heard of the run and
   // main's pause path silently did nothing.
   "modeTurn",
+  // The user's compaction settings. The kernel reads them where it decides to
+  // compact (`compactionSettings.enabled`), the same single field the Node
+  // runtime reads (`compactionEnabled` in `packages/agent-runtime/src/runtime.ts`:
+  // the token thresholds in this shape are deliberately ignored there, because
+  // they are derived from the model's window instead).
+  "compactionSettings",
+  // The delegation model catalog: the keys main authorized for `Task.model` and
+  // the credential-bearing binding behind each. The kernel lists the keys on the
+  // `Task` declaration, refuses a key outside them, and runs that delegate on the
+  // binding's own provider and model. Dropped, a user's cheaper delegation model
+  // never took effect and every delegate ran on the session model.
+  "subagentProviders",
+  "subagentModelKeys",
 ] as const;
 
 /**
@@ -91,20 +104,19 @@ export const FORWARDED_PROMPT_PARAMS = [
  *
  * `mode`, `pluginTools` and `modeTurn` left this list: the kernel parses the
  * first into the turn's mode, takes the second as `tools` declarations, and the
- * third as the staged run the turn works on. What is left is a real parity gap,
- * reported per turn so it stays measurable.
+ * third as the staged run the turn works on. `compactionSettings`,
+ * `subagentProviders` and `subagentModelKeys` left it too — the kernel now reads
+ * each at the point where it changes behaviour. What is left is a real parity
+ * gap, reported per turn so it stays measurable.
  */
 export const KNOWN_UNSUPPORTED_PROMPT_PARAMS = [
   "fastMode",
   "attachmentsDir",
   "scratchDir",
   "visualizationsDir",
-  "compactionSettings",
   "projectMemory",
   "permissionMode",
   "streamRules",
-  "subagentProviders",
-  "subagentModelKeys",
   "trustedExtensions",
   "remoteWorkspace",
   "infiniteProviderRetry",
@@ -238,6 +250,52 @@ function declarationsFromPluginTools(raw: unknown): Wire[] | undefined {
 }
 
 /**
+ * The delegation model catalog as the kernel reads it.
+ *
+ * `subagentModelKeys` names the models the user authorized for delegation and
+ * `subagentProviders` carries this app's provider row behind each key. The kernel
+ * builds one provider per entry and sends that delegate's request to it, along
+ * with the binding's own `modelId`, so only keys whose entry it can actually
+ * speak are forwarded: an entry on a wire the kernel refuses (Responses,
+ * pi-messages) is dropped here rather than advertised and then failing the
+ * delegate mid-turn. A key with no entry behind it is dropped for the same
+ * reason — the kernel would have nothing to send to.
+ *
+ * Returns `undefined` when nothing survived, which leaves both keys off the wire:
+ * the kernel then reports no catalog and every delegate runs on the session model,
+ * exactly the behaviour before these parameters had a reader.
+ */
+function delegationModels(raw: Wire): { providers: Wire; keys: string[] } | undefined {
+  const entries = isWire(raw.subagentProviders) ? raw.subagentProviders : undefined;
+  const declared = Array.isArray(raw.subagentModelKeys)
+    ? raw.subagentModelKeys.filter((key): key is string => typeof key === "string")
+    : [];
+  if (!entries || declared.length === 0) return undefined;
+
+  const providers: Wire = {};
+  const keys: string[] = [];
+  for (const key of new Set(declared)) {
+    const entry = entries[key];
+    if (!isWire(entry)) continue;
+    const adapted = adaptKernelProvider(entry);
+    if (!adapted.provider) continue;
+    // The model this key stands for. Without it the kernel has a provider and no
+    // model to ask for, which is not an override.
+    const modelId = str(entry.modelId);
+    if (!modelId) continue;
+    keys.push(key);
+    providers[key] = {
+      ...adapted.provider,
+      modelId,
+      // The delegate's own window, so its context budget is derived from the
+      // model it actually runs on rather than from the parent's.
+      ...(isWire(entry.modelConfig) ? { modelConfig: entry.modelConfig } : {}),
+    };
+  }
+  return keys.length > 0 ? { providers, keys } : undefined;
+}
+
+/**
  * One launch-payload prompt as kernel parameters.
  *
  * `params.unsupported` lists what was dropped, so the caller can log it once per
@@ -271,9 +329,23 @@ export function adaptKernelPrompt(raw: unknown): {
   const modelId = str(raw.modelId) ?? str(providerInput?.modelId);
   if (modelId) params.modelId = modelId;
 
+  // The delegation catalog goes on the wire under the launch path's own names, but
+  // each entry is the kernel's provider spec: it builds a provider per key. Placed
+  // after the forwarding loop, which would otherwise pass the app's raw provider
+  // rows through — and a catalog nothing usable survives in is withheld entirely
+  // rather than sent as an empty container.
+  const delegation = delegationModels(raw);
+
   for (const key of FORWARDED_PROMPT_PARAMS) {
     if (key in params || raw[key] === undefined) continue;
     params[key] = raw[key];
+  }
+
+  delete params.subagentProviders;
+  delete params.subagentModelKeys;
+  if (delegation) {
+    params.subagentProviders = delegation.providers;
+    params.subagentModelKeys = delegation.keys;
   }
 
   // `pluginTools` is the one renamed parameter: the launch path names the list

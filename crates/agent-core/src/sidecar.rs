@@ -929,26 +929,34 @@ impl Sidecar {
         let subagents = parse_subagents(request);
         if !subagents.is_empty() && matches!(mode, crate::prompt::SessionMode::Agent) {
             // A delegate runs its own turn with the session's provider and only
-            // the tools its definition declares.
-            let hub = Arc::new(crate::delegate::DelegationHub::new(
-                session.delegations.clone(),
-                subagents,
-                Arc::new(SidecarDelegateRunner {
-                    provider,
-                    tools: tools.clone(),
-                    sink: Arc::new(NotificationSink {
-                        out: self.out.clone(),
+            // the tools its definition declares. `Task.model` may name one of the
+            // delegation models main authorized for this turn; without one the
+            // delegate runs exactly as before, on the session's own model.
+            let models = parse_subagent_models(request);
+            let model_keys: Vec<String> = models.keys().cloned().collect();
+            let hub = Arc::new(
+                crate::delegate::DelegationHub::new(
+                    session.delegations.clone(),
+                    subagents,
+                    Arc::new(SidecarDelegateRunner {
+                        provider,
+                        tools: tools.clone(),
+                        sink: Arc::new(NotificationSink {
+                            out: self.out.clone(),
+                        }),
+                        model: config.model.clone(),
+                        model_limits: model_limits_from(request),
+                        models: Arc::new(models),
+                        guidance: Vec::new(),
+                        infinite_provider_retry,
+                        cache: crate::provider::CacheRetention::resolve(
+                            request.str_param("cacheRetention"),
+                            std::env::var("PI_CACHE_RETENTION").ok().as_deref(),
+                        ),
                     }),
-                    model: config.model.clone(),
-                    model_limits: model_limits_from(request),
-                    guidance: Vec::new(),
-                    infinite_provider_retry,
-                    cache: crate::provider::CacheRetention::resolve(
-                        request.str_param("cacheRetention"),
-                        std::env::var("PI_CACHE_RETENTION").ok().as_deref(),
-                    ),
-                }),
-            ));
+                )
+                .with_models(model_keys),
+            );
             extra.push(Arc::new(crate::delegate::TaskTool::new(hub.clone())));
             extra.push(Arc::new(crate::delegate::TaskWaitTool::new(hub.clone())));
             extra.push(Arc::new(crate::delegate::TaskListTool::new(hub.clone())));
@@ -3682,6 +3690,47 @@ fn snippet(text: &str, limit: usize) -> String {
     format!("{head}…")
 }
 
+/// The window and output budget a provider's `modelConfig` declares.
+///
+/// A models.dev config carries them under `limit`; a flat config carries
+/// `contextWindow` / `maxTokens`. Reading only the flat key meant a real prompt
+/// looked like a model with no declared window, so the turn never learned its
+/// budget and never compacted.
+fn model_limits_from_model_config(model_config: Option<&Value>) -> ModelLimits {
+    let from_model = |key: &str| {
+        model_config
+            .and_then(|config| config.get(key))
+            .and_then(Value::as_u64)
+    };
+    let limit = model_config.and_then(|config| config.get("limit"));
+    let from_limit = |key: &str| limit.and_then(|limit| limit.get(key)).and_then(Value::as_u64);
+    ModelLimits {
+        context_window: from_model("contextWindow").or_else(|| from_limit("context")),
+        max_tokens: from_model("maxTokens").or_else(|| from_limit("output")),
+        ..ModelLimits::default()
+    }
+}
+
+/// The user's compaction switch from the launch payload.
+///
+/// Only `enabled` is read, and that is deliberate: the Node runtime ignores the
+/// token thresholds this shape also carries and derives them from the model
+/// window instead (`compactionEnabled` in `packages/agent-runtime/src/runtime.ts`
+/// reads `enabled` alone, and `prepareCompaction` is handed
+/// `budget.requestHeadroom` / `budget.keepRecentTokens`, never the configured
+/// numbers). Reading them here would give the kernel a second, incompatible
+/// compaction vocabulary.
+///
+/// Automatic compaction is on unless the setting says otherwise.
+fn compaction_enabled_from(request: &Request) -> bool {
+    request
+        .params
+        .get("compactionSettings")
+        .and_then(|settings| settings.get("enabled"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+}
+
 /// The model window facts a prompt carries. Main stamps them per turn; without
 /// them the loop cannot tell a large context from a small one.
 fn model_limits_from(request: &Request) -> Option<ModelLimits> {
@@ -3692,33 +3741,17 @@ fn model_limits_from(request: &Request) -> Option<ModelLimits> {
         .params
         .get("provider")
         .and_then(|provider| provider.get("modelConfig"));
-    let from_model = |key: &str| {
-        model_config
-            .and_then(|config| config.get(key))
-            .and_then(Value::as_u64)
-    };
-    // A models.dev config carries the window under `limit`, not at the top level.
-    // Reading only the flat key meant a real prompt looked like a model with no
-    // declared window, so the turn never learned its budget and never compacted.
-    let limit = model_config.and_then(|config| config.get("limit"));
-    let from_limit = |key: &str| {
-        limit
-            .and_then(|limit| limit.get(key))
-            .and_then(Value::as_u64)
-    };
-    let context_window = from_model("contextWindow")
-        .or_else(|| from_limit("context"))
-        .or_else(|| request.params.get("contextWindow").and_then(Value::as_u64));
-    let max_tokens = from_model("maxTokens")
-        .or_else(|| from_limit("output"))
-        .or_else(|| request.params.get("maxTokens").and_then(Value::as_u64));
-    if context_window.is_none() && max_tokens.is_none() {
+    let mut limits = model_limits_from_model_config(model_config);
+    if limits.context_window.is_none() {
+        limits.context_window = request.params.get("contextWindow").and_then(Value::as_u64);
+    }
+    if limits.max_tokens.is_none() {
+        limits.max_tokens = request.params.get("maxTokens").and_then(Value::as_u64);
+    }
+    if limits.context_window.is_none() && limits.max_tokens.is_none() {
         return None;
     }
-    Some(ModelLimits {
-        context_window,
-        max_tokens,
-    })
+    Some(limits.with_compaction_enabled(compaction_enabled_from(request)))
 }
 
 /// Attributes everything a delegate emits to the `Task` call that started it, so
@@ -3979,9 +4012,35 @@ struct SidecarDelegateRunner {
     sink: Arc<dyn crate::EventSink>,
     model: String,
     model_limits: Option<crate::context::ModelLimits>,
+    /// Delegation model overrides this turn may use, keyed by `Task.model`.
+    models: Arc<std::collections::BTreeMap<String, SubagentModelBinding>>,
     guidance: Vec<String>,
     infinite_provider_retry: bool,
     cache: crate::provider::CacheRetention,
+}
+
+impl SidecarDelegateRunner {
+    /// The provider, model and budget a delegate runs with.
+    ///
+    /// A key the parent named selects that binding's own provider, model id and
+    /// window — the delegate then costs what the user chose for it. No key runs
+    /// the session's model, which is the reference behaviour when the definition
+    /// pins nothing. The key was already checked against the catalog by `Task`,
+    /// so a miss here can only mean the two disagree, and the session model is
+    /// the safe side of that.
+    fn run_binding(
+        &self,
+        model_key: Option<&str>,
+    ) -> (Arc<dyn Provider>, String, Option<crate::context::ModelLimits>) {
+        match model_key.and_then(|key| self.models.get(key)) {
+            Some(binding) => (
+                binding.provider.clone(),
+                binding.model.clone(),
+                Some(binding.limits),
+            ),
+            None => (self.provider.clone(), self.model.clone(), self.model_limits),
+        }
+    }
 }
 
 impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
@@ -4002,14 +4061,15 @@ impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
                 parent_tool_call_id: request.parent_tool_call_id.clone(),
                 agent_name: request.definition.name.clone(),
             });
-            let mut engine = TurnEngine::new(self.provider.clone(), scoped, sink);
-            if let Some(limits) = self.model_limits {
+            let (provider, model, model_limits) = self.run_binding(request.model_key.as_deref());
+            let mut engine = TurnEngine::new(provider, scoped, sink);
+            if let Some(limits) = model_limits {
                 engine = engine.with_model_limits(limits);
             }
             let mut transcript = Transcript::new();
             transcript.push(Message::user_text(request.task.clone()));
             let config = TurnConfig {
-                model: self.model.clone(),
+                model,
                 system: Some(prompt),
                 max_steps: crate::delegate::SUBAGENT_MAX_STEPS,
                 temperature: None,
@@ -4340,6 +4400,77 @@ fn parse_subagents(request: &Request) -> Vec<crate::delegate::SubagentDefinition
     definitions
 }
 
+/// One delegation model override: the binding main resolved for a key, and the
+/// model id a delegate started with that key must send.
+struct SubagentModelBinding {
+    provider: Arc<dyn Provider>,
+    model: String,
+    limits: ModelLimits,
+}
+
+/// The delegation model catalog this turn may use.
+///
+/// Two launch parameters, both required, exactly as in the Node runtime:
+/// `subagentModelKeys` names the models the user authorized for delegation and
+/// `subagentProviders` carries the credential-bearing binding for each. A key
+/// with no binding is not a usable override; a binding nobody opted into is not
+/// an authorization (`availableSubagentModelKeys` in
+/// `packages/agent-runtime/src/runtime.ts` intersects the two).
+///
+/// An entry this kernel cannot build a provider for is dropped rather than
+/// failing the turn: the key is then simply not offered, and the session keeps
+/// working on its own model.
+fn parse_subagent_models(
+    request: &Request,
+) -> std::collections::BTreeMap<String, SubagentModelBinding> {
+    let mut models = std::collections::BTreeMap::new();
+    let Some(providers) = request.params.get("subagentProviders").and_then(Value::as_object) else {
+        return models;
+    };
+    let Some(keys) = request.params.get("subagentModelKeys").and_then(Value::as_array) else {
+        return models;
+    };
+    let compaction_enabled = compaction_enabled_from(request);
+    for key in keys.iter().filter_map(Value::as_str) {
+        let Some(spec) = providers.get(key) else {
+            continue;
+        };
+        // The model the delegate's request carries is the binding's own, not the
+        // session's: that is the whole point of the override.
+        let Some(model) = spec
+            .get("modelId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|model| !model.is_empty())
+        else {
+            continue;
+        };
+        let provider = match build_provider(spec) {
+            Ok(provider) => provider,
+            Err(error) => {
+                tracing::debug!(
+                    target: "agent_core::sidecar",
+                    key,
+                    %error,
+                    "delegation model binding dropped"
+                );
+                continue;
+            }
+        };
+        let limits = model_limits_from_model_config(spec.get("modelConfig"))
+            .with_compaction_enabled(compaction_enabled);
+        models.insert(
+            key.to_string(),
+            SubagentModelBinding {
+                provider,
+                model: model.to_string(),
+                limits,
+            },
+        );
+    }
+    models
+}
+
 #[cfg(test)]
 mod provider_wire_tests {
     use super::*;
@@ -4496,5 +4627,274 @@ mod provider_wire_tests {
             build_provider(&spec).is_err(),
             "a key-using provider without a key is a configuration error"
         );
+    }
+}
+
+#[cfg(test)]
+mod prompt_parameter_tests {
+    use super::*;
+    use crate::context::{BudgetDecision, ContextLimits};
+    use crate::delegate::{DelegateRunRequest, DelegateRunner, SubagentDefinition};
+    use crate::event::RecordingSink;
+    use crate::message::StopReason;
+    use crate::provider::scripted::ScriptedProvider;
+    use crate::provider::StreamEvent;
+    use crate::tool::{AllowAll, ToolRegistry};
+
+    fn prompt_request(params: Value) -> Request {
+        serde_json::from_value::<Request>(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "agent.prompt",
+            "params": params
+        }))
+        .expect("a prompt")
+    }
+
+    /// The shape main sends: a models.dev window on the provider, and whatever the
+    /// user's compaction settings are.
+    fn session_params(compaction: Option<Value>) -> Value {
+        let mut params = json!({
+            "sessionId": "s",
+            "turnId": "t",
+            "content": "hi",
+            "provider": {
+                "apiStyle": "openai-completions",
+                "modelId": "gw-large",
+                "modelConfig": {"limit": {"context": 128_000, "output": 8_192}}
+            }
+        });
+        if let Some(settings) = compaction {
+            params["compactionSettings"] = settings;
+        }
+        params
+    }
+
+    fn limits_of(params: Value) -> ContextLimits {
+        let request = prompt_request(params);
+        ContextLimits::for_model(model_limits_from(&request).expect("a window"))
+    }
+
+    #[test]
+    fn compaction_is_on_when_the_launch_says_nothing() {
+        let limits = limits_of(session_params(None));
+        assert!(limits.compaction_enabled, "automatic protection is the default");
+        assert_eq!(limits.decide(limits.trigger), BudgetDecision::Compact);
+    }
+
+    /// The user's switch, end to end from the launch parameter to the decision the
+    /// turn loop reads: `enabled: false` means a request above the trigger is sent,
+    /// not summarized.
+    #[test]
+    fn a_disabled_switch_stops_the_trigger_and_keeps_the_hard_limit() {
+        let enabled = limits_of(session_params(None));
+        let disabled = limits_of(session_params(Some(json!({
+            "enabled": false,
+            "reserveTokens": 16_384,
+            "keepRecentTokens": 20_000
+        }))));
+
+        assert_eq!(
+            disabled.decide(disabled.trigger),
+            BudgetDecision::Proceed,
+            "a session that turned compaction off must not compact at the trigger"
+        );
+        assert_eq!(
+            disabled.decide(disabled.hard_limit - 1),
+            BudgetDecision::Proceed
+        );
+        assert_eq!(
+            disabled.decide(disabled.hard_limit),
+            BudgetDecision::Overflow,
+            "the hard boundary is a safety limit, not a preference"
+        );
+        // Same numbers: the switch changes the decision, not the budget.
+        assert_eq!(disabled.trigger, enabled.trigger);
+        assert_eq!(disabled.hard_limit, enabled.hard_limit);
+        assert_eq!(disabled.keep_recent_tokens, enabled.keep_recent_tokens);
+    }
+
+    /// The legacy token thresholds do not become a second compaction vocabulary.
+    /// The Node runtime derives both numbers from the model window and ignores the
+    /// configured ones (`prepareCompaction` is handed `budget.requestHeadroom` and
+    /// `budget.keepRecentTokens`), so a payload that only moves the thresholds
+    /// changes nothing here either.
+    #[test]
+    fn the_legacy_token_thresholds_do_not_move_the_budget() {
+        let plain = limits_of(session_params(None));
+        let tuned = limits_of(session_params(Some(json!({
+            "enabled": true,
+            "reserveTokens": 2_000,
+            "keepRecentTokens": 1_000
+        }))));
+        assert_eq!(tuned.trigger, plain.trigger);
+        assert_eq!(tuned.hard_limit, plain.hard_limit);
+        assert_eq!(tuned.keep_recent_tokens, plain.keep_recent_tokens);
+        assert_eq!(
+            tuned.retained_user_message_budget,
+            plain.retained_user_message_budget
+        );
+    }
+
+    fn delegation_params() -> Value {
+        json!({
+            "sessionId": "s",
+            "turnId": "t",
+            "content": "hi",
+            "provider": {
+                "apiStyle": "openai-completions",
+                "modelId": "gw-large",
+                "modelConfig": {"limit": {"context": 128_000, "output": 8_192}}
+            },
+            "subagents": [{
+                "name": "explorer",
+                "description": "Read-only search.",
+                "tools": ["Read"]
+            }],
+            "subagentModelKeys": [
+                "cheap/model-x",
+                "unauthorized/key",
+                "responses/key",
+                "no-binding/key"
+            ],
+            "subagentProviders": {
+                "cheap/model-x": {
+                    "id": "row-cheap",
+                    "name": "Cheap",
+                    "baseUrl": "https://cheap.example/v1",
+                    "apiStyle": "openai-completions",
+                    "modelId": "cheap-model",
+                    "apiKey": "test-key",
+                    "modelConfig": {"limit": {"context": 32_000, "output": 4_096}}
+                },
+                "unauthorized/key": {
+                    "apiStyle": "openai-completions",
+                    "modelId": "not-allowed",
+                    "apiKey": "test-key"
+                },
+                "responses/key": {
+                    "apiStyle": "responses",
+                    "modelId": "responses-model",
+                    "apiKey": "test-key"
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn the_catalog_is_the_keys_that_also_have_a_usable_binding() {
+        let request = prompt_request(delegation_params());
+        let models = parse_subagent_models(&request);
+        assert_eq!(
+            models.keys().cloned().collect::<Vec<_>>(),
+            vec!["cheap/model-x".to_string()],
+            "only an authorized key with a binding this kernel can build is offered"
+        );
+        let binding = models.get("cheap/model-x").expect("the cheap binding");
+        assert_eq!(binding.model, "cheap-model");
+        assert_eq!(binding.limits.context_window, Some(32_000));
+        assert_eq!(
+            binding.limits.max_tokens,
+            Some(4_096),
+            "the delegate budget comes from its own model"
+        );
+    }
+
+    #[test]
+    fn a_prompt_without_a_catalog_offers_no_override() {
+        let mut params = session_params(None);
+        params["subagents"] = json!([{"name": "explorer"}]);
+        let request = prompt_request(params);
+        assert!(parse_subagent_models(&request).is_empty());
+    }
+
+    fn delegate_request(model_key: Option<&str>) -> DelegateRunRequest {
+        DelegateRunRequest {
+            session_id: "s".into(),
+            parent_turn_id: "t".into(),
+            parent_tool_call_id: "call_1".into(),
+            delegation_id: "d1".into(),
+            definition: SubagentDefinition {
+                name: "explorer".into(),
+                description: "Read-only search.".into(),
+                prompt: "Search and report.".into(),
+                tools: Vec::new(),
+                can_mutate: false,
+            },
+            task: "find the flag".into(),
+            model_key: model_key.map(str::to_string),
+            cancel: CancelToken::new(),
+        }
+    }
+
+    fn runner(
+        parent: &ScriptedProvider,
+        models: std::collections::BTreeMap<String, SubagentModelBinding>,
+    ) -> SidecarDelegateRunner {
+        SidecarDelegateRunner {
+            provider: Arc::new(parent.clone()),
+            tools: Arc::new(ToolRegistry::new(Arc::new(AllowAll))),
+            sink: Arc::new(RecordingSink::new()),
+            model: "gw-large".into(),
+            model_limits: Some(ModelLimits::new(128_000, 8_192)),
+            models: Arc::new(models),
+            guidance: Vec::new(),
+            infinite_provider_retry: false,
+            cache: crate::provider::CacheRetention::resolve(None, None),
+        }
+    }
+
+    fn answer(text: &str) -> Vec<StreamEvent> {
+        vec![
+            StreamEvent::TextDelta(text.to_string()),
+            StreamEvent::Finish(StopReason::EndTurn),
+        ]
+    }
+
+    /// The delegation model the user picked is the model the delegate request
+    /// carries, on that key own provider: the whole point of `subagentModelKeys`.
+    #[tokio::test]
+    async fn a_delegate_runs_on_the_model_its_key_names() {
+        let parent = ScriptedProvider::new(vec![answer("parent")]);
+        let cheap = ScriptedProvider::new(vec![answer("delegated")]);
+        let mut models = std::collections::BTreeMap::new();
+        models.insert(
+            "cheap/model-x".to_string(),
+            SubagentModelBinding {
+                provider: Arc::new(cheap.clone()),
+                model: "cheap-model".into(),
+                limits: ModelLimits::new(32_000, 4_096),
+            },
+        );
+
+        let outcome = runner(&parent, models)
+            .run(delegate_request(Some("cheap/model-x")))
+            .await;
+
+        assert_eq!(outcome.report, "delegated");
+        let sent = cheap.requests();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(
+            sent[0].model, "cheap-model",
+            "the delegate request must name the model its key stands for"
+        );
+        assert!(
+            parent.requests().is_empty(),
+            "the session own provider must not carry the delegate"
+        );
+    }
+
+    /// No key is the reference default: the delegate runs the session model.
+    #[tokio::test]
+    async fn a_delegate_without_a_key_runs_the_session_model() {
+        let parent = ScriptedProvider::new(vec![answer("parent model")]);
+        let outcome = runner(&parent, std::collections::BTreeMap::new())
+            .run(delegate_request(None))
+            .await;
+
+        assert_eq!(outcome.report, "parent model");
+        let sent = parent.requests();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].model, "gw-large");
     }
 }

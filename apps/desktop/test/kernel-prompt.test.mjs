@@ -155,6 +155,7 @@ test("every forwarded key is one the kernel actually reads", () => {
     [
       "attachments",
       "commandShell",
+      "compactionSettings",
       "content",
       "contextWindow",
       "customSystemPrompt",
@@ -169,6 +170,8 @@ test("every forwarded key is one the kernel actually reads", () => {
       "sessionId",
       "skillReview",
       "stepBudget",
+      "subagentModelKeys",
+      "subagentProviders",
       "subagents",
       "supportsVision",
       "systemPrompt",
@@ -365,4 +368,107 @@ test("a prompt without text never starts a turn", () => {
 test("the older text alias still reaches the model", () => {
   const { params } = adaptKernelPrompt({ ...LAUNCH, content: undefined, text: "hello" });
   assert.equal(params.content, "hello");
+});
+
+test("the user's compaction settings reach the kernel under their own name", () => {
+  // The kernel reads `compactionSettings.enabled` where it decides to compact —
+  // the same single field the Node runtime reads. Dropped, a user who turned
+  // automatic compaction off still had the kernel summarizing their context.
+  const settings = { enabled: false, reserveTokens: 16_384, keepRecentTokens: 20_000 };
+  const { params, unsupported } = adaptKernelPrompt({ ...LAUNCH, compactionSettings: settings });
+  assert.deepEqual(params.compactionSettings, settings, "the launch path's own shape crosses the wire");
+  assert.equal(unsupported.includes("compactionSettings"), false, "it has a reader now");
+
+  // Absent stays absent: the kernel then keeps its own default (compaction on),
+  // rather than being handed an empty object that means nothing.
+  const none = adaptKernelPrompt(LAUNCH);
+  assert.equal("compactionSettings" in none.params, false);
+  assert.equal(none.unsupported.includes("compactionSettings"), false);
+});
+
+/** `launch.sidecarParams.subagentProviders` / `.subagentModelKeys`. */
+const SUBAGENT_MODELS = {
+  subagentProviders: {
+    "cheap/model-x": {
+      id: "row-cheap",
+      name: "Cheap",
+      baseUrl: "https://cheap.example/v1",
+      apiStyle: "openai-completions",
+      authKind: "api_key",
+      apiKey: "test-key-cheap",
+      modelId: "cheap-model",
+      modelConfig: { contextWindow: 32_000, maxOutputTokens: 4_096 },
+    },
+    // Authorized, but on a wire the kernel refuses: advertising it would fail the
+    // delegate mid-turn instead of before it starts.
+    "responses/key": {
+      id: "row-responses",
+      name: "Responses",
+      baseUrl: "https://responses.example/v1",
+      apiStyle: "responses",
+      authKind: "api_key",
+      apiKey: "test-key-responses",
+      modelId: "responses-model",
+    },
+    // A binding nobody opted into: not an authorization.
+    "unauthorized/key": {
+      id: "row-other",
+      name: "Other",
+      baseUrl: "https://other.example/v1",
+      apiStyle: "openai-completions",
+      authKind: "api_key",
+      apiKey: "test-key-other",
+      modelId: "not-allowed",
+    },
+  },
+  // `unauthorized/key` has a binding but no opt-in, and `no-binding/key` an opt-in
+  // with no binding: neither is a usable override.
+  subagentModelKeys: ["cheap/model-x", "responses/key", "no-binding/key"],
+};
+
+test("the delegation catalog reaches the kernel as a provider per key", () => {
+  // `Task.model` takes one of these keys; the kernel sends that delegate's
+  // request to the binding's own endpoint and model. Dropped, a user's cheaper
+  // delegation model never took effect and every delegate ran on the session
+  // model.
+  const { params, unsupported } = adaptKernelPrompt({ ...LAUNCH, ...SUBAGENT_MODELS });
+  assert.deepEqual(
+    params.subagentModelKeys,
+    ["cheap/model-x"],
+    "only an authorized key with a binding the kernel can speak is offered",
+  );
+  assert.deepEqual(params.subagentProviders, {
+    "cheap/model-x": {
+      kind: "openai",
+      baseUrl: "https://cheap.example/v1",
+      apiKey: "test-key-cheap",
+      name: "Cheap",
+      defaultMaxTokens: 4_096,
+      modelId: "cheap-model",
+      // The delegate's own window, so its budget comes from the model it runs on.
+      modelConfig: { contextWindow: 32_000, maxOutputTokens: 4_096 },
+    },
+  });
+  assert.equal(unsupported.includes("subagentProviders"), false, "it has a reader now");
+  assert.equal(unsupported.includes("subagentModelKeys"), false, "so does the key list");
+});
+
+test("a catalog with nothing usable sends neither key", () => {
+  // The kernel reads an absent catalog as "no overrides": every delegate runs on
+  // the session model, which is the behaviour before these parameters had a
+  // reader. Sending empty containers would claim the user configured something.
+  const { params } = adaptKernelPrompt({
+    ...LAUNCH,
+    subagentProviders: { "ghost/key": { ...SUBAGENT_MODELS.subagentProviders["cheap/model-x"], apiStyle: "responses" } },
+    subagentModelKeys: ["ghost/key"],
+    subagents: [{ name: "reviewer" }],
+  });
+  assert.equal("subagentProviders" in params, false);
+  assert.equal("subagentModelKeys" in params, false);
+});
+
+test("a delegation key list without bindings is not an override", () => {
+  const { params } = adaptKernelPrompt({ ...LAUNCH, subagentProviders: {}, subagentModelKeys: ["cheap/model-x"] });
+  assert.equal("subagentProviders" in params, false);
+  assert.equal("subagentModelKeys" in params, false);
 });

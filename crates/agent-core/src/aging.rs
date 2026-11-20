@@ -232,6 +232,7 @@ mod tests {
             keep_recent_tokens: 4_000,
             trigger,
             retained_user_message_budget: 2_000,
+            compaction_enabled: true,
         }
     }
 
