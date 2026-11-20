@@ -1,0 +1,22 @@
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 63-66
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 83-89,130,135
+crates/agent-core/src/prompt/instructions.rs
+  h_201ed4c689ac8b 32,39-40,45-46
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 777-782,2880-2901
+crates/agent-core/tests/prompt_inputs.rs
+  h_201ed4c689ac8b 1-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "89bc68a93262a776642caff6da6077a788e3883d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
