@@ -31,10 +31,6 @@ export const KERNEL_UNSUPPORTED_METHODS: Readonly<Record<string, KernelMethodGap
     surface: "stop the turn at the next completed assistant boundary (graceful stop)",
     pending: "kernel: graceful stop shares the cancel path with agent.abort",
   },
-  "agent.modeTurnNotice": {
-    surface: "mode-run turn notices (plan/goal stage boundaries)",
-    pending: "kernel: mode stage events",
-  },
   "widget.invoke": {
     surface: "run a widget package action from the Tools page",
     pending: "kernel: widget runner (host-core owns discovery/trust already)",

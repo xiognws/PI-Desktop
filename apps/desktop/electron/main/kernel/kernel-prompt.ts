@@ -9,7 +9,7 @@
  * line — instead of a silently narrower turn.
  *
  * Kernel side (verified against `crates/agent-core/src/sidecar.rs` + `src/prompt`):
- *   sessionId, content, turnId, mode
+ *   sessionId, content, turnId, mode, modeTurn
  *   modelId | provider.modelId
  *   provider {kind|apiStyle, baseUrl, apiKey, name, headers, authKind, defaultMaxTokens}
  *   systemPrompt, tools, pluginSkills, subagents, skillReview
@@ -76,17 +76,25 @@ export const FORWARDED_PROMPT_PARAMS = [
   // the kernel receives the finished text and must not re-read the workspace.
   "customSystemPrompt",
   "projectInstructions",
+  // The staged mode run this turn works on (ADR mode-definitions), validated by
+  // main against the run's snapshot. The kernel parses it exactly as the Node
+  // sidecar does (`parseModeTurn` in `packages/agent-runtime/src/modes/mode-params.ts`:
+  // the same six keys, the same bounds) and keeps the run turn, so
+  // `agent.modeTurnNotice` can answer whether a pause/release applied to it.
+  // Dropped, every notice reached a kernel that had never heard of the run and
+  // main's pause path silently did nothing.
+  "modeTurn",
 ] as const;
 
 /**
  * Launch parameters this app still sends, by name, with no kernel reader.
  *
- * `mode` and `pluginTools` left this list: the kernel parses the first into the
- * turn's mode and takes the second as `tools` declarations. What is left is a
- * real parity gap, reported per turn so it stays measurable.
+ * `mode`, `pluginTools` and `modeTurn` left this list: the kernel parses the
+ * first into the turn's mode, takes the second as `tools` declarations, and the
+ * third as the staged run the turn works on. What is left is a real parity gap,
+ * reported per turn so it stays measurable.
  */
 export const KNOWN_UNSUPPORTED_PROMPT_PARAMS = [
-  "modeTurn",
   "fastMode",
   "attachmentsDir",
   "scratchDir",
@@ -188,12 +196,17 @@ function contextWindowOf(provider: unknown): number | undefined {
  * kernel reads both from one array: `install_tools` in
  * `crates/agent-core/src/sidecar.rs` installs every entry as a host-executed
  * tool. Only the fields its reader consumes are carried over —
- * `tool_spec_from_value` keeps `name`, `description` and `parameters`, and
- * `McpToolIdentity::from_value` needs `mcpServerId` to authorize an
- * `mcpServerIds` / `mcpToolNames` selection. `risk` and `planSafeActions`
- * describe the plugin to host-core, not the model, and a kernel declaration has
- * nowhere to put them: forwarding them would look like support that does not
- * exist, so they stay out.
+ * `tool_spec_from_value` keeps `name`, `description`, `parameters`,
+ * `planSafeActions`, and `McpToolIdentity::from_value` needs `mcpServerId` to
+ * authorize a `mcpServerIds` / `mcpToolNames` selection.
+ *
+ * `planSafeActions` is carried even though the model never reads it: the kernel
+ * quotes it back on every `tools.execute`, and host-core denies a `plugin_*` call
+ * in a contract mode (Plan, Goal) unless the declaration lists the actions it may
+ * still perform (`permissions.rs`). Dropped, every plugin tool is refused in Plan
+ * mode with a reason that points at the plugin rather than at this adapter.
+ * `risk` still stays out — it reaches host-core through the plugin registry, which
+ * owns it, not through a per-turn declaration.
  */
 function declarationsFromPluginTools(raw: unknown): Wire[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -206,6 +219,11 @@ function declarationsFromPluginTools(raw: unknown): Wire[] | undefined {
     // the plugin that produced it.
     if (!name) continue;
     const mcpServerId = str(entry.mcpServerId);
+    // Non-empty or absent, never an empty list: host-core reads an empty list the
+    // same way it reads a missing one, and the kernel drops the key either way.
+    const planSafeActions = Array.isArray(entry.planSafeActions)
+      ? entry.planSafeActions.filter((action): action is string => typeof action === "string")
+      : [];
     declarations.push({
       name,
       description: str(entry.description) ?? "",
@@ -213,6 +231,7 @@ function declarationsFromPluginTools(raw: unknown): Wire[] | undefined {
       // no parameters keeps that default instead of inventing a shape.
       parameters: isWire(entry.parameters) ? entry.parameters : { type: "object" },
       ...(mcpServerId ? { mcpServerId } : {}),
+      ...(planSafeActions.length > 0 ? { planSafeActions } : {}),
     });
   }
   return declarations.length > 0 ? declarations : undefined;

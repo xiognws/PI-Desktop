@@ -15,7 +15,6 @@ const {
  */
 
 const EXPECTED_GAPS = [
-  "agent.modeTurnNotice",
   "agent.stop",
   "extensions.command.run",
   "native.session.fork",
@@ -65,6 +64,9 @@ test("methods the kernel does answer are not in the table", () => {
     // Approved-plan execution is answered by the kernel now: main's
     // `agent.executeApprovedPlan` call must reach it instead of UNSUPPORTED.
     "agent.executeApprovedPlan",
+    // A mode-run pause/release must reach the kernel too, or main's notice path
+    // logs a failure for a run the kernel is already executing.
+    "agent.modeTurnNotice",
     "asktool.resolve",
     "sidecar.configure",
     "sidecar.health",

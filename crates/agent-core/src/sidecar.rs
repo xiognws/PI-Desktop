@@ -265,6 +265,33 @@ struct Session {
     plan: Arc<crate::plan::PlanState>,
     /// Turn-boundary snapshots, so a wrong turn can be rewound.
     checkpoints: Mutex<crate::checkpoint::CheckpointStore>,
+    /// The staged mode run this session's last prompt claimed, and what Electron
+    /// main has since said about it. Written by `agent.prompt` (`modeTurn`) and by
+    /// `agent.modeTurnNotice`; the run itself belongs to host-core.
+    mode_run: Mutex<ModeRun>,
+}
+
+/// The run turn one prompt claimed: which run, and which stage of it.
+///
+/// Mirrors `ModeTurnContext` from `@pi-workspace/shared`, narrowed to what this
+/// process decides anything from. The kernel does not compose the stage brief or
+/// the `CompleteStage` gate (the Node runtime does that from the run's
+/// `modeDefinition`, which never reaches this side), so the claim is kept for
+/// identity: a notice for this turn and this run is applied, anything else is not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ModeRunTurn {
+    turn_id: String,
+    run_id: String,
+    stage_id: String,
+}
+
+/// What this session knows about its mode run.
+#[derive(Debug, Clone, Default)]
+struct ModeRun {
+    /// The run turn the session's last prompt claimed.
+    turn: Option<ModeRunTurn>,
+    /// Main paused the run while that turn was working on it.
+    closing_out: bool,
 }
 
 impl Session {
@@ -283,6 +310,7 @@ impl Session {
             delegations: Arc::new(crate::delegate::DelegationRegistry::new(session_id)),
             plan: Arc::new(crate::plan::PlanState::new()),
             checkpoints: Mutex::new(crate::checkpoint::CheckpointStore::default()),
+            mode_run: Mutex::new(ModeRun::default()),
         }
     }
 }
@@ -469,6 +497,10 @@ impl Sidecar {
             "asktool.resolve" => self.resolve_ask(request),
             "agent.steer" => self.steer(request),
             "agent.steeringContext" => self.steering_context(request),
+            // A staged mode run's turn changed under it: the user paused the run,
+            // or removed it. Main sends the notice; this kernel answers whether it
+            // was applied to the turn and run it names.
+            "agent.modeTurnNotice" => self.mode_turn_notice(request),
             "agent.abort" => self.abort(request),
             "agent.getStatus" => self.get_status(request),
             "agent.stopSubagents" => self.stop_subagents(request),
@@ -895,6 +927,11 @@ impl Sidecar {
             .or_else(|| request.str_param("text"))
             .ok_or_else(|| RpcError::invalid_params("`content` must be a string"))?
             .to_string();
+        // The staged mode run this turn works on, when main claimed one
+        // (ADR mode-definitions). Parsed first: a claim this kernel cannot read
+        // refuses the prompt before a session is reserved or a provider is
+        // built, so a malformed run never becomes a turn of the bare mode.
+        let mode_turn = parse_mode_turn(request.params.get("modeTurn"))?;
         // A prompt carries its own provider: main stamps the session's model and
         // credentials on every turn. The configured provider is only a fallback
         // for harnesses and the self-check.
@@ -994,6 +1031,22 @@ impl Sidecar {
             .current_turn
             .lock()
             .map_err(|_| RpcError::internal("turn lock poisoned"))? = Some(turn_id.clone());
+        // The run turn this prompt claimed, recorded before the turn task starts:
+        // a notice that arrives while the turn runs must find it already there.
+        // A prompt with no claim clears it, which is what `beginTurn` does to the
+        // Node runtime's mode state on every non-run turn.
+        {
+            let mut run = session
+                .mode_run
+                .lock()
+                .map_err(|_| RpcError::internal("mode run lock poisoned"))?;
+            run.turn = mode_turn.map(|claim| ModeRunTurn {
+                turn_id: turn_id.clone(),
+                run_id: claim.run_id,
+                stage_id: claim.stage_id,
+            });
+            run.closing_out = false;
+        }
 
         // A reopened session starts with the history host-core kept for it.
         self.restore_history(&session, session_id.as_str()).await?;
@@ -1610,6 +1663,81 @@ impl Sidecar {
         }))
     }
 
+    /// `agent.modeTurnNotice`: main reports that the run this turn works on
+    /// changed (ADR mode-definitions) — `closeout` after the user paused it,
+    /// `release` after the user removed it or the run settled elsewhere.
+    ///
+    /// Upstream counterpart: `DesktopAgentRuntime.modeTurnNotice` in
+    /// `packages/agent-runtime/src/runtime.ts` (with `RuntimeModeState` in
+    /// `src/modes/mode-state.ts`), reached from
+    /// `apps/desktop/electron/main/runtime/mode-services.ts`. Two things are
+    /// carried over exactly, because main acts on them: a notice for another
+    /// turn or another run is not applied, and the answer is the same
+    /// `{ applied: boolean }` — never an error for a notice that simply arrived
+    /// too late.
+    ///
+    /// What is deliberately narrower: the Node runtime answers a closeout by
+    /// recomposing the system prompt mid-turn (`setAgentSystemPrompt`), which
+    /// this kernel cannot do — a turn's system prompt is fixed when its task is
+    /// spawned. So the notice updates the session's run state and nothing else;
+    /// the stage brief and the `CompleteStage` gate are not ported either, since
+    /// they need the run's `modeDefinition`, which never crosses this wire.
+    fn mode_turn_notice(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let notice = parse_mode_turn_notice(&request.params)?;
+        // A session this process has never run has no turn to apply a notice to.
+        // The Node sidecar answers `{ applied: false }` for the same reason.
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?;
+        let Some(session) = sessions.get(session_id) else {
+            return Ok(json!({ "applied": false }));
+        };
+        // The turn the notice names must be the turn this session is running:
+        // Node compares against `this.turnId`, and the kernel's equivalent is
+        // the turn it reserved (cleared when the turn task settles).
+        let current = session
+            .current_turn
+            .lock()
+            .map_err(|_| RpcError::internal("turn lock poisoned"))?
+            .clone();
+        let (turn_id, run_id, action) = notice.into_parts();
+        if current.as_deref() != Some(turn_id.as_str()) {
+            return Ok(json!({ "applied": false }));
+        }
+        let mut run = session
+            .mode_run
+            .lock()
+            .map_err(|_| RpcError::internal("mode run lock poisoned"))?;
+        // The run the notice names must be the run this turn claimed.
+        match run.turn.as_ref() {
+            Some(turn) if turn.run_id == run_id => {}
+            _ => return Ok(json!({ "applied": false })),
+        }
+        let applied = match action {
+            // `beginCloseout` refuses a second closeout of the same turn, so a
+            // repeated pause notice is answered `false` rather than restating it.
+            ModeTurnAction::Closeout => {
+                if run.closing_out {
+                    false
+                } else {
+                    run.closing_out = true;
+                    true
+                }
+            }
+            // The turn finishes as an ordinary turn of the mode the session
+            // returned to: the run context, and with it every stage-scoped
+            // behaviour, leaves now.
+            ModeTurnAction::Release => {
+                run.turn = None;
+                run.closing_out = false;
+                true
+            }
+        };
+        Ok(json!({ "applied": applied }))
+    }
+
     /// Answer one ask card. A malformed answer is rejected and the card stays
     /// pending, so a bad click cannot silently skip a question.
     fn resolve_ask(&self, request: &Request) -> Result<Value, RpcError> {
@@ -2004,6 +2132,22 @@ impl Sidecar {
         if running {
             if let Some(turn_id) = current_turn {
                 status["currentTurnId"] = json!(turn_id);
+            }
+        }
+        // The staged mode run this session's last prompt claimed, when there is
+        // one. Additive diagnostics: `adaptStatus` in
+        // `apps/desktop/electron/main/kernel/kernel-adapter.ts` reads the fields
+        // it knows and ignores the rest, and a support bundle that shows which
+        // run turn the kernel is serving — and whether main has paused it — is
+        // what makes a mode-run report answerable at all.
+        if let Ok(run) = session.mode_run.lock() {
+            if let Some(turn) = run.turn.as_ref() {
+                status["modeRun"] = json!({
+                    "turnId": turn.turn_id,
+                    "runId": turn.run_id,
+                    "stageId": turn.stage_id,
+                    "closingOut": run.closing_out,
+                });
             }
         }
         Ok(json!({ "status": status }))
@@ -3705,6 +3849,185 @@ fn last_assistant_text(transcript: &Transcript) -> String {
         .find(|message| message.role == crate::Role::Assistant)
         .map(|message| message.text())
         .unwrap_or_default()
+}
+
+/// The run context one prompt claimed: which run, and which stage of it.
+///
+/// The kernel keeps only these two facts because they are the ones a notice is
+/// matched on; the rest of `ModeTurnContext` (`origin`, `enteredStage`, `input`,
+/// `artifactPaths`) is validated for shape and then dropped — composing a stage
+/// brief from it is the Node runtime's job, done from the definition snapshot
+/// this side never receives.
+struct ModeTurnClaim {
+    run_id: String,
+    stage_id: String,
+}
+
+/// A parameter set this kernel refuses is refused by name, as
+/// `packages/agent-runtime/src/modes/mode-params.ts` refuses it: JSON-RPC
+/// `-32602` plus an `errorCode` main classifies on.
+fn reject_mode_params(error_code: &str, message: impl Into<String>) -> RpcError {
+    let mut error = RpcError::invalid_params(message);
+    error.data = Some(json!({ "errorCode": error_code }));
+    error
+}
+
+/// `MODE_ID_RE` from `@pi-workspace/shared`: `^[a-z][a-z0-9-]{0,39}$`.
+fn is_mode_id(value: &str) -> bool {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) if first.is_ascii_lowercase() => {}
+        _ => return false,
+    }
+    value.len() <= 40
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// `modeTurn` of one `agent.prompt`: the trusted run context Electron main
+/// claimed for this turn (ADR mode-definitions).
+///
+/// Ported from `parseModeTurn` in
+/// `packages/agent-runtime/src/modes/mode-params.ts`: the same six keys, the
+/// same exact-key rule, the same `MODE_ID_RE` and the same 16-artifact bound, so
+/// a claim main could not have produced refuses the prompt instead of starting a
+/// turn whose stage nobody can name.
+///
+/// One deliberate difference: the Node parser also checks the stage exists in
+/// the mode's `modeDefinition`. This kernel does not read `modeDefinition` — its
+/// prompt and tool set are chosen from the mode id — so there is no stage list to
+/// check against. Main has already matched the claim to the run's snapshot in
+/// `apps/desktop/electron/main/runtime/mode-runs.ts`, which is the boundary the
+/// claim is trusted from.
+fn parse_mode_turn(value: Option<&Value>) -> Result<Option<ModeTurnClaim>, RpcError> {
+    let Some(value) = value.filter(|value| !value.is_null()) else {
+        return Ok(None);
+    };
+    let invalid = |message: String| {
+        reject_mode_params("MODE_TURN_INVALID", format!("invalid modeTurn: {message}"))
+    };
+    let Some(object) = value.as_object() else {
+        return Err(invalid("expected an object".into()));
+    };
+    const KEYS: [&str; 6] = [
+        "runId",
+        "stageId",
+        "origin",
+        "enteredStage",
+        "input",
+        "artifactPaths",
+    ];
+    if object.len() != KEYS.len() || !KEYS.iter().all(|key| object.contains_key(*key)) {
+        return Err(invalid(format!("expected exactly {}", KEYS.join(", "))));
+    }
+    let run_id = object
+        .get("runId")
+        .and_then(Value::as_str)
+        .filter(|id| !id.trim().is_empty() && id.len() <= 200)
+        .ok_or_else(|| invalid("runId".into()))?;
+    let stage_id = object
+        .get("stageId")
+        .and_then(Value::as_str)
+        .filter(|id| is_mode_id(id))
+        .ok_or_else(|| invalid("stageId".into()))?;
+    match object.get("origin").and_then(Value::as_str) {
+        Some("user") | Some("approval") | Some("host") => {}
+        _ => return Err(invalid("origin".into())),
+    }
+    if !matches!(object.get("enteredStage"), Some(Value::Bool(_))) {
+        return Err(invalid("enteredStage".into()));
+    }
+    if !matches!(object.get("input"), Some(Value::String(_))) {
+        return Err(invalid("input".into()));
+    }
+    let paths = object
+        .get("artifactPaths")
+        .and_then(Value::as_object)
+        .ok_or_else(|| invalid("artifactPaths".into()))?;
+    // `MODE_LIMITS.artifacts` is 16: a claim naming more artifact paths than a
+    // definition may declare is not one main can have built.
+    if paths.len() > 16
+        || paths.iter().any(|(id, path)| {
+            !is_mode_id(id)
+                || path
+                    .as_str()
+                    .map(|path| path.is_empty())
+                    .unwrap_or(true)
+        })
+    {
+        return Err(invalid("artifactPaths".into()));
+    }
+    Ok(Some(ModeTurnClaim {
+        run_id: run_id.to_string(),
+        stage_id: stage_id.to_string(),
+    }))
+}
+
+/// What main reported about the run: it paused it, or it let it go.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ModeTurnAction {
+    Closeout,
+    Release,
+}
+
+/// One `agent.modeTurnNotice`, parsed.
+struct ModeTurnNotice {
+    turn_id: String,
+    run_id: String,
+    action: ModeTurnAction,
+}
+
+impl ModeTurnNotice {
+    fn into_parts(self) -> (String, String, ModeTurnAction) {
+        (self.turn_id, self.run_id, self.action)
+    }
+}
+
+/// `agent.modeTurnNotice` from Electron main: `parseModeTurnNotice` in
+/// `mode-params.ts`, action for action.
+fn parse_mode_turn_notice(params: &Value) -> Result<ModeTurnNotice, RpcError> {
+    let invalid = |name: &str| {
+        reject_mode_params(
+            "INVALID_ARGUMENT",
+            format!("invalid mode turn notice: {name}"),
+        )
+    };
+    let id = |name: &str| -> Result<String, RpcError> {
+        params
+            .get(name)
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty() && value.len() <= 200)
+            .map(str::to_string)
+            .ok_or_else(|| invalid(name))
+    };
+    let turn_id = id("turnId")?;
+    let run_id = id("runId")?;
+    let action = match params.get("action").and_then(Value::as_str) {
+        Some("closeout") => ModeTurnAction::Closeout,
+        Some("release") => {
+            // A release names the mode the session returned to. The kernel
+            // composed its mode into the turn already running, so the id is
+            // validated and not applied: main stamps the session's mode on the
+            // next prompt itself.
+            let mode = params
+                .get("mode")
+                .and_then(Value::as_str)
+                .unwrap_or("agent");
+            // `parseModeParam`: absent means Agent, `chat` is the legacy Plan id.
+            if !(mode == "chat" || is_mode_id(mode)) {
+                return Err(reject_mode_params(
+                    "MODE_INVALID",
+                    "mode must be a mode id",
+                ));
+            }
+            ModeTurnAction::Release
+        }
+        _ => return Err(invalid("action")),
+    };
+    Ok(ModeTurnNotice {
+        turn_id,
+        run_id,
+        action,
+    })
 }
 
 /// Tools that can change files or run commands, for the delegate's mutability note.

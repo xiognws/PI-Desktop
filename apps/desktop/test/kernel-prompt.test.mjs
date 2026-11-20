@@ -17,6 +17,16 @@ const {
  * instead of being dropped in silence.
  */
 
+/** `launch.sidecarParams.modeTurn`: the staged run this turn claimed (mode-runs.ts). */
+const MODE_TURN = {
+  runId: "run-1",
+  stageId: "implement",
+  origin: "user",
+  enteredStage: true,
+  input: "把 README 里的旧文案改掉",
+  artifactPaths: { goal: ".pi/runs/run-1/goal.md" },
+};
+
 /** A launch payload shaped like `launch.sidecarParams` + the prompt fields. */
 const LAUNCH = {
   sessionId: "session-1",
@@ -35,6 +45,7 @@ const LAUNCH = {
   workspaceRoot: "D:/work/project",
   mcpServerIds: ["srv-1"],
   mcpToolNames: [],
+  modeTurn: MODE_TURN,
   skillReview: { enabled: true },
   subagents: [{ name: "reviewer" }],
   tools: [{ name: "Read", description: "read a file", parameters: {} }],
@@ -150,6 +161,7 @@ test("every forwarded key is one the kernel actually reads", () => {
       "mcpServerIds",
       "mcpToolNames",
       "mode",
+      "modeTurn",
       "modelId",
       "pluginSkills",
       "projectInstructions",
@@ -189,14 +201,17 @@ test("plugin tools and MCP tools reach the kernel as `tools` declarations", () =
   assert.equal("pluginTools" in params, false, "the kernel's name is `tools`");
   assert.equal(unsupported.includes("pluginTools"), false);
   // Exactly what the kernel's reader consumes: `name`, `description`,
-  // `parameters`, plus `mcpServerId`, which authorizes an MCP selection. `risk`
-  // and `planSafeActions` are host-core's knowledge of the plugin and are not
-  // part of a declaration the model sees.
+  // `parameters`, `planSafeActions`, plus `mcpServerId`, which authorizes an MCP
+  // selection. `risk` reaches host-core through the plugin registry that owns it,
+  // so it is not part of a per-turn declaration.
   assert.deepEqual(params.tools, [
     {
       name: "plugin_demo_probe",
       description: "Probe a URL",
       parameters: { type: "object", properties: { url: { type: "string" } } },
+      // Quoted back on every `tools.execute`: host-core denies a `plugin_*` call
+      // in a contract mode unless the declaration lists what it may still do.
+      planSafeActions: ["inspect"],
     },
     {
       name: "mcp__filesystem__read_file",
@@ -205,6 +220,24 @@ test("plugin tools and MCP tools reach the kernel as `tools` declarations", () =
       parameters: { type: "object", properties: { path: { type: "string" } } },
     },
   ]);
+  assert.equal("risk" in params.tools[0], false, "risk belongs to the plugin registry");
+});
+
+test("a tool without plan-safe actions sends no key rather than an empty one", () => {
+  // host-core reads an empty list the same way it reads a missing one, and the
+  // kernel drops the key either way — sending `[]` would only describe a
+  // capability that does not exist.
+  const { params } = adaptKernelPrompt({
+    ...LAUNCH,
+    pluginTools: [
+      { name: "plugin_demo_run", description: "Run", parameters: { type: "object" }, planSafeActions: [] },
+      { name: "plugin_demo_bad", description: "Bad", parameters: { type: "object" }, planSafeActions: ["ok", 7] },
+    ],
+  });
+  // LAUNCH declares `Read` first, so the plugin tools follow it.
+  const byName = (name) => params.tools.find((tool) => tool.name === name);
+  assert.equal("planSafeActions" in byName("plugin_demo_run"), false);
+  assert.deepEqual(byName("plugin_demo_bad").planSafeActions, ["ok"], "non-string entries are dropped");
 });
 
 test("declarations keep one entry per name, host declarations first", () => {
@@ -250,6 +283,27 @@ test("the parameter lists never overlap", () => {
       `${to} is the kernel's side of the mapping and must be a name it reads`,
     );
   }
+});
+
+test("the staged run's context reaches the kernel instead of being dropped", () => {
+  // Main claims the run turn before the prompt (mode-runs.ts) and the kernel
+  // parses `modeTurn` exactly as the Node sidecar does. Without it every
+  // `agent.modeTurnNotice` describes a run the kernel has never heard of, so a
+  // pause is answered `{ applied: false }` for a turn that is still working.
+  const { params, unsupported } = adaptKernelPrompt(LAUNCH);
+  assert.deepEqual(params.modeTurn, MODE_TURN, "the claim crosses the wire unchanged");
+  assert.equal(unsupported.includes("modeTurn"), false, "the kernel reads it now");
+  for (const key of ["runId", "stageId", "origin", "enteredStage", "input", "artifactPaths"]) {
+    assert.ok(key in params.modeTurn, `${key} survives the adapter`);
+  }
+});
+
+test("a turn with no run claims none", () => {
+  // An ordinary turn must not carry an empty claim: the kernel would have to
+  // guess whether the turn belongs to a run.
+  const { params, unsupported } = adaptKernelPrompt({ ...LAUNCH, modeTurn: undefined });
+  assert.equal("modeTurn" in params, false);
+  assert.equal(unsupported.includes("modeTurn"), false);
 });
 
 test("an unsupported wire refuses the turn even with a mode and tools to declare", () => {
