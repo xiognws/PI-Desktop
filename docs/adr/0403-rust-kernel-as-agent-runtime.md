@@ -95,18 +95,38 @@ the kernel, not a reason to change the UI.
 * The kernel is forked into this repository. Upstream improvements must be ported
   deliberately; there is no shared dependency to pull from.
 * Parity is measurable and currently incomplete: part of the RPC surface
-  (`agent.stop`, `agent.executeApprovedPlan`, `agent.modeTurnNotice`, `widget.*`,
-  `native.session.*`, `extensions.command.run`), two event types (`tool_update`,
-  `planning_state`) and a set of prompt parameters (`scratchDir`,
-  `customSystemPrompt`, `projectInstructions`, `projectMemory`, `modeTurn`, …) still
-  have no kernel reader. Each is closed by teaching the kernel the parameter and
-  deleting it from the reported list in the same change.
+  (`agent.stop`, `agent.modeTurnNotice`, `widget.*`, `native.session.*`,
+  `extensions.command.run`) and a set of prompt parameters (`scratchDir`,
+  `projectMemory`, `permissionMode`, `subagentProviders`, …) still have no kernel
+  reader. Each is closed by teaching the kernel the parameter and deleting it from
+  the reported list in the same change.
 * `agent.stopSubagents` is closed: the renderer's subagent stop button reaches it.
   The rule lives in one place — `DelegationRegistry::stop` — and both the `TaskStop`
   tool and the RPC phrase its outcomes for their own reader. The remaining RPC gaps
   have no renderer caller today, so they are surface parity, not user-visible
   breakage; `agent.stop` in particular is dead surface, because the stop button
   sends `agent.abort`, which the kernel already answers.
+* `mode` and `pluginTools` are closed. Dropping `mode` had the kernel run a Plan or
+  Goal session as Agent — the wrong rules in the prompt, and Write/Edit still in its
+  own declarations; the adapter now forwards it. `pluginTools` is the one renamed
+  parameter: it reaches the kernel as `tools`, because one declaration array covers
+  both plugin agent tools and the user's MCP tools. `risk` and `planSafeActions`
+  describe the plugin to host-core and have nowhere to live in a kernel declaration,
+  so a Plan-mode plugin tool is still denied by host-core's contract rule until
+  `planSafeActions` is carried on `tools.execute` as well.
+* An approved plan runs again: `agent.executeApprovedPlan` turns the approval into
+  the turn's instruction and runs the ordinary prompt path, and `SubmitPlan` exists
+  in Plan mode — the mode prompt named a tool that was not registered. Both follow
+  the Node runtime's argument names and instruction text, because a second
+  execution path beside the first is a second set of bugs. Two differences remain:
+  the kernel's `Tool` trait has no `terminate` flag, so an accepted submission does
+  not end the turn the way Node's does, and the kernel keeps its checklist in
+  `PlanState` (`Todo`) while the checklist the user sees is host-core's `TodoWrite`
+  rows — one concept, two owners, still to be merged.
+* `planning_state` is emitted; `tool_update` needs nothing, because this app has no
+  partial tool-result channel for it to report: tools run as one `tools.execute`
+  round trip, so the Node runtime only emitted it from an executor this product does
+  not use.
 * Prompt `attachments` are closed. The payload carries a path, not bytes: the kernel
   reads the file, inlines it as base64 when the launch declares the model can see it,
   and keeps a text reference otherwise (no vision, missing file, or past the
@@ -131,10 +151,14 @@ the kernel, not a reason to change the UI.
 ```bash
 cargo build --offline -p agent-core --bin nubo-proto
 cargo test  --offline -p agent-core
-node scripts/e2e-agent-kernel.mjs      # 12 checks: session, events, persistence, history restore
+node scripts/e2e-agent-kernel.mjs             # 12 checks: session, events, persistence, history restore
+node scripts/e2e-agent-kernel-parity.mjs      # 9 checks: mode, plugin tool declarations, approved plan
 pnpm --filter @pi-workspace/desktop typecheck
 ```
 
 The e2e run is the acceptance gate for the port: it proves the kernel streams a
 turn, that its frames survive adaptation and land in host-core, and that a fresh
-kernel process restores that transcript on the next prompt.
+kernel process restores that transcript on the next prompt. The parity run covers
+what a scripted turn cannot show — which tools a mode declares, whether the
+adapter honours a renamed parameter, and whether the approved-plan call is still
+unknown to the kernel.
