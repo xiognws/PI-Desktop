@@ -1,0 +1,16 @@
+apps/desktop/electron/main/browser-host.ts
+  h_201ed4c689ac8b 3-4,14-24,132-140,190-193,320-328,330,332,350-388,571-601,603-604,698,713-715,742
+apps/desktop/electron/test/browser-host-guest-limit.test.mjs
+  h_201ed4c689ac8b 1-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7bad173fc891bb942fd3610131d8042de884c628",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
