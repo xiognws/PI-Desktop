@@ -1,0 +1,14 @@
+scripts/e2e-plan-ui.mjs
+  h_201ed4c689ac8b 1449-1455,1458-1460
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e591232921c9c1ebcc8a0f56e4c08056cd2072d2",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
