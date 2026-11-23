@@ -321,11 +321,12 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
       await pressTab();
       await pressTab(true);
       const focusedTitle = await paint(title(seed.paths.alpha));
+      const focusedHeaderPaint = await paint(header(seed.paths.alpha));
       check(
         focusedTitle.focusVisible && focusedTitle.outline !== "none" && focusedTitle.outlineWidth > 0 &&
-          focusedTitle.background === transparent && (await paint(header(seed.paths.alpha))).background === transparent,
+          focusedTitle.background === transparent && focusedHeaderPaint.background === transparent,
         `${theme} keyboard focus has an outline without a second selection surface`,
-        JSON.stringify(focusedTitle),
+        JSON.stringify({ focusedTitle, focusedHeaderPaint }),
       );
       await click(title(seed.paths.alpha));
       await waitFor(() => cdp.evaluate(`document.querySelector(${JSON.stringify(group(seed.paths.alpha) + ' .sidebar-session-group-body')}).inert`), "selected group folds");
