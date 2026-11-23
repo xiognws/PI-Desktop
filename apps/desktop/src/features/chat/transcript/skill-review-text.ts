@@ -49,10 +49,7 @@ export function skillReviewReports(notice: SkillReviewNotice): boolean {
  */
 export function skillReviewText(notice: SkillReviewNotice, t: Translate): string {
   if (notice.outcome === "applied") {
-    const detail = skillReviewDetail(notice, t);
-    return detail
-      ? t("chat.skillReviewAppliedDetail", { detail })
-      : t("chat.skillReviewApplied", { count: notice.actions.length });
+    return t("chat.skillReviewApplied", { count: notice.actions.length });
   }
   if (notice.outcome === "failed") return t("chat.skillReviewFailed");
   if (notice.reason === "no-tool-calls") return t("chat.skillReviewNoLook");
@@ -96,16 +93,42 @@ export function skillReviewActionText(
 }
 
 /**
- * The writes of one pass, joined the way the reference joins them.
+ * The glyph each kind of write is drawn with.
  *
- * Falls back to the runtime's English sentences when a notice arrived from a
- * runtime that does not send the structured form — an old session replayed from
- * the log still renders.
+ * The reference prints one line per write, prefixed by a glyph rather than a
+ * bullet: a hand for something written, a plaster for something patched, a brain
+ * for a memory. The glyph is what lets a reader scan four lines in one look and
+ * see that three were writes and one was a fix.
  */
-export function skillReviewDetail(notice: SkillReviewNotice, t: Translate): string {
+const ACTION_GLYPH: Record<string, string> = {
+  created: "\u{2795}",
+  patched: "\u{1FA79}",
+  wrote: "\u{270D}\u{FE0F}",
+  removed: "\u{2796}",
+  memory: "\u{1F9E0}",
+};
+
+/**
+ * The writes of one pass, one line each — the shape the screenshot shows.
+ *
+ * Each line is `✍️ skill 'x' wrote references/y.md`, composed from the structured
+ * write and the locale. A notice from a runtime that does not send the structured
+ * form falls back to its own English sentences, which still carry the glyph: an
+ * old session replayed from the log renders instead of going blank.
+ */
+export function skillReviewWriteLines(
+  notice: SkillReviewNotice,
+  t: Translate,
+): string[] {
   const details = notice.actionDetails ?? [];
   if (details.length > 0) {
-    return details.map((detail) => skillReviewActionText(detail, t)).join(" · ");
+    return details.map(
+      (detail) =>
+        `${ACTION_GLYPH[detail.kind ?? ""] ?? ACTION_GLYPH.wrote} ${skillReviewActionText(detail, t)}`,
+    );
   }
-  return notice.actions.join(" · ");
+  return notice.actions.map((action) => {
+    const verb = action.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? "";
+    return `${ACTION_GLYPH[verb === "memory" ? "memory" : verb] ?? ACTION_GLYPH.wrote} ${action}`;
+  });
 }
