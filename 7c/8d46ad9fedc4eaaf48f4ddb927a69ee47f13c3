@@ -1,0 +1,20 @@
+crates/agent-core/src/context.rs
+  h_201ed4c689ac8b 8-14,138-141,337,339-347,351-361
+docs/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 581-587,707-709
+packages/agent-runtime/src/context-budget.test.ts
+  h_201ed4c689ac8b 44,53-56,58-59,63-65,107,113-116
+packages/agent-runtime/src/context-budget.ts
+  h_201ed4c689ac8b 46,48-53,55-58,88-90,140-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7c8d46ad9fedc4eaaf48f4ddb927a69ee47f13c3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
