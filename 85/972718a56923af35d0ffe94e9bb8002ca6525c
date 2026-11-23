@@ -1,0 +1,18 @@
+apps/desktop/src/features/chat/transcript/SkillReviewRow.tsx
+  h_201ed4c689ac8b 9-13,36-40,43-53
+apps/desktop/src/features/chat/transcript/skill-review-text.ts
+  h_201ed4c689ac8b 52,96,98-101,103-122,125-128,130-133
+apps/desktop/test/skill-review-text.test.mjs
+  h_201ed4c689ac8b 5-7,12-14,16-19,32-36,39,47-54,57-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "85972718a56923af35d0ffe94e9bb8002ca6525c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
