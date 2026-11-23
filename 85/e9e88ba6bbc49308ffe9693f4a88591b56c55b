@@ -1,0 +1,16 @@
+docs/adr/0404-turn-abort-provider-traffic.md
+  h_201ed4c689ac8b 1-90
+docs/adr/README.md
+  h_201ed4c689ac8b 437-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "85e9e88ba6bbc49308ffe9693f4a88591b56c55b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
