@@ -1,0 +1,20 @@
+crates/agent-core/src/skill_review.rs
+  h_201ed4c689ac8b 51-68,487-495,502-516,519-531,752-790
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 9-11,13,61,70,1527-1537,1554,2831-2834,2839-2841,3018-3019,5048-5095,7611-7613,8140
+packages/agent-runtime/src/skill-review-run.test.ts
+  h_201ed4c689ac8b 5-6,15,70-104
+packages/agent-runtime/src/skill-review-run.ts
+  h_201ed4c689ac8b 195-259
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "85ee30664f32b1784e3f179b8966f9d7629978d3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
