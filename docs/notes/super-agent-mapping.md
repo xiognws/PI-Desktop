@@ -77,9 +77,17 @@ Nothing in that path touches `SessionTask`, so ADR 0398/0386 stay dormant.
 It is a second product, not a feature of this one. The parts that exist and
 would carry over: the host boundary (`packages/agent-host`), the persisted queue,
 the permission model, `session_collaboration`'s durable ledger and completion
-callback (`crates/host-core/src/session_collaboration/settlement.rs`). The parts
-that do not exist and cannot be faked: an event intake (webhook/poll →
-admission), a router that decides *whether* to accept work and with which model,
-and a delivery channel. That is a different trust boundary — untrusted input
+callback (`crates/host-core/src/session_collaboration/settlement.rs`).
+
+The kernel also now carries router/worker machinery of its own —
+`crates/agent-core/src/super_agent/` (router 879, worker 843, trigger 691,
+watchdog 488, recall 492, async_task 512 lines) behind nine
+`superagent.*` RPC methods, with `tests/superagent_rpc.rs` covering them. It is
+**dormant**: nothing under `apps/desktop` calls those methods, so the default
+path never touches it. An earlier draft of this note said the router "does not
+exist"; that was true when written and is no longer true of the kernel crate.
+
+What still does not exist and cannot be faked: an event intake (webhook/poll →
+admission) and a delivery channel. That is a different trust boundary — untrusted input
 starting work with no operator present — and deserves its own threat model
 before any code.
