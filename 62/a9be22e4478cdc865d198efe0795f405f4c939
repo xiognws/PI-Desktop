@@ -1,0 +1,14 @@
+docs/spec/07-plugins/16-trusted-extensions.md
+  h_201ed4c689ac8b 220-246,314-320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "62a9be22e4478cdc865d198efe0795f405f4c939",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
