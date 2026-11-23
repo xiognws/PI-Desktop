@@ -1446,20 +1446,24 @@ async function runAcceptance(state) {
   await connectRenderer(state);
   await waitForRendererReady(state);
   await setViewport(state, 1280, 800);
+  // The shell opens with no session of its own (a temporary chat starts on the
+  // first message), and the seeded session was created straight through the host,
+  // so no list-changed event reached a renderer that was already booted. Reload
+  // once so the sidebar reads the database again instead of rendering an empty
+  // project.
+  await reloadRenderer(state);
+  await waitForRendererReady(state);
   await selectSession(state, state.sessionId);
 
-  const settings = await getSettings(state);
-  assert(settings.defaultMode === "agent", `new-session default is not Agent: ${jsonText(settings)}`);
-  // The shell no longer creates a session at boot (temporary chats start on
-  // the first message), so create the independent Agent session the way the
-  // renderer's new-task path does: with the settings default mode.
+  // The settings payload no longer carries a default session mode, so the product
+  // decides it where the session is created. Assert the behaviour rather than a
+  // field: a session created without naming a mode has to come back as Agent.
   const sessions = await getSessions(state);
   let defaultAgent = sessions.find((session) => session.id !== state.sessionId && session.mode === "agent");
   if (!defaultAgent) {
     const created = await getPreloadResult(state, "sessionCreate", [
       {
         title: "Independent Agent session",
-        mode: settings.defaultMode,
         projectPath: state.workspace,
       },
     ]);
