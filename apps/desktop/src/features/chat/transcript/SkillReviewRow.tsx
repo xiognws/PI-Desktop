@@ -6,11 +6,7 @@ import type { TranscriptEntry } from "../../../lib/assistant-turns";
 import { useAppStore } from "../../../stores/app-store";
 import type { SkillReviewNotice } from "../../../stores/app-state";
 import { TranscriptHistory, TranscriptTail } from "./AssistantTurn";
-import {
-  skillReviewReports,
-  skillReviewText,
-  skillReviewWriteLines,
-} from "./skill-review-text";
+import { skillReviewReports, skillReviewText } from "./skill-review-text";
 
 /**
  * One quiet line under a finished turn reporting the self-improvement review.
@@ -33,24 +29,12 @@ export function SkillReviewRow({ notice }: { notice: SkillReviewNotice }) {
   const visible = useAppStore((state) => state.settings?.skillReviewVisible !== false);
   if (!visible) return null;
   if (!skillReviewReports(notice)) return null;
-  // One line per write, glyph first — the shape the reference prints and the shape
-  // a reader scans: `✍️ skill 'x' wrote references/y.md`. Each line is composed in
-  // the reader's language from the structured write, so a Chinese UI does not echo
-  // English prose from the runtime.
-  const lines = skillReviewWriteLines(notice, t);
+  // One line for the whole pass: the writes name themselves inside it, separated by
+  // `·`. A pass that touched four skills used to print four lines of the same shape
+  // and push the conversation down without saying anything new.
   return (
     <div className="skill-review-row" data-outcome={notice.outcome} role="status">
-      {lines.length > 0 ? (
-        <ul className="skill-review-lines">
-          {lines.map((line, index) => (
-            <li key={`${index}:${line}`} className="skill-review-line">
-              {line}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <span className="skill-review-text">{skillReviewText(notice, t)}</span>
-      )}
+      <span className="skill-review-text">{skillReviewText(notice, t)}</span>
     </div>
   );
 }

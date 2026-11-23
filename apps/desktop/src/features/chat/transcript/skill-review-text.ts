@@ -49,7 +49,10 @@ export function skillReviewReports(notice: SkillReviewNotice): boolean {
  */
 export function skillReviewText(notice: SkillReviewNotice, t: Translate): string {
   if (notice.outcome === "applied") {
-    return t("chat.skillReviewApplied", { count: notice.actions.length });
+    const detail = skillReviewDetail(notice, t);
+    return detail
+      ? t("chat.skillReviewAppliedDetail", { detail })
+      : t("chat.skillReviewApplied", { count: notice.actions.length });
   }
   if (notice.outcome === "failed") return t("chat.skillReviewFailed");
   if (notice.reason === "no-tool-calls") return t("chat.skillReviewNoLook");
@@ -93,42 +96,21 @@ export function skillReviewActionText(
 }
 
 /**
- * The glyph each kind of write is drawn with.
+ * The writes of one pass, joined into a single sentence.
  *
- * The reference prints one line per write, prefixed by a glyph rather than a
- * bullet: a hand for something written, a plaster for something patched, a brain
- * for a memory. The glyph is what lets a reader scan four lines in one look and
- * see that three were writes and one was a fix.
- */
-const ACTION_GLYPH: Record<string, string> = {
-  created: "\u{2795}",
-  patched: "\u{1FA79}",
-  wrote: "\u{270D}\u{FE0F}",
-  removed: "\u{2796}",
-  memory: "\u{1F9E0}",
-};
-
-/**
- * The writes of one pass, one line each — the shape the screenshot shows.
+ * One line, not one line per write: a pass that touched four skills produced four
+ * lines of the same shape and pushed the conversation down for no new information.
+ * The writes still name themselves — `skill 'x' wrote references/y.md` — so the
+ * reader can see what changed; they are separated by `·` inside one line.
  *
- * Each line is `✍️ skill 'x' wrote references/y.md`, composed from the structured
- * write and the locale. A notice from a runtime that does not send the structured
- * form falls back to its own English sentences, which still carry the glyph: an
- * old session replayed from the log renders instead of going blank.
+ * Falls back to the runtime's own English sentences when a notice arrived from a
+ * runtime that does not send the structured form, so a session replayed from an old
+ * log renders instead of going blank.
  */
-export function skillReviewWriteLines(
-  notice: SkillReviewNotice,
-  t: Translate,
-): string[] {
+export function skillReviewDetail(notice: SkillReviewNotice, t: Translate): string {
   const details = notice.actionDetails ?? [];
   if (details.length > 0) {
-    return details.map(
-      (detail) =>
-        `${ACTION_GLYPH[detail.kind ?? ""] ?? ACTION_GLYPH.wrote} ${skillReviewActionText(detail, t)}`,
-    );
+    return details.map((detail) => skillReviewActionText(detail, t)).join(" \u00b7 ");
   }
-  return notice.actions.map((action) => {
-    const verb = action.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? "";
-    return `${ACTION_GLYPH[verb === "memory" ? "memory" : verb] ?? ACTION_GLYPH.wrote} ${action}`;
-  });
+  return notice.actions.join(" \u00b7 ");
 }
