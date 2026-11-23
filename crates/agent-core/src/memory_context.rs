@@ -18,6 +18,17 @@ use crate::message::{ContentPart, Message, Role};
 
 /// Characters of the user prompt used as the recall query.
 pub const MAX_QUERY_CHARS: usize = 2_000;
+/// Characters of that budget spent on the prompt's opening.
+///
+/// A long prompt is usually pasted material — a log, a file — and the question
+/// sits after it, so the tail carries the intent. A short opening still travels
+/// with it, because some prompts lead with the heading and bury the detail.
+pub const QUERY_HEAD_CHARS: usize = 200;
+/// Characters any single memory may take in the block.
+///
+/// Without it one long note consumes the whole budget and the hits behind it are
+/// dropped, which looks identical to "nothing else matched".
+pub const MAX_HIT_CHARS: usize = 900;
 /// Characters of the rendered block; roughly 800 tokens.
 pub const MAX_BLOCK_CHARS: usize = 3_000;
 /// Hits asked from the host; the block budget trims them further.
@@ -46,7 +57,7 @@ pub async fn recall_prefix(
     if trimmed.is_empty() {
         return None;
     }
-    let text: String = trimmed.chars().take(MAX_QUERY_CHARS).collect();
+    let text = recall_query(trimmed);
     let mut params = serde_json::Map::new();
     params.insert("query".into(), json!(text));
     if let Some(path) = project_path {
@@ -57,14 +68,64 @@ pub async fn recall_prefix(
     }
     params.insert("limit".into(), json!(limit));
 
-    let reply = tokio::time::timeout(
+    let reply = match tokio::time::timeout(
         RECALL_TIMEOUT,
         host.call("memory.recall", Value::Object(params)),
     )
     .await
-    .ok()?
-    .ok()?;
+    {
+        Ok(Ok(reply)) => reply,
+        // Recall is best effort by design, but a silent failure made "memory is
+        // not working" undiagnosable: the turn simply ran without context and
+        // nothing said why.
+        Ok(Err(error)) => {
+            tracing::warn!(
+                %error,
+                "memory.recall failed: this turn runs without remembered context"
+            );
+            return None;
+        }
+        Err(elapsed) => {
+            tracing::warn!(
+                ?elapsed,
+                limit = ?RECALL_TIMEOUT,
+                "memory.recall did not answer in time: this turn runs without remembered context"
+            );
+            return None;
+        }
+    };
     render(&reply)
+}
+
+/// The slice of a long prompt that becomes the recall query.
+///
+/// Pasted material dominates the character budget and the question usually
+/// follows it, so the tail is the part worth matching. A short opening still
+/// travels with it for prompts that lead with the answer and explain afterwards.
+fn recall_query(prompt: &str) -> String {
+    let len = prompt.chars().count();
+    if len <= MAX_QUERY_CHARS {
+        return prompt.to_string();
+    }
+    // The separator is part of the budget: the host receives at most
+    // MAX_QUERY_CHARS characters, never one more.
+    const SEPARATOR: &str = "\n…\n";
+    let tail_len = MAX_QUERY_CHARS - QUERY_HEAD_CHARS - SEPARATOR.chars().count();
+    let head: String = prompt.chars().take(QUERY_HEAD_CHARS).collect();
+    let tail: String = prompt.chars().skip(len - tail_len).collect();
+    format!("{head}{SEPARATOR}{tail}")
+}
+
+/// Clip one rendered memory to `limit` characters, marking where it was cut.
+fn clip_line(line: String, limit: usize) -> String {
+    if line.chars().count() <= limit {
+        return line;
+    }
+    const MARKER: &str = " …";
+    let keep = limit.saturating_sub(MARKER.chars().count());
+    let mut clipped: String = line.chars().take(keep).collect();
+    clipped.push_str(MARKER);
+    clipped
 }
 
 /// Render hits into the block, best first, stopping at the character budget.
@@ -101,6 +162,10 @@ pub fn render(reply: &Value) -> Option<String> {
             ""
         };
         let line = format!("- {label}{title}{separator}{body}{confidence}");
+        // One long note must not evict every hit behind it. Clip it to its own
+        // share and keep going; the marker makes a truncated memory impossible to
+        // mistake for the whole note.
+        let line = clip_line(line, MAX_HIT_CHARS);
         let cost = line.chars().count() + 1;
         if used + cost > MAX_BLOCK_CHARS {
             break;
@@ -260,16 +325,29 @@ mod tests {
 
     #[test]
     fn the_block_stops_at_its_character_budget() {
+        // Each note exceeds what one hit may take, so the block is bounded by
+        // per-hit clipping first and by the total budget second: the clipped
+        // notes no longer evict the ones behind them.
         let big = "y".repeat(1_500);
         let reply = json!({"memories": [
             hit("global", "fact", "one", &big, 0.7),
             hit("global", "fact", "two", &big, 0.7),
             hit("global", "fact", "three", &big, 0.7),
+            hit("global", "fact", "four", &big, 0.7),
+            hit("global", "fact", "five", &big, 0.7),
         ]});
         let block = render(&reply).expect("a block");
         assert!(block.chars().count() <= MAX_BLOCK_CHARS);
         assert!(block.contains("- [global/fact] one:"));
-        assert!(!block.contains("two"), "the budget cut the rest");
+        assert!(
+            block.contains("two"),
+            "a clipped note no longer evicts the rest"
+        );
+        assert!(
+            !block.contains("five"),
+            "the total budget still stops the block: {}",
+            block.chars().count()
+        );
     }
 
     #[test]
@@ -308,6 +386,46 @@ mod tests {
         assert!(
             messages[2].text() == "second",
             "the input transcript is untouched"
+        );
+    }
+
+    #[test]
+    fn a_long_prompt_sends_its_tail_within_the_budget() {
+        let question = "why does the build fail after the upgrade";
+        let prompt = format!("{}{question}", "x".repeat(MAX_QUERY_CHARS * 2));
+        let query = recall_query(&prompt);
+        assert!(
+            query.chars().count() <= MAX_QUERY_CHARS,
+            "the host never receives more than the budget: {}",
+            query.chars().count()
+        );
+        assert!(
+            query.ends_with(question),
+            "the question at the end survives"
+        );
+        assert!(query.starts_with("xxx"), "a short opening still travels");
+        assert!(query.contains('…'), "the cut is visible");
+    }
+
+    #[test]
+    fn a_short_prompt_is_the_query_unchanged() {
+        let prompt = "  how long is the build  ";
+        assert_eq!(recall_query(prompt), prompt);
+    }
+
+    #[test]
+    fn a_long_memory_is_clipped_so_the_hits_behind_it_survive() {
+        let long_body = "y".repeat(MAX_HIT_CHARS * 2);
+        let reply = json!({"memories": [
+            hit("global", "fact", "long", &long_body, 0.9),
+            hit("global", "fact", "short", "the small one", 0.5),
+        ]});
+        let block = render(&reply).expect("a block");
+        assert!(block.contains("long"), "the clipped note still appears");
+        assert!(block.contains('…'), "and says it was cut");
+        assert!(
+            block.contains("the small one"),
+            "the hit behind it is not evicted"
         );
     }
 

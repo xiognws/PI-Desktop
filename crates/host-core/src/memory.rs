@@ -504,16 +504,25 @@ impl Database {
         // temp-file and language rules are written there. They are returned
         // whatever the query says, because a rule the agent must always follow
         // cannot depend on how one message happens to be worded.
+        let plan = RecallPlan::parse(&query.query);
+        // A pinned rule must always arrive, but it must not take every slot. With
+        // MAX_PINNED at 32 and a five-hit block, five pinned notes left the query
+        // nothing to fill, so recall silently degraded into "pinned only" as soon
+        // as the user pinned five things.
+        let pinned_limit = if plan.is_empty() {
+            limit
+        } else {
+            limit.saturating_sub(1).max(1)
+        };
         let mut hits: Vec<MemoryHit> = self
             .pinned_memories(
                 query.project_path.as_deref(),
                 query.session_id.as_deref(),
-                limit,
+                pinned_limit,
             )?
             .into_iter()
             .map(|memory| MemoryHit { memory, score: 0.0 })
             .collect();
-        let plan = RecallPlan::parse(&query.query);
         if plan.is_empty() {
             let touched: Vec<String> = hits.iter().map(|hit| hit.memory.id.clone()).collect();
             self.mark_used(&touched)?;

@@ -418,6 +418,48 @@ fn pinned_memories_come_back_without_a_query() {
 }
 
 #[test]
+fn pinned_memories_leave_a_slot_for_the_query() {
+    let (db, _dir) = db();
+    // Five pinned rules is exactly the block the model receives (RECALL_LIMIT),
+    // which used to leave the query nothing to fill.
+    for index in 0..5 {
+        db.remember(
+            project_memory(
+                &format!("rule {index}"),
+                &format!("always do thing {index}"),
+                "/w/pi",
+            )
+            .pinned(true),
+        )
+        .unwrap();
+    }
+    db.remember(project_memory(
+        "deploy target",
+        "the deploy host is sda-build-02",
+        "/w/pi",
+    ))
+    .unwrap();
+
+    let titles: Vec<String> = db
+        .recall(RecallQuery {
+            query: "deploy host".to_string(),
+            project_path: Some("/w/pi".to_string()),
+            session_id: Some("s1".to_string()),
+            limit: Some(5),
+            ..Default::default()
+        })
+        .unwrap()
+        .into_iter()
+        .map(|hit| hit.memory.title)
+        .collect();
+
+    assert!(
+        titles.iter().any(|title| title == "deploy target"),
+        "the query keeps one slot even when pinned rules fill the rest: {titles:?}"
+    );
+}
+
+#[test]
 fn a_pinned_rule_survives_an_unrelated_query() {
     let (db, dir) = db();
     // The installation facts are pinned globals: no matter what the turn is
