@@ -57,8 +57,16 @@ export function createExtensionModelRegistry(
     const pluginModels = input.agents().flatMap((agent) =>
       agent.models.map((model) => project(agent, model)),
     );
+    // The session's model is listed under the provider label an extension addresses
+    // it by — the same string the Node registry reports (`vendorKey` when the row has
+    // one, its id otherwise). Anything else and the same extension code would compare
+    // against a different value on each runtime.
     const own: ExtensionRegistryModel[] = input.binding
-      ? [{ id: input.binding.modelId, name: input.binding.modelId, provider: input.binding.providerId }]
+      ? [{
+          id: input.binding.modelId,
+          name: input.binding.modelId,
+          provider: input.binding.providerKey ?? input.binding.providerId,
+        }]
       : [];
     // Keyed the way the Node registry keys it, so one agent listed twice is one
     // entry rather than a duplicate the extension has to dedupe.
@@ -71,14 +79,21 @@ export function createExtensionModelRegistry(
   // `setModel` switches to a plugin agent only, so a provider is "configured"
   // exactly when main knows how to reach it: the session's own binding, or an
   // agent a loaded module registered. Nothing here reads a secret to say so.
+  // Both spellings count as "configured": an extension that read the label from the
+  // registry and one that was handed the row id are asking about the same provider.
   const configured = (providerId: string): boolean =>
     providerId === input.binding?.providerId ||
+    providerId === input.binding?.providerKey ||
     input.agents().some((agent) => agent.providerId === providerId);
   return {
     getAll: () => entries(),
     getAvailable: () => entries(),
     find: (providerId: string, modelId: string) =>
-      entries().find((model) => model.provider === providerId && model.id === modelId),
+      entries().find((model) => model.provider === providerId && model.id === modelId) ??
+      // A caller holding the row id instead of the label still finds its own model.
+      entries().find(
+        (model) => model.id === modelId && input.binding?.providerId === providerId,
+      ),
     getProviderDisplayName: (providerId: string) =>
       input.agents().find((agent) => agent.providerId === providerId)?.name ?? providerId,
     getProviderAuthStatus: (providerId: string) => ({

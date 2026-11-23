@@ -119,7 +119,19 @@ export function createExtensionSessionHost(
           id: sessionId,
           messageLimit: 1,
         });
-        return bindingFrom(result?.session);
+        const binding = bindingFrom(result?.session);
+        if (!binding) return undefined;
+        // The row carries the provider id, not the label an extension addresses it
+        // by. Read it from the provider list — this runs once per Runner, not per
+        // call, so one extra RPC is cheaper than a cache to invalidate.
+        const providers = await host
+          .call<{ providers?: { id?: string; vendorKey?: string }[] }>("providers.list", {
+            includeDisabled: true,
+          })
+          .catch(() => undefined);
+        const row = providers?.providers?.find((entry) => entry?.id === binding.providerId);
+        const label = typeof row?.vendorKey === "string" ? row.vendorKey.trim() : "";
+        return label ? { ...binding, providerKey: label } : { ...binding, providerKey: binding.providerId };
       } catch (error) {
         deps.log?.("warn", "extension session binding unreadable", {
           sessionId,

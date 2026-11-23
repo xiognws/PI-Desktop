@@ -245,3 +245,24 @@ test("without host services the turn half refuses instead of pretending", async 
     .sort();
   assert.deepEqual(kinds, ["handler_error:command:switch", "handler_error:setSessionName"]);
 });
+
+test("the session's model is listed under the provider label an extension addresses", async (t) => {
+  // The Node runtime keys a model by its pi provider string: the row's vendorKey when
+  // it has one, the row id otherwise (`provider-binding.ts`). Main must say the same
+  // string, or `modelRegistry.getAll()[0].provider` means something different on each
+  // runtime and an extension that stores it cannot switch models portably.
+  const spec = withExtension(t);
+  const host = sessionHost({
+    binding: { providerId: "provider-1", providerKey: "custom", modelId: "stub-1", mode: "agent" },
+  });
+  const bridge = createBridge(host);
+  t.after(() => bridge.clearSession("session-1"));
+  delete globalThis.__commandReport;
+
+  await bridge.runCommand({ sessionId: "session-1", name: "switch", args: "Ann", specs: [spec] });
+  const report = globalThis.__commandReport;
+  const own = report.models.find((model) => model.id === "stub-1");
+  assert.equal(own.provider, "custom", `own binding provider: ${JSON.stringify(own)}`);
+  // Both spellings ask about the same provider, so both answer "configured".
+  assert.deepEqual(report.status, { configured: true, source: "plugin" });
+});

@@ -143,6 +143,16 @@ export type ExtensionCommandRunner = {
  */
 export type ExtensionSessionBinding = {
   providerId: string;
+  /**
+   * The provider as an extension addresses it.
+   *
+   * The Node runtime's registry keys a model by its pi provider string, which is a
+   * provider's `vendorKey` when it has one and its row id otherwise
+   * (`provider-binding.ts`: `vendorKey?.trim() || id`). Main has to say the same
+   * thing here, or `modelRegistry.getAll()[0].provider` means two different strings
+   * depending on which runtime the session is on.
+   */
+  providerKey?: string;
   modelId: string;
   mode?: string;
   thinkingLevel?: string;
