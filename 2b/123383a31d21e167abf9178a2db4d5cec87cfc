@@ -1,0 +1,14 @@
+crates/host-core/src/tools/web.rs
+  h_201ed4c689ac8b 2126-2191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2b123383a31d21e167abf9178a2db4d5cec87cfc",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
