@@ -29,6 +29,8 @@ import { relaxedNetworkPolicyEnabled } from "../endpoint-policy";
 import { shellCommandShape, type ShellCommandShape } from "./tool-log-shape";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import type { AgentExtensionBridge } from "../agent-extensions";
+import { createExtensionSessionHost } from "../extension-session-host";
+import { installPluginAgentTransport } from "../plugin-agent-transport";
 import type { BrowserHost } from "../browser-host";
 import type { InflightCheckpointer } from "@pi-workspace/host-runtime";
 import { summarizeToolResult, type Logger } from "../logger";
@@ -112,6 +114,23 @@ export function createSidecarRuntime({
   wireSidecar: (sidecar: AgentSidecar) => void;
   startSidecar: () => Promise<void>;
 } {
+  // The host-owned half of an extension command (spec 16 §8): rename, queue,
+  // model binding. One instance for both runtimes — the `extensions.*` bridge
+  // below answers the Node sidecar with the same methods a main-run command
+  // reaches, so `setModel` cannot mean two things in one app.
+  const extensionSessionHost = createExtensionSessionHost({
+    // A thin indirection, not a second host client: the process handle is
+    // mutable (it restarts), so the port is looked up per call.
+    getHost: () => {
+      const host = runtimeState.host;
+      return host ? { call: (method: string, params?: unknown) => host.call(method, params) } : null;
+    },
+    getAgentHost: () => runtimeState.agentHostBridge,
+    isTurnActive: (sessionId) => activeTurns.has(sessionId),
+    broadcast: (event, payload) => plugins.broadcastEvent(event, payload),
+    log: (level, message, data) => logger.app("plugin", level, message, { data }),
+  });
+  agentExtensions.setSessionHost(extensionSessionHost);
   const emitAgentEvent = (envelope: AgentEventEnvelope) => {
     // A terminal event for a turn that no longer owns its session must not clear
     // the current turn's state in Agent Host or the renderer. Persistence is a
@@ -486,6 +505,22 @@ export function createSidecarRuntime({
         root: extension.root,
       }));
 
+  // The kernel cannot run a plugin's `stream`/`complete`, so main serves that
+  // agent's transport on loopback for it (`plugin-agent-transport.ts`). Installed
+  // here because this is where the session's trusted set is decided: the
+  // endpoint resolves through the same filter and the same Runner, so a plugin
+  // that may not run for a project cannot be reached through it either.
+  installPluginAgentTransport({
+    resolve: ({ sessionId, agentKey, modelId }) =>
+      agentExtensions.agentTransport({
+        sessionId,
+        specs: trustedExtensionSpecs(sessionId),
+        agentKey,
+        modelId,
+      }),
+    log: (level, message, data) => logger.app("plugin", level, message, { data }),
+  });
+
   s.setTrustedExtensionBridge({
     describe: (params) => {
       const sessionId = String(params.sessionId ?? "");
@@ -526,29 +561,15 @@ export function createSidecarRuntime({
       ),
     requestUi: (params) => agentExtensions.requestUi(params as any),
     configureModel: async (params) => {
-      if (!runtimeState.host) throw new Error("host unavailable");
       const sessionId = String(params.sessionId ?? "").trim();
-      const result = await runtimeState.host.call<{ session?: {
-        providerId?: string;
-        modelId?: string;
-        thinkingLevel?: string;
-      } | null }>("session.configure", {
-        id: sessionId,
+      const result = await extensionSessionHost.configureModel({
+        sessionId,
         mode: String(params.mode ?? "agent"),
         providerId: String(params.providerId ?? ""),
         modelId: String(params.modelId ?? ""),
-        thinkingLevel: typeof params.thinkingLevel === "string" ? params.thinkingLevel : undefined,
+        ...(typeof params.thinkingLevel === "string" ? { thinkingLevel: params.thinkingLevel } : {}),
       });
-      if (result.session) {
-        plugins.broadcastEvent("session:modelChanged", [{
-          sessionId,
-          modelKey: result.session.providerId && result.session.modelId
-            ? `${result.session.providerId}/${result.session.modelId}`
-            : null,
-          thinkingLevel: result.session.thinkingLevel,
-        }]);
-      }
-      return { ok: Boolean(result.session), session: result.session ?? null };
+      return { ok: result.ok, session: result.session };
     },
     queuePush: async (params) => {
       if (!runtimeState.agentHostBridge) throw new Error("agent host unavailable");

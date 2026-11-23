@@ -22,6 +22,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { extensionToastText } from "./extension-toast-policy";
+import {
+  createExtensionModelRegistry,
+  findRegisteredAgentModel,
+} from "./extension-model-registry";
+import { extensionMessageText } from "./extension-session-host";
 import { assertImportedPackagePath, discoverImportedPackageSkills } from "./imported-package-skills";
 import {
   IMPORTED_PLUGIN_ID_PREFIX,
@@ -29,8 +34,15 @@ import {
   IMPORTED_PLUGIN_WRAPPER_SOURCE,
 } from "./imported-plugin-wrapper";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type {
+  Api,
+  AssistantMessageEventStream,
+  Context,
+  Model,
+} from "@earendil-works/pi-ai";
 import {
   discoverManualPath,
+  type RegisteredTrustedExtensionAgent,
   type TrustedExtensionBridge,
   type TrustedExtensionEventName,
 } from "@pi-workspace/agent-runtime";
@@ -74,12 +86,30 @@ export type AgentExtensionBridgeOptions = {
   promptTimeoutMs?: number;
   /** Overrides the Runner built for {@link AgentExtensionBridge.runCommand}. */
   runnerFactory?: ExtensionCommandRunnerFactory;
+  /**
+   * Host-owned session services for a command's turn half. Main supplies them
+   * once the host and Agent Host exist ({@link AgentExtensionBridge.setSessionHost}).
+   */
+  sessionHost?: AgentExtensionSessionHost;
+};
+
+/**
+ * One plugin agent's transport, when the host has to serve it for a runtime that
+ * cannot run JavaScript (`plugin-agent-transport.ts`).
+ *
+ * `model` is the model the plugin declared: its callback owns request
+ * serialisation, so it receives its own metadata rather than the host's.
+ */
+export type ExtensionAgentTransport = {
+  providerId: string;
+  model: Model<Api>;
+  stream(context: Context, options: { signal?: AbortSignal }): AssistantMessageEventStream;
 };
 
 /**
  * The slice of `TrustedExtensionRunner` main needs while it is the only
  * JavaScript host a session has: run one command, answer one hook, run one
- * extension tool.
+ * extension tool, and name the plugin agents the modules registered.
  *
  * Everything past `dispose` is optional so a test double can stand in for the
  * shipped Runner; a member that is absent means "this session has no handler
@@ -93,6 +123,8 @@ export type ExtensionCommandRunner = {
   getLoadReports?(): TrustedExtensionLoadReport[];
   /** Tools the loaded modules registered (`TrustedExtensionRunner.getAgentTools`). */
   getAgentTools?(): AgentTool[];
+  /** Plugin agents the loaded modules registered, for the registry and transport. */
+  getAgents?(): RegisteredTrustedExtensionAgent[];
   /** One hook event, folded by the runner the way the Node runtime folds it. */
   emit?<R = unknown>(
     event: TrustedExtensionEventName,
@@ -101,6 +133,54 @@ export type ExtensionCommandRunner = {
   ): Promise<R | undefined>;
   emitBeforeAgentStart?(prompt: string, systemPrompt: string): Promise<string | undefined>;
   emitBeforeProviderRequest?(payload: unknown): Promise<unknown>;
+};
+
+/**
+ * A session's own model binding, as the extension surface sees it.
+ *
+ * Read off the session row, so it can only ever name ids: never a provider's
+ * endpoint, headers, or secret.
+ */
+export type ExtensionSessionBinding = {
+  providerId: string;
+  modelId: string;
+  mode?: string;
+  thinkingLevel?: string;
+  title?: string;
+  /** Project root, or the session's scratch directory — what `ctx.cwd` means here. */
+  projectPath?: string;
+};
+
+export type ExtensionSessionConfigureInput = {
+  sessionId: string;
+  mode: string;
+  providerId: string;
+  modelId: string;
+  thinkingLevel?: string;
+};
+
+/**
+ * The host-owned session services a main-run command reaches (spec §5, §8).
+ *
+ * Supplied by Electron main from the host RPC and the Agent Host — the same
+ * services the Node sidecar's extension bridge calls — so `setSessionName`,
+ * `sendUserMessage` and `setModel` mean one thing under either runtime. Absent,
+ * those members refuse with a diagnostic instead of pretending to work.
+ */
+export type AgentExtensionSessionHost = {
+  sessionBinding(sessionId: string): Promise<ExtensionSessionBinding | undefined>;
+  configureModel(
+    input: ExtensionSessionConfigureInput,
+  ): Promise<{ ok: boolean; session: ExtensionSessionBinding | null }>;
+  renameSession(input: { sessionId: string; title: string }): Promise<void>;
+  queueUserMessage(input: {
+    sessionId: string;
+    content: string;
+    idempotencyKey?: string;
+  }): Promise<{ id?: string }>;
+  prioritizeQueuedMessage(id: string): Promise<void>;
+  /** `setModel` is idle-only, exactly as it is in the Node runtime. */
+  isSessionIdle(sessionId: string): boolean;
 };
 
 /** One extension-registered agent tool, as the kernel needs to declare it. */
@@ -153,9 +233,25 @@ export class AgentExtensionBridge {
   private readonly uiRequests = new Map<string, { sessionId: string; controller: AbortController }>();
   /** One JavaScript Runner per session, but only for sessions main must run itself. */
   private readonly commandRunners = new Map<string, { key: string; ready: Promise<ExtensionCommandRunner> }>();
+  /** Last name a command gave each session, until the next host read replaces it. */
+  private readonly sessionNames = new Map<string, string>();
+  private sessionHost?: AgentExtensionSessionHost;
 
   constructor(options: AgentExtensionBridgeOptions) {
     this.options = options;
+    this.sessionHost = options.sessionHost;
+  }
+
+  /**
+   * Wire the host-owned session services after the host exists.
+   *
+   * `main/index.ts` builds this bridge before host-core and the Agent Host have
+   * started, so the services arrive once and are cached here. Without them a
+   * command's turn half (`setModel`, `setSessionName`, `sendUserMessage`)
+   * refuses with a diagnostic instead of pretending to have run.
+   */
+  setSessionHost(host: AgentExtensionSessionHost): void {
+    this.sessionHost = host;
   }
 
   // --- sidecar publications ---------------------------------------------------
@@ -404,6 +500,35 @@ export class AgentExtensionBridge {
   }
 
   /**
+   * The transport one registered plugin agent serves for this session.
+   *
+   * A runtime without a JavaScript runner cannot call a plugin's `stream`/
+   * `complete` itself, so main hands it over (`plugin-agent-transport.ts`). The
+   * Runner is looked up per call — the same one commands, hooks and tools use —
+   * so a reload, an enable or a scope change reaches the next turn.
+   */
+  async agentTransport(input: {
+    sessionId: string;
+    specs: TrustedExtensionSpec[];
+    agentKey: string;
+    modelId: string;
+  }): Promise<ExtensionAgentTransport | undefined> {
+    const sessionId = String(input?.sessionId ?? "").trim();
+    const specs = input?.specs ?? [];
+    const agentKey = String(input?.agentKey ?? "").trim();
+    if (!sessionId || !agentKey || specs.length === 0) return undefined;
+    const runner = await this.sessionRunner(sessionId, specs);
+    const agent = (runner.getAgents?.() ?? []).find((entry) => entry.key === agentKey);
+    const model = agent?.models.find((entry) => !input.modelId || entry.id === input.modelId);
+    if (!agent || !model) return undefined;
+    return {
+      providerId: agent.providerId,
+      model,
+      stream: (context, options) => agent.stream(model, context, options),
+    };
+  }
+
+  /**
    * What the plugin row shows for one plugin's modules (spec §11): the most
    * recent session that reported on any of them wins; `enabled` until then.
    */
@@ -587,12 +712,17 @@ export class AgentExtensionBridge {
     if (cached) void cached.ready.then((runner) => runner.dispose()).catch(() => undefined);
     const factory = this.options.runnerFactory ?? loadTrustedExtensionRunner;
     const built: { current?: ExtensionCommandRunner } = {};
-    const ready = Promise.resolve(factory({ specs, bridge: this.commandBridge(sessionId, built) }))
-      .then(async (runner) => {
-        built.current = runner;
-        await runner.load();
-        return runner;
-      });
+    const host = this.sessionHost;
+    const ready = (async () => {
+      // The session's own binding, read once per Runner: `ctx.cwd`, `ctx.model`
+      // and the model registry all need it, and a host round trip per member
+      // would be three reads of the same row.
+      const binding = host ? await host.sessionBinding(sessionId).catch(() => undefined) : undefined;
+      const runner = await factory({ specs, bridge: this.commandBridge(sessionId, built, binding) });
+      built.current = runner;
+      await runner.load();
+      return runner;
+    })();
     // A load failure must not poison the cache: the next command retries it.
     ready.catch(() => {
       if (this.commandRunners.get(sessionId)?.ready === ready) this.commandRunners.delete(sessionId);
@@ -611,27 +741,52 @@ export class AgentExtensionBridge {
   /**
    * What a command sees while main runs it (spec 16 §8).
    *
-   * The UI half is real: prompts, toasts and status go through this bridge, so a
-   * command asks the same window the sidecar would. The turn half is not —
-   * there is no runtime here to abort, compact, or queue a message into — and
-   * the members that need one say so instead of quietly doing nothing: the
-   * Runner records the throw as a diagnostic on the plugin row.
+   * The UI half goes through this bridge, so a command asks the same window the
+   * sidecar would. The turn half is answered by the host services main supplies
+   * ({@link AgentExtensionSessionHost}): rename, queue and model binding are the
+   * same `session.*` flows the Node runtime's own bridge calls, not a second
+   * implementation of what they mean. Without those services a member refuses
+   * loudly — the Runner records the throw as a diagnostic on the plugin row,
+   * which is what a session with no runtime to reach should look like.
    */
   private commandBridge(
     sessionId: string,
     built: { current?: ExtensionCommandRunner },
+    binding: ExtensionSessionBinding | undefined,
   ): TrustedExtensionBridge {
-    const needsTurn = (member: string) => () => {
-      throw new Error(`${member} needs a live agent turn and is not available while the kernel runs the session`);
-    };
+    const host = this.sessionHost;
     return {
       sessionId,
-      cwd: process.cwd(),
-      getModel: () => undefined,
-      setModel: async () => false,
-      getThinkingLevel: () => "off",
+      cwd: binding?.projectPath ?? process.cwd(),
+      // The binding's ids, not a provider row: the registry is the only place a
+      // model is described, and it is a redacted projection (spec §5).
+      getModel: () =>
+        binding ? { provider: binding.providerId, id: binding.modelId } : undefined,
+      setModel: async (model) => {
+        if (!host) return false;
+        if (!host.isSessionIdle(sessionId)) return false;
+        const target = findRegisteredAgentModel(built.current?.getAgents?.() ?? [], model);
+        if (!target) return false;
+        try {
+          const result = await host.configureModel({
+            sessionId,
+            mode: binding?.mode ?? "agent",
+            providerId: target.providerId,
+            modelId: target.modelId,
+            ...(binding?.thinkingLevel ? { thinkingLevel: binding.thinkingLevel } : {}),
+          });
+          return result.ok;
+        } catch {
+          return false;
+        }
+      },
+      modelRegistry: createExtensionModelRegistry({
+        agents: () => built.current?.getAgents?.() ?? [],
+        binding,
+      }),
+      getThinkingLevel: () => binding?.thinkingLevel ?? "off",
       setThinkingLevel: () => {},
-      isIdle: () => true,
+      isIdle: () => (host ? host.isSessionIdle(sessionId) : true),
       abort: () => {},
       hasPendingMessages: () => false,
       getContextUsage: () => undefined,
@@ -640,9 +795,31 @@ export class AgentExtensionBridge {
       getActiveTools: () => [],
       getAllTools: () => [],
       setActiveTools: () => {},
-      getSessionName: () => undefined,
-      setSessionName: needsTurn("ctx.setSessionName"),
-      sendUserMessage: needsTurn("ctx.sendUserMessage"),
+      getSessionName: () => this.sessionNames.get(sessionId) ?? binding?.title,
+      setSessionName: async (name) => {
+        if (!host) throw new Error("ctx.setSessionName needs the host session services");
+        const title = String(name);
+        await host.renameSession({ sessionId, title });
+        this.sessionNames.set(sessionId, title);
+        void built.current?.emit?.("session_info_changed", {
+          type: "session_info_changed",
+          name: title,
+        });
+      },
+      sendUserMessage: async (content, options) => {
+        if (!host) throw new Error("ctx.sendUserMessage needs the host session services");
+        // Host-owned queue (D386): the Agent Host drains it at the next turn
+        // boundary, or right away when the session is idle. `steer` moves it to
+        // the head — the same two calls the Node bridge makes.
+        const pushed = await host.queueUserMessage({
+          sessionId,
+          content: extensionMessageText(content),
+          idempotencyKey: randomUUID(),
+        });
+        if (options?.deliverAs === "steer" && pushed?.id) {
+          await host.prioritizeQueuedMessage(pushed.id).catch(() => undefined);
+        }
+      },
       waitForIdle: async () => {},
       newSession: async () => ({ cancelled: true }),
       fork: async () => ({ cancelled: true }),

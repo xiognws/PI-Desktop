@@ -21,6 +21,7 @@ import {
 import {
   capabilitiesFromModelConfig,
   clampThinkingLevel,
+  genericModelConfig,
   loadCustomSystemPrompt,
   loadInstructionChain,
   loadSubagentDefinitions,
@@ -35,6 +36,7 @@ import {
 import { builtinSkills, effectiveDisabledBuiltinSkills, VISUALIZE_SKILL_ID } from "../builtin-skills";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import { kernelRuntimeRequested } from "../agent-sidecar-launch";
+import { pluginAgentTransport } from "../plugin-agent-transport";
 import {
   catalogModelConfigFor,
   type ModelsDevCatalog,
@@ -447,8 +449,26 @@ export function createSessionLaunchRuntime({
       );
     }
     const storedModel = bindingForModel(provider, modelId);
-    const apiStyle = vendorBinding?.apiStyle ?? provider.apiStyle;
-    const baseUrl = vendorBinding?.baseUrl ?? provider.baseUrl;
+    // A plugin agent's transport is a JavaScript callback, which the kernel
+    // cannot run. Main serves it on loopback for the length of the turn and the
+    // launch points there; the Node runtime keeps the plugin in process and
+    // never asks for this (`activateTrustedExtensionAgent`).
+    const pluginAgent =
+      extensionAgentKey && kernelRuntimeRequested()
+        ? await pluginAgentTransport()
+            ?.endpoint({ sessionId, agentKey: extensionAgentKey, modelId })
+            .catch(() => undefined)
+        : undefined;
+    if (isExtensionAgent && kernelRuntimeRequested() && !pluginAgent) {
+      throw Object.assign(
+        new Error("No plugin agent transport is available for this session"),
+        { errorCode: ErrorCodes.MODEL_NOT_CONFIGURED },
+      );
+    }
+    const apiStyle = pluginAgent
+      ? "chat_completions"
+      : vendorBinding?.apiStyle ?? provider.apiStyle;
+    const baseUrl = pluginAgent?.baseUrl ?? vendorBinding?.baseUrl ?? provider.baseUrl;
     const catalogModelConfig = vendorBinding?.modelConfig ??
       catalogModelConfigFor(modelsDevCatalog, {
         providerId: provider.id,
@@ -464,9 +484,18 @@ export function createSessionLaunchRuntime({
     // row that would undo it (#2120). The subagent path and enrichProvider
     // already apply the binding; the main session was the one path that
     // dropped it. Without a stored binding the catalog answer stands.
-    const modelConfig = storedModel
-      ? modelConfigWithBinding(catalogModelConfig, storedModel)
-      : catalogModelConfig;
+    // A plugin agent's limits are the ones it declared, not a catalog guess: the
+    // kernel budgets the turn from here and the model itself may be unknown.
+    const modelConfig = pluginAgent
+      ? {
+          ...genericModelConfig(modelId, pluginAgent.baseUrl),
+          reasoning: pluginAgent.model.reasoning === true,
+          contextWindow: pluginAgent.model.contextWindow,
+          maxTokens: pluginAgent.model.maxTokens,
+        }
+      : storedModel
+        ? modelConfigWithBinding(catalogModelConfig, storedModel)
+        : catalogModelConfig;
     const thinkingCapabilities = capabilitiesFromModelConfig(modelConfig);
     const thinkingLevel = clampThinkingLevel(
       thinkingCapabilities,
@@ -820,7 +849,7 @@ export function createSessionLaunchRuntime({
           vendorKey: provider.vendorKey,
           baseUrl: vendorAuth?.baseUrl ?? baseUrl,
           modelId,
-          apiKey: vendorAuth?.apiKey || secret.value || "",
+          apiKey: pluginAgent?.apiKey || vendorAuth?.apiKey || secret.value || "",
           authKind: provider.authKind,
           extensionAgentKey: provider.extensionAgentKey,
           apiStyle,

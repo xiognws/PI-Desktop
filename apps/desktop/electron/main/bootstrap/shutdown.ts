@@ -1,6 +1,7 @@
 import { app, globalShortcut, type Tray } from "electron";
 import type { CloseBehavior } from "@pi-workspace/shared";
 import type { AgentSidecar } from "../agent-sidecar";
+import { resetPluginAgentTransport } from "../plugin-agent-transport";
 import type { BrowserHost } from "../browser-host";
 import type { HostProcess } from "../host-process";
 import type { InflightCheckpointer } from "@pi-workspace/host-runtime";
@@ -197,6 +198,9 @@ export function registerShutdownHandlers({
       // still awaiting the host; closing host-core first loses that archive.
       const sidecarShutdown = getSidecar()?.dispose();
       await Promise.allSettled([sidecarShutdown]);
+      // The plugin agent transport is a loopback listener this process started;
+      // closing it here keeps a quit from leaving a port open behind it.
+      await resetPluginAgentTransport();
       await inflightCheckpointer.flushAll();
       let persistenceTimer: ReturnType<typeof setTimeout> | undefined;
       try {
