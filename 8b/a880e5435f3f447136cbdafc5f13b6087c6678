@@ -1,0 +1,18 @@
+apps/desktop/package.json
+  h_201ed4c689ac8b 354-364
+apps/desktop/test/packaging-footprint.test.mjs
+  h_201ed4c689ac8b 387-415
+pnpm-lock.yaml
+  h_201ed4c689ac8b 358-385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8ba880e5435f3f447136cbdafc5f13b6087c6678",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
