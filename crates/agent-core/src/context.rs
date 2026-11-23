@@ -117,7 +117,12 @@ pub struct ContextLimits {
     /// so a request above the trigger is sent as it is. The hard boundary is
     /// unaffected — a request at it is still classified
     /// [`BudgetDecision::Overflow`], which is a safety limit rather than a
-    /// compaction preference.
+    /// compaction preference, and `TurnEngine::run_turn` then ends the turn with
+    /// [`crate::error::AgentError::ContextTooLarge`] instead of compacting. That refusal is the
+    /// reference's `CONTEXT_TOO_LARGE` in `prepareNextTurn`
+    /// (`packages/agent-runtime/src/runtime.ts`): with the switch off there is no
+    /// checkpoint the user would accept, so the turn stops rather than sends a
+    /// request the provider would reject.
     pub compaction_enabled: bool,
 }
 
@@ -186,7 +191,9 @@ impl ContextLimits {
     /// automatic compaction disabled, the trigger classifies as `Proceed` and no
     /// summary is requested. The hard boundary keeps classifying as `Overflow`
     /// regardless — a turned-off preference must not turn off the limit that
-    /// keeps a request the provider would reject from being sent.
+    /// keeps a request the provider would reject from being sent — and the turn
+    /// loop refuses the step there rather than compacting
+    /// ([`crate::error::AgentError::ContextTooLarge`], the reference's `CONTEXT_TOO_LARGE`).
     pub fn decide(&self, tokens: u64) -> BudgetDecision {
         if tokens >= self.hard_limit {
             BudgetDecision::Overflow

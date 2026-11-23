@@ -276,11 +276,172 @@ async fn a_session_that_turned_compaction_off_is_not_summarized() {
         context.trigger
     );
     assert!(
+        tokens < context.hard_limit,
+        "and still below the hard boundary, which is the interval this case is about: {tokens} >= {}",
+        context.hard_limit
+    );
+    assert!(
         !sink
             .events()
             .iter()
             .any(|event| matches!(event, AgentEvent::CompactionStart { .. })),
         "the gate must not even open"
+    );
+}
+
+/// Characters of filler that carry `tokens` through the tool call's **arguments**
+/// alone. Arguments are never aged, so this is the share of an overrun that no
+/// free relief can shrink — the request really is that large.
+fn argument_chars(tokens: u64) -> usize {
+    (tokens as f64 * agent_core::context::ESTIMATED_TEXT_CHARS_PER_TOKEN) as usize
+}
+
+/// The switch is off and the next step sits at the hard boundary. The reference
+/// refuses that step (`CONTEXT_TOO_LARGE` from `prepareNextTurn`,
+/// `packages/agent-runtime/src/runtime.ts:8455`) instead of summarizing around a
+/// switch its owner turned off; before this behaviour was ported the kernel
+/// opened its overflow compaction there, spending a checkpoint the user had
+/// declined and sending a request the boundary exists to prevent.
+#[tokio::test]
+async fn a_disabled_session_at_the_hard_limit_refuses_the_step_instead_of_compacting() {
+    let (model, context, _) = limits();
+    // Argument-side filler only: whatever aging does to the tool result, this part
+    // of the request stays and pushes it over the hard boundary.
+    FILLER_CHARS.with(|value| {
+        *value.borrow_mut() = argument_chars(context.hard_limit + context.hard_limit / 4)
+    });
+    let provider = Arc::new(BehaviorProvider::new());
+    let sink = Arc::new(RecordingSink::new());
+    let engine = engine(provider.clone(), sink.clone())
+        .with_model_limits(model.with_compaction_enabled(false));
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("compact me"));
+
+    let error = engine
+        .run_turn(
+            "s1",
+            "t1",
+            &mut transcript,
+            &TurnConfig::new("test-model"),
+            CancelToken::new(),
+        )
+        .await
+        .expect_err("a session at the hard boundary must not issue the request");
+
+    // The failure is the dedicated budget verdict, not a generic refusal.
+    assert!(
+        matches!(error, AgentError::ContextTooLarge),
+        "expected ContextTooLarge, got: {error:?}"
+    );
+    assert_eq!(error.code(), "CONTEXT_TOO_LARGE");
+    assert!(
+        error
+            .to_string()
+            .contains("while automatic compaction is disabled"),
+        "the sentence has to name the switch: {error}"
+    );
+
+    // The fixture crossed the boundary, or the case proves nothing.
+    let tokens = agent_core::context::estimate_context_tokens(transcript.messages()).tokens;
+    assert!(
+        tokens >= context.hard_limit,
+        "the transcript must be at the hard boundary: {tokens} < {}",
+        context.hard_limit
+    );
+
+    // No checkpoint was asked for, and no over-budget continuation was sent:
+    // the one request recorded is the step before the boundary.
+    assert_eq!(
+        provider.summaries(),
+        0,
+        "compaction is off; a summary request would be exactly the ignored switch"
+    );
+    assert_eq!(
+        provider.requests().len(),
+        1,
+        "the over-budget continuation must not reach the provider"
+    );
+    let events = sink.events();
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, AgentEvent::CompactionStart { .. })),
+        "the gate must not compact around a switch the user turned off"
+    );
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            AgentEvent::Error { code, message }
+                if code == "CONTEXT_TOO_LARGE"
+                    && message.contains("automatic compaction is disabled")
+        )),
+        "the renderer learns why the turn stopped: {events:?}"
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, AgentEvent::AgentEnd { .. })),
+        "the turn ends on the error, not on a normal agent end"
+    );
+}
+
+/// The other half of the same branch: with no `compactionSettings` at all the
+/// hard boundary is still an escape valve, not a refusal. This is the behaviour
+/// the change above must leave untouched — if the refusal ever stopped checking
+/// the switch, this case fails.
+#[tokio::test]
+async fn an_unconfigured_session_at_the_hard_limit_still_compacts_and_continues() {
+    // A window whose summary budget can actually hold the overrun, so the
+    // checkpoint succeeds and the turn continues on evidence rather than on a
+    // fallback.
+    let model = ModelLimits::new(32_768, 4_096);
+    let context = ContextLimits::for_model(model);
+    FILLER_CHARS.with(|value| {
+        *value.borrow_mut() = argument_chars(context.hard_limit + context.hard_limit / 4)
+    });
+    let provider = Arc::new(BehaviorProvider::new());
+    let sink = Arc::new(RecordingSink::new());
+    let engine = engine(provider.clone(), sink.clone()).with_model_limits(model);
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("compact me"));
+
+    let outcome = engine
+        .run_turn(
+            "s1",
+            "t1",
+            &mut transcript,
+            &TurnConfig::new("test-model"),
+            CancelToken::new(),
+        )
+        .await
+        .expect("an unconfigured session compacts at the boundary and finishes");
+
+    assert_eq!(outcome.stop_reason, StopReason::EndTurn);
+    assert!(
+        provider.summaries() >= 1,
+        "the escape valve still asks for a checkpoint"
+    );
+    let events = sink.events();
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            AgentEvent::CompactionStart {
+                reason: CompactionReason::Overflow
+            }
+        )),
+        "the compaction is the overflow one: {events:?}"
+    );
+    let requests = provider.requests();
+    assert_eq!(
+        requests.len(),
+        2,
+        "the turn continued: tool step, then the answer step"
+    );
+    let after = agent_core::context::estimate_context_tokens(&requests[1].messages).tokens;
+    assert!(
+        after < context.hard_limit,
+        "the request that went out fits after the checkpoint: {after} >= {}",
+        context.hard_limit
     );
 }
 

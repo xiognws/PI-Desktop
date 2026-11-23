@@ -33,6 +33,14 @@ pub enum AgentError {
     /// other is money that was spent on purpose.
     #[error("run budget exhausted: {0}")]
     Budget(String),
+    /// Automatic compaction is off and the next request already sits at the hard
+    /// boundary. The reference refuses the turn there instead of summarizing
+    /// around a switch the user turned off: `CONTEXT_TOO_LARGE`, thrown from
+    /// `prepareNextTurn` in `packages/agent-runtime/src/runtime.ts`. Separate
+    /// from [`Self::Invalid`] because this one is a budget verdict the renderer
+    /// classifies, not a malformed request.
+    #[error("context exceeds the safe model budget while automatic compaction is disabled")]
+    ContextTooLarge,
     #[error("invalid request: {0}")]
     Invalid(String),
     /// A tool call the tool itself refused, with a sentence written for the
@@ -61,6 +69,7 @@ impl AgentError {
             Self::Cancelled => "TURN_CANCELLED",
             Self::StepLimit { .. } => "STEP_LIMIT",
             Self::Budget(_) => "BUDGET_EXHAUSTED",
+            Self::ContextTooLarge => "CONTEXT_TOO_LARGE",
             Self::Invalid(_) => "INVALID_REQUEST",
             Self::Refused(_) => "TOOL_REFUSED",
             Self::IncompleteStream => "INCOMPLETE_STREAM",

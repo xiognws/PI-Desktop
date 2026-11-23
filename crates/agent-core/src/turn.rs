@@ -370,6 +370,25 @@ impl TurnEngine {
                 );
                 let decision = limits.decide(estimate_context_tokens(&pre_aged.messages).tokens);
                 if decision != BudgetDecision::Proceed {
+                    // With the user's compaction switch off, the hard boundary is
+                    // a refusal, not a summary trigger: the reference stops the
+                    // turn here (`CONTEXT_TOO_LARGE`, thrown from
+                    // `prepareNextTurn` in `packages/agent-runtime/src/runtime.ts`)
+                    // rather than spending a checkpoint on a session whose owner
+                    // asked for no checkpoints. Continuing would issue exactly the
+                    // over-budget request this boundary exists to prevent.
+                    if !limits.compaction_enabled && decision == BudgetDecision::Overflow {
+                        let error = AgentError::ContextTooLarge;
+                        self.emit(
+                            session_id,
+                            turn_id,
+                            AgentEvent::Error {
+                                code: error.code().into(),
+                                message: error.to_string(),
+                            },
+                        );
+                        return Err(error);
+                    }
                     let reason = match decision {
                         BudgetDecision::Overflow => CompactionReason::Overflow,
                         _ => CompactionReason::Threshold,
