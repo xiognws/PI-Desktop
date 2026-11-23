@@ -1,0 +1,14 @@
+scripts/e2e-plan-history.mjs
+  h_201ed4c689ac8b 111-114,121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "88d80d7e56c337b6b2d4e6873d5ca79a7fe10417",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
