@@ -1,0 +1,14 @@
+packages/python-runtime/scripts/bundle.mjs
+  h_201ed4c689ac8b 166-178,182,185,189,191,193-225,227-237,241,327-330,348-351
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2b4dcdb6cf8c29ad2eca00bfa6c370b51e1bb93c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
