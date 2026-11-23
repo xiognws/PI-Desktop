@@ -1,0 +1,268 @@
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 105,701-704,986-988
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 82-87,300-303
+apps/desktop/electron/main/ipc/session-ipc.ts
+  h_201ed4c689ac8b 116-125,145-146,149-158,268,433,474-476
+apps/desktop/test/bounded-history-mutations.test.mjs
+  h_201ed4c689ac8b 9,77,184-185
+apps/desktop/test/helpers/transcript-rewrite-harness.mjs
+  h_201ed4c689ac8b 37-47
+apps/desktop/test/mode-session-create.test.mjs
+  h_201ed4c689ac8b 14
+apps/desktop/test/session-collaboration-ipc.test.mjs
+  h_201ed4c689ac8b 10,41-42,107-108
+apps/desktop/test/session-list-runtime.test.mjs
+  h_201ed4c689ac8b 21-22
+package.json
+  h_201ed4c689ac8b 16-17,131-132
+pnpm-lock.yaml
+  h_201ed4c689ac8b 222-224,3703-3707,8138-8139
+scripts/bundle-python-extras.mjs
+  h_201ed4c689ac8b 148,181,233
+scripts/bundle-python-runtime.mjs
+  h_201ed4c689ac8b 241,292,318,362
+scripts/bundle-ripgrep.mjs
+  h_201ed4c689ac8b 94,103,182
+scripts/check-pr-base-main.test.mjs
+  h_201ed4c689ac8b 57,78,99
+scripts/check-release-docs.mjs
+  h_201ed4c689ac8b 140
+scripts/dev-electron.mjs
+  h_201ed4c689ac8b 89,94,147
+scripts/e2e-agent-kernel-live.mjs
+  h_201ed4c689ac8b 259
+scripts/e2e-agent-kernel-parity.mjs
+  h_201ed4c689ac8b 372
+scripts/e2e-agent-kernel.mjs
+  h_201ed4c689ac8b 277
+scripts/e2e-agent-live.mjs
+  h_201ed4c689ac8b 20,32,143
+scripts/e2e-anthropic-oauth-identity.mjs
+  h_201ed4c689ac8b 242
+scripts/e2e-asktool-card.mjs
+  h_201ed4c689ac8b 135
+scripts/e2e-attachment-vision.mjs
+  h_201ed4c689ac8b 214
+scripts/e2e-browser-exec.mjs
+  h_201ed4c689ac8b 125
+scripts/e2e-browser-system-appearance.mjs
+  h_201ed4c689ac8b 113
+scripts/e2e-capability-move.mjs
+  h_201ed4c689ac8b 377
+scripts/e2e-chat-html-artifacts.mjs
+  h_201ed4c689ac8b 18-20
+scripts/e2e-checkpoint-lifecycle.mjs
+  h_201ed4c689ac8b 75
+scripts/e2e-compaction-restore-tool-pairs.mjs
+  h_201ed4c689ac8b 128
+scripts/e2e-compaction-tail.mjs
+  h_201ed4c689ac8b 38
+scripts/e2e-composer-autocomplete.mjs
+  h_201ed4c689ac8b 108
+scripts/e2e-composer-ime-stack.mjs
+  h_201ed4c689ac8b 168
+scripts/e2e-composer-mcp.mjs
+  h_201ed4c689ac8b 180
+scripts/e2e-composer-model-selection.mjs
+  h_201ed4c689ac8b 111
+scripts/e2e-composer-paste.mjs
+  h_201ed4c689ac8b 483
+scripts/e2e-config-sync-multidevice.mjs
+  h_201ed4c689ac8b 76
+scripts/e2e-context-usage-compaction.mjs
+  h_201ed4c689ac8b 123
+scripts/e2e-copy-tex.mjs
+  h_201ed4c689ac8b 122
+scripts/e2e-electron-boot.mjs
+  h_201ed4c689ac8b 89
+scripts/e2e-execute-code.mjs
+  h_201ed4c689ac8b 82
+scripts/e2e-file-ref-line-scroll.mjs
+  h_201ed4c689ac8b 98
+scripts/e2e-fixed-tool-declarations.mjs
+  h_201ed4c689ac8b 169
+scripts/e2e-gen-ui.mjs
+  h_201ed4c689ac8b 76
+scripts/e2e-goal-live.mjs
+  h_201ed4c689ac8b 65
+scripts/e2e-headless-startup-abort.mjs
+  h_201ed4c689ac8b 60
+scripts/e2e-image-generate.mjs
+  h_201ed4c689ac8b 116
+scripts/e2e-image-generation-ui.mjs
+  h_201ed4c689ac8b 88
+scripts/e2e-image-generation.mjs
+  h_201ed4c689ac8b 146
+scripts/e2e-local-agent-remote-tools.mjs
+  h_201ed4c689ac8b 140
+scripts/e2e-market-retry.mjs
+  h_201ed4c689ac8b 122
+scripts/e2e-mcp-market.mjs
+  h_201ed4c689ac8b 343-344
+scripts/e2e-mcp-timeout-clear.mjs
+  h_201ed4c689ac8b 93
+scripts/e2e-model-discovery-state.mjs
+  h_201ed4c689ac8b 89
+scripts/e2e-native-workspace-files.mjs
+  h_201ed4c689ac8b 70
+scripts/e2e-plan-history.mjs
+  h_201ed4c689ac8b 148
+scripts/e2e-plugin-import-deps.mjs
+  h_201ed4c689ac8b 104,318
+scripts/e2e-plugin-jsx-runtime.mjs
+  h_201ed4c689ac8b 63
+scripts/e2e-plugin-projects.mjs
+  h_201ed4c689ac8b 18
+scripts/e2e-preinstalled-plugins.mjs
+  h_201ed4c689ac8b 62,154
+scripts/e2e-provider-api-style.mjs
+  h_201ed4c689ac8b 111
+scripts/e2e-provider-certificate-ui.mjs
+  h_201ed4c689ac8b 65
+scripts/e2e-provider-certificates.mjs
+  h_201ed4c689ac8b 80
+scripts/e2e-provider-client-certificate.mjs
+  h_201ed4c689ac8b 46
+scripts/e2e-provider-model-layout.mjs
+  h_201ed4c689ac8b 106
+scripts/e2e-provider-order.mjs
+  h_201ed4c689ac8b 136
+scripts/e2e-provider-retry-idle.mjs
+  h_201ed4c689ac8b 96
+scripts/e2e-question-notification.mjs
+  h_201ed4c689ac8b 89
+scripts/e2e-queue-refresh-event-order.mjs
+  h_201ed4c689ac8b 66
+scripts/e2e-read-only-stop.mjs
+  h_201ed4c689ac8b 34-38,40-42,126
+scripts/e2e-regenerate-root.mjs
+  h_201ed4c689ac8b 199
+scripts/e2e-remote-file-manager.mjs
+  h_201ed4c689ac8b 224
+scripts/e2e-remote-host.mjs
+  h_201ed4c689ac8b 222
+scripts/e2e-remote-mvp-ui.mjs
+  h_201ed4c689ac8b 68
+scripts/e2e-remote-mvp.mjs
+  h_201ed4c689ac8b 176
+scripts/e2e-renderer-responsiveness.mjs
+  h_201ed4c689ac8b 259
+scripts/e2e-review-history.mjs
+  h_201ed4c689ac8b 81
+scripts/e2e-review-state-persistence.mjs
+  h_201ed4c689ac8b 121
+scripts/e2e-rpc-unicode.mjs
+  h_201ed4c689ac8b 140
+scripts/e2e-running-session-reopen.mjs
+  h_201ed4c689ac8b 109
+scripts/e2e-send-now-subagents.mjs
+  h_201ed4c689ac8b 251
+scripts/e2e-session-collaboration.mjs
+  h_201ed4c689ac8b 525
+scripts/e2e-session-completion.mjs
+  h_201ed4c689ac8b 180
+scripts/e2e-session-metadata-reads.mjs
+  h_201ed4c689ac8b 245
+scripts/e2e-session-window-cache-race.mjs
+  h_201ed4c689ac8b 66
+scripts/e2e-settings-scroll.mjs
+  h_201ed4c689ac8b 88
+scripts/e2e-sidebar-recovery.mjs
+  h_201ed4c689ac8b 93
+scripts/e2e-skill-market.mjs
+  h_201ed4c689ac8b 269-270
+scripts/e2e-startup-animation.mjs
+  h_201ed4c689ac8b 207
+scripts/e2e-storage-bootstrap.mjs
+  h_201ed4c689ac8b 198
+scripts/e2e-storage-settings.mjs
+  h_201ed4c689ac8b 72
+scripts/e2e-subagent-parent-error.mjs
+  h_201ed4c689ac8b 184
+scripts/e2e-subagent-stop.mjs
+  h_201ed4c689ac8b 233
+scripts/e2e-subagents.mjs
+  h_201ed4c689ac8b 438,445
+scripts/e2e-supervision.mjs
+  h_201ed4c689ac8b 53
+scripts/e2e-system-transcript.mjs
+  h_201ed4c689ac8b 171
+scripts/e2e-task-dock-tabs.mjs
+  h_201ed4c689ac8b 60
+scripts/e2e-theme-surfaces.mjs
+  h_201ed4c689ac8b 116
+scripts/e2e-three-column-layout.mjs
+  h_201ed4c689ac8b 331
+scripts/e2e-todo-checklist.mjs
+  h_201ed4c689ac8b 153
+scripts/e2e-tool-admission.mjs
+  h_201ed4c689ac8b 132
+scripts/e2e-tool-result-persistence.mjs
+  h_201ed4c689ac8b 202-203
+scripts/e2e-transcript-anchor-repair.mjs
+  h_201ed4c689ac8b 98
+scripts/e2e-transcript-disclosure-anchor.mjs
+  h_201ed4c689ac8b 119
+scripts/e2e-transcript-history-loading.mjs
+  h_201ed4c689ac8b 211
+scripts/e2e-transcript-minimap-jump.mjs
+  h_201ed4c689ac8b 135
+scripts/e2e-transcript-prose-state.mjs
+  h_201ed4c689ac8b 84
+scripts/e2e-transcript-reading-position.mjs
+  h_201ed4c689ac8b 79
+scripts/e2e-transcript-render.mjs
+  h_201ed4c689ac8b 294
+scripts/e2e-transcript-turn-completion.mjs
+  h_201ed4c689ac8b 116
+scripts/e2e-trusted-extensions.mjs
+  h_201ed4c689ac8b 247
+scripts/e2e-window-controls.mjs
+  h_201ed4c689ac8b 12,16-24,134,190,318
+scripts/e2e-work-panel-launcher-overflow.mjs
+  h_201ed4c689ac8b 99
+scripts/e2e-work-panel-reorder.mjs
+  h_201ed4c689ac8b 87
+scripts/e2e-work-panel-tab-close.mjs
+  h_201ed4c689ac8b 136
+scripts/e2e-worktree-live.mjs
+  h_201ed4c689ac8b 323
+scripts/e2e/gen-ui-main.mjs
+  h_201ed4c689ac8b 13,87
+scripts/e2e/hosted-search-sidecar.mjs
+  h_201ed4c689ac8b 114-116,222-225
+scripts/macos-signing-watchdog.mjs
+  h_201ed4c689ac8b 502,840
+scripts/pi-patch-hash.test.mjs
+  h_201ed4c689ac8b 181,191,202,213,224
+scripts/stage-desktop-manual.mjs
+  h_201ed4c689ac8b 127
+scripts/stress-tools-av.mjs
+  h_201ed4c689ac8b 368
+scripts/sync-bundled-plugins.mjs
+  h_201ed4c689ac8b 300
+scripts/sync-python-runtime.mjs
+  h_201ed4c689ac8b 84,104,118
+scripts/test-dialog-overflow.mjs
+  h_201ed4c689ac8b 48
+scripts/test-image-generation-live.mjs
+  h_201ed4c689ac8b 166
+scripts/test-overlay-selection.mjs
+  h_201ed4c689ac8b 37
+scripts/test-shortcut-settings.mjs
+  h_201ed4c689ac8b 108
+scripts/verify-bundled-plugins.mjs
+  h_201ed4c689ac8b 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7638e49e0465e4ee86f521dde068674cb5a97d46",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
