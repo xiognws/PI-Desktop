@@ -308,10 +308,20 @@ globalThis.providerApiStyleProbe = async (reasoningOnly = false) => {
         () => Boolean(document.querySelector<HTMLInputElement>(".provider-models-row input")),
         "local model discovery result",
       );
-      const localModel = document.querySelector<HTMLInputElement>(".provider-models-row input");
-      assert(localModel, `${locale}: the local service model was not selectable`);
-      if (!localModel.checked) click(localModel);
-      await until(() => !control("settings.saveProvider").disabled, "no-auth provider save enabled");
+      assert(
+        document.querySelector<HTMLInputElement>(".provider-models-row input"),
+        `${locale}: the local service model was not selectable`,
+      );
+      // Re-query on every attempt: discovery updates can remount the list, and a
+      // node captured before that remount is detached — clicking it reaches no
+      // React handler, which reads as "the checkbox refuses to tick".
+      await until(() => {
+        const box = document.querySelector<HTMLInputElement>(".provider-models-row input");
+        if (!box) return false;
+        if (!box.checked) box.click();
+        return box.checked;
+      }, "local model ticked");
+      await until(() => !(control("settings.saveProvider")?.disabled ?? true), "no-auth provider save enabled");
       const beforeLocalCreate = creates.length;
       savedProvider = undefined;
       click(control("settings.saveProvider"));
