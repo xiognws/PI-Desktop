@@ -45,6 +45,7 @@ pub mod shell_session;
 mod shell_session_tests;
 pub mod timeout_policy;
 pub mod vision;
+pub mod web;
 #[cfg(windows)]
 mod windows_process_tree;
 
@@ -1621,6 +1622,22 @@ pub async fn execute_tool_with_file_lease(
             let data_dir = crate::pi_home::data_dir();
             browser_exec::execute(args, workspace, data_dir.as_deref()).await
         }
+        // The two web tools make their outward call here rather than in the
+        // kernel: the kernel declares them and forwards `tools.execute`, and the
+        // backend ladder, the SSRF gate and the character budget live in
+        // `tools/web.rs`. A transport that cannot be built is this call's error,
+        // not a panic: `WEB_UNAVAILABLE` reaches the model as a readable refusal.
+        name if web::recognizes_search(name) => match web::host_transport() {
+            Ok(transport) => {
+                let config = web::WebConfig::load();
+                web::search(args, &config, transport).await
+            }
+            Err(error) => Err(error),
+        },
+        name if web::recognizes_extract(name) => match web::host_transport() {
+            Ok(transport) => web::extract(args, transport).await,
+            Err(error) => Err(error),
+        },
         other if is_desktop_dispatched(other) => Err(hashline::ToolError::new(
             "TOOL_NOT_FOUND",
             format!("{other} requires the desktop runner (dispatched via plugins.execute)"),

@@ -141,10 +141,11 @@ impl ShellIdentity {
 /// Those carry real nested schemas (spreadsheet rows, document blocks, slides, a
 /// weekly schedule), so the growth is shape, not prose: every description in the
 /// set is still a verb phrase under forty characters. → 6 850 with `BrowserExec`
-/// declared beside them (the set measures 6 791). Adding a tool is the one
+/// declared beside them (the set measures 6 791). → 7 300 for the web pair,
+/// `WebSearch` and `WebExtract` (the set measures 7 247). Adding a tool is the one
 /// change allowed to raise it; buying room by deleting another tool's parameter
 /// hints is not, because those hints are what keep a model from calling wrongly.
-pub const DECLARATION_BUDGET_BYTES: usize = 6_850;
+pub const DECLARATION_BUDGET_BYTES: usize = 7_300;
 
 fn read() -> Value {
     json!({
@@ -251,6 +252,49 @@ fn browser_exec() -> Value {
                 "mode": {"type": "string", "enum": ["dom", "text", "screenshot"]}
             },
             "required": ["url"]
+        }
+    })
+}
+
+/// The two web tools, ported from the reference agent's pair (`web_search` /
+/// `web_extract`; this kernel spells names the way every other built-in here is
+/// spelled, and host-core accepts both).
+///
+/// Agent mode only, for two reasons a declaration can state but not enforce: a
+/// search spends a third party's quota, and a fetch reaches a host the user never
+/// named. `permissions::plan_mode_allows` refuses both in Plan and Goal anyway,
+/// so declaring them there would only offer a tool the mode cannot run.
+///
+/// `limit` is declared because the default is deliberately small — three results
+/// are about 97 tokens against 178 for five — so a caller that needs more has to
+/// be able to ask. `max_chars` is declared for the same reason at page scale: the
+/// default (6 000) is one article's worth of context, not a page's.
+fn web_search() -> Value {
+    json!({
+        "name": "WebSearch",
+        "description": "Search the web.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "integer", "description": "default 3"}
+            },
+            "required": ["query"]
+        }
+    })
+}
+
+fn web_extract() -> Value {
+    json!({
+        "name": "WebExtract",
+        "description": "Fetch pages as text; 5 per call.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "urls": {"type": "array", "items": {"type": "string"}},
+                "max_chars": {"type": "integer", "description": "per page, default 6000"}
+            },
+            "required": ["urls"]
         }
     })
 }
@@ -633,6 +677,12 @@ pub fn declarations(mode: SessionMode, shell: Option<&ShellIdentity>) -> Vec<Val
         // A browser process and a network fetch, so Agent mode only: it is the
         // tool that is slowest and hardest to undo.
         tools.push(browser_exec());
+        // The ordinary way to read the web: one search, then the pages worth
+        // reading. Both spend something the user did not ask for in so many
+        // words — a vendor's quota, and a request to a host the model chose — so
+        // they follow the browser into Agent mode.
+        tools.push(web_search());
+        tools.push(web_extract());
         // Drawing lands in the workspace, next to the project it was drawn for.
         tools.push(generate_images());
         // Both halves of the codemod end in a write, so they follow Write/Edit.
@@ -682,6 +732,8 @@ mod tests {
                 "Edit",
                 "ExecuteCode",
                 "BrowserExec",
+                "WebSearch",
+                "WebExtract",
                 "GenerateImages",
                 "AstEdit",
                 "AstEditApply",
@@ -725,6 +777,8 @@ mod tests {
                     || name == "Edit"
                     || name == "ExecuteCode"
                     || name == "BrowserExec"
+                    || name == "WebSearch"
+                    || name == "WebExtract"
                     || name == "GenerateImages"
                     || name == "AstEdit"
                     || name == "AstEditApply"

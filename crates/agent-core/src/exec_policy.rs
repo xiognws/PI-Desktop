@@ -238,7 +238,11 @@ impl ExecPolicy {
         match tool {
             "Write" | "Edit" | "MultiEdit" | "NotebookEdit" | "patch" | "Patch" | "apply_patch"
             | "str_replace" | "edit_file" => ToolClass::Mutating,
-            "WebFetch" | "WebSearch" | "Fetch" | "Http" => ToolClass::Network,
+            // Both web tools reach a third party, so they grade as network calls:
+            // `WebExtract` fetches a host the model chose, which is exactly the
+            // class a network refusal exists for.
+            "WebFetch" | "WebSearch" | "WebExtract" | "web_search" | "web_extract" | "Fetch"
+            | "Http" => ToolClass::Network,
             // Anything the host declares as a writer is a mutation; everything else
             // that is not exec and not network is read-only.
             other if other.ends_with("_file") && other.starts_with("write") => ToolClass::Mutating,
@@ -701,6 +705,11 @@ mod tests {
             policy.classify("Bash", &json!({"command": "reg add HKCU\\x /v y /d z"})),
             ToolClass::Privileged
         );
+        // The web pair grades as one class: a fetch of a model-chosen host is a
+        // network call, not a read of a local file.
+        for tool in ["WebSearch", "WebExtract", "web_search", "web_extract"] {
+            assert_eq!(policy.classify(tool, &json!({})), ToolClass::Network, "{tool}");
+        }
     }
 
     #[test]

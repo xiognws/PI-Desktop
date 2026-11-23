@@ -124,6 +124,17 @@ pub const CONTRACT_CORE_TOOL_NAMES: &[&str] = &[
     crate::plan::SUBMIT_PLAN_TOOL_NAME,
 ];
 
+/// Names that must stay on demand even in Agent mode, with the reason the
+/// derived split cannot state.
+///
+/// [`deferrable_names`] would defer both web tools anyway — neither is core — so
+/// what this constant records is *why* that must not change. `WebSearch` spends a
+/// third party's quota and `WebExtract` fetches a host the model picked; in the
+/// core set they would be re-sent on every request of every session, and a model
+/// that has a search declared up front reaches for it on turns that never needed
+/// one. On demand, the cost is paid by the turn that actually searches.
+pub const ON_DEMAND_ONLY_TOOL_NAMES: &[&str] = &["WebSearch", "WebExtract"];
+
 /// The always-declared names for `mode`.
 pub fn core_tool_names(mode: &SessionMode) -> &'static [&'static str] {
     match mode {
@@ -615,6 +626,38 @@ mod tests {
         assert!(activation.activate(&matched).is_empty());
         let declared = names(&activation.declared());
         assert_eq!(declared.iter().filter(|name| *name == "OfficeRead").count(), 1);
+    }
+
+    /// The web pair is reachable only through `ToolSearch`, and never from a
+    /// contract mode: a plan proposes, it does not search.
+    #[test]
+    fn the_web_tools_are_on_demand_and_only_in_agent_mode() {
+        let agent = activation(SessionMode::Agent);
+        let declared = names(&agent.declared());
+        for name in ON_DEMAND_ONLY_TOOL_NAMES {
+            assert!(
+                !AGENT_CORE_TOOL_NAMES.contains(name) && !CONTRACT_CORE_TOOL_NAMES.contains(name),
+                "`{name}` must not be core: a networking tool in the core set is billed every turn"
+            );
+            assert!(
+                agent.deferred_names().contains(&name.to_string()),
+                "`{name}` is missing from the on-demand catalog"
+            );
+            assert!(
+                !declared.contains(&name.to_string()),
+                "`{name}` must not be declared before it is activated: {declared:?}"
+            );
+            assert!(agent.blocks(name), "`{name}` is not gated by activation");
+        }
+
+        let matched = agent.resolve("WebSearch");
+        assert_eq!(matched, vec!["WebSearch".to_string()]);
+        assert_eq!(agent.activate(&matched), vec!["WebSearch".to_string()]);
+        assert!(names(&agent.declared()).contains(&"WebSearch".to_string()));
+
+        let plan = activation(SessionMode::Plan);
+        assert!(!plan.deferred_names().contains(&"WebSearch".to_string()));
+        assert!(plan.resolve("WebSearch").is_empty());
     }
 
     /// Activation never reaches a tool the mode does not declare, and an unknown
