@@ -167,7 +167,11 @@ async function seedSidebarProjects(hostBinary, dataDir, tempDirs) {
     const paths = {
       alpha: canonical("e2e-fold-alpha-0"),
       beta: canonical("e2e-fold-beta-0"),
-      gamma,
+      // The empty group has no session whose stored path could be canonicalised,
+      // so it has to be normalised here: project keys are compared in the form
+      // the host stores them (forward slashes), and a backslash spelling simply
+      // never matches the sidebar's own key for the same directory.
+      gamma: gamma.replaceAll("\\", "/"),
       delta: canonical("e2e-fold-delta-0"),
       history: canonical("e2e-history-project-0"),
     };
@@ -777,8 +781,12 @@ async function main() {
         width: Math.round(bar.getBoundingClientRect().width),
         clipped: bar.scrollWidth > bar.clientWidth + 1,
         sameRow:
-          Math.round(left.getBoundingClientRect().top) ===
-          Math.round(right.getBoundingClientRect().top),
+          // Both groups are centred in a 42px bar; a 2px height difference puts
+          // their rounded tops 1px apart while they stay on one row, so compare
+          // with that tolerance instead of demanding identical integers.
+          Math.abs(
+            left.getBoundingClientRect().top - right.getBoundingClientRect().top,
+          ) <= 2,
         modelLabelHidden: modelLabelStyles.display === "none",
         modelChipWidth: Math.round(modelChip.getBoundingClientRect().width),
       };
@@ -890,9 +898,13 @@ async function main() {
           actionRight,
           leftClear: actions.length > 0 && headerBox.left >= actionRight + 8,
           insetClear: actions[0].getBoundingClientRect().left >= (sidebar?.getBoundingClientRect().right ?? 0) + inset,
+          // macOS draws its traffic lights in the window frame and the component
+          // returns null there, so a darwin CSS emulation must not require room
+          // for the Windows-style controls it still renders in this harness.
           rightClear: headerBox.right <= window.innerWidth -
             (platform === "win32" || platform === "linux" ? 120 : 0) &&
-            (!controls || headerBox.right <= controls.getBoundingClientRect().left),
+            (platform === "darwin" || !controls ||
+              headerBox.right <= controls.getBoundingClientRect().left),
           tabClear: !firstTab || firstTab.getBoundingClientRect().left >= actionRight + 8,
           rowRegion: getComputedStyle(row).webkitAppRegion,
           spacerRegion: getComputedStyle(spacer).webkitAppRegion,
@@ -1413,7 +1425,7 @@ async function main() {
                 (property) => rest[property] === reference[property],
               ),
             `${route}/${theme} ${action} shares the rendered 28px chrome target and rest style`,
-            JSON.stringify(rest),
+            JSON.stringify({ rest, reference }),
           );
           await movePointer(rest.x, rest.y);
           const hover = await readChromeAction(selector);
