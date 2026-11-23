@@ -190,7 +190,11 @@ try {
   assert.equal(await readFile(join(dataDir, nestedPath), "utf8"), originalNestedRaw, "relocation leaves source intact");
   host = start(movedDataDir); await host.handshake();
   const movedNested = (await host.call("session.get", { id: nestedId })).session.messages[0];
-  const expectedNested = nestedRow(join(movedDataDir, "scratch", "nested.png"));
+  // `--relocate-data` stores every path in the spelling all writers use: forward
+  // slashes and no extended-length prefix, so keys built by the same project keep
+  // matching after the move. The expectation has to use that spelling too, or a
+  // correct relocation looks like a lost field.
+  const expectedNested = nestedRow(join(movedDataDir, "scratch", "nested.png").replaceAll("\\", "/"));
   assert.deepEqual(movedNested.toolResult, expectedNested.toolResult);
   assert.equal(movedNested.content, expectedNested.content);
   const movedRaw = await readFile(join(movedDataDir, nestedPath), "utf8");
