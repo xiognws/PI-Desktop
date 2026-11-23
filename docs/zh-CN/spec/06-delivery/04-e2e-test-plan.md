@@ -4909,9 +4909,10 @@ eleven-tool-round desktop paths are verified by
 - **里程碑**：M6+
 - **状态**：部分自动化（host-core `background_tasks::tests`、渲染层契约测试
   `apps/desktop/test/background-tasks.test.mjs`；运行
-  `node scripts/e2e-background-tasks-host.mjs` 验证真实宿主、进程和管道压力路径，
-  `node scripts/e2e-background-tasks.mjs` 在隔离 Electron 中以 1280px、700px、
-  390px 宽度验证生产 React 组件。宿主回归测试覆盖退出前输出排空和输出锁竞争时关闭。
+  `node scripts/e2e-background-tasks-host.mjs` 验证真实宿主、进程和管道压力路径。
+  独立的后台任务条已并入共享任务坞，原先在隔离 Electron 中以 1280px、700px、
+  390px 宽度挂载它的渲染层场景已无可驱动组件，随组件一并移除。宿主回归测试
+  覆盖退出前输出排空和输出锁竞争时关闭。
   完整 agent 到桌面流程及约 83 分钟的十万行定速长测仍为人工场景；
   自动化的大输出测试采用加速模式。）
 

@@ -8626,9 +8626,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Status**: Partially automated (host-core `background_tasks::tests` and the
   renderer contract test `apps/desktop/test/background-tasks.test.mjs`;
   `node scripts/e2e-background-tasks-host.mjs` runs the real Host/process/pipe
-  stress path without providers, and `node scripts/e2e-background-tasks.mjs`
-  exercises production React components in isolated Electron at 1280px, 700px,
-  and 390px widths. Host tests cover exit-before-drain and shutdown under output
+  stress path without providers. The standalone bar was folded into the shared
+  task dock, so the Electron scenario that mounted it at 1280px, 700px and 390px
+  widths has no component left to drive and was retired together with it. Host
+  tests cover exit-before-drain and shutdown under output
   lock contention. The full agent-to-Desktop journey and an 83-minute paced
   100,000-line soak remain manual; the automated volume test is accelerated.
   Renderer visibility (grace window, close action, pinned output preview) is
