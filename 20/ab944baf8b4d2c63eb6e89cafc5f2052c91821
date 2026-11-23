@@ -1,0 +1,22 @@
+crates/agent-core/src/builtin_tools.rs
+  h_201ed4c689ac8b 144-145,148,259-301,680-685,735-736,780-781
+crates/agent-core/src/exec_policy.rs
+  h_201ed4c689ac8b 241-245,708-712
+crates/agent-core/src/tool_activation.rs
+  h_201ed4c689ac8b 127-137,631-662
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 48,1625-1640
+crates/host-core/src/tools/web.rs
+  h_201ed4c689ac8b 1-2126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "20ab944baf8b4d2c63eb6e89cafc5f2052c91821",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
