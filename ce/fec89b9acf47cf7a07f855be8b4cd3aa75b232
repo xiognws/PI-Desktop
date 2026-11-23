@@ -1,0 +1,14 @@
+docs/notes/super-agent-mapping.md
+  h_201ed4c689ac8b 80-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "cefec89b9acf47cf7a07f855be8b4cd3aa75b232",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
