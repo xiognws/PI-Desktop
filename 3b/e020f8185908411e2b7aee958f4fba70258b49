@@ -1,0 +1,16 @@
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 8629-8632
+docs/zh-CN/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 4912-4915
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3be020f8185908411e2b7aee958f4fba70258b49",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
