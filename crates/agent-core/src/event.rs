@@ -97,6 +97,10 @@ pub enum AgentEvent {
         reason: Option<String>,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         actions: Vec<String>,
+        /// The same writes as `actions`, structured as `{kind, subject, file}` so
+        /// a client renders them in the user's language.
+        #[serde(rename = "actionDetails", skip_serializing_if = "Vec::is_empty")]
+        action_details: Vec<serde_json::Value>,
     },
     /// The session's run state changed.
     ///

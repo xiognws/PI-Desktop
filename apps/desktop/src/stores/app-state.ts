@@ -119,6 +119,15 @@ export type DraftSessionConfiguration = {
 };
 
 
+export type SkillReviewActionDetail = {
+  /** `created` | `patched` | `wrote` | `removed` | `memory`. */
+  kind?: string;
+  /** Skill name, or `user` / `memory` for a memory write. */
+  subject?: string;
+  /** Path inside the skill, when the write named one. */
+  file?: string;
+};
+
 export type SkillReviewNotice = {
   /**
    * Identity of this arrival, not of the review. A session keeps every notice in
@@ -129,6 +138,12 @@ export type SkillReviewNotice = {
   reason?: string;
   /** One short description per write the review made. */
   actions: string[];
+  /**
+   * The same writes, structured. `actions` is English prose rendered by the
+   * runtime; a row that wants to say "skill 'x' wrote references/y.md" in the
+   * reader's language needs the parts, not the sentence.
+   */
+  actionDetails?: SkillReviewActionDetail[];
   /**
    * Id of the newest transcript message when the review landed — the turn the
    * notice reports on. The review arrives after that turn has rendered, so this

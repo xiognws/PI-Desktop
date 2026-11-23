@@ -292,6 +292,7 @@ export function createEventsSlice({
           outcome: event.outcome,
           ...(event.reason ? { reason: event.reason } : {}),
           actions: event.actions ?? [],
+          ...(event.actionDetails?.length ? { actionDetails: event.actionDetails } : {}),
           ...(anchor ? { afterMessageId: anchor } : {}),
         };
         set((state) => ({

@@ -3843,10 +3843,14 @@ impl ReviewSink {
         }
     }
 
-    fn snapshot(&self) -> (usize, Vec<String>) {
+    fn snapshot(&self) -> (usize, Vec<String>, Vec<Value>) {
         match self.collector.lock() {
-            Ok(collector) => (collector.tool_call_count(), collector.action_lines()),
-            Err(_) => (0, Vec::new()),
+            Ok(collector) => (
+                collector.tool_call_count(),
+                collector.action_lines(),
+                collector.action_details(),
+            ),
+            Err(_) => (0, Vec::new(), Vec::new()),
         }
     }
 }
@@ -3918,6 +3922,7 @@ async fn skill_review_pass(input: SkillReviewInput) {
                 outcome: notice.outcome.as_str().to_string(),
                 reason: notice.reason.clone(),
                 actions: notice.actions.clone(),
+                action_details: notice.details.clone(),
             },
         ));
     };
@@ -4040,12 +4045,13 @@ async fn skill_review_pass(input: SkillReviewInput) {
             if let Ok(mut gate) = session.review_gate.lock() {
                 gate.record_review(std::time::Instant::now());
             }
-            let (tool_calls, actions) = sink.snapshot();
+            let (tool_calls, actions, details) = sink.snapshot();
             if tool_calls == 0 {
                 crate::skill_review::ReviewNotice {
                     outcome: crate::skill_review::ReviewOutcome::Failed,
                     reason: Some("no-tool-calls".to_string()),
                     actions: Vec::new(),
+                    details: Vec::new(),
                 }
             } else if actions.is_empty() {
                 crate::skill_review::ReviewNotice::skipped("nothing-to-save")
@@ -4054,6 +4060,7 @@ async fn skill_review_pass(input: SkillReviewInput) {
                     outcome: crate::skill_review::ReviewOutcome::Applied,
                     reason: None,
                     actions,
+                    details,
                 }
             }
         }

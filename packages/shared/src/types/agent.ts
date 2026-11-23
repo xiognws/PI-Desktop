@@ -334,6 +334,12 @@ export type AgentEvent =
       outcome: "applied" | "skipped" | "failed";
       reason?: string;
       actions?: string[];
+      /**
+       * The same writes as `actions`, structured. The runtime cannot know the
+       * reader's language, so a row that wants to print "skill 'x' wrote
+       * references/y.md" gets the parts and composes the sentence itself.
+       */
+      actionDetails?: { kind?: string; subject?: string; file?: string }[];
     }
   | { type: "status"; status: AgentStatus };
 

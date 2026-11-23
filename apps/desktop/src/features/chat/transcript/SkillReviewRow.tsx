@@ -6,7 +6,7 @@ import type { TranscriptEntry } from "../../../lib/assistant-turns";
 import { useAppStore } from "../../../stores/app-store";
 import type { SkillReviewNotice } from "../../../stores/app-state";
 import { TranscriptHistory, TranscriptTail } from "./AssistantTurn";
-import { skillReviewLines, skillReviewReports, skillReviewText } from "./skill-review-text";
+import { skillReviewReports, skillReviewText } from "./skill-review-text";
 
 /**
  * One quiet line under a finished turn reporting the self-improvement review.
@@ -29,23 +29,13 @@ export function SkillReviewRow({ notice }: { notice: SkillReviewNotice }) {
   const visible = useAppStore((state) => state.settings?.skillReviewVisible !== false);
   if (!visible) return null;
   if (!skillReviewReports(notice)) return null;
-  // One line per write, glyph first — the shape Hermes uses for a review's memory
-  // and skill operations. A single "N updates" sentence told the reader that
-  // something happened but not what, which is the part they act on.
-  const lines = skillReviewLines(notice);
+  // One line, glyph first, writes joined with `·` — the exact shape the reference
+  // prints: `✨ Self-improvement review: skill 'x' wrote references/y.md · …`. The
+  // sentence is composed in the reader's language from the structured writes, so a
+  // Chinese UI does not echo English prose from the runtime.
   return (
     <div className="skill-review-row" data-outcome={notice.outcome} role="status">
-      {lines.length > 0 ? (
-        <ul className="skill-review-lines">
-          {lines.map((line) => (
-            <li key={line} className="skill-review-line">
-              {line}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <span className="skill-review-text">{skillReviewText(notice, t)}</span>
-      )}
+      <span className="skill-review-text">{skillReviewText(notice, t)}</span>
     </div>
   );
 }

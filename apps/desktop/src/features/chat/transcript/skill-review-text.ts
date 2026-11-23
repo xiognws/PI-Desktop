@@ -1,4 +1,7 @@
-import type { SkillReviewNotice } from "../../../stores/app-state";
+import type {
+  SkillReviewActionDetail,
+  SkillReviewNotice,
+} from "../../../stores/app-state";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -46,7 +49,7 @@ export function skillReviewReports(notice: SkillReviewNotice): boolean {
  */
 export function skillReviewText(notice: SkillReviewNotice, t: Translate): string {
   if (notice.outcome === "applied") {
-    const detail = notice.actions.join(" · ");
+    const detail = skillReviewDetail(notice, t);
     return detail
       ? t("chat.skillReviewAppliedDetail", { detail })
       : t("chat.skillReviewApplied", { count: notice.actions.length });
@@ -58,20 +61,51 @@ export function skillReviewText(notice: SkillReviewNotice, t: Translate): string
 }
 
 /**
- * The review's writes as one line each, the way Hermes prints them.
+ * Which verb a structured write speaks, as an i18n key.
  *
- * Hermes renders a memory/skill write from the review as its own line with a
- * glyph (`display.review.memory_op_line`, `skill_patched_verbose`), not as one
- * sentence summarising the pass — the reader wants to see *which* skill changed
- * and what it says, and a summary hides exactly that. The op strings come from
- * the runtime as `created 'x'`, `patched 'x'`, `memory 'memory'`.
+ * The kinds are the runtime's own (`created` / `patched` / `wrote` / `removed` /
+ * `memory`), not this file's invention: the same names `describe_review_action`
+ * renders in English.
  */
-export function skillReviewLines(notice: SkillReviewNotice): string[] {
-  if (notice.outcome !== "applied") return [];
-  return notice.actions.map((action) => {
-    const verb = action.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? "";
-    const glyph =
-      verb === "memory" ? "\u{1F9E0}" : verb === "patched" ? "\u{270E}" : verb === "deleted" ? "\u{2212}" : "\u{270D}";
-    return `${glyph} ${action}`;
-  });
+const ACTION_VERB_KEY: Record<string, string> = {
+  created: "chat.skillReviewVerbCreated",
+  patched: "chat.skillReviewVerbPatched",
+  wrote: "chat.skillReviewVerbWrote",
+  removed: "chat.skillReviewVerbRemoved",
+};
+
+/**
+ * One write, in the reader's language: `skill 'x' wrote references/y.md`.
+ *
+ * The reference implementation prints exactly this line per write, prefixed with a
+ * glyph and joined with `·`, rather than a count of what happened — the reader
+ * wants to know *which* skill changed and where. A memory write is its own shape,
+ * because it has no skill and no file.
+ */
+export function skillReviewActionText(
+  detail: SkillReviewActionDetail,
+  t: Translate,
+): string {
+  const name = detail.subject ?? "";
+  if (detail.kind === "memory") return t("chat.skillReviewMemoryAction", { name });
+  const verb = t(ACTION_VERB_KEY[detail.kind ?? ""] ?? "chat.skillReviewVerbWrote");
+  const file = detail.file ?? "";
+  return file
+    ? t("chat.skillReviewActionWithFile", { name, verb, file })
+    : t("chat.skillReviewAction", { name, verb });
+}
+
+/**
+ * The writes of one pass, joined the way the reference joins them.
+ *
+ * Falls back to the runtime's English sentences when a notice arrived from a
+ * runtime that does not send the structured form — an old session replayed from
+ * the log still renders.
+ */
+export function skillReviewDetail(notice: SkillReviewNotice, t: Translate): string {
+  const details = notice.actionDetails ?? [];
+  if (details.length > 0) {
+    return details.map((detail) => skillReviewActionText(detail, t)).join(" · ");
+  }
+  return notice.actions.join(" · ");
 }

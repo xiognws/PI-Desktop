@@ -351,6 +351,33 @@ impl ReviewActionCollector {
         }
         lines
     }
+
+    /// The same writes as `action_lines`, structured.
+    ///
+    /// `{kind, subject, file}` is everything a client needs to render the write
+    /// in its own words; the rendered line above is English and cannot be
+    /// translated after the fact.
+    pub fn action_details(&self) -> Vec<Value> {
+        let mut seen = HashSet::new();
+        let mut details = Vec::new();
+        for (tool_name, arguments, is_error) in &self.calls {
+            if *is_error {
+                continue;
+            }
+            let Some(action) = review_action_from_call(tool_name, arguments) else {
+                continue;
+            };
+            let value = json!({
+                "kind": action.kind.as_str(),
+                "subject": action.subject,
+                "file": action.file,
+            });
+            if seen.insert(value.to_string()) {
+                details.push(value);
+            }
+        }
+        details
+    }
 }
 
 /// The outcome a review pass reports.
@@ -358,7 +385,11 @@ impl ReviewActionCollector {
 pub struct ReviewNotice {
     pub outcome: ReviewOutcome,
     pub reason: Option<String>,
+    /// One rendered line per write, for logs and for clients that only print.
     pub actions: Vec<String>,
+    /// The same writes, structured, so a renderer can say "skill 'x' wrote
+    /// references/y.md" in the user's own language instead of echoing English.
+    pub details: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -384,6 +415,7 @@ impl ReviewNotice {
             outcome: ReviewOutcome::Skipped,
             reason: Some(reason.into()),
             actions: Vec::new(),
+            details: Vec::new(),
         }
     }
 
@@ -392,6 +424,7 @@ impl ReviewNotice {
             outcome: ReviewOutcome::Failed,
             reason: Some(reason.into()),
             actions: Vec::new(),
+            details: Vec::new(),
         }
     }
 
@@ -407,6 +440,7 @@ impl ReviewNotice {
                 outcome: ReviewOutcome::Applied,
                 reason: None,
                 actions,
+                details: collector.action_details(),
             };
         }
         if collector.tool_call_count() == 0 {
@@ -414,6 +448,7 @@ impl ReviewNotice {
                 outcome: ReviewOutcome::Failed,
                 reason: Some("no-tool-calls".to_string()),
                 actions: Vec::new(),
+                details: Vec::new(),
             };
         }
         Self::skipped("nothing-to-save")
@@ -457,6 +492,9 @@ pub fn review_event(notice: &ReviewNotice) -> Value {
     }
     if !notice.actions.is_empty() {
         event["actions"] = json!(notice.actions);
+    }
+    if !notice.details.is_empty() {
+        event["actionDetails"] = json!(notice.details);
     }
     event
 }
@@ -546,6 +584,22 @@ mod tests {
             describe_review_action(&action),
             "patched 'rust-agent-kernel-port' — Grep the test tree for the symbol first."
         );
+    }
+
+    #[test]
+    fn the_event_carries_the_parts_a_client_translates() {
+        // `actions` is English prose; a renderer that has to say the same thing in
+        // another language needs the parts, not the sentence.
+        let mut collector = ReviewActionCollector::new();
+        let arguments = json!({"action": "write_file", "name": "pi-desktop-dev", "file_path": "references/x.md"});
+        collector.start("c1", "skill_manage", &arguments);
+        collector.end("c1", false);
+        let notice = ReviewNotice::from_collector(&collector);
+        let event = review_event(&notice);
+        assert_eq!(event["outcome"], "applied");
+        assert_eq!(event["actionDetails"][0]["kind"], "wrote");
+        assert_eq!(event["actionDetails"][0]["subject"], "pi-desktop-dev");
+        assert_eq!(event["actionDetails"][0]["file"], "references/x.md");
     }
 
     #[test]
