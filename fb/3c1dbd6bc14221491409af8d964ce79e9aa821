@@ -1,0 +1,20 @@
+apps/desktop/electron/main/agent-sidecar-launch.ts
+  h_201ed4c689ac8b 123-136
+apps/desktop/electron/main/runtime/session-launch.ts
+  h_201ed4c689ac8b 37,391-410,821,823,827-837
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 180,322,324,337-339,406-412,430,466
+apps/desktop/test/vendor-oauth-kernel-launch.test.mjs
+  h_201ed4c689ac8b 1-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "fb3c1dbd6bc14221491409af8d964ce79e9aa821",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
