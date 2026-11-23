@@ -8,6 +8,21 @@ import {
   type UserSkillRecord,
 } from "@pi-workspace/shared";
 import { api, type MemoryKind, type MemoryRecord } from "../../lib/api";
+import { IPC } from "@pi-workspace/shared/protocol";
+
+/** What `curator.status` answers: the scheduler's state, not its settings. */
+type CuratorStatus = {
+  enabled: boolean;
+  paused: boolean;
+  intervalHours: number;
+  minIdleHours: number;
+  staleAfterDays: number;
+  archiveAfterDays: number;
+  lastRunAt: number | null;
+  runCount: number;
+  lastReportPath: string | null;
+};
+
 import { capabilityQuery, deriveProjectOverrides, type CapabilityOverride } from "../../lib/capability-scope";
 import { useAppStore } from "../../stores/app-store";
 import { useHostCollection } from "../../hooks/use-host-collection";
@@ -188,6 +203,46 @@ export function AgentSkillsPage() {
     });
   };
   const showToast = useAppStore((state) => state.showToast);
+  // The scheduler's own state, read once and after every action. The switch above
+  // says whether the pass may run; this says what it has been doing — paused,
+  // active, or off — which is the part a reader cannot infer from a switch.
+  const [curator, setCurator] = useState<CuratorStatus | null>(null);
+  const loadCurator = useCallback(async (): Promise<void> => {
+    const result = await window.piDesktop?.invoke<CuratorStatus>(IPC.invoke.curatorStatus);
+    if (result?.ok && result.data) setCurator(result.data);
+  }, []);
+  useEffect(() => {
+    void loadCurator();
+  }, [loadCurator]);
+  const toggleCuratorPaused = async (): Promise<void> => {
+    if (!curator) return;
+    const next = !curator.paused;
+    setCurator({ ...curator, paused: next });
+    try {
+      await window.piDesktop?.invoke(IPC.invoke.curatorSetPaused, { paused: next });
+    } catch (error) {
+      setCurator(curator);
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    }
+  };
+  const runCuratorNow = async (): Promise<void> => {
+    try {
+      const result = await window.piDesktop?.invoke<{ archived?: unknown[] }>(
+        IPC.invoke.curatorRun,
+        { dryRun: false },
+      );
+      if (!result?.ok) throw new Error(String(result?.error ?? "curator run failed"));
+      showToast(
+        t("settings.skillCuratorScheduleRan", { count: result.data?.archived?.length ?? 0 }),
+        { variant: "success" },
+      );
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      await loadCurator();
+    }
+  };
+
   const { selectedProjectPath, setSelectedProjectPath, options } = useAgentProjects();
   const fetchSkills = useCallback(async (): Promise<SkillCollection> => {
     // The global list omits the selected project on purpose: its rows read the
@@ -1398,6 +1453,43 @@ export function AgentSkillsPage() {
             label={t("settings.skillCurateAutoTitle")}
             onChange={() => saveCurateAutomatically(!curateAutomatically)}
           />
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.skillCuratorScheduleTitle")}
+          description={t("settings.skillCuratorScheduleDesc")}
+        >
+          <div className="agent-capability-row-actions">
+            {/* The badge the reference shows: off, paused, or running. The classes
+                are the ones this settings page already styles, so the row matches
+                the rows around it without a new stylesheet rule. */}
+            <span
+              className="agent-capability-badge is-ready"
+              data-curator-state={!curateAutomatically ? "disabled" : curator?.paused ? "paused" : "active"}
+              title={
+                curator?.lastRunAt
+                  ? t("settings.skillCuratorScheduleLastRun", {
+                      when: new Date(curator.lastRunAt).toLocaleString(),
+                    })
+                  : t("settings.skillCuratorScheduleNeverRan")
+              }
+            >
+              {!curateAutomatically
+                ? t("settings.skillCuratorScheduleDisabled")
+                : curator?.paused
+                  ? t("settings.skillCuratorSchedulePaused")
+                  : t("settings.skillCuratorScheduleActive")}
+            </span>
+            {curateAutomatically ? (
+              <button type="button" className="btn btn-ghost" onClick={() => void toggleCuratorPaused()}>
+                {curator?.paused
+                  ? t("settings.skillCuratorScheduleResume")
+                  : t("settings.skillCuratorSchedulePause")}
+              </button>
+            ) : null}
+            <button type="button" className="btn btn-ghost" onClick={() => void runCuratorNow()}>
+              {t("settings.skillCuratorScheduleRunNow")}
+            </button>
+          </div>
         </SettingsRow>
       </SettingsCard>
 
