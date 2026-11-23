@@ -24,11 +24,15 @@ use crate::message::Role;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WireApi {
-    /// `POST {base}/chat/completions` with `Authorization: Bearer`.
+    /// `POST {base}/chat/completions` with a bearer `Authorization` header.
     OpenAiCompatible,
     /// `POST {base}/v1/messages` with `x-api-key` (or a bearer, when the
     /// provider is a gateway that speaks the Anthropic wire over OAuth).
     AnthropicMessages,
+    /// `POST {base}/responses` with the same bearer `Authorization` header as
+    /// [`Self::OpenAiCompatible`] — the OpenAI Responses API: same vendor and
+    /// credential, a different envelope. See [`super::responses`] for the mapping.
+    OpenAiResponses,
 }
 
 #[derive(Debug, Clone)]
@@ -72,10 +76,24 @@ impl HttpProviderConfig {
         }
     }
 
+    /// The OpenAI Responses wire. Authentication is the same bearer token the
+    /// Chat Completions wire sends; only the path and the envelope differ.
+    pub fn openai_responses(
+        name: impl Into<String>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Self {
+        Self {
+            wire: WireApi::OpenAiResponses,
+            ..Self::openai(name, base_url, api_key)
+        }
+    }
+
     fn endpoint(&self) -> String {
         match self.wire {
             WireApi::OpenAiCompatible => format!("{}/chat/completions", self.base_url),
             WireApi::AnthropicMessages => format!("{}/messages", self.base_url),
+            WireApi::OpenAiResponses => format!("{}/responses", self.base_url),
         }
     }
 }
@@ -97,7 +115,7 @@ impl HttpProvider {
     fn headers(&self) -> Result<HeaderMap> {
         let mut headers = HeaderMap::new();
         match self.config.wire {
-            WireApi::OpenAiCompatible => {
+            WireApi::OpenAiCompatible | WireApi::OpenAiResponses => {
                 let mut raw = b"Bearer ".to_vec();
                 raw.extend_from_slice(self.config.api_key.as_bytes());
                 let mut value = HeaderValue::from_bytes(&raw).map_err(|error| {
@@ -134,6 +152,7 @@ impl HttpProvider {
         match self.config.wire {
             WireApi::OpenAiCompatible => Ok(openai_body(&self.config, request)),
             WireApi::AnthropicMessages => Ok(anthropic_body(&self.config, request)),
+            WireApi::OpenAiResponses => Ok(super::responses::responses_body(&self.config, request)),
         }
     }
 }
@@ -211,6 +230,32 @@ impl Provider for HttpProvider {
     }
 }
 
+/// One decoder per wire, chosen once so the read loop has a single call site and
+/// a fourth wire cannot grow a fourth copy of the match.
+enum WireDecoder {
+    OpenAi(OpenAiStreamDecoder),
+    Anthropic(AnthropicStreamDecoder),
+    Responses(super::responses::ResponsesStreamDecoder),
+}
+
+impl WireDecoder {
+    fn new(wire: WireApi) -> Self {
+        match wire {
+            WireApi::OpenAiCompatible => Self::OpenAi(OpenAiStreamDecoder::new()),
+            WireApi::AnthropicMessages => Self::Anthropic(AnthropicStreamDecoder::new()),
+            WireApi::OpenAiResponses => Self::Responses(super::responses::ResponsesStreamDecoder::new()),
+        }
+    }
+
+    fn push_chunk(&mut self, chunk: &str) -> Result<Vec<StreamEvent>> {
+        match self {
+            Self::OpenAi(decoder) => decoder.push_chunk(chunk),
+            Self::Anthropic(decoder) => decoder.push_chunk(chunk),
+            Self::Responses(decoder) => decoder.push_chunk(chunk),
+        }
+    }
+}
+
 /// Read the body and forward decoded frames until the provider finishes, the
 /// consumer goes away, or the turn is cancelled.
 async fn pump(
@@ -219,8 +264,7 @@ async fn pump(
     tx: mpsc::Sender<StreamEvent>,
     cancel: CancelToken,
 ) {
-    let mut openai = OpenAiStreamDecoder::new();
-    let mut anthropic = AnthropicStreamDecoder::new();
+    let mut decoder = WireDecoder::new(wire);
     let mut finished = false;
 
     loop {
@@ -235,11 +279,7 @@ async fn pump(
         let events = match chunk {
             Ok(Some(bytes)) => {
                 let text = String::from_utf8_lossy(&bytes);
-                let decoded = match wire {
-                    WireApi::OpenAiCompatible => openai.push_chunk(&text),
-                    WireApi::AnthropicMessages => anthropic.push_chunk(&text),
-                };
-                match decoded {
+                match decoder.push_chunk(&text) {
                     Ok(events) => events,
                     Err(error) => {
                         tracing::warn!(target: "agent_core::provider::http", %error, "stream decode failed");
@@ -288,7 +328,7 @@ const VISION_ONLY_SYSTEM_PROMPT: &str =
 
 /// The system message a request actually sends: what the caller set, or — when an
 /// image is the only other content — the guard above.
-fn effective_system(request: &ChatRequest) -> Option<String> {
+pub(super) fn effective_system(request: &ChatRequest) -> Option<String> {
     if let Some(system) = request
         .system
         .as_deref()
@@ -639,6 +679,36 @@ mod tests {
             config(WireApi::AnthropicMessages).endpoint(),
             "https://example.test/v1/messages"
         );
+        assert_eq!(
+            config(WireApi::OpenAiResponses).endpoint(),
+            "https://example.test/v1/responses"
+        );
+    }
+
+    /// The Responses wire is the same vendor and the same credential: only the
+    /// path and the envelope change. A separate auth scheme here would break every
+    /// OpenAI-compatible gateway that also serves `/responses`.
+    #[test]
+    fn the_responses_wire_sends_the_same_bearer_token() {
+        let responses = HttpProvider::new(config(WireApi::OpenAiResponses)).unwrap();
+        let headers = responses.headers().unwrap();
+        assert_eq!(
+            headers.get(reqwest::header::AUTHORIZATION).unwrap(),
+            "Bearer sk-secret"
+        );
+        assert!(headers.get("x-api-key").is_none());
+    }
+
+    #[test]
+    fn the_responses_wire_builds_an_input_envelope_not_messages() {
+        let request = ChatRequest::new("gpt-5", vec![Message::user_text("hi")]);
+        let body = HttpProvider::new(config(WireApi::OpenAiResponses))
+            .unwrap()
+            .body(&request)
+            .expect("a body");
+        assert!(body.get("input").is_some(), "sent: {body}");
+        assert!(body.get("messages").is_none(), "sent: {body}");
+        assert_eq!(body["stream"], true);
     }
 
     #[test]

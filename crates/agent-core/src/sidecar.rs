@@ -3339,15 +3339,19 @@ impl Sidecar {
 /// against only ever came from its own tests.
 const API_STYLE_OPENAI_COMPLETIONS: &str = "openai-completions";
 const API_STYLE_ANTHROPIC_MESSAGES: &str = "anthropic_messages";
+/// OpenAI's own `/responses` envelope. Same credential as Chat Completions, a
+/// different body and event vocabulary (`provider::responses`).
+const API_STYLE_RESPONSES: &str = "responses";
 /// Known wires this kernel does not implement yet. They fail loudly: silently
 /// falling back to Chat Completions would send a valid credential to an endpoint
 /// of a different shape and surface as an unexplained provider 400.
-const API_STYLES_NOT_MIGRATED: &[&str] = &["responses", "openai_codex_responses", "pi_messages"];
+const API_STYLES_NOT_MIGRATED: &[&str] = &["openai_codex_responses", "pi_messages"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProviderWire {
     OpenAiCompletions,
     AnthropicMessages,
+    OpenAiResponses,
 }
 
 /// Which wire a provider spec asks for.
@@ -3377,6 +3381,7 @@ fn provider_wire(spec: &Value) -> Result<ProviderWire, RpcError> {
     }
     Ok(match style {
         API_STYLE_ANTHROPIC_MESSAGES => ProviderWire::AnthropicMessages,
+        API_STYLE_RESPONSES => ProviderWire::OpenAiResponses,
         _ => ProviderWire::OpenAiCompletions,
     })
 }
@@ -3399,6 +3404,7 @@ fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
     match provider_wire(spec)? {
         ProviderWire::OpenAiCompletions => http_provider(spec, ProviderWire::OpenAiCompletions),
         ProviderWire::AnthropicMessages => http_provider(spec, ProviderWire::AnthropicMessages),
+        ProviderWire::OpenAiResponses => http_provider(spec, ProviderWire::OpenAiResponses),
     }
 }
 
@@ -3659,10 +3665,14 @@ fn http_provider(spec: &Value, wire: ProviderWire) -> Result<Arc<dyn Provider>, 
         .unwrap_or(match wire {
             ProviderWire::OpenAiCompletions => "openai",
             ProviderWire::AnthropicMessages => "anthropic",
+            ProviderWire::OpenAiResponses => "openai-responses",
         });
     let mut config = match wire {
         ProviderWire::OpenAiCompletions => HttpProviderConfig::openai(label, base_url, &api_key),
         ProviderWire::AnthropicMessages => HttpProviderConfig::anthropic(label, base_url, &api_key),
+        ProviderWire::OpenAiResponses => {
+            HttpProviderConfig::openai_responses(label, base_url, &api_key)
+        }
     };
     if let Some(max_tokens) = spec.get("defaultMaxTokens").and_then(Value::as_u64) {
         config.default_max_tokens = max_tokens as u32;
@@ -4578,8 +4588,21 @@ mod provider_wire_tests {
     }
 
     #[test]
+    fn a_responses_style_selects_the_responses_wire() {
+        assert_eq!(
+            provider_wire(&production_spec(Some("responses"))).unwrap(),
+            ProviderWire::OpenAiResponses
+        );
+        // `apiStyle` is what main sends; `kind` is the kernel's own spelling and
+        // must not be required for a real prompt.
+        let provider = build_provider(&production_spec(Some("responses")))
+            .expect("a Responses provider builds without a kind");
+        assert_eq!(provider.name(), "Gateway");
+    }
+
+    #[test]
     fn an_unmigrated_wire_fails_loudly_instead_of_using_the_wrong_endpoint() {
-        for style in ["responses", "openai_codex_responses", "pi_messages"] {
+        for style in ["openai_codex_responses", "pi_messages"] {
             let error = provider_wire(&production_spec(Some(style)))
                 .expect_err("an unimplemented wire must not silently become Chat Completions");
             let message = error.to_string();
