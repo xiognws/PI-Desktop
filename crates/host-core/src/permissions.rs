@@ -135,6 +135,13 @@ impl PermissionManager {
             "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" | "Remember"
             | "memory" | "skill_manage" | "Skill" | "LspDefinition" | "LspReferences"
             | "LspDiagnostics" | "VisionAnalyze" | "vision_analyze" => Risk::Low,
+            // Searching the session's own history is a read of the app's own
+            // SQLite store: no file is written, no process runs and nothing
+            // leaves the machine, so it belongs beside `Read` and `Grep` rather
+            // than behind a card the user dismisses on every recollection. Both
+            // spellings are listed because host-core accepts the reference
+            // agent's `session_search` as well as the kernel's `SessionSearch`.
+            "SessionSearch" | "session_search" => Risk::Low,
             // Runs arbitrary code through an interpreter: the same grant `Bash`
             // needs, and for the same reason. A missing entry here would not fail
             // the call — it would leave it waiting on an approval card that the
@@ -505,6 +512,30 @@ mod tests {
                     Risk::Low
                 ),
                 "{tool} must stay low risk"
+            );
+        }
+    }
+
+    #[test]
+    fn a_history_search_never_needs_a_card() {
+        // Read-only, local and the app's own store: an approval card here would
+        // interrupt a turn every time the model tried to remember something it
+        // was told in an earlier session.
+        let pm = PermissionManager::default();
+        for tool in ["SessionSearch", "session_search"] {
+            assert!(
+                matches!(
+                    PermissionManager::tool_risk_with_declared(tool, None),
+                    Risk::Low
+                ),
+                "{tool} must stay low risk"
+            );
+            let decision =
+                pm.evaluate_auto_with_permission_mode("s", tool, "agent", "ask", &no_grants());
+            assert_eq!(
+                decision,
+                Some(PermissionDecision::AllowOnce),
+                "{tool} must not prompt"
             );
         }
     }

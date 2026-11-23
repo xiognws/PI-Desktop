@@ -243,6 +243,12 @@ impl ExecPolicy {
             // class a network refusal exists for.
             "WebFetch" | "WebSearch" | "WebExtract" | "web_search" | "web_extract" | "Fetch"
             | "Http" => ToolClass::Network,
+            // Searching the session's own history reads one local SQLite table:
+            // nothing leaves the machine and nothing is written, so it grades
+            // with `Read`, not with the network pair above. It is named
+            // explicitly rather than left to the catch-all so a later arm cannot
+            // quietly reclassify it.
+            "SessionSearch" | "session_search" => ToolClass::ReadOnly,
             // Anything the host declares as a writer is a mutation; everything else
             // that is not exec and not network is read-only.
             other if other.ends_with("_file") && other.starts_with("write") => ToolClass::Mutating,
@@ -709,6 +715,16 @@ mod tests {
         // network call, not a read of a local file.
         for tool in ["WebSearch", "WebExtract", "web_search", "web_extract"] {
             assert_eq!(policy.classify(tool, &json!({})), ToolClass::Network, "{tool}");
+        }
+        // The history tool is local: reading the session store is a read, and a
+        // network or mutating grade here would ask the user to approve a lookup
+        // that never left the machine.
+        for tool in ["SessionSearch", "session_search"] {
+            assert_eq!(
+                policy.classify(tool, &json!({ "query": "retry budget" })),
+                ToolClass::ReadOnly,
+                "{tool}"
+            );
         }
     }
 

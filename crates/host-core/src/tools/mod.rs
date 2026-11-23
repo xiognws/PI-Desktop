@@ -40,6 +40,7 @@ mod output_budget;
 mod process_group;
 pub mod provider_store;
 pub mod shell;
+pub mod session_search_tool;
 pub mod shell_session;
 #[cfg(test)]
 mod shell_session_tests;
@@ -1637,6 +1638,20 @@ pub async fn execute_tool_with_file_lease(
         name if web::recognizes_extract(name) => match web::host_transport() {
             Ok(transport) => web::extract(args, transport).await,
             Err(error) => Err(error),
+        },
+        // The model's own history, searched the same way the desktop search box
+        // searches it: `crate::session_search::search` owns the matching and the
+        // cursor, `tools/session_search_tool.rs` owns the argument reading and the
+        // flat, citable shape. The store is opened here rather than handed in
+        // because a tool call reaches this point with no `AppState` — the same
+        // reason `provider_store` opens it. A host with no data directory has no
+        // history to search, and says so instead of returning an empty page.
+        name if session_search_tool::recognizes(name) => match crate::pi_home::data_dir() {
+            Some(data_dir) => session_search_tool::execute(args, &data_dir).await,
+            None => Err(hashline::ToolError::new(
+                "SESSION_SEARCH_UNAVAILABLE",
+                "this host has no data directory, so there is no session history to search",
+            )),
         },
         other if is_desktop_dispatched(other) => Err(hashline::ToolError::new(
             "TOOL_NOT_FOUND",

@@ -135,6 +135,17 @@ pub const CONTRACT_CORE_TOOL_NAMES: &[&str] = &[
 /// one. On demand, the cost is paid by the turn that actually searches.
 pub const ON_DEMAND_ONLY_TOOL_NAMES: &[&str] = &["WebSearch", "WebExtract"];
 
+/// Names that must stay on demand in *every* mode that declares them.
+///
+/// [`deferrable_names`] would defer them anyway — neither is core — so what this
+/// constant records is why that must not change. `SessionSearch` reads a local
+/// SQLite table, so unlike the web pair it is not dangerous; it is *situational*.
+/// Most turns never look anything up, and a catalog that declares it up front is
+/// billed on every request of every session for a capability the third turn of a
+/// long conversation needs. On demand, the turn that actually remembers pays for
+/// it, through one `ToolSearch`.
+pub const ALWAYS_ON_DEMAND_TOOL_NAMES: &[&str] = &[crate::builtin_tools::SESSION_SEARCH_TOOL_NAME];
+
 /// The always-declared names for `mode`.
 pub fn core_tool_names(mode: &SessionMode) -> &'static [&'static str] {
     match mode {
@@ -658,6 +669,50 @@ mod tests {
         let plan = activation(SessionMode::Plan);
         assert!(!plan.deferred_names().contains(&"WebSearch".to_string()));
         assert!(plan.resolve("WebSearch").is_empty());
+    }
+
+    /// The history tool is reachable only through `ToolSearch`, and a call before
+    /// activation is refused — read-only is not the same as always declared.
+    ///
+    /// Unlike the web pair it *is* legitimate on the third turn of a long
+    /// conversation, which is exactly why it must be cheap to not use: the core
+    /// set is re-sent with every request of every session.
+    #[test]
+    fn the_history_tool_is_on_demand() {
+        let agent = activation(SessionMode::Agent);
+        let declared = names(&agent.declared());
+        for name in ALWAYS_ON_DEMAND_TOOL_NAMES {
+            assert!(
+                !AGENT_CORE_TOOL_NAMES.contains(name) && !CONTRACT_CORE_TOOL_NAMES.contains(name),
+                "`{name}` must not be core: a tool most turns never call is billed every turn"
+            );
+            assert!(
+                agent.deferred_names().contains(&name.to_string()),
+                "`{name}` is missing from the on-demand catalog"
+            );
+            assert!(
+                !declared.contains(&name.to_string()),
+                "`{name}` must not be declared before it is activated: {declared:?}"
+            );
+            assert!(agent.blocks(name), "`{name}` is not gated by activation");
+        }
+
+        let matched = agent.resolve(ALWAYS_ON_DEMAND_TOOL_NAMES[0]);
+        assert_eq!(matched, vec![ALWAYS_ON_DEMAND_TOOL_NAMES[0].to_string()]);
+        assert_eq!(agent.activate(&matched), matched);
+        assert!(
+            names(&agent.declared()).contains(&ALWAYS_ON_DEMAND_TOOL_NAMES[0].to_string()),
+            "activation must reach the next request"
+        );
+        assert!(!agent.blocks(ALWAYS_ON_DEMAND_TOOL_NAMES[0]));
+
+        // A contract mode does not declare it at all (the host denies it there),
+        // so it cannot be activated either.
+        let plan = activation(SessionMode::Plan);
+        assert!(!plan
+            .deferred_names()
+            .contains(&ALWAYS_ON_DEMAND_TOOL_NAMES[0].to_string()));
+        assert!(plan.resolve(ALWAYS_ON_DEMAND_TOOL_NAMES[0]).is_empty());
     }
 
     /// Activation never reaches a tool the mode does not declare, and an unknown

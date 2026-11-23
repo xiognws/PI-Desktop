@@ -142,10 +142,11 @@ impl ShellIdentity {
 /// weekly schedule), so the growth is shape, not prose: every description in the
 /// set is still a verb phrase under forty characters. → 6 850 with `BrowserExec`
 /// declared beside them (the set measures 6 791). → 7 300 for the web pair,
-/// `WebSearch` and `WebExtract` (the set measures 7 247). Adding a tool is the one
-/// change allowed to raise it; buying room by deleting another tool's parameter
-/// hints is not, because those hints are what keep a model from calling wrongly.
-pub const DECLARATION_BUDGET_BYTES: usize = 7_300;
+/// `WebSearch` and `WebExtract` (the set measures 7 247). → 7 550 for
+/// `SessionSearch` (the set measures 7 528). Adding a tool is the one change
+/// allowed to raise it; buying room by deleting another tool's parameter hints
+/// is not, because those hints are what keep a model from calling wrongly.
+pub const DECLARATION_BUDGET_BYTES: usize = 7_550;
 
 fn read() -> Value {
     json!({
@@ -295,6 +296,41 @@ fn web_extract() -> Value {
                 "max_chars": {"type": "integer", "description": "per page, default 6000"}
             },
             "required": ["urls"]
+        }
+    })
+}
+
+/// The history tool's name, shared with [`crate::tool_activation`] so the
+/// declaration and the on-demand catalog cannot drift apart.
+pub const SESSION_SEARCH_TOOL_NAME: &str = "SessionSearch";
+
+/// The model's own history, ported from the reference agent's `session_search`
+/// (same argument names: `query`, `limit`, `offset`; this kernel spells the name
+/// the way every other built-in here is spelled, and host-core accepts both).
+///
+/// Agent mode only, and not because searching is dangerous — it reads one local
+/// SQLite table. The host's contract-mode allowlist
+/// (`host-core` `permissions::plan_mode_allows`) is an authoritative list of
+/// names, and this one is not on it, so a Plan or Goal turn declaring it would be
+/// offering a tool every call to which the host refuses. Widening that allowlist
+/// is a security-boundary change and belongs in its own ADR.
+///
+/// `limit` counts sessions, not hits, and is declared because the default is
+/// deliberately small: ten sessions of titles and snippets is a screenful, and a
+/// model that wants a longer walk has to be able to ask for it. `offset` is the
+/// page cursor the reply hands back.
+fn session_search() -> Value {
+    json!({
+        "name": SESSION_SEARCH_TOOL_NAME,
+        "description": "Search your past sessions.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "integer", "description": "sessions, default 10"},
+                "offset": {"type": "integer", "description": "page cursor"}
+            },
+            "required": ["query"]
         }
     })
 }
@@ -683,6 +719,10 @@ pub fn declarations(mode: SessionMode, shell: Option<&ShellIdentity>) -> Vec<Val
         // they follow the browser into Agent mode.
         tools.push(web_search());
         tools.push(web_extract());
+        // Its own history: the one question this product can answer that a fresh
+        // context cannot. Read-only, but Agent mode only — see the declaration's
+        // note on the host's contract-mode allowlist.
+        tools.push(session_search());
         // Drawing lands in the workspace, next to the project it was drawn for.
         tools.push(generate_images());
         // Both halves of the codemod end in a write, so they follow Write/Edit.
@@ -734,6 +774,7 @@ mod tests {
                 "BrowserExec",
                 "WebSearch",
                 "WebExtract",
+                "SessionSearch",
                 "GenerateImages",
                 "AstEdit",
                 "AstEditApply",
@@ -802,6 +843,26 @@ mod tests {
             assert!(
                 names.iter().any(|name| name == "LspDefinition"),
                 "{label}: {names:?}"
+            );
+        }
+    }
+
+    /// The host refuses this one in a contract mode (`permissions::plan_mode_allows`
+    /// is an authoritative allowlist), so declaring it there would offer a tool
+    /// every call to which is denied. Agent mode still gets it.
+    #[test]
+    fn session_search_is_agent_mode_only() {
+        let names = |mode| -> Vec<String> {
+            declarations(mode, Some(&shell()))
+                .iter()
+                .filter_map(|tool| tool["name"].as_str().map(str::to_string))
+                .collect()
+        };
+        assert!(names(SessionMode::Agent).contains(&SESSION_SEARCH_TOOL_NAME.to_string()));
+        for mode in [SessionMode::Plan, SessionMode::Goal] {
+            assert!(
+                !names(mode).contains(&SESSION_SEARCH_TOOL_NAME.to_string()),
+                "a contract mode must not declare a tool the host denies"
             );
         }
     }
