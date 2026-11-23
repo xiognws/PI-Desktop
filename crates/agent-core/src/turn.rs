@@ -141,6 +141,9 @@ pub struct TurnEngine {
     /// self-check, the compaction turn and a subagent want: none of them is in
     /// the on-demand business.
     activation: Option<Arc<crate::tool_activation::ToolActivation>>,
+    /// Trusted extensions listening to this turn. `None` — the default — leaves
+    /// the loop byte-identical to the turn that had no extensions at all.
+    extensions: Option<crate::extensions::ExtensionHost>,
 }
 
 impl TurnEngine {
@@ -162,6 +165,7 @@ impl TurnEngine {
             repeats: None,
             parallel_tool_calls: false,
             activation: None,
+            extensions: None,
         }
     }
 
@@ -179,6 +183,18 @@ impl TurnEngine {
     /// entirely, which is what the self-check and the loop tests want.
     pub fn with_steering(mut self, source: Arc<dyn SteeringSource>) -> Self {
         self.steering = Some(source);
+        self
+    }
+
+    /// Let this session's trusted extensions watch the turn.
+    ///
+    /// An extension may block one call (`tool_call`), replace one result
+    /// (`tool_result`) and rewrite one request's messages (`context`); the other
+    /// events it hears are notifications. Every one of them degrades to "no
+    /// change" — see [`crate::extensions`] — so a broken extension cannot fail a
+    /// turn, only miss its own hook.
+    pub fn with_extensions(mut self, extensions: crate::extensions::ExtensionHost) -> Self {
+        self.extensions = Some(extensions);
         self
     }
 
@@ -248,6 +264,9 @@ impl TurnEngine {
         cancel: CancelToken,
     ) -> Result<TurnOutcome> {
         self.emit(session_id, turn_id, AgentEvent::AgentStart);
+        if let Some(extensions) = &self.extensions {
+            extensions.notify("agent_start").await;
+        }
 
         let repaired = transcript.repair_tool_pairs();
         if repaired.repaired_anything() {
@@ -268,6 +287,9 @@ impl TurnEngine {
         let mut stop_reason: Option<StopReason> = None;
         let mut graceful_stop = false;
         let mut steps_taken = 0usize;
+        // pi's turn index for extension handlers: one per provider request, 1-based
+        // (`extensionTurnIndex` in `packages/agent-runtime/src/runtime.ts`).
+        let mut extension_turns = 0usize;
         // The definition-of-done tracker and the repeat cache live for exactly one
         // turn: both are about "what did this turn already do", and carrying either
         // across turns would be a cache with no expiry.
@@ -431,8 +453,23 @@ impl TurnEngine {
                     "aged old tool output for this request"
                 );
             }
-            let mut request = ChatRequest::new(&config.model, aged.messages);
+            // `turn_start` / `context`: pi's turn is one response plus the tools it
+            // asked for, so the extension's turn boundary is this request. The
+            // context hook may rewrite the messages of *this* request only — the
+            // transcript keeps every byte the model already saw.
+            let mut request_messages = aged.messages;
+            if let Some(extensions) = &self.extensions {
+                extension_turns += 1;
+                extensions.turn_start(extension_turns).await;
+                if let Some(replaced) = extensions.context(&request_messages).await {
+                    request_messages = replaced;
+                }
+            }
+            let mut request = ChatRequest::new(&config.model, request_messages);
             request.system = config.system.clone();
+            // One conversation, one cache-routing name. The session id is stable across
+            // every step of every turn, which is exactly the scope a prefix cache has.
+            request.cache_key = Some(session_id.to_string());
             // Re-read every step: `ToolSearch` changes this set mid-turn.
             request.tools = match &self.activation {
                 Some(activation) => activation.declared(),
@@ -594,6 +631,11 @@ impl TurnEngine {
                         continue;
                     }
                 }
+                if let Some(extensions) = &self.extensions {
+                    extensions
+                        .turn_end(extension_turns, Some(&assembled.message), &[])
+                        .await;
+                }
                 stop_reason = Some(assembled.stop_reason);
                 break;
             }
@@ -630,6 +672,10 @@ impl TurnEngine {
             let results = self
                 .run_step_calls(session_id, turn_id, &step_calls, &cancel, repeats.as_mut())
                 .await;
+            // Node's `turn_end` fires once this response's calls are done and carries
+            // both halves; the results are cloned for the notification because the
+            // transcript takes ownership of them below.
+            let extension_results = results.clone();
 
             for result in results {
                 self.emit(
@@ -648,6 +694,12 @@ impl TurnEngine {
                 let message = Message::tool_result(result);
                 added_ids.push(message.id.clone());
                 transcript.push(message);
+            }
+
+            if let Some(extensions) = &self.extensions {
+                extensions
+                    .turn_end(extension_turns, Some(&assembled.message), &extension_results)
+                    .await;
             }
 
             if step + 1 == config.max_steps {
@@ -709,6 +761,9 @@ impl TurnEngine {
             AgentEvent::Usage { usage: total_usage },
         );
         self.emit(session_id, turn_id, AgentEvent::TurnEnd);
+        if let Some(extensions) = &self.extensions {
+            extensions.agent_end(transcript.messages()).await;
+        }
         self.emit(
             session_id,
             turn_id,
@@ -771,6 +826,9 @@ impl TurnEngine {
     ) -> Vec<ToolResult> {
         let mut slots: Vec<Option<ToolResult>> = vec![None; calls.len()];
         let mut pending: Vec<(usize, ToolCall)> = Vec::new();
+        // Calls an extension blocked never ran, so they have no result to offer the
+        // `tool_result` hook. Everything else does.
+        let mut blocked: Vec<bool> = vec![false; calls.len()];
 
         for (index, call) in calls.iter().enumerate() {
             // A declaration is not activation: a tool the prompt listed as
@@ -785,6 +843,24 @@ impl TurnEngine {
                         is_error: true,
                         truncated: false,
                     });
+                    blocked[index] = true;
+                    continue;
+                }
+            }
+            // `tool_call`: an extension may refuse this one call with a reason.
+            // The reason becomes the result the model reads — Node's `block`
+            // answer is a tool error carrying the handler's sentence — and the
+            // tool itself never runs.
+            if let Some(extensions) = &self.extensions {
+                if let Some(reason) = extensions.tool_call(call).await {
+                    slots[index] = Some(ToolResult {
+                        call_id: call.id.clone(),
+                        name: call.name.clone(),
+                        content: reason,
+                        is_error: true,
+                        truncated: false,
+                    });
+                    blocked[index] = true;
                     continue;
                 }
             }
@@ -853,6 +929,21 @@ impl TurnEngine {
                 },
             })
             .collect();
+
+        // `tool_result`: an extension may replace what the tool said. Applied
+        // before the transcript stores it and before the repeat cache remembers it,
+        // which is exactly where Node's `afterToolCall` sits.
+        let mut results = results;
+        if let Some(extensions) = &self.extensions {
+            for (index, call) in calls.iter().enumerate() {
+                if blocked[index] {
+                    continue;
+                }
+                if let Some(patch) = extensions.tool_result(call, &results[index]).await {
+                    crate::extensions::apply_tool_result_patch(&mut results[index], &patch);
+                }
+            }
+        }
 
         if let Some(guard) = repeats.as_mut() {
             for (call, result) in calls.iter().zip(&results) {

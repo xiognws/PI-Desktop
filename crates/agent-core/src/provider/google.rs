@@ -75,7 +75,11 @@
 //!
 //! * Prompt-cache breakpoints. Gemini caches implicitly and an explicit
 //!   `cachedContents` resource is a separate API call, so `ChatRequest::cache`
-//!   is ignored here rather than guessed at.
+//!   is ignored here rather than guessed at. Explicit caching is not just a field:
+//!   it needs create/refresh/delete calls and a TTL per cached prefix, and a stale
+//!   one is billed whether it is read or not. Implicit caching needs none of that,
+//!   so it stays the default until a session is measured paying more for re-sent
+//!   prefixes than the lifecycle would cost.
 //! * Thought signatures on replay. The kernel keeps the thinking *text*, not the
 //!   encrypted `thoughtSignature` that preserves the reasoning chain, so prior
 //!   thinking is not re-sent (a signature-less `thought: true` part is what
@@ -400,10 +404,14 @@ fn parse_usage(value: &Value) -> Option<Usage> {
     if prompt == 0 && candidates == 0 && thoughts == 0 {
         return None;
     }
+    // `promptTokenCount` includes the cached slice, and `Usage`'s three input
+    // numbers are disjoint everywhere they are read, so the cached count is taken
+    // out here rather than double-billed downstream.
+    let cached = count("cachedContentTokenCount");
     Some(Usage {
-        input_tokens: prompt,
+        input_tokens: prompt.saturating_sub(cached),
         output_tokens: candidates + thoughts,
-        cache_read_tokens: count("cachedContentTokenCount"),
+        cache_read_tokens: cached,
         cache_write_tokens: 0,
         reasoning_tokens: thoughts,
     })
@@ -1001,7 +1009,9 @@ mod tests {
         assert_eq!(
             response.usage,
             Usage {
-                input_tokens: 10,
+                input_tokens: 6,
+                // 10 prompt tokens with 4 served from cache: the cached slice is
+                // reported once, on `cache_read_tokens`.
                 // candidates + thoughts: thinking is spent out of the answer budget
                 output_tokens: 5,
                 cache_read_tokens: 4,

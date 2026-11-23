@@ -163,13 +163,19 @@ fn parse_usage(value: &Value) -> Option<Usage> {
     }
     let details = value.get("prompt_tokens_details");
     let completion_details = value.get("completion_tokens_details");
+    // `prompt_tokens` counts the cached slice *inside* itself, while every consumer
+    // of `Usage` treats the three input numbers as disjoint parts of one prompt —
+    // the shape Anthropic's fields already have. Leaving it whole would bill a
+    // cached turn twice and make the context meter report a session twice as full as
+    // it is, so the cached slice is subtracted here, once, at the wire boundary.
+    let cached = details
+        .and_then(|d| d.get("cached_tokens"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
     Some(Usage {
-        input_tokens: input,
+        input_tokens: input.saturating_sub(cached),
         output_tokens: output,
-        cache_read_tokens: details
-            .and_then(|d| d.get("cached_tokens"))
-            .and_then(Value::as_u64)
-            .unwrap_or(0),
+        cache_read_tokens: cached,
         cache_write_tokens: 0,
         reasoning_tokens: completion_details
             .and_then(|d| d.get("reasoning_tokens"))
@@ -204,7 +210,9 @@ mod tests {
         assert!(events.contains(&StreamEvent::ThinkingDelta("think ".into())));
         assert!(events.contains(&StreamEvent::Finish(StopReason::EndTurn)));
         assert!(events.contains(&StreamEvent::Usage(Usage {
-            input_tokens: 11,
+            input_tokens: 8,
+            // Disjoint parts of one 11-token prompt: the cached 3 are not billed
+            // a second time as input.
             output_tokens: 7,
             cache_read_tokens: 3,
             cache_write_tokens: 0,

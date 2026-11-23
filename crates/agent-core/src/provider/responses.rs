@@ -62,10 +62,12 @@
 //!
 //! # What this wire does not carry
 //!
-//! * Prompt-cache breakpoints. Responses caches on its own; the knobs that steer it
-//!   (`prompt_cache_key`, `prompt_cache_retention`) are provider-specific and a
-//!   compatible gateway may reject them, so `ChatRequest::cache` is ignored here
-//!   rather than guessed at.
+//! * `prompt_cache_key` / `prompt_cache_retention` on anything but OpenAI's own API.
+//!   Responses caches on its own, and these two knobs are the only way to steer it —
+//!   but they are provider-specific and a compatible gateway may reject an unknown
+//!   field, so they are sent to `*.openai.com` only (see `caches_by_key`). Extended
+//!   retention (`CacheRetention::Long`) becomes `24h`; the default window is left
+//!   unstated so the provider's own default stands.
 //! * Reasoning items on replay. The kernel keeps thinking text, not the encrypted
 //!   `reasoning` item the API wants back, so prior thinking is not re-sent.
 
@@ -74,6 +76,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json::{json, Value};
 
 use super::http::HttpProviderConfig;
+use super::CacheRetention;
 use super::sse::SseFramer;
 use super::StreamEvent;
 use crate::error::{AgentError, ProviderErrorKind, Result};
@@ -181,6 +184,17 @@ pub fn responses_body(config: &HttpProviderConfig, request: &ChatRequest) -> Val
     // field, so the provider's own default stands.
     if let Some(effort) = request.thinking.reasoning_effort() {
         body["reasoning"] = json!({"effort": effort});
+    }
+    // Cache routing and window. Same gate as the Chat Completions body: documented
+    // on OpenAI's own API, omitted everywhere else, and omitted entirely when the
+    // caller asked for no cache at all.
+    if config.caches_by_key() && request.cache != CacheRetention::None {
+        if let Some(key) = request.cache_key.as_deref().filter(|key| !key.is_empty()) {
+            body["prompt_cache_key"] = json!(key);
+        }
+        if request.cache == CacheRetention::Long {
+            body["prompt_cache_retention"] = json!("24h");
+        }
     }
     if !request.tools.is_empty() {
         body["tools"] = Value::Array(
@@ -495,9 +509,10 @@ fn map_status(response: &Value) -> StopReason {
     }
 }
 
-/// OpenAI counts cached tokens inside `input_tokens`, exactly as on Chat
-/// Completions, so the number is kept whole and the cached slice is reported next
-/// to it — the same reading the other OpenAI adapter produces.
+/// OpenAI counts cached tokens inside `input_tokens`, so the cached slice is
+/// subtracted here and reported separately: every reader of `Usage` adds the three
+/// input numbers together, which is only correct when they are disjoint. Chat
+/// Completions gets the same treatment.
 fn parse_usage(value: &Value) -> Option<Usage> {
     let input = value
         .get("input_tokens")
@@ -510,14 +525,15 @@ fn parse_usage(value: &Value) -> Option<Usage> {
     if input == 0 && output == 0 {
         return None;
     }
+    let cached = value
+        .get("input_tokens_details")
+        .and_then(|details| details.get("cached_tokens"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
     Some(Usage {
-        input_tokens: input,
+        input_tokens: input.saturating_sub(cached),
         output_tokens: output,
-        cache_read_tokens: value
-            .get("input_tokens_details")
-            .and_then(|details| details.get("cached_tokens"))
-            .and_then(Value::as_u64)
-            .unwrap_or(0),
+        cache_read_tokens: cached,
         cache_write_tokens: 0,
         reasoning_tokens: value
             .get("output_tokens_details")
@@ -603,6 +619,39 @@ mod tests {
         }
     }
 
+    /// Extended retention becomes `24h`, the default window is left unstated, and a
+    /// gateway hears neither field.
+    #[test]
+    fn cache_steering_is_sent_only_where_it_is_documented() {
+        let mut request = ChatRequest::new("gpt-5", vec![Message::user_text("hi")]);
+        request.cache_key = Some("session-1".into());
+
+        let openai = HttpProviderConfig {
+            default_max_tokens: 4096,
+            ..HttpProviderConfig::openai_responses("oai", "https://api.openai.com/v1", "sk")
+        };
+        let body = responses_body(&openai, &request);
+        assert_eq!(body["prompt_cache_key"], "session-1");
+        // Short retention states nothing: the provider's default window stands.
+        assert!(body.get("prompt_cache_retention").is_none());
+
+        request.cache = CacheRetention::Long;
+        assert_eq!(
+            responses_body(&openai, &request)["prompt_cache_retention"],
+            "24h"
+        );
+
+        let gateway = config();
+        let body = responses_body(&gateway, &request);
+        assert!(body.get("prompt_cache_key").is_none());
+        assert!(body.get("prompt_cache_retention").is_none());
+
+        request.cache = CacheRetention::None;
+        assert!(responses_body(&openai, &request)
+            .get("prompt_cache_key")
+            .is_none());
+    }
+
     fn decode(raw: &str) -> Vec<StreamEvent> {
         let mut decoder = ResponsesStreamDecoder::new();
         decoder.push_chunk(raw).expect("fixture must decode")
@@ -654,7 +703,8 @@ mod tests {
         // The `done` frame must not append the text a second time.
         assert_eq!(text, "Hello");
         assert!(events.contains(&StreamEvent::Usage(Usage {
-            input_tokens: 11,
+            input_tokens: 8,
+            // Disjoint parts of one 11-token prompt.
             output_tokens: 7,
             cache_read_tokens: 3,
             cache_write_tokens: 0,

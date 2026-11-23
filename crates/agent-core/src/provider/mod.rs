@@ -181,6 +181,14 @@ pub struct ChatRequest {
     pub temperature: Option<f32>,
     pub thinking: ThinkingLevel,
     pub cache: CacheRetention,
+    /// A stable name for this conversation, for providers that route requests by it.
+    ///
+    /// OpenAI's cache is a prefix cache, but *where* the prefix is cached depends on
+    /// which machine the request lands on: two identical requests can miss each
+    /// other's cache if they are routed differently. `prompt_cache_key` is the field
+    /// that pins them together. It is not content — a session id, not a digest of the
+    /// prompt — because the provider only uses it as a routing hint.
+    pub cache_key: Option<String>,
 }
 
 impl ChatRequest {
@@ -194,6 +202,7 @@ impl ChatRequest {
             temperature: None,
             thinking: ThinkingLevel::Off,
             cache: CacheRetention::default(),
+            cache_key: None,
         }
     }
 }
@@ -227,6 +236,24 @@ pub trait Provider: Send + Sync {
         request: ChatRequest,
         cancel: CancelToken,
     ) -> BoxFuture<'a, Result<ProviderStream>>;
+}
+
+/// A listener on the wire: what one request carries, and what came back.
+///
+/// The transport builds the payload and sends it; it does not decide what goes
+/// in it. Trusted extensions do, through `before_provider_request`, and they
+/// see the same payload object the provider would have sent
+/// (`withExtensionProviderHooks` in `packages/agent-runtime/src/runtime.ts`
+/// rides pi-ai's `onPayload` / `onResponse` the same way).
+///
+/// Every method has a safe default so a provider without extensions pays
+/// nothing and a transport cannot forge an answer.
+pub trait WireHooks: Send + Sync {
+    /// The payload to send: the hook's replacement, or the original.
+    fn before_request<'a>(&'a self, payload: serde_json::Value) -> BoxFuture<'a, serde_json::Value>;
+
+    /// The response arrived, whatever its status.
+    fn after_response<'a>(&'a self, status: u16) -> BoxFuture<'a, ()>;
 }
 
 #[derive(Debug)]

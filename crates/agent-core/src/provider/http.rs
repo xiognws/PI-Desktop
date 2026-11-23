@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 
 use super::anthropic::AnthropicStreamDecoder;
 use super::openai::OpenAiStreamDecoder;
-use super::{BoxFuture, ChatRequest, Provider, ProviderStream, StreamEvent};
+use super::{BoxFuture, CacheRetention, ChatRequest, Provider, ProviderStream, StreamEvent};
 use crate::cancel::CancelToken;
 use crate::error::{AgentError, ProviderErrorKind, Result};
 use crate::message::Role;
@@ -126,6 +126,9 @@ impl HttpProviderConfig {
 pub struct HttpProvider {
     config: HttpProviderConfig,
     client: reqwest::Client,
+    /// Trusted extensions listening on this provider's wire, when the host has
+    /// any. `None` — the default — leaves the request byte-identical.
+    hooks: Option<std::sync::Arc<dyn super::WireHooks>>,
 }
 
 impl HttpProvider {
@@ -134,7 +137,17 @@ impl HttpProvider {
             .timeout(config.timeout)
             .build()
             .map_err(|error| AgentError::Transport(error.to_string()))?;
-        Ok(Self { config, client })
+        Ok(Self {
+            config,
+            client,
+            hooks: None,
+        })
+    }
+
+    /// The same provider, with trusted extensions watching its wire.
+    pub fn with_hooks(mut self, hooks: std::sync::Arc<dyn super::WireHooks>) -> Self {
+        self.hooks = Some(hooks);
+        self
     }
 
     fn headers(&self) -> Result<HeaderMap> {
@@ -207,6 +220,12 @@ impl Provider for HttpProvider {
     ) -> BoxFuture<'a, Result<ProviderStream>> {
         Box::pin(async move {
             let body = self.body(&request)?;
+            // `before_provider_request` sees the payload the provider was about
+            // to send, and may replace it (`onPayload` in the reference).
+            let body = match &self.hooks {
+                Some(hooks) => hooks.before_request(body).await,
+                None => body,
+            };
             let headers = self.headers()?;
             let url = self.config.endpoint(&request.model);
             let wire = self.config.wire;
@@ -229,6 +248,12 @@ impl Provider for HttpProvider {
                 })?;
 
             let status = response.status();
+            // `after_provider_response` is a notification: the reference emits it
+            // for every answer, a failure included, because a handler that counts
+            // responses must not miss the 429s. It never changes the outcome.
+            if let Some(hooks) = &self.hooks {
+                hooks.after_response(status.as_u16()).await;
+            }
             if !status.is_success() {
                 // Read the delay before the body: `text()` consumes the response.
                 let retry_after = crate::retry::parse_retry_after_ms(
@@ -395,6 +420,33 @@ pub(super) fn effective_system(request: &ChatRequest) -> Option<String> {
     has_image.then(|| VISION_ONLY_SYSTEM_PROMPT.to_string())
 }
 
+impl HttpProviderConfig {
+    /// Whether this endpoint routes prompt-cache entries by `prompt_cache_key`.
+    ///
+    /// Only OpenAI's own API documents the field. A compatible gateway is free to
+    /// reject an unknown one, and a rejected request costs a whole turn — so the
+    /// field is sent where it is documented and omitted everywhere else, rather than
+    /// sent optimistically and discovered in production.
+    pub(super) fn caches_by_key(&self) -> bool {
+        let host = self
+            .base_url
+            .split("://")
+            .nth(1)
+            .unwrap_or(self.base_url.as_str())
+            .split('/')
+            .next()
+            .unwrap_or_default()
+            .rsplit('@')
+            .next()
+            .unwrap_or_default()
+            .split(':')
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        host == "openai.com" || host.ends_with(".openai.com")
+    }
+}
+
 fn openai_body(config: &HttpProviderConfig, request: &ChatRequest) -> Value {
     let mut messages: Vec<Value> = Vec::new();
     if let Some(system) = effective_system(request) {
@@ -481,6 +533,16 @@ fn openai_body(config: &HttpProviderConfig, request: &ChatRequest) -> Value {
     // stands, and neither is spelled as a value here.
     if let Some(effort) = request.thinking.reasoning_effort() {
         body["reasoning_effort"] = json!(effort);
+    }
+    // Cache routing hint. `None` retention is a user asking for no caching, so the
+    // hint goes with it: a keyless request is the only shape that cannot populate a
+    // cache entry the user asked not to have.
+    if config.caches_by_key() {
+        if let Some(key) = request.cache_key.as_deref().filter(|key| !key.is_empty()) {
+            if request.cache != CacheRetention::None {
+                body["prompt_cache_key"] = json!(key);
+            }
+        }
     }
     if !request.tools.is_empty() {
         body["tools"] = Value::Array(
@@ -1054,6 +1116,46 @@ mod tests {
 
     /// A one-shot request writes a cache entry nobody reads: it must stay clean,
     /// and it must not send a field a strict provider would reject.
+    /// The cache-routing hint is sent where it is documented and nowhere else.
+    ///
+    /// A compatible gateway is free to reject an unknown field, and a rejected request
+    /// costs a turn, so "send it and see" is not an option for a request path.
+    #[test]
+    fn prompt_cache_key_reaches_openai_but_never_a_gateway() {
+        let mut request = request_with_cache(crate::provider::CacheRetention::Short);
+        request.cache_key = Some("session-1".into());
+
+        let openai = HttpProviderConfig {
+            base_url: "https://api.openai.com/v1".into(),
+            ..config(WireApi::OpenAiCompatible)
+        };
+        assert_eq!(
+            openai_body(&openai, &request)["prompt_cache_key"],
+            "session-1"
+        );
+
+        let gateway = config(WireApi::OpenAiCompatible);
+        assert!(openai_body(&gateway, &request)
+            .get("prompt_cache_key")
+            .is_none());
+
+        // No cache at all means the user asked for caching to be off: a key would
+        // populate exactly the entry they declined.
+        let mut uncached = request.clone();
+        uncached.cache = crate::provider::CacheRetention::None;
+        assert!(openai_body(&openai, &uncached)
+            .get("prompt_cache_key")
+            .is_none());
+
+        // A request with no key at all (a caller that never named its conversation)
+        // adds no field either.
+        let mut anonymous = request;
+        anonymous.cache_key = None;
+        assert!(openai_body(&openai, &anonymous)
+            .get("prompt_cache_key")
+            .is_none());
+    }
+
     #[test]
     fn no_retention_sends_no_cache_fields_and_keeps_system_a_string() {
         let body = anthropic_body(
