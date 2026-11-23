@@ -46,10 +46,12 @@ fn sidebar_backup_relocates_internal_project_paths_without_rewriting_labels_or_e
     .unwrap();
     copy_directory(&source, &destination);
     relocate(&source, &destination).unwrap();
-    let moved = destination
-        .join("projects/default")
-        .to_string_lossy()
-        .into_owned();
+    // Project repositories store this spelling: verbatim prefix stripped and
+    // separators normalised. Building it with `join` alone yields the platform
+    // separator and compares unequal on Windows.
+    let moved =
+        crate::db::normalize_project_path(&destination.join("projects/default").to_string_lossy())
+            .unwrap();
     let restored = read_json(&destination.join("sidebar-preferences.json"));
     assert_eq!(restored["openProjectPaths"], json!([moved, external]));
     assert_eq!(restored["projectMeta"][&moved]["name"], internal);
