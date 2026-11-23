@@ -5,9 +5,13 @@
 //! `pi-runtime-estimates.ts`, because they are a spend bound, not a stylistic
 //! choice:
 //!
-//! * the window a session plans against is capped at 262,144 tokens, so a model
-//!   advertising a million cannot carry half a million through hundreds of
-//!   requests in one turn;
+//! * the window a session plans against is the one its model declares: a value the
+//!   user edited in Settings → Models is what the turn is budgeted on, because a
+//!   number the settings page shows and the runtime silently halves is a lie about
+//!   cost. There used to be a 262,144 spend cap here, inherited from the Node
+//!   runtime; it made a 1M-token model plan against a quarter of what the user
+//!   configured, and was removed when the settings page and the runtime were made
+//!   to agree;
 //! * `hardLimit` is the safety boundary — no provider request is issued at or
 //!   above it;
 //! * automatic compaction starts at **half** of `hardLimit` (the same 0.5 share
@@ -29,8 +33,6 @@ pub const COMPACTION_MIN_KEEP_RECENT_TOKENS: u64 = 8_000;
 pub const COMPACTION_MAX_KEEP_RECENT_TOKENS: u64 = 64_000;
 /// Cap on a user message carried across a compaction boundary.
 pub const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS: u64 = 20_000;
-/// Spend bound on the window a session plans against.
-pub const COMPACTION_CONTEXT_WINDOW_CEILING: u64 = 262_144;
 /// Share of `hardLimit` that starts automatic compaction.
 pub const AUTO_COMPACTION_TRIGGER_RATIO: f64 = 0.5;
 /// Character-per-token ratio used by the text estimator.
@@ -133,8 +135,10 @@ impl ContextLimits {
             .context_window
             .unwrap_or(DEFAULT_CONTEXT_WINDOW)
             .max(1);
-        // Spend bound, not a capability claim.
-        let window = reported_window.min(COMPACTION_CONTEXT_WINDOW_CEILING);
+        // The configured window is the budget. Nothing caps it here: the number the
+        // user set in Settings → Models is what a turn plans against, and a silent
+        // second bound is what made the two disagree.
+        let window = reported_window;
 
         let model_output_budget = model
             .max_tokens
@@ -330,16 +334,29 @@ mod tests {
     use crate::message::{ContentPart, Message, StopReason, ToolCall, ToolResult, Usage};
 
     #[test]
-    fn a_large_window_is_planned_against_the_ceiling() {
+    fn a_large_window_is_planned_against_the_configured_value() {
         let limits = ContextLimits::for_model(ModelLimits::new(1_000_000, 32_768));
-        assert_eq!(limits.window, COMPACTION_CONTEXT_WINDOW_CEILING);
-        // The model's own 32K output budget dominates the 16,384 floor and 5%.
-        assert_eq!(limits.request_headroom, 32_768);
-        assert_eq!(limits.hard_limit, 229_376);
-        assert_eq!(limits.trigger, 114_688);
-        // 20% of the safe budget, inside the 8k..64k clamp.
-        assert_eq!(limits.keep_recent_tokens, 45_875);
+        // Settings → Models says a million; the turn plans against a million.
+        assert_eq!(limits.window, 1_000_000);
+        // The model's own 32K output budget dominates the 16,384 floor; 5% of the
+        // window dominates both at this size.
+        assert_eq!(limits.request_headroom, 50_000);
+        assert_eq!(limits.hard_limit, 950_000);
+        assert_eq!(limits.trigger, 475_000);
+        // 20% of the safe budget, clamped at the 64k maximum.
+        assert_eq!(limits.keep_recent_tokens, 64_000);
         assert_eq!(limits.retained_user_message_budget, 20_000);
+    }
+
+    #[test]
+    fn a_window_edited_between_turns_moves_the_budget() {
+        // The settings page writes the model row; the next turn reads it. Same
+        // model, two configurations, two budgets — no restart, no stale cap.
+        let small = ContextLimits::for_model(ModelLimits::new(200_000, 32_768));
+        let large = ContextLimits::for_model(ModelLimits::new(1_000_000, 32_768));
+        assert_eq!(small.window, 200_000);
+        assert_eq!(large.window, 1_000_000);
+        assert!(large.trigger > small.trigger);
     }
 
     #[test]

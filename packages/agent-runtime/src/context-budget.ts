@@ -43,20 +43,20 @@ export const COMPACTION_MAX_KEEP_RECENT_TOKENS = 64_000;
 export const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS = 20_000;
 
 /**
- * Ceiling on the window a session plans its compaction against.
+ * Window a session plans its compaction against.
  *
- * The compaction trigger is a fraction of the window, so a model that advertises
- * a million tokens would let one turn carry half a million tokens through
- * hundreds of requests: a measured Hindsight->memory import turn ran 312
- * requests from 13k to 527k tokens, 87.8M prompt tokens in one turn.
+ * This used to be a 262,144-token ceiling, so a model advertising a million could
+ * not carry half a million through hundreds of requests (one measured
+ * Hindsight→memory import turn ran 312 requests from 13k to 527k tokens, 87.8M
+ * prompt tokens in a single turn). The ceiling was removed because it made the
+ * number Settings → Models showed and the number the session budgeted on
+ * different: a user who set a million got a quarter of it, silently.
  *
- * Hermes bounds the same problem per model with `context_length: 262144`, and
- * this ceiling is the same number: a bigger reported window still runs, but the
- * session compacts at half of 262,144 instead of half a million. The model's own
- * reported window is left as published — this bounds spend, not capability —
- * and the summary request is still preflighted against the real window.
+ * What bounds spend now is the trigger rather than the window: compaction starts
+ * at half of the safe budget, so a large window still compacts early in absolute
+ * terms. A per-model cap is the settings row's decision — the value the user wrote
+ * is the value the turn uses.
  */
-export const COMPACTION_CONTEXT_WINDOW_CEILING = 262_144;
 
 /** Context limits derived from the active model's window.
  *
@@ -85,9 +85,9 @@ export type ContextBudget = {
  * half a million tokens - one measured Hindsight->memory import turn carried 312
  * requests from 13k to 527k tokens, 87.8M prompt tokens in a single turn.
  *
- * The window itself is bounded separately: `COMPACTION_CONTEXT_WINDOW_CEILING`
- * caps the window a session plans against, the way Hermes caps it per model with
- * `context_length`.
+ * The window itself is whatever the model's settings row declares; there is no
+ * second, smaller bound, so the number the settings page shows is the number this
+ * trigger is a fraction of.
  */
 export const AUTO_COMPACTION_TRIGGER_RATIO = 0.5;
 
@@ -137,9 +137,10 @@ export function contextBudgetLimitsFor(
     1,
     Math.round(model.contextWindow || DEFAULT_CONTEXT_WINDOW),
   );
-  // Spend bound, not a capability claim: a million-token window still serves a
-  // request of that size, but the session compacts as if the window were smaller.
-  const contextWindow = Math.min(reportedWindow, COMPACTION_CONTEXT_WINDOW_CEILING);
+  // The configured window is the budget. Nothing caps it here: the number the user
+  // set in Settings → Models is what a turn plans against, and a silent second
+  // bound is what made the two disagree.
+  const contextWindow = reportedWindow;
   const modelOutputBudget = Math.min(
     Math.max(1, Math.round(model.maxTokens || DEFAULT_MAX_TOKENS)),
     Math.max(1, Math.floor(contextWindow * 0.25)),

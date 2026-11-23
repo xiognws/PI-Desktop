@@ -578,10 +578,13 @@ Compaction follows Codex's mechanism (ADR 0064, amended by D623): it remains
 inline at turn boundaries, and the model can request it through `new_context`.
 Automatic compaction starts at half of the derived `hardLimit` — the same 0.5
 share Hermes uses for `compression.threshold` — and the window that budget is
-derived from is capped at 262,144 tokens
-(`COMPACTION_CONTEXT_WINDOW_CEILING`), so a model that advertises a million
-tokens cannot let one turn carry half a million tokens through hundreds of
-requests; there is no background pre-computation.
+derived from is the model's configured context window (Settings → Models), so
+the number the settings page shows is the number the turn is budgeted on. There
+used to be a 262,144-token ceiling here, inherited from the Node runtime; it made
+a model configured at a million plan against a quarter of it, so the settings page
+and the session budget disagreed, and the ceiling was removed. Compacting at half
+of the safe budget is what bounds a long turn now. There is no background
+pre-computation.
 
 pi 0.84.4+ invokes `prepareNextTurn` only when the loop will start another
 assistant turn in the same run — including between a completed tool batch and
@@ -701,9 +704,9 @@ Neither reminder is persisted or shown in the transcript.
 
 The hard boundary is the model context window minus request headroom. Automatic
 compaction starts at half of `hardLimit`; this deterministic margin is not
-configurable, and the window the boundary is computed from is capped at 262,144
-tokens (`COMPACTION_CONTEXT_WINDOW_CEILING`), so a larger advertised window
-bounds spend rather than deferring compaction. Headroom is the maximum of a
+configurable, and the window the boundary is computed from is the model's
+configured context window — a larger configured window defers compaction, because
+the user asked for it. Headroom is the maximum of a
 16,384-token reserve floor, model
 maximum output capped at 25% of the context window, and a 5% safety margin. The
 reserve floor is itself capped at half the window. The cut-point target used by

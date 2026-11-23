@@ -4,7 +4,6 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
   AUTO_COMPACTION_TRIGGER_RATIO,
   automaticCompactionThresholdFor,
-  COMPACTION_CONTEXT_WINDOW_CEILING,
   COMPACTION_MAX_KEEP_RECENT_TOKENS,
   COMPACTION_MIN_KEEP_RECENT_TOKENS,
   COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS,
@@ -42,9 +41,7 @@ describe("contextBudgetFor", () => {
   });
 
   it("compacts at half the safe budget, so a long turn cannot re-send the window", () => {
-    // The window a session plans against is capped
-    // (COMPACTION_CONTEXT_WINDOW_CEILING), then compacted at this fraction:
-    // a 1M window becomes 262_144 → hardLimit 229_376 → trigger 114_688.
+    // A 262,144-token window plans a 229,376 hard limit and compacts at half of it.
     const limits = contextBudgetLimitsFor({ contextWindow: 262_144, maxTokens: 32_768 });
 
     expect(limits.hardLimit).toBe(229_376);
@@ -53,18 +50,19 @@ describe("contextBudgetFor", () => {
     expect(limits.keepRecentTokens).toBeLessThan(automaticCompactionThresholdFor(limits));
   });
 
-  it("plans against a capped window when the model reports a million tokens", () => {
-    // Before the ceiling this window compacted at 0.9 × 950_000 = 855_000, and a
-    // measured import turn re-sent up to 527k tokens 312 times.
+  it("plans a million-token model against the window it declares", () => {
+    // Settings → Models says a million, so the turn plans against a million. This
+    // used to be capped at 262,144, which is what made the settings page and the
+    // session budget disagree.
     const limited = contextBudgetLimitsFor({ contextWindow: 1_000_000, maxTokens: 32_768 });
-    const capped = contextBudgetLimitsFor({
-      contextWindow: COMPACTION_CONTEXT_WINDOW_CEILING,
+    const quarter = contextBudgetLimitsFor({
+      contextWindow: 262_144,
       maxTokens: 32_768,
     });
 
-    expect(COMPACTION_CONTEXT_WINDOW_CEILING).toBe(262_144);
-    expect(limited).toEqual(capped);
-    expect(automaticCompactionThresholdFor(limited)).toBe(114_688);
+    expect(limited.hardLimit).toBe(950_000);
+    expect(automaticCompactionThresholdFor(limited)).toBe(475_000);
+    expect(limited).not.toEqual(quarter);
   });
 
   it("clamps the retained tail for a small model context window", () => {
@@ -106,21 +104,16 @@ describe("contextBudgetFor", () => {
     expect(budget.keepRecentTokens).toBe(Math.floor(DEFAULT_CONTEXT_WINDOW * 0.15));
   });
 
-  it("derives the tail from the capped window, not the advertised one", () => {
+  it("derives the tail from the configured window", () => {
     const advertised = contextBudgetLimitsFor({
       contextWindow: 1_048_576,
       maxTokens: 64_000,
     });
-    const capped = contextBudgetLimitsFor({
-      contextWindow: COMPACTION_CONTEXT_WINDOW_CEILING,
-      maxTokens: 64_000,
-    });
 
-    // The million-token window plans exactly like the capped one.
-    expect(advertised).toEqual(capped);
-    expect(advertised.hardLimit).toBe(198_144);
-    // 20% of that safe budget, not ~197K carried forward from the advertised window.
-    expect(advertised.keepRecentTokens).toBe(39_628);
+    // A million-token model is planned as a million-token model: the headroom is
+    // its 64K output budget, not a share of a smaller, invented window.
+    expect(advertised.hardLimit).toBe(984_576);
+    expect(advertised.keepRecentTokens).toBe(64_000);
   });
 
   it("never lets the retained tail exceed half of the hard limit", () => {
