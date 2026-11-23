@@ -217,8 +217,33 @@ that every third-party extension dependency can execute.
 
 ### 4.1 Where extensions run
 
-Extensions load inside the Agent sidecar process (`packages/agent-runtime`),
-never in Electron main, the renderer, or a plugin host process.
+Extensions never run in the renderer or in a plugin host process. *Which* host
+process runs them follows the agent runtime the session is on:
+
+| Agent runtime | Extension host | How the agent reaches it |
+| --- | --- | --- |
+| Node sidecar (`packages/agent-runtime`) | The sidecar itself | In process: the adapter implements `ExtensionAPI` directly |
+| Rust kernel (`crates/agent-core`) | Electron main, which owns the same `TrustedExtensionRunner` | Over the host bridge: `extensions.session.describe`, `extensions.hooks.emit`, `extensions.tools.execute` |
+
+The kernel has no JavaScript runner and does not grow one. It asks the host for a
+hook the way it asks for a tool, and main runs the same Runner the Node path runs,
+so a hook has one implementation rather than two. Hook names, payload fields and
+ordering are identical on both paths — `before_agent_start`, `context`,
+`before_provider_request`, `after_provider_response`, `tool_call`, `tool_result`,
+`turn_start`, `turn_end`, `agent_end` — and a hook that fails, times out or has no
+host leaves the prompt and the tool results unchanged while the turn still ends.
+
+Two consequences worth stating:
+
+- An extension's own **agent tools** are declared to the kernel at launch and are
+  activated through `ToolSearch` like any deferred tool; activation is what makes
+  the model able to call them.
+- A plugin-owned **model provider** cannot be reached by the kernel directly,
+  because serving it means running the plugin's JavaScript stream. Main serves that
+  agent on a loopback Chat Completions endpoint — bound to `127.0.0.1` on an
+  ephemeral port, behind a random per-process bearer key, closed on quit — and the
+  launch points the kernel there. `modelRegistry` reports ids, limits and auth
+  availability only; endpoints, headers and tokens never cross that boundary.
 
 ### 4.2 Loader
 
@@ -285,6 +310,13 @@ unsupported ones.
 | Supported on context | `ui.notify`, `ui.confirm`, `ui.select`, `ui.input`, `ui.setStatus`, `ui.setWorkingMessage`, `cwd`, `modelRegistry`, `isIdle`, `abort`, `hasPendingMessages`, `getContextUsage`, `compact`, `getSystemPrompt`, `waitForIdle`, `newSession`, `fork` |
 | Deferred to v2 | `sendMessage`, `appendEntry`, `setLabel`, `sessionManager` read API, `switchSession`, `registerShortcut`, `registerMarkdownTransformer`, `ui.setEditorText`, `ui.getEditorText`, `ui.addAutocompleteProvider`, `registerFlag` value editing |
 | Unsupported | `ui.setWidget`, `ui.setFooter`, `ui.setHeader`, `ui.setTitle`, `ui.custom`, `ui.overlay`, `ui.onTerminalInput`, `ui.setWorkingVisible`, `ui.setWorkingIndicator`, `ui.setHiddenThinkingLabel`, `ui.pasteToEditor`, `ui.editor`, `registerMessageRenderer`, `registerEntryRenderer`, `navigateTree`, `shutdown` |
+
+On the **Rust kernel path** a subset of the context surface is still stubbed in
+main and reports unavailable rather than pretending: `getContextUsage`, `compact`,
+`abort`, `hasPendingMessages`, `waitForIdle`, `getSystemPrompt`, `get/setActiveTools`
+and the write side of `setThinkingLevel`. An extension that needs one of them must
+treat the failure as "not here" and keep working; no shipped e2e scenario depends on
+them yet, and they are the next slice of the port.
 
 `getActiveTools` describes the model-facing declarations, not execution grants.
 Plan/Goal can retain denied Write/Edit and configured Task-family declarations;
