@@ -108,18 +108,17 @@ app.whenReady().then(async () => {
       await fs.mkdir(process.env.PI_DESKTOP_E2E_EVIDENCE_DIR, { recursive: true });
       await fs.writeFile(path.join(process.env.PI_DESKTOP_E2E_EVIDENCE_DIR, "plan-history.png"), (await window.webContents.capturePage()).toPNG());
     }
-    const { session: goal } = await host.call("session.create", { title: "Goal history", mode: "goal", projectPath: workspace });
-    const goalSubmission = await submit(goal, "goal", "goal");
-    await resolve(goalSubmission.proposal, "reject");
-    await host.call("session.endTurn", { turnId: goalSubmission.proposal.turnId, createNotification: false });
-    const goals = await probe("planHistoryLoad", goal.id, ["rejected"], "zh-CN");
+    // A goal approval can no longer be created through the product: the legacy
+    // Goal negotiation is closed and the staged builtin Goal runs as a mode, so
+    // no RPC writes a goal plan row any more. Reading and resolving existing
+    // goal approvals is covered by host-core modes_rpc_tests.
     await host.call("session.appendCompaction", { sessionId: session.id, compaction: { id: "history-compaction",
       summary: "Earlier planning condensed", throughMessageId: second.message.id, tokensBefore: 100, createdAt: new Date().toISOString() } });
     await host.call("session.appendMessage", { sessionId: session.id, message: { id: "continued", role: "assistant", content: "continued after compaction", createdAt: new Date().toISOString() } });
     await host.restart();
     await window.loadFile(path.join(__dirname, "index.html"));
     const restart = await probe("planHistoryLoad", session.id, ["approved", "rejected"]);
-    console.log("PLAN_HISTORY_PROBE " + JSON.stringify({ ok: true, pending, stateOnly, live, versions, pagination, goals, restart, compaction: true }));
+    console.log("PLAN_HISTORY_PROBE " + JSON.stringify({ ok: true, pending, stateOnly, live, versions, pagination, restart, compaction: true }));
   } catch (error) {
     failure = error;
     console.error("PLAN_HISTORY_PROBE " + JSON.stringify({ ok: false, error: String(error) }));
