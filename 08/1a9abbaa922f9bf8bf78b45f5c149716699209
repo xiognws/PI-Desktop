@@ -1,0 +1,20 @@
+apps/desktop/electron/main/agent-extensions.ts
+  h_201ed4c689ac8b 146-155
+apps/desktop/electron/main/extension-model-registry.ts
+  h_201ed4c689ac8b 60-63,65-69,82-83,86,92-96
+apps/desktop/electron/main/extension-session-host.ts
+  h_201ed4c689ac8b 122-134
+apps/desktop/test/extension-command-host.test.mjs
+  h_201ed4c689ac8b 248-268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "081a9abbaa922f9bf8bf78b45f5c149716699209",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
