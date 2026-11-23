@@ -1,0 +1,30 @@
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 367-369,379-383
+apps/desktop/electron/main/ipc/curator-ipc.ts
+  h_201ed4c689ac8b 1-87
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 44,562-565
+apps/desktop/electron/main/runtime/curator-report.ts
+  h_201ed4c689ac8b 1-491
+apps/desktop/electron/main/runtime/curator-runner.ts
+  h_201ed4c689ac8b 5-23,27-28,42-54,56-70,77-79,81-96,98-109,117-215,219,221-222,224-229,232,234-236,238-239,241-244,249,253-255,258-299,301-360,364-366,368-498,500-509,511-520,522-550,553-554,560-589,591-592
+apps/desktop/electron/test/curator-runner.test.mjs
+  h_201ed4c689ac8b 1-446
+apps/desktop/test/curator-auto-run.test.mjs
+  h_201ed4c689ac8b 1-10,12-14,18,22-25,27-38,41,55,66-69,74-75,79,85-94,98,101-102,104-111,113-114,116-117,120-127,131-136,139-143,146-150,153-157,160-161,163-164,172-176,184-187,191-193,196-197,199,205-208,221-228,233-234,237-240,244-250,252-253,255-256,264
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 5959-5971,6827-6829,6832-6833
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 467-472
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "23d3fe33426c5adb0427bccb59394341b6493924",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
