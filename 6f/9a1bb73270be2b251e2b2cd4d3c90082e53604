@@ -1,0 +1,14 @@
+scripts/e2e/provider-api-style.tsx
+  h_201ed4c689ac8b 311-324
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6f9a1bb73270be2b251e2b2cd4d3c90082e53604",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
