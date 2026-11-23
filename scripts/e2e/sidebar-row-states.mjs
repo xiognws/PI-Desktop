@@ -67,12 +67,10 @@ export async function checkSidebarProjectMenuPlacement({ cdp, check, waitFor }) 
     const scroller = document.querySelector(".sidebar-session-groups");
     if (!scroller) return null;
     scroller.scrollTop = scroller.scrollHeight;
-    const bounds = scroller.getBoundingClientRect();
-    const headers = [...scroller.querySelectorAll(".project-group > .sidebar-session-group-header")]
-      .filter((header) => {
-        const rect = header.getBoundingClientRect();
-        return rect.bottom > bounds.top && rect.top < bounds.bottom;
-      });
+    // Scrolling to the end can carry the last header above the viewport when the
+    // rail has a footer, so "bottom row" is the lowest header in the list rather
+    // than the lowest one still visible.
+    const headers = [...scroller.querySelectorAll(".project-group > .sidebar-session-group-header")];
     if (!headers.length) return null;
     const header = headers.reduce((lowest, candidate) =>
       candidate.getBoundingClientRect().bottom > lowest.getBoundingClientRect().bottom
