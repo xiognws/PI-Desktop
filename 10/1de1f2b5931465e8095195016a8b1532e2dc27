@@ -1,0 +1,18 @@
+apps/desktop/src/components/StatusBarUsage.tsx
+  h_201ed4c689ac8b 28-36,38-39
+apps/desktop/src/lib/latest-turn-context.ts
+  h_201ed4c689ac8b 29-40,81-90,92
+apps/desktop/test/latest-turn-context.test.mjs
+  h_201ed4c689ac8b 219-270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "101de1f2b5931465e8095195016a8b1532e2dc27",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
