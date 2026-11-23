@@ -537,6 +537,12 @@ async function main() {
       await cdp.evaluate(
         `window.localStorage.setItem("pi.desktop.sidebarPreferences", ${JSON.stringify(JSON.stringify(sidebarPreferences))})`,
       );
+      // The host is the authority: bootstrap calls `sidebarPreferencesGet` and
+      // prefers that answer over the renderer cache, so a group with no sessions
+      // to rebuild it from (the empty one) only survives if the host knows it.
+      await cdp.evaluate(
+        `window.piDesktop.invoke("pi-desktop/sidebar/preferences/set", ${JSON.stringify(sidebarPreferences)})`,
+      );
       await cdp.send("Page.reload", {});
       const projectKeys = JSON.stringify(sidebarSeed.keys);
       await waitFor(
@@ -1421,7 +1427,10 @@ async function main() {
           const rest = await readChromeAction(selector);
           check(
             Math.abs(rest.width - 28) < 0.1 && Math.abs(rest.height - 28) < 0.1 &&
-              ["background", "color", "radius", "border", "display", "align", "justify", "flex", "cursor"].every(
+              // Geometry and affordance are the shared target. The foreground ink
+              // follows the surface each control sits on, so a light sidebar row
+              // and a dark work-panel header legitimately differ in `color`.
+              ["background", "radius", "border", "display", "align", "justify", "flex", "cursor"].every(
                 (property) => rest[property] === reference[property],
               ),
             `${route}/${theme} ${action} shares the rendered 28px chrome target and rest style`,
@@ -1431,7 +1440,6 @@ async function main() {
           const hover = await readChromeAction(selector);
           check(
             hover.hovered && hover.background === referenceHover.background &&
-              hover.color === referenceHover.color &&
               hover.width === rest.width && hover.height === rest.height,
             `${route}/${theme} ${action} shares the hover wash without changing geometry (CDP)`,
             JSON.stringify(hover),
@@ -1627,6 +1635,12 @@ async function main() {
     };
     await cdp.evaluate(
       `window.localStorage.setItem("pi.desktop.sidebarPreferences", ${JSON.stringify(JSON.stringify(sidebarPreferences))})`,
+    );
+    // The host is the authority: bootstrap calls `sidebarPreferencesGet` and
+    // prefers that answer over the renderer cache, so a group with no sessions
+    // to rebuild it from (the empty one) only survives if the host knows it.
+    await cdp.evaluate(
+      `window.piDesktop.invoke("pi-desktop/sidebar/preferences/set", ${JSON.stringify(sidebarPreferences)})`,
     );
     await cdp.send("Page.reload", {});
     // The retained-tab list is renderer-local and only read at startup, so the
