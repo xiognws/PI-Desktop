@@ -1,0 +1,28 @@
+apps/desktop/electron/main/agent-extensions.ts
+  h_201ed4c689ac8b 31-36,79-87,94-120,228,231,237,241-405,577-581,583,604,686-718
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 100-106
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 2-7,467-488,490-515
+crates/agent-core/src/extensions.rs
+  h_201ed4c689ac8b 1-770
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 47
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1202-1231,1240-1248,1484-1504,1526,1533-1539,1563-1564,3512-3525,3530-3554,3556-3596,3837-3841,3883-3886
+crates/agent-core/tests/extension_hooks.rs
+  h_201ed4c689ac8b 1-480
+packages/host-runtime/src/agent-sidecar.ts
+  h_201ed4c689ac8b 116-123,140-151,598-600
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5bb19fdfd6a9a38f9b6a740c564897674e154f76",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
