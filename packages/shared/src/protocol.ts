@@ -464,6 +464,12 @@ export const IPC = {
     skillTransfer: "pi-desktop/skill/transfer",
     skillRead: "pi-desktop/skill/read",
     skillReveal: "pi-desktop/skill/reveal",
+    /** The maintenance schedule as the settings page draws it. */
+    curatorStatus: "pi-desktop/curator/status",
+    /** Stop or resume the automatic maintenance pass. */
+    curatorSetPaused: "pi-desktop/curator/setPaused",
+    /** Run one pass by hand; `{ dryRun }` previews it without touching a skill. */
+    curatorRun: "pi-desktop/curator/run",
     subagentList: "pi-desktop/subagent/list",
     subagentCatalog: "pi-desktop/subagent/catalog",
     subagentCreate: "pi-desktop/subagent/create",

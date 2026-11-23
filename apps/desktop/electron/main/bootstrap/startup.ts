@@ -364,6 +364,9 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     const curatorMaintenance = createCuratorMaintenance({
       getHost,
       isBusy: isAnySessionBusy,
+      // Reports and the pre-run snapshot live under the installation's data
+      // directory, beside the logs the diagnostics bundle already collects.
+      dataDir: () => dataDir,
       log: (level, message, data) =>
         logger.app("runtime", level, message, data ? { data } : undefined),
     });
@@ -373,7 +376,11 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       report: (error) => logger.app("runtime", "warn", "scheduled task dispatch failed", { data: String(error) }),
       // The curation pass rides this tick rather than owning a timer: one
       // 30-second poll drives both, so neither can run twice or out of phase.
-      maintenance: () => curatorMaintenance.run(),
+      // The outcome is logged by the pass itself; the tick only waits for it, so
+      // a slow pass cannot overlap the next poll.
+      maintenance: async () => {
+        await curatorMaintenance.run();
+      },
     });
     scheduledRunner.start();
     logger.app("runtime", "info", "scheduled runner started");

@@ -41,6 +41,7 @@ import { registerStorageIpc } from "../storage/ipc";
 import { registerConfigSyncIpc } from "./config-sync-ipc";
 import { registerBackgroundTasksIpc } from "./background-tasks-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
+import { registerCuratorIpc } from "./curator-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
 import { registerRemoteHostIpc } from "./remote-host-ipc";
 import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-catalog";
@@ -557,6 +558,10 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     sendToRenderer,
     logger,
   });
+
+  // The curator's schedule and its manual run. Kept beside the skill channels
+  // because it exists for them: same library, same report.
+  registerCuratorIpc({ registrar, getHost, dataDir: () => dataDir, logger });
 
 
   registerAgentImportIpc({

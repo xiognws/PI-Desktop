@@ -5956,7 +5956,19 @@ async fn handle_request(
                 .user_skills
                 .curate(project_path, policy, dry_run)
                 .map_err(skill_err)?;
-            Ok(json!({ "report": report }))
+            // The global library's directory, for callers that must copy the
+            // documents before a pass moves them (the desktop curator snapshots
+            // the library first). Same shape `skills.tidy` answers with: the
+            // report, plus where it came from. A project library lives in the
+            // project and is not reported here; the automatic pass never
+            // curates one.
+            let root = crate::agent_capabilities::capability_dir(
+                CapabilityLevel::Global,
+                None,
+                "skills",
+            )
+            .map_err(skill_err)?;
+            Ok(json!({ "report": report, "root": root.to_string_lossy() }))
         }
         "skills.restore" => {
             // The way back from a curation pass: the document was moved into
@@ -6812,8 +6824,13 @@ mod tests {
         )
         .await
         .unwrap();
+        // The answer also names the global library: the desktop curator copies
+        // it into the pre-run snapshot, so the path must be the real root.
+        let root = report["root"].as_str().unwrap_or_default().to_string();
         let report = &report["report"];
         assert_eq!(report["dryRun"], json!(true));
+        assert!(root.ends_with("skills"), "expected the skills root, got {root}");
+
         assert_eq!(report["archived"], json!([]));
         let entry = report["entries"]
             .as_array()
