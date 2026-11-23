@@ -1,0 +1,14 @@
+crates/host-core/src/data_relocation/tests.rs
+  h_201ed4c689ac8b 49-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7d896940ec888699364f86c26d41c1ac522a3a68",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
