@@ -153,18 +153,32 @@ export function adaptKernelProvider(raw: unknown): {
   const baseUrl = str(raw.baseUrl);
   if (!baseUrl) return { unsupported: "provider.baseUrl" };
 
-  // The kernel speaks exactly two wires. Everything else — Responses,
-  // codex-responses, pi-messages — is refused by name rather than flattened onto
-  // Chat Completions, which would send a valid credential to an endpoint of a
-  // different shape and surface as an unexplained 400.
+  // The kernel speaks three wires: Chat Completions and Anthropic Messages are
+  // selected by `kind`, Responses by `apiStyle` (it has its own envelope and event
+  // vocabulary). Everything else — codex-responses, pi-messages, opencode — is
+  // refused by name rather than flattened onto Chat Completions, which would send
+  // a valid credential to an endpoint of a different shape and surface as an
+  // unexplained 400.
+  //
+  // `chat_completions` is the app's own default wire (`API_STYLES` in
+  // `@pi-workspace/shared`), and `openai-completions` is the pi-runtime spelling
+  // for it; both name the wire the kernel implements as `openai`. Reading only the
+  // second spelling rejected every provider a user had not re-styled by hand —
+  // with `KERNEL_PROMPT_INVALID`, before the turn could start.
   const apiStyle = str(raw.apiStyle);
-  const kind =
-    apiStyle === "anthropic_messages"
+  // `kind` wins over `apiStyle` inside the kernel, so a Responses row carries none:
+  // sending both would select Chat Completions while the row asked for Responses.
+  const responsesWire = apiStyle === "responses";
+  const kind = responsesWire
+    ? undefined
+    : apiStyle === "anthropic_messages"
       ? "anthropic"
-      : apiStyle === undefined || apiStyle === "openai-completions"
+      : apiStyle === undefined ||
+          apiStyle === "chat_completions" ||
+          apiStyle === "openai-completions"
         ? "openai"
         : undefined;
-  if (!kind) return { unsupported: `provider.apiStyle(${apiStyle})` };
+  if (!kind && !responsesWire) return { unsupported: `provider.apiStyle(${apiStyle})` };
 
   const authless = str(raw.authKind) === "none";
   const apiKey = str(raw.apiKey) ?? (authless ? "" : undefined);
@@ -176,7 +190,8 @@ export function adaptKernelProvider(raw: unknown): {
 
   return {
     provider: {
-      kind,
+      ...(kind ? { kind } : {}),
+      ...(responsesWire ? { apiStyle: "responses" } : {}),
       baseUrl,
       ...(apiKey === "" ? {} : { apiKey }),
       ...(str(raw.name) ? { name: str(raw.name) } : {}),
