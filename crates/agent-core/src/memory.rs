@@ -64,20 +64,15 @@ pub const MEMORY_KINDS: [&str; 5] = ["fact", "preference", "decision", "pitfall"
 pub const MEMORY_SCOPES: [&str; 3] = ["global", "project", "session"];
 
 const MEMORY_TOOL_DESCRIPTION: &str = "\
-Store and recall durable memory: one structured list of memories that stays with you across sessions.
+Durable memory: a structured store, recalled per turn, never in full; no size budget.
 
-Memory holds what stays true after this conversation, one memory per thing learned: a preference the user stated, a decision and its reason, a pitfall you actually hit, a constraint of this repository or machine. Each memory has a short `title`, a `body`, a `kind`, optional `tags` and a `scope`. Nothing here enters your system prompt in full — the memories relevant to a turn are recalled alongside the user's message, so the store can grow without costing context and there is no size budget to manage.
+- `remember`: one memory per thing learned. Required `title` (a few words) and `body`. Optional `kind` — `fact` (default), `preference`, `decision`, `pitfall`; `tags`; `scope` — `global` (default), `project` (this project), `session` (this conversation); `pinned` (recalled every turn). Same title+body refreshes that memory instead of adding one.
+- `remember` + `items`: up to 50 per call — imports, migrations.
+- `update` by `id`: any of `title`, `body`, `tags`, `pinned`, `confidence`; for a changed fact, not a second contradictory copy.
+- `forget` by `id`: wrong, or the user asked.
+- `search`: keywords, closest memories with ids. Search before `remember` if you may already know it, and before `update`/`forget` without an id; query with words the memory would contain, not a question.
 
-Actions:
-- `remember` stores one memory. Required: `title` (a few words naming what it is about) and `body` (the memory itself). Optional: `kind` — `fact` (default), `preference`, `decision`, `pitfall`; `tags`; `scope` — `global` (default, true everywhere), `project` (this project only), `session` (this conversation only); `pinned` (recalled every turn). Writing the same title and body again refreshes the existing memory instead of duplicating it.
-- `remember` with `items` stores many memories in one call (at most 50). Use it whenever you have more than a couple to write — an import, a migration, a notes file: one call per memory is 50 provider requests, each re-sending the whole conversation.
-- `update` changes a memory you already hold, by `id`: any of `title`, `body`, `tags`, `pinned`, `confidence`. Use it when the fact changed, rather than storing a contradicting second copy.
-- `forget` deletes one memory by `id`. Use it for what turned out wrong, or that the user asked you to drop.
-- `search` runs a keyword query over the store and returns the closest memories with their ids, best first. Search before `remember` when you may already know this, and before `update` or `forget` when you do not have the id. Query with the words the memory would contain, not with a question.
-
-A procedure — two or more steps that will still be true next month — belongs in a skill, not here: write it with `skill_manage`. This tool refuses a body that reads like steps (`MEMORY_PROCEDURE_NEEDS_SKILL`) and names the skill to patch when one already covers it. Facts, preferences and one-line quirks are exactly what memory is for.
-
-Record what you learned, not the task you ran: not progress, not file contents you can re-read, not secrets. Write in the language the user writes in — a memory is read back to them, and matched against their words, in a later session.";
+A procedure — steps still true next month — is a skill, not a memory: `skill_manage` refuses a step-like body (`MEMORY_PROCEDURE_NEEDS_SKILL`) and names the skill to patch. Record facts, not the run: no progress, no re-readable contents, no secrets. Write in the user's language; it is read back later.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemoryKind {
@@ -719,41 +714,41 @@ impl Tool for MemoryTool {
                         "enum": ["remember", "update", "forget", "search"],
                         "description": "What to do with the store."
                     },
-                    "title": {"type": "string", "description": "remember / update. A few words naming the thing this memory is about."},
-                    "body": {"type": "string", "description": "remember / update. The memory itself: one fact, preference, decision or pitfall."},
+                    "title": {"type": "string", "description": "remember / update."},
+                    "body": {"type": "string", "description": "remember / update."},
                     "kind": {
                         "type": "string",
                         "enum": MEMORY_KINDS,
-                        "description": "remember only. Defaults to `fact`."
+                        "description": "remember only."
                     },
                     "tags": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "remember / update. Short labels that make this memory findable later."
+                        "description": "remember / update."
                     },
                     "scope": {
                         "type": "string",
                         "enum": MEMORY_SCOPES,
-                        "description": "remember only. Defaults to `global`."
+                        "description": "remember only."
                     },
-                    "pinned": {"type": "boolean", "description": "remember / update. Recalled on every turn; for standing instructions only."},
-                    "confidence": {"type": "number", "description": "update only. 0..1, how sure this memory is; it is written as 0.7."},
-                    "id": {"type": "string", "description": "update / forget. The id a `remember` or `search` result gave you."},
-                    "query": {"type": "string", "description": "search. Words the memory would contain."},
-                    "limit": {"type": "number", "description": "search. How many hits at most. Defaults to 8, capped at 50."},
+                    "pinned": {"type": "boolean", "description": "remember / update."},
+                    "confidence": {"type": "number", "description": "update only. 0..1."},
+                    "id": {"type": "string", "description": "update / forget."},
+                    "query": {"type": "string", "description": "search."},
+                    "limit": {"type": "number", "description": "search. Defaults to 8, capped at 50."},
                     "items": {
                         "type": "array",
                         "maxItems": MEMORY_BATCH_LIMIT,
-                        "description": "remember only. Store many memories in one call (at most 50) instead of one call per memory — use this for imports and migrations.",
+                        "description": "remember only. Many at once — imports, migrations.",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "title": {"type": "string", "description": "A few words naming what this memory is about."},
-                                "body": {"type": "string", "description": "The memory itself: one fact, preference, decision or pitfall."},
+                                "title": {"type": "string", "description": "A few words."},
+                                "body": {"type": "string", "description": "The memory itself."},
                                 "kind": {"type": "string", "enum": MEMORY_KINDS, "description": "Defaults to `fact`."},
                                 "tags": {"type": "array", "items": {"type": "string"}},
                                 "scope": {"type": "string", "enum": MEMORY_SCOPES, "description": "Defaults to `global`."},
-                                "pinned": {"type": "boolean", "description": "Recalled on every turn; standing instructions only."}
+                                "pinned": {"type": "boolean", "description": "Recalled every turn."}
                             },
                             "additionalProperties": false,
                             "required": ["title", "body"]

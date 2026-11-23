@@ -31,19 +31,18 @@ export type SkillManageHost = Pick<RuntimeHost, "call">;
 type SkillRecord = { id: string; name: string; path?: string };
 
 const SKILL_MANAGE_DESCRIPTION = [
-  "Read and edit your durable skill library: the SKILL.md documents that load into later sessions.",
+  "Read and edit your skill library: the SKILL.md documents later sessions load.",
   "",
-  "Use it the moment a turn teaches you something reusable — a procedure, a pitfall, a decision rule, a command sequence that worked. Capture the rule, not the afternoon: name the class of problem, never the single issue.",
+  "Write the moment a turn teaches something reusable — a procedure, a pitfall, a decision rule, a command sequence — at class level, not for one afternoon.",
   "",
-  "Actions:",
-  "- `create` starts a new skill. Give `name` (lowercase-hyphenated) and `description` (one sentence: when to use it); `body` is the document. A name that already exists is refused — patch that skill instead.",
-  "- `patch` replaces ONE span inside an existing skill's document. `old_string` must occur exactly once; copy it verbatim. This is the usual way to extend a skill you already have.",
-  "- `write_file` adds one file beside the skill's SKILL.md. `references/<topic>.md` is the usual choice (prose the model reads); `templates/`, `scripts/` and `assets/` hold what a procedure needs to run — a fill-in file, a program, a data file. Prefer this over a whole-document rewrite: it is a small write and cannot damage the document.",
-  "- `remove_file` deletes one such file that is wrong or superseded.",
-  "- `delete` removes a whole skill. Only when its content now lives somewhere better.",
-  "- `absorb` merges one skill into another: its resource files move under the umbrella (existing files are kept as the umbrella's) and it leaves the catalog. Nothing is deleted, so this is the right move when two skills turned out to be one topic — pass the redundant skill as `name` and the umbrella as `into`. Patch the umbrella first so its body describes what it now covers.",
+  "- `create`: `name` (lowercase-hyphenated), `description` (when to use it), `body` (the document); an existing name is refused — patch it.",
+  "- `patch`: ONE span, `old_string` verbatim and occurring exactly once — the usual way to extend a skill.",
+  "- `write_file`: one file beside SKILL.md — `references/<topic>.md` for prose the model reads, `templates/`, `scripts/`, `assets/` for what a procedure runs; prefer it to a rewrite, which can damage the document.",
+  "- `remove_file`: one such file, wrong or superseded.",
+  "- `delete`: a whole skill, only when its content lives somewhere better.",
+  "- `absorb`: merge into another — resource files move under the umbrella (existing kept), it leaves the catalog, nothing is deleted; `name` = the redundant one, `into` = the umbrella, patched first to describe what it now covers.",
   "",
-  "Never create a near-duplicate of a skill you already have: patch it, or add a reference to it.",
+  "Never a near-duplicate: patch it, or add a reference.",
   "",
   SKILL_AUTHORING_GUIDE,
 ].join("\n");
@@ -62,38 +61,35 @@ const SKILL_MANAGE_PARAMETERS = Type.Object(
       { description: "What to do with the library." },
     ),
     name: Type.String({
-      description:
-        "Skill id, exactly as listed in your Skills section. For `create`, the new skill's name.",
+      description: "Skill id; for `create`, the new name.",
     }),
     description: Type.Optional(
       Type.String({
-        description:
-          "create only. ONE sentence, <=60 characters, `Use when <trigger>. <behavior>.` It is what later sessions index on.",
+        description: "create only.",
       }),
     ),
     body: Type.Optional(
-      Type.String({ description: "create only. The SKILL.md document, without frontmatter." }),
+      Type.String({ description: "create only. Without frontmatter." }),
     ),
     old_string: Type.Optional(
       Type.String({
-        description: "patch only. Text copied verbatim from the skill document; must occur exactly once.",
+        description: "patch only. Verbatim, exactly once.",
       }),
     ),
     new_string: Type.Optional(
-      Type.String({ description: "patch only. The replacement for old_string." }),
+      Type.String({ description: "patch only. The replacement." }),
     ),
     file_path: Type.Optional(
       Type.String({
-        description:
-          "write_file / remove_file. `<root>/<name>` with root `references` (markdown only), `templates`, `scripts` or `assets`.",
+        description: "write_file / remove_file. `<root>/<name>`.",
       }),
     ),
     content: Type.Optional(
-      Type.String({ description: "write_file only. Markdown for the reference file." }),
+      Type.String({ description: "write_file only. Markdown." }),
     ),
     into: Type.Optional(
       Type.String({
-        description: "absorb only. Skill id of the umbrella that keeps the content.",
+        description: "absorb only. The umbrella.",
       }),
     ),
   },
