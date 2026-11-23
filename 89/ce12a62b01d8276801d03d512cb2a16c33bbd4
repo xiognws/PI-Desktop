@@ -1,0 +1,14 @@
+scripts/e2e-three-column-layout.mjs
+  h_201ed4c689ac8b 170-174,784-789,901-903,906-907,1428
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "89ce12a62b01d8276801d03d512cb2a16c33bbd4",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
