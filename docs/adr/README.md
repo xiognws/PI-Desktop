@@ -434,3 +434,8 @@ Each ADR includes:
 | 0397 | [Run the WorkBuddy gateway as an in-app provider](0397-in-app-provider-gateway.md) | Accepted for implementation (amends ADR 0259; the plugin stays bundled, default-disabled) |
 | 0398 | [Vendor Session Orchestrator with push-first work deliveries](0398-vendored-session-orchestrator-push-delivery.md) | Accepted for implementation |
 | 0399 | [The voice feature is removed from the desktop app](0399-remove-voice-feature.md) | Accepted (supersedes the product surface of ADR 0281, 0291, 0313–0316) |
+| 0400 | [Stream rules abort the turn instead of repeating themselves](0400-stream-rules-abort-and-retry.md) | Accepted |
+| 0401 | [Read-only language intelligence, not an IDE](0401-read-only-language-intelligence.md) | Proposed |
+| 0402 | [The agent kernel is a Rust crate, not the Node sidecar](0402-rust-agent-core.md) | Accepted |
+| 0403 | [The Rust kernel is the agent runtime](0403-rust-kernel-as-agent-runtime.md) | Accepted (implementation in progress) |
+| 0404 | [Abort releases tools, but the provider loop can still run](0404-turn-abort-provider-traffic.md) | Accepted (limitation recorded; upstream fix pending) |
