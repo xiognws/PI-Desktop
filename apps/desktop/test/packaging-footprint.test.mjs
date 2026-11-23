@@ -398,3 +398,27 @@ test("main output is minified without renaming and shares one Pi SDK copy", () =
     /MAIN_SHARED_PACKAGES = \["@earendil-works\/pi-ai", "typebox"\]/,
   );
 });
+
+/**
+ * The optional Python extras are switched off, not removed.
+ *
+ * ~400 MB of binary wheels that only work against one interpreter version: with
+ * the app no longer shipping an interpreter they would be installed next to an
+ * artifact nobody reads, so the release chains opt out. The script stays, because
+ * turning it back on must be one argument away — and a release that quietly starts
+ * shipping them again is exactly what this guards.
+ */
+test("the release chains skip the optional Python extras, and the script remains", () => {
+  assert.equal(typeof packageJson.scripts["bundle:python:extras"], "string");
+  for (const script of ["pack", "dist", "dist:win"]) {
+    const command = packageJson.scripts[script];
+    assert.ok(command, `${script} must exist`);
+    assert.ok(
+      !command.includes("bundle:python:extras"),
+      `${script} must not bundle the extras`,
+    );
+  }
+  for (const script of ["dist", "dist:win"]) {
+    assert.match(packageJson.scripts[script], /--skip-python-extras/);
+  }
+});
