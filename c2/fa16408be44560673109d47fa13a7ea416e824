@@ -1,0 +1,22 @@
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1244,1271-1282,1288-1292
+crates/agent-core/src/tool_activation.rs
+  h_201ed4c689ac8b 157,159-163,213-225,241,243-244,737-741,756-762,765-767
+crates/agent-core/tests/graceful_stop.rs
+  h_201ed4c689ac8b 89-93
+crates/agent-core/tests/mode_run_notice.rs
+  h_201ed4c689ac8b 95-97
+crates/agent-core/tests/tool_activation.rs
+  h_201ed4c689ac8b 362-424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c2fa16408be44560673109d47fa13a7ea416e824",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
