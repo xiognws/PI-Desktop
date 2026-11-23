@@ -1,0 +1,18 @@
+apps/desktop/electron/main/python-runtime.ts
+  h_201ed4c689ac8b 502-509
+apps/desktop/package.json
+  h_201ed4c689ac8b 32-33,35
+apps/desktop/test/packaging-footprint.test.mjs
+  h_201ed4c689ac8b 204-209,235-236,238-239,242-243,245-247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6bc89dfe8693489523e75c0f02f458673c5e5e7f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
