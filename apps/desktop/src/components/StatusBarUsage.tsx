@@ -25,9 +25,18 @@ function useTurnInspector() {
   const compactions = useAppStore((s) =>
     s.activeSessionId ? s.sessionCompactions[s.activeSessionId] : undefined,
   );
+  // The session's own model, so the meter measures against the window the user
+  // configured rather than the 128K default. The usage record does not name its
+  // model, so without this the percentage was always computed on a guess.
+  const sessions = useAppStore((s) => s.sessions);
+  const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const model = useMemo(
+    () => sessions.find((session) => session.id === activeSessionId),
+    [sessions, activeSessionId],
+  );
   return useMemo(
-    () => latestTurnContextInspector(messages, providerModels, providers, compactions),
-    [messages, providerModels, providers, compactions],
+    () => latestTurnContextInspector(messages, providerModels, providers, compactions, model),
+    [messages, providerModels, providers, compactions, model],
   );
 }
 

@@ -26,6 +26,18 @@ export type LatestTurnContextInspector = {
   compactedContextTokens?: number;
 };
 
+/**
+ * Whether a record names the model a request went to.
+ *
+ * Both halves are required: a provider without a model cannot be looked up, and a
+ * model without a provider cannot pick between two providers serving the same id.
+ */
+function carriesModel(
+  candidate?: { providerId?: string; modelId?: string } | null,
+): candidate is { providerId: string; modelId: string } {
+  return Boolean(candidate?.providerId && candidate?.modelId);
+}
+
 const inspectors = new WeakMap<object, LatestTurnContextInspector>();
 
 function sameUsage(previous: MessageUsage, next: MessageUsage): boolean {
@@ -66,13 +78,18 @@ export function latestTurnContextInspector(
   const compactedContextTokens = usagePredatesCompaction
     ? compaction?.contextTokens
     : undefined;
-  const windowModel = compactedContextTokens !== undefined
-    ? compaction?.providerId && compaction.modelId
-      ? compaction
-      : currentModel?.providerId && currentModel.modelId
+  // Which model's window this occupancy is measured against. The usage record is
+  // the most precise answer, but the runtime does not stamp provider/model on it —
+  // so every session fell back to the 128K default and reported "≈128K" whatever
+  // model was selected. A carrier only counts when it names both halves; after it,
+  // the session's own model (what the composer is set to) is the answer.
+  const windowModel = compactedContextTokens !== undefined && carriesModel(compaction)
+    ? compaction
+    : carriesModel(latestUsageMessage)
+      ? latestUsageMessage
+      : carriesModel(currentModel)
         ? currentModel
-        : latestUsageMessage
-    : latestUsageMessage;
+        : latestUsageMessage;
   const knownContextWindow = resolveKnownContextWindow(
     windowModel?.providerId, windowModel?.modelId, providerModels, providers,
   );

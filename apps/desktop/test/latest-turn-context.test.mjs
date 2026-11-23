@@ -216,3 +216,55 @@ test("latest turn inspector keeps last-request usage beside the turn sum", () =>
   assert.equal(inspector?.turnUsage.cacheReadTokens, 51_500);
   assert.equal(inspector?.turnUsage.inputTokens, 57_300);
 });
+
+test("a usage record that does not name its model still measures the configured window", () => {
+  // The runtime stamps usage without provider/model, so every session used to fall
+  // back to the 128K default and report "≈128K" whatever model was selected — the
+  // composer said 256K and the meter said ≈128K in the same window.
+  const inspected = latestTurnContextInspector(
+    [
+      {
+        id: "u1",
+        role: "user",
+        content: "hi",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "a1",
+        role: "assistant",
+        content: "hello",
+        createdAt: "2026-01-01T00:00:01.000Z",
+        usage: { inputTokens: 1_000, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      },
+    ],
+    {},
+    [{ id: "changan", models: [{ id: "9554", contextWindow: 256_000, contextWindowSource: "user" }] }],
+    undefined,
+    { providerId: "changan", modelId: "9554" },
+  );
+  assert.equal(inspected?.contextWindow, 256_000);
+  assert.equal(inspected?.contextWindowEstimated, undefined);
+});
+
+test("a usage record that names its own model wins over the session default", () => {
+  // A turn that ran on a different model than the session is currently set to must
+  // be measured against the model it actually used.
+  const inspected = latestTurnContextInspector(
+    [
+      {
+        id: "a1",
+        role: "assistant",
+        content: "hello",
+        createdAt: "2026-01-01T00:00:01.000Z",
+        providerId: "provider",
+        modelId: "catalog-model",
+        usage: { inputTokens: 1_000, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      },
+    ],
+    providerModels,
+    providers,
+    undefined,
+    { providerId: "changan", modelId: "9554" },
+  );
+  assert.equal(inspected?.contextWindow, 256_000);
+});
