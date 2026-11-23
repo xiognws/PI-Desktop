@@ -1199,6 +1199,36 @@ impl Sidecar {
         // refuses the prompt before a session is reserved or a provider is
         // built, so a malformed run never becomes a turn of the bare mode.
         let mode_turn = parse_mode_turn(request.params.get("modeTurn"))?;
+        // Trusted extensions are described before anything is built: one round trip
+        // per prompt that names the events with handlers (so no other hook costs one)
+        // and the agent tools the modules registered. The same handle reaches the
+        // provider, the tool registry and the turn, because all three speak for this
+        // one session.
+        let extensions =
+            crate::extensions::ExtensionHost::new(self.bridge.clone(), session_id.clone());
+        // Main decided which plugins are enabled for this session's project and
+        // sent their ids; an empty list is the answer, and the kernel then asks the
+        // host nothing at all. That is the Node sidecar's own rule — it builds a
+        // Runner only for a non-empty trusted set — and it keeps an
+        // extension-free turn from paying a round trip it has no use for.
+        let extension_session = match request
+            .params
+            .get("trustedExtensions")
+            .and_then(Value::as_array)
+            .map(|specs| specs.len())
+        {
+            Some(count) if count > 0 => extensions.describe().await,
+            _ => crate::extensions::ExtensionSession::default(),
+        };
+        let extensions = extensions.scoped(extension_session.events.clone());
+        if !extension_session.is_empty() {
+            tracing::debug!(
+                target: "agent_core::sidecar",
+                events = extension_session.events.len(),
+                tools = extension_session.tools.len(),
+                "trusted extensions registered for this session"
+            );
+        }
         // A prompt carries its own provider: main stamps the session's model and
         // credentials on every turn. The configured provider is only a fallback
         // for harnesses and the self-check.
@@ -1207,7 +1237,15 @@ impl Sidecar {
             .get("provider")
             .filter(|value| !value.is_null())
         {
-            Some(spec) => build_provider(spec)?,
+            Some(spec) => {
+                // `before_provider_headers` is a per-turn hook in the reference
+                // (`extensionBeforeAgentStart`): handlers edit the row's own headers
+                // in place, and the merged set is what every request of this turn
+                // sends. Asked before the provider is built, because a provider owns
+                // its header map.
+                let spec = extension_provider_spec(&extensions, spec).await;
+                build_provider_hooked(&spec, extension_wire_hooks(&extensions))?
+            }
             None => self
                 .provider
                 .lock()
@@ -1443,6 +1481,27 @@ impl Sidecar {
         } else {
             Arc::new(tools.extended(extras))
         };
+        // Agent tools the trusted extensions registered. They are ordinary
+        // declarations — deferred like a plugin tool, activated with `ToolSearch`
+        // (the stub in the E2E suite relies on exactly that) — but a call to one
+        // travels to `extensions.tools.execute`, because the module that implements
+        // it runs in main and host-core has never heard of the name.
+        let tools = if extension_session.tools.is_empty() {
+            tools
+        } else {
+            Arc::new(tools.extended(
+                extension_session
+                    .tools
+                    .iter()
+                    .map(|tool| {
+                        Arc::new(crate::extensions::ExtensionTool::new(
+                            tool.spec.clone(),
+                            extensions.clone(),
+                        )) as Arc<dyn crate::tool::Tool>
+                    })
+                    .collect(),
+            ))
+        };
         // Core declarations on every request, the rest on demand. The object is
         // also what refuses a call to a tool the model never activated, so the
         // turn below gets it too.
@@ -1464,13 +1523,20 @@ impl Sidecar {
         // Compose the system prompt for this turn: persona, custom append, tool
         // guidance, the project instruction chain, the skill catalog, the mode's
         // rules and the on-demand tool catalogue.
-        let composed = self.compose_prompt(
+        let mut composed = self.compose_prompt(
             request,
             &config,
             mode.clone(),
             &catalog,
             activation_section.as_deref(),
         );
+        // `before_agent_start`: extensions chain a replacement of the composed
+        // prompt, each handler seeing what the previous one returned
+        // (`emitBeforeAgentStart`). Applied to the composed value itself, so the
+        // journal row below records the prompt the model was actually sent.
+        if let Some(replaced) = extensions.before_agent_start(&text, &composed.system).await {
+            composed.system = replaced;
+        }
         if !composed.system.trim().is_empty() {
             config.system = Some(composed.system.clone());
         }
@@ -1494,7 +1560,8 @@ impl Sidecar {
             }),
         )
         .with_steering(session.clone())
-        .with_tool_activation(activation);
+        .with_tool_activation(activation)
+        .with_extensions(extensions.clone());
         // Main stamps the session's model window on the prompt; without it the
         // loop has no budget to enforce and would never compact.
         let engine = match model_limits_from(request) {
@@ -3442,15 +3509,91 @@ fn push_unique_spec(specs: &mut Vec<ToolSpec>, spec: ToolSpec) {
 }
 
 fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
+    build_provider_hooked(spec, None)
+}
+
+/// The same provider, with trusted extensions listening on its wire.
+///
+/// `before_provider_request` and `after_provider_response` are the two hooks that
+/// belong to the transport rather than the loop: they see the payload that is
+/// actually sent and the status that actually came back. `None` — a session with
+/// no extension at all — leaves the request byte-identical to the one before
+/// this surface existed.
+fn build_provider_hooked(
+    spec: &Value,
+    hooks: Option<Arc<dyn crate::provider::WireHooks>>,
+) -> Result<Arc<dyn Provider>, RpcError> {
     if spec.get("kind").and_then(Value::as_str) == Some("scripted") {
         return scripted_provider(spec);
     }
     match provider_wire(spec)? {
-        ProviderWire::OpenAiCompletions => http_provider(spec, ProviderWire::OpenAiCompletions),
-        ProviderWire::AnthropicMessages => http_provider(spec, ProviderWire::AnthropicMessages),
-        ProviderWire::OpenAiResponses => http_provider(spec, ProviderWire::OpenAiResponses),
-        ProviderWire::GoogleGenerativeAi => http_provider(spec, ProviderWire::GoogleGenerativeAi),
+        ProviderWire::OpenAiCompletions => {
+            http_provider(spec, ProviderWire::OpenAiCompletions, hooks)
+        }
+        ProviderWire::AnthropicMessages => {
+            http_provider(spec, ProviderWire::AnthropicMessages, hooks)
+        }
+        ProviderWire::OpenAiResponses => {
+            http_provider(spec, ProviderWire::OpenAiResponses, hooks)
+        }
+        ProviderWire::GoogleGenerativeAi => {
+            http_provider(spec, ProviderWire::GoogleGenerativeAi, hooks)
+        }
     }
+}
+
+/// The transport hooks for a session with extensions, or `None`.
+///
+/// A session whose extensions registered neither wire hook still needs the
+/// object: `ExtensionHost::emit` skips an event with no handler, so the cost is
+/// one local `has` check rather than a round trip.
+fn extension_wire_hooks(
+    extensions: &crate::extensions::ExtensionHost,
+) -> Option<Arc<dyn crate::provider::WireHooks>> {
+    if extensions.events().is_empty() {
+        return None;
+    }
+    Some(Arc::new(crate::extensions::ProviderHook::new(
+        extensions.clone(),
+    )))
+}
+
+/// The provider spec this turn sends, after `before_provider_headers`.
+///
+/// Node seeds the handlers with the provider row's own headers and merges what
+/// they edited into every request of the run, so the hook is asked once per
+/// prompt with the row's `headers` object. A session with no handler gets the
+/// spec back unchanged — the same object, not a rewritten copy.
+async fn extension_provider_spec(
+    extensions: &crate::extensions::ExtensionHost,
+    spec: &Value,
+) -> Value {
+    if !extensions.events().has("before_provider_headers") {
+        return spec.clone();
+    }
+    let Some(object) = spec.as_object() else {
+        return spec.clone();
+    };
+    let headers: Vec<(String, String)> = object
+        .get("headers")
+        .and_then(Value::as_object)
+        .map(|headers| {
+            headers
+                .iter()
+                .filter_map(|(name, value)| {
+                    value.as_str().map(|value| (name.clone(), value.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let merged = extensions.before_provider_headers(headers).await;
+    let mut next = object.clone();
+    let mut map = serde_json::Map::new();
+    for (name, value) in merged {
+        map.insert(name, Value::String(value));
+    }
+    next.insert("headers".to_string(), Value::Object(map));
+    Value::Object(next)
 }
 
 /// The two prompt inputs the host resolves for us: the custom `SYSTEM.md` /
@@ -3691,7 +3834,11 @@ fn scripted_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
 }
 
 /// An HTTP provider over the requested wire.
-fn http_provider(spec: &Value, wire: ProviderWire) -> Result<Arc<dyn Provider>, RpcError> {
+fn http_provider(
+    spec: &Value,
+    wire: ProviderWire,
+    hooks: Option<Arc<dyn crate::provider::WireHooks>>,
+) -> Result<Arc<dyn Provider>, RpcError> {
     let base_url = spec
         .get("baseUrl")
         .and_then(Value::as_str)
@@ -3733,6 +3880,10 @@ fn http_provider(spec: &Value, wire: ProviderWire) -> Result<Arc<dyn Provider>, 
     }
     let provider = HttpProvider::new(config)
         .map_err(|error| RpcError::app(error.code(), error.to_string()))?;
+    let provider = match hooks {
+        Some(hooks) => provider.with_hooks(hooks),
+        None => provider,
+    };
     Ok(Arc::new(provider))
 }
 

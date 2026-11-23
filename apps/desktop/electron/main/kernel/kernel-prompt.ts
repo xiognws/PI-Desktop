@@ -97,6 +97,13 @@ export const FORWARDED_PROMPT_PARAMS = [
   // never took effect and every delegate ran on the session model.
   "subagentProviders",
   "subagentModelKeys",
+  // Trusted extensions enabled for this session's project, as main decided them.
+  // The kernel has no JavaScript runner, so it cannot load one; what it needs is
+  // the signal that there is anything to ask the host about. Without the list it
+  // asked `extensions.session.describe` on every prompt — a round trip per turn
+  // for every session that has no extension at all, and a 60 s stall whenever the
+  // host did not answer it (which every fake host in the kernel's own tests does).
+  "trustedExtensions",
 ] as const;
 
 /**
@@ -117,7 +124,6 @@ export const KNOWN_UNSUPPORTED_PROMPT_PARAMS = [
   "projectMemory",
   "permissionMode",
   "streamRules",
-  "trustedExtensions",
   "remoteWorkspace",
   "infiniteProviderRetry",
   "sessionMessage",

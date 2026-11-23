@@ -1,5 +1,10 @@
 import { createLspDefinitionTool, createLspDiagnosticsTool, createLspReferencesTool } from "../lsp/tools.ts";
-import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-workspace/shared";
+import {
+  IPC,
+  type AgentEventEnvelope,
+  type TrustedExtensionSpec,
+  type UiMessage,
+} from "@pi-workspace/shared";
 import {
   findSubagentProviderSource,
   modelConfigWithBinding,
@@ -459,7 +464,55 @@ export function createSidecarRuntime({
     // Request auth for a vendor account (ADR 0098). The sidecar names a provider
   // row it was launched with; main resolves that row's account and returns a
   // short-lived `ModelAuth`. The refresh token never crosses this boundary.
+  /**
+   * Extensions trusted for one session's project, in the shape the loader takes.
+   *
+   * The same filter and the same fields main hands the sidecar in
+   * `session-launch`: a plugin that is not enabled for this project is in neither
+   * set, so which host runs a hook or an extension tool never widens what may
+   * run. The trust decision stays here; the bridge only loads what it is handed.
+   */
+  const trustedExtensionSpecs = (sessionId: string): TrustedExtensionSpec[] =>
+    plugins
+      .getAgentExtensions()
+      .filter((extension) =>
+        pluginActiveInProject(extension.pluginId, sessionProjects.get(sessionId) ?? null),
+      )
+      .map((extension) => ({
+        id: extension.id,
+        entry: extension.entry,
+        label: extension.pluginName,
+        source: "plugin" as const,
+        root: extension.root,
+      }));
+
   s.setTrustedExtensionBridge({
+    describe: (params) => {
+      const sessionId = String(params.sessionId ?? "");
+      return agentExtensions.describe({ sessionId, specs: trustedExtensionSpecs(sessionId) });
+    },
+    emitHook: (params) => {
+      const sessionId = String(params.sessionId ?? "");
+      const payload = params.payload;
+      return agentExtensions.emitHook({
+        sessionId,
+        specs: trustedExtensionSpecs(sessionId),
+        event: String(params.event ?? ""),
+        payload: payload && typeof payload === "object" && !Array.isArray(payload)
+          ? (payload as Record<string, unknown>)
+          : {},
+      });
+    },
+    executeExtensionTool: (params) => {
+      const sessionId = String(params.sessionId ?? "");
+      return agentExtensions.executeExtensionTool({
+        sessionId,
+        specs: trustedExtensionSpecs(sessionId),
+        toolName: String(params.toolName ?? ""),
+        toolCallId: String(params.toolCallId ?? ""),
+        args: params.args,
+      });
+    },
     publishCommands: (params) =>
       agentExtensions.publishCommands(
         String(params.sessionId ?? ""),

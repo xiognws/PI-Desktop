@@ -44,6 +44,7 @@ pub mod error;
 pub mod event;
 pub mod exec;
 pub mod exec_policy;
+pub mod extensions;
 pub mod hooks;
 pub mod host_bridge;
 pub mod journal;

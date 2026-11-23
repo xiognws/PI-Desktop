@@ -28,7 +28,12 @@ import {
   IMPORTED_PLUGIN_MAIN,
   IMPORTED_PLUGIN_WRAPPER_SOURCE,
 } from "./imported-plugin-wrapper";
-import { discoverManualPath, type TrustedExtensionBridge } from "@pi-workspace/agent-runtime";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import {
+  discoverManualPath,
+  type TrustedExtensionBridge,
+  type TrustedExtensionEventName,
+} from "@pi-workspace/agent-runtime";
 export { defaultDependencyRunner, installExtensionDependencies } from "./npm-installer";
 export type { DependencyCommandRunner, ExtensionDependencyInstallResult } from "./npm-installer";
 import {
@@ -71,13 +76,48 @@ export type AgentExtensionBridgeOptions = {
   runnerFactory?: ExtensionCommandRunnerFactory;
 };
 
-/** The slice of `TrustedExtensionRunner` main needs to run one command. */
+/**
+ * The slice of `TrustedExtensionRunner` main needs while it is the only
+ * JavaScript host a session has: run one command, answer one hook, run one
+ * extension tool.
+ *
+ * Everything past `dispose` is optional so a test double can stand in for the
+ * shipped Runner; a member that is absent means "this session has no handler
+ * for it", which is exactly what an empty extension set behaves like.
+ */
 export type ExtensionCommandRunner = {
   load(): Promise<unknown>;
   runCommand(name: string, args: string): Promise<boolean>;
   dispose(): Promise<void>;
   /** Load reports, published beside diagnostics the way the sidecar does. */
   getLoadReports?(): TrustedExtensionLoadReport[];
+  /** Tools the loaded modules registered (`TrustedExtensionRunner.getAgentTools`). */
+  getAgentTools?(): AgentTool[];
+  /** One hook event, folded by the runner the way the Node runtime folds it. */
+  emit?<R = unknown>(
+    event: TrustedExtensionEventName,
+    payload: Record<string, unknown>,
+    fold?: (acc: R | undefined, next: R) => R,
+  ): Promise<R | undefined>;
+  emitBeforeAgentStart?(prompt: string, systemPrompt: string): Promise<string | undefined>;
+  emitBeforeProviderRequest?(payload: unknown): Promise<unknown>;
+};
+
+/** One extension-registered agent tool, as the kernel needs to declare it. */
+export type ExtensionToolSpec = {
+  name: string;
+  description: string;
+  parameters: unknown;
+};
+
+/**
+ * What one session's extensions registered, for a host that must declare their
+ * tools before the model can ask for one.
+ */
+export type ExtensionSessionDescription = {
+  /** Events with at least one handler, so the kernel can skip the rest. */
+  events: string[];
+  tools: ExtensionToolSpec[];
 };
 
 export type ExtensionCommandRunnerFactory = (options: {
@@ -185,17 +225,182 @@ export class AgentExtensionBridge {
       // Nothing is trusted for this session any more: a runner from an earlier
       // trusted set must not stay loaded, or disabling a plugin would not stop
       // its commands in a session that had already run one.
-      this.disposeCommandRunner(sessionId);
+      this.disposeSessionRunner(sessionId);
       return { handled: false };
     }
-    const runner = await this.commandRunner(sessionId, specs);
+    const runner = await this.sessionRunner(sessionId, specs);
     return { handled: await runner.runCommand(name, String(input.args ?? "")) };
   }
 
   clearSession(sessionId: string): void {
     this.cancelPrompts(sessionId);
-    this.disposeCommandRunner(sessionId);
+    this.disposeSessionRunner(sessionId);
     if (this.sessions.delete(sessionId)) this.options.onChanged();
+  }
+
+  // --- hooks and tools run by main --------------------------------------------
+
+  /**
+   * What this session's extensions registered.
+   *
+   * Loading the modules here is what fires `session_start`, at the same point in
+   * the turn the Node runtime loads its Runner — before the first
+   * `before_agent_start` and before any request. The answer is the two things a
+   * host without a JavaScript runner cannot work out for itself: which hook
+   * events have handlers, and which agent tools the modules declared.
+   *
+   * An empty trusted set answers empty and loads nothing: a session with no
+   * extension must not pay for a loader, and nothing may be cached from a set
+   * the user has since disabled.
+   */
+  async describe(input: {
+    sessionId: string;
+    specs: TrustedExtensionSpec[];
+  }): Promise<ExtensionSessionDescription> {
+    const sessionId = String(input?.sessionId ?? "").trim();
+    const specs = input?.specs ?? [];
+    if (!sessionId || specs.length === 0) return { events: [], tools: [] };
+    const runner = await this.sessionRunner(sessionId, specs);
+    const events = new Set<string>();
+    for (const report of runner.getLoadReports?.() ?? []) {
+      for (const event of report.eventNames ?? []) events.add(event);
+    }
+    const tools = (runner.getAgentTools?.() ?? []).map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters ?? { type: "object", properties: {} },
+    }));
+    return { events: [...events].sort(), tools };
+  }
+
+  /**
+   * Run one hook event through the session's Runner.
+   *
+   * The folds below are the ones `packages/agent-runtime/src/runtime.ts` uses at
+   * each emission site, copied rather than re-invented: a hook that chains
+   * (`before_agent_start`, `before_provider_request`) sees the previous handler's
+   * answer, and a hook that accumulates (`tool_call`, `tool_result`) keeps what
+   * earlier handlers said. `runner.emit` already isolates a result event's payload
+   * per handler and records a throwing or stalled handler as a diagnostic.
+   */
+  async emitHook(input: {
+    sessionId: string;
+    specs: TrustedExtensionSpec[];
+    event: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ result: unknown }> {
+    const sessionId = String(input?.sessionId ?? "").trim();
+    const specs = input?.specs ?? [];
+    const payload = input?.payload ?? {};
+    if (!sessionId || specs.length === 0) return { result: null };
+    const runner = await this.sessionRunner(sessionId, specs);
+    switch (input.event) {
+      case "before_agent_start": {
+        const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
+        const systemPrompt = typeof payload.systemPrompt === "string" ? payload.systemPrompt : "";
+        const replaced = await runner.emitBeforeAgentStart?.(prompt, systemPrompt);
+        return { result: typeof replaced === "string" ? { systemPrompt: replaced } : null };
+      }
+      case "before_provider_request": {
+        const replaced = await runner.emitBeforeProviderRequest?.(payload.payload);
+        return { result: replaced === undefined ? null : replaced };
+      }
+      case "before_provider_headers": {
+        // Handlers edit the headers object in place, as they do in the pi CLI.
+        const headers: Record<string, string> = {};
+        const source = payload.headers;
+        if (source && typeof source === "object" && !Array.isArray(source)) {
+          for (const [name, value] of Object.entries(source)) {
+            if (typeof value === "string") headers[name] = value;
+          }
+        }
+        await runner.emit?.("before_provider_headers", { type: "before_provider_headers", headers });
+        return { result: { headers } };
+      }
+      case "context": {
+        const result = await runner.emit?.<{ messages?: unknown }>(
+          "context",
+          payload,
+          (_acc, next) => next,
+        );
+        return { result: result && typeof result === "object" ? result : null };
+      }
+      case "tool_call": {
+        const result = await runner.emit?.<{ block?: boolean; reason?: string }>(
+          "tool_call",
+          payload,
+          (acc, next) => (acc?.block ? acc : next),
+        );
+        return { result: result ?? null };
+      }
+      case "tool_result": {
+        const result = await runner.emit?.<Record<string, unknown>>(
+          "tool_result",
+          payload,
+          (acc, next) => ({ ...(acc ?? {}), ...next }),
+        );
+        return { result: result ?? null };
+      }
+      default: {
+        await runner.emit?.(input.event as TrustedExtensionEventName, payload);
+        return { result: null };
+      }
+    }
+  }
+
+  /**
+   * Run one extension-registered agent tool.
+   *
+   * The declaration reached the kernel from {@link describe}; the call comes back
+   * here because the module that implements it runs in this process. A model that
+   * calls a name no loaded module registered gets an error result rather than a
+   * silent success — the kernel would otherwise record "ok" for work nobody did.
+   */
+  async executeExtensionTool(input: {
+    sessionId: string;
+    specs: TrustedExtensionSpec[];
+    toolName: string;
+    toolCallId: string;
+    args: unknown;
+  }): Promise<{ ok: boolean; content: unknown; isError?: boolean; errorCode?: string }> {
+    const sessionId = String(input?.sessionId ?? "").trim();
+    const specs = input?.specs ?? [];
+    const toolName = String(input?.toolName ?? "").trim();
+    if (!sessionId || !toolName) {
+      return { ok: false, isError: true, errorCode: ErrorCodes.INVALID_ARGUMENT, content: "session and tool name required" };
+    }
+    if (specs.length === 0) {
+      return {
+        ok: false,
+        isError: true,
+        errorCode: ErrorCodes.NOT_FOUND,
+        content: `extension tool "${toolName}" is not registered in this session`,
+      };
+    }
+    const runner = await this.sessionRunner(sessionId, specs);
+    const tool = (runner.getAgentTools?.() ?? []).find((candidate) => candidate.name === toolName);
+    if (!tool) return unknownExtensionTool(toolName);
+    try {
+      // Four arguments is the whole callback the Runner's own `execute` closure
+      // takes: it supplies the extension context itself, so passing one here
+      // would be a second, competing context.
+      const result = await tool.execute(
+        String(input.toolCallId ?? ""),
+        input.args ?? {},
+        undefined,
+        undefined,
+      );
+      return { ok: true, content: extensionToolText(result?.content) };
+    } catch (error) {
+      // A throwing handler is a tool error the model reads, not a failed call:
+      // the same answer `TrustedExtensionRunner` gives a command handler.
+      return {
+        ok: false,
+        isError: true,
+        errorCode: ErrorCodes.TOOL_FAILED ?? "TOOL_FAILED",
+        content: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   /**
@@ -369,8 +574,13 @@ export class AgentExtensionBridge {
   /**
    * The Runner for one session, rebuilt when the trusted set changes — the same
    * rule the sidecar applies, where the set is part of the runtime match.
+   *
+   * One Runner per session serves commands, hooks and extension tools. Sharing it
+   * is not an optimisation: module-level state is shared between Runners in one
+   * pi process, so a second instance would give an extension two copies of
+   * itself and fire `session_start` twice.
    */
-  private commandRunner(sessionId: string, specs: TrustedExtensionSpec[]): Promise<ExtensionCommandRunner> {
+  private sessionRunner(sessionId: string, specs: TrustedExtensionSpec[]): Promise<ExtensionCommandRunner> {
     const key = specs.map((spec) => `${spec.id}\0${spec.entry}`).sort().join("\n");
     const cached = this.commandRunners.get(sessionId);
     if (cached?.key === key) return cached.ready;
@@ -391,7 +601,7 @@ export class AgentExtensionBridge {
     return ready;
   }
 
-  private disposeCommandRunner(sessionId: string): void {
+  private disposeSessionRunner(sessionId: string): void {
     const cached = this.commandRunners.get(sessionId);
     if (!cached) return;
     this.commandRunners.delete(sessionId);
@@ -472,6 +682,39 @@ export class AgentExtensionBridge {
   }
 }
 
+
+
+/** One extension tool's declared content as the single text the kernel stores. */
+function extensionToolText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) {
+    return content === undefined || content === null ? "" : JSON.stringify(content);
+  }
+  const text = content
+    .map((block) =>
+      block && typeof block === "object" && (block as { type?: unknown }).type === "text"
+        ? String((block as { text?: unknown }).text ?? "")
+        : "",
+    )
+    .join("");
+  // A result made only of non-text blocks still has to say something: the kernel's
+  // tool row is text, and an empty one would look like a tool that did nothing.
+  return text.length > 0 ? text : JSON.stringify(content);
+}
+
+function unknownExtensionTool(toolName: string): {
+  ok: boolean;
+  content: unknown;
+  isError?: boolean;
+  errorCode?: string;
+} {
+  return {
+    ok: false,
+    isError: true,
+    errorCode: ErrorCodes.NOT_FOUND,
+    content: `extension tool "${toolName}" is not registered in this session`,
+  };
+}
 
 const NPM_LOCKFILE_NAMES = ["package-lock.json", "npm-shrinkwrap.json"] as const;
 

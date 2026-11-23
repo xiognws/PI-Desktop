@@ -113,6 +113,14 @@ const HOST_PROXY_ALLOWED = new Set([
   "extensions.ui.request",
   "extensions.diagnostics.publish",
   "extensions.model.configure",
+  // The hook surface of the same extension set, asked of the host because the
+  // kernel has no JavaScript runner: `describe` names the events with handlers
+  // and the agent tools the modules registered, `hooks.emit` runs one event
+  // through the same `TrustedExtensionRunner` the Node path uses, and
+  // `tools.execute` runs one extension tool in the module that declared it.
+  "extensions.session.describe",
+  "extensions.hooks.emit",
+  "extensions.tools.execute",
   "session.rename",
   "session.create",
   "session.fork",
@@ -129,6 +137,18 @@ export type TrustedExtensionSidecarBridge = {
   /** `sendUserMessage`: the Host-owned queue drains it (D386); host-core alone would only store it. */
   queuePush: (params: Record<string, unknown>) => Promise<unknown>;
   queuePrioritize: (params: Record<string, unknown>) => Promise<unknown>;
+  /**
+   * What this session's extensions registered: `{ events, tools }`.
+   *
+   * The kernel asks once per prompt so it can skip every hook that has no
+   * handler — Node's `runner.hasHandlers(event)` — and declare the agent tools
+   * the modules registered.
+   */
+  describe: (params: Record<string, unknown>) => Promise<unknown>;
+  /** Run one hook event; the answer is the folded result Node's fold would produce. */
+  emitHook: (params: Record<string, unknown>) => Promise<unknown>;
+  /** Run one extension-registered agent tool, in the module that declared it. */
+  executeExtensionTool: (params: Record<string, unknown>) => Promise<unknown>;
 };
 
 /** The host-core transport as the sidecar proxy sees it. `HostProcess` satisfies it. */
@@ -575,6 +595,9 @@ export class AgentSidecar {
           else if (method === "extensions.model.configure") result = await bridge.configureModel(params);
           else if (method === "session.queuePush") result = await bridge.queuePush(params);
           else if (method === "session.queuePrioritize") result = await bridge.queuePrioritize(params);
+          else if (method === "extensions.session.describe") result = await bridge.describe(params);
+          else if (method === "extensions.hooks.emit") result = await bridge.emitHook(params);
+          else if (method === "extensions.tools.execute") result = await bridge.executeExtensionTool(params);
           else result = await bridge.requestUi(params);
           this.writeToChild(
             JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
