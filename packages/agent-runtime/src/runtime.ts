@@ -54,6 +54,7 @@ import {
   accrueReviewToolCalls,
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
   REVIEW_DEFAULT_MIN_TOOL_CALLS,
+  REVIEW_MEMORY_BLOCK,
   SKILL_REVIEW_DEFINITION,
   SKILL_REVIEW_NO_LOOK_RETRY,
   SKILL_REVIEW_PROMPT,
@@ -62,6 +63,7 @@ import {
   canReview,
   dedupeSkillLoads,
   describeReviewAction,
+  reviewHistoryTail,
   reviewToolsFrom,
 } from "./skill-review-run.js";
 import { createJevClassifierTool } from "./jev-classifier-tool.js";
@@ -2775,11 +2777,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
               sessionId: this.sessionId,
             }),
           ]),
-      // The same gap one layer down: `memory` is deferred, so the fork only had it
-      // when the turn happened to activate it. A pass that learns a preference —
-      // the case the review prompt calls a first-class signal — could not write it
-      // anywhere, which is the memory half of the loop going quiet.
-
     ]);
     // A fork without `skill_manage` and `Skill` would pay a full completion and
     // could not land a single change.
@@ -2815,12 +2812,17 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           definition: SKILL_REVIEW_DEFINITION,
           sessionId: this.sessionId,
           parentToolCallId: "skill-review",
-          task: SKILL_REVIEW_PROMPT + (attempt === 1 ? "" : `\n\n${SKILL_REVIEW_NO_LOOK_RETRY}`),
+          task:
+            SKILL_REVIEW_PROMPT +
+            REVIEW_MEMORY_BLOCK +
+            (attempt === 1 ? "" : `\n\n${SKILL_REVIEW_NO_LOOK_RETRY}`),
           systemPrompt: SKILL_REVIEW_TOOL_NOTE,
           tools: reviewTools,
           provider: this.provider,
           thinkingLevel: "off",
-          initialMessages: [...this.agent.state.messages],
+          // The whole session used to travel, which overflowed the window exactly
+          // on the long sessions that carry the most to review.
+          initialMessages: reviewHistoryTail(this.agent.state.messages),
           onEvent: (envelope) => collector.record(envelope.event),
           signal: controller.signal,
         });

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   REVIEW_MAX_ITERATIONS,
+  REVIEW_MAX_HISTORY_CHARS,
+  REVIEW_MEMORY_BLOCK,
   REVIEW_READONLY_TOOLS,
   REVIEW_TOOL_ALLOWLIST,
   SKILL_REVIEW_NO_LOOK_RETRY,
@@ -10,6 +12,7 @@ import {
   REVIEW_DEFAULT_MIN_INTERVAL_SEC,
   REVIEW_DEFAULT_MIN_TOOL_CALLS,
   dedupeSkillLoads,
+  reviewHistoryTail,
   ReviewActionCollector,
   accrueReviewToolCalls,
   canReview,
@@ -61,6 +64,41 @@ describe("SKILL_REVIEW_PROMPT", () => {
     // `decision points` / `decision table` are prose; a JSON key is not.
     expect(SKILL_REVIEW_PROMPT).not.toContain('"decision"');
     expect(SKILL_REVIEW_PROMPT).not.toContain("Return ONLY JSON");
+  });
+});
+
+describe("the memory half of the review", () => {
+  it("travels with the skill instructions", () => {
+    // The fork already carried the `memory` tool; without this block it reviewed
+    // the skill library and dropped every lesson that is one sentence long.
+    const prompt = SKILL_REVIEW_PROMPT + REVIEW_MEMORY_BLOCK;
+    expect(prompt).toContain("belongs in memory");
+    expect(prompt).toContain("`remember`");
+    expect(prompt).toContain("Nothing to save");
+  });
+
+  it("keeps the end of a long session and always keeps the newest message", () => {
+    const big = "x".repeat(REVIEW_MAX_HISTORY_CHARS / 2);
+    const messages = [
+      { role: "system", content: "be brief" },
+      { role: "user", content: `oldest ${big}` },
+      { role: "user", content: "old turn" },
+      { role: "user", content: `recent ${big}` },
+      { role: "user", content: "the work being reviewed" },
+    ];
+
+    const kept = reviewHistoryTail(messages);
+
+    expect(kept.map((message) => message.content)).not.toContain("be brief");
+    expect(kept.at(-1)?.content).toBe("the work being reviewed");
+    expect(kept.some((message) => String(message.content).startsWith("oldest "))).toBe(false);
+  });
+
+  it("sends an oversized newest message anyway", () => {
+    const huge = "y".repeat(REVIEW_MAX_HISTORY_CHARS + 1_000);
+    const kept = reviewHistoryTail([{ role: "user", content: huge }]);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.content).toBe(huge);
   });
 });
 

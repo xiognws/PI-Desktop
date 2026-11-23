@@ -48,6 +48,24 @@ pub const SKILL_REVIEW_NO_LOOK_RETRY: &str = "You answered without calling any t
 /// The review's own user turn. Verbatim from the reference implementation, with this app's tool names.
 pub const SKILL_REVIEW_PROMPT: &str = "Before anything else: look at the library. Call `Skill` with no arguments to list what exists, or `Grep` the skills directory for the topic of this session. Judging whether a lesson is already covered without reading it is the one failure this pass cannot detect from inside — so read first, then decide.\n\nReview the conversation above and update the skill library. Be ACTIVE — most sessions produce at least one skill update, even if small. A pass that does nothing is a missed learning opportunity, not a neutral outcome.\n\nTarget shape of the library: CLASS-LEVEL skills, each with a SKILL.md of always-on rules and a small `references/` set of topical depth. Not a flat list of narrow one-session skills, and not an umbrella hoarding a references/ file per session. This shapes HOW you update, not WHETHER you update.\n\nWhat a skill IS: the instructions for doing a class of task the most efficient and correct way, to THIS user's specifications — the procedure, the tools and commands that work, the order, the user's preferences for how the result should look, and the pitfalls that cost time. A future session should be able to follow it and produce what the user wants on the first try. Everything below is about writing that well:\n  • Procedure first: the steps in the order they are done, with the concrete commands, tool calls, and decision points. Lessons and pitfalls attach to the step they affect.\n  • A pitfall is a generalizable rule + one clause of WHY (the mechanism), imperative. 'Grep the test tree for the SYMBOL before widening a helper signature — hand-rolled mocks reimplement the old shape and fail on a shard you did not run.' Not a narrative of what happened this session.\n  • No PR/issue numbers, dates, ticket IDs, or quoted user text as content — the rule must stand without the incident behind it. Keep a short quote ONLY when the quote itself is the clearest statement of the rule.\n  • The same lesson learned twice is ONE rule. Before adding, search the skill (and its references/) for the rule already stated; strengthen or clarify it rather than appending a second copy.\n  • Not a duplicate of what the environment already teaches: repo AGENTS.md files, tool schema descriptions, and other always-loaded context. A skill carries the WORKFLOW and the pitfalls; it does not restate the codebase map or a tool's parameter list.\n  • Always-on rules (standing user preferences, gates that apply to every instance of the task) live in SKILL.md itself, whole. references/ is for depth that is only needed sometimes: a decision table, a recipe, a domain note — each file topical and reusable, never '<date>-<incident>.md'. Prefer extending an existing references/ file over creating one; a skill with dozens of one-off references is the failure shape, not the goal.\n  • Fix the skill in place when it is wrong: edit the sentence that misled, do not append 'UPDATE: actually...' underneath it.\n\nDo not capture these — they become persistent self-imposed constraints that bite later when the environment changes:\n  • Environment-dependent failures: missing binaries, fresh-install errors, post-migration path mismatches, 'command not found', unconfigured credentials, uninstalled packages. The user can fix these — they are not durable rules.\n  • Negative claims about tools or features ('browser tools do not work', 'X tool is broken', 'cannot use Y from execute_code'). These harden into refusals the agent cites against itself for months after the actual problem was fixed.\n  • Session-specific transient errors that resolved before the conversation ended. If retrying worked, the lesson is the retry pattern, not the original failure.\n  • One-off task narratives. A user asking 'summarize today's market' or 'analyze this PR' is not a class of work that warrants a skill.\n  • Unresolved failures: if the session ended WITHOUT actually finding a working method — you tried several things, none worked, and told the user to check manually — do NOT write those attempts up as a 'reliable workflow' or 'recommended approach'. That presents an untested sequence of failures as validated guidance a future session will trust and repeat. Either say 'Nothing to save', or, only if you are independently confident of a real working alternative (not something you are merely guessing might work), capture ONLY that alternative — never the dead ends, and never dressed up as best practice.\n\nIf a tool failed because of setup state, capture the FIX (install command, config step, env var to set) under an existing setup or troubleshooting skill — never 'this tool does not work' as a standalone constraint.\n\nSignals to look for (any one of these warrants action):\n  • User corrected your style, tone, format, legibility, or verbosity. Frustration signals like 'stop doing X', 'this is too verbose', 'don't format like this', 'why are you explaining', 'just give me the answer', 'you always do Y and I hate it', or an explicit 'remember this' are FIRST-CLASS skill signals, not just memory signals. Update the relevant skill(s) to embed the preference so the next session starts already knowing.\n  • User corrected your workflow, approach, or sequence of steps. Encode the correction as a pitfall or explicit step in the skill that governs that class of task.\n  • Non-trivial technique, fix, workaround, debugging path, or tool-usage pattern emerged that a future session would benefit from. Capture it.\n  • A skill that got loaded or consulted this session turned out to be wrong, missing a step, or outdated. Patch it NOW.\n\nPreference order — prefer the earliest action that fits, but do pick one when a signal above fired:\n  1. UPDATE A CURRENTLY-LOADED SKILL. Look back through the conversation for skills the user loaded or you read with `Skill`. If any of them covers the territory of the new learning, PATCH that one first — re-load it with `Skill` during this review first. It is the skill that was in play, so it is the right one to extend: hand-written, installed, bundled and pinned skills are all yours to improve.\n  2. UPDATE AN EXISTING UMBRELLA (list the library, then `Skill` the candidate). If no loaded skill fits but an existing class-level skill does, patch it. Add a subsection, a pitfall, or broaden a trigger.\n\nFinish by saying what you changed, in one line per action. If the library genuinely needs nothing, say 'Nothing to save.'";
 
+/// What the review also considers for durable memory.
+///
+/// Skills and memory are different stores and each fact belongs to exactly one:
+/// a procedure is a skill, a single fact or preference is a memory. The review
+/// was skill-only, so the lessons that are one sentence long — a correction, a
+/// standing preference, an environment fact — were reviewed and then dropped.
+pub const REVIEW_MEMORY_BLOCK: &str = r#"
+
+Then decide whether anything belongs in memory instead of, or in addition to, a skill. They are different stores and one fact goes to exactly one of them:
+  • A procedure — steps still true next month — is a skill. The `memory` tool refuses a step-like body on purpose; do not fight it.
+  • Memory is a single fact, preference, decision or pitfall that applies beyond this one task.
+Store it with `memory` action `remember`, choosing:
+  • kind — `fact` (how this environment is), `preference` (how this user wants things done), `decision` (a choice and its reason), `pitfall` (a trap that cost time).
+  • scope — `global` for this machine and this user, `project` for this repository, `session` for what is only true for this conversation.
+Search before writing (`memory` action `search`): a near-duplicate that restates an existing note is worse than no note, because recall then spends a slot on both. Correct a note that is wrong with `update`; retract one that is no longer true with `forget`.
+Do not store what the conversation already shows and the repository already says: file contents, command output, or a restatement of an AGENTS.md rule.
+Finish by saying what you changed, in one line per action. If neither the library nor memory needs anything, say 'Nothing to save.'"#;
+
 /// The review policy a session launches with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SkillReviewPolicy {
@@ -466,19 +484,51 @@ impl ReviewNotice {
     }
 }
 
+/// Characters of session history the review fork may read.
+///
+/// The review used to receive the whole transcript. A long session then
+/// overflowed the model's window, so the fork became a failed request that
+/// reported nothing — the pass that mattered most was the one that silently
+/// never ran. The budget keeps the END of the conversation, which is the work
+/// being reviewed, and drops the oldest turns.
+pub const REVIEW_MAX_HISTORY_CHARS: usize = 120_000;
+
 /// The transcript the fork starts from: the session's own turns, then its prompt.
 ///
 /// The review reads the conversation; giving it the history is what lets it judge
 /// whether a lesson was already visible in the work. The system prompt is left to
 /// the fork's own composition.
 pub fn review_transcript(history: &[Message]) -> Vec<Message> {
-    let mut messages: Vec<Message> = history
+    let mut messages = history_budget(history);
+    // Skill instructions and memory instructions arrive as one user turn: the
+    // review decides between the two stores in a single pass, and a second pass
+    // would cost another fork.
+    messages.push(Message::user_text(format!(
+        "{SKILL_REVIEW_PROMPT}{REVIEW_MEMORY_BLOCK}"
+    )));
+    messages
+}
+
+/// The tail of the session that fits the review's input budget, newest last.
+fn history_budget(history: &[Message]) -> Vec<Message> {
+    let mut budget = REVIEW_MAX_HISTORY_CHARS;
+    let mut kept: Vec<Message> = Vec::new();
+    for message in history
         .iter()
         .filter(|message| message.role != crate::message::Role::System)
-        .cloned()
-        .collect();
-    messages.push(Message::user_text(SKILL_REVIEW_PROMPT));
-    messages
+        .rev()
+    {
+        let cost = message.text().chars().count();
+        // The newest turn always travels, whatever its size: a review that cannot
+        // see the answer has nothing to judge.
+        if cost > budget && !kept.is_empty() {
+            break;
+        }
+        budget = budget.saturating_sub(cost);
+        kept.push(message.clone());
+    }
+    kept.reverse();
+    kept
 }
 
 /// The event a finished review emits.
@@ -699,6 +749,44 @@ mod tests {
             .iter()
             .all(|message| message.role != crate::message::Role::System));
         assert_eq!(transcript.len(), 2, "the user turn plus the review prompt");
-        assert_eq!(transcript[1].text(), SKILL_REVIEW_PROMPT);
+        assert!(
+            transcript[1].text().starts_with(SKILL_REVIEW_PROMPT),
+            "the skill instructions still lead"
+        );
+        assert!(
+            transcript[1].text().contains("belongs in memory"),
+            "and the memory instructions travel with them"
+        );
+    }
+
+    #[test]
+    fn a_long_session_is_reviewed_from_its_end() {
+        let big = |tag: &str| format!("{tag}{}", "x".repeat(REVIEW_MAX_HISTORY_CHARS / 2));
+        let history = vec![
+            Message::user_text(&big("oldest ")),
+            Message::user_text("old turn"),
+            Message::user_text(&big("recent ")),
+            Message::user_text("the work being reviewed"),
+        ];
+        let transcript = review_transcript(&history);
+        let texts: Vec<String> = transcript.iter().map(|message| message.text()).collect();
+        assert!(
+            texts.iter().any(|text| text == "the work being reviewed"),
+            "the newest turn always travels"
+        );
+        assert!(
+            !texts.iter().any(|text| text.starts_with("oldest ")),
+            "the oldest turn is dropped once the budget is spent: kept {} of {} turns",
+            texts.len(),
+            history.len() + 1
+        );
+    }
+
+    #[test]
+    fn an_oversized_newest_turn_still_travels() {
+        let huge = "y".repeat(REVIEW_MAX_HISTORY_CHARS + 1_000);
+        let transcript = review_transcript(&[Message::user_text(&huge)]);
+        assert_eq!(transcript.len(), 2, "the oversized turn and the prompt");
+        assert!(transcript[0].text().starts_with('y'));
     }
 }

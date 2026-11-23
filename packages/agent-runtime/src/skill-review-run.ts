@@ -192,6 +192,71 @@ Before you answer, check one thing: did this session contain a complete reusable
 
 'Nothing to save.' is a real option but should NOT be the default. If the session ran smoothly with no corrections and produced no new technique, just say 'Nothing to save.' and stop. Otherwise, act.`;
 
+/**
+ * What the review also considers for durable memory.
+ *
+ * Skills and memory are different stores and each fact belongs to exactly one:
+ * a procedure is a skill, a single fact or preference is a memory. The fork
+ * already carried the `memory` tool, but the prompt never asked it to judge
+ * memory, so the one-line lessons were reviewed and dropped.
+ */
+export const REVIEW_MEMORY_BLOCK = `
+
+Then decide whether anything belongs in memory instead of, or in addition to, a skill. They are different stores and one fact goes to exactly one of them:
+  • A procedure — steps still true next month — is a skill. The \`memory\` tool refuses a step-like body on purpose; do not fight it.
+  • Memory is a single fact, preference, decision or pitfall that applies beyond this one task.
+Store it with \`memory\` action \`remember\`, choosing:
+  • kind — \`fact\` (how this environment is), \`preference\` (how this user wants things done), \`decision\` (a choice and its reason), \`pitfall\` (a trap that cost time).
+  • scope — \`global\` for this machine and this user, \`project\` for this repository, \`session\` for what is only true for this conversation.
+Search before writing (\`memory\` action \`search\`): a near-duplicate that restates an existing note is worse than no note, because recall then spends a slot on both. Correct a note that is wrong with \`update\`; retract one that is no longer true with \`forget\`.
+Do not store what the conversation already shows and the repository already says: file contents, command output, or a restatement of an AGENTS.md rule.
+Finish by saying what you changed, in one line per action. If neither the library nor memory needs anything, say 'Nothing to save.'`;
+
+/**
+ * Characters of session history the review fork may read.
+ *
+ * The fork used to receive every message. A long session then overflowed the
+ * model's window, so the pass became a failed request that reported nothing —
+ * and the longest sessions are the ones with the most to review.
+ */
+export const REVIEW_MAX_HISTORY_CHARS = 120_000;
+
+/** Characters one message contributes to the review's input budget. */
+function messageChars(message: { content?: unknown }): number {
+  const content = message.content;
+  if (typeof content === "string") return content.length;
+  if (!Array.isArray(content)) return 0;
+  let total = 0;
+  for (const part of content) {
+    if (part && typeof part === "object" && "text" in part && typeof part.text === "string") {
+      total += part.text.length;
+    }
+  }
+  return total;
+}
+
+/**
+ * The tail of the session that fits the review's input budget, newest last.
+ *
+ * The newest message always travels, whatever its size: a review that cannot see
+ * the answer has nothing to judge.
+ */
+export function reviewHistoryTail<T extends { role: string; content?: unknown }>(
+  messages: readonly T[],
+): T[] {
+  const kept: T[] = [];
+  let budget = REVIEW_MAX_HISTORY_CHARS;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role === "system") continue;
+    const cost = messageChars(message);
+    if (cost > budget && kept.length > 0) break;
+    budget -= cost;
+    kept.push(message);
+  }
+  return kept.reverse();
+}
+
 /** Appended by the caller so the model knows the ceiling before it plans. */
 export const SKILL_REVIEW_TOOL_NOTE =
   `You can only call ${REVIEW_SKILL_TOOLS.join(", ")}, ${REVIEW_MEMORY_TOOLS.join(", ")} and ` +
