@@ -1,0 +1,36 @@
+apps/desktop/electron/main/ipc/session-ipc.ts
+  h_201ed4c689ac8b 33-36,117,137,140,208-210,232-235,275,284-285,289-290,356-363,418
+apps/desktop/electron/main/ipc/widgets-ipc.ts
+  h_201ed4c689ac8b 6-12,23,78-107,109,113-116,128,135,145,155,186-188
+apps/desktop/electron/main/kernel/kernel-methods.ts
+  h_201ed4c689ac8b 30-42
+apps/desktop/electron/main/native-sessions.ts
+  h_201ed4c689ac8b 1-1102
+apps/desktop/electron/main/remote/workspace-file-scope.ts
+  h_201ed4c689ac8b 2,11-20,23,25
+apps/desktop/electron/main/widget-commands.ts
+  h_201ed4c689ac8b 1-217
+apps/desktop/test/kernel-methods.test.mjs
+  h_201ed4c689ac8b 18-23,37-72,74
+apps/desktop/test/native-pi-sessions.test.mjs
+  h_201ed4c689ac8b 222-260,264,273-275,277-280,299-300,305,317,320,330-331,335,339,347,367-370,374,378,389,399-400,404,458-459,461-462,470,474,478-479,481-482,487
+apps/desktop/test/native-sessions-store.test.mjs
+  h_201ed4c689ac8b 1-332
+apps/desktop/test/native-workspace-files.test.mjs
+  h_201ed4c689ac8b 2,4-23,26-54,56,58-61,64,66-69,71-74,77,79-85
+apps/desktop/test/widget-commands.test.mjs
+  h_201ed4c689ac8b 1-276
+apps/desktop/test/widgets-ipc-runtime.test.mjs
+  h_201ed4c689ac8b 1-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b8e4c1bd11d4572bf95ae7eb59d0a28cc6afd5fb",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
