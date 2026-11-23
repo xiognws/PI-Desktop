@@ -92,6 +92,9 @@ fn scripted() -> Value {
     json!({
         "kind": "scripted",
         "script": [
+            // The host tool is on demand (not core ⇒ deferred), so the model
+            // activates it before calling it.
+            { "toolCall": { "id": "call_0", "name": "ToolSearch", "arguments": { "query": "mode_probe" } } },
             { "toolCall": { "id": "call_1", "name": "mode_probe", "arguments": {} } },
             { "text": "done" }
         ]

@@ -359,3 +359,66 @@ async fn an_unactivated_on_demand_call_is_refused() {
     let requests = request_names(&provider.requests());
     assert!(!requests[1].contains(&"OfficeRead".to_string()));
 }
+
+/// A host-declared tool is on demand, not invisible.
+///
+/// The reference rule is "not core ⇒ deferred" over the whole catalog, so a
+/// plugin's tool starts deferred. What must still work is the path from there:
+/// `ToolSearch` finds it, activation declares it, and the next step's call
+/// reaches the host. Before this, host declarations were kept outside both
+/// lists — never declared, never searchable — and the model could not reach
+/// them at all.
+#[tokio::test]
+async fn a_host_declared_tool_is_activated_by_tool_search_and_then_reaches_the_host() {
+    let (sidecar, lines) = sidecar();
+    let response = call(
+        &sidecar,
+        1,
+        "agent.prompt",
+        json!({
+            "sessionId": "s1",
+            "turnId": "t1",
+            "content": "add 20 and 22",
+            "mode": "agent",
+            "tools": [{
+                "name": "fx_add",
+                "description": "Add two numbers.",
+                "parameters": { "type": "object", "properties": {} }
+            }],
+            "provider": {
+                "kind": "scripted",
+                "script": [
+                    { "toolCall": { "id": "call_search", "name": "ToolSearch", "arguments": { "query": "fx_add" } } },
+                    { "toolCall": { "id": "call_add", "name": "fx_add", "arguments": {} } },
+                    { "text": "done" }
+                ]
+            }
+        }),
+    )
+    .await;
+    assert!(response.get("error").is_none(), "got: {response}");
+    lines
+        .wait_for_event("agent_end", Duration::from_secs(10))
+        .await
+        .expect("the turn ends");
+
+    let events = lines.notifications("agent.event");
+    let end_of = |id: &str| {
+        events
+            .iter()
+            .find(|params| {
+                params["event"]["type"] == "tool_end"
+                    && params["event"]["toolCallId"].as_str() == Some(id)
+            })
+            .map(|params| params["event"].clone())
+    };
+    let search = end_of("call_search").expect("the ToolSearch call completes");
+    let said = search["result"]["content"].as_str().unwrap_or("");
+    assert!(
+        said.contains("Activated on-demand tools: fx_add"),
+        "ToolSearch did not find the host tool: {search}"
+    );
+    let added = end_of("call_add").expect("the host tool runs");
+    assert_eq!(added["result"]["content"], "tool output");
+    assert_eq!(added["isError"], Value::Null);
+}

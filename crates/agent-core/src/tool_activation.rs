@@ -154,14 +154,13 @@ pub fn core_tool_names(mode: &SessionMode) -> &'static [&'static str] {
     }
 }
 
-/// The names this kernel declares and is willing to leave on demand: the
-/// built-in declarations for `mode`.
+/// The names this kernel declares for `mode` — its own built-in catalog.
 ///
-/// Deliberately *not* every name in the catalog. A host tool that is declared
-/// with `tools` (a plugin action, an MCP server's tool) is the host's contract
-/// with main, and deferring it would break the composer's tool selection and the
-/// permission card the user is shown; a kernel tool outside this list is core by
-/// definition. What is left is exactly what this module owns and can measure.
+/// Not the deferral rule: since the catalog split became the reference's "not
+/// core ⇒ deferred", everything outside [`core_tool_names`] is on demand whether
+/// this module or the host declared it. What this function still answers is the
+/// narrower question "which on-demand tools does the kernel itself own", which is
+/// what the budget and the activation tests measure.
 pub fn deferrable_names(mode: &SessionMode) -> Vec<String> {
     crate::builtin_tools::declarations(mode.clone(), None)
         .iter()
@@ -211,13 +210,19 @@ pub struct ToolActivation {
 impl ToolActivation {
     /// Split a catalog into core and on-demand, for `mode`.
     ///
-    /// Node's rule is "not core ⇒ deferred" over its whole catalog, because that
-    /// runtime owns every tool in it. This kernel does not: main declares plugin
-    /// and MCP tools of its own, and hiding one of those would change what the
-    /// renderer's permission cards, the composer's tool selection and host-core's
-    /// own refusals are talking about. So only a tool **this kernel declares**
-    /// (see [`deferrable_names`]) can be deferred; anything the host declared is
-    /// always declared, and so is a core name.
+    /// The rule is the reference runtime's (`runtime.ts:5136`): **not core ⇒
+    /// deferred**, over the whole catalog, whatever declared it. This kernel used
+    /// to hesitate here — host-declared plugin and MCP tools were kept always
+    /// declared, on the theory that deferring them would change what the
+    /// renderer's permission cards and the composer's selection were talking
+    /// about. The effect was worse than the theory: a plugin tool was in no list
+    /// at all, so `ToolSearch` could not find it and the model could never use it
+    /// (measured by the trusted-extensions acceptance, which passes on the Node
+    /// runtime and failed here).
+    ///
+    /// A tool the composer selected explicitly is activated up front instead
+    /// (`agent.prompt` resolves `mcpToolNames` and adds the names to this
+    /// session's active set), so deferral never hides a tool the user asked for.
     ///
     /// [`TOOL_SEARCH_NAME`] itself is neither: it is declared by this module
     /// exactly when something is deferred.
@@ -227,19 +232,16 @@ impl ToolActivation {
         active: Arc<Mutex<BTreeSet<String>>>,
     ) -> Self {
         let core_names = core_tool_names(mode);
-        let deferrable = deferrable_names(mode);
         let mut core = Vec::new();
         let mut deferred = Vec::new();
         for spec in specs {
             if spec.name == TOOL_SEARCH_NAME {
                 continue;
             }
-            let deferred_here = deferrable.iter().any(|name| name == &spec.name)
-                && !core_names.contains(&spec.name.as_str());
-            if deferred_here {
-                deferred.push(spec);
-            } else {
+            if core_names.contains(&spec.name.as_str()) {
                 core.push(spec);
+            } else {
+                deferred.push(spec);
             }
         }
         core.sort_by(|left, right| left.name.cmp(&right.name));
@@ -732,7 +734,11 @@ mod tests {
     /// tool the model was never offered, so only the kernel's own built-ins can
     /// be deferred.
     #[test]
-    fn a_host_declared_tool_is_always_declared() {
+    fn a_host_declared_tool_is_found_through_tool_search() {
+        // The reference rule is "not core ⇒ deferred", and it applies to what the
+        // host declares too. Keeping host tools always declared put a plugin tool
+        // in no list at all: `ToolSearch` could not resolve it, so the model could
+        // never reach it, which is how the trusted-extensions acceptance failed.
         let mut specs: Vec<ToolSpec> = builtin_tools::declarations(SessionMode::Agent, None)
             .iter()
             .map(|value| crate::host_bridge::tool_spec_from_value(value).expect("a declaration"))
@@ -747,12 +753,18 @@ mod tests {
             specs,
             ToolActivation::empty_active(),
         );
+        // Deferred, so not declared up front and refused until activated...
+        assert!(!names(&activation.declared()).contains(&"plugin_alpha".to_string()));
+        assert!(activation.deferred_names().contains(&"plugin_alpha".to_string()));
+        assert!(activation.blocks("plugin_alpha"));
+        // ...but reachable: the catalog finds it and activation declares it.
+        assert!(activation.resolve("plugin_alpha").contains(&"plugin_alpha".to_string()));
+        activation.activate(&["plugin_alpha".to_string()]);
         assert!(names(&activation.declared()).contains(&"plugin_alpha".to_string()));
-        assert!(!activation.deferred_names().contains(&"plugin_alpha".to_string()));
         assert!(!activation.blocks("plugin_alpha"));
-        // The kernel's own big schemas are still deferred, so the rule did not
-        // simply turn the split off.
-        assert!(activation.deferred_names().contains(&"OfficeWrite".to_string()));
+        // A core tool is still declared without asking, so the split did not simply
+        // turn into "everything is on demand".
+        assert!(names(&activation.declared()).contains(&"Read".to_string()));
     }
 
     /// A widget description still finds its tool: the whole point of accepting a

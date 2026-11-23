@@ -86,6 +86,11 @@ fn prompt_params() -> Value {
         "provider": {
             "kind": "scripted",
             "script": [
+                // The host tool is on demand now (the reference's "not core =>
+                // deferred" rule applies to host declarations too), so the model
+                // activates it first. Activation is a kernel tool: it costs a
+                // step, not a host call.
+                { "toolCall": { "id": "call_0", "name": "ToolSearch", "arguments": { "query": "probe" } } },
                 { "toolCall": { "id": "call_1", "name": "probe", "arguments": {} } },
                 { "text": "this answer must never be requested" }
             ]

@@ -1241,6 +1241,7 @@ impl Sidecar {
         // those names authorize — resolved by exact identity, never by the shape
         // of a tool name — and a selection that cannot be honoured refuses the
         // prompt instead of quietly running without the tool.
+        let mut selected_tools: Vec<String> = Vec::new();
         if request.params.get("mcpServerIds").is_some()
             || request.params.get("mcpToolNames").is_some()
         {
@@ -1267,16 +1268,28 @@ impl Sidecar {
                 &available,
                 request.params.get("mcpToolNames"),
             ) {
-                Ok(names) => tracing::debug!(
-                    target: "agent_core::sidecar",
-                    count = names.len(),
-                    "mcp tools selected for this prompt"
-                ),
+                Ok(names) => {
+                    // The composer asked for these by name, so they stay callable
+                    // without a `ToolSearch`: a deferral must never hide a tool the
+                    // user selected, and the model has no way to know it was meant
+                    // to look for it.
+                    selected_tools = names.clone();
+                    tracing::debug!(
+                        target: "agent_core::sidecar",
+                        count = names.len(),
+                        "mcp tools selected for this prompt"
+                    );
+                }
                 Err(error) => return Err(RpcError::app(error.code(), error.message())),
             }
         }
 
         let session = self.session(&session_id)?;
+        if !selected_tools.is_empty() {
+            if let Ok(mut active) = session.active_tools.lock() {
+                active.extend(selected_tools.iter().cloned());
+            }
+        }
         // One turn at a time, per session: the flag is the admission gate.
         if session.running.swap(true, Ordering::SeqCst) {
             return Err(RpcError::app(
