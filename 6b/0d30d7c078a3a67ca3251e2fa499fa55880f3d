@@ -1,0 +1,16 @@
+scripts/e2e-three-column-layout.mjs
+  h_201ed4c689ac8b 311-319,564,938-946,1843-1847,2016-2017,2021-2025
+scripts/e2e/sidebar-row-states.mjs
+  h_201ed4c689ac8b 324,327,329
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6b0d30d7c078a3a67ca3251e2fa499fa55880f3d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
