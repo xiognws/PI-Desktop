@@ -34,6 +34,7 @@ import {
 } from "@pi-workspace/agent-runtime";
 import { builtinSkills, effectiveDisabledBuiltinSkills, VISUALIZE_SKILL_ID } from "../builtin-skills";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
+import { kernelRuntimeRequested } from "../agent-sidecar-launch";
 import {
   catalogModelConfigFor,
   type ModelsDevCatalog,
@@ -387,6 +388,26 @@ export function createSessionLaunchRuntime({
         errorCode: ErrorCodes.PROVIDER_SECRET_MISSING,
       });
     }
+    // A vendor account has no stored secret: the Node runtime asks the host for a
+    // short-lived token per request (`provider.resolveAuth`), and the kernel has no
+    // such call — so a kernel session launched with no credential and refused every
+    // turn with KERNEL_PROMPT_INVALID. Resolve the same token here, through the same
+    // store lock and refresh path, and hand it over with the launch. The Node path
+    // keeps resolving for itself: a token minted at launch would go stale inside a
+    // long turn, and that runtime already knows how to refresh.
+    const vendorAuth =
+      isVendorAccount && kernelRuntimeRequested()
+        ? await vendorOAuth.resolveAuth(provider.id).catch((error: unknown) => {
+            logger.app("session", "warn", "vendor auth could not be resolved for the kernel launch", {
+              code: "PROVIDER_AUTH_UNRESOLVED",
+              data: {
+                providerId: provider.id,
+                error: error instanceof Error ? error.message : String(error),
+              },
+            });
+            return undefined;
+          })
+        : undefined;
     const modelId = isExtensionAgent
       ? overrides.modelId ?? session.modelId
       : (provider.id === requestedProviderId
@@ -797,13 +818,23 @@ export function createSessionLaunchRuntime({
           id: provider.id,
           name: provider.name,
           vendorKey: provider.vendorKey,
-          baseUrl,
+          baseUrl: vendorAuth?.baseUrl ?? baseUrl,
           modelId,
-          apiKey: secret.value || "",
+          apiKey: vendorAuth?.apiKey || secret.value || "",
           authKind: provider.authKind,
           extensionAgentKey: provider.extensionAgentKey,
           apiStyle,
-          ...optionalProviderHeaders(provider.headers),
+          // A vendor account's auth carries headers the request needs (the account
+          // id on a subscription endpoint, an originator), so they travel with the
+          // launch instead of being lost between the resolver and the wire.
+          ...optionalProviderHeaders(
+            // `provider.headers` is a stored record and may hold nulls; a header map
+            // is strings only, so a null simply does not travel.
+            Object.fromEntries(
+              Object.entries({ ...(provider.headers ?? {}), ...(vendorAuth?.headers ?? {}) })
+                .filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+            ),
+          ),
           supportsReasoning: thinkingCapabilities.supportsReasoning,
           supportsVision: visionFromModelConfig(modelConfig),
           supportedThinkingLevels: [...thinkingCapabilities.supportedThinkingLevels],

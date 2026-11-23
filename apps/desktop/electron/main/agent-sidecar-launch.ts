@@ -120,6 +120,20 @@ function nodeLaunch(input: ResolveAgentSidecarLaunchInput, entry: string): Resol
   };
 }
 
+/**
+ * Whether this process will run the Rust kernel.
+ *
+ * Env-only on purpose: `resolveAgentSidecarLaunch` also probes the filesystem for
+ * the binary, and a caller that only needs to know *which runtime* a launch targets
+ * must not depend on whether the file happens to be there. A missing binary falls
+ * back to Node with a reason, and that fallback is the launcher's business.
+ */
+export function kernelRuntimeRequested(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return (env[AGENT_CORE_SWITCH_ENV] ?? "").trim().toLowerCase() !== "node";
+}
+
 export function resolveAgentSidecarLaunch(
   input: ResolveAgentSidecarLaunchInput,
   options: { nodeEntry: string },

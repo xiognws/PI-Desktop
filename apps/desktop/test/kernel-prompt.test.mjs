@@ -177,6 +177,7 @@ test("every forwarded key is one the kernel actually reads", () => {
       "systemPrompt",
       "thinkingLevel",
       "tools",
+      "trustedExtensions",
       "turnId",
       "workspaceRoot",
     ].sort(),
@@ -318,9 +319,9 @@ test("an unsupported wire refuses the turn even with a mode and tools to declare
         ...LAUNCH,
         mode: "plan",
         pluginTools: PLUGIN_TOOLS,
-        provider: { ...LAUNCH.provider, apiStyle: "responses" },
+        provider: { ...LAUNCH.provider, apiStyle: "pi_messages" },
       }),
-    /provider\.apiStyle\(responses\)/,
+    /provider\.apiStyle\(pi_messages\)/,
   );
 });
 
@@ -333,7 +334,9 @@ test("an Anthropic-shaped endpoint keeps its wire", () => {
 });
 
 test("a wire the kernel does not speak is refused by name", () => {
-  for (const apiStyle of ["responses", "openai_codex_responses", "pi_messages"]) {
+  // `responses` left this list when the kernel learned to speak it; what remains is
+  // genuinely unsupported.
+  for (const apiStyle of ["openai_codex_responses", "pi_messages"]) {
     assert.throws(
       () => adaptKernelPrompt({ ...LAUNCH, provider: { ...LAUNCH.provider, apiStyle } }),
       new RegExp(`provider\\.apiStyle\\(${apiStyle}\\)`),
@@ -400,12 +403,13 @@ const SUBAGENT_MODELS = {
       modelConfig: { contextWindow: 32_000, maxOutputTokens: 4_096 },
     },
     // Authorized, but on a wire the kernel refuses: advertising it would fail the
-    // delegate mid-turn instead of before it starts.
-    "responses/key": {
-      id: "row-responses",
-      name: "Responses",
-      baseUrl: "https://responses.example/v1",
-      apiStyle: "responses",
+    // delegate mid-turn instead of before it starts. `responses` used to stand here;
+    // the kernel speaks it now, so the fixture moved to a wire it still does not.
+    "pi-messages/key": {
+      id: "row-pi-messages",
+      name: "Pi messages",
+      baseUrl: "https://pi-messages.example/v1",
+      apiStyle: "pi_messages",
       authKind: "api_key",
       apiKey: "test-key-responses",
       modelId: "responses-model",
@@ -423,7 +427,7 @@ const SUBAGENT_MODELS = {
   },
   // `unauthorized/key` has a binding but no opt-in, and `no-binding/key` an opt-in
   // with no binding: neither is a usable override.
-  subagentModelKeys: ["cheap/model-x", "responses/key", "no-binding/key"],
+  subagentModelKeys: ["cheap/model-x", "pi-messages/key", "no-binding/key"],
 };
 
 test("the delegation catalog reaches the kernel as a provider per key", () => {
@@ -459,7 +463,7 @@ test("a catalog with nothing usable sends neither key", () => {
   // reader. Sending empty containers would claim the user configured something.
   const { params } = adaptKernelPrompt({
     ...LAUNCH,
-    subagentProviders: { "ghost/key": { ...SUBAGENT_MODELS.subagentProviders["cheap/model-x"], apiStyle: "responses" } },
+    subagentProviders: { "ghost/key": { ...SUBAGENT_MODELS.subagentProviders["cheap/model-x"], apiStyle: "pi_messages" } },
     subagentModelKeys: ["ghost/key"],
     subagents: [{ name: "reviewer" }],
   });
