@@ -1,0 +1,20 @@
+crates/agent-core/src/memory.rs
+  h_201ed4c689ac8b 67,69-73,75,717-718,722,727,732,734-738,742,746-747,751
+crates/agent-core/src/skill_manage.rs
+  h_201ed4c689ac8b 385,400,404,406,409,411,414,416-417
+packages/agent-runtime/src/memory-agent-tool.ts
+  h_201ed4c689ac8b 66,68-72,74,90,95,100,105,110,115,120,125,128,130,136,138,145,152,159
+packages/agent-runtime/src/skill-manage-tool.ts
+  h_201ed4c689ac8b 34,36,38-43,45,64,68,72,76,80,84,88,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "aff4c77ac95309c8c6874b9db1b9bc2e7f7a7816",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
