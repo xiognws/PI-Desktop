@@ -2123,4 +2123,70 @@ mod tests {
             Some("https://example.org/two")
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Live runs. Not part of `cargo test`: they need the internet, and a build
+    // machine that cannot reach the network must stay green. They exist because
+    // every other test in this module feeds the parser a fixed document — that
+    // proves the parser, not that the request it makes is still the one Bing
+    // answers.
+    //
+    //   cargo test -p host-core live_ -- --ignored --nocapture
+    //
+    // `cn.bing.com` is the only search host reachable from this build host;
+    // duckduckgo and the Google endpoints are both blackholed here, which is why
+    // the keyless tier asks Bing first.
+    // -----------------------------------------------------------------------
+
+    /// A real keyless search returns real rows, shaped the way the model reads them.
+    #[tokio::test]
+    #[ignore = "network: run with --ignored"]
+    async fn live_search_answers_from_the_real_web() {
+        let transport = ReqwestTransport::new().expect("a client");
+        let value = search(
+            &json!({ "query": "rust programming language", "limit": 3 }),
+            &WebConfig::default(),
+            &transport,
+        )
+        .await
+        .expect("a real search");
+        let rows = value["data"]["web"].as_array().expect("web rows");
+        assert!(!rows.is_empty(), "no rows: {value}");
+        assert_eq!(value["success"], true);
+        for row in rows {
+            let url = row["url"].as_str().expect("a url");
+            assert!(
+                url.starts_with("http://") || url.starts_with("https://"),
+                "not a web url: {url}"
+            );
+            assert!(!row["title"].as_str().unwrap_or("").trim().is_empty(), "{row}");
+        }
+        println!("live search rows = {}", rows.len());
+        println!("first = {}", rows[0]["url"]);
+    }
+
+    /// A real extract returns readable text for a page the gate lets through.
+    #[tokio::test]
+    #[ignore = "network: run with --ignored"]
+    async fn live_extract_returns_text_for_a_public_page() {
+        let transport = ReqwestTransport::new().expect("a client");
+        let value = extract(
+            &json!({ "urls": ["https://cn.bing.com/"], "maxChars": 2000 }),
+            &transport,
+        )
+        .await
+        .expect("a real extract");
+        let results = value["results"]
+            .as_array()
+            .or_else(|| value["data"].as_array())
+            .expect("results");
+        assert!(!results.is_empty(), "no results: {value}");
+        let text = results[0]["content"]
+            .as_str()
+            .or_else(|| results[0]["text"].as_str())
+            .unwrap_or("");
+        assert!(!text.trim().is_empty(), "empty text: {value}");
+        println!("live extract chars = {}", text.chars().count());
+    }
+
 }
