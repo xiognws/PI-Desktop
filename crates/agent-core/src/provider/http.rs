@@ -33,6 +33,11 @@ pub enum WireApi {
     /// [`Self::OpenAiCompatible`] — the OpenAI Responses API: same vendor and
     /// credential, a different envelope. See [`super::responses`] for the mapping.
     OpenAiResponses,
+    /// `POST {base}/models/{model}:streamGenerateContent?alt=sse` with the key
+    /// in an `x-goog-api-key` header — Gemini's own API. The model is part of
+    /// the path, which is why [`HttpProviderConfig::endpoint`] needs it. See
+    /// [`super::google`] for the mapping.
+    GoogleGenerativeAi,
 }
 
 #[derive(Debug, Clone)]
@@ -89,11 +94,31 @@ impl HttpProviderConfig {
         }
     }
 
-    fn endpoint(&self) -> String {
+    /// Gemini's own API. `base_url` carries the version segment
+    /// (`…/v1beta`), exactly as `provider-binding.ts` defaults it.
+    pub fn google(
+        name: impl Into<String>,
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Self {
+        Self {
+            wire: WireApi::GoogleGenerativeAi,
+            ..Self::openai(name, base_url, api_key)
+        }
+    }
+
+    fn endpoint(&self, model: &str) -> String {
         match self.wire {
             WireApi::OpenAiCompatible => format!("{}/chat/completions", self.base_url),
             WireApi::AnthropicMessages => format!("{}/messages", self.base_url),
             WireApi::OpenAiResponses => format!("{}/responses", self.base_url),
+            // The method — `streamGenerateContent` — is part of the URL, and
+            // `alt=sse` is what makes the response a frame stream instead of one
+            // buffered JSON array.
+            WireApi::GoogleGenerativeAi => format!(
+                "{}/models/{}:streamGenerateContent?alt=sse",
+                self.base_url, model
+            ),
         }
     }
 }
@@ -135,6 +160,18 @@ impl HttpProvider {
                     HeaderValue::from_static("2023-06-01"),
                 );
             }
+            WireApi::GoogleGenerativeAi => {
+                // The key goes in a header, not `?key=`: a URL ends up in logs,
+                // proxy caches and error messages, and a credential does not
+                // belong in any of them.
+                if !self.config.api_key.is_empty() {
+                    let mut key = HeaderValue::from_str(&self.config.api_key).map_err(|error| {
+                        AgentError::Invalid(format!("api key is not a valid header: {error}"))
+                    })?;
+                    key.set_sensitive(true);
+                    headers.insert(HeaderName::from_static("x-goog-api-key"), key);
+                }
+            }
         }
         for (name, value) in &self.config.extra_headers {
             let name = HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
@@ -153,6 +190,7 @@ impl HttpProvider {
             WireApi::OpenAiCompatible => Ok(openai_body(&self.config, request)),
             WireApi::AnthropicMessages => Ok(anthropic_body(&self.config, request)),
             WireApi::OpenAiResponses => Ok(super::responses::responses_body(&self.config, request)),
+            WireApi::GoogleGenerativeAi => Ok(super::google::google_body(&self.config, request)),
         }
     }
 }
@@ -170,7 +208,7 @@ impl Provider for HttpProvider {
         Box::pin(async move {
             let body = self.body(&request)?;
             let headers = self.headers()?;
-            let url = self.config.endpoint();
+            let url = self.config.endpoint(&request.model);
             let wire = self.config.wire;
 
             // The request is sent here, not inside the stream task, so an HTTP
@@ -208,6 +246,14 @@ impl Provider for HttpProvider {
                     .text()
                     .await
                     .unwrap_or_else(|error| format!("<body unavailable: {error}>"));
+                // Gemini answers a rejected request with the same
+                // `{"error":{"code":…,"message":…,"status":…}}` object it streams,
+                // so the person gets the sentence instead of the envelope.
+                let detail = match wire {
+                    WireApi::GoogleGenerativeAi => super::google::readable_error_body(&detail)
+                        .unwrap_or_else(|| truncate(&detail, 600)),
+                    _ => truncate(&detail, 600),
+                };
                 let kind = if status.as_u16() == 429 || status.is_server_error() {
                     ProviderErrorKind::Retryable
                 } else {
@@ -236,6 +282,7 @@ enum WireDecoder {
     OpenAi(OpenAiStreamDecoder),
     Anthropic(AnthropicStreamDecoder),
     Responses(super::responses::ResponsesStreamDecoder),
+    Google(super::google::GoogleStreamDecoder),
 }
 
 impl WireDecoder {
@@ -244,6 +291,7 @@ impl WireDecoder {
             WireApi::OpenAiCompatible => Self::OpenAi(OpenAiStreamDecoder::new()),
             WireApi::AnthropicMessages => Self::Anthropic(AnthropicStreamDecoder::new()),
             WireApi::OpenAiResponses => Self::Responses(super::responses::ResponsesStreamDecoder::new()),
+            WireApi::GoogleGenerativeAi => Self::Google(super::google::GoogleStreamDecoder::new()),
         }
     }
 
@@ -252,6 +300,7 @@ impl WireDecoder {
             Self::OpenAi(decoder) => decoder.push_chunk(chunk),
             Self::Anthropic(decoder) => decoder.push_chunk(chunk),
             Self::Responses(decoder) => decoder.push_chunk(chunk),
+            Self::Google(decoder) => decoder.push_chunk(chunk),
         }
     }
 }
@@ -672,17 +721,65 @@ mod tests {
     #[test]
     fn endpoints_are_appended_to_the_base_url() {
         assert_eq!(
-            config(WireApi::OpenAiCompatible).endpoint(),
+            config(WireApi::OpenAiCompatible).endpoint("m"),
             "https://example.test/v1/chat/completions"
         );
         assert_eq!(
-            config(WireApi::AnthropicMessages).endpoint(),
+            config(WireApi::AnthropicMessages).endpoint("m"),
             "https://example.test/v1/messages"
         );
         assert_eq!(
-            config(WireApi::OpenAiResponses).endpoint(),
+            config(WireApi::OpenAiResponses).endpoint("m"),
             "https://example.test/v1/responses"
         );
+    }
+
+    /// Gemini names the method in the path and the model inside it, so the model
+    /// cannot travel in the body the way it does on the other three wires.
+    #[test]
+    fn a_google_endpoint_targets_the_model_method_and_asks_for_sse() {
+        assert_eq!(
+            config(WireApi::GoogleGenerativeAi).endpoint("gemini-2.5-flash"),
+            "https://example.test/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+        );
+    }
+
+    #[test]
+    fn the_google_wire_sends_the_key_in_a_header_not_the_url() {
+        let provider = HttpProvider::new(config(WireApi::GoogleGenerativeAi)).unwrap();
+        let headers = provider.headers().unwrap();
+        assert_eq!(headers.get("x-goog-api-key").unwrap(), "sk-secret");
+        // A URL ends up in logs and error messages.
+        assert!(!provider
+            .config
+            .endpoint("m")
+            .contains(&provider.config.api_key));
+        assert!(headers.get(reqwest::header::AUTHORIZATION).is_none());
+        assert!(headers.get("x-api-key").is_none());
+    }
+
+    /// A row that authenticates elsewhere has no key to send; an empty
+    /// `x-goog-api-key` would be a credential Google rejects outright.
+    #[test]
+    fn an_authless_google_row_sends_no_key_header() {
+        let config = HttpProviderConfig {
+            api_key: String::new(),
+            ..config(WireApi::GoogleGenerativeAi)
+        };
+        let headers = HttpProvider::new(config).unwrap().headers().unwrap();
+        assert!(headers.get("x-goog-api-key").is_none());
+    }
+
+    #[test]
+    fn the_google_wire_builds_a_contents_body() {
+        let request = ChatRequest::new("gemini-2.5-flash", vec![Message::user_text("hi")]);
+        let body = HttpProvider::new(config(WireApi::GoogleGenerativeAi))
+            .unwrap()
+            .body(&request)
+            .expect("a body");
+        assert!(body.get("contents").is_some(), "sent: {body}");
+        assert!(body.get("messages").is_none(), "sent: {body}");
+        assert!(body.get("systemInstruction").is_none(), "sent: {body}");
     }
 
     /// The Responses wire is the same vendor and the same credential: only the
@@ -817,7 +914,9 @@ mod tests {
         let blocks = body["messages"][1]["content"]
             .as_array()
             .expect("a user turn with an image sends a multimodal array");
-        assert!(blocks.iter().any(|block| block["type"] == json!("image_url")));
+        assert!(blocks
+            .iter()
+            .any(|block| block["type"] == json!("image_url")));
 
         let anthropic = anthropic_body(&config(WireApi::AnthropicMessages), &request);
         // The system field is a block array so the caching breakpoint can ride on it.
@@ -1002,7 +1101,8 @@ mod tests {
         level: crate::provider::ThinkingLevel,
         max_output_tokens: Option<u32>,
     ) -> ChatRequest {
-        let mut request = ChatRequest::new("test-model", vec![Message::user_text("think about it")]);
+        let mut request =
+            ChatRequest::new("test-model", vec![Message::user_text("think about it")]);
         request.thinking = level;
         request.max_output_tokens = max_output_tokens;
         request

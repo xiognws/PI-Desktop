@@ -3342,6 +3342,10 @@ const API_STYLE_ANTHROPIC_MESSAGES: &str = "anthropic_messages";
 /// OpenAI's own `/responses` envelope. Same credential as Chat Completions, a
 /// different body and event vocabulary (`provider::responses`).
 const API_STYLE_RESPONSES: &str = "responses";
+/// Gemini's native API — `models/{model}:streamGenerateContent?alt=sse`, with
+/// `contents`/`systemInstruction`/`generationConfig` instead of `messages`
+/// (`provider::google`).
+const API_STYLE_GOOGLE_GENERATIVE_AI: &str = "google_generative_ai";
 /// Known wires this kernel does not implement yet. They fail loudly: silently
 /// falling back to Chat Completions would send a valid credential to an endpoint
 /// of a different shape and surface as an unexplained provider 400.
@@ -3352,6 +3356,7 @@ enum ProviderWire {
     OpenAiCompletions,
     AnthropicMessages,
     OpenAiResponses,
+    GoogleGenerativeAi,
 }
 
 /// Which wire a provider spec asks for.
@@ -3375,13 +3380,17 @@ fn provider_wire(spec: &Value) -> Result<ProviderWire, RpcError> {
     };
     if API_STYLES_NOT_MIGRATED.contains(&style) {
         return Err(RpcError::invalid_params(format!(
-            "provider apiStyle `{style}` is not migrated to this kernel yet; supported: {}, {}",
-            API_STYLE_OPENAI_COMPLETIONS, API_STYLE_ANTHROPIC_MESSAGES
+            "provider apiStyle `{style}` is not migrated to this kernel yet; supported: {}, {}, {}, {}",
+            API_STYLE_OPENAI_COMPLETIONS,
+            API_STYLE_ANTHROPIC_MESSAGES,
+            API_STYLE_RESPONSES,
+            API_STYLE_GOOGLE_GENERATIVE_AI
         )));
     }
     Ok(match style {
         API_STYLE_ANTHROPIC_MESSAGES => ProviderWire::AnthropicMessages,
         API_STYLE_RESPONSES => ProviderWire::OpenAiResponses,
+        API_STYLE_GOOGLE_GENERATIVE_AI => ProviderWire::GoogleGenerativeAi,
         _ => ProviderWire::OpenAiCompletions,
     })
 }
@@ -3405,6 +3414,7 @@ fn build_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
         ProviderWire::OpenAiCompletions => http_provider(spec, ProviderWire::OpenAiCompletions),
         ProviderWire::AnthropicMessages => http_provider(spec, ProviderWire::AnthropicMessages),
         ProviderWire::OpenAiResponses => http_provider(spec, ProviderWire::OpenAiResponses),
+        ProviderWire::GoogleGenerativeAi => http_provider(spec, ProviderWire::GoogleGenerativeAi),
     }
 }
 
@@ -3666,6 +3676,7 @@ fn http_provider(spec: &Value, wire: ProviderWire) -> Result<Arc<dyn Provider>, 
             ProviderWire::OpenAiCompletions => "openai",
             ProviderWire::AnthropicMessages => "anthropic",
             ProviderWire::OpenAiResponses => "openai-responses",
+            ProviderWire::GoogleGenerativeAi => "google",
         });
     let mut config = match wire {
         ProviderWire::OpenAiCompletions => HttpProviderConfig::openai(label, base_url, &api_key),
@@ -3673,6 +3684,7 @@ fn http_provider(spec: &Value, wire: ProviderWire) -> Result<Arc<dyn Provider>, 
         ProviderWire::OpenAiResponses => {
             HttpProviderConfig::openai_responses(label, base_url, &api_key)
         }
+        ProviderWire::GoogleGenerativeAi => HttpProviderConfig::google(label, base_url, &api_key),
     };
     if let Some(max_tokens) = spec.get("defaultMaxTokens").and_then(Value::as_u64) {
         config.default_max_tokens = max_tokens as u32;
@@ -4597,6 +4609,20 @@ mod provider_wire_tests {
         // must not be required for a real prompt.
         let provider = build_provider(&production_spec(Some("responses")))
             .expect("a Responses provider builds without a kind");
+        assert_eq!(provider.name(), "Gateway");
+    }
+
+    #[test]
+    fn a_google_style_selects_the_gemini_wire() {
+        assert_eq!(
+            provider_wire(&production_spec(Some("google_generative_ai"))).unwrap(),
+            ProviderWire::GoogleGenerativeAi
+        );
+        // Regression: an unrecognised style falls back to Chat Completions, so
+        // before this arm existed a Gemini row was sent to `/chat/completions`
+        // with the wrong envelope and answered with an unexplained 400.
+        let provider = build_provider(&production_spec(Some("google_generative_ai")))
+            .expect("a Gemini provider builds without a kind");
         assert_eq!(provider.name(), "Gateway");
     }
 

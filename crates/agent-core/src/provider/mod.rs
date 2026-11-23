@@ -11,6 +11,7 @@
 //! the sidecar in phase 2. That keeps the whole kernel testable from fixtures.
 
 pub mod anthropic;
+pub mod google;
 pub mod http;
 pub mod openai;
 pub mod responses;
