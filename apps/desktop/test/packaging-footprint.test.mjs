@@ -201,6 +201,12 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "build/icon.png",
       to: "tray-icon.png",
     },
+    // Windows needs its own icon file beside the executable; the tray keeps the
+    // png. Both are read from disk, not from the asar.
+    {
+      from: "build/icon.ico",
+      to: "icon.ico",
+    },
     {
       from: "../../packages/agent-runtime/dist-bundle",
       to: "agent-runtime",
@@ -226,16 +232,19 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "resources/tools",
       to: "tools",
     },
+    // The host binaries and their helpers are spawned, so they cannot live inside
+    // the asar either.
+    {
+      from: "resources/bin",
+      to: "bin",
+    },
     {
       from: "resources/models.dev",
       to: "models.dev",
     },
-    // The embedded Python runtime and the build handbook shipped inside the
-    // installer: both are read from disk next to `resources/`.
-    {
-      from: "resources/python",
-      to: "python",
-    },
+    // The build handbook ships inside the installer: it is read from disk next to
+    // `resources/`. The Python runtime does not ship — the interpreter is the one
+    // the machine already has, resolved in `python-runtime.ts`.
     {
       from: "resources/manual",
       to: "manual",

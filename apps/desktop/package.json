@@ -29,10 +29,10 @@
     "bundle:autotest-framework": "pnpm --filter @pi-workspace/autotest-framework bundle",
     "bundle:python:extras": "node ../../scripts/bundle-python-extras.mjs && pnpm --filter @pi-workspace/autotest-framework deps",
     "stage:manual": "node ../../scripts/stage-desktop-manual.mjs",
-    "pack": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && electron-builder --dir -c.extraMetadata.piDistribution=zip && pnpm run bundle:python:extras",
-    "dist": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
+    "pack": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && electron-builder --dir -c.extraMetadata.piDistribution=zip && pnpm run bundle:python:extras",
+    "dist": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs",
     "dist:mac": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:python && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
+    "dist:win": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run bundle:autotest-ui && pnpm run stage:manual && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
     "dist:linux": "pnpm run build:deps && pnpm run bundle:ripgrep && pnpm run build:host-release && pnpm run build:agent-release && pnpm run bundle:runtime && pnpm run stage:manual && electron-vite build && electron-builder --linux --publish never",
     "bundle:autotest-ui": "npm --prefix ../../services/autotest/ui ci --no-audit --no-fund && npm --prefix ../../services/autotest/ui run build"
   },
@@ -160,10 +160,6 @@
       {
         "from": "resources/models.dev",
         "to": "models.dev"
-      },
-      {
-        "from": "resources/python",
-        "to": "python"
       },
       {
         "from": "resources/manual",

@@ -499,7 +499,14 @@ export function resolvePythonRuntime(
       };
     }
   }
-  return { state: "missing", reason: "no python interpreter found (bundled tree absent too)" };
+  // Nothing ships with the app any more: the interpreter is the machine's. Say
+  // what to do about it rather than reporting the absence as an internal state —
+  // this string reaches the settings page and the tool result the model reads.
+  return {
+    state: "missing",
+    reason:
+      "no Python 3 interpreter found: install Python 3.10 or newer, or point the app at one in Settings",
+  };
 }
 
 /**
