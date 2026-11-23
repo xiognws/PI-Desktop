@@ -138,9 +138,18 @@ export const RENAMED_PROMPT_PARAMS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Wires the kernel selects by `apiStyle` rather than by its own `kind` spelling —
+ * each has an envelope and event vocabulary of its own.
+ */
+const KERNEL_WIRES_SELECTED_BY_API_STYLE: ReadonlySet<string> = new Set([
+  "responses",
+  "google_generative_ai",
+]);
+
+/**
  * This app's provider row as the kernel's provider spec.
  *
- * The kernel speaks two wires and refuses the rest loudly (a Responses-shaped or
+ * The kernel speaks four wires and refuses the rest loudly (a codex-responses or
  * pi-messages credential sent to a Chat Completions endpoint fails as an
  * unexplained 400). Endpoints the kernel cannot speak are reported instead of
  * being flattened onto OpenAI completions.
@@ -153,12 +162,12 @@ export function adaptKernelProvider(raw: unknown): {
   const baseUrl = str(raw.baseUrl);
   if (!baseUrl) return { unsupported: "provider.baseUrl" };
 
-  // The kernel speaks three wires: Chat Completions and Anthropic Messages are
-  // selected by `kind`, Responses by `apiStyle` (it has its own envelope and event
-  // vocabulary). Everything else — codex-responses, pi-messages, opencode — is
-  // refused by name rather than flattened onto Chat Completions, which would send
-  // a valid credential to an endpoint of a different shape and surface as an
-  // unexplained 400.
+  // The kernel speaks four wires: Chat Completions and Anthropic Messages are
+  // selected by `kind`; Responses and Gemini are selected by `apiStyle`, because
+  // they have their own envelope and event vocabulary. Everything else —
+  // codex-responses, pi-messages, opencode — is refused by name rather than
+  // flattened onto Chat Completions, which would send a valid credential to an
+  // endpoint of a different shape and surface as an unexplained 400.
   //
   // `chat_completions` is the app's own default wire (`API_STYLES` in
   // `@pi-workspace/shared`), and `openai-completions` is the pi-runtime spelling
@@ -166,10 +175,12 @@ export function adaptKernelProvider(raw: unknown): {
   // second spelling rejected every provider a user had not re-styled by hand —
   // with `KERNEL_PROMPT_INVALID`, before the turn could start.
   const apiStyle = str(raw.apiStyle);
-  // `kind` wins over `apiStyle` inside the kernel, so a Responses row carries none:
-  // sending both would select Chat Completions while the row asked for Responses.
-  const responsesWire = apiStyle === "responses";
-  const kind = responsesWire
+  // `kind` wins over `apiStyle` inside the kernel, so a style-selected wire
+  // carries none: sending both would select Chat Completions while the row asked
+  // for something else.
+  const styleSelectedWire =
+    apiStyle !== undefined && KERNEL_WIRES_SELECTED_BY_API_STYLE.has(apiStyle);
+  const kind = styleSelectedWire
     ? undefined
     : apiStyle === "anthropic_messages"
       ? "anthropic"
@@ -178,7 +189,7 @@ export function adaptKernelProvider(raw: unknown): {
           apiStyle === "openai-completions"
         ? "openai"
         : undefined;
-  if (!kind && !responsesWire) return { unsupported: `provider.apiStyle(${apiStyle})` };
+  if (!kind && !styleSelectedWire) return { unsupported: `provider.apiStyle(${apiStyle})` };
 
   const authless = str(raw.authKind) === "none";
   const apiKey = str(raw.apiKey) ?? (authless ? "" : undefined);
@@ -191,7 +202,7 @@ export function adaptKernelProvider(raw: unknown): {
   return {
     provider: {
       ...(kind ? { kind } : {}),
-      ...(responsesWire ? { apiStyle: "responses" } : {}),
+      ...(styleSelectedWire ? { apiStyle } : {}),
       baseUrl,
       ...(apiKey === "" ? {} : { apiKey }),
       ...(str(raw.name) ? { name: str(raw.name) } : {}),

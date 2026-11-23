@@ -39,13 +39,15 @@ test("treats a provider with no apiStyle as chat completions", () => {
   assert.equal(result.provider?.kind, "openai");
 });
 
-test("accepts a Responses provider by apiStyle and carries no kind", () => {
-  const result = adaptKernelProvider({ ...base, apiStyle: "responses" });
-  assert.equal(result.unsupported, undefined);
-  assert.equal(result.provider?.apiStyle, "responses");
-  // `kind` wins over `apiStyle` inside the kernel, so carrying both would select
-  // the Chat Completions wire while the row asked for Responses.
-  assert.equal(result.provider?.kind, undefined);
+test("accepts the wires the kernel selects by apiStyle, and carries no kind", () => {
+  for (const apiStyle of ["responses", "google_generative_ai"]) {
+    const result = adaptKernelProvider({ ...base, apiStyle });
+    assert.equal(result.unsupported, undefined, apiStyle);
+    assert.equal(result.provider?.apiStyle, apiStyle, apiStyle);
+    // `kind` wins over `apiStyle` inside the kernel, so carrying both would select
+    // the Chat Completions wire while the row asked for something else.
+    assert.equal(result.provider?.kind, undefined, apiStyle);
+  }
 });
 
 test("refuses a wire the kernel does not speak instead of flattening it", () => {
