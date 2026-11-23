@@ -351,5 +351,16 @@
     "asar": {
       "smartUnpack": false
     }
+  },
+  "optionalDependencies": {
+    "@ast-grep/napi-darwin-arm64": "0.51.0",
+    "@ast-grep/napi-darwin-x64": "0.51.0",
+    "@ast-grep/napi-linux-arm64-gnu": "0.51.0",
+    "@ast-grep/napi-linux-arm64-musl": "0.51.0",
+    "@ast-grep/napi-linux-x64-gnu": "0.51.0",
+    "@ast-grep/napi-linux-x64-musl": "0.51.0",
+    "@ast-grep/napi-win32-arm64-msvc": "0.51.0",
+    "@ast-grep/napi-win32-ia32-msvc": "0.51.0",
+    "@ast-grep/napi-win32-x64-msvc": "0.51.0"
   }
 }

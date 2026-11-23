@@ -355,6 +355,34 @@ importers:
       zustand:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
+    optionalDependencies:
+      '@ast-grep/napi-darwin-arm64':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-darwin-x64':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-linux-arm64-gnu':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-linux-arm64-musl':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-linux-x64-gnu':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-linux-x64-musl':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-win32-arm64-msvc':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-win32-ia32-msvc':
+        specifier: 0.51.0
+        version: 0.51.0
+      '@ast-grep/napi-win32-x64-msvc':
+        specifier: 0.51.0
+        version: 0.51.0
 
   apps/pi-host:
     dependencies:

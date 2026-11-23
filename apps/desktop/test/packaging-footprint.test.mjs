@@ -384,6 +384,35 @@ test("packaging ships only the target platform's voice native payloads", () => {
   assert.ok(packageJson.build.files.every((pattern) => !pattern.includes("koffi/src")));
 });
 
+/**
+ * The kernel speaks no JS, but two main-process tools parse source with
+ * `@ast-grep/napi`, which resolves a platform package at require time
+ * (`@ast-grep/napi-<platform>-<arch>`). A packaged app that ships only the JS
+ * half dies at startup with "Cannot find native binding", and the log reads like
+ * a storage failure — which is what it did before this test existed: pnpm keeps
+ * the platform package outside `apps/desktop/node_modules`, so electron-builder's
+ * dependency walk never saw it. Declaring it here is what puts it in the asar.
+ */
+test("declares the ast-grep native binding electron-builder must package", () => {
+  const napiVersion = packageJson.dependencies["@ast-grep/napi"];
+  assert.ok(napiVersion, "@ast-grep/napi must stay a dependency");
+  const platformPackage = {
+    "win32-x64": "@ast-grep/napi-win32-x64-msvc",
+    "win32-arm64": "@ast-grep/napi-win32-arm64-msvc",
+    "win32-ia32": "@ast-grep/napi-win32-ia32-msvc",
+    "darwin-arm64": "@ast-grep/napi-darwin-arm64",
+    "darwin-x64": "@ast-grep/napi-darwin-x64",
+    "linux-x64": "@ast-grep/napi-linux-x64-gnu",
+    "linux-arm64": "@ast-grep/napi-linux-arm64-gnu",
+  }[`${process.platform}-${process.arch}`];
+  assert.ok(platformPackage, `no ast-grep package known for ${process.platform}-${process.arch}`);
+  assert.equal(
+    packageJson.optionalDependencies?.[platformPackage],
+    napiVersion,
+    `${platformPackage} must be declared at the same version as @ast-grep/napi`,
+  );
+});
+
 test("main output is minified without renaming and shares one Pi SDK copy", () => {
   const mainConfig = viteConfigSource.slice(
     viteConfigSource.indexOf("  main: {"),
