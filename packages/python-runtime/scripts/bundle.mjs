@@ -163,27 +163,81 @@ async function resolveWheelSource(wheelsDir) {
   return null;
 }
 
+/**
+ * The interpreter used to install the wheels.
+ *
+ * It has to be the minor version the lock pins: the wheels include binary ones
+ * (`lxml`, `pillow`) whose ABI belongs to that minor, so another interpreter
+ * cannot install them. `--python` wins; then the PATH; then the copies this
+ * repository already has on disk — a previous release artifact ships one, and
+ * the packaging step should not depend on the build host having 3.12 installed.
+ *
+ * Returns `null` when none is found: the caller skips the Python bundle and the
+ * rest of the release still builds. A shipped package without the interpreter is
+ * a degraded package, but a release that cannot be produced at all is worse.
+ */
 function resolvePython() {
   if (PYTHON) return PYTHON;
   const wanted = lock.python.version.split(".").slice(0, 2).join(".");
-  const candidates = platform === "windows" ? ["python.exe", "python"] : ["python3", "python"];
-  for (const candidate of candidates) {
+  const probe = (exe) => {
     try {
       const version = execFileSync(
-        candidate,
+        exe,
         ["-c", "import sys;print('%d.%d' % sys.version_info[:2])"],
         { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
       ).trim();
-      if (version === wanted) return candidate;
+      return version === wanted ? exe : null;
     } catch {
-      // Not installed, or not the pinned minor: try the next candidate.
+      return null;
+    }
+  };
+
+  const onPath = platform === "windows" ? ["python.exe", "python"] : ["python3", "python"];
+  for (const candidate of onPath) {
+    const found = probe(candidate);
+    if (found) return found;
+  }
+
+  // Copies already on disk. A previous release artifact is the interesting one:
+  // it is the same interpreter this product ships, so the wheels match it by
+  // construction.
+  const onDisk = [];
+  for (const relative of [
+    "apps/desktop/release/win-unpacked/resources/python/runtime/python.exe",
+    "apps/desktop/resources/python/runtime/python.exe",
+    "packages/python-runtime/dist/runtime/python.exe",
+    "apps/desktop/release/win-unpacked/resources/python/runtime/bin/python3",
+  ]) {
+    onDisk.push(join(REPO, relative));
+  }
+  const localAppData = process.env.LOCALAPPDATA;
+  if (localAppData) {
+    for (let minor = 10; minor <= 14; minor += 1) {
+      onDisk.push(join(localAppData, "Programs", "Python", `Python3${minor}`, "python.exe"));
     }
   }
-  throw new Error(
-    `no Python ${wanted} on PATH. Pass --python <exe>. ` +
-      "The interpreter shipped in the artifact is copied separately; this one only installs the wheels.",
+  for (let minor = 10; minor <= 14; minor += 1) {
+    onDisk.push(`C:/Python3${minor}/python.exe`, `/usr/bin/python3.${minor}`);
+  }
+  for (const candidate of onDisk) {
+    if (!existsSync(candidate)) continue;
+    const found = probe(candidate);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+/** Said once, when the Python bundle cannot be produced on this host. */
+function pythonSkipNotice() {
+  const wanted = lock.python.version.split(".").slice(0, 2).join(".");
+  return (
+    `skipping the Python runtime: no Python ${wanted} found (PATH, a previous release ` +
+    "artifact, or a local install). Pass --python <exe> to name one. The desktop release " +
+    "still builds; the tools that need the bundled interpreter will report it as unavailable."
   );
 }
+
 
 async function applyOverlays(sitePackages) {
   const overlays = (lock.overlays ?? []).filter((o) => (o.scope ?? "bundle") === "bundle");
@@ -270,6 +324,10 @@ if (wheelSource && wheelSource !== wheelsDir) {
 
 if (!wheelSource) {
   if (!python) python = resolvePython();
+  if (!python) {
+    console.log(pythonSkipNotice());
+    process.exit(0);
+  }
   console.log("downloading the pinned wheels…");
   execFileSync(
     python,
@@ -287,6 +345,10 @@ if (!wheelSource) {
 await rm(siteDir, { recursive: true, force: true });
 await mkdir(siteDir, { recursive: true });
 if (!python) python = resolvePython();
+if (!python) {
+  console.log(pythonSkipNotice());
+  process.exit(0);
+}
 console.log("installing the pinned wheels…");
 execFileSync(
   python,
