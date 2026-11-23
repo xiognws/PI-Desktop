@@ -1,0 +1,32 @@
+apps/desktop/src/components/settings/AgentSkillsPage.tsx
+  h_201ed4c689ac8b 11-25,206-245,1457-1493
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1566-1576,1681
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1576-1586
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1566-1576,1681
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1566-1576,1681
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1572-1582
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1546-1556
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1572-1582
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1563-1573
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1563-1573
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1f8f7b3ba88b39829b35b849e6217244e8e45852",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
