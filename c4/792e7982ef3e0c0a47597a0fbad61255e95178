@@ -1,0 +1,48 @@
+apps/desktop/src/features/chat/transcript/SkillReviewRow.tsx
+  h_201ed4c689ac8b 9,32-35,38
+apps/desktop/src/features/chat/transcript/skill-review-text.ts
+  h_201ed4c689ac8b 1-4,52,64,66-68,70-110
+apps/desktop/src/stores/app-state.ts
+  h_201ed4c689ac8b 122-130,141-146
+apps/desktop/src/stores/slices/events-slice.ts
+  h_201ed4c689ac8b 295
+apps/desktop/test/skill-review-text.test.mjs
+  h_201ed4c689ac8b 27-60
+crates/agent-core/src/event.rs
+  h_201ed4c689ac8b 100-103
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 3846,3848-3853,3925,4048,4054,4063
+crates/agent-core/src/skill_review.rs
+  h_201ed4c689ac8b 354-380,388,390-392,418,427,443,451,496-498,589-604
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 683-690,2101
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 698-705,2121
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 683-690,2101
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 683-690,2101
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 695-702,2117
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 685-692,2077
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 695-702,2117
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 688-695,2102
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 688-695,2102
+packages/shared/src/types/agent.ts
+  h_201ed4c689ac8b 337-342
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c4792e7982ef3e0c0a47597a0fbad61255e95178",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
