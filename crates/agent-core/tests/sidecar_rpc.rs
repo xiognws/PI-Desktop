@@ -138,6 +138,39 @@ async fn a_prompt_runs_a_turn_and_streams_agent_events() {
 }
 
 #[tokio::test]
+async fn a_settled_turn_still_names_itself_to_a_poller() {
+    // The completion signal external clients and the renderer poll for is
+    // "this turn id, not running". Reporting the id only while running made
+    // every poller wait for a turn that had already finished.
+    let (sidecar, lines) = sidecar();
+    call(&sidecar, 1, "sidecar.configure", scripted_configure()).await;
+
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({"sessionId": "s1", "turnId": "t-finished", "prompt": "one"}),
+    )
+    .await;
+    lines
+        .wait_for("agent.event", Duration::from_secs(10))
+        .await
+        .expect("turn starts");
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let status = call(&sidecar, 3, "agent.getStatus", json!({"sessionId": "s1"})).await;
+        let status = &status["result"]["status"];
+        if status["isRunning"] == false {
+            assert_eq!(status["currentTurnId"], "t-finished", "status: {status}");
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline, "turn never idled");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+}
+
+#[tokio::test]
 async fn the_same_session_answers_a_second_prompt_after_the_first_ends() {
     let (sidecar, lines) = sidecar();
     call(&sidecar, 1, "sidecar.configure", scripted_configure()).await;

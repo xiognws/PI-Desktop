@@ -238,6 +238,13 @@ struct Session {
     cancel: Mutex<CancelToken>,
     running: AtomicBool,
     current_turn: Mutex<Option<String>>,
+    /// The last turn this session ran, kept after it settles.
+    ///
+    /// `agent.getStatus` is polled for progress by external MCP clients and the
+    /// renderer, and the terminal answer they look for is "this turn, no longer
+    /// running". Clearing every trace of the turn on completion left those pollers
+    /// waiting forever for a turn that had already finished.
+    last_turn: Mutex<Option<String>>,
     /// Messages a user sent while the turn was running. Drained by the loop
     /// between steps, so a steer reaches the model on the next request instead
     /// of waiting for the turn to finish.
@@ -310,6 +317,7 @@ impl Session {
             cancel: Mutex::new(CancelToken::new()),
             running: AtomicBool::new(false),
             current_turn: Mutex::new(None),
+            last_turn: Mutex::new(None),
             steering: Mutex::new(std::collections::VecDeque::new()),
             skills: Arc::new(crate::skills::SkillCatalog::new()),
             restored: AtomicBool::new(false),
@@ -1288,6 +1296,11 @@ impl Sidecar {
             .map_err(|_| RpcError::internal("cancel lock poisoned"))? = cancel.clone();
         *session
             .current_turn
+            .lock()
+            .map_err(|_| RpcError::internal("turn lock poisoned"))? = Some(turn_id.clone());
+        // Kept past the settle so a poller can read "this turn, no longer running".
+        *session
+            .last_turn
             .lock()
             .map_err(|_| RpcError::internal("turn lock poisoned"))? = Some(turn_id.clone());
         // The run turn this prompt claimed, recorded before the turn task starts:
@@ -2370,10 +2383,19 @@ impl Sidecar {
             // renderer reads it.
             "pendingToolConfirmations": 0,
         });
-        if running {
-            if let Some(turn_id) = current_turn {
-                status["currentTurnId"] = json!(turn_id);
-            }
+        // The turn the session is on, or the one it last finished. A poller asks
+        // "did *this* turn finish", and that answer needs both halves: the id and
+        // `isRunning: false`. Reporting the id only while running left every such
+        // poller waiting for a turn that had already completed.
+        let reported_turn = current_turn.or_else(|| {
+            session
+                .last_turn
+                .lock()
+                .ok()
+                .and_then(|turn| turn.clone())
+        });
+        if let Some(turn_id) = reported_turn {
+            status["currentTurnId"] = json!(turn_id);
         }
         // The staged mode run this session's last prompt claimed, when there is
         // one. Additive diagnostics: `adaptStatus` in
