@@ -3,8 +3,13 @@
  *
  * Two back ends, deliberately split by ownership: the host-core side scans
  * the data directory and owns trust/enabled state, while loading and running
- * a package happens in the agent sidecar. Invoking therefore needs both —
- * the host answers "may this run", the sidecar answers "run it".
+ * a package happens in a JavaScript host. Invoking therefore needs both — the
+ * host answers "may this run", the JS host answers "run it".
+ *
+ * Which JS host is a runtime detail, not a second contract: the Node sidecar
+ * runs the package when it answers turns, and when the Rust kernel does, main
+ * runs it itself through {@link WidgetCommandHost}. Both use the same registry,
+ * so the renderer sees one surface either way.
  *
  * Parameters are narrowed here so the IPC boundary never forwards a shape the
  * renderer invented; both back ends validate again.
@@ -15,6 +20,7 @@ import { IPC, type WidgetSummary } from "@pi-workspace/shared";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
 import { stripWinLongPrefix } from "../path-utils";
+import { WidgetCommandHost } from "../widget-commands";
 import type { IpcRegistrar } from "./types";
 
 const MAX_ID_CHARS = 200;
@@ -69,14 +75,45 @@ export function registerWidgetsIpc({
   getSidecar: () => AgentSidecar | null;
 }): void {
   /**
-   * Push the host's view of every package into the sidecar so it loads the
-   * trusted, enabled ones. Called on every list so a reload self-heals:
-   * nothing else in the process can leave the two sides out of step.
+   * The JS host that runs package code, when it is not the sidecar.
+   *
+   * Built here rather than injected: `registerWidgetsIpc` is called with the
+   * host and sidecar accessors only, and main already owns the host client this
+   * needs. Construction is free — the runtime module loads on first use.
    */
-  async function syncSidecar(
+  const widgetHost = new WidgetCommandHost({
+    callHost: (method, params) => {
+      const host = getHost();
+      if (!host) throw new Error("host unavailable");
+      return host.call(method, params);
+    },
+    pythonInterpreter: () => process.env.PI_DESKTOP_WIDGET_PYTHON || undefined,
+  });
+
+  /**
+   * True when the runtime answering turns has no JavaScript host, so main is
+   * the one that loads and runs packages. Same rule as
+   * `extensions.command.run` in `register.ts`, read from the one place that
+   * knows which runtime is running.
+   */
+  function runsWidgetsHere(sidecar: AgentSidecar | null): boolean {
+    return sidecar?.runtime === "rust";
+  }
+
+  /**
+   * Push the host's view of every package into whichever host executes package
+   * code, so it loads the trusted, enabled ones. Called on every list so a
+   * reload self-heals: nothing else in the process can leave the two sides out
+   * of step.
+   */
+  async function syncRuntime(
     sidecar: AgentSidecar,
     packages: WidgetSummary[],
   ): Promise<void> {
+    if (runsWidgetsHere(sidecar)) {
+      await widgetHost.sync({ packages }).catch(() => undefined);
+      return;
+    }
     await sidecar.call("widget.sync", { packages }).catch(() => undefined);
   }
 
@@ -88,13 +125,14 @@ export function registerWidgetsIpc({
     };
     const packages = listed.packages ?? [];
     const sidecar = getSidecar();
-    if (sidecar) await syncSidecar(sidecar, packages);
+    if (sidecar) await syncRuntime(sidecar, packages);
     return { packages };
   });
 
   registrar.handle(IPC.invoke.widgetsRuntime, async () => {
     const sidecar = getSidecar();
     if (!sidecar) return { states: [] };
+    if (runsWidgetsHere(sidecar)) return widgetHost.list();
     return sidecar.call("widget.list", {});
   });
 
@@ -104,7 +142,7 @@ export function registerWidgetsIpc({
     const result = await host.call("widgets.setEnabled", toggleParams(input));
     const packages = ((result as { packages?: WidgetSummary[] }).packages ?? []);
     const sidecar = getSidecar();
-    if (sidecar) await syncSidecar(sidecar, packages);
+    if (sidecar) await syncRuntime(sidecar, packages);
     return { packages };
   });
 
@@ -114,7 +152,7 @@ export function registerWidgetsIpc({
     const result = await host.call("widgets.setTrusted", trustParams(input));
     const packages = ((result as { packages?: WidgetSummary[] }).packages ?? []);
     const sidecar = getSidecar();
-    if (sidecar) await syncSidecar(sidecar, packages);
+    if (sidecar) await syncRuntime(sidecar, packages);
     return { packages };
   });
 
@@ -145,6 +183,8 @@ export function registerWidgetsIpc({
   registrar.handle(IPC.invoke.widgetsInvoke, async (input?: unknown) => {
     const sidecar = getSidecar();
     if (!sidecar) throw new Error("agent runtime unavailable");
-    return sidecar.call("widget.invoke", invokeParams(input));
+    const params = invokeParams(input);
+    if (runsWidgetsHere(sidecar)) return widgetHost.invoke(params);
+    return sidecar.call("widget.invoke", params);
   });
 }

@@ -30,6 +30,10 @@ import type { PluginRuntime } from "../plugin-runtime";
 import { shutdownLspSessions } from "../lsp/tools";
 import { readSessionCollaboration } from "../services/session-collaboration";
 import { localNativeProjectPaths, searchSessionsAcrossSources } from "../services/session-search";
+// The legacy pi JSONL store is read in main: the Rust kernel keeps no
+// pi-format session store, and "the kernel has no reader" must not hide the
+// user's existing conversations (ADR 0403, native.session.*).
+import { nativeSessionClient, nativeSessionStore } from "../native-sessions";
 import type { IpcRegistrar } from "./types";
 import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts.js";
 
@@ -110,6 +114,7 @@ export type SessionIpcDependencies = {
   stripWinLongPrefix: (path: string) => string;
   /** Resolves the definition snapshot attached to a mode selection. */
   modeCatalog: Pick<ModeCatalogService, "snapshotFor">;
+
 };
 
 export function registerSessionIpc({
@@ -129,8 +134,10 @@ export function registerSessionIpc({
   forgetTranscriptRewriteHistory,
   stripWinLongPrefix,
   modeCatalog,
+
 }: SessionIpcDependencies): void {
   let host: HostProcess | null = null;
+
   let sidecar: AgentSidecar | null = null;
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
     registrar.handle(channel, async (...args) => {
@@ -198,7 +205,9 @@ export function registerSessionIpc({
 
   handle(IPC.invoke.sessionSearch, async (input) => {
     if (!host) throw new Error("host unavailable");
-    return searchSessionsAcrossSources(host, sidecar, input);
+    // Native search is answered from the pi JSONL store in main; passing the
+    // in-process client keeps `searchSessionsAcrossSources` runtime-agnostic.
+    return searchSessionsAcrossSources(host, nativeSessionClient(), input);
   });
   handle(IPC.invoke.sessionSearchContext, async (input) => {
     if (!host) throw new Error("host unavailable");
@@ -220,11 +229,10 @@ export function registerSessionIpc({
       host.call<{ sessions: RuntimeSession[] }>("session.list"),
       sessionCapabilityContext(),
     ]);
-    const native = sidecar
-      ? await sidecar
-          .call<{ sessions: RuntimeSession[] }>("native.session.list", { projectPaths })
-          .catch(() => ({ sessions: [] as RuntimeSession[] }))
-      : { sessions: [] as RuntimeSession[] };
+    const native = await nativeSessionStore()
+      .list({ projectPaths })
+      .then((sessions) => ({ sessions: sessions as RuntimeSession[] }))
+      .catch(() => ({ sessions: [] as RuntimeSession[] }));
     return {
       ...result,
       runningSessionIds: [...activeTurns.keys()],
@@ -264,8 +272,7 @@ export function registerSessionIpc({
       const sessionId = String(input.sessionId ?? "").trim();
       if (sessionId.startsWith("native-pi:")) {
         // Native forks read the canonical JSONL and publish a new child file in
-        // the sidecar; the Rust host and the Desktop queue are never involved.
-        if (!sidecar) throw new Error("sidecar unavailable");
+        // main; the Rust host and the Desktop queue are never involved.
         const title = typeof input.title === "string" ? input.title.trim().replace(/\s+/g, " ").slice(0, 200) : "";
         const throughMessageId =
           typeof input.throughMessageId === "string" ? input.throughMessageId.trim() : "";
@@ -274,14 +281,13 @@ export function registerSessionIpc({
             errorCode: ErrorCodes.INVALID_ARGUMENT,
           });
         }
-        const result = await sidecar.call<{ session?: RuntimeSession | null }>(
-          "native.session.fork",
-          {
+        const result = {
+          session: await nativeSessionStore().fork({
             id: sessionId,
             ...(title ? { title } : {}),
             ...(throughMessageId ? { throughMessageId } : {}),
-          },
-        );
+          }) as RuntimeSession,
+        };
         logger.app("session", "info", "native session forked", {
           sessionId: (result.session as { id?: string } | null)?.id,
           data: { sourceSessionId: sessionId },
@@ -347,8 +353,14 @@ export function registerSessionIpc({
       const id = String(request.id ?? "").trim();
       if (!id) throw new Error("session id required");
       if (id.startsWith("native-pi:")) {
-        if (!sidecar) throw new Error("sidecar unavailable");
-        return sidecar.call("native.session.get", { id, ...request });
+        return {
+          session: await nativeSessionStore().get(id, {
+            ...(typeof request.messageAround === "string" ? { messageAround: request.messageAround } : {}),
+            ...(typeof request.messageBefore === "number" ? { messageBefore: request.messageBefore } : {}),
+            ...(typeof request.messageLimit === "number" ? { messageLimit: request.messageLimit } : {}),
+            ...(typeof request.contentLimit === "number" ? { contentLimit: request.contentLimit } : {}),
+          }),
+        };
       }
       const [result, { providers, defaults }] = await Promise.all([
         host.call<{ session?: RuntimeSession | null }>("session.get", {
@@ -403,8 +415,7 @@ export function registerSessionIpc({
     const sessionId = String(rawSessionId ?? "").trim();
     if (!sessionId) throw new Error("session id required");
     if (sessionId.startsWith("native-pi:")) {
-      if (!sidecar) throw new Error("sidecar unavailable");
-      return sidecar.call("native.session.get", { id: sessionId, messageLimit: 1 });
+      return { session: await nativeSessionStore().get(sessionId, { messageLimit: 1 }) };
     }
     const [result, { providers, defaults }] = await Promise.all([
       host.call<{ session?: RuntimeSession | null }>("session.get", {

@@ -27,46 +27,19 @@ export type KernelMethodGap = {
  * `-32601` surfaces as before, which is the signal that the table is stale.
  */
 export const KERNEL_UNSUPPORTED_METHODS: Readonly<Record<string, KernelMethodGap>> = {
-  "widget.invoke": {
-    surface: "run a widget package action from the Tools page",
-    pending: "kernel: widget runner (host-core owns discovery/trust already)",
-  },
-  "widget.list": {
-    surface: "list widget package actions",
-    pending: "kernel: widget runner",
-  },
-  "widget.logs": {
-    surface: "read a widget package's log",
-    pending: "kernel: widget runner",
-  },
-  "widget.sync": {
-    surface: "reconcile widget packages with the host",
-    pending: "kernel: widget runner",
-  },
-  "widget.clear": {
-    surface: "drop a widget package's cached state",
-    pending: "kernel: widget runner",
-  },
-  // `extensions.command.run` is deliberately absent: an extension command is
-  // JavaScript, so when the kernel is the runtime main runs it itself instead of
-  // forwarding a method no JS-less process could answer. It is not a kernel gap
-  // waiting to be filled, so listing it here would be a false to-do.
-  "native.session.list": {
-    surface: "list sessions stored in the legacy pi JSONL format",
-    pending: "kernel: the kernel keeps no pi-format session store; this surface retires with it",
-  },
-  "native.session.search": {
-    surface: "search the legacy pi JSONL sessions",
-    pending: "kernel: the kernel keeps no pi-format session store",
-  },
-  "native.session.get": {
-    surface: "open one legacy pi JSONL session",
-    pending: "kernel: the kernel keeps no pi-format session store",
-  },
-  "native.session.fork": {
-    surface: "fork a legacy pi JSONL session",
-    pending: "kernel: the kernel keeps no pi-format session store",
-  },
+  // Deliberately empty, and each entry that used to be here left for the same
+  // reason: the surface belongs to a host that can answer it, not to the kernel.
+  //
+  // `extensions.command.run` and `widget.*` are JavaScript — an extension
+  // command (`agent-extensions.ts`), and a widget package's load/run
+  // (`widget-commands.ts`). The kernel has no JS runner and should not grow one,
+  // so when it is the runtime main runs these itself, from the same trusted set
+  // and the same registry the Node sidecar uses.
+  //
+  // `native.session.list|search|get|fork` serve the *legacy pi JSONL store*,
+  // which is a Node-side file format the kernel will never own. Main answers
+  // them in-process from that store (`native-sessions.ts`) instead of reporting
+  // the user's existing conversations as an unsupported surface.
 };
 
 /**

@@ -15,15 +15,12 @@ const {
  */
 
 const EXPECTED_GAPS = [
-  "native.session.fork",
-  "native.session.get",
-  "native.session.list",
-  "native.session.search",
-  "widget.clear",
-  "widget.invoke",
-  "widget.list",
-  "widget.logs",
-  "widget.sync",
+  // Empty on purpose. Every surface that used to sit here now has an owner that
+  // can actually answer it: `widget.*` and `extensions.command.run` are run by
+  // main when the kernel is the runtime (`widget-commands.ts`,
+  // `agent-extensions.ts`), and `native.session.*` is answered in-process from
+  // the legacy pi JSONL store (`native-sessions.ts`). A name reappearing here
+  // means a surface went back to failing with UNSUPPORTED.
 ];
 
 test("the gap table lists exactly the surfaces the kernel does not answer", () => {
@@ -37,12 +34,44 @@ test("every gap says what the surface is and where it is being closed", () => {
   }
 });
 
-test("a gap fails as UNSUPPORTED with a message a person can act on", () => {
-  const error = kernelUnsupportedMethodError("widget.invoke");
+test("the legacy pi session store is not a kernel gap", () => {
+  // These four read a JSONL file store the kernel never owns. Main answers them
+  // in-process (`electron/main/native-sessions.ts`), so listing them here would
+  // turn a user's existing conversations into an UNSUPPORTED error.
+  for (const method of [
+    "native.session.list",
+    "native.session.search",
+    "native.session.get",
+    "native.session.fork",
+  ]) {
+    assert.equal(isKernelUnsupportedMethod(method), false, `${method} is answered in main`);
+  }
+});
+
+test("the widget surfaces are answered by main, so they are not kernel gaps", () => {
+  // A widget package is JavaScript and the kernel is not a JS host: listing
+  // these as gaps would turn a working Tools page into UNSUPPORTED the moment
+  // the kernel became the runtime. Main runs them itself instead.
+  for (const method of [
+    "widget.list",
+    "widget.sync",
+    "widget.invoke",
+    "widget.logs",
+    "widget.clear",
+    // The same rule, for the extension command precedent this follows.
+    "extensions.command.run",
+  ]) {
+    assert.equal(isKernelUnsupportedMethod(method), false, `${method} is answered in main`);
+  }
+});
+
+test("a method the table never listed still fails as UNSUPPORTED", () => {
+  // The table is empty, so a stale method name reaches the kernel and fails
+  // there. Main must still classify it, with a message that does not claim a
+  // surface or a pending fix it does not have.
+  const error = kernelUnsupportedMethodError("widget.imaginary");
   assert.equal(error.errorCode, "UNSUPPORTED");
-  assert.match(error.message, /^widget\.invoke is not available on the Rust agent kernel yet/);
-  assert.match(error.message, /widget package action/);
-  assert.match(error.message, /kernel: /);
+  assert.match(error.message, /^widget\.imaginary is not answered by the Rust agent kernel$/);
 });
 
 test("an unknown method still fails as UNSUPPORTED instead of throwing something else", () => {

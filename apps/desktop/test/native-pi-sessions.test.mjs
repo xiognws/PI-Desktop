@@ -219,10 +219,49 @@ function loadSessionIpc(imports) {
   return module.exports;
 }
 
-function forkHarness({ host, sidecar, activeTurns = new Map() }) {
+/**
+ * The legacy pi JSONL store is answered in Electron main now
+ * (`electron/main/native-sessions.ts`), not by the sidecar. The harness stubs
+ * that module so these cases stay about routing: every native call is recorded
+ * here, and no native call may reach the sidecar any more.
+ */
+function nativeModule(spec = {}) {
+  const calls = [];
+  const record = (method, input) => calls.push({ method, input });
+  const store = {
+    list: async (input) => {
+      record("native.session.list", input);
+      return (spec.list ?? (() => []))(input);
+    },
+    search: async (query, input) => {
+      record("native.session.search", { query, ...input });
+      return (spec.search ?? (() => ({ hits: [], nextOffset: null })))(query, input);
+    },
+    get: async (id, input) => {
+      record("native.session.get", { id, ...input });
+      return (spec.get ?? (() => { throw new Error("no native session stubbed"); }))(id, input);
+    },
+    fork: async (input) => {
+      record("native.session.fork", input);
+      return (spec.fork ?? (() => { throw new Error("no native fork stubbed"); }))(input);
+    },
+  };
+  const client = {
+    call: async (method, input = {}) => {
+      if (method === "native.session.search") {
+        return store.search(String(input.query ?? ""), { projectPaths: input.projectPaths });
+      }
+      throw new Error(`unexpected native session method ${method}`);
+    },
+  };
+  return { calls, store, client };
+}
+
+function forkHarness({ host, sidecar, activeTurns = new Map(), native } = {}) {
   const handlers = new Map();
   const hostCalls = [];
   const sidecarCalls = [];
+  const nativeStub = nativeModule(native);
   const { registerSessionIpc } = loadSessionIpc({
     electron: { shell: {} },
     "node:path": nodePath,
@@ -231,7 +270,14 @@ function forkHarness({ host, sidecar, activeTurns = new Map() }) {
     "../importers": { convertSession() {}, scanAllSources() {}, scanModelConfigs() {} },
     "../services/session-collaboration": { readSessionCollaboration() {} },
     "../services/session-search": { localNativeProjectPaths, searchSessionsAcrossSources },
+    // Imported by session-ipc for session deletion; the harness only needs the
+    // symbol to exist for the cases below.
+    "../lsp/tools": { shutdownLspSessions: async () => {} },
     "../bootstrap/remote-hosts.js": { getActiveRemoteHostsBoot: () => null },
+    "../native-sessions": {
+      nativeSessionStore: () => nativeStub.store,
+      nativeSessionClient: () => nativeStub.client,
+    },
   });
   registerSessionIpc({
     registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
@@ -250,10 +296,13 @@ function forkHarness({ host, sidecar, activeTurns = new Map() }) {
   });
   return {
     handle: handlers.get(IPC.invoke.sessionFork),
+    get: handlers.get(IPC.invoke.sessionGet),
+    open: handlers.get(IPC.invoke.sessionOpen),
     list: handlers.get(IPC.invoke.sessionList),
     search: handlers.get(IPC.invoke.sessionSearch),
     hostCalls,
     sidecarCalls,
+    nativeCalls: nativeStub.calls,
   };
 }
 
@@ -265,10 +314,10 @@ const searchSession = (id, updatedAt) => ({
   matches: [],
 });
 
-test("global session search merges native sidecar hits with Desktop results", async () => {
+test("global session search merges native store hits with Desktop results", async () => {
   const nativeHit = searchSession("native-pi:child", "2026-09-14T00:00:02.000Z");
   const desktopHit = searchSession("desktop-session", "2026-09-14T00:00:01.000Z");
-  const { search, hostCalls, sidecarCalls } = forkHarness({
+  const { search, hostCalls, sidecarCalls, nativeCalls } = forkHarness({
     host: (calls) => ({
       call: async (method, input) => {
         calls.push({ method, input });
@@ -278,19 +327,16 @@ test("global session search merges native sidecar hits with Desktop results", as
         return { hits: [desktopHit], nextOffset: null };
       },
     }),
-    sidecar: (calls) => ({
-      call: async (method, input) => {
-        calls.push({ method, input });
-        return { hits: [nativeHit], nextOffset: null };
-      },
-    }),
+    sidecar: () => ({ call: () => assert.fail("native search must not reach the sidecar") }),
+    native: { search: () => ({ hits: [nativeHit], nextOffset: null }) },
   });
   const result = await search({ query: "side chat", offset: 0 });
   assert.deepEqual(result.hits.map((hit) => hit.session.id), ["native-pi:child", "desktop-session"]);
-  assert.deepEqual(sidecarCalls, [{
+  assert.deepEqual(nativeCalls, [{
     method: "native.session.search",
     input: { query: "side chat", projectPaths: ["/work/demo"] },
   }]);
+  assert.deepEqual(sidecarCalls, []);
   assert.deepEqual(hostCalls, [
     { method: "projects.list", input: undefined },
     { method: "search.sessions", input: { query: "side chat", offset: 0, limit: 30 } },
@@ -298,7 +344,7 @@ test("global session search merges native sidecar hits with Desktop results", as
 });
 
 test("session list forwards local project paths to native discovery (#1732)", async () => {
-  const { list, hostCalls, sidecarCalls } = forkHarness({
+  const { list, hostCalls, sidecarCalls, nativeCalls } = forkHarness({
     host: (calls) => ({
       call: async (method, input) => {
         calls.push({ method, input });
@@ -318,21 +364,18 @@ test("session list forwards local project paths to native discovery (#1732)", as
         return {};
       },
     }),
-    sidecar: (calls) => ({
-      call: async (method, input) => {
-        calls.push({ method, input });
-        return {
-          sessions: [{ id: "native-pi:1", updatedAt: "2026-09-14T00:00:02.000Z", source: "pi-native" }],
-        };
-      },
-    }),
+    sidecar: () => ({ call: () => assert.fail("native list must not reach the sidecar") }),
+    native: {
+      list: () => [{ id: "native-pi:1", updatedAt: "2026-09-14T00:00:02.000Z", source: "pi-native" }],
+    },
   });
   const result = await list();
   assert.deepEqual(result.sessions.map((session) => session.id), ["native-pi:1", "desktop-1"]);
-  assert.deepEqual(sidecarCalls, [{
+  assert.deepEqual(nativeCalls, [{
     method: "native.session.list",
     input: { projectPaths: ["/work/demo"] },
   }]);
+  assert.deepEqual(sidecarCalls, []);
   assert.deepEqual(hostCalls.map((call) => call.method), ["projects.list", "session.list"]);
 });
 
@@ -343,7 +386,7 @@ test("a failed projects.list keeps Desktop sessions and logs the skip (#1732)", 
     warnings.push(args);
   };
   try {
-    const { list, sidecarCalls } = forkHarness({
+    const { list, nativeCalls } = forkHarness({
       host: () => ({
         call: async (method) => {
           if (method === "projects.list") throw new Error("index down");
@@ -353,16 +396,12 @@ test("a failed projects.list keeps Desktop sessions and logs the skip (#1732)", 
           return {};
         },
       }),
-      sidecar: (calls) => ({
-        call: async (method, input) => {
-          calls.push({ method, input });
-          return { sessions: [] };
-        },
-      }),
+      sidecar: () => ({ call: () => assert.fail("native list must not reach the sidecar") }),
+      native: { list: () => [] },
     });
     const result = await list();
     assert.deepEqual(result.sessions.map((session) => session.id), ["desktop-1"]);
-    assert.deepEqual(sidecarCalls, [{
+    assert.deepEqual(nativeCalls, [{
       method: "native.session.list",
       input: { projectPaths: [] },
     }]);
@@ -416,15 +455,11 @@ test("session list attaches host handlers before projects.list settles (#1732)",
   }
 });
 
-test("native fork routes to the sidecar and never to the Desktop host", async () => {
-  const { handle, hostCalls, sidecarCalls } = forkHarness({
+test("native fork routes to the main-process store and never to the Desktop host", async () => {
+  const { handle, hostCalls, sidecarCalls, nativeCalls } = forkHarness({
     host: () => ({ call: () => { throw new Error("native fork must not call the host"); } }),
-    sidecar: (calls) => ({
-      call: async (method, input) => {
-        calls.push({ method, input });
-        return { session: { id: "native-pi:child", title: "Side chat" } };
-      },
-    }),
+    sidecar: () => ({ call: () => assert.fail("native fork must not reach the sidecar") }),
+    native: { fork: () => ({ id: "native-pi:child", title: "Side chat" }) },
   });
   const result = await handle({
     sessionId: " native-pi:parent ",
@@ -432,22 +467,24 @@ test("native fork routes to the sidecar and never to the Desktop host", async ()
     throughMessageId: " a1 ",
   });
   assert.equal(result.session.id, "native-pi:child");
-  assert.deepEqual(sidecarCalls, [{
+  assert.deepEqual(nativeCalls, [{
     method: "native.session.fork",
     input: { id: "native-pi:parent", title: "Side chat", throughMessageId: "a1" },
   }]);
+  assert.deepEqual(sidecarCalls, []);
   assert.deepEqual(hostCalls, []);
 });
 
-test("native fork rejects an oversized anchor before calling the sidecar", async () => {
-  const { handle, sidecarCalls } = forkHarness({
+test("native fork rejects an oversized anchor before calling the store", async () => {
+  const { handle, nativeCalls } = forkHarness({
     host: () => ({ call: () => { throw new Error("native fork must not call the host"); } }),
-    sidecar: (calls) => ({ call: async (method, input) => { calls.push({ method, input }); } }),
+    sidecar: () => null,
+    native: {},
   });
   await assert.rejects(handle({ sessionId: "native-pi:parent", throughMessageId: "x".repeat(257) }), {
     errorCode: "INVALID_ARGUMENT",
   });
-  assert.deepEqual(sidecarCalls, []);
+  assert.deepEqual(nativeCalls, []);
 });
 
 test("desktop session fork keeps the existing host contract", async () => {

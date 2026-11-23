@@ -1,4 +1,5 @@
 import type { ProjectGroupRecord, RemoteWorkspace } from "@pi-workspace/shared";
+import { nativeSessionStore } from "../native-sessions";
 
 type FileHost = { call<T>(method: string, input?: unknown): Promise<T> };
 
@@ -7,14 +8,21 @@ export async function sessionForFiles(
   sessionId: string,
   getSidecar?: () => FileHost | null,
 ): Promise<{ projectPath?: string; worktree?: unknown }> {
-  const native = sessionId.startsWith("native-pi:");
-  const getOwner = native ? getSidecar : getHost;
-  const owner = getOwner?.();
+  if (sessionId.startsWith("native-pi:")) {
+    // A legacy pi session has no host-core row and no worktree: its project is
+    // the `cwd` its own file records. The store is read in main now, so this
+    // needs neither the sidecar nor a "source replaced" re-check — the store is
+    // a process singleton, not a swappable runtime. `getSidecar` stays in the
+    // signature for the call sites that already resolve one.
+    void getSidecar;
+    return nativeSessionStore().get(sessionId, { messageLimit: 1 });
+  }
+  const owner = getHost();
   if (!owner) throw Object.assign(new Error("session source unavailable"), { errorCode: "HOST_UNAVAILABLE" });
   const { session } = await owner.call<{ session?: { projectPath?: string; worktree?: unknown } }>(
-    native ? "native.session.get" : "session.get", { id: sessionId, messageLimit: 1 },
+    "session.get", { id: sessionId, messageLimit: 1 },
   );
-  if (getOwner?.() !== owner) throw Object.assign(new Error("session source replaced"), { errorCode: "HOST_UNAVAILABLE" });
+  if (getHost() !== owner) throw Object.assign(new Error("session source replaced"), { errorCode: "HOST_UNAVAILABLE" });
   if (!session) throw Object.assign(new Error("session not found"), { errorCode: "NOT_FOUND" });
   return session;
 }
