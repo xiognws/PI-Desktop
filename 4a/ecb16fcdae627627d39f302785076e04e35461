@@ -1,0 +1,24 @@
+crates/agent-core/src/provider/google.rs
+  h_201ed4c689ac8b 78-82,407-410,412,414,1012-1014
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 20,129-131,140-150,223-228,251-256,423-449,537-546,1119-1158
+crates/agent-core/src/provider/mod.rs
+  h_201ed4c689ac8b 184-191,205,241-258
+crates/agent-core/src/provider/openai.rs
+  h_201ed4c689ac8b 166-174,176,178,213-215
+crates/agent-core/src/provider/responses.rs
+  h_201ed4c689ac8b 65-70,79,188-198,512-515,528-532,534,536,622-654,706-707
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 144-146,168,189-200,267-269,290-292,456-468,470-472,634-638,675-678,699-704,764-766,829-831,846-863,933-947
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4aecb16fcdae627627d39f302785076e04e35461",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
