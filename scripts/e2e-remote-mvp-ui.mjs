@@ -65,4 +65,4 @@ app.whenReady().then(async () => {
     assert.match(output, /REMOTE_MVP_UI.*"ok":true/, output);
     console.log(output.split("\n").find(line => line.startsWith("REMOTE_MVP_UI ")));
   } finally { clearTimeout(timer); }
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

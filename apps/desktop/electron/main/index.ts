@@ -102,7 +102,7 @@ import { createLauncher } from "./bootstrap/launcher";
 import { createWorkPanelRuntime } from "./bootstrap/work-panel";
 import { createCloseBehaviorRuntime } from "./bootstrap/close-behavior";
 import { registerShutdownHandlers } from "./bootstrap/shutdown";
-import { disposeLspServers } from "./lsp/tools";
+import { disposeLspServers, shutdownLspSessions } from "./lsp/tools";
 import { stripWinLongPrefix } from "./path-utils";
 import { getModuleDirectory } from "./module-path";
 
@@ -698,10 +698,10 @@ const sessionCoordination = createSessionCoordination({
     // A new turn owns the composer now, so a suggestion about the previous one
     // stops being shown and stops being showable (ADR 0333).
     pluginServices.composerSuggestion.noteTurnStarted(sessionId, turnId);
-    // The workbench service is what an agent turn may reach next, so this is the
-    // earliest honest moment to have it up — and the latest one that still keeps
-    // an idle launch free of an interpreter process.
-    startAutotestForFirstUse();
+    // The workbench is a widget capability now: nothing in the client starts it
+    // on its own. An interpreter plus a loopback listener that appear because a
+    // turn began - before the user asked for the workbench - is exactly the shape
+    // behavioural AV engines score as a dropped payload.
   },
 });
 const {
@@ -983,6 +983,9 @@ function registerIpc() {
     /** The shell answers a composer suggestion through the same invoke list. */
     settleComposerSuggestion: (answer: ComposerSuggestionAnswer) =>
       pluginServices.composerSuggestion.settle(answer),
+    // The language-server pool is this module's to dispose: a deleted session
+    // takes its servers with it, and the IPC layer only forwards the call.
+    disposeSessionResources: shutdownLspSessions,
     getPluginLauncherWindow: () => mainState.pluginLauncherWindow,
     togglePluginLauncher,
     /** Same delivery path as the application menu, so readiness and focus are
@@ -1117,9 +1120,6 @@ app.once("will-quit", () => void autotestService.stop());
  * runs, and a `function` declaration keeps that reference legal without moving
  * the service construction above the session wiring it depends on.
  */
-function startAutotestForFirstUse(): void {
-  void autotestService.ensureStarted();
-}
 // The in-app gateways hold loopback ports; a quit that leaves them listening
 // would make the next launch look like a port conflict.
 app.once("will-quit", () => void inAppProviders.stop());

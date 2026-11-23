@@ -45,5 +45,5 @@ try {
   process.exitCode = code ?? 1;
 } finally {
   server.closeAllConnections(); await new Promise((resolvePromise) => server.close(resolvePromise));
-  if (artifacts !== temp) await rm(temp, { recursive: true, force: true });
+  if (artifacts !== temp) await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

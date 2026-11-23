@@ -111,6 +111,9 @@ export class OfflineSidecar {
       else pending.resolve(frame.result);
       return;
     }
+    // Main records `agent.diagnostic` for the diagnostics bundle; a scenario that
+    // asserts on transcript events has nothing to check in it.
+    if (frame.method === "agent.diagnostic") return;
     assert.equal(frame.method, "agent.event", "unexpected sidecar notification");
     const envelope = frame.params;
     this.events.push(envelope);
@@ -216,6 +219,10 @@ export function fixtureHost({ history = [], instructions = false } = {}) {
       // Declining file batching keeps the offline fixtures on the per-call
       // tools.execute path; the runtime negotiates this before the first turn.
       case "tools.fileBatchCapabilities": return { version: 1, supported: false };
+      // Durable memory is optional on the host (ADR 0371 §recall is best effort):
+      // a fixture that serves no memories answers with none. Throwing here fails
+      // the whole turn over a block the runtime is told to skip.
+      case "memory.recall": return { memories: [] };
       case "tools.execute":
         assert.equal(params.toolName, "Read", "Task must execute inside the real runtime, never fake host");
         assert.equal(params.args.path, "nested/fixture.txt");

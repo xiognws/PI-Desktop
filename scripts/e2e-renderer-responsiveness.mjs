@@ -256,5 +256,5 @@ app.whenReady().then(async () => {
   assert.equal(code, 0, output.slice(-6000));
   assert.equal(result.ok, true, JSON.stringify(result));
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

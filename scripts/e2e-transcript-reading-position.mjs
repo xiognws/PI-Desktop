@@ -76,5 +76,5 @@ app.whenReady().then(async () => {
   assert.equal(code, 0, result.scrolling?.error ?? result.session?.error ?? result.continuation?.error ?? result.liveTail?.error ?? output.slice(-4000));
   assert.equal(result.ok, true);
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

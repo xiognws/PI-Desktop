@@ -221,5 +221,5 @@ app.whenReady().then(async()=>{
   if (runtime) await runtime.unload("pi.file-manager");
   if (bridge) await new Promise(done => bridge.close(done));
   await adapter?.close(); protocol?.server.close(); await binding?.close();
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

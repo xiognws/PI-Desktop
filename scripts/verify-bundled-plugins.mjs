@@ -66,5 +66,5 @@ try {
   console.log("ids:", rows.map((row) => row.id).sort().join(","));
 } finally {
   await host.stop().catch(() => {});
-  await rm(dataDir, { recursive: true, force: true }).catch(() => {});
+  await rm(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => {});
 }

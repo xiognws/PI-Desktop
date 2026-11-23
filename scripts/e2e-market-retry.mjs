@@ -119,5 +119,5 @@ try {
     console.log(`MARKET_SNAPSHOT_SHOTS ok=${staged.length} dir=${resolve(evidence)}`);
   }
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

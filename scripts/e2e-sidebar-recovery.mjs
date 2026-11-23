@@ -90,4 +90,4 @@ try {
     }
   }
   console.log("PASS: catalog recovery, retained and closed tabs, metadata, three process starts with fresh Chromium profiles, and trusted-frame IPC.");
-} finally { await rm(scratch, { recursive: true, force: true }); }
+} finally { await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

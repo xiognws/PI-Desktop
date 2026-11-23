@@ -219,7 +219,7 @@ try {
   record("headless-remote-host-e2e", false, `${error?.message ?? error}\n${stderr.slice(-3000)}`);
 } finally {
   await stopHost();
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 const failed = results.filter((result) => !result.ok);

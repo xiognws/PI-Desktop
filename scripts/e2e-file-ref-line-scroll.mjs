@@ -95,5 +95,5 @@ app.whenReady().then(async () => {
   assert.ok(result.scrollTop > 0, "host file viewer did not scroll away from the top");
   assert.equal(result.targetLineVisible, true, "requested line is outside the visible viewer area");
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

@@ -120,5 +120,5 @@ async function scenario(mode) {
 try {
   for (const mode of ["cached-input", "partial-buckets", "normal-usage"]) await scenario(mode);
 } finally {
-  await rm(temporary, { recursive: true, force: true });
+  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

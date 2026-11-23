@@ -72,5 +72,5 @@ try {
     sameSessionWritesSerialized: true, otherSessionProgressedWhileHeld: true }));
 } finally {
   await Promise.allSettled(hosts.map((host) => host.dispose()));
-  await rm(root, { recursive: true, force: true });
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

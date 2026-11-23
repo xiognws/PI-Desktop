@@ -113,7 +113,7 @@ try {
   } catch {
     /* ignore */
   }
-  if (!keep) rmSync(dataDir, { recursive: true, force: true });
+  if (!keep) rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   else console.log(`kept profile: ${dataDir}`);
 }
 

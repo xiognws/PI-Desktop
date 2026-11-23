@@ -242,5 +242,5 @@ try {
     if (app.exitCode === null) app.kill("SIGKILL");
   }
   server?.close();
-  await rm(scratch, { recursive: true, force: true, maxRetries: 3 });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

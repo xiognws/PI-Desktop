@@ -173,4 +173,4 @@ try {
   console.error(hostLog);
   if (fixtureFailure) console.error(fixtureFailure);
   process.exitCode = 1;
-} finally { await stop(); await rm(root, { recursive: true, force: true }); }
+} finally { await stop(); await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

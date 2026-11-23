@@ -93,5 +93,5 @@ try {
   for (const mode of ["abort-backoff", "retry-after", "stalled-request"]) await scenario(mode);
   console.log(JSON.stringify({ passed: true, results }));
 } finally {
-  await rm(temporary, { recursive: true, force: true });
+  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

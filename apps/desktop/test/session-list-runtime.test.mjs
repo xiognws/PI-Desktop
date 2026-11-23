@@ -18,6 +18,8 @@ const imports = {
   "../importers": {},
   "../services/session-collaboration": {},
   "../services/session-search": { localNativeProjectPaths },
+  // session-ipc imports the legacy pi JSONL store; listing never reaches it.
+  "../native-sessions": { nativeSessionClient: () => ({ call: async () => ({}) }), nativeSessionStore: () => ({ get: async () => null, fork: async () => null, list: async () => [] }) },
   "../bootstrap/remote-hosts.js": { getActiveRemoteHostsBoot: () => null },
 };
 const loaded = { exports: {} };

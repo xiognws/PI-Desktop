@@ -108,5 +108,5 @@ app.whenReady().then(async () => {
   );
   console.log("PASS Composer applies a switched model default and preserves same-model manual thinking");
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

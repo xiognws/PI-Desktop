@@ -67,5 +67,5 @@ app.whenReady().then(async () => {
   assert.match(output, /NATIVE_WORKSPACE_FILES_E2E_OK/);
   console.log("Native workspace file IPC E2E passed");
 } finally {
-  await rm(temporary, { recursive: true, force: true });
+  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

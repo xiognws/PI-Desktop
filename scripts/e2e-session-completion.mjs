@@ -177,5 +177,5 @@ try {
   }
   await host.stop();
   await new Promise((resolve) => server.close(resolve));
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

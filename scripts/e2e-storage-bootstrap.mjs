@@ -195,4 +195,4 @@ if (process.env.STORAGE_E2E_MODE === 'seed') {
   assert.deepEqual(await readFile(pointer, "utf8"), previousPointer);
   await assert.rejects(stat(cancelledDefault), { code: "ENOENT" });
   console.log("STORAGE_BOOTSTRAP " + JSON.stringify({ migration: true, progress: true, chromiumState: true, pluginState: true, safeCache: true, backupCleanup: true, defaultRecovery: true, existingRecovery: true, recoveryCancel: true }));
-} finally { await rm(scratch, { recursive: true, force: true }); }
+} finally { await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

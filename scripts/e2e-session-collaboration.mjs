@@ -522,7 +522,7 @@ async function main() {
     } catch (error) {
       record(ORCHESTRATOR_ID, false, `host cleanup: ${formatError(error)}`);
     }
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 
   if (results.some((result) => !result.ok)) {

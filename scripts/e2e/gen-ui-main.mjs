@@ -10,7 +10,7 @@ import {
   resolveGenUiAssetRequest, genUiAssetResponse,
 } from "../../apps/desktop/electron/main/gen-ui-protocol.ts";
 import { genUiAssetFileFromUrl, loadGenUiKit } from "../../apps/desktop/electron/main/gen-ui-kit.ts";
-import { installLiveMicrophonePermissionHandlers } from "../../apps/desktop/electron/main/live-voice/microphone-permissions.ts";
+import { installGenUiPermissionHandlers } from "../../apps/desktop/electron/main/gen-ui-permissions.ts";
 import { createGenUiFragmentReader } from "../../apps/desktop/electron/main/gen-ui-files.ts";
 
 const root = process.env.PI_GEN_UI_E2E_ROOT;
@@ -84,7 +84,7 @@ async function run() {
     show: false, width: 900, height: 700,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   });
-  installLiveMicrophonePermissionHandlers({ targetSession: session.defaultSession, getMainWindow: () => window, hasReservation: () => false });
+  installGenUiPermissionHandlers({ targetSession: session.defaultSession });
   const host = async (expression) => {
     try { return await window.webContents.executeJavaScript(expression); }
     catch (error) { throw new Error(`Host probe ${expression}: ${error.message}`, { cause: error }); }

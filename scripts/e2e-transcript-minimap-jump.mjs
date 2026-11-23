@@ -132,5 +132,5 @@ app.whenReady().then(async () => {
   assert.equal(result.ok, true, result.error ?? "minimap jump probe failed");
   console.log("minimap jump: ok");
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

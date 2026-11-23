@@ -499,7 +499,7 @@ function run() {
     } catch (error) {
       if (shimRoot !== "") {
         try {
-          rmSync(shimRoot, { recursive: true, force: true });
+          rmSync(shimRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
         } catch {
           // Best effort: a leftover temp directory is harmless.
         }
@@ -837,7 +837,7 @@ function run() {
 
     if (shimRoot !== "") {
       try {
-        rmSync(shimRoot, { recursive: true, force: true });
+        rmSync(shimRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
       } catch {
         // Best effort: a leftover temp directory is harmless.
       }

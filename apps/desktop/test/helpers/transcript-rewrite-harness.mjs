@@ -34,6 +34,17 @@ const { registerSessionIpc } = load("../../electron/main/ipc/session-ipc.ts", {
   "../services/session-collaboration": {},
   "../bootstrap/remote-hosts.js": {},
   "../services/session-search": {},
+  // The legacy pi JSONL store is a reader for another surface; these transcript
+  // rewrite operations never reach it. Both exports are factory functions, so the
+  // stub has to be callable rather than a plain object.
+  "../native-sessions": {
+    nativeSessionClient: () => ({ call: async () => ({}) }),
+    nativeSessionStore: () => ({
+      get: async () => null,
+      fork: async () => null,
+      list: async () => [],
+    }),
+  },
 });
 
 export function transcriptRewriteHarness(host, dataDir) {

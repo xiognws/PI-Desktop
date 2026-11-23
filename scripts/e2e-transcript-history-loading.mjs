@@ -208,4 +208,4 @@ app.whenReady().then(async () => {
   finally { clearTimeout(timer); }
   assert.equal(code, 0, output.slice(-6000));
   if (!manual) assert.match(output, /HISTORY_LOADING_PROBE .*"ok":true/);
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

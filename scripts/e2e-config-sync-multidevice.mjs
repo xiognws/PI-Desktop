@@ -73,7 +73,7 @@ try {
   }
   // Retain isolated data if a process could still be using it.
   if (stopped.every((result) => result.status === "fulfilled")) {
-    try { await rm(dataRoot, { recursive: true, force: true }); } catch (error) { errors.push(error); }
+    try { await rm(dataRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { errors.push(error); }
   }
 }
 if (errors.length) {

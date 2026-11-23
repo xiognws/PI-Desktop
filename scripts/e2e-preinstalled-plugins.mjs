@@ -59,7 +59,7 @@ test("preinstalled plugins are removable, and the decision survives a restart", 
   const host = new Host(hostBinary, data, { env, quiet: true });
   t.after(async () => {
     await host.stop();
-    await rm(temp, { recursive: true, force: true });
+    await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
 
   // The image ships two plugins.
@@ -151,7 +151,7 @@ test("an external copy wins over the image under the same id", { timeout: 120_00
   });
   t.after(async () => {
     await host.stop();
-    await rm(temp, { recursive: true, force: true });
+    await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
 
   await writePlugin(image, "acme.todo", "1.0.0");

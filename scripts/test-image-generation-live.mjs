@@ -163,5 +163,5 @@ try {
   );
   assert(edited.ok, "Live edit failed; no retry was attempted.");
 } finally {
-  await rm(directory, { recursive: true, force: true });
+  await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

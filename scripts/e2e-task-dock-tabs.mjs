@@ -57,4 +57,4 @@ app.whenReady().then(async () => {
   assert.equal(code, 0, output);
   assert.match(output, /TASK_DOCK_TABS .*"ok":true/);
   console.log(output.trim());
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

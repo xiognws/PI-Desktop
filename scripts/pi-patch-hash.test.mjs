@@ -178,7 +178,7 @@ test("check-pi-dependencies accepts a shortened virtual store entry name", () =>
     const result = run(patchDependencyCheck, dir);
     assert.equal(result.code, 0, result.stderr);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -188,7 +188,7 @@ test("check-pi-patches accepts a shortened virtual store entry name", () => {
     const result = run(patchCheck, dir);
     assert.equal(result.code, 0, result.stderr);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -199,7 +199,7 @@ test("check-pi-dependencies still rejects an install with no patched snapshot", 
     assert.equal(result.code, 1);
     assert.match(result.stderr, /does not resolve to pnpm's patched package instance/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -210,7 +210,7 @@ test("check-pi-patches rejects an installed patch hash that pnpm-lock.yaml does 
     assert.equal(result.code, 1);
     assert.match(result.stderr, /absent from pnpm-lock\.yaml/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -221,6 +221,6 @@ test("check-pi-patches rejects a package that is not installed as a patched inst
     assert.equal(result.code, 1);
     assert.match(result.stderr, /is not installed as a patched instance/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });

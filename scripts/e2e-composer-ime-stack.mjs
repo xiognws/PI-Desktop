@@ -165,5 +165,5 @@ app.whenReady().then(async () => {
   assert.equal(code, 0, output.slice(-6000));
   assert.equal(result.ok, true, "the slash menu did not reopen after the IME draft was cleared");
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

@@ -137,7 +137,7 @@ async function loadChangelogCatalog() {
     }
     return await import(pathToFileURL(path.join(tempDir, "changelog.js")).href);
   } finally {
-    rmSync(tempDir, { recursive: true, force: true });
+    rmSync(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
 

@@ -60,5 +60,5 @@ try {
   console.log("PASS production and development JSX plugin activation with host hooks and context", JSON.stringify(result));
 } finally {
   if (server) await new Promise(done => server.close(done));
-  await rm(scratch, { recursive: true, force: true });
+  await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

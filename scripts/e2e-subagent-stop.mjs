@@ -230,5 +230,5 @@ try {
   await terminateChildTree(child);
   server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));
-  if (!show) await rm(scratch, { recursive: true, force: true });
+  if (!show) await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

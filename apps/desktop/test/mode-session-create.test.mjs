@@ -11,7 +11,7 @@ const imports = {
   electron: { shell: {} }, "node:fs": {}, "node:path": {},
   "@pi-workspace/shared": { IPC, ErrorCodes, isModeId }, "../importers": {},
   "../services/session-collaboration": {}, "../bootstrap/remote-hosts.js": {},
-  "../services/session-search": {},
+  "../services/session-search": {}, "../native-sessions": { nativeSessionClient: () => ({ call: async () => ({}) }), nativeSessionStore: () => ({ get: async () => null, fork: async () => null, list: async () => [] }) },
 };
 new Function("require", "exports", "module", ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },

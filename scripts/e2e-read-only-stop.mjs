@@ -31,7 +31,15 @@ async function scenario(toolName) {
     for await (const chunk of request) chunks.push(chunk);
     requestBodies.push(Buffer.concat(chunks).toString("utf8"));
     requests++;
+    if (process.env.PI_E2E_DEBUG_PROVIDER) {
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+      const last = body.messages?.at(-1);
+      console.error(`[provider] #${requests} msgs=${body.messages?.length} last=${last?.role}:${String(last?.content).slice(0, 100)}`);
+    }
     if (request.url !== "/v1/chat/completions" || requests > 2) {
+      if (process.env.PI_E2E_DEBUG_PROVIDER) {
+        console.error(`[provider] rejected #${requests} ${request.url} bytes=${Buffer.concat(chunks).length}`);
+      }
       response.writeHead(400).end("Unexpected provider request");
       return;
     }
@@ -115,5 +123,5 @@ try {
   for (const tool of ["Read", "Glob", "Grep", "Write"]) await scenario(tool);
   console.log(JSON.stringify({ passed: true, results }));
 } finally {
-  await rm(temporary, { recursive: true, force: true });
+  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

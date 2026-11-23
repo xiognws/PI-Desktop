@@ -27,7 +27,6 @@ import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PersistenceOutbox } from "../persistence-outbox";
 import type { PluginRuntime } from "../plugin-runtime";
-import { shutdownLspSessions } from "../lsp/tools";
 import { readSessionCollaboration } from "../services/session-collaboration";
 import { localNativeProjectPaths, searchSessionsAcrossSources } from "../services/session-search";
 // The legacy pi JSONL store is read in main: the Rust kernel keeps no
@@ -114,7 +113,16 @@ export type SessionIpcDependencies = {
   stripWinLongPrefix: (path: string) => string;
   /** Resolves the definition snapshot attached to a mode selection. */
   modeCatalog: Pick<ModeCatalogService, "snapshotFor">;
-
+  /** Bring the in-app provider gateways up the first time a session is used. */
+  ensureInAppProviders?: () => Promise<void>;
+  /**
+   * Release the host resources that belong to one session when it is deleted.
+   *
+   * Injected rather than imported: this module is loaded by test harnesses with an
+   * explicit dependency list, and a language-server client pulled in from here
+   * would put business logic behind the IPC boundary.
+   */
+  disposeSessionResources?: (sessionId: string) => Promise<void>;
 };
 
 export function registerSessionIpc({
@@ -134,10 +142,20 @@ export function registerSessionIpc({
   forgetTranscriptRewriteHistory,
   stripWinLongPrefix,
   modeCatalog,
-
+  ensureInAppProviders,
+  disposeSessionResources,
 }: SessionIpcDependencies): void {
   let host: HostProcess | null = null;
-
+  // Opening a session is the first moment the app knows which provider the user
+  // is about to talk to. The gateways behind the in-app providers are forked
+  // processes with loopback ports, so they are created here rather than at boot.
+  const startProviderGatewaysForUse = (): void => {
+    void ensureInAppProviders?.().catch((error: unknown) => {
+      logger.app("provider", "warn", "in-app provider startup failed", {
+        data: String(error),
+      });
+    });
+  };
   let sidecar: AgentSidecar | null = null;
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
     registrar.handle(channel, async (...args) => {
@@ -247,6 +265,7 @@ export function registerSessionIpc({
     };
   });
   handle(IPC.invoke.sessionCreate, async (input = {}) => {
+    startProviderGatewaysForUse();
     if (!host) throw new Error("host unavailable");
     if (!input || typeof input !== "object" || Array.isArray(input) ||
       (input.mode !== undefined && (typeof input.mode !== "string" || !isModeId(input.mode)))) {
@@ -411,6 +430,7 @@ export function registerSessionIpc({
     return host.call("session.usageCost", { sessionId });
   });
   handle(IPC.invoke.sessionOpen, async (rawSessionId: string) => {
+    startProviderGatewaysForUse();
     if (!host) throw new Error("host unavailable");
     const sessionId = String(rawSessionId ?? "").trim();
     if (!sessionId) throw new Error("session id required");
@@ -451,8 +471,9 @@ export function registerSessionIpc({
         .catch(() => undefined);
     }
     // A language server holds an index of the workspace and belongs to the
-    // session that asked for it; a deleted session leaves it no owner.
-    await shutdownLspSessions(id).catch(() => undefined);
+    // session that asked for it; a deleted session leaves it no owner. The host
+    // that owns the LSP pool injects this, so the IPC layer stays free of it.
+    await disposeSessionResources?.(id).catch(() => undefined);
     sessionProjects.delete(id);
     logger.app("session", "info", "session deleted", { sessionId: id });
     return res;

@@ -248,5 +248,5 @@ try {
   model.closeAllConnections();
   await new Promise((resolve) => model.close(resolve));
   await host.stop();
-  rmSync(root, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

@@ -86,12 +86,12 @@ export function prepareMacDevelopmentBundle({
   ) {
     return targetExecutable;
   }
-  if (existsSync(targetRoot)) rmSync(targetRoot, { recursive: true, force: true });
+  if (existsSync(targetRoot)) rmSync(targetRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 
   mkdirSync(cacheRoot, { recursive: true });
   const stagingRoot = join(cacheRoot, `${cacheKey}.staging-${process.pid}`);
   const stagingBundle = join(stagingRoot, `${APP_NAME}.app`);
-  rmSync(stagingRoot, { recursive: true, force: true });
+  rmSync(stagingRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 
   try {
     cpSync(sourceBundle, stagingBundle, {
@@ -144,7 +144,7 @@ export function prepareMacDevelopmentBundle({
       existsSync(targetExecutable) &&
       existsSync(targetTrayIcon) &&
       existsSync(targetTrayIconMac);
-    rmSync(stagingRoot, { recursive: true, force: true });
+    rmSync(stagingRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     if (cacheWonRace) return targetExecutable;
     throw error;
   }

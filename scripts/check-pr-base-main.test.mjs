@@ -54,7 +54,7 @@ test("check-pr-base-main accepts a head that already contains main", () => {
     assert.equal(result.code, 0);
     assert.match(result.stdout, /PR base check passed/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -75,7 +75,7 @@ test("check-pr-base-main rejects a head that is behind main", () => {
     assert.match(result.stderr, /not an ancestor/);
     assert.match(result.stderr, /behind origin\/main/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -96,6 +96,6 @@ test("check-pr-base-main accepts a head rebased onto latest main", () => {
     assert.equal(result.code, 0);
     assert.match(result.stdout, /is an ancestor/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });

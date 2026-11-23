@@ -101,7 +101,7 @@ try {
   {
     const sourceRoot = join(tempRoot, "dependency-extension");
     const importRoot = join(tempRoot, "imported");
-    rmSync(sourceRoot, { recursive: true, force: true });
+    rmSync(sourceRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     writeExtensionSource(sourceRoot, {
       name: "dependency-extension",
       version: "1.0.0",
@@ -315,7 +315,7 @@ try {
     record("E2E-PLUGIN-import-extension-reports-missing-dependency", false, detail);
   }
 } finally {
-  rmSync(tempRoot, { recursive: true, force: true });
+  rmSync(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 }
 

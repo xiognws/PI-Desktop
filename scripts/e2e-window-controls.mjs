@@ -9,9 +9,19 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
 import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+
+/**
+ * The corner probe only uses `Add-Type` and Win32 structs, which Windows
+ * PowerShell 5.1 handles exactly like PowerShell 7. This host has no `pwsh`
+ * and the intranet cannot reach the winget source for it, so fall back rather
+ * than fail the scenario on a missing interpreter. Override with PI_TEST_PWSH.
+ */
+const PWSH = process.env.PI_TEST_PWSH
+  ?? (existsSync("C:/Program Files/PowerShell/7/pwsh.exe") ? "pwsh.exe" : "powershell.exe");
 import { assertDesktopBuild, repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 import { Host, resolveHostBinary } from "./e2e/host.mjs";
 
@@ -121,7 +131,7 @@ async function checkWindowsRoundedCorners(
   try {
     await waitFor(async () => {
       try {
-        const { stdout } = await execFileAsync("pwsh.exe", [
+        const { stdout } = await execFileAsync(PWSH, [
           "-NoLogo", "-NoProfile", "-File",
           fileURLToPath(new URL("./e2e/probe-window-corners.ps1", import.meta.url)),
           String(child.pid), String(radius),
@@ -177,7 +187,7 @@ async function checkNativeWindowResizes(edges) {
   for (const edge of edges) {
     await evaluate(`window.piDesktop.invoke('pi-desktop/menu/nativeAction', { action: 'restoreMainWindow' })`);
     await waitFor(() => evaluate(`document.hasFocus()`), `${edge} drag window focused`);
-    const { stdout } = await execFileAsync("pwsh.exe", [
+    const { stdout } = await execFileAsync(PWSH, [
       "-NoLogo", "-NoProfile", "-File",
       fileURLToPath(new URL("./e2e/drag-window-edge.ps1", import.meta.url)),
       String(child.pid), edge,
@@ -305,7 +315,7 @@ try {
   await settle();
   await checkControls("native fullscreen with panel open");
   if (process.platform === "win32") {
-    const { stdout } = await execFileAsync("pwsh.exe", [
+    const { stdout } = await execFileAsync(PWSH, [
       "-NoLogo", "-NoProfile", "-File",
       fileURLToPath(new URL("./e2e/probe-fullscreen-taskbar.ps1", import.meta.url)),
       String(child.pid),

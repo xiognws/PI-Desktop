@@ -73,5 +73,5 @@ try {
 } finally {
   clearTimeout(timeout);
   if (child && child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-  await rm(directory, { recursive: true, force: true });
+  await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

@@ -6,6 +6,7 @@ import ts from "typescript";
 import { register } from "node:module";
 import { ErrorCodes } from "../../../packages/shared/src/errors.ts";
 import { IPC, IPC_WHITELIST } from "../../../packages/shared/src/protocol.ts";
+import { IN_APP_PROVIDER_CHANNELS } from "../src/lib/in-app-provider-channels.ts";
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const transcript = await import("../src/lib/session-transcript.ts");
 const safety = await import("../src/lib/remote-session-safety.ts");
@@ -73,7 +74,7 @@ for (const outcome of ["success", "exception", "reply_started"]) {
   });
 }
 const { registerSessionIpc } = load("../electron/main/ipc/session-ipc.ts", {
-  electron: { shell: {} }, "node:fs": fs, "node:path": path, "@pi-workspace/shared": { ErrorCodes, IPC }, "../importers": {}, "../services/session-collaboration": {}, "../bootstrap/remote-hosts.js": {}, "../services/session-search": {},
+  electron: { shell: {} }, "node:fs": fs, "node:path": path, "@pi-workspace/shared": { ErrorCodes, IPC }, "../importers": {}, "../services/session-collaboration": {}, "../bootstrap/remote-hosts.js": {}, "../services/session-search": {}, "../native-sessions": { nativeSessionClient: () => ({ call: async () => ({}) }), nativeSessionStore: () => ({ get: async () => null, fork: async () => null, list: async () => [] }) },
 });
 function ipcHarness(pending = false, result = { ok: true }) {
   const handlers = new Map(); const events = [];
@@ -180,6 +181,8 @@ test("the real store/API/preload/IPC path uploads bounded ids with more than 64 
   const { api } = load("../src/lib/api.ts", {
     "@pi-workspace/shared": shared, "./plan-history": {}, "./remote-session-safety": safety,
     "./remote-ipc-safety": { guardRemoteInvocation() {} },
+    // A real constant module: the channel list must be the product's own.
+    "./in-app-provider-channels": { IN_APP_PROVIDER_CHANNELS },
   }, { window: { piDesktop: bridge } });
   const h = harness({ state: { messages: huge }, runtime: { loadFullSessionMessages: async () => huge }, api });
   await h.actions.deleteMessage("u2");

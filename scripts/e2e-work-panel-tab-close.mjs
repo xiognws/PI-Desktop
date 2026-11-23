@@ -133,5 +133,5 @@ app.whenReady().then(async () => {
   }
   console.log("tab close geometry: PASS");
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

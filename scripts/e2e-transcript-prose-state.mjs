@@ -81,4 +81,4 @@ app.whenReady().then(async()=>{
   console.log(output);
   assert.equal(code, 0, "Real Markdown state regression failed");
   assert.match(output, /"ordinaryProseRecycled":true/);
-} finally { await rm(directory, { recursive: true, force: true }); }
+} finally { await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

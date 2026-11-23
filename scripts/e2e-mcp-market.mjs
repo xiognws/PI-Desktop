@@ -340,8 +340,8 @@ try {
   record("E2E-MCP-MARKET-INSTALL", false, error.message);
 } finally {
   host?.dispose();
-  setTimeout(() => rmSync(home, { recursive: true, force: true }), 200);
-  rmSync(dataDir, { recursive: true, force: true });
+  setTimeout(() => rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }), 200);
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 const failed = results.filter((result) => !result.ok);

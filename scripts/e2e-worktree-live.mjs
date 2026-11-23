@@ -320,7 +320,7 @@ try {
   if (process.env.PI_DESKTOP_KEEP_TEMP) {
     console.log(`kept ${temp} (its data directory holds the provider key; delete it when done)`);
   }
-  else rmSync(temp, { recursive: true, force: true });
+  else rmSync(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 const failed = results.filter((result) => !result.ok);

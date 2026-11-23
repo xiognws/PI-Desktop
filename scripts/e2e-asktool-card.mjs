@@ -132,5 +132,5 @@ app.whenReady().then(async () => {
   assert.equal(result.ok, true, result.error ?? "asktool card probe failed");
   console.log("asktool card: ok");
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

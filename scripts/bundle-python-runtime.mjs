@@ -238,7 +238,7 @@ if (!wheelSource) {
 
 // Install into an empty directory: `--target` does not uninstall, so a second
 // run over the same directory would keep files of a removed dependency.
-rmSync(siteDir, { recursive: true, force: true });
+rmSync(siteDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 await mkdir(siteDir, { recursive: true });
 await writeFile(join(STAGING, "requirements.txt"), requirementsTxt());
 python = python || resolvePython();
@@ -289,7 +289,7 @@ if (!existsSync(join(runtimeSource, "python.exe")) && !existsSync(join(runtimeSo
 if (!existsSync(join(runtimeSource, "Lib"))) {
   throw new Error(`${runtimeSource} has no Lib/ directory; a bundled runtime needs the standard library`);
 }
-rmSync(runtimeDir, { recursive: true, force: true });
+rmSync(runtimeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 await mkdir(runtimeDir, { recursive: true });
 for (const entry of await readdir(runtimeSource, { withFileTypes: true })) {
   if (entry.name === "Lib" || entry.name === "Scripts" || entry.name === "__pycache__") continue;
@@ -315,7 +315,7 @@ async function cp(from, to, isDirectory) {
 }
 
 // Assemble the shipped tree, then record what it contains.
-rmSync(TARGET, { recursive: true, force: true });
+rmSync(TARGET, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 await mkdir(join(TARGET, "site-packages"), { recursive: true });
 for (const entry of await readdir(runtimeDir, { withFileTypes: true })) {
   await cp(join(runtimeDir, entry.name), join(TARGET, "runtime", entry.name), entry.isDirectory());
@@ -359,7 +359,7 @@ for (const file of files.sort()) {
 }
 await writeFile(join(TARGET, "MANIFEST.json"), JSON.stringify(manifest, null, 2) + "\n");
 
-if (!KEEP_STAGING) rmSync(STAGING, { recursive: true, force: true });
+if (!KEEP_STAGING) rmSync(STAGING, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 
 console.log(
   `bundled: ${manifest.files.length} files, ${(bytesTotal / 1048576).toFixed(1)} MiB, ` +

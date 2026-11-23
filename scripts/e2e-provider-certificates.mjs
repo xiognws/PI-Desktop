@@ -77,5 +77,5 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',method:'test.trust',params:{s
 } finally {
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

@@ -15,7 +15,9 @@ import { startHtmlPreviewModel } from "./e2e/html-preview-model.mjs";
 
 const root = repositoryRoot();
 const require = createRequire(import.meta.url);
-const { _electron } = require(process.env.PI_TEST_PLAYWRIGHT || "playwright");
+// `playwright-core` already ships the Electron driver this harness needs; the
+// full `playwright` package would only add browser downloads we never launch.
+const { _electron } = require(process.env.PI_TEST_PLAYWRIGHT || "playwright-core");
 const output = await mkdtemp(join(process.env.PI_TEST_OUTPUT || tmpdir(), "pi-html-links-"));
 const data = join(output, "data"), primary = join(output, "project"), secondary = join(output, "assets");
 await Promise.all([data, primary, secondary].map(path => mkdir(path, { recursive: true })));

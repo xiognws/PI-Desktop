@@ -150,4 +150,4 @@ app.whenReady().then(async () => {
   const result = output.split(/\r?\n/).find((line) => line.startsWith("TODO_CHECKLIST "));
   assert(result, output);
   console.log(result);
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

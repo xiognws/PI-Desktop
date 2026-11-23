@@ -137,5 +137,5 @@ try {
   }
   if (previousBinary === undefined) delete process.env.PI_DESKTOP_HOST_BIN;
   else process.env.PI_DESKTOP_HOST_BIN = previousBinary;
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

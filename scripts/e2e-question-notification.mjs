@@ -86,4 +86,4 @@ app.whenReady().then(async () => {
   assert.equal(code, 0, output.slice(-6000));
   assert.equal(result.ok, true, result.error);
   console.log("question notification navigation: ok");
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

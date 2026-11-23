@@ -78,4 +78,4 @@ result.checks.push(...restored.checks);console.log('REVIEW_HISTORY '+JSON.string
   assert.equal(code, 0, output);
   const result = output.split(/\r?\n/).find(line => line.startsWith("REVIEW_HISTORY ")); assert(result, output); console.log(result);
   console.log("Preview screenshots: " + screenshots);
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

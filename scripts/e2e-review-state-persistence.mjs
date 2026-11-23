@@ -118,5 +118,5 @@ try {
   }));
 } finally {
   await host.stop();
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

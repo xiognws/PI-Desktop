@@ -7,6 +7,7 @@ import test from "node:test";
 import ts from "typescript";
 import { ErrorCodes } from "../../../packages/shared/src/errors.ts";
 import { IPC, IPC_WHITELIST } from "../../../packages/shared/src/protocol.ts";
+import { IN_APP_PROVIDER_CHANNELS } from "../src/lib/in-app-provider-channels.ts";
 
 function load(relative, imports, globals = {}) {
   const file = new URL(relative, import.meta.url);
@@ -37,6 +38,8 @@ const { registerSessionIpc } = load("../electron/main/ipc/session-ipc.ts", {
   "../services/session-collaboration": collaboration,
   "../bootstrap/remote-hosts.js": { getActiveRemoteHostsBoot: () => null },
   "../services/session-search": { searchSessionsAcrossSources: async () => ({ hits: [], nextOffset: null }) },
+  // session-ipc imports the legacy pi JSONL store; collaboration never reaches it.
+  "../native-sessions": { nativeSessionClient: () => ({ call: async () => ({}) }), nativeSessionStore: () => ({ get: async () => null, fork: async () => null, list: async () => [] }) },
 });
 const summary = {
   sessionId: "worker-session-id",
@@ -101,6 +104,8 @@ function rendererApi(invoke) {
       i18next: { default: i18n },
     }),
     "./remote-session-safety": load("../src/lib/remote-session-safety.ts", {}),
+    // A real constant module: the channel list must be the product's own.
+    "./in-app-provider-channels": { IN_APP_PROVIDER_CHANNELS },
   }, {
     window: { piDesktop: bridge },
   });

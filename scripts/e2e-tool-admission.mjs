@@ -129,7 +129,7 @@ async function main() {
       console.log("PASS E2E-097-admission: 4 active + 12 queued shells leave independent Read/Write capacity and drain cleanly");
     }, binary, tempRoot, PROTOCOL_VERSION);
   } finally {
-    await rm(tempRoot, { recursive: true, force: true });
+    await rm(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
 

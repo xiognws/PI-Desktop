@@ -63,4 +63,4 @@ app.whenReady().then(async () => {
   assert(line, output.slice(-5000));
   assert.equal(JSON.parse(line.slice('MAINTENANCE_RESULT '.length)).ok, true);
   console.log('PASS queue-refresh-event-order: real Electron, production renderer/store, controlled external API');
-} finally { await rm(scratch, { recursive: true, force: true }); }
+} finally { await rm(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

@@ -85,4 +85,4 @@ app.whenReady().then(async () => {
   const segments = output.split(/\r?\n/).find((line) => line.startsWith("SETTINGS_SEGMENTS "));
   assert(segments, output);
   console.log(segments);
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

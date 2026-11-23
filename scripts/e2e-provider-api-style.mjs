@@ -108,5 +108,5 @@ app.whenReady().then(async () => {
   if (reasoningOnly) for (const item of result) assert.equal(item.ok, true);
   else assert.equal(result.ok, true);
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

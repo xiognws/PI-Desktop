@@ -137,5 +137,5 @@ try {
 } finally {
   clearTimeout(deadline);
   await runtime?.dispose(); relay?.dispose(); await localHost?.dispose(); await boot?.closeAll(); h?.server.close(); await binding?.close(); await host?.dispose();
-  model.closeAllConnections(); await new Promise(resolveClose => model.close(resolveClose)); await rm(root, { recursive: true, force: true });
+  model.closeAllConnections(); await new Promise(resolveClose => model.close(resolveClose)); await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

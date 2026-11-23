@@ -35,5 +35,5 @@ try {
   console.log("COMPACTION_TAIL " + JSON.stringify({ ok: true, restart: true, contextTokens: 26136 }));
 } finally {
   await host.stop();
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

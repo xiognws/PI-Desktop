@@ -125,4 +125,4 @@ async function scenario(boundary) {
 
 try {
   for (const boundary of ["assistant", "tool-a", "tool-b", undefined]) await scenario(boundary);
-} finally { await rm(temporary, { recursive: true, force: true }); }
+} finally { await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

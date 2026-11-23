@@ -50,7 +50,7 @@ const timeout = setTimeout(() => {
 function cleanup(code) {
   clearTimeout(timeout);
   try {
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   } catch {}
   process.exit(code);
 }

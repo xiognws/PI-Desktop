@@ -17,7 +17,7 @@ if (missingEnv.length > 0) {
     "Set PI_DESKTOP_TEST_API_KEY (provider API key), PI_DESKTOP_TEST_BASE_URL " +
       "(OpenAI-compatible base URL), and PI_DESKTOP_TEST_MODEL (model id) to run this live test.",
   );
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   process.exit(1);
 }
 const API_KEY = process.env.PI_DESKTOP_TEST_API_KEY;
@@ -29,7 +29,7 @@ try {
   hostBin = resolveHostBinary();
 } catch (error) {
   console.error(error instanceof Error ? error.message : "host-core binary missing");
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   process.exit(1);
 }
 
@@ -140,7 +140,7 @@ try {
     try {
       await host.stop();
     } finally {
-      rmSync(dataDir, { recursive: true, force: true });
+      rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }
   }
 }

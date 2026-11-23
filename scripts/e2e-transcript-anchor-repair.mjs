@@ -95,4 +95,4 @@ app.whenReady().then(async()=>{
     if (result.kind === "unreachable") assert.equal(result.top, 0);
   }
   assert(results.every(result => result.drift < 2), "Same readable paragraph moved: " + JSON.stringify(results));
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

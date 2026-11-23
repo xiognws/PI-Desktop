@@ -57,7 +57,7 @@ for (const phase of ["begin", "append", "restore"]) {
       const directory = resolve(scratch);
       assert.equal(dirname(directory), resolve(tmpdir()));
       assert.ok(basename(directory).startsWith("pi-headless-startup-"));
-      await rm(directory, { recursive: true, force: true });
+      await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     });
     server.listen(0, "127.0.0.1");
     await once(server, "listening");

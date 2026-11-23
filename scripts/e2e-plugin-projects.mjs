@@ -15,7 +15,7 @@ const { createPluginProjectLister } = await import(
 test("plugin project picker enumerates durable projects without selecting a workspace", { timeout: 60_000 }, async (t) => {
   const temp = await mkdtemp(join(tmpdir(), "pi-projects-e2e-"));
   const host = new Host(resolveHostBinary(), join(temp, "data"));
-  t.after(async () => { await host.stop(); await rm(temp, { recursive: true, force: true }); });
+  t.after(async () => { await host.stop(); await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); });
   await host.start();
   const paths = ["solo", "primary", "extra"].map((name) => join(temp, name));
   for (const path of paths) await mkdir(path);

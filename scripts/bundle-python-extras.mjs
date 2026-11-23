@@ -145,7 +145,7 @@ function markerBody(entries) {
  * stays as the fallback so the script still works on macOS and Linux.
  */
 async function copyTree(from, to) {
-  await rm(to, { recursive: true, force: true });
+  await rm(to, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   await mkdir(dirname(to), { recursive: true });
   if (process.platform === "win32") {
     const result = spawnSync(
@@ -178,7 +178,7 @@ async function linkOrCopy(target, link) {
   if (process.platform === "win32") {
     // `rmdir` removes a junction without following it into the cache.
     spawnSync("cmd", ["/c", "rmdir", link], { stdio: "ignore" });
-    await rm(link, { recursive: true, force: true });
+    await rm(link, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     await mkdir(dirname(link), { recursive: true });
     const result = spawnSync("cmd", ["/c", "mklink", "/J", link, target], { stdio: "ignore" });
     if (result.status === 0) return "junction";
@@ -230,7 +230,7 @@ if (wheelSource) {
   );
 }
 
-await rm(siteDir, { recursive: true, force: true });
+await rm(siteDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 await mkdir(siteDir, { recursive: true });
 console.log("  installing…");
 // `--no-deps`: the extras set is a mirror of a working environment, and pip's

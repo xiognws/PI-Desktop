@@ -244,7 +244,7 @@ async function main() {
   assertDesktopBuild(root);
 
   mkdirSync(runRoot, { recursive: true });
-  rmSync(homeDir, { recursive: true, force: true });
+  rmSync(homeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   rmSync(requestLog, { force: true });
   const allocatedPorts = new Set();
   const stubPort = await freePort(allocatedPorts);

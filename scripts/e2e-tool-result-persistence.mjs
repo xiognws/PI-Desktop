@@ -199,6 +199,6 @@ try {
   console.log(JSON.stringify({ phase: "nested-cross-language-profile-relocation", levels: 3, storedCopies: 1, result: "pass" }));
 } finally {
   if (host) await host.dispose();
-  await rm(dataDir, { recursive: true, force: true });
-  if (movedDataDir) await rm(movedDataDir, { recursive: true, force: true });
+  await rm(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  if (movedDataDir) await rm(movedDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

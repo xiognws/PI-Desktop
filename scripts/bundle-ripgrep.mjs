@@ -91,7 +91,7 @@ async function stagedFromLocal(from) {
   if (stats.isDirectory()) return { dir: from, cleanup: null };
   if (from.toLowerCase().endsWith(".zip")) {
     const dir = join(cacheDir(), "extracted-local");
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     await mkdir(dir, { recursive: true });
     extractZip(from, dir);
     return { dir, cleanup: dir };
@@ -100,7 +100,7 @@ async function stagedFromLocal(from) {
   // handling below has one shape to deal with. Licenses stay behind, so they
   // are read from the lock's own platform entry instead.
   const dir = join(cacheDir(), "extracted-local");
-  await rm(dir, { recursive: true, force: true });
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   await mkdir(dir, { recursive: true });
   await copyFile(from, join(dir, entry.binary));
   return { dir, cleanup: dir };
@@ -179,7 +179,7 @@ async function main() {
   } else {
     const archive = await fetchArchive();
     const dir = join(cacheDir(), "extracted");
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     await mkdir(dir, { recursive: true });
     extractZip(archive, dir);
     source = { dir, cleanup: dir };

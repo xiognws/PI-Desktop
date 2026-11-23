@@ -106,5 +106,5 @@ try {
   })));
   console.log("RUNNING_REOPEN_PROBE " + JSON.stringify({ passed: true, results }));
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

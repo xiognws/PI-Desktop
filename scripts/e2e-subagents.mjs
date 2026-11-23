@@ -435,14 +435,14 @@ try {
       legacy.diagnostics.length === 0,
     `${legacy.diagnostics.length} diagnostic(s): ${legacy.diagnostics.join(" / ") || "none"}`,
   );
-  rmSync(legacyDir, { recursive: true, force: true });
+  rmSync(legacyDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 } catch (error) {
   check("the run completed", false, String(error));
 } finally {
   host.stdin.end();
   host.kill();
   for (const dir of [dataDir, homeDir, projectA, projectB]) {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
   if (previousHome === undefined) delete process.env.HOME;
   else process.env.HOME = previousHome;

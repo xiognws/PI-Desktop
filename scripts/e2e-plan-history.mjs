@@ -145,4 +145,4 @@ app.whenReady().then(async () => {
   console.log(line);
   assert.equal(code, 0, output.slice(-6000));
   assert.equal(JSON.parse(line.slice("PLAN_HISTORY_PROBE ".length)).ok, true);
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

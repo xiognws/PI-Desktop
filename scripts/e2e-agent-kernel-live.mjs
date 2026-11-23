@@ -256,7 +256,7 @@ try {
   try {
     await host?.stop?.();
   } catch {}
-  if (!process.argv.includes("--keep")) rmSync(dataDir, { recursive: true, force: true });
+  if (!process.argv.includes("--keep")) rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 console.log("\nchecks:");

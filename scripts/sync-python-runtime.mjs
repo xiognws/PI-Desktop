@@ -81,7 +81,7 @@ if (!FORCE && existsSync(join(TARGET, MANIFEST))) {
 */
 const NEXT = `${TARGET}.next`;
 const PREVIOUS = `${TARGET}.previous`;
-await rm(NEXT, { recursive: true, force: true });
+await rm(NEXT, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 await mkdir(dirname(NEXT), { recursive: true });
 
 async function copy(from, to) {
@@ -101,7 +101,7 @@ await copy(SOURCE, NEXT);
 
 // A partial copy must not cost the installed tree: if the copy above failed,
 // this line is never reached and the live directory is untouched.
-await rm(PREVIOUS, { recursive: true, force: true });
+await rm(PREVIOUS, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 if (existsSync(TARGET)) await rename(TARGET, PREVIOUS);
 
 try {
@@ -115,7 +115,7 @@ try {
 
 // Best effort: a client still holding files keeps this directory around, which
 // is harmless until the next successful run removes it.
-await rm(PREVIOUS, { recursive: true, force: true }).catch(() => {});
+await rm(PREVIOUS, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => {});
 
 console.log(
   `staged ${sourceManifest.name}@${sourceManifest.version} → ${relative(REPO, TARGET)} ` +

@@ -204,7 +204,7 @@ async function withLaunch(writeFixture, run, { missLoadedData = false } = {}) {
     try { ws?.close(); } catch {}
     try { child.kill("SIGKILL"); } catch {}
     if (process.env.PI_DESKTOP_KEEP_TEMP !== "1") {
-      try { rmSync(dataDir, { recursive: true, force: true }); } catch {}
+      try { rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch {}
     }
   }
 }

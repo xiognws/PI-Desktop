@@ -62,4 +62,4 @@ app.whenReady().then(async () => {
   assert.equal(code, 0, output);
   assert.ok(output.includes('"ok":true'), output);
   console.log(output.trim());
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally { await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }

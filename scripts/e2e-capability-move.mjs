@@ -374,7 +374,7 @@ try {
 } finally {
   host?.dispose();
   for (const dir of [home, dataDir, projectA, projectB]) {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
 

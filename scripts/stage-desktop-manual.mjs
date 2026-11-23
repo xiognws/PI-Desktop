@@ -124,7 +124,7 @@ if (failures.length > 0) {
 
 // The staged tree is generated output: replace it whole so a removed
 // screenshot cannot linger into the package.
-rmSync(targetDir, { recursive: true, force: true });
+rmSync(targetDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 mkdirSync(targetDir, { recursive: true });
 cpSync(path.join(handbookDir, handbook), path.join(targetDir, handbook));
 cpSync(shotsDir, path.join(targetDir, "shots"), {

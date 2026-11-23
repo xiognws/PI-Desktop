@@ -62,7 +62,7 @@ async function loadApiKey() {
     return value;
   } finally {
     await host.stop();
-    await rm(data, { recursive: true, force: true });
+    await rm(data, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }
 

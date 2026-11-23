@@ -297,7 +297,7 @@ await Promise.all(
           continue;
         }
         const dest = join(TARGET, item.id);
-        await rm(dest, { recursive: true, force: true });
+        await rm(dest, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
         const writtenPaths = [];
         let stripped = 0;
         for (const entry of entries) {

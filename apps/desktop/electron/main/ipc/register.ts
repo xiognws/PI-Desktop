@@ -79,6 +79,12 @@ export type RegisterIpcDependencies = {
   ) => void;
   /** The shell's answer to a composer suggestion it was offered (ADR 0333). */
   settleComposerSuggestion: (answer: ComposerSuggestionAnswer) => boolean;
+  /**
+   * Releases host resources owned by one session when it is deleted — today the
+   * language servers it started (ADR 0401). Injected from the composition root so
+   * neither the IPC layer nor this registrar imports the LSP pool.
+   */
+  disposeSessionResources?: (sessionId: string) => Promise<void>;
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
   disabledBuiltinSubagents: () => Promise<string[]>;
   disabledBuiltinSkills: () => Promise<string[]>;
@@ -291,6 +297,10 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     getSidecar,
     dataDir,
+    // Forked gateways with loopback ports: created on first session use, never
+    // during boot, so an idle launch holds no child process and no listener.
+    ensureInAppProviders: () => inAppProviders.start(),
+    disposeSessionResources: dependencies.disposeSessionResources,
     activeTurns,
     sessionProjects,
     persistenceOutbox,

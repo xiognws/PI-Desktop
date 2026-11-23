@@ -105,5 +105,5 @@ app.whenReady().then(async () => {
   clearTimeout(timeout);
   assert.equal(code, 0, "Mounted shortcut interaction regression");
 } finally {
-  await rm(temp, { recursive: true, force: true });
+  await rm(temp, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
