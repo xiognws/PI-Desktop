@@ -1,0 +1,38 @@
+apps/desktop/electron/main/runtime/session-launch.ts
+  h_201ed4c689ac8b 328-377,855-863,887-890
+apps/desktop/src/features/settings/pages/AgentBehaviorSettings.tsx
+  h_201ed4c689ac8b 17,27,92-106
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 1145-1151,2825-2832
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1776-1778
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1788-1790
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1776-1778
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1776-1778
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1784-1786
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1753-1755
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1784-1786
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1774-1776
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1774-1776
+packages/shared/src/types/settings.ts
+  h_201ed4c689ac8b 103-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "92f9e07e779cc473aad9de5225c7ea28ff4b071b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
