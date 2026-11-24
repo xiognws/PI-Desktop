@@ -1,0 +1,24 @@
+apps/desktop/electron/main/crash-forensics.ts
+  h_201ed4c689ac8b 1-147
+apps/desktop/electron/main/runtime/host.ts
+  h_201ed4c689ac8b 2,23,424-431
+apps/desktop/electron/main/runtime/lifecycle.ts
+  h_201ed4c689ac8b 29,37-42,252-271,276-280,284,302-320
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 31,425-442
+apps/desktop/electron/test/crash-forensics.test.mjs
+  h_201ed4c689ac8b 1-105
+docs/spec/03-runtime/09-logging-and-observability.md
+  h_201ed4c689ac8b 100-103,109-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e34590871a3ebfe19906938870af4ae0aedd7022",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
