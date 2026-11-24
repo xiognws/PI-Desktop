@@ -98,3 +98,20 @@ test("the launcher window is resizable and remembers its size", () => {
   assert.match(main, /window\.on\("resize", \(\) => schedulePluginLauncherBounds/);
   assert.match(main, /window\.on\("move", \(\) => schedulePluginLauncherBounds/);
 });
+
+test("the launcher asks for its surface by hash, which a packaged asar can serve", () => {
+  // `loadFile(…, { query })` on a path inside `app.asar` failed to load at all in a
+  // packaged build — `ERR_FAILED (-2)` on
+  // `file://…/app.asar/out/renderer/index.html?surface=plugin-launcher`, logged as
+  // `plugin.launcher.warm.up.failed` on every boot. A fragment is not part of path
+  // resolution, so it loads from the asar and from the dev server alike.
+  assert.match(main, /hash: "surface=plugin-launcher"/);
+  assert.match(main, /url\.hash = "surface=plugin-launcher"/);
+  assert.doesNotMatch(
+    main,
+    /query: \{ surface: "plugin-launcher" \}/,
+    "a query on the asar file URL is what broke the packaged load",
+  );
+  // The renderer has to read the new place, or it renders the main window instead.
+  assert.match(renderer, /window\.location\.hash\.replace\(/);
+});

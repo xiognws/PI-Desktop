@@ -12,7 +12,11 @@ import { initLanguageSync } from "./lib/app-language";
 import { installScrollbarReveal } from "./lib/scrollbar-reveal";
 import "./styles/globals.css";
 
-const rendererSurface = new URLSearchParams(window.location.search).get("surface");
+// The window asking for a surface may say so in the query (a dev server URL) or in
+// the hash (a packaged asar, where a query on the file URL fails to load at all).
+const rendererSurface =
+  new URLSearchParams(window.location.search).get("surface") ??
+  new URLSearchParams(window.location.hash.replace(/^#/, "")).get("surface");
 if (rendererSurface) document.documentElement.dataset.surface = rendererSurface;
 document.documentElement.dataset.theme = "dark";
 // Window-chrome layout differs per OS (traffic lights left on macOS,

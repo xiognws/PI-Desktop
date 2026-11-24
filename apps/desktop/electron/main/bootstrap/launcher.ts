@@ -193,14 +193,23 @@ export function createLauncher({
       });
 
       try {
+        // The surface travels in the HASH, not the query string.
+        //
+        // A packaged renderer is loaded from inside `app.asar`, and Electron's file
+        // handler resolves that path itself — a `?query` on it made Chromium fail the
+        // load outright in a packaged build (`ERR_FAILED (-2)` on
+        // `file://…/app.asar/out/renderer/index.html?surface=plugin-launcher`), so the
+        // warm-up logged a failure on every boot and the launcher opened late or not
+        // at all. A fragment never takes part in path resolution, so it works in both
+        // the dev server and the asar.
         if (process.env.ELECTRON_RENDERER_URL) {
           const url = new URL(process.env.ELECTRON_RENDERER_URL);
-          url.searchParams.set("surface", "plugin-launcher");
+          url.hash = "surface=plugin-launcher";
           await window.loadURL(url.toString());
         } else {
           await window.loadFile(
             join(getModuleDirectory(import.meta.url), "../renderer/index.html"),
-            { query: { surface: "plugin-launcher" } },
+            { hash: "surface=plugin-launcher" },
           );
         }
         return window;

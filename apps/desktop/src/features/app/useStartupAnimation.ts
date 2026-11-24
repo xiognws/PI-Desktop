@@ -90,7 +90,9 @@ function decidePlayback(
   descriptor: ReturnType<typeof readDescriptor>,
 ): boolean {
   if (pageLoadVerdict !== null) return pageLoadVerdict;
-  const surface = new URLSearchParams(window.location.search).get("surface");
+  const surface =
+    new URLSearchParams(window.location.search).get("surface") ??
+    new URLSearchParams(window.location.hash.replace(/^#/, "")).get("surface");
   const play = shouldPlayStartupAnimation({
     descriptor,
     surface,
