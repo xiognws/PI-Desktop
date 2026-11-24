@@ -1,0 +1,14 @@
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 350,367-379
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b3e7948e5c5e42b1a8ed5983f17ab89ca6a43f38",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
