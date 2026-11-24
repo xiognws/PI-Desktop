@@ -103,3 +103,29 @@ test("崩溃优先于主动退出原因：真的挂了就说挂了", () => {
   });
   assert.equal(verdict.outcome, "crash");
 });
+
+test("本进程自己写的标记不算上一次运行，否则每次启动都误报被终止", () => {
+  const verdict = judgePreviousRun({
+    marker,
+    selfPid: marker.pid,
+    lastExitReason: null,
+    newCrashDumps: noDumps,
+    mainProcessErrorSinceStart: false,
+  });
+  assert.equal(verdict.outcome, "clean");
+  assert.deepEqual(verdict.evidence, []);
+  assert.equal(previousRunVerdictLevel(verdict), "info");
+  assert.match(verdict.summary, /no previous run/);
+});
+
+test("别人的标记照旧判定，selfPid 不掩盖真正的异常退出", () => {
+  const verdict = judgePreviousRun({
+    marker,
+    selfPid: marker.pid + 1,
+    lastExitReason: null,
+    newCrashDumps: noDumps,
+    mainProcessErrorSinceStart: false,
+  });
+  assert.equal(verdict.outcome, "killed");
+  assert.equal(verdict.detail.pid, marker.pid);
+});

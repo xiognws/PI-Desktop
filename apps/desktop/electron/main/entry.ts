@@ -2,6 +2,7 @@ import { app, BrowserWindow } from "electron";
 import { defaultDataDir, hasSingleInstanceLock, singleInstanceRequired } from "./installation";
 import { prepareStorage } from "./storage/bootstrap";
 import {
+  capturePreviousRunMarker,
   recordExitReason,
   setRunMarkerDirectory,
   startRunMarkerHeartbeat,
@@ -21,6 +22,10 @@ if (hasSingleInstanceLock) {
   // The marker lives in the data directory, and the exit paths below run before
   // the composition root does, so point it there first.
   setRunMarkerDirectory(defaultDataDir);
+  // Read the previous run's marker before this one overwrites it: the boot
+  // verdict has no other chance to see it, and reading it afterwards would
+  // judge this run's own heartbeat marker as a kill.
+  capturePreviousRunMarker();
   // Write it now, and keep it beating, so a death *before* the composition root —
   // storage preparation, or a Chromium-level abort that never reaches our logger —
   // still leaves a breadcrumb. Without this the next start has nothing to read and a

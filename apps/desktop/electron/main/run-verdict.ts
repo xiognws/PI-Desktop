@@ -60,6 +60,14 @@ export type PreviousRunInput = {
    * the previous launch began. Read by the caller, which owns the log file.
    */
   mainProcessErrorSinceStart: boolean;
+  /**
+   * This process's own pid, so a marker it wrote itself is never read as a
+   * previous run. `entry.ts` claims the breadcrumb before the composition root
+   * exists; a caller that reads the file afterwards gets this run's marker, and
+   * without this guard every healthy start reports the one outcome that is never
+   * actionable: `killed`.
+   */
+  selfPid?: number;
 };
 
 export type PreviousRunVerdict = {
@@ -91,8 +99,21 @@ function countDumps(
  * loss. `unknown` is reserved for a caller that could read no evidence at all.
  */
 export function judgePreviousRun(input: PreviousRunInput): PreviousRunVerdict {
-  const { marker, lastExitReason, newCrashDumps, mainProcessErrorSinceStart } =
+  const { marker, lastExitReason, newCrashDumps, mainProcessErrorSinceStart, selfPid } =
     input;
+
+  // A marker this process wrote is not a previous run. Reading it back is the
+  // one way this module could ever call a healthy process `killed`, so the guard
+  // sits before every other rule and reports the same "nothing died" verdict as
+  // an absent marker.
+  if (marker && selfPid !== undefined && marker.pid === selfPid) {
+    return {
+      outcome: "clean",
+      evidence: [],
+      summary: "no previous run recorded",
+      detail: {},
+    };
+  }
 
   if (!marker) {
     return {

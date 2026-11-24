@@ -6,7 +6,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { localTimestamp } from "./log-timestamp.js";
 
@@ -94,6 +94,41 @@ export function writeRunMarker(version: string): void {
   if (!markerDirectory) return;
   if (!marker) marker = { pid: process.pid, startedAt: localTimestamp(), version };
   writeMarker(marker);
+}
+
+/**
+ * The marker this run found on disk, taken before it overwrote it.
+ *
+ * `entry.ts` claims the breadcrumb before the composition root exists, so the
+ * boot verdict cannot read that file later without reading this run's own
+ * marker — and a marker with no exit reason and no dump judges as `killed`,
+ * which made every healthy start look like a crash. Reading it once, first, is
+ * the only place the previous run is still on disk.
+ */
+let capturedPrevious: { directory: string; marker: RunMarker | null } | null = null;
+
+/** Read the previous run's marker now, while this one has not written yet. */
+export function capturePreviousRunMarker(): void {
+  if (!markerDirectory) return;
+  capturedPrevious = { directory: markerDirectory, marker: readRunMarker() };
+}
+
+/**
+ * The captured previous-run marker, when it belongs to `directory`.
+ *
+ * `used: false` means nothing was captured, or the capture was taken in another
+ * directory — the caller then reads the marker itself, exactly as before. A
+ * build whose entry-time and runtime data directories differ keeps working.
+ */
+export function capturedPreviousRunMarker(directory: string): {
+  used: boolean;
+  marker: RunMarker | null;
+} {
+  if (!capturedPrevious) return { used: false, marker: null };
+  if (resolve(capturedPrevious.directory) !== resolve(directory)) {
+    return { used: false, marker: null };
+  }
+  return { used: true, marker: capturedPrevious.marker };
 }
 
 /** The identity of this run, kept so a heartbeat does not rewrite the start time. */

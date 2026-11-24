@@ -18,6 +18,7 @@ import {
 } from "../host-boot-diagnostics";
 import type { Logger } from "../logger";
 import {
+  capturedPreviousRunMarker,
   readLastExitReason,
   readRunMarker,
   setRunMarkerDirectory,
@@ -235,7 +236,12 @@ export function createRuntimeLifecycle({
     // the reader correlating timestamps by hand. One verdict record states the
     // outcome (clean / deliberate / crash / killed) and the evidence behind it.
     setRunMarkerDirectory(dataDir);
-    const previousMarker = readRunMarker();
+    // `entry.ts` already wrote this run's breadcrumb, so the file on disk is
+    // ours: judging it would report a healthy start as killed. The capture taken
+    // before that write holds the previous run; the fallback keeps the plain read
+    // for a build whose entry-time directory differs from this one.
+    const captured = capturedPreviousRunMarker(dataDir);
+    const previousMarker = captured.used ? captured.marker : readRunMarker();
     try {
       const previousStartedMs = previousMarker
         ? Date.parse(previousMarker.startedAt)
@@ -252,6 +258,9 @@ export function createRuntimeLifecycle({
         // `uncaughtException` / `unhandledRejection` handlers; the marker
         // surviving an error-level app/runtime record is the signal here.
         mainProcessErrorSinceStart: false,
+        // Belt and braces: even if a future call site re-reads the marker after
+        // writing it, this process can never be its own "previous run".
+        selfPid: process.pid,
       });
       logger.app(
         "lifecycle",
