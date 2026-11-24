@@ -48,9 +48,16 @@ pub const SUMMARY_CHUNK_TRUNCATION_MARKER: &str =
     "\n\n[message truncated: the summary request budget could not carry it whole]";
 /// Header of the message installed as a checkpoint.
 pub const CHECKPOINT_HEADER: &str = "[context checkpoint]";
+/// What the installed checkpoint tells the model to do first, so a compaction
+/// boundary forces a re-anchor instead of an unanchored continuation: the
+/// summary carries the decisions, but the model is what must still hold them.
+pub const CHECKPOINT_REANCHOR_DIRECTIVE: &str = "This checkpoint replaced an earlier stretch of the conversation. Before your next action, reconcile against it in one line: confirm the objective still holds and name the open-work item you are acting on.";
 /// The message a successful checkpoint installs in place of the summarized range.
 pub fn checkpoint_message(summary: &str) -> Message {
-    Message::user_text(format!("{CHECKPOINT_HEADER}\n\n{}", summary.trim()))
+    Message::user_text(format!(
+        "{CHECKPOINT_HEADER}\n\n{}\n\n{CHECKPOINT_REANCHOR_DIRECTIVE}",
+        summary.trim()
+    ))
 }
 /// Installed ahead of a retained-tail fallback, so the model knows the earlier
 /// conversation was dropped without a summary rather than never existing.
@@ -745,6 +752,18 @@ mod tests {
         let messages = vec![Message::user_text("only one")];
         assert!(plan_compaction(&messages, &limits(), CompactionMode::ActiveTurn).is_none());
         assert!(plan_compaction(&[], &limits(), CompactionMode::CompletedTurn).is_none());
+    }
+
+    #[test]
+    fn an_installed_checkpoint_forces_a_reanchor() {
+        let message = checkpoint_message("Objective: port the trigger.\nOpen work: the c item.");
+        assert!(message.text().starts_with(CHECKPOINT_HEADER));
+        assert!(message.text().contains("Objective: port the trigger."));
+        assert!(
+            message.text().contains(CHECKPOINT_REANCHOR_DIRECTIVE),
+            "the boundary must tell the model to reconcile before acting: {}",
+            message.text()
+        );
     }
 
     #[test]
