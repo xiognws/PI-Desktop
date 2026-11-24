@@ -173,12 +173,10 @@ html {
   color: var(--ds-text-primary);
 }
 
-/* Settings replaces the chat shell but keeps the same frame: without the same
-   reservation the rail runs the full window height and its material stops
-   matching the sidebar's. */
-.settings-shell-full {
-  padding-bottom: 30px;
-}
+/* Settings replaces the chat shell, so it does not reserve the status bar: the
+   status bar is not painted on that page, and the reserve showed up as a blank
+   band under it. `.app-shell.settings-mode` (styles/settings.css) owns the frame
+   for both the outer shell and the settings page itself. */
 
 /* Keep the chat tree mounted while Settings is open without changing the
    shell's flex layout or exposing the hidden tree to focus and accessibility. */
