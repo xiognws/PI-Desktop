@@ -1,0 +1,24 @@
+apps/desktop/electron/main/entry.ts
+  h_201ed4c689ac8b 5,25-28
+apps/desktop/electron/main/run-marker.ts
+  h_201ed4c689ac8b 9,99-133
+apps/desktop/electron/main/run-verdict.ts
+  h_201ed4c689ac8b 63-70,102,105-117
+apps/desktop/electron/main/runtime/lifecycle.ts
+  h_201ed4c689ac8b 21,239-244,261-263
+apps/desktop/electron/test/run-marker.test.mjs
+  h_201ed4c689ac8b 1-82
+apps/desktop/electron/test/run-verdict.test.mjs
+  h_201ed4c689ac8b 106-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9f28fc3328c28e0c3eb191e1185957bd293707fd",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
