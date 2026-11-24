@@ -1,0 +1,14 @@
+crates/agent-core/src/compaction.rs
+  h_201ed4c689ac8b 51-54,57-60,757-768
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "68b5d76b9dea5841e08f6341c45ba61d4d05cbb5",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
