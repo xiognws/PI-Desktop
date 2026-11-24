@@ -1,0 +1,16 @@
+apps/desktop/electron/main/kernel/kernel-adapter.ts
+  h_201ed4c689ac8b 272-282,288-289
+apps/desktop/test/kernel-adapter.test.mjs
+  h_201ed4c689ac8b 272-304
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4b9f0074bf4fe5190a2ebe8a30fe690babfbbe30",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
