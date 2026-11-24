@@ -1,0 +1,20 @@
+apps/desktop/electron/main/run-marker.ts
+  h_201ed4c689ac8b 28-37,40-42,75-77,94-103,107,113-138,141-142,159-162
+apps/desktop/electron/main/run-verdict.ts
+  h_201ed4c689ac8b 48,111-113
+apps/desktop/electron/main/runtime/lifecycle.ts
+  h_201ed4c689ac8b 25,273-275
+apps/desktop/test/run-marker.test.mjs
+  h_201ed4c689ac8b 19-20,97-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "86701104e432a6f31551df7bae61284461a86616",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
