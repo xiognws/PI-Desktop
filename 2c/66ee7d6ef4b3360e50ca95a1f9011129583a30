@@ -1,0 +1,18 @@
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 1,44,155-156,158-159,161,168-190,382-384
+apps/desktop/electron/main/crash-report.ts
+  h_201ed4c689ac8b 28,301-363
+apps/desktop/test/crash-reporter-health.test.mjs
+  h_201ed4c689ac8b 1-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2c66ee7d6ef4b3360e50ca95a1f9011129583a30",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
