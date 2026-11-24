@@ -315,6 +315,22 @@ impl ToolActivation {
         declared
     }
 
+    /// The names one request declares — Node's `activeTools()` map to names
+    /// (`runtime.ts:5306`): the core set, the activated on-demand tools, and
+    /// [`TOOL_SEARCH_NAME`] when anything is deferred.
+    ///
+    /// The same set [`Self::declared`] carries, named: an extension asking
+    /// `getActiveTools()` must see what the next request will declare, not a
+    /// third answer computed from the catalog.
+    pub fn declared_names(&self) -> Vec<String> {
+        let mut names = self.core_names();
+        names.extend(self.active_names());
+        if !self.deferred.is_empty() {
+            names.push(TOOL_SEARCH_NAME.to_string());
+        }
+        names
+    }
+
     /// Whether a call to `name` must be refused until it is activated.
     ///
     /// A declaration is not activation (Node `runtime.ts:3241`): the tool stays

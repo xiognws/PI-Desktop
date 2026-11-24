@@ -285,6 +285,13 @@ struct Session {
     /// live catalog when they are read, so a mode switch cannot resurrect a tool
     /// that mode withholds.
     active_tools: Arc<Mutex<std::collections::BTreeSet<String>>>,
+    /// What the last turn composed, for the extension surface
+    /// (`agent.surface`): the prompt, the budget and the declaration set.
+    ///
+    /// Main answers a trusted extension's `ctx.getContextUsage()` and friends
+    /// under the Node runtime from its live agent state; under this kernel that
+    /// state is here, so the turn records it once and a read reports it.
+    surface: crate::session_surface::SessionSurface,
 }
 
 /// The run turn one prompt claimed: which run, and which stage of it.
@@ -329,6 +336,7 @@ impl Session {
             checkpoints: Mutex::new(crate::checkpoint::CheckpointStore::default()),
             mode_run: Mutex::new(ModeRun::default()),
             active_tools: crate::tool_activation::ToolActivation::empty_active(),
+            surface: crate::session_surface::SessionSurface::new(),
         }
     }
 }
@@ -472,11 +480,26 @@ impl Sidecar {
     /// Answer one request. Notifications get no answer.
     pub async fn handle(&self, request: Request) -> Option<String> {
         let id = request.id.clone();
+        // Method and id only: params carry user content and tool arguments, which
+        // a support log must not hold.
+        tracing::debug!(
+            target: "agent_core::sidecar",
+            method = %request.method,
+            request_id = ?id,
+            "request received"
+        );
+        let started = std::time::Instant::now();
         let result = self.dispatch(&request).await;
         match (id, result) {
             (Some(id), Ok(value)) => Some(rpc::response(id, value)),
             (Some(id), Err(error)) => {
-                tracing::debug!(target: "agent_core::sidecar", method = %request.method, %error, "request failed");
+                tracing::warn!(
+                    target: "agent_core::sidecar",
+                    method = %request.method,
+                    %error,
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "request failed"
+                );
                 Some(rpc::error_response(id, error))
             }
             (None, _) => None,
@@ -546,6 +569,12 @@ impl Sidecar {
             // the opposite effect on the work in flight — see `stop`.
             "agent.stop" => self.stop(request),
             "agent.getStatus" => self.get_status(request),
+            // What a kernel-run extension command reads off `ctx`. Under the
+            // Node runtime the runtime answers these from its live agent state;
+            // here the kernel composes the prompt and holds the activation set,
+            // so main asks rather than re-deriving either.
+            "agent.surface" => self.surface(request),
+            "agent.setActiveTools" => self.set_active_tools(request),
             "agent.stopSubagents" => self.stop_subagents(request),
             "agent.disposeSession" => self.dispose_session(request),
             "native.session.get" => self.session_get(request).await,
@@ -1097,6 +1126,20 @@ impl Sidecar {
             .clone())
     }
 
+    /// A session this process already knows, without creating one.
+    ///
+    /// A read uses this, not [`Self::session`]: inserting on a read would make a
+    /// session the kernel has never run a turn for answer as an empty
+    /// conversation, and its history only arrives from host-core at the first
+    /// prompt. "Not known here" is the honest answer, and the caller says so.
+    fn known_session(&self, session_id: &str) -> Result<Option<Arc<Session>>, RpcError> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| RpcError::internal("session lock poisoned"))?;
+        Ok(sessions.get(session_id).cloned())
+    }
+
     /// `agent.executeApprovedPlan`: run a plan the user approved.
     ///
     /// Upstream counterparts: `executeApprovedPlan` / `executeApprovedPlanTurn`
@@ -1545,6 +1588,16 @@ impl Sidecar {
         // reproduce what it ran with, and a support bundle cannot show it.
         self.journal_system_prompt(request, &session, &composed, session_id.as_str(), &turn_id)
             .await?;
+        // What this turn composed, kept for the extension surface
+        // (`agent.surface`): under this kernel main is the JavaScript host for
+        // trusted extensions and cannot compose the prompt or the declaration
+        // set itself. Recorded before dispatch, so a prompt that fails to run is
+        // still the prompt the session last composed.
+        session.surface.record_turn(
+            &composed.system,
+            activation.clone(),
+            model_limits_from(request).map(ContextLimits::for_model),
+        );
         // Keep the pieces the background review needs: the engine takes
         // ownership of the provider and the tool set below.
         let review_provider = provider.clone();
@@ -1651,7 +1704,29 @@ impl Sidecar {
         // client has already been told the turn ended, so nothing is held back.
         let review_policy =
             crate::skill_review::SkillReviewPolicy::from_params(request.params.get("skillReview"));
-        let review_model = config.model.clone();
+        // A review pinned to its own model is the point of the setting: it is a
+        // second completion after every qualifying turn, and the cheapest model that
+        // can judge a session is rarely the one the session itself needs.
+        let review_model = review_policy
+            .model
+            .clone()
+            .unwrap_or_else(|| config.model.clone());
+        // A provider overlay the kernel cannot build falls back to the session's own
+        // rather than skipping the pass: a bad overlay must not silently turn the
+        // review off.
+        let review_provider = match review_policy.provider.as_ref() {
+            Some(spec) => match build_provider(spec) {
+                Ok(provider) => provider,
+                Err(error) => {
+                    tracing::warn!(
+                        %error,
+                        "skill review provider could not be built; using the session's own"
+                    );
+                    review_provider.clone()
+                }
+            },
+            None => review_provider.clone(),
+        };
         let review_system = config.system.clone();
         let review_mode = mode.clone();
         let review_out = self.out.clone();
@@ -2494,6 +2569,113 @@ impl Sidecar {
             }
         }
         Ok(json!({ "status": status }))
+    }
+
+    /// `agent.surface`: what a kernel-run extension command reads about one
+    /// session — the answer to `ctx.getContextUsage()`, `ctx.getSystemPrompt()`
+    /// and `ctx.getActiveTools()` / `ctx.getAllTools()`.
+    ///
+    /// Upstream counterpart: those four members of `createExtensionBridge`
+    /// (`packages/agent-runtime/src/runtime.ts:3555-3610`), answered there from
+    /// the Node runtime's live agent state. Here that state is the kernel's: the
+    /// prompt is composed by `compose_prompt`, the budget is the model window
+    /// the launch declared, and the declaration set is
+    /// [`crate::tool_activation::ToolActivation`]. They are reported together
+    /// because they describe one session's one turn — three reads would be three
+    /// round trips and could disagree if a turn finished between them.
+    ///
+    /// An unknown session answers `null` rather than zeros: this process has not
+    /// composed that session's prompt, and history is restored from host-core at
+    /// its first prompt, so a count of nothing would be a guess about a
+    /// transcript the kernel has never read.
+    fn surface(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let Some(session) = self.known_session(session_id)? else {
+            return Ok(json!({
+                "usage": null,
+                "systemPrompt": null,
+                "tools": crate::session_surface::tools_report(None),
+                "reason": "unknown session",
+            }));
+        };
+        // The budget: the caller's when it supplies one (a session whose model
+        // changed needs the new numbers), else the one the last turn planned
+        // against. Neither is a default — a default window would report a
+        // percentage for a model the session is not running.
+        let budget = model_limits_from(request)
+            .map(ContextLimits::for_model)
+            .or_else(|| session.surface.limits());
+        // A turn in flight holds the transcript. Waiting would block a command
+        // behind a whole turn, so the answer says the count is not available
+        // instead of presenting a stale one as current.
+        let usage = budget.and_then(|budget| match session.transcript.try_lock() {
+            Ok(transcript) => Some(crate::session_surface::context_usage(
+                transcript.messages(),
+                &budget,
+            )),
+            Err(_) => None,
+        });
+        let activation = session.surface.activation();
+        Ok(json!({
+            "usage": usage,
+            "systemPrompt": session.surface.system_prompt(),
+            "tools": crate::session_surface::tools_report(activation.as_deref()),
+        }))
+    }
+
+    /// `agent.setActiveTools`: the on-demand set the session's next request
+    /// declares.
+    ///
+    /// Upstream counterpart: `setActiveTools` in `createExtensionBridge`
+    /// (`runtime.ts:3598`): every on-demand name the wanted set does not list is
+    /// switched off, and every one it does list is switched on. Core tools are
+    /// not in that set, so naming one — or leaving it out — changes nothing,
+    /// exactly as there. The answer is the state the write left behind, so a
+    /// caller never has to read back to know what it did.
+    fn set_active_tools(&self, request: &Request) -> Result<Value, RpcError> {
+        let session_id = request.require_str("sessionId")?;
+        let names = request
+            .params
+            .get("names")
+            .and_then(Value::as_array)
+            .ok_or_else(|| RpcError::invalid_params("`names` must be an array of tool names"))?;
+        let mut wanted = std::collections::BTreeSet::new();
+        for name in names {
+            let name = name
+                .as_str()
+                .ok_or_else(|| RpcError::invalid_params("`names` must be an array of tool names"))?;
+            wanted.insert(name.to_string());
+        }
+        let session = self.session(session_id)?;
+        let activation = session.surface.activation();
+        {
+            let mut active = session
+                .active_tools
+                .lock()
+                .map_err(|_| RpcError::internal("tool activation lock poisoned"))?;
+            match activation.as_deref() {
+                Some(activation) => {
+                    for name in activation.deferred_names() {
+                        if wanted.contains(&name) {
+                            active.insert(name);
+                        } else {
+                            active.remove(&name);
+                        }
+                    }
+                }
+                // No turn yet, so no catalog to filter against: the wanted names
+                // are the set. The next prompt intersects it with the catalog it
+                // builds, which is the rule activation follows everywhere else —
+                // a name that mode withholds cannot be resurrected by this write.
+                None => {
+                    active.clear();
+                    active.extend(wanted);
+                }
+            }
+        }
+        Ok(json!({
+            "tools": crate::session_surface::tools_report(activation.as_deref())
+        }))
     }
 
     /// The plan lane's state: what is awaiting approval, and where the host's
@@ -4063,7 +4245,7 @@ async fn skill_review_pass(input: SkillReviewInput) {
     } = input;
 
     let emit_notice = |notice: &crate::skill_review::ReviewNotice| {
-        if !notice.is_visible(policy) {
+        if !notice.is_visible(&policy) {
             return;
         }
         NotificationSink { out: out.clone() }.emit(crate::AgentEventEnvelope::new(
@@ -4097,7 +4279,7 @@ async fn skill_review_pass(input: SkillReviewInput) {
     let qualified = {
         let gate = session.review_gate.lock();
         match gate {
-            Ok(mut gate) => gate.qualify(policy, tool_calls, std::time::Instant::now()),
+            Ok(mut gate) => gate.qualify(&policy, tool_calls, std::time::Instant::now()),
             Err(_) => {
                 session.review_running.store(false, Ordering::SeqCst);
                 return;

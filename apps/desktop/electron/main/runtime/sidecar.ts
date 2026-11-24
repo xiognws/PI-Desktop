@@ -126,6 +126,16 @@ export function createSidecarRuntime({
       return host ? { call: (method: string, params?: unknown) => host.call(method, params) } : null;
     },
     getAgentHost: () => runtimeState.agentHostBridge,
+    // The kernel sidecar, for the members host-core cannot answer: context
+    // usage, the composed prompt, the tool set, abort and compact. Looked up per
+    // call for the same reason as the host: the process handle is replaced when
+    // it restarts.
+    getAgentRuntime: () => {
+      const sidecar = runtimeState.sidecar;
+      return sidecar
+        ? { call: (method: string, params?: unknown) => sidecar.call(method, params) }
+        : null;
+    },
     isTurnActive: (sessionId) => activeTurns.has(sessionId),
     broadcast: (event, payload) => plugins.broadcastEvent(event, payload),
     log: (level, message, data) => logger.app("plugin", level, message, { data }),

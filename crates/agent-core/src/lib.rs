@@ -61,6 +61,7 @@ pub mod retry;
 pub mod rpc;
 pub mod schedule;
 pub mod session;
+pub mod session_surface;
 pub mod sidecar;
 pub mod skill_manage;
 pub mod skill_overlap;

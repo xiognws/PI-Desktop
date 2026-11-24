@@ -27,6 +27,7 @@ import {
   findRegisteredAgentModel,
 } from "./extension-model-registry";
 import { extensionMessageText } from "./extension-session-host";
+import type { ExtensionSessionSurface } from "./extension-session-host";
 import { assertImportedPackagePath, discoverImportedPackageSkills } from "./imported-package-skills";
 import {
   IMPORTED_PLUGIN_ID_PREFIX,
@@ -191,6 +192,20 @@ export type AgentExtensionSessionHost = {
   prioritizeQueuedMessage(id: string): Promise<void>;
   /** `setModel` is idle-only, exactly as it is in the Node runtime. */
   isSessionIdle(sessionId: string): boolean;
+  /**
+   * The runtime's own view of the session: context usage, the composed prompt,
+   * and the tool set. Optional so a test double from before the kernel answered
+   * these still serves the members it does implement — a missing one is reported
+   * as unavailable, never as a default.
+   */
+  sessionSurface?(sessionId: string): Promise<ExtensionSessionSurface | undefined>;
+  setActiveTools?(
+    sessionId: string,
+    names: string[],
+  ): Promise<ExtensionSessionSurface["tools"] | undefined>;
+  abortSession?(sessionId: string): Promise<void>;
+  compactSession?(sessionId: string): Promise<boolean>;
+  waitForIdle?(sessionId: string, timeoutMs?: number): Promise<boolean>;
 };
 
 /** One extension-registered agent tool, as the kernel needs to declare it. */
@@ -234,6 +249,32 @@ function dismissedResponse(kind: PendingPrompt["kind"]): TrustedExtensionUiRespo
   return kind === "confirm" ? { kind, value: false, cancelled: true } : { kind, value: undefined, cancelled: true };
 }
 
+/**
+ * The thinking levels host-core accepts on `session.configure`
+ * (`THINKING_LEVELS`, `crates/host-core/src/sessions.rs`).
+ *
+ * The Node bridge clamps a request against the model's declared capabilities
+ * (`clampThinkingLevel`, `packages/agent-runtime/src/thinking-level.ts`), which
+ * main cannot see here: capabilities travel with the launch and are applied where
+ * the request is built. Main's half is the vocabulary host-core will persist, so
+ * a level it cannot store is refused instead of stored and silently dropped.
+ */
+const EXTENSION_THINKING_LEVELS: readonly string[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "omit",
+];
+
+function extensionThinkingLevel(level: unknown): string | undefined {
+  const normalized = String(level ?? "").trim().toLowerCase();
+  return EXTENSION_THINKING_LEVELS.includes(normalized) ? normalized : undefined;
+}
+
 export class AgentExtensionBridge {
   private readonly options: AgentExtensionBridgeOptions;
   private readonly sessions = new Map<string, SessionState>();
@@ -245,6 +286,18 @@ export class AgentExtensionBridge {
   private readonly commandRunners = new Map<string, { key: string; ready: Promise<ExtensionCommandRunner> }>();
   /** Last name a command gave each session, until the next host read replaces it. */
   private readonly sessionNames = new Map<string, string>();
+  /**
+   * What the agent runtime reports about each session, refreshed once per Runner
+   * use.
+   *
+   * The extension-side read members are synchronous — `ctx.getContextUsage()`
+   * answers a number, not a promise, exactly as under Node — so main cannot ask
+   * the runtime while an extension is waiting. It asks before the Runner runs
+   * ({@link refreshSurface}) and answers from what came back. A session with no
+   * entry reports the member as unavailable rather than guessing: a fabricated
+   * `0` tokens is worse than an honest `undefined`.
+   */
+  private readonly surfaces = new Map<string, ExtensionSessionSurface>();
   private sessionHost?: AgentExtensionSessionHost;
 
   constructor(options: AgentExtensionBridgeOptions) {
@@ -341,6 +394,7 @@ export class AgentExtensionBridge {
   clearSession(sessionId: string): void {
     this.cancelPrompts(sessionId);
     this.disposeSessionRunner(sessionId);
+    this.surfaces.delete(sessionId);
     if (this.sessions.delete(sessionId)) this.options.onChanged();
   }
 
@@ -715,10 +769,16 @@ export class AgentExtensionBridge {
    * pi process, so a second instance would give an extension two copies of
    * itself and fire `session_start` twice.
    */
-  private sessionRunner(sessionId: string, specs: TrustedExtensionSpec[]): Promise<ExtensionCommandRunner> {
+  private async sessionRunner(sessionId: string, specs: TrustedExtensionSpec[]): Promise<ExtensionCommandRunner> {
     const key = specs.map((spec) => `${spec.id}\0${spec.entry}`).sort().join("\n");
     const cached = this.commandRunners.get(sessionId);
-    if (cached?.key === key) return cached.ready;
+    if (cached?.key === key) {
+      // A cached Runner still needs a fresh surface: commands run between turns,
+      // and the read members must describe the turn that just finished rather
+      // than the one that was running when the Runner was built.
+      await this.refreshSurface(sessionId);
+      return cached.ready;
+    }
     if (cached) void cached.ready.then((runner) => runner.dispose()).catch(() => undefined);
     const factory = this.options.runnerFactory ?? loadTrustedExtensionRunner;
     const built: { current?: ExtensionCommandRunner } = {};
@@ -728,6 +788,9 @@ export class AgentExtensionBridge {
       // and the model registry all need it, and a host round trip per member
       // would be three reads of the same row.
       const binding = host ? await host.sessionBinding(sessionId).catch(() => undefined) : undefined;
+      // The runtime's own view of the session, read once per Runner for the same
+      // reason: the members that report it are synchronous.
+      await this.refreshSurface(sessionId);
       const runner = await factory({ specs, bridge: this.commandBridge(sessionId, built, binding) });
       built.current = runner;
       await runner.load();
@@ -739,6 +802,34 @@ export class AgentExtensionBridge {
     });
     this.commandRunners.set(sessionId, { key, ready });
     return ready;
+  }
+
+  /**
+   * Read what the agent runtime knows about this session, or record that it does
+   * not know.
+   *
+   * One RPC (`agent.surface`) answers all three read members, because they
+   * describe the same turn. A failed read clears the entry: the next member call
+   * then reports "unavailable" instead of a snapshot the runtime has since moved
+   * past.
+   *
+   * Never while a turn is running. `agent.prompt` answers main's own calls —
+   * `extensions.describe`, then the extension hooks — *before* it hands the turn
+   * to its own task, and the kernel handles requests on one worker: a request
+   * main sent in that window would wait in the kernel's queue behind the call
+   * that is waiting for main. The snapshot then stays as it was, and a session
+   * with none reports "unavailable" rather than a stall.
+   */
+  private async refreshSurface(sessionId: string): Promise<void> {
+    const host = this.sessionHost;
+    if (typeof host?.sessionSurface !== "function") {
+      this.surfaces.delete(sessionId);
+      return;
+    }
+    if (!host.isSessionIdle(sessionId)) return;
+    const surface = await host.sessionSurface(sessionId).catch(() => undefined);
+    if (surface) this.surfaces.set(sessionId, surface);
+    else this.surfaces.delete(sessionId);
   }
 
   private disposeSessionRunner(sessionId: string): void {
@@ -765,6 +856,9 @@ export class AgentExtensionBridge {
     binding: ExtensionSessionBinding | undefined,
   ): TrustedExtensionBridge {
     const host = this.sessionHost;
+    // The runtime's view, read live: a command may switch the tool set, and the
+    // next read in the same Runner must see the state the write left behind.
+    const surface = () => this.surfaces.get(sessionId);
     return {
       sessionId,
       cwd: binding?.projectPath ?? process.cwd(),
@@ -795,16 +889,90 @@ export class AgentExtensionBridge {
         binding,
       }),
       getThinkingLevel: () => binding?.thinkingLevel ?? "off",
-      setThinkingLevel: () => {},
+      setThinkingLevel: (level) => {
+        const next = extensionThinkingLevel(level);
+        if (!next) {
+          throw new Error(`ctx.setThinkingLevel: unknown thinking level "${String(level)}"`);
+        }
+        if (!host) throw new Error("ctx.setThinkingLevel needs the host session services");
+        if (!binding) throw new Error("ctx.setThinkingLevel needs this session's model binding");
+        // Node sets the level on the running agent; main has no agent, so it is
+        // persisted where the next launch reads it — the same `session.configure`
+        // write `setModel` makes — and the session's binding is updated in place
+        // so a later `getThinkingLevel()` from this command agrees with the write.
+        const previous = binding.thinkingLevel;
+        binding.thinkingLevel = next;
+        const restore = () => {
+          binding.thinkingLevel = previous;
+          this.options.onToast(
+            "An extension could not change the thinking level.",
+            "warning",
+          );
+        };
+        void host
+          .configureModel({
+            sessionId,
+            mode: binding.mode ?? "agent",
+            providerId: binding.providerId,
+            modelId: binding.modelId,
+            thinkingLevel: next,
+          })
+          .then((result) => {
+            if (!result.ok) restore();
+          })
+          .catch(restore);
+      },
       isIdle: () => (host ? host.isSessionIdle(sessionId) : true),
-      abort: () => {},
+      abort: () => {
+        if (!host?.abortSession) throw new Error("ctx.abort needs the host session services");
+        // Aborting a turn dismisses the prompts it left open (spec §9): the
+        // kernel settles its ask cards, and this host settles the extension's.
+        this.cancelPrompts(sessionId);
+        // Fire and forget, exactly as the Node bridge does (`void
+        // runtime.abort()`): a command does not wait for the turn to unwind.
+        void host.abortSession(sessionId).catch((error) => {
+          this.options.onToast(`ctx.abort failed: ${String(error)}`, "warning");
+        });
+      },
+      // Node answers a constant here (`hasPendingMessages: () => false`) and that
+      // is deliberate there: pending messages are not a state the extension
+      // surface acts on. The kernel does hold a steering queue, but reporting it
+      // would make the same member mean two different things per runtime, so this
+      // matches Node rather than inventing a queue view.
       hasPendingMessages: () => false,
-      getContextUsage: () => undefined,
-      compact: () => {},
-      getSystemPrompt: () => "",
-      getActiveTools: () => [],
-      getAllTools: () => [],
-      setActiveTools: () => {},
+      getContextUsage: () => surface()?.usage,
+      compact: () => {
+        if (!host?.compactSession) throw new Error("ctx.compact needs the host session services");
+        // Fire and forget: the kernel compacts at the session's next boundary and
+        // a command must not wait for a provider round trip. A refusal — a turn
+        // that will not settle, a provider that cannot summarize — is reported
+        // rather than swallowed.
+        void host.compactSession(sessionId).catch((error) => {
+          this.options.onToast(`ctx.compact failed: ${String(error)}`, "warning");
+        });
+      },
+      // An uncomposed prompt is the empty string, which is also what Node's
+      // `agent.state.systemPrompt` holds before the first turn — not a fabricated
+      // prompt, and not a description of one this host cannot see.
+      getSystemPrompt: () => surface()?.systemPrompt ?? "",
+      getActiveTools: () => surface()?.tools?.active ?? [],
+      getAllTools: () => surface()?.tools?.catalog ?? [],
+      setActiveTools: (names) => {
+        if (!host?.setActiveTools) {
+          throw new Error("ctx.setActiveTools needs the host session services");
+        }
+        const wanted = Array.isArray(names) ? names.map((name) => String(name)) : [];
+        void host
+          .setActiveTools(sessionId, wanted)
+          .then((tools) => {
+            // The runtime answers with the state the write left behind, which is
+            // newer than the snapshot this Runner loaded.
+            if (tools) this.surfaces.set(sessionId, { ...surface(), tools });
+          })
+          .catch((error) => {
+            this.options.onToast(`ctx.setActiveTools failed: ${String(error)}`, "warning");
+          });
+      },
       getSessionName: () => this.sessionNames.get(sessionId) ?? binding?.title,
       setSessionName: async (name) => {
         if (!host) throw new Error("ctx.setSessionName needs the host session services");
@@ -830,7 +998,14 @@ export class AgentExtensionBridge {
           await host.prioritizeQueuedMessage(pushed.id).catch(() => undefined);
         }
       },
-      waitForIdle: async () => {},
+      waitForIdle: async () => {
+        // The host's bounded wait, which resolves even when the session never
+        // settles: a handler that awaits idle must not outlive the turn it is
+        // waiting for. With no runtime there is nothing to settle, so it returns
+        // at once.
+        if (!host?.waitForIdle) return;
+        await host.waitForIdle(sessionId);
+      },
       newSession: async () => ({ cancelled: true }),
       fork: async () => ({ cancelled: true }),
       requestUi: (spec, request, signal) =>
