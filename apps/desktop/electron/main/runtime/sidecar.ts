@@ -28,6 +28,7 @@ import { adaptKernelEvent } from "../kernel/kernel-adapter.ts";
 import { relaxedNetworkPolicyEnabled } from "../endpoint-policy";
 import { shellCommandShape, type ShellCommandShape } from "./tool-log-shape";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
+import { writeCrashForensicsReport } from "../crash-forensics.js";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import { createExtensionSessionHost } from "../extension-session-host";
 import { installPluginAgentTransport } from "../plugin-agent-transport";
@@ -421,6 +422,24 @@ export function createSidecarRuntime({
         ...(crash.marker ? { crashMarker: crash.marker } : {}),
       },
     });
+    // A sidecar death is the agent half of the app disappearing. Its own log is
+    // separate from the app channel, so the tail is the only place both halves
+    // of the story sit in one file.
+    writeCrashForensicsReport(
+      dataDir,
+      {
+        kind: "child-exited",
+        detail: {
+          component: "agent",
+          exitCode: code,
+          signal,
+          crashKind: crash.kind,
+          stderrTail,
+        },
+      },
+      (level, message, fields) =>
+        logger.app("diagnostics", level, message, (fields ?? {}) as Record<string, unknown>),
+    );
     sendToRenderer(IPC.event.hostStatus, {
       ok: false,
       component: "sidecar",

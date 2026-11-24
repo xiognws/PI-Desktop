@@ -26,6 +26,7 @@ import {
   startRunMarkerHeartbeat,
 } from "../run-marker.js";
 import { countCrashDumpsSince } from "../crash-report.js";
+import { missingDumpForensicsWanted, writeCrashForensicsReport } from "../crash-forensics.js";
 import { judgePreviousRun, previousRunVerdictLevel } from "../run-verdict.js";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
@@ -33,6 +34,12 @@ import { syncPluginDisplayLocale } from "../plugin-display-locale";
 import { RuntimeSupervisor } from "@pi-workspace/host-runtime";
 
 type RestartKind = "host" | "sidecar";
+
+/**
+ * One `render-process-gone` listener per process, however many times the runtime
+ * lifecycle is rebuilt (a host restart re-enters `bootBackends`).
+ */
+let forensicsWired = false;
 export type RuntimeLifecycleDependencies = {
   runtimeState: RuntimeState;
   dataDir: string;
@@ -242,18 +249,39 @@ export function createRuntimeLifecycle({
     // for a build whose entry-time directory differs from this one.
     const captured = capturedPreviousRunMarker(dataDir);
     const previousMarker = captured.used ? captured.marker : readRunMarker();
+    const forensicsLog = (level: "info" | "warn", message: string, fields?: unknown) =>
+      logger.app("diagnostics", level, message, (fields ?? {}) as Record<string, unknown>);
+    // Renderers die while the app is up all the time — a plugin panel, a browser
+    // surface, an out-of-memory tab. `render-process-gone` names the process and
+    // the exit code, but on a build with no Crashpad handler there is no dump, so
+    // the report is the only artefact that ties the death to what was on screen.
+    if (!forensicsWired) {
+      forensicsWired = true;
+      app.on("render-process-gone", (_event, _contents, details) => {
+        if (details.reason === "clean-exit") return;
+        writeCrashForensicsReport(
+          dataDir,
+          {
+            kind: "renderer-gone",
+            detail: { reason: details.reason, exitCode: details.exitCode },
+          },
+          forensicsLog,
+        );
+      });
+    }
     try {
       const previousStartedMs = previousMarker
         ? Date.parse(previousMarker.startedAt)
         : Number.NaN;
+      // Only dumps written after the previous run began belong to it; an
+      // earlier crash's dumps are already accounted for.
+      const newCrashDumps = Number.isFinite(previousStartedMs)
+        ? countCrashDumpsSince(app.getPath("crashDumps"), previousStartedMs)
+        : { main: 0, renderer: 0, gpu: 0, utility: 0 };
       const verdict = judgePreviousRun({
         marker: previousMarker,
         lastExitReason: previousMarker ? readLastExitReason() : null,
-        // Only dumps written after the previous run began belong to it; an
-        // earlier crash's dumps are already accounted for.
-        newCrashDumps: Number.isFinite(previousStartedMs)
-          ? countCrashDumpsSince(app.getPath("crashDumps"), previousStartedMs)
-          : { main: 0, renderer: 0, gpu: 0, utility: 0 },
+        newCrashDumps,
         // The fatal main-process record is already written by the
         // `uncaughtException` / `unhandledRejection` handlers; the marker
         // surviving an error-level app/runtime record is the signal here.
@@ -271,6 +299,25 @@ export function createRuntimeLifecycle({
           data: { outcome: verdict.outcome, evidence: verdict.evidence, ...verdict.detail },
         },
       );
+      // The verdict says the run vanished; with no dump on disk nothing says
+      // where. This run is the only one that can still add anything — the
+      // previous run's log is on disk, and it is the last record of what that
+      // process was doing when it stopped writing.
+      if (missingDumpForensicsWanted(verdict.outcome, newCrashDumps.main)) {
+        writeCrashForensicsReport(
+          dataDir,
+          {
+            kind: "previous-run-vanished",
+            detail: {
+              outcome: verdict.outcome,
+              evidence: verdict.evidence,
+              ...verdict.detail,
+              newCrashDumps,
+            },
+          },
+          forensicsLog,
+        );
+      }
     } catch (error) {
       // Diagnostics must never hold up the first window (D602).
       logger.app("lifecycle", "warn", "previous run verdict failed", {

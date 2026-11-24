@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { session } from "electron";
 import { ErrorCodes, IPC, type AgentEventEnvelope, type PlanExecutionFinishStatus, type Risk } from "@pi-workspace/shared";
 import { assertLinuxGlibcSupported } from "../linux-glibc";
 import { HostProcess } from "../host-process";
@@ -19,6 +20,7 @@ import {
   setPreferredPythonPath,
 } from "../python-runtime.ts";
 import { readPythonInterpreterPreference } from "../python-preferences.ts";
+import { writeCrashForensicsReport } from "../crash-forensics.js";
 
 export type HostRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -419,6 +421,14 @@ export function createHostRuntime({
       code: ErrorCodes.HOST_UNAVAILABLE,
       data: { exitCode: code, signal },
     });
+    // The stderr tail already went to the host channel; this file pairs it with
+    // the app log's last lines, which is what a dump would have told us.
+    writeCrashForensicsReport(
+      dataDir,
+      { kind: "child-exited", detail: { component: "host", exitCode: code, signal } },
+      (level, message, fields) =>
+        logger.app("diagnostics", level, message, (fields ?? {}) as Record<string, unknown>),
+    );
     sendToRenderer(IPC.event.hostStatus, {
       ok: false,
       component: "host",

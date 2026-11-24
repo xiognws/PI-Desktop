@@ -97,11 +97,25 @@ The application categories are:
   `app-log`) and carries the previous pid, start stamp and version, so one line
   answers "was that exit normal, and if not, how". Only `crash` is logged at
   `error`; `clean` is `info` and the rest are `warn`. A verdict that cannot be
-  computed is one `previousRunVerdictFailed` warn.
+  computed is one `previousRunVerdictFailed` warn. The marker the verdict judges
+  is the one read before this launch wrote its own — a marker carrying this
+  process's pid is never a previous run, and reports `clean` with
+  `evidence: []` and the summary `no previous run recorded` instead of `killed`.
   Each renderer `render-process-gone` event records one `renderer.process.gone`
   entry with the Electron exit `reason` and `exitCode`, plus whether the current
   main window was reloaded. Clean exits are informational; unexpected exits are
   warnings.
+
+- `crash-dumps/forensics` — one JSON report per death that left no dump, for the
+  builds whose Electron ships no `chrome_crashpad_handler.exe`. Three kinds:
+  `previous-run-vanished` (written by the next launch when the verdict is
+  `killed` with zero main-process dumps), `renderer-gone` (any non-`clean-exit`
+  `render-process-gone`), and `child-exited` (host-core or the agent sidecar
+  leaving without an intentional quit). Each report carries the moment, the
+  verdict or exit detail, the crash-dump list *including an empty one*, and the
+  last lines of the app log — the only remaining record of what the process was
+  doing when it stopped writing. The newest 20 reports are kept; a report that
+  cannot be written is logged and dropped, never raised.
 
 - `runtime` — host/sidecar lifecycle, uncategorized child output, and
   main-process `uncaughtException` / `unhandledRejection` records
