@@ -1,0 +1,16 @@
+apps/desktop/src/styles/base.css
+  h_201ed4c689ac8b 176-179
+apps/desktop/src/styles/settings.css
+  h_201ed4c689ac8b 11-14,19-24,85,103,105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "436645c432d62426be163468f211a76f6c464505",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
