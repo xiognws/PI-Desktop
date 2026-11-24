@@ -100,6 +100,15 @@ export type AppSettings = {
    * session rarely needs the strongest model in the account.
    */
   skillReviewModelId?: string | null;
+  /**
+   * Provider the review runs on. Absent or empty uses the provider this
+   * conversation runs on, which is the safe default: another provider needs its
+   * own credential resolved, and a review is not worth a misconfigured launch.
+   *
+   * Only set together with {@link skillReviewModelId} — a provider without a model
+   * would send the review to whatever model that provider defaults to.
+   */
+  skillReviewProviderId?: string | null;
   /** Turn the automatic review off entirely. Absent means enabled. */
   skillReviewAfterTurn?: boolean;
   /** Configured command shell for the agent Bash protocol tool. */

@@ -14,6 +14,7 @@ import { SettingsMenuSelect } from "../../../components/settings/SettingsMenuSel
 import { StreamRulesSettings } from "../stream-rules/StreamRulesSettings";
 import { GoalBudgetSettingsRow } from "../../modes/GoalBudgetSettingsRow";
 import { CommandShellRow, SettingsCard, SettingsRow } from "../primitives";
+import { useAppStore } from "../../../stores/app-store";
 
 export function AgentBehaviorSettings({
   settings,
@@ -23,6 +24,7 @@ export function AgentBehaviorSettings({
   saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const providers = useAppStore((state) => state.providers);
   return (
     <div className="settings-stack">
       <SettingsCard
@@ -85,6 +87,21 @@ export function AgentBehaviorSettings({
                 skillReviewAfterTurn: settings.skillReviewAfterTurn === false,
               })
             }
+          />
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.skillReviewProvider")}
+          description={t("settings.skillReviewProviderDesc")}
+        >
+          <SettingsMenuSelect
+            className="settings-permission-select"
+            label={t("settings.skillReviewProvider")}
+            value={settings.skillReviewProviderId ?? ""}
+            onChange={(id) => void saveSettings({ skillReviewProviderId: id || null })}
+            options={[
+              { id: "", label: t("settings.skillReviewProviderFollow") },
+              ...providers.map((row) => ({ id: row.id, label: row.name })),
+            ]}
           />
         </SettingsRow>
         <SettingsRow

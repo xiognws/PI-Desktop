@@ -325,6 +325,56 @@ export function createSessionLaunchRuntime({
     return root;
   }
 
+  /**
+   * The provider spec the review runs on, when the user pinned a different one.
+   *
+   * `undefined` when nothing is pinned, when the pinned provider is the session's
+   * own, or when its credential cannot be resolved: the review then stays on the
+   * session's provider, because an unusable overlay must not fail a launch. Vendor
+   * (OAuth) and plugin-owned providers are skipped — their transport lives inside a
+   * layer the review cannot borrow, and guessing at it would send requests nowhere.
+   */
+  async function reviewProviderOverlay(input: {
+    providerId: string;
+    modelId: string;
+    sessionProviderId: string;
+    providerRows: readonly RuntimeProvider[];
+  }): Promise<Record<string, unknown> | undefined> {
+    const wanted = input.providerId.trim();
+    const model = input.modelId.trim();
+    if (!wanted || !model || wanted === input.sessionProviderId) return undefined;
+    const row = input.providerRows.find((item) => item.id === wanted);
+    if (!row?.baseUrl) return undefined;
+    if (row.authKind === OAUTH_AUTH_KIND || row.extensionAgentKey) return undefined;
+    let apiKey = "";
+    if (row.authKind !== "none") {
+      if (!runtimeState.host) return undefined;
+      const secret = await runtimeState.host.call<{ value?: string }>("providers.getSecret", {
+        id: row.id,
+      });
+      apiKey = typeof secret?.value === "string" ? secret.value : "";
+      if (!apiKey) return undefined;
+    }
+    const modelConfig = catalogModelConfigFor(modelsDevCatalog, {
+      providerId: row.id,
+      vendorKey: row.vendorKey,
+      baseUrl: row.baseUrl,
+      apiStyle: row.apiStyle,
+      modelId: model,
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      ...(row.vendorKey ? { vendorKey: row.vendorKey } : {}),
+      baseUrl: row.baseUrl,
+      modelId: model,
+      apiKey,
+      ...(row.authKind ? { authKind: row.authKind } : {}),
+      ...(row.apiStyle ? { apiStyle: row.apiStyle } : {}),
+      ...(modelConfig ? { modelConfig } : {}),
+    };
+  }
+
   async function resolveAgentRuntimeLaunch(
     sessionId: string,
     session: any,
@@ -802,6 +852,15 @@ export function createSessionLaunchRuntime({
         });
       }
     }
+    // Resolved once, before the launch object: reading another provider's secret is
+    // an async host call and the review must not pay for it twice.
+    const reviewOverlay = await reviewProviderOverlay({
+      providerId:
+        typeof settings.skillReviewProviderId === "string" ? settings.skillReviewProviderId : "",
+      modelId: typeof settings.skillReviewModelId === "string" ? settings.skillReviewModelId : "",
+      sessionProviderId: provider.id,
+      providerRows: providers.providers,
+    });
     return {
       providerId: provider.id,
       modelId,
@@ -825,7 +884,10 @@ export function createSessionLaunchRuntime({
         // The background review runs inside the runtime — that is where the agent
         // loop and its tools are — so its policy travels with the launch. The
         // settings stay Main's: they are the user's.
-        skillReview: skillReviewPolicyFrom(settings as unknown as Record<string, unknown>),
+        skillReview: {
+          ...skillReviewPolicyFrom(settings as unknown as Record<string, unknown>),
+          ...(reviewOverlay ? { provider: reviewOverlay } : {}),
+        },
         ...(jevApiKey ? { jevApiKey } : {}),
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),

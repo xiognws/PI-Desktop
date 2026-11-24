@@ -1142,6 +1142,13 @@ export type SkillReviewPolicy = {
    * a cheaper model is what keeps a background convenience off the bill.
    */
   model?: string;
+  /**
+   * Provider spec the review runs on, built by Electron main.
+   *
+   * Absent follows the session's provider. Main resolves the credential and the
+   * model metadata, so this arrives ready to use — the runtime never reads a key.
+   */
+  provider?: Partial<RuntimeProviderConfig>;
 };
 
 export type AgentRuntimeOptions = {
@@ -2815,12 +2822,14 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       // rather than a gate on the scheduler. Those stay in the log.
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         const collector = new ReviewActionCollector();
-        // A pinned review model is the point of the setting: the review is a second
-        // completion after every qualifying turn. Cloning the session's provider
-        // config keeps credentials and wire style intact and swaps only the model.
-        const reviewProvider = policy.model
-          ? { ...this.provider, modelId: policy.model }
-          : this.provider;
+        // A pinned review provider arrives resolved from Electron main; a pinned
+        // model alone only swaps the model on the session's provider. Both keep the
+        // session's credentials and wire style for everything they do not override.
+        const reviewProvider = policy.provider
+          ? { ...this.provider, ...policy.provider }
+          : policy.model
+            ? { ...this.provider, modelId: policy.model }
+            : this.provider;
         const run = new SubagentRun({
           definition: SKILL_REVIEW_DEFINITION,
           sessionId: this.sessionId,
