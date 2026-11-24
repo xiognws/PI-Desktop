@@ -1,0 +1,40 @@
+apps/desktop/src/features/settings/pages/AgentBehaviorSettings.tsx
+  h_201ed4c689ac8b 12,72-110
+crates/agent-core/src/skill_review.rs
+  h_201ed4c689ac8b 70,76-85,95-96,120-127,142-146,198,504,590,597,606,609,613,627,637,640,733,736,747
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 1138-1144,2818-2823,2834
+packages/agent-runtime/src/skill-review-run.ts
+  h_201ed4c689ac8b 74-75,81-87,93
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1769-1775
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1781-1787
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1769-1775
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1769-1775
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1777-1783
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1746-1752
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1777-1783
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1767-1773
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1767-1773
+packages/shared/src/types/settings.ts
+  h_201ed4c689ac8b 93-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "19535f7c6074ff06764f3acbef1ae5df248e70f5",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
