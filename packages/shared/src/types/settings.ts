@@ -90,6 +90,18 @@ export type AppSettings = {
   keepAwakeWhileRunning?: boolean;
   /** Enable scheduled task UI, tools and new runs. Absent means enabled. */
   scheduledTasksEnabled?: boolean;
+  /**
+   * Model the self-improvement review runs on. Absent or empty follows the
+   * session's own model, which is the default because a review is a background
+   * convenience.
+   *
+   * It exists because the review is a second completion after every qualifying
+   * turn: on an expensive model that is a visible bill, and judging a finished
+   * session rarely needs the strongest model in the account.
+   */
+  skillReviewModelId?: string | null;
+  /** Turn the automatic review off entirely. Absent means enabled. */
+  skillReviewAfterTurn?: boolean;
   /** Configured command shell for the agent Bash protocol tool. */
   defaultCommandShell?: CommandShellId;
   /**

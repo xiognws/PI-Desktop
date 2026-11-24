@@ -71,16 +71,26 @@ export function skillReviewPolicyFrom(settings: Record<string, unknown> = {}): {
   afterToolCalls: number;
   minIntervalSec: number;
   showQuietPasses: boolean;
+  /** Model the review runs on. Absent follows the session's own. */
+  model?: string;
 } {
   const positive = (key: string, fallback: number): number => {
     const value = settings[key];
     return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
   };
+  const text = (key: string): string | undefined => {
+    const value = settings[key];
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  };
+  const model = text("skillReviewModelId");
   return {
     enabled: settings.skillReviewAfterTurn !== false,
     afterToolCalls: positive("skillReviewAfterToolCalls", REVIEW_DEFAULT_MIN_TOOL_CALLS),
     minIntervalSec: positive("skillReviewMinIntervalSec", REVIEW_DEFAULT_MIN_INTERVAL_SEC),
     showQuietPasses: settings.skillReviewShowQuietPasses === true,
+    ...(model ? { model } : {}),
   };
 }
 

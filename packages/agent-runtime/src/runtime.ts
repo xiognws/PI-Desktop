@@ -1135,6 +1135,13 @@ export type SkillReviewPolicy = {
    * reviews that wrote something or broke.
    */
   showQuietPasses?: boolean;
+  /**
+   * Model the review runs on. Absent follows the session's own model.
+   *
+   * The review is a second completion after every qualifying turn, so pinning it to
+   * a cheaper model is what keeps a background convenience off the bill.
+   */
+  model?: string;
 };
 
 export type AgentRuntimeOptions = {
@@ -2808,6 +2815,12 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       // rather than a gate on the scheduler. Those stay in the log.
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         const collector = new ReviewActionCollector();
+        // A pinned review model is the point of the setting: the review is a second
+        // completion after every qualifying turn. Cloning the session's provider
+        // config keeps credentials and wire style intact and swaps only the model.
+        const reviewProvider = policy.model
+          ? { ...this.provider, modelId: policy.model }
+          : this.provider;
         const run = new SubagentRun({
           definition: SKILL_REVIEW_DEFINITION,
           sessionId: this.sessionId,
@@ -2818,7 +2831,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             (attempt === 1 ? "" : `\n\n${SKILL_REVIEW_NO_LOOK_RETRY}`),
           systemPrompt: SKILL_REVIEW_TOOL_NOTE,
           tools: reviewTools,
-          provider: this.provider,
+          provider: reviewProvider,
           thinkingLevel: "off",
           // The whole session used to travel, which overflowed the window exactly
           // on the long sessions that carry the most to review.

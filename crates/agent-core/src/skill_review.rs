@@ -67,12 +67,22 @@ Do not store what the conversation already shows and the repository already says
 Finish by saying what you changed, in one line per action. If neither the library nor memory needs anything, say 'Nothing to save.'"#;
 
 /// The review policy a session launches with.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillReviewPolicy {
     pub enabled: bool,
     pub after_tool_calls: usize,
     pub min_interval: Duration,
     pub show_quiet_passes: bool,
+    /// Provider spec the review fork runs on.
+    ///
+    /// `None` follows the session's own provider. A review is a second, smaller
+    /// completion after every qualifying turn, so pinning it to a cheaper provider
+    /// is the difference between a background nicety and a visible bill. The spec
+    /// arrives as the same JSON the session's own provider uses, because the kernel
+    /// builds a provider from a spec either way.
+    pub provider: Option<Value>,
+    /// Model the review fork runs on. `None` follows the session's model.
+    pub model: Option<String>,
 }
 
 impl Default for SkillReviewPolicy {
@@ -82,6 +92,8 @@ impl Default for SkillReviewPolicy {
             after_tool_calls: REVIEW_DEFAULT_MIN_TOOL_CALLS,
             min_interval: Duration::from_secs(REVIEW_DEFAULT_MIN_INTERVAL_SEC),
             show_quiet_passes: false,
+            provider: None,
+            model: None,
         }
     }
 }
@@ -105,6 +117,14 @@ impl SkillReviewPolicy {
                 .map(|value| value as usize)
                 .unwrap_or(fallback)
         };
+        let text = |key: &str| {
+            object
+                .get(key)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        };
         Self {
             enabled: object
                 .get("enabled")
@@ -119,6 +139,11 @@ impl SkillReviewPolicy {
                 .get("showQuietPasses")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            // Only an object is a provider spec. Anything else follows the session,
+            // because a malformed overlay must not leave the review with no provider
+            // at all.
+            provider: object.get("provider").filter(|value| value.is_object()).cloned(),
+            model: text("model"),
         }
     }
 }
@@ -170,7 +195,7 @@ impl ReviewGate {
     /// turn qualify an unrelated short one.
     pub fn qualify(
         &mut self,
-        policy: SkillReviewPolicy,
+        policy: &SkillReviewPolicy,
         this_turn_tool_calls: usize,
         now: Instant,
     ) -> Result<(), ReviewSkip> {
@@ -476,7 +501,7 @@ impl ReviewNotice {
     ///
     /// A quiet pass is the normal answer, and reporting it on every qualifying
     /// turn is noise; a write and a failure always report.
-    pub fn is_visible(&self, policy: SkillReviewPolicy) -> bool {
+    pub fn is_visible(&self, policy: &SkillReviewPolicy) -> bool {
         if self.outcome != ReviewOutcome::Skipped {
             return true;
         }
@@ -562,14 +587,14 @@ mod tests {
         // Regression: comparing before counting threw this turn away, and a
         // machine running one qualifying turn at a time never reviewed at all.
         let mut gate = ReviewGate::new();
-        assert_eq!(gate.qualify(policy(), 1, Instant::now()), Ok(()));
+        assert_eq!(gate.qualify(&policy(), 1, Instant::now()), Ok(()));
     }
 
     #[test]
     fn a_turn_with_no_tools_does_not_open_it() {
         let mut gate = ReviewGate::new();
         assert_eq!(
-            gate.qualify(policy(), 0, Instant::now()),
+            gate.qualify(&policy(), 0, Instant::now()),
             Err(ReviewSkip::TooFewTools)
         );
     }
@@ -578,14 +603,14 @@ mod tests {
     fn the_cooldown_holds_a_second_review_back() {
         let now = Instant::now();
         let mut gate = ReviewGate::new();
-        assert_eq!(gate.qualify(policy(), 1, now), Ok(()));
+        assert_eq!(gate.qualify(&policy(), 1, now), Ok(()));
         gate.record_review(now);
         assert_eq!(
-            gate.qualify(policy(), 1, now + Duration::from_secs(5)),
+            gate.qualify(&policy(), 1, now + Duration::from_secs(5)),
             Err(ReviewSkip::Cooldown)
         );
         assert_eq!(
-            gate.qualify(policy(), 1, now + Duration::from_secs(121)),
+            gate.qualify(&policy(), 1, now + Duration::from_secs(121)),
             Ok(()),
             "the floor has passed"
         );
@@ -599,7 +624,7 @@ mod tests {
             ..policy()
         };
         assert_eq!(
-            gate.qualify(disabled, 5, Instant::now()),
+            gate.qualify(&disabled, 5, Instant::now()),
             Err(ReviewSkip::Disabled)
         );
     }
@@ -609,10 +634,10 @@ mod tests {
         // The review resets the count; a skipped turn still spends what it used.
         let now = Instant::now();
         let mut gate = ReviewGate::new();
-        assert_eq!(gate.qualify(policy(), 0, now), Err(ReviewSkip::TooFewTools));
+        assert_eq!(gate.qualify(&policy(), 0, now), Err(ReviewSkip::TooFewTools));
         gate.record_review(now);
         assert_eq!(
-            gate.qualify(policy(), 0, now + Duration::from_secs(200)),
+            gate.qualify(&policy(), 0, now + Duration::from_secs(200)),
             Err(ReviewSkip::TooFewTools),
             "the earlier turn's spend is not a credit"
         );
@@ -705,10 +730,10 @@ mod tests {
         assert_eq!(notice.outcome, ReviewOutcome::Skipped);
         assert_eq!(notice.reason.as_deref(), Some("nothing-to-save"));
         assert!(
-            !notice.is_visible(policy()),
+            !notice.is_visible(&policy()),
             "quiet passes stay out of the chat"
         );
-        assert!(notice.is_visible(SkillReviewPolicy {
+        assert!(notice.is_visible(&SkillReviewPolicy {
             show_quiet_passes: true,
             ..policy()
         }));
@@ -719,7 +744,7 @@ mod tests {
         let notice = ReviewNotice::from_collector(&ReviewActionCollector::new());
         assert_eq!(notice.outcome, ReviewOutcome::Failed);
         assert_eq!(notice.reason.as_deref(), Some("no-tool-calls"));
-        assert!(notice.is_visible(policy()));
+        assert!(notice.is_visible(&policy()));
     }
 
     #[test]

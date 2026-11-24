@@ -9,7 +9,7 @@
  */
 import type { AppSettings, GlobalPermissionMode } from "@pi-workspace/shared";
 import { useTranslation } from "react-i18next";
-import { SegmentedControl, SettingsToggle } from "../../../components/ui";
+import { Input, SegmentedControl, SettingsToggle } from "../../../components/ui";
 import { SettingsMenuSelect } from "../../../components/settings/SettingsMenuSelect";
 import { StreamRulesSettings } from "../stream-rules/StreamRulesSettings";
 import { GoalBudgetSettingsRow } from "../../modes/GoalBudgetSettingsRow";
@@ -67,6 +67,45 @@ export function AgentBehaviorSettings({
           />
         </SettingsRow>
         <CommandShellRow settings={settings} saveSettings={saveSettings} />
+      </SettingsCard>
+
+      <SettingsCard
+        title={t("settings.skillReview")}
+        caption={t("settings.skillReviewCaption")}
+      >
+        <SettingsRow
+          title={t("settings.skillReviewEnabled")}
+          description={t("settings.skillReviewEnabledDesc")}
+        >
+          <SettingsToggle
+            checked={settings.skillReviewAfterTurn !== false}
+            label={t("settings.skillReviewEnabled")}
+            onChange={() =>
+              void saveSettings({
+                skillReviewAfterTurn: settings.skillReviewAfterTurn === false,
+              })
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.skillReviewModel")}
+          description={t("settings.skillReviewModelDesc")}
+        >
+          <Input
+            // Remounting on the stored value keeps the field in step with an edit
+            // made elsewhere, without writing settings on every keystroke.
+            key={settings.skillReviewModelId ?? ""}
+            defaultValue={settings.skillReviewModelId ?? ""}
+            placeholder={t("settings.skillReviewModelPlaceholder")}
+            aria-label={t("settings.skillReviewModel")}
+            onBlur={(event) =>
+              void saveSettings({ skillReviewModelId: event.target.value.trim() || null })
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
+          />
+        </SettingsRow>
       </SettingsCard>
 
       <SettingsCard title={t("settings.execution")}>
