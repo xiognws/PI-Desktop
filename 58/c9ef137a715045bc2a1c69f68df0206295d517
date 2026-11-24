@@ -1,0 +1,30 @@
+apps/desktop/electron/main/model-discovery.ts
+  h_201ed4c689ac8b 98-106,108-118,123-126,133,163
+apps/desktop/electron/test/model-discovery.test.mjs
+  h_201ed4c689ac8b 1-90
+crates/agent-core/src/context.rs
+  h_201ed4c689ac8b 36,38-45,180-188,382-384,395-396,402-415
+packages/agent-runtime/src/compaction-auto-gate.ts
+  h_201ed4c689ac8b 48
+packages/agent-runtime/src/context-budget.test.ts
+  h_201ed4c689ac8b 28,39-41,46-61,65,93,105
+packages/agent-runtime/src/context-budget.ts
+  h_201ed4c689ac8b 65-66,77-78,96-106,110-114,117,119-126,194
+packages/agent-runtime/src/delegation-history.test.ts
+  h_201ed4c689ac8b 45-47
+packages/agent-runtime/src/subagent-context.test.ts
+  h_201ed4c689ac8b 312-318,325
+packages/agent-runtime/src/turn-token-ledger.ts
+  h_201ed4c689ac8b 160,166-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "58c9ef137a715045bc2a1c69f68df0206295d517",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
