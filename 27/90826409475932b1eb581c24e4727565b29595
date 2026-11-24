@@ -1,0 +1,16 @@
+apps/desktop/electron/main/entry.ts
+  h_201ed4c689ac8b 4-9,24-29
+apps/desktop/test/run-marker.test.mjs
+  h_201ed4c689ac8b 125-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "2790826409475932b1eb581c24e4727565b29595",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
