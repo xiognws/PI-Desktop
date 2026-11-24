@@ -204,11 +204,27 @@ here — never deleted or rewritten.
 
 ### 9.1 Stage 2a: recall injection (implemented, scored store)
 
-- **Recall runs per turn** (`packages/agent-runtime/src/memory-context.ts`): the
-  user prompt (first 2 000 chars) is sent to the host's optional
-  `memoryRecall` member, with the session's `projectPath` / `sessionId`, up to 5
-  hits, rendered into one `<memory_context>` block capped at 3 000 chars
-  (≈800 tokens).
+- **Recall runs per turn** (`crates/agent-core/src/memory_context.rs`, mirrored by
+  `packages/agent-runtime/src/memory-context.ts`): the user prompt is sent to the
+  host's optional `memoryRecall` member, with the session's `projectPath` /
+  `sessionId`, up to 5 hits, rendered into one `<memory_context>` block capped at
+  3 000 chars (≈800 tokens).
+- **The query is the prompt's tail, not its head.** The budget is 2 000 chars; a
+  longer prompt contributes a 200-char opening plus its tail. A pasted log, a
+  file, a stack trace fills the budget, and the question worth matching sits after
+  it — taking the opening sent the noise and dropped the intent.
+- **Pinned memories fill at most `limit - 1` slots** when a query exists. They are
+  still injected unconditionally — a standing rule must not depend on how one
+  message happens to be worded — but with `MAX_PINNED = 32` against a five-hit
+  block, five pinned notes used to leave the query nothing to fill, and recall
+  quietly degraded into "pinned only".
+- **One oversized memory is clipped, not evicted.** A hit renders up to 900 chars
+  with a `…` marker; before that, a single long note consumed the 3 000-char
+  budget and every hit behind it was dropped, which is indistinguishable from
+  "nothing else matched".
+- **A failed or timed-out recall is logged, not silent**: both warn with the
+  elapsed time, because "the turn ran without memory" and "memory is broken"
+  looked identical from the outside.
 - **`memoryRecall` is an optional host member**, not a generic `call` entry: a
   host that does not implement it (an older sidecar, a test stub that only
   stubs `call`) gets no memory block, and recall never appears in the RPC
