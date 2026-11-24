@@ -21,7 +21,7 @@ crates/host-core/src/db/session_smart_mode_test.rs
 crates/host-core/src/db/session_smart_mode_migration.rs
   h_201ed4c689ac8b 1-46
 crates/agent-core/src/event.rs
-  h_201ed4c689ac8b 14-15,176
+  h_201ed4c689ac8b 14-15,14-39,176
   h_201ed4c689ac8b 16-39
 packages/i18n/src/locales/tr/index.ts
   h_201ed4c689ac8b 937,1786-1798
@@ -50,7 +50,7 @@ apps/desktop/src/lib/api.ts
 docs/adr/0405-smart-mode-model-pair.md
   h_201ed4c689ac8b 1-80
 crates/agent-core/src/tool.rs
-  h_201ed4c689ac8b 260-263,362,364-366,371-372,374-380,429,433-440,442,607-608
+  h_201ed4c689ac8b 111-149,260-263,349-362,362,364-366,368,371-372,371-382,374-380,429,433-440,433-442,442,553-608,607-608
   h_201ed4c689ac8b 111-149,349-361,368,373,381-382,441,553-606
 packages/i18n/src/locales/zh-CN/index.ts
   h_201ed4c689ac8b 933,1776-1788
