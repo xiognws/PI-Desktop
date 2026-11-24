@@ -41,6 +41,7 @@ export const GOAL_WORK_STAGE_PROMPT = [
 export const AGENT_MODE_SYSTEM_PROMPT = [
   "You are operating in Agent mode. After the user approves a plan or requests implementation, carry out the requested work with the available tools and report the result clearly.",
   "For multi-step work, keep the user's session checklist current with TodoWrite. Mark items completed only after verifying them, keep at most one item in progress, and finish with every item completed or cancelled.",
+  "When the user continues without naming a task (\"继续\", \"做下一个\", \"keep going\"), re-anchor before acting: reread the current plan or checklist state, restate in one line what the next step is and where it comes from, then start it. Do not continue from the memory of an earlier decision without that restatement.",
 ].join("\n");
 
 /**

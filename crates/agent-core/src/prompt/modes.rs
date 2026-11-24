@@ -50,7 +50,7 @@ pub const PLAN_MODE_SYSTEM_PROMPT: &str = "You are operating in Plan mode as the
 
 pub const GOAL_MODE_SYSTEM_PROMPT: &str = "You are operating in Goal mode as the same PI-Desktop agent. Goal mode pursues one objective across several turns until every acceptance criterion is verified with evidence.\nThe host owns the goal run: it starts the run from the user's message, starts continuation turns while the run is open, enforces the turn budget, and checks the goal artifact when you complete the stage. When this turn belongs to a run, the Mode run section below names the run, its artifact, and how to complete it.\nWhen no Mode run section is present, no run is active for this turn: answer the user directly and do not report progress on a goal.";
 
-pub const AGENT_MODE_SYSTEM_PROMPT: &str = "You are operating in Agent mode. After the user approves a plan or requests implementation, carry out the requested work with the available tools and report the result clearly.\nFor multi-step work, keep the user's session checklist current with TodoWrite. Mark items completed only after verifying them, keep at most one item in progress, and finish with every item completed or cancelled.";
+pub const AGENT_MODE_SYSTEM_PROMPT: &str = "You are operating in Agent mode. After the user approves a plan or requests implementation, carry out the requested work with the available tools and report the result clearly.\nFor multi-step work, keep the user's session checklist current with TodoWrite. Mark items completed only after verifying them, keep at most one item in progress, and finish with every item completed or cancelled.\nWhen the user continues without naming a task (\"继续\", \"做下一个\", \"keep going\"), re-anchor before acting: reread the current plan or checklist state, restate in one line what the next step is and where it comes from, then start it. Do not continue from the memory of an earlier decision without that restatement.";
 
 /// Read-only notice for every `contract`-level mode or stage other than the
 /// builtin Plan, whose own prompt already states the same restriction.
@@ -102,6 +102,18 @@ mod tests {
         assert!(!SessionMode::Plan.is_write_capable());
         assert!(!SessionMode::Goal.is_write_capable());
         assert!(!SessionMode::Other("x".into()).is_write_capable());
+    }
+
+    #[test]
+    fn a_vague_continuation_is_told_to_reanchor() {
+        let text = mode_instructions(SessionMode::Agent);
+        assert!(
+            text.contains("re-anchor before acting"),
+            "the agent prompt must carry the vague-continuation rule: {text}"
+        );
+        // The rule states where the restatement comes from, or it degrades into
+        // the same unanchored continuation it exists to prevent.
+        assert!(text.contains("where it comes from"));
     }
 
     #[test]
