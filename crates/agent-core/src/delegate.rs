@@ -25,9 +25,10 @@ use tokio::sync::Notify;
 
 use crate::cancel::CancelToken;
 use crate::error::{AgentError, Result};
-use crate::message::{ToolCall, Usage};
+use crate::event::{tool_result_payload, AgentEvent, AgentEventEnvelope, EventSink};
+use crate::message::{ToolCall, ToolResult, Usage};
 use crate::provider::BoxFuture;
-use crate::tool::{Tool, ToolContext, ToolSpec};
+use crate::tool::{Tool, ToolContext, ToolOutcome, ToolSpec};
 
 /// Start a delegate.
 pub const TASK_TOOL_NAME: &str = "Task";
@@ -58,7 +59,7 @@ pub const SUBAGENT_MAX_STEPS: usize = 24;
 pub const MAX_DELEGATION_RESULT_CHARS: usize = 50_000;
 
 /// Sent as the prompt that resumes the parent once delegates settle.
-pub const DELEGATION_RESUME_PROMPT: &str = "The following subagents have finished. Integrate their reports and continue the user's original task. Call TaskStop only if you have decided a still-running delegate should not continue.";
+pub const DELEGATION_RESUME_PROMPT: &str = "The following subagents have finished. First re-anchor: in one line, state which part of the user's original task these results serve and what the next concrete step is. Then integrate their reports and continue. Call TaskStop only if you have decided a still-running delegate should not continue.";
 
 /// What `model` on `Task` means, for the tool description and for a refusal.
 ///
@@ -306,7 +307,9 @@ pub enum StopOutcome {
 impl StopOutcome {
     pub fn id(&self) -> &str {
         match self {
-            Self::Requested { id, .. } | Self::AlreadySettled { id, .. } | Self::Unknown { id } => id,
+            Self::Requested { id, .. } | Self::AlreadySettled { id, .. } | Self::Unknown { id } => {
+                id
+            }
         }
     }
 }
@@ -362,6 +365,19 @@ impl DelegationRegistry {
                     .map(|record| DelegationView::from(&*record))
             })
             .collect()
+    }
+
+    /// One delegation, or `None` when this session never started it.
+    pub fn view(&self, delegation_id: &str) -> Option<DelegationView> {
+        let handle = self
+            .records
+            .lock()
+            .ok()
+            .and_then(|records| records.get(delegation_id).cloned())?;
+        handle
+            .lock()
+            .ok()
+            .map(|record| DelegationView::from(&*record))
     }
 
     /// Cancel delegations the caller asked to stop.
@@ -563,6 +579,103 @@ impl From<&DelegationRecord> for DelegationView {
     }
 }
 
+/// One delegation as the `details` of its `Task` tool row.
+///
+/// The reference tool result carries exactly this shape
+/// (`{delegationId, agent, status, startedAt, modelId, …}`), and the renderer
+/// reads it directly: the topology node's badge comes from `status`, its
+/// elapsed clock from `startedAt`/`completedAt`, and `delegationId` is what
+/// ties the row to the subagent transcript and to host-core's stored snapshot.
+/// `status` is `running` while the delegate works, which is why the row must be
+/// refreshed once it settles — see [`settled_tool_result`].
+pub fn delegation_details(view: &DelegationView) -> Value {
+    let mut details = serde_json::Map::new();
+    details.insert("delegationId".into(), json!(view.delegation_id));
+    details.insert("agent".into(), json!(view.agent_name));
+    details.insert("status".into(), json!(view.status.as_str()));
+    details.insert("startedAt".into(), json!(view.started_at_ms));
+    details.insert("turns".into(), json!(view.turns));
+    details.insert("toolCalls".into(), json!(view.tool_calls));
+    if !view.model_id.is_empty() {
+        details.insert("modelId".into(), json!(view.model_id));
+    }
+    if let Some(label) = &view.label {
+        details.insert("label".into(), json!(label));
+    }
+    if let Some(completed_at) = view.completed_at_ms {
+        details.insert("completedAt".into(), json!(completed_at));
+    }
+    if let Some(error) = &view.error {
+        details.insert(
+            "error".into(),
+            json!({ "code": error.code, "message": error.message }),
+        );
+    }
+    Value::Object(details)
+}
+
+/// The `delegations[]` roster a lifecycle row (`TaskWait`/`TaskList`) reports.
+pub fn delegation_roster(views: &[DelegationView]) -> Value {
+    json!(views.iter().map(delegation_details).collect::<Vec<_>>())
+}
+
+/// Why a settled delegation failed, as the parent model should read it.
+///
+/// A step-limit exhaustion is not an ordinary failure: the subagent did real
+/// work and the ceiling cut it off mid-task, so the parent must see the
+/// reason and its ways forward — continue itself, rerun the delegate with a
+/// larger `stepBudget`, or narrow the task — instead of an unexplained
+/// "failed" that invites rerunning the identical shape (the reference marks
+/// such runs `interrupted` and hands back the partial output; this frames the
+/// same outcome inside the existing `failed` status without touching the
+/// persisted status vocabulary the renderer badges on).
+fn failure_reason(view: &DelegationView) -> Option<String> {
+    let error = view.error.as_ref()?;
+    Some(match error.code.as_str() {
+        "STEP_LIMIT" => format!(
+            "hit its step ceiling with the task unfinished ({}); the report is partial — continue it yourself, rerun it with a larger stepBudget, or narrow the task instead of rerunning it unchanged",
+            error.message
+        ),
+        _ => format!("{} ({})", error.code, error.message),
+    })
+}
+
+/// The settled `Task` row: same call id, terminal status.
+///
+/// `Task` returns the moment its delegate starts, so the row it produced says
+/// `running` even though the call itself succeeded. Replacing the text and
+/// details of that row is what tells the transcript, host-core's snapshot and
+/// the topology badge how the subagent actually ended; without it a finished
+/// delegation reads as still running, and at turn end as aborted.
+pub fn settled_tool_result(call_id: &str, view: &DelegationView) -> (ToolResult, Value) {
+    let text = match failure_reason(view) {
+        Some(reason) => format!(
+            "Delegation {} settled: the {} subagent failed after {} turn(s) and {} tool call(s) — {}.",
+            view.delegation_id,
+            view.agent_name,
+            view.turns,
+            view.tool_calls,
+            reason
+        ),
+        None => format!(
+            "Delegation {} settled: the {} subagent {} after {} turn(s) and {} tool call(s).",
+            view.delegation_id,
+            view.agent_name,
+            view.status.as_str(),
+            view.turns,
+            view.tool_calls
+        ),
+    };
+    let result = ToolResult {
+        call_id: call_id.to_string(),
+        name: TASK_TOOL_NAME.to_string(),
+        content: text,
+        is_error: matches!(view.status, DelegationStatus::Failed),
+        truncated: false,
+    };
+    (result, delegation_details(view))
+}
+
 /// Join settled reports into the text that resumes the parent's turn.
 ///
 /// Returns the text and the ids it actually carried: a report that did not fit
@@ -580,12 +693,22 @@ pub fn format_resume_text(
             .report
             .clone()
             .unwrap_or_else(|| format!("({} without a report)", view.status.as_str()));
-        let block = format!(
-            "## {} ({}) — {}\n{report}",
-            view.agent_name,
-            view.delegation_id,
-            view.status.as_str()
-        );
+        // A failed block names why: the parent reading a resume must be able to
+        // tell a ceiling cut a real run short from a run that never got going.
+        let block = match failure_reason(view) {
+            Some(reason) => format!(
+                "## {} ({}) — {} ({reason})\n{report}",
+                view.agent_name,
+                view.delegation_id,
+                view.status.as_str()
+            ),
+            None => format!(
+                "## {} ({}) — {}\n{report}",
+                view.agent_name,
+                view.delegation_id,
+                view.status.as_str()
+            ),
+        };
         if used + block.chars().count() > MAX_DELEGATION_RESULT_CHARS {
             omitted += 1;
             continue;
@@ -660,6 +783,17 @@ pub struct DelegationHub {
     /// that also had a `subagentProviders` binding). Empty means delegation runs
     /// on the session's own model, which is the reference default.
     models: Vec<String>,
+    /// The model a delegate that names none runs on, when the session is on a
+    /// model pair (smart mode). `None` keeps the reference default, the session's
+    /// own model, so a single-model session is unaffected.
+    default_model: Option<String>,
+    /// Where a settled delegation's refreshed `Task` row is published.
+    ///
+    /// A delegate outlives the step that started it, so its `Task` row cannot be
+    /// corrected by the turn loop — the settle task has to emit the replacement
+    /// itself. Without a sink the row keeps saying `running`, which is exactly
+    /// what a test harness wants and what a client must never see.
+    sink: Option<Arc<dyn EventSink>>,
 }
 
 impl DelegationHub {
@@ -673,7 +807,15 @@ impl DelegationHub {
             definitions,
             runner,
             models: Vec::new(),
+            default_model: None,
+            sink: None,
         }
+    }
+
+    /// Publish settlement refreshes to the session's event stream.
+    pub fn with_sink(mut self, sink: Arc<dyn EventSink>) -> Self {
+        self.sink = Some(sink);
+        self
     }
 
     /// The model keys `Task.model` may name, in the order main authorized them.
@@ -682,8 +824,27 @@ impl DelegationHub {
         self
     }
 
+    /// Smart mode: make the cheap half the default for a delegate that names no
+    /// model. `None` restores the reference default.
+    pub fn with_default_model(mut self, key: Option<String>) -> Self {
+        self.default_model = key;
+        self
+    }
+
     fn has_model(&self, key: &str) -> bool {
         self.models.iter().any(|available| available == key)
+    }
+
+    /// The default a delegate that named no model runs on, when it is usable.
+    ///
+    /// It has to be in the catalog: a default that was never authorized would
+    /// put a delegate on an expensive model the user did not choose, which is a
+    /// spend decision rather than a fallback.
+    fn default_model_key(&self) -> Option<String> {
+        self.default_model
+            .as_ref()
+            .filter(|key| self.has_model(key))
+            .cloned()
     }
 
     /// What to tell the model when the key it named is not usable: the keys it
@@ -777,9 +938,15 @@ impl Tool for TaskTool {
             }
         });
         if models.is_some() {
+            let omitted = match self.hub.default_model_key() {
+                Some(key) => format!(
+                    "Omit to run the delegate on `{key}`, the cheap half of this session's model pair."
+                ),
+                None => "Omit to run the delegate on the session's own model.".to_string(),
+            };
             properties["model"] = json!({
                 "type": "string",
-                "description": "Delegation model key, from the available-models list. Omit to run the delegate on the session's own model."
+                "description": format!("Delegation model key, from the available-models list. {omitted}")
             });
         }
         let catalog_section = match &models {
@@ -805,6 +972,18 @@ impl Tool for TaskTool {
         call: &'a ToolCall,
         ctx: &'a ToolContext,
     ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(async move {
+            self.call_with_details(call, ctx)
+                .await
+                .map(|outcome| outcome.content)
+        })
+    }
+
+    fn call_with_details<'a>(
+        &'a self,
+        call: &'a ToolCall,
+        ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<ToolOutcome>> {
         Box::pin(async move {
             let requested = call
                 .arguments
@@ -845,14 +1024,14 @@ impl Tool for TaskTool {
             // with a tool error rather than quietly running on the parent's
             // model, because a delegate on an expensive model the user did not
             // authorize is a spend decision, not a fallback.
-            let model_key = call
+            let explicit_model = call
                 .arguments
                 .get("model")
                 .and_then(Value::as_str)
                 .map(str::trim)
                 .filter(|key| !key.is_empty())
                 .map(str::to_string);
-            if let Some(key) = &model_key {
+            if let Some(key) = &explicit_model {
                 if !self.hub.has_model(key) {
                     return Err(AgentError::Refused(format!(
                         "Model \"{key}\" is not available for delegation.{}",
@@ -860,6 +1039,10 @@ impl Tool for TaskTool {
                     )));
                 }
             }
+            // Smart mode's one behavioural change to delegation: naming no model
+            // means the cheap half, not the orchestrator's own model. Explicit
+            // still wins, and a session without a pair keeps the old default.
+            let model_key = explicit_model.or_else(|| self.hub.default_model_key());
             let delegation_id = uuid::Uuid::new_v4().to_string();
             let delegate_cancel = ctx.cancel.child();
             let handle = self.hub.registry.insert(DelegationRecord {
@@ -883,8 +1066,13 @@ impl Tool for TaskTool {
 
             // The delegate runs on its own task: `Task` returns now, and the
             // parent's turn keeps its own steps.
+            let agent_name = definition.name.clone();
+            let session_id = ctx.session_id.clone();
+            let parent_turn_id = ctx.turn_id.clone();
+            let parent_call_id = call.id.clone();
             let runner = self.hub.runner.clone();
             let registry = self.hub.registry.clone();
+            let sink = self.hub.sink.clone();
             let request = DelegateRunRequest {
                 session_id: ctx.session_id.clone(),
                 parent_turn_id: ctx.turn_id.clone(),
@@ -895,19 +1083,78 @@ impl Tool for TaskTool {
                 model_key,
                 cancel: delegate_cancel,
             };
+            tracing::info!(
+                target: "agent_core::delegate",
+                delegation_id = %delegation_id,
+                agent = %agent_name,
+                session = %session_id,
+                "subagent delegation started"
+            );
             tokio::spawn(async move {
+                let delegation_id = request.delegation_id.clone();
                 let outcome = runner.run(request).await;
+                // A delegate that ends without completing is the case a client
+                // reports as "the subagent hung / the app died": keep the status,
+                // the turn count and the reason next to the delegation id.
+                if outcome.status == DelegationStatus::Completed {
+                    tracing::info!(
+                        target: "agent_core::delegate",
+                        delegation_id = %delegation_id,
+                        turns = outcome.turns as u64,
+                        tool_calls = outcome.tool_calls as u64,
+                        "subagent delegation completed"
+                    );
+                } else {
+                    tracing::warn!(
+                        target: "agent_core::delegate",
+                        delegation_id = %delegation_id,
+                        status = outcome.status.as_str(),
+                        turns = outcome.turns as u64,
+                        tool_calls = outcome.tool_calls as u64,
+                        reason = outcome
+                            .error
+                            .as_ref()
+                            .map(|error| error.message.as_str())
+                            .unwrap_or(""),
+                        "subagent delegation ended without completing"
+                    );
+                }
                 registry.settle(&handle, outcome);
+                // The `Task` call settled when the delegate *started*, so the row
+                // it produced still says `running`. Publish the settled row now:
+                // the same tool call id with a terminal status is what the
+                // renderer's badge, host-core's stored snapshot and a reload all
+                // read, so nothing else has to poll for it.
+                let (Some(sink), Some(view)) = (sink, registry.view(&delegation_id)) else {
+                    return;
+                };
+                let (result, details) = settled_tool_result(&parent_call_id, &view);
+                sink.emit(AgentEventEnvelope::new(
+                    session_id,
+                    parent_turn_id,
+                    AgentEvent::ToolEnd {
+                        tool_call_id: parent_call_id,
+                        result: tool_result_payload(&result, Some(details)),
+                        is_error: result.is_error,
+                    },
+                ));
             });
 
             let label_note = label.map(|label| format!(" ({label})")).unwrap_or_default();
-            Ok(format!(
+            let content = format!(
                 "Delegation {delegation_id} started: the {} subagent is working in the background{label_note}. Continue your own independent work, then call TaskWait with this delegationId to converge, or TaskStop to stop it. Job reference: {}",
                 self.hub
                     .records_agent_name(&delegation_id)
                     .unwrap_or_else(|| "requested".to_string()),
                 json!({"kind": "delegation", "id": delegation_id})
-            ))
+            );
+            // `status` is `running`: the delegate was started, not finished. The
+            // renderer shows this node as running until the settlement event
+            // above replaces it.
+            Ok(match self.hub.registry.view(&delegation_id) {
+                Some(view) => ToolOutcome::with_details(content, delegation_details(&view)),
+                None => ToolOutcome::text(content),
+            })
         })
     }
 }
@@ -971,6 +1218,18 @@ impl Tool for TaskWaitTool {
         ctx: &'a ToolContext,
     ) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
+            self.call_with_details(call, ctx)
+                .await
+                .map(|outcome| outcome.content)
+        })
+    }
+
+    fn call_with_details<'a>(
+        &'a self,
+        call: &'a ToolCall,
+        ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<ToolOutcome>> {
+        Box::pin(async move {
             let requested_ids: Vec<String> = call
                 .arguments
                 .get("delegationIds")
@@ -1009,10 +1268,9 @@ impl Tool for TaskWaitTool {
                 })
                 .collect();
             if targets.is_empty() {
-                return Ok(
-                    "No delegation to wait on: nothing has been started in this session."
-                        .to_string(),
-                );
+                return Ok(ToolOutcome::text(
+                    "No delegation to wait on: nothing has been started in this session.",
+                ));
             }
             let mode_any = call.arguments.get("mode").and_then(Value::as_str) == Some("any");
             let min_completed = call
@@ -1047,10 +1305,9 @@ impl Tool for TaskWaitTool {
                 )
                 .await;
             if ctx.cancel.is_cancelled() {
-                return Ok(
-                    "Interrupted by new user input. Unfinished subagents keep working; handle the user's message before waiting again."
-                        .to_string(),
-                );
+                return Ok(ToolOutcome::text(
+                    "Interrupted by new user input. Unfinished subagents keep working; handle the user's message before waiting again.",
+                ));
             }
 
             let views = self.hub.registry.snapshot();
@@ -1096,7 +1353,14 @@ impl Tool for TaskWaitTool {
                     ),
                 );
             }
-            Ok(lines.join("\n").trim_end().to_string())
+            let roster: Vec<DelegationView> = ids
+                .iter()
+                .filter_map(|id| views.iter().find(|view| &view.delegation_id == id).cloned())
+                .collect();
+            Ok(ToolOutcome::with_details(
+                lines.join("\n").trim_end().to_string(),
+                json!({ "delegations": delegation_roster(&roster) }),
+            ))
         })
     }
 }
@@ -1161,16 +1425,28 @@ impl Tool for TaskListTool {
 
     fn call<'a>(
         &'a self,
+        call: &'a ToolCall,
+        ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(async move {
+            self.call_with_details(call, ctx)
+                .await
+                .map(|outcome| outcome.content)
+        })
+    }
+
+    fn call_with_details<'a>(
+        &'a self,
         _call: &'a ToolCall,
         _ctx: &'a ToolContext,
-    ) -> BoxFuture<'a, Result<String>> {
+    ) -> BoxFuture<'a, Result<ToolOutcome>> {
         Box::pin(async move {
             let views = self.hub.registry.snapshot();
             if views.is_empty() {
-                return Ok("This session has started no subagents.".to_string());
+                return Ok(ToolOutcome::text("This session has started no subagents."));
             }
             let mut lines = vec![format!("{} delegation(s):", views.len())];
-            for view in views {
+            for view in &views {
                 let note = match view.status {
                     DelegationStatus::Running => "report not ready".to_string(),
                     _ => match (&view.report, &view.error) {
@@ -1188,7 +1464,10 @@ impl Tool for TaskListTool {
                     view.tool_calls
                 ));
             }
-            Ok(lines.join("\n"))
+            Ok(ToolOutcome::with_details(
+                lines.join("\n"),
+                json!({ "delegations": delegation_roster(&views) }),
+            ))
         })
     }
 }
@@ -1227,8 +1506,20 @@ impl Tool for TaskStopTool {
     fn call<'a>(
         &'a self,
         call: &'a ToolCall,
-        _ctx: &'a ToolContext,
+        ctx: &'a ToolContext,
     ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(async move {
+            self.call_with_details(call, ctx)
+                .await
+                .map(|outcome| outcome.content)
+        })
+    }
+
+    fn call_with_details<'a>(
+        &'a self,
+        call: &'a ToolCall,
+        _ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<ToolOutcome>> {
         Box::pin(async move {
             let ids: Vec<String> = call
                 .arguments
@@ -1263,7 +1554,16 @@ impl Tool for TaskStopTool {
                     }
                 });
             }
-            Ok(lines.join("\n"))
+            // The row reports on the delegations it named, so it reads as a
+            // subagent row: `stopped[]` is the roster `TaskStop` owns (D268).
+            let stopped: Vec<DelegationView> = ids
+                .iter()
+                .filter_map(|id| self.hub.registry.view(id))
+                .collect();
+            Ok(ToolOutcome::with_details(
+                lines.join("\n"),
+                json!({ "stopped": delegation_roster(&stopped) }),
+            ))
         })
     }
 }
@@ -1271,6 +1571,7 @@ impl Tool for TaskStopTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::RecordingSink;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// A runner whose delegates settle when the test says so.
@@ -1345,6 +1646,99 @@ mod tests {
         }
     }
 
+    fn start_args() -> Value {
+        json!({ "agent": "explorer", "task": "find the parser", "description": "look for it" })
+    }
+
+    #[tokio::test]
+    async fn the_task_row_carries_the_delegation_it_started() {
+        let task = TaskTool::new(hub(Arc::new(InstantRunner)));
+        let outcome = task
+            .call_with_details(
+                &call(TASK_TOOL_NAME, start_args()),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect("a delegation starts");
+        let details = outcome.details.expect("Task publishes its delegation");
+        assert_eq!(details["agent"], "explorer");
+        // Running, not completed: the delegate was started, and the settled row
+        // replaces this one when it finishes.
+        assert_eq!(details["status"], "running");
+        assert_eq!(details["label"], "look for it");
+        assert!(details["delegationId"]
+            .as_str()
+            .is_some_and(|id| !id.is_empty()));
+        assert!(details["startedAt"].as_i64().is_some_and(|ms| ms > 0));
+        // No `completedAt` until it settles: the card's clock keeps running.
+        assert!(details.get("completedAt").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_settled_delegate_republishes_its_task_row() {
+        let sink = RecordingSink::new();
+        let hub = Arc::new(
+            DelegationHub::new(
+                Arc::new(DelegationRegistry::new("s1")),
+                vec![definition()],
+                Arc::new(InstantRunner),
+            )
+            .with_sink(Arc::new(sink.clone())),
+        );
+        TaskTool::new(hub)
+            .call(
+                &call(TASK_TOOL_NAME, start_args()),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect("a delegation starts");
+        // The delegate runs on its own task, so the replacement arrives later.
+        let refreshed = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let found = sink
+                    .snapshot()
+                    .into_iter()
+                    .find_map(|envelope| match envelope.event {
+                        AgentEvent::ToolEnd {
+                            tool_call_id,
+                            result,
+                            ..
+                        } if tool_call_id == "call_1" => Some(result),
+                        _ => None,
+                    });
+                if let Some(result) = found {
+                    return result;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("the settled row is published");
+        assert_eq!(refreshed["details"]["status"], "completed");
+        assert_eq!(refreshed["details"]["agent"], "explorer");
+        assert!(refreshed["details"]["completedAt"]
+            .as_i64()
+            .is_some_and(|ms| ms > 0));
+        assert!(refreshed["content"]
+            .as_str()
+            .is_some_and(|text| text.contains("settled")));
+    }
+
+    #[tokio::test]
+    async fn a_wait_row_reports_the_delegations_it_converged_on() {
+        let wait = TaskWaitTool::new(hub(Arc::new(InstantRunner)));
+        let outcome = wait
+            .call_with_details(
+                &call(TASK_WAIT_TOOL_NAME, json!({ "timeoutSeconds": 1 })),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect("wait answers");
+        // Nothing has started in this session, so there is no roster to report.
+        assert!(outcome.details.is_none());
+        assert!(outcome.content.contains("No delegation to wait on"));
+    }
+
     #[test]
     fn the_delegate_prompt_frames_the_job_and_puts_project_rules_last() {
         let prompt = compose_subagent_system_prompt(
@@ -1395,6 +1789,114 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_step_limit_settlement_tells_the_parent_why_and_what_next() {
+        let view = DelegationView {
+            delegation_id: "del-1".into(),
+            agent_name: "scout".into(),
+            label: None,
+            status: DelegationStatus::Failed,
+            model_id: String::new(),
+            turns: 24,
+            tool_calls: 40,
+            started_at_ms: 0,
+            completed_at_ms: Some(1),
+            report: Some("read three files, mapped the flow".into()),
+            error: Some(DelegationError {
+                code: "STEP_LIMIT".into(),
+                message: "turn exceeded its 24-step budget".into(),
+            }),
+            report_delivered: false,
+        };
+
+        let (result, _) = settled_tool_result("call-1", &view);
+        assert!(result.is_error);
+        assert!(
+            result
+                .content
+                .contains("hit its step ceiling with the task unfinished"),
+            "the reason must name the ceiling, not just \"failed\": {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("larger stepBudget"),
+            "the parent must see its ways forward: {}",
+            result.content
+        );
+
+        let (text, delivered) = format_resume_text(&[view.clone()], &[]);
+        assert_eq!(delivered, vec!["del-1".to_string()]);
+        assert!(text.starts_with(DELEGATION_RESUME_PROMPT));
+        assert!(
+            text.contains("First re-anchor"),
+            "the resume boundary must force a re-anchor before the reports are acted on"
+        );
+        assert!(text.contains("## scout (del-1) — failed (hit its step ceiling"));
+        assert!(
+            text.contains("read three files, mapped the flow"),
+            "the partial output the run produced must reach the parent"
+        );
+    }
+
+    #[test]
+    fn a_failed_delegate_without_a_step_limit_keeps_a_plain_reason() {
+        let view = DelegationView {
+            delegation_id: "del-3".into(),
+            agent_name: "scout".into(),
+            label: None,
+            status: DelegationStatus::Failed,
+            model_id: String::new(),
+            turns: 2,
+            tool_calls: 1,
+            started_at_ms: 0,
+            completed_at_ms: Some(1),
+            report: Some(String::new()),
+            error: Some(DelegationError {
+                code: "PROVIDER_500".into(),
+                message: "the gateway reset the stream".into(),
+            }),
+            report_delivered: false,
+        };
+
+        let (result, _) = settled_tool_result("call-3", &view);
+        assert!(result
+            .content
+            .contains("PROVIDER_500 (the gateway reset the stream)"));
+        assert!(
+            !result.content.contains("stepBudget"),
+            "an ordinary failure must not borrow the ceiling guidance"
+        );
+        let (text, _) = format_resume_text(&[view], &[]);
+        assert!(text.contains("— failed (PROVIDER_500 (the gateway reset the stream))"));
+    }
+
+    #[test]
+    fn a_settled_success_keeps_its_plain_wording() {
+        let view = DelegationView {
+            delegation_id: "del-2".into(),
+            agent_name: "scout".into(),
+            label: None,
+            status: DelegationStatus::Completed,
+            model_id: String::new(),
+            turns: 3,
+            tool_calls: 4,
+            started_at_ms: 0,
+            completed_at_ms: Some(1),
+            report: Some("done".into()),
+            error: None,
+            report_delivered: false,
+        };
+
+        let (result, _) = settled_tool_result("call-2", &view);
+        assert!(!result.is_error);
+        assert!(result
+            .content
+            .contains("the scout subagent completed after 3 turn(s)"));
+        assert!(!result.content.contains("ceiling"));
+        let (text, _) = format_resume_text(&[view], &[]);
+        assert!(text.contains("## scout (del-2) — completed\ndone"));
+    }
+
     /// A runner that only records which model key it was asked for.
     struct ModelKeyRunner {
         seen: Arc<Mutex<Vec<Option<String>>>>,
@@ -1421,6 +1923,77 @@ mod tests {
             )
             .with_models(models.into_iter().map(str::to_string).collect()),
         )
+    }
+
+    /// The same catalog plus smart mode's default, which is what a launch from a
+    /// session on a model pair produces.
+    fn hub_with_models_and_default(
+        runner: Arc<dyn DelegateRunner>,
+        models: Vec<&str>,
+        default_model: Option<&str>,
+    ) -> Arc<DelegationHub> {
+        Arc::new(
+            DelegationHub::new(
+                Arc::new(DelegationRegistry::new("s1")),
+                vec![definition()],
+                runner,
+            )
+            .with_models(models.into_iter().map(str::to_string).collect())
+            .with_default_model(default_model.map(str::to_string)),
+        )
+    }
+
+    /// Smart mode: a `Task` that names no model runs on the pair's cheap half,
+    /// and the record names it so the transcript shows the model that ran.
+    #[tokio::test]
+    async fn a_delegate_that_names_no_model_runs_on_the_pair_default() {
+        let hub = hub_with_models_and_default(
+            Arc::new(InstantRunner),
+            vec!["cheap/model-x"],
+            Some("cheap/model-x"),
+        );
+        TaskTool::new(hub.clone())
+            .call(
+                &call(TASK_TOOL_NAME, start_args()),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect("a delegation starts");
+        assert_eq!(hub.registry.snapshot()[0].model_id, "cheap/model-x");
+    }
+
+    /// An explicit key still wins, and a default nobody authorized is dropped
+    /// rather than spent: a stale launch must not put work on an unchosen model.
+    #[tokio::test]
+    async fn an_explicit_model_outranks_the_default_and_a_stale_default_is_ignored() {
+        let hub = hub_with_models_and_default(
+            Arc::new(InstantRunner),
+            vec!["cheap/model-x", "fast/model-y"],
+            Some("cheap/model-x"),
+        );
+        let mut args = start_args();
+        args["model"] = json!("fast/model-y");
+        TaskTool::new(hub.clone())
+            .call(&call(TASK_TOOL_NAME, args), &context(CancelToken::new()))
+            .await
+            .expect("a delegation starts");
+        assert_eq!(hub.registry.snapshot()[0].model_id, "fast/model-y");
+
+        let stale = hub_with_models_and_default(
+            Arc::new(InstantRunner),
+            vec!["cheap/model-x"],
+            Some("gone/model-z"),
+        );
+        assert_eq!(stale.default_model_key(), None);
+        TaskTool::new(stale.clone())
+            .call(
+                &call(TASK_TOOL_NAME, start_args()),
+                &context(CancelToken::new()),
+            )
+            .await
+            .expect("a delegation starts");
+        // Empty: the delegate inherits the session model, the reference default.
+        assert_eq!(stale.registry.snapshot()[0].model_id, "");
     }
 
     /// `Task.model` is the reference's own argument: the key the parent picks is
@@ -1521,7 +2094,10 @@ mod tests {
     /// one it was shown.
     #[test]
     fn the_task_declaration_lists_the_authorized_models() {
-        let hub = hub_with_models(Arc::new(InstantRunner), vec!["cheap/model-x", "fast/model-y"]);
+        let hub = hub_with_models(
+            Arc::new(InstantRunner),
+            vec!["cheap/model-x", "fast/model-y"],
+        );
         let spec = TaskTool::new(hub).spec();
         assert_eq!(spec.parameters["properties"]["model"]["type"], "string");
         assert!(spec.description.contains("- `cheap/model-x`"));
@@ -1743,10 +2319,9 @@ mod tests {
         // the delegate settles itself exactly once.
         let all = hub.registry.stop(None);
         assert_eq!(all.len(), 2);
-        assert!(all.iter().all(|outcome| matches!(
-            outcome,
-            StopOutcome::Requested { .. }
-        )));
+        assert!(all
+            .iter()
+            .all(|outcome| matches!(outcome, StopOutcome::Requested { .. })));
     }
 
     #[tokio::test]
