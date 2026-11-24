@@ -15,6 +15,7 @@ import {
   type Mode,
   type Risk,
   type SessionThinkingLevel,
+  type SmartTier,
   type UserSkillRecord,
   type UserSubagentRecord,
 } from "@pi-workspace/shared";
@@ -49,6 +50,7 @@ import type { RuntimeProvider } from "./provider-catalog";
 import type { LoadedSkillDocument } from "../skill-document";
 import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
 import { loadRemoteWorkspaceInstructions } from "../remote/remote-workspace-instructions.js";
+import type { SmartRouting } from "./smart-routing";
 
 const ErrorCodes = {
   ...SharedErrorCodes,
@@ -85,6 +87,8 @@ export type SessionLaunchRuntimeDependencies = {
     capabilities: ReturnType<typeof capabilitiesFromModelConfig>;
   };
   normalizeThinkingLevel: (value: unknown) => SessionThinkingLevel;
+  /** Smart-mode turn routing: which half of the pair serves this turn. */
+  smartRouting: SmartRouting;
 };
 
 export function createSessionLaunchRuntime({
@@ -101,6 +105,7 @@ export function createSessionLaunchRuntime({
   bindingForModel,
   effectiveSubagentModelConfig,
   normalizeThinkingLevel,
+  smartRouting,
 }: SessionLaunchRuntimeDependencies) {
   const isHostUnavailable = (error: unknown): boolean =>
     (error as { errorCode?: string } | null | undefined)?.errorCode ===
@@ -385,6 +390,13 @@ export function createSessionLaunchRuntime({
       providerId?: string;
       modelId?: string;
       thinkingLevel?: SessionThinkingLevel;
+      /** Routing inputs for a session that runs on a model pair (smart mode). */
+      smart?: {
+        prompt: string;
+        attachments: number;
+        stagedMode: boolean;
+        override?: SmartTier;
+      };
     } = {},
   ) {
     if (!runtimeState.host) throw new Error("host unavailable");
@@ -400,6 +412,30 @@ export function createSessionLaunchRuntime({
       { includeDisabled: false },
     );
     for (const row of providers.providers) modelsDevCatalog.configureAccount(row);
+    // Smart mode decides the tier before anything is resolved, from signals that
+    // are already in hand: a `sub` turn rewrites the overrides so the rest of
+    // this function resolves the cheap binding through exactly the same path a
+    // single-model session resolves its own. That is what keeps one provider
+    // resolution rule in the app instead of a second, cheaper copy that drifts.
+    const smartPlan = overrides.smart
+      ? smartRouting.planTurn({
+          sessionId,
+          smartMode: session.smartMode,
+          providers: providers.providers,
+          prompt: overrides.smart.prompt,
+          attachments: overrides.smart.attachments,
+          stagedMode: overrides.smart.stagedMode,
+          messageCount: typeof session.messageCount === "number" ? session.messageCount : 0,
+          ...(overrides.smart.override ? { override: overrides.smart.override } : {}),
+        })
+      : null;
+    if (smartPlan && smartPlan.tier === "sub") {
+      overrides = {
+        ...overrides,
+        providerId: smartPlan.binding.providerId,
+        modelId: smartPlan.binding.modelId,
+      };
+    }
     const requestedProviderId = overrides.providerId ?? session.providerId;
     const extensionAgentKey = requestedProviderId
       ? trustedExtensionAgentKeyFromProviderId(requestedProviderId)
@@ -730,11 +766,37 @@ export function createSessionLaunchRuntime({
     // them and the parent agent can pass them to `Task.model` without an
     // extra RPC round-trip. Statically pinned entries from definitions take
     // precedence — they were resolved above with stricter diagnostics.
+    // Smart mode resolves both halves of the pair through this one loop: the
+    // cheap half as a delegation key, the strong one only so a stuck cheap turn
+    // has somewhere to continue. `delegation: false` keeps it out of the catalog
+    // the model may name, because the orchestrator is not a delegate.
+    const smartHalves: Array<{ providerId: string; modelId: string; delegation: boolean }> =
+      smartPlan
+        ? [
+            {
+              providerId: smartPlan.snapshot.main.providerId,
+              modelId: smartPlan.snapshot.main.modelId,
+              delegation: false,
+            },
+            {
+              providerId: smartPlan.snapshot.sub.providerId,
+              modelId: smartPlan.snapshot.sub.modelId,
+              delegation: true,
+            },
+          ]
+        : [];
     const subagentModelKeys: string[] = [];
     for (const row of providers.providers) {
       if (!row.enabled) continue;
       for (const binding of row.models ?? []) {
-        if (!binding.availableForSubagents) continue;
+        // Smart mode's halves are the pair the user already selected, so they
+        // are resolved without the model's own delegation opt-in: asking for
+        // both would be asking the same question twice.
+        const smartHalf = smartHalves.find(
+          (half) => half.providerId === row.id && half.modelId === binding.id,
+        );
+        if (!binding.availableForSubagents && !smartHalf) continue;
+        const authorizeForDelegation = binding.availableForSubagents || smartHalf?.delegation === true;
         let key = `${row.vendorKey ?? row.name}/${binding.id}`;
         // Two provider rows can share a vendor alias. Opting in one row must
         // not authorize the credential-bearing pin resolved from another row.
@@ -742,8 +804,10 @@ export function createSessionLaunchRuntime({
           key = `${row.id}/${binding.id}`;
         }
         if (subagentBindings.providers[key]) {
-          subagentModelKeys.push(key);
-          continue; // already resolved, and independently opted in
+          // Already resolved, and independently opted in — unless this row is
+          // only the strong half, which must not become a delegation key.
+          if (authorizeForDelegation) subagentModelKeys.push(key);
+          continue;
         }
         const isVendorAccount = row.authKind === OAUTH_AUTH_KIND;
         let apiKey = "";
@@ -802,9 +866,38 @@ export function createSessionLaunchRuntime({
           supportedThinkingLevels: [...caps.supportedThinkingLevels],
           ...(mc ? { modelConfig: mc } : {}),
         };
-        subagentModelKeys.push(key);
+        if (authorizeForDelegation) subagentModelKeys.push(key);
       }
     }
+
+    // The strong half's binding, keyed the way this launch keyed it. The kernel
+    // builds its own provider from it, so a hand-over needs no second request.
+    const smartEscalationKey =
+      smartPlan && smartPlan.tier === "sub"
+        ? Object.keys(subagentBindings.providers).find((key) => {
+            const binding = subagentBindings.providers[key] as
+              | { id?: string; modelId?: string }
+              | undefined;
+            return (
+              binding?.id === smartPlan.snapshot.main.providerId &&
+              binding?.modelId === smartPlan.snapshot.main.modelId
+            );
+          })
+        : undefined;
+
+    // The key the kernel will accept for the cheap half, when it resolved. It
+    // is the same key shape `Task.model` names, so the kernel refuses nothing.
+    const smartDelegationKey = smartPlan
+      ? subagentModelKeys.find((key) => {
+          const binding = subagentBindings.providers[key] as
+            | { id?: string; modelId?: string }
+            | undefined;
+          return (
+            binding?.id === smartPlan.snapshot.sub.providerId &&
+            binding?.modelId === smartPlan.snapshot.sub.modelId
+          );
+        })
+      : undefined;
 
     const subagentDiagnostics = [
       ...subagentCatalog.diagnostics,
@@ -981,6 +1074,28 @@ export function createSessionLaunchRuntime({
         subagents: subagentCatalog.definitions,
         subagentProviders: subagentBindings.providers,
         subagentModelKeys,
+        // Smart mode: a `Task` that names no model runs on the cheap half, which
+        // makes delegation the path of least resistance for the orchestrator
+        // instead of something it has to remember to ask for.
+        ...(smartDelegationKey && smartPlan?.snapshot.policy.delegateToSub
+          ? { delegationDefaultModel: smartDelegationKey }
+          : {}),
+        // Which tier this turn was routed to, and why. The model reads nothing
+        // here; the turn notice and the transcript do.
+        ...(smartPlan ? { smartTurn: { tier: smartPlan.tier, reason: smartPlan.reason } } : {}),
+        // A cheap turn that gets stuck continues on the strong half with the same
+        // transcript, so the hand-over costs one re-send and never a replay.
+        ...(smartPlan?.tier === "sub" && smartEscalationKey
+          ? {
+              escalation: {
+                provider: subagentBindings.providers[smartEscalationKey],
+                policy: {
+                  afterToolErrors: smartPlan.snapshot.policy.escalateAfterToolErrors,
+                  afterBudgetUsed: smartPlan.snapshot.policy.escalateAfterBudgetUsed,
+                },
+              },
+            }
+          : {}),
       },
     };
   }

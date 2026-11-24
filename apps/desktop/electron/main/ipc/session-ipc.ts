@@ -730,6 +730,8 @@ export function registerSessionIpc({
         thinkingLevel?: SessionThinkingLevel;
         permissionMode?: "inherit" | "ask" | "accept-edits" | "auto";
         fastMode?: boolean;
+        /** Smart-mode snapshot: absent keeps the stored pair, null clears it. */
+        smartMode?: Record<string, unknown> | null;
       },
     ) => {
       rejectNativeMutation(id, "configuration");

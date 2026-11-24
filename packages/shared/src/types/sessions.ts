@@ -6,6 +6,7 @@ import type { PermissionMode } from "./permissions.js";
 import type { UiMessage } from "./messages.js";
 import type { PlanHistoryEntry, PlanningState } from "./plans.js";
 import type { SessionWorktreeSummary } from "./worktree.js";
+import type { SmartModeSnapshot } from "../smart-mode.js";
 
 /**
  * Which authority owns a session's transcript.
@@ -81,6 +82,13 @@ export type SessionSummary = {
    * omit it, meaning off.
    */
   fastMode?: boolean;
+  /**
+   * Smart mode (ADR smart-mode): the model pair this conversation runs on and
+   * the policy that routed its turns. A snapshot of the template, not a
+   * reference to it — editing a template later must not rewrite a conversation.
+   * Older hosts, remote sessions and single-model chats omit it.
+   */
+  smartMode?: SmartModeSnapshot;
   /** Effective capability for this session's exact provider/model pair. */
   supportsReasoning?: boolean;
   /** Effective image-input capability for this session's exact model. */

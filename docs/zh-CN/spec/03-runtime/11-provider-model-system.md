@@ -761,6 +761,17 @@ OpenAI Responses 适配器会把 `response.completed` 和
    兼容性覆盖；提供程序默认值不得覆盖会话的
    在回合解析期间选择的模型。
 
+## 17a. 智能模式（模型对）
+
+一次会话可以跑在一对模型上，而不是一个：`main` 负责规划、判断与回答，`sub` 承接机械回合与被派发的工作。ADR 0405。
+
+- **选择。** 这一对属于应用级设置（`smartModeMainProviderId/ModelId`、`smartModeSubProviderId/ModelId`、`smartModeTurnRouting`、`smartModeDelegateToSub`）。输入框的 `智能模式` 条目只在两半都配置好时出现，选中后把快照写入 `sessions.smart_mode_json`；直接选一个模型会清掉它。快照不跟随之后的设置修改。
+- **路由。** `decideTurnTier` 是确定性的、不额外发请求：附件数、分阶段模式、粘连升级、首回合、提示词长度、代码标记与两份意图词表共同决定档位；质量规则先于省钱规则执行。
+- **派发。** 这一对的 `sub` 绑定无需模型自身的 `availableForSubagents` 开关即进入委派目录，`delegationDefaultModel` 让未指定 `model` 的 `Task` 落到它上面；显式 `Task.model` 仍然优先，目录外的键仍然被拒。
+- **可用性。** 便宜的那一半必须已启用、可达（`baseUrl`）、列在该提供商下并可签名请求；否则回合留在 `main`，决策记录 `downgradedFrom: "sub"`。
+- **回合内升级。** `sub` 档的回合卡住时把余下的工作交给 `main`：连续 `afterToolErrors` 次工具失败，或步数预算用掉 `afterBudgetUsed`。启动参数里带着强模型的 provider spec，内核沿用同一份 transcript 继续、只多一次重发——已完成的工具不会重放，且每回合最多升级一次。两半都走同一条目录解析循环，只有便宜那一半会成为 `Task` 的键。
+- **计量。** `turns.provider_id/model_id` 记录回合**起始**的模型，因此不需要新存储就能按回合衡量节省；升级会连同两个模型与触发原因写进日志。
+
 ## 18. 验证规则
 
 - 需要 `name`

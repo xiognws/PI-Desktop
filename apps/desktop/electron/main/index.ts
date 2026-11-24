@@ -88,6 +88,7 @@ import {
 } from "./runtime/provider-catalog";
 import { createSessionLaunchRuntime } from "./runtime/session-launch";
 import { createSessionCoordination } from "./runtime/session-coordination";
+import { createSmartRouting } from "./runtime/smart-routing";
 import { createScheduledRuntime } from "./runtime/scheduled";
 import { createDesktopServices } from "./services/desktop-services";
 import { createPluginServices } from "./services/plugin-services";
@@ -424,6 +425,11 @@ const {
   listRuntimeProviders,
 } = providerCatalogRuntime;
 
+// Smart mode: the one router instance. It watches turn events for the signals a
+// prompt cannot carry (did the last turn call a tool, did it fail) and answers
+// the tier question for every turn of a session that runs on a pair.
+const smartRouting = createSmartRouting({ logger });
+
 const createdSessionLaunchRuntime = createSessionLaunchRuntime({
   runtimeState,
   logger,
@@ -438,6 +444,7 @@ const createdSessionLaunchRuntime = createSessionLaunchRuntime({
   bindingForModel,
   effectiveSubagentModelConfig,
   normalizeThinkingLevel,
+  smartRouting,
 });
 sessionLaunchRuntime = createdSessionLaunchRuntime;
 const {
@@ -883,6 +890,10 @@ const sidecarRuntime = createSidecarRuntime({
 });
 emitAgentEvent = (envelope: AgentEventEnvelope) => {
   announceSkillReview(envelope);
+  // The router only reads what is already on the wire: a tool call, a reply, a
+  // failure, a closed turn. Observing here means no separate subscription and
+  // no second copy of the event stream.
+  smartRouting.observeEvent(envelope);
   sidecarRuntime.emitAgentEvent(envelope);
 };
 const { startSidecar } = sidecarRuntime;

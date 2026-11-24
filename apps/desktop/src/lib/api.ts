@@ -839,7 +839,8 @@ export type PythonStatus = {
 export type PythonCandidate = {
   path: string;
   version?: string;
-  hasLibraries: boolean;
+  /** Installed distributions in that interpreter's own site-packages. */
+  libraryCount: number;
   /** `bundled` is the runtime this build ships, offered first in the list. */
   source: "bundled" | "configured" | "data-venv" | "launcher" | "path" | "common";
 };
@@ -986,7 +987,12 @@ export const api = {
   configureSession: (
     id: string,
     config: Pick<SessionSummary, "mode" | "providerId" | "modelId"> &
-      Partial<Pick<SessionSummary, "thinkingLevel" | "permissionMode" | "fastMode">>,
+      Partial<
+        Pick<SessionSummary, "thinkingLevel" | "permissionMode" | "fastMode">
+      > & {
+        /** A snapshot turns smart mode on for this chat; `null` turns it off. */
+        smartMode?: SessionSummary["smartMode"] | null;
+      },
   ) =>
     invoke<{ session: SessionSummary }>(
       IPC.invoke.sessionConfigure,
@@ -2100,6 +2106,11 @@ export const api = {
     invoke<import("@pi-workspace/shared").TokenUsageHistoryResult>(
       IPC.invoke.statsGetTokenUsageHistory,
       query,
+    ),
+  getUsageSummary: (query?: { startDate?: number; endDate?: number }) =>
+    invoke<import("@pi-workspace/shared").UsageSummary>(
+      IPC.invoke.statsGetUsageSummary,
+      query ?? {},
     ),
   menuRendererReady: () =>
     invoke<{ ready: boolean }>(IPC.invoke.menuRendererReady),

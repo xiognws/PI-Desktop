@@ -3,9 +3,59 @@ import { basename, join, posix, win32 } from "node:path";
 import { realpath, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-type NativeClipboard = {
-  readBuffer(format: string): Buffer;
+/**
+ * The clipboard entry a file list arrives in.
+ *
+ * Electron 44 replaced the synchronous clipboard module with a W3C-style async
+ * one: `readBuffer(format)` and a synchronous `availableFormats()` are gone, and
+ * a paste is read as `read()` + `getType(mime)`. The old call did not fail at
+ * import time — it threw `readBuffer is not a function` on the first macOS or
+ * Linux file paste, which is why this type names the API that actually exists.
+ */
+type NativeClipboardItem = {
+  /** MIME types the platform currently offers for this entry. */
+  types?: readonly string[];
+  /** Resolves with the payload; a `Blob` for every type this module reads. */
+  getType(type: string): Promise<unknown>;
 };
+
+type NativeClipboard = {
+  read(): Promise<readonly NativeClipboardItem[]>;
+};
+
+/**
+ * Types that carry a pasted file list, in the order worth trying.
+ *
+ * `text/uri-list` is the documented shape on every platform; `public.file-url`
+ * is what some macOS copies expose instead, and `x-special/gnome-copied-files`
+ * is the Linux file-manager spelling.
+ */
+const URI_LIST_TYPES = [
+  "text/uri-list",
+  "public.file-url",
+  "x-special/gnome-copied-files",
+] as const;
+
+/** Read the pasted URI list, or an empty string when the clipboard holds none. */
+async function clipboardUriList(clipboard: NativeClipboard): Promise<string> {
+  const items = await clipboard.read();
+  for (const type of URI_LIST_TYPES) {
+    const item = items.find((candidate) => (candidate.types ?? []).includes(type));
+    if (!item) continue;
+    const payload = await item.getType(type);
+    const text = typeof (payload as { text?: () => Promise<string> }).text === "function"
+      ? await (payload as Blob).text()
+      : "";
+    if (!text) continue;
+    // The bound is on the bytes we are about to parse, not on the clipboard:
+    // a 100 MB copy must be refused before it becomes a string.
+    if (Buffer.byteLength(text, "utf8") > MAX_METADATA_BYTES) {
+      throw new Error("clipboard file metadata is too large");
+    }
+    return text;
+  }
+  return "";
+}
 
 const MAX_ITEMS = 20;
 const MAX_METADATA_BYTES = 1024 * 1024;
@@ -69,29 +119,20 @@ export async function nativeClipboardPaths(
   platform: NodeJS.Platform = process.platform,
   readWindowsPaths: () => Promise<string[]> = windowsClipboardPaths,
 ): Promise<string[]> {
-  const read = (format: string) => {
-    // availableFormats exposes normalized MIME names, not native pasteboard types.
-    const bytes = clipboard.readBuffer(format);
-    if (bytes.length > MAX_METADATA_BYTES) throw new Error("clipboard file metadata is too large");
-    return bytes;
-  };
   let paths: string[] = [];
-  const macList = platform === "darwin" ? read("NSFilenamesPboardType") : Buffer.alloc(0);
-  if (platform === "win32") paths = await readWindowsPaths();
-  else if (macList.length) {
-    const value: unknown = JSON.parse(
-      (
-        await execFileAsync("/usr/bin/plutil", ["-convert", "json", "-o", "-", "--", "-"], {
-          maxBuffer: MAX_METADATA_BYTES,
-          timeout: 10000,
-        }, macList)
-      ).toString("utf8"),
-    );
-    if (!Array.isArray(value) || !value.every(path => typeof path === "string")) throw new Error("invalid clipboard file list");
-    paths = value;
+  if (platform === "win32") {
+    // Windows hands over a real file-drop list, which is more precise than any
+    // URI spelling, so it keeps its own native reader.
+    paths = await readWindowsPaths();
   } else {
-    const uris = read("text/uri-list").toString("utf8") || read("x-special/gnome-copied-files").toString("utf8") || read("public.file-url").toString("utf8");
-    paths = uris.split(/[\r\n\0]+/).filter(line => line.startsWith("file:")).map(uri => fileURLToPath(uri, { windows: false }));
+    // macOS and Linux both publish the selection as a URI list. The macOS
+    // `NSFilenamesPboardType` plist this used to decode is no longer readable:
+    // the API that returned it synchronously is gone.
+    const uris = await clipboardUriList(clipboard);
+    paths = uris
+      .split(/[\r\n\0]+/)
+      .filter(line => line.startsWith("file:"))
+      .map(uri => fileURLToPath(uri, { windows: false }));
   }
   paths = [...new Set(paths)];
   if (paths.length > MAX_ITEMS) throw new Error(`too many pasted items (maximum ${MAX_ITEMS})`);

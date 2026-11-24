@@ -1635,6 +1635,12 @@ impl Sidecar {
         let engine = match model_limits_from(request) {
             Some(limits) => engine.with_model_limits(limits),
             None => engine,
+        };
+        // Smart mode: the strong half this turn may hand over to. A launch that
+        // named none keeps the turn on one provider, exactly as before.
+        let engine = match escalation_target_from(request, compaction_enabled_from(request)) {
+            Some(target) => engine.with_escalation(target),
+            None => engine,
         }
         .with_memory_prefix(memory_prefix)
         .with_delegations(session.delegations.clone())
@@ -4804,6 +4810,55 @@ struct SubagentModelBinding {
     provider: Arc<dyn Provider>,
     model: String,
     limits: ModelLimits,
+}
+
+/// The model a stuck cheap turn continues on, when the launch named one.
+///
+/// Smart mode sends the strong half of the pair as a provider spec plus the two
+/// thresholds the kernel watches. Anything unusable — no binding, no model, a
+/// provider this kernel cannot build — leaves the turn on its own provider: a
+/// failed hand-over must never be the reason a turn fails.
+fn escalation_target_from(
+    request: &Request,
+    compaction_enabled: bool,
+) -> Option<crate::turn::EscalationTarget> {
+    let spec = request.params.get("escalation")?;
+    let provider_spec = spec.get("provider")?;
+    let model = provider_spec
+        .get("modelId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|model| !model.is_empty())?
+        .to_string();
+    let provider = match build_provider(provider_spec) {
+        Ok(provider) => provider,
+        Err(error) => {
+            tracing::warn!(
+                target: "agent_core::sidecar",
+                %error,
+                "escalation provider dropped; the turn stays on its own model"
+            );
+            return None;
+        }
+    };
+    let limits = model_limits_from_model_config(provider_spec.get("modelConfig"))
+        .with_compaction_enabled(compaction_enabled);
+    let policy = spec.get("policy");
+    let after_tool_errors = policy
+        .and_then(|policy| policy.get("afterToolErrors"))
+        .and_then(Value::as_u64)
+        .unwrap_or(2) as usize;
+    let after_budget_used = policy
+        .and_then(|policy| policy.get("afterBudgetUsed"))
+        .and_then(Value::as_f64)
+        .unwrap_or(0.6) as f32;
+    Some(crate::turn::EscalationTarget {
+        provider,
+        model,
+        limits: Some(limits),
+        after_tool_errors,
+        after_budget_used,
+    })
 }
 
 /// The delegation model catalog this turn may use.

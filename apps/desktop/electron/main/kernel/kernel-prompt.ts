@@ -97,6 +97,17 @@ export const FORWARDED_PROMPT_PARAMS = [
   // never took effect and every delegate ran on the session model.
   "subagentProviders",
   "subagentModelKeys",
+  // Smart mode's two additions. `delegationDefaultModel` names the cheap half as
+  // the default for `Task` (a delegate that omits `model` runs there), and
+  // `smartTurn` tells the kernel which tier main routed this turn to. Dropped,
+  // smart mode would cost the prompt text and save nothing: the delegate would
+  // fall back to the session's strong model.
+  "delegationDefaultModel",
+  "smartTurn",
+  // The strong half a stuck cheap turn continues on: a provider spec plus the two
+  // thresholds. Dropped, smart mode could enter the cheap tier but never leave
+  // it, so a hard turn would answer badly instead of answering well.
+  "escalation",
   // Trusted extensions enabled for this session's project, as main decided them.
   // The kernel has no JavaScript runner, so it cannot load one; what it needs is
   // the signal that there is anything to ask the host about. Without the list it

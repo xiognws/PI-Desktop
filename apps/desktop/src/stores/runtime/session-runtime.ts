@@ -1,6 +1,7 @@
 import type {
   AgentEventEnvelope,
   SessionSummary,
+  SmartModeSnapshot,
   UiMessage,
 } from "@pi-workspace/shared";
 import { applyMessageUpdate } from "@pi-workspace/shared";
@@ -43,7 +44,14 @@ export type SessionConfiguration = Pick<
   SessionSummary,
   "mode" | "providerId" | "modelId" | "thinkingLevel"
 > &
-  Partial<Pick<SessionSummary, "permissionMode" | "fastMode">>;
+  Partial<Pick<SessionSummary, "permissionMode" | "fastMode">> & {
+    /**
+     * Tri-state, which is why it is not part of the `Pick` above: absent keeps
+     * the stored pair, `null` turns smart mode off for this chat, and a snapshot
+     * turns it on.
+     */
+    smartMode?: SmartModeSnapshot | null;
+  };
 
 export type SessionSelection = { id: string; intent: number };
 

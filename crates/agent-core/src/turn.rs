@@ -106,6 +106,51 @@ pub struct TurnRun<'a> {
     pub cancel: &'a CancelToken,
 }
 
+/// The strong half of a smart-mode pair, and the evidence that hands over.
+///
+/// A cheap turn starts on the session's provider and keeps going on it until the
+/// work itself argues otherwise: repeated tool failures, or a spent step budget.
+/// The hand-over reuses the transcript — the delegate machinery's fallback does
+/// the same for its own model — so nothing is replayed except the one request the
+/// next step was going to make anyway.
+#[derive(Clone)]
+pub struct EscalationTarget {
+    /// Where the turn continues.
+    pub provider: Arc<dyn Provider>,
+    pub model: String,
+    /// Context facts of the strong model: the window the rest of the turn
+    /// compacts against after a hand-over.
+    pub limits: Option<ModelLimits>,
+    /// Consecutive tool failures that end the cheap attempt.
+    pub after_tool_errors: usize,
+    /// Share of the step budget after which the cheap attempt ends.
+    pub after_budget_used: f32,
+}
+
+impl EscalationTarget {
+    /// Why this turn should hand over now, if it should.
+    ///
+    /// `None` keeps the turn where it is. The two reasons are named so the log
+    /// line says which evidence fired rather than only that something did.
+    pub fn trigger(
+        &self,
+        consecutive_tool_errors: usize,
+        step: usize,
+        max_steps: usize,
+    ) -> Option<&'static str> {
+        if self.after_tool_errors > 0 && consecutive_tool_errors >= self.after_tool_errors {
+            return Some("tool-errors");
+        }
+        if self.after_budget_used > 0.0 && max_steps > 0 {
+            let used = step as f32 / max_steps as f32;
+            if used >= self.after_budget_used {
+                return Some("budget");
+            }
+        }
+        None
+    }
+}
+
 pub struct TurnEngine {
     provider: Arc<dyn Provider>,
     tools: Arc<ToolRegistry>,
@@ -144,6 +189,9 @@ pub struct TurnEngine {
     /// Trusted extensions listening to this turn. `None` — the default — leaves
     /// the loop byte-identical to the turn that had no extensions at all.
     extensions: Option<crate::extensions::ExtensionHost>,
+    /// Where a smart-mode cheap turn hands over. `None` — the default — keeps
+    /// the turn on one provider from its first step to its last.
+    escalation: Option<EscalationTarget>,
 }
 
 impl TurnEngine {
@@ -166,6 +214,7 @@ impl TurnEngine {
             parallel_tool_calls: false,
             activation: None,
             extensions: None,
+            escalation: None,
         }
     }
 
@@ -201,6 +250,12 @@ impl TurnEngine {
     /// Attach the model's context facts, which enables automatic compaction.
     pub fn with_model_limits(mut self, limits: ModelLimits) -> Self {
         self.model_limits = Some(limits);
+        self
+    }
+
+    /// Let a cheap turn continue on the strong model when it gets stuck.
+    pub fn with_escalation(mut self, target: EscalationTarget) -> Self {
+        self.escalation = Some(target);
         self
     }
 
@@ -298,6 +353,13 @@ impl TurnEngine {
             .clone()
             .map(|policy| (policy, CompletionTracker::new()));
         let mut repeats = self.repeats.clone().map(crate::tool_use::RepeatGuard::new);
+        // What the rest of this turn runs on. It starts as the engine's own
+        // target and may be replaced exactly once, by the escalation target.
+        let mut active_provider = self.provider.clone();
+        let mut active_model = config.model.clone();
+        let mut active_limits = self.model_limits;
+        let mut escalated = false;
+        let mut consecutive_tool_errors: usize = 0;
 
         for step in 0..config.max_steps {
             steps_taken += 1;
@@ -379,7 +441,32 @@ impl TurnEngine {
             // Compaction gate: a request at or above the hard boundary must not
             // be issued, and a session at the trigger compacts before it grows
             // further. Both run here, between steps, never on a background path.
-            if let Some(model_limits) = self.model_limits {
+            // The hand-over, checked before this step spends anything: a stale
+            // cheap attempt must not pay for another request. Once only, so a
+            // strong model that also struggles ends the turn instead of looping.
+            if let (Some(target), false) = (self.escalation.as_ref(), escalated) {
+                if let Some(reason) =
+                    target.trigger(consecutive_tool_errors, step, config.max_steps)
+                {
+                    tracing::warn!(
+                        target: "agent_core::turn",
+                        from = %active_model,
+                        to = %target.model,
+                        reason,
+                        step,
+                        "smart-mode turn escalated"
+                    );
+                    active_provider = target.provider.clone();
+                    active_model = target.model.clone();
+                    active_limits = target.limits;
+                    escalated = true;
+                    // The failures that caused the hand-over belong to the other
+                    // model's attempt; the strong one starts with a clean count.
+                    consecutive_tool_errors = 0;
+                }
+            }
+
+            if let Some(model_limits) = active_limits {
                 let limits = ContextLimits::for_model(model_limits);
                 // Age first, then decide. A single oversized tool result is often the
                 // whole overrun, and a summary cannot shrink it: the same bytes come
@@ -439,7 +526,7 @@ impl TurnEngine {
             // Old tool output is the bulk of a long session's history. It is aged
             // in the request only: the transcript keeps every byte, and a request
             // with room in the window is sent untouched so the cached prefix holds.
-            let aging_limits = self.model_limits.map(ContextLimits::for_model);
+            let aging_limits = active_limits.map(ContextLimits::for_model);
             let aged = crate::aging::age_tool_results(
                 &messages,
                 aging_limits.as_ref(),
@@ -465,7 +552,7 @@ impl TurnEngine {
                     request_messages = replaced;
                 }
             }
-            let mut request = ChatRequest::new(&config.model, request_messages);
+            let mut request = ChatRequest::new(&active_model, request_messages);
             request.system = config.system.clone();
             // One conversation, one cache-routing name. The session id is stable across
             // every step of every turn, which is exactly the scope a prefix cache has.
@@ -487,7 +574,7 @@ impl TurnEngine {
             let mut transient_attempts: u32 = 0;
             let assembled = loop {
                 match self
-                    .run_step(session_id, turn_id, request.clone(), &cancel)
+                    .run_step(session_id, turn_id, request.clone(), &cancel, &active_provider)
                     .await
                 {
                     Ok(assembled) => break assembled,
@@ -676,6 +763,15 @@ impl TurnEngine {
             // both halves; the results are cloned for the notification because the
             // transcript takes ownership of them below.
             let extension_results = results.clone();
+            // Evidence for the hand-over: a failure streak, reset by any success.
+            // One unlucky call is not a pattern, and a stuck turn is.
+            for result in &results {
+                if result.is_error {
+                    consecutive_tool_errors += 1;
+                } else {
+                    consecutive_tool_errors = 0;
+                }
+            }
 
             for result in results {
                 self.emit(
@@ -1239,8 +1335,9 @@ impl TurnEngine {
         turn_id: &str,
         request: ChatRequest,
         cancel: &CancelToken,
+        provider: &Arc<dyn Provider>,
     ) -> Result<crate::provider::AssembledResponse> {
-        let mut stream = self.provider.stream(request, cancel.clone()).await?;
+        let mut stream = provider.stream(request, cancel.clone()).await?;
         let mut assembler = ResponseAssembler::new();
         let mut live = Message::new(Role::Assistant);
         let mut started = false;
@@ -1366,4 +1463,59 @@ fn jitter() -> f64 {
         .map(|elapsed| elapsed.subsec_nanos())
         .unwrap_or_default();
     (f64::from(nanos % 2_000) / 1_000.0) - 1.0
+}
+
+#[cfg(test)]
+mod escalation_tests {
+    use super::EscalationTarget;
+    use crate::provider::{Provider, StreamEvent};
+    use std::sync::Arc;
+
+    /// The trigger never reads the provider, so a provider that refuses every
+    /// request is enough to build the target.
+    struct UnusedProvider;
+
+    impl Provider for UnusedProvider {
+        fn stream<'a>(
+            &'a self,
+            _request: crate::provider::ChatRequest,
+            _cancel: crate::cancel::CancelToken,
+        ) -> crate::error::BoxFuture<'a, crate::error::Result<crate::provider::EventStream>> {
+            Box::pin(async {
+                Err(crate::error::AgentError::Refused(
+                    "the trigger policy never sends a request".into(),
+                ))
+            })
+        }
+    }
+
+    fn target(after_tool_errors: usize, after_budget_used: f32) -> EscalationTarget {
+        EscalationTarget {
+            provider: Arc::new(UnusedProvider),
+            model: "strong-1".into(),
+            limits: None,
+            after_tool_errors,
+            after_budget_used,
+        }
+    }
+
+    #[test]
+    fn a_single_failure_is_not_evidence() {
+        assert_eq!(target(2, 0.6).trigger(1, 0, 10), None);
+        assert_eq!(target(2, 0.6).trigger(2, 0, 10), Some("tool-errors"));
+    }
+
+    #[test]
+    fn a_spent_budget_hands_over_even_without_failures() {
+        assert_eq!(target(2, 0.6).trigger(0, 5, 10), None);
+        assert_eq!(target(2, 0.6).trigger(0, 6, 10), Some("budget"));
+        // A turn with no declared budget never escalates on a ratio it cannot compute.
+        assert_eq!(target(2, 0.6).trigger(0, 5, 0), None);
+    }
+
+    #[test]
+    fn either_threshold_can_be_switched_off() {
+        assert_eq!(target(0, 0.0).trigger(99, 9, 10), None);
+        assert_eq!(target(1, 0.0).trigger(1, 0, 10), Some("tool-errors"));
+    }
 }

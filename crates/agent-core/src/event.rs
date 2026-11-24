@@ -11,7 +11,32 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-use crate::message::{now_ms, Message, Usage};
+use crate::message::{now_ms, Message, ToolResult, Usage};
+
+/// The `result` object a `ToolEnd` frame carries.
+///
+/// `content`/`truncated` are what the model reads. `details` is the structured
+/// half a client renders — the subagent topology reads a `Task` row's
+/// `delegationId`/`status`, the background-job and review panels read their own
+/// keys, and host-core only replaces a provisional `Task` row when its details
+/// name the delegation and a terminal status. A tool that publishes nothing
+/// leaves the row text-only, exactly as before.
+pub fn tool_result_payload(
+    result: &ToolResult,
+    details: Option<serde_json::Value>,
+) -> serde_json::Value {
+    match details {
+        Some(details) => serde_json::json!({
+            "content": result.content,
+            "truncated": result.truncated,
+            "details": details,
+        }),
+        None => serde_json::json!({
+            "content": result.content,
+            "truncated": result.truncated,
+        }),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -148,10 +173,7 @@ pub enum AgentEvent {
         target_permission_mode: Option<String>,
         #[serde(rename = "executionId", skip_serializing_if = "Option::is_none")]
         execution_id: Option<String>,
-        #[serde(
-            rename = "executionState",
-            skip_serializing_if = "Option::is_none"
-        )]
+        #[serde(rename = "executionState", skip_serializing_if = "Option::is_none")]
         execution_state: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         proposal: Option<serde_json::Value>,

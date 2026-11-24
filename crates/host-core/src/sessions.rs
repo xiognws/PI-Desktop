@@ -154,6 +154,12 @@ pub struct SessionSummary {
     /// use the priority tier only when the model binding also allows it.
     #[serde(default)]
     pub fast_mode: bool,
+    /// Smart mode (ADR 0405): the model pair this conversation runs on and the
+    /// routing policy that picked each turn's tier. A snapshot, not a reference —
+    /// editing the template afterwards must not rewrite a conversation that
+    /// already ran on the old pair. `None` is smart mode off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smart_mode: Option<Value>,
     pub updated_at: String,
     pub created_at: String,
     /// True when this session is the transcript owned by a scheduled-task run.
@@ -1388,7 +1394,7 @@ const SUMMARY_SELECT: &str =
     "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
             s.thinking_level, s.permission_mode, s.updated_at, s.created_at,
             EXISTS (SELECT 1 FROM task_runs r WHERE r.session_id = s.id) AS scheduled_run,
-            s.fast_mode
+            s.fast_mode, s.smart_mode_json
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
      WHERE s.deleted_at IS NULL";
 
@@ -1409,8 +1415,28 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
         // alias keeps this mapper independent of any one query's column order.
         scheduled_run: row.get("scheduled_run")?,
         fast_mode: row.get("fast_mode")?,
+        smart_mode: smart_mode_from_row(row)?,
         worktree: None,
     })
+}
+
+/// Parse the stored snapshot, or `None` when the session has no smart mode.
+///
+/// A row whose JSON cannot be parsed is reported and read as "off": losing the
+/// routing policy must not make the conversation unreadable, and silently
+/// pretending it parsed would run turns on the wrong tier.
+fn smart_mode_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Option<Value>> {
+    let Some(raw) = row.get::<_, Option<String>>("smart_mode_json")? else {
+        return Ok(None);
+    };
+    match serde_json::from_str::<Value>(&raw) {
+        Ok(value) if value.is_object() => Ok(Some(value)),
+        Ok(_) => Ok(None),
+        Err(error) => {
+            tracing::warn!(%error, "session smart-mode snapshot is unreadable; treating it as off");
+            Ok(None)
+        }
+    }
 }
 
 /// Attach isolated-worktree badges. Sessions without a worktree are untouched.
@@ -1941,11 +1967,12 @@ pub fn fork_session_through(
             .prepare_cached(
                 "INSERT INTO sessions (
                     id, title, project_id, provider_id, model_id, mode, thinking_level,
-                    permission_mode, fast_mode, mode_snapshot_hash, source, pinned, last_seq,
-                    created_at, updated_at
+                    permission_mode, fast_mode, smart_mode_json, mode_snapshot_hash,
+                    source, pinned, last_seq, created_at, updated_at
                  )
                  SELECT ?1, ?2, project_id, provider_id, model_id, mode, thinking_level,
-                        permission_mode, fast_mode, mode_snapshot_hash, NULL, 0, ?3, ?4, ?4
+                        permission_mode, fast_mode, smart_mode_json, mode_snapshot_hash,
+                        NULL, 0, ?3, ?4, ?4
                  FROM sessions WHERE id = ?5",
             )?
             .execute(params![id, title, records.len() as i64, now, source_id])?;
@@ -1976,6 +2003,7 @@ pub fn fork_session_through(
         thinking_level: source.summary.thinking_level,
         permission_mode: source.summary.permission_mode,
         fast_mode: source.summary.fast_mode,
+        smart_mode: source.summary.smart_mode,
         updated_at: created_at.clone(),
         created_at,
         // A fork is the user's own conversation, not the automation's transcript.
@@ -2074,6 +2102,72 @@ pub fn configure_session_with_mode_snapshot(
     fast_mode: Option<bool>,
     mode_snapshot_hash: Option<&str>,
 ) -> Result<Option<SessionSummary>> {
+    configure_session_full(
+        db,
+        id,
+        mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        permission_mode,
+        fast_mode,
+        mode_snapshot_hash,
+        SmartModeWrite::Keep,
+    )
+}
+
+/// What a configure call does with the session's Smart-mode snapshot.
+///
+/// Three states rather than `Option`: a call that never mentioned smart mode
+/// must leave the stored pair alone, while a user picking a plain model is an
+/// explicit "off" that has to clear it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SmartModeWrite<'a> {
+    /// Leave the stored snapshot alone.
+    #[default]
+    Keep,
+    /// Turn smart mode off (the user selected a single model).
+    Clear,
+    /// Store this snapshot, already normalized by the caller.
+    Set(&'a str),
+}
+
+/// Full configurator: every field of a session's turn configuration in one
+/// statement, so a pair and the model chosen with it can never disagree.
+#[allow(clippy::too_many_arguments)]
+pub fn configure_session_full(
+    db: &Database,
+    id: &str,
+    mode: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+    thinking_level: Option<&str>,
+    permission_mode: Option<&str>,
+    fast_mode: Option<bool>,
+    mode_snapshot_hash: Option<&str>,
+    smart_mode: SmartModeWrite<'_>,
+) -> Result<Option<SessionSummary>> {
+    // The snapshot names the pair a conversation runs on, and the session's own
+    // binding is what every other reader trusts. Two sources of that answer is
+    // how a turn ends up on the model the router did not pick, so a mismatch is
+    // refused rather than silently resolved either way.
+    if let SmartModeWrite::Set(raw) = smart_mode {
+        let snapshot: Value = serde_json::from_str(raw)
+            .map_err(|error| anyhow!("smartMode must be a JSON object: {error}"))?;
+        let main = snapshot.get("main").cloned().unwrap_or(Value::Null);
+        let main_provider = main.get("providerId").and_then(Value::as_str);
+        let main_model = main.get("modelId").and_then(Value::as_str);
+        match (main_provider, main_model) {
+            (Some(expected_provider), Some(expected_model)) => {
+                if provider_id != Some(expected_provider) || model_id != Some(expected_model) {
+                    return Err(anyhow!(
+                        "smartMode.main must match the configured providerId/modelId"
+                    ));
+                }
+            }
+            _ => return Err(anyhow!("smartMode.main requires providerId and modelId")),
+        }
+    }
     if !(is_valid_mode(mode) || mode == "chat") {
         return Err(anyhow!("mode must be a valid mode id"));
     }
@@ -2101,7 +2195,13 @@ pub fn configure_session_with_mode_snapshot(
                  model_id = COALESCE(?4, model_id),
                  thinking_level = COALESCE(?5, thinking_level),
                  permission_mode = COALESCE(?6, permission_mode),
-                 fast_mode = COALESCE(?8, fast_mode), mode_snapshot_hash = ?9,
+                 fast_mode = COALESCE(?8, fast_mode),
+                 smart_mode_json = CASE ?10
+                     WHEN 0 THEN smart_mode_json
+                     WHEN 1 THEN NULL
+                     ELSE ?11
+                 END,
+                 mode_snapshot_hash = ?9,
                  updated_at = ?7
              WHERE id = ?1",
         )?
@@ -2114,7 +2214,16 @@ pub fn configure_session_with_mode_snapshot(
             permission_mode,
             now_ms(),
             fast_mode,
-            mode_snapshot_hash
+            mode_snapshot_hash,
+            match smart_mode {
+                SmartModeWrite::Keep => 0,
+                SmartModeWrite::Clear => 1,
+                SmartModeWrite::Set(_) => 2,
+            },
+            match smart_mode {
+                SmartModeWrite::Set(raw) => Some(raw),
+                _ => None,
+            }
         ])?;
     if changed == 0 {
         return Ok(None);
@@ -5410,6 +5519,7 @@ mod tests {
             // Ownership is derived from `task_runs`, so an import is never one.
             scheduled_run: false,
             fast_mode: false,
+        smart_mode: None,
             worktree: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
@@ -5464,6 +5574,7 @@ mod tests {
             // Ownership is derived from `task_runs`, so an import is never one.
             scheduled_run: false,
             fast_mode: false,
+        smart_mode: None,
             worktree: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
@@ -6720,6 +6831,7 @@ mod tests {
             // Ownership is derived from `task_runs`, so an import is never one.
             scheduled_run: false,
             fast_mode: false,
+        smart_mode: None,
             worktree: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),

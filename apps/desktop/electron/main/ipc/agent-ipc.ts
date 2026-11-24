@@ -340,6 +340,17 @@ export function registerAgentIpc({
       req.sessionId,
       session,
       settings,
+      {
+        // Smart mode's routing inputs. The router reads the prompt, never sends
+        // it anywhere: this is the same text the turn is about to carry.
+        smart: {
+          prompt: sessionMessage?.content ?? req.content,
+          attachments: req.attachments?.length ?? 0,
+          stagedMode:
+            Boolean(modeOrigin) ||
+            (typeof session.mode === "string" && session.mode !== "agent"),
+        },
+      },
     );
     sidecar.setProjectInstructionRoot(req.sessionId, launch.workspaceRoot ?? launch.projectPath);
 

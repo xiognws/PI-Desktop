@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { ReactNode } from "react";
 import { ComposerModelList } from "./ComposerModelList";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
-import { IconBot, IconChevronDown, IconZap } from "../../../components/icons";
+import { IconBot, IconCheck, IconChevronDown, IconZap } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 import { ThinkingLevelSlider } from "./ThinkingLevelSlider";
@@ -24,6 +24,13 @@ export type ComposerModelPickerProps = {
   rootActions?: ReactNode;
   /** Opens the Models settings destination; omitted where Settings is the host. */
   onOpenModelSettings?: () => void;
+  /**
+   * The app-wide model pair, when both halves are configured. Absent hides the
+   * entry: half a pair would run turns on a model nobody chose.
+   */
+  smartMode?: { active: boolean; main: string; sub: string } | null;
+  /** Switch this chat onto the pair. */
+  onSelectSmartMode?: () => void;
 };
 
 /** Model/reasoning picker with its keyboard and focus contract intact. */
@@ -40,6 +47,8 @@ export function ComposerModelPicker({
   onCloseOtherMenus,
   rootActions,
   onOpenModelSettings,
+  smartMode,
+  onSelectSmartMode,
 }: ComposerModelPickerProps) {
   const {
     open,
@@ -114,6 +123,31 @@ export function ComposerModelPicker({
       )}
     >
       <div className="composer-menu-root" onMouseMove={() => setModelHighlight(-1)} onMouseLeave={() => setModelHighlight(-1)}>
+        {/* Smart mode is a mode, not another model: it sits above the list so it
+            reads as "how this chat runs", and the pair itself is shown inline. */}
+        {smartMode ? (
+          <button
+            type="button"
+            className={`composer-plus-item composer-model-option ${smartMode.active ? "active" : ""}`}
+            aria-pressed={smartMode.active}
+            onClick={() => {
+              setOpen(false);
+              onSelectSmartMode?.();
+            }}
+          >
+            <span className="composer-model-option-main">
+              <span className="composer-model-label">{t("chat.smartModeEntry")}</span>
+              <span className="composer-model-option-meta">
+                <span className="composer-model-option-provider">{smartMode.main}</span>
+                <span aria-hidden="true">{" \u2192 "}</span>
+                <span className="composer-model-option-provider">{smartMode.sub}</span>
+              </span>
+            </span>
+            <span className="composer-model-check-slot" aria-hidden="true">
+              {smartMode.active ? <IconCheck size={13} className="composer-model-check" /> : null}
+            </span>
+          </button>
+        ) : null}
         {rootActions}
         <ComposerModelList
           t={t} query={query} setQuery={setQuery}

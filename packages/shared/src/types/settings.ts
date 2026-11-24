@@ -111,6 +111,25 @@ export type AppSettings = {
   skillReviewProviderId?: string | null;
   /** Turn the automatic review off entirely. Absent means enabled. */
   skillReviewAfterTurn?: boolean;
+  /**
+   * Smart mode (ADR smart-mode): the model pair the "smart" composer entry turns
+   * a chat into. One pair is app-wide; a session stores a snapshot of it, so
+   * editing these later never rewrites a conversation that already ran.
+   *
+   * All four are read together: a pair with a missing half is no pair, and the
+   * composer entry stays hidden rather than billing a model nobody chose.
+   */
+  smartModeMainProviderId?: string | null;
+  smartModeMainModelId?: string | null;
+  smartModeSubProviderId?: string | null;
+  smartModeSubModelId?: string | null;
+  /**
+   * Route whole mechanical turns to the cheap half. Absent means on; turning it
+   * off keeps delegation routing only, which is the conservative setting.
+   */
+  smartModeTurnRouting?: boolean;
+  /** Let a `Task` that names no model run on the cheap half. Absent means on. */
+  smartModeDelegateToSub?: boolean;
   /** Configured command shell for the agent Bash protocol tool. */
   defaultCommandShell?: CommandShellId;
   /**

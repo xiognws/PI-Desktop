@@ -52,7 +52,12 @@ type UseComposerModelMenuOptions = {
   thinkingLevel: SessionThinkingLevel;
   controlsBlocked: boolean;
   configureActiveSession: (configuration: {
-    mode: Mode; providerId?: string; modelId?: string; thinkingLevel: SessionThinkingLevel;
+    mode: Mode;
+    providerId?: string;
+    modelId?: string;
+    thinkingLevel: SessionThinkingLevel;
+    /** `null` leaves smart mode: one picked model is one model. */
+    smartMode?: import("@pi-workspace/shared").SmartModeSnapshot | null;
   }) => Promise<void>;
 };
 
@@ -329,6 +334,9 @@ export function useComposerModelMenu({
         providerId: candidate.id,
         modelId: nextModelId,
         thinkingLevel: nextThinkingLevel,
+        // Naming one model is naming *one* model: the chat leaves smart mode,
+        // and the next turn stops carrying a pair it no longer runs on.
+        smartMode: null,
       });
       setQuery("");
       setModelHighlight(-1);

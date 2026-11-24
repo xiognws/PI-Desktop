@@ -23,8 +23,14 @@ function loadWithExecFile(execFile) {
 }
 const { nativeClipboardPaths, readComposerClipboardDirectories } = load("../electron/main/composer-clipboard-directories.ts");
 const { serializeComposerFileReferences, serializeInlineComposerFileReferences } = load("../../../packages/shared/src/composer-trigger.ts");
-const clipboard = values => ({ availableFormats: () => Object.keys(values), readBuffer: format => Buffer.from(values[format] ?? "") });
-const silentWindowsClipboard = () => ({ readBuffer: () => assert.fail("Windows must use its native file list") });
+// Electron 44's clipboard is async: `read()` lists the entries, `getType` reads one.
+const clipboard = values => ({
+  read: async () => [{
+    types: Object.keys(values),
+    getType: async type => new Blob([values[type] ?? ""]),
+  }],
+});
+const silentWindowsClipboard = () => ({ read: () => assert.fail("Windows must use its native file list") });
 
 test("native URI file lists preserve order and decode spaces/unicode without reading clipboard text", async () => {
   assert.deepEqual(await nativeClipboardPaths(clipboard({
@@ -46,15 +52,23 @@ test("Windows uses the complete native FileDropList instead of custom CF_HDROP o
   await assert.rejects(() => nativeClipboardPaths(clipboard({}), "win32", () => ["relative"]), /invalid clipboard file path/);
 });
 
-test("normalized MIME enumeration does not hide raw Finder file URLs", async () => {
-  const native = clipboard({ "public.file-url": "file:///tmp/synthetic-folder" });
-  native.availableFormats = () => ["text/uri-list"];
-  assert.deepEqual(await nativeClipboardPaths(native, "darwin"), ["/tmp/synthetic-folder"]);
+test("a macOS copy that only offers public.file-url still yields its paths", async () => {
+  assert.deepEqual(
+    await nativeClipboardPaths(clipboard({ "public.file-url": "file:///tmp/synthetic-folder" }), "darwin"),
+    ["/tmp/synthetic-folder"],
+  );
+  // Two Finder items arrive as one URI list, the way every platform spells it.
+  assert.deepEqual(
+    await nativeClipboardPaths(
+      clipboard({ "text/uri-list": "file:///tmp/first%20folder\r\nfile:///tmp/second" }),
+      "darwin",
+    ),
+    ["/tmp/first folder", "/tmp/second"],
+  );
 });
 
-test("macOS Finder file-list metadata is decoded in full", { skip: process.platform !== "darwin" }, async () => {
-  const xml = '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array><string>/tmp/first folder</string><string>/tmp/second</string></array></plist>';
-  assert.deepEqual(await nativeClipboardPaths(clipboard({ NSFilenamesPboardType: xml }), "darwin"), ["/tmp/first folder", "/tmp/second"]);
+test("a clipboard with no file list yields nothing instead of throwing", async () => {
+  assert.deepEqual(await nativeClipboardPaths(clipboard({ "text/plain": "hello" }), "linux"), []);
 });
 
 test("an asynchronous Windows clipboard probe keeps the event loop responsive", async () => {
@@ -69,37 +83,6 @@ test("an asynchronous Windows clipboard probe keeps the event loop responsive", 
     clearInterval(spin);
   }
   assert.ok(ticks >= 3, "the event loop must keep running while the clipboard probe is pending");
-});
-
-test("macOS Finder metadata is piped to plutil asynchronously", async () => {
-  const plist = Buffer.from("synthetic Finder plist");
-  const paths = ["/tmp/first folder", "/tmp/second"];
-  const calls = [];
-  let stdinBytes;
-  const child = new EventEmitter();
-  child.stdout = new EventEmitter();
-  child.stdin = {
-    on() {},
-    end(input) {
-      stdinBytes = Buffer.from(input);
-      setImmediate(() => {
-        child.stdout.emit("data", Buffer.from(JSON.stringify(paths)));
-        child.emit("close", 0);
-      });
-    },
-  };
-  const { nativeClipboardPaths: readPaths } = loadWithExecFile((command, args, options) => {
-    calls.push({ command, args, options });
-    return child;
-  });
-
-  assert.deepEqual(await readPaths(clipboard({ NSFilenamesPboardType: plist }), "darwin"), paths);
-  assert.deepEqual(stdinBytes, plist);
-  assert.equal(calls[0].command, "/usr/bin/plutil");
-  assert.deepEqual(calls[0].args, ["-convert", "json", "-o", "-", "--", "-"]);
-  assert.equal(calls[0].options.timeout, 10_000);
-  assert.equal(calls[0].options.maxBuffer, 1024 * 1024);
-  assert.equal("input" in calls[0].options, false);
 });
 
 test("Windows PowerShell clipboard adapter reads stdout asynchronously with process bounds", async () => {

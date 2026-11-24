@@ -53,6 +53,9 @@ export type ComposerToolbarProps = {
   thinkingLabel: string;
   /** The selected model asks for OpenAI's priority tier (ADR 0334). */
   modelFastMode?: boolean;
+  /** The app-wide model pair, when the user configured one (smart mode). */
+  smartMode?: { active: boolean; main: string; sub: string } | null;
+  onSelectSmartMode?: () => void;
   contextUsage: ContextUsage | null;
   value: string;
   modelReady: boolean;
@@ -95,6 +98,8 @@ export function ComposerToolbar({
   modelLabel,
   thinkingLabel,
   modelFastMode = false,
+  smartMode = null,
+  onSelectSmartMode,
   contextUsage,
   value,
   modelReady,
@@ -199,6 +204,8 @@ export function ComposerToolbar({
           controlsBlocked={controlsBlocked}
           onCloseOtherMenus={() => setPermissionOpen(false)}
           onOpenModelSettings={() => useAppStore.getState().setSettingsTab("agent")}
+          smartMode={smartMode}
+          onSelectSmartMode={onSelectSmartMode}
         />
         {composerTransforms.map((transform) => {
           const key = `${transform.pluginId}/${transform.id}`;

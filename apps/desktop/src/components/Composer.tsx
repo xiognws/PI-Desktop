@@ -18,6 +18,8 @@ import {
   imageGenerationBindings,
   isImageGenerationModel,
   normalizeLargePasteThreshold,
+  smartTemplateFromSettings,
+  snapshotFromTemplate,
 } from "@pi-workspace/shared";
 import { useAppStore } from "../stores/app-store";
 import { latestTurnContextInspector } from "../lib/latest-turn-context";
@@ -318,6 +320,16 @@ export function Composer({
 
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
+  // Smart mode's pair, from settings. `null` unless both halves are configured,
+  // so a half-set template never becomes a selectable mode.
+  const smartTemplate = smartTemplateFromSettings(settings);
+  const smartEntry = smartTemplate
+    ? {
+        active: (activeSession?.smartMode ?? null) !== null,
+        main: smartTemplate.main.modelId,
+        sub: smartTemplate.sub.modelId,
+      }
+    : null;
   const draftConfiguration = useAppStore((s) => s.draftConfiguration);
   const mode: Mode = activeSession
     ? activeSession.mode
@@ -626,6 +638,23 @@ export function Composer({
             modelLabel={modelLabel}
             thinkingLabel={thinkingLabel}
             modelFastMode={sessionFastModeActive(provider, modelId, activeSession ?? draftConfiguration)}
+            smartMode={smartEntry}
+            onSelectSmartMode={() => {
+              if (!smartTemplate) return;
+              void configureActiveSession({
+                mode,
+                // The pair's strong half is the chat's own binding: every other
+                // surface keeps reading one model, and the router picks the tier.
+                providerId: smartTemplate.main.providerId,
+                modelId: smartTemplate.main.modelId,
+                thinkingLevel,
+                smartMode: snapshotFromTemplate(smartTemplate),
+              }).catch((error: unknown) => {
+                showToast(error instanceof Error ? error.message : String(error), {
+                  variant: "error",
+                });
+              });
+            }}
             contextUsage={composerContextUsage ?? null}
             value={value}
             modelReady={modelReady}

@@ -25,6 +25,13 @@ export function AgentBehaviorSettings({
 }) {
   const { t } = useTranslation();
   const providers = useAppStore((state) => state.providers);
+  /** Models the chosen provider actually offers, for the second select. */
+  const modelsOf = (providerId: string | null | undefined) =>
+    (providers.find((row) => row.id === providerId)?.models ?? []).map((binding) => ({
+      id: binding.id,
+      label: binding.alias?.trim() || binding.id,
+    }));
+  const noneOption = [{ id: "", label: t("settings.smartModeNone") }];
   return (
     <div className="settings-stack">
       <SettingsCard
@@ -69,6 +76,89 @@ export function AgentBehaviorSettings({
           />
         </SettingsRow>
         <CommandShellRow settings={settings} saveSettings={saveSettings} />
+      </SettingsCard>
+
+      <SettingsCard
+        title={t("settings.smartMode")}
+        caption={t("settings.smartModeCaption")}
+      >
+        <SettingsRow
+          title={t("settings.smartModeMain")}
+          description={t("settings.smartModeMainDesc")}
+        >
+          <>
+            <SettingsMenuSelect
+              className="settings-permission-select"
+              label={t("settings.smartModeProvider")}
+              value={settings.smartModeMainProviderId ?? ""}
+              onChange={(id) =>
+                // A model belongs to its provider, so changing one clears the other.
+                void saveSettings({
+                  smartModeMainProviderId: id || null,
+                  smartModeMainModelId: null,
+                })
+              }
+              options={[...noneOption, ...providers.map((row) => ({ id: row.id, label: row.name }))]}
+            />
+            <SettingsMenuSelect
+              className="settings-permission-select"
+              label={t("settings.smartModeModel")}
+              value={settings.smartModeMainModelId ?? ""}
+              onChange={(id) => void saveSettings({ smartModeMainModelId: id || null })}
+              options={[...noneOption, ...modelsOf(settings.smartModeMainProviderId)]}
+            />
+          </>
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.smartModeSub")}
+          description={t("settings.smartModeSubDesc")}
+        >
+          <>
+            <SettingsMenuSelect
+              className="settings-permission-select"
+              label={t("settings.smartModeProvider")}
+              value={settings.smartModeSubProviderId ?? ""}
+              onChange={(id) =>
+                void saveSettings({
+                  smartModeSubProviderId: id || null,
+                  smartModeSubModelId: null,
+                })
+              }
+              options={[...noneOption, ...providers.map((row) => ({ id: row.id, label: row.name }))]}
+            />
+            <SettingsMenuSelect
+              className="settings-permission-select"
+              label={t("settings.smartModeModel")}
+              value={settings.smartModeSubModelId ?? ""}
+              onChange={(id) => void saveSettings({ smartModeSubModelId: id || null })}
+              options={[...noneOption, ...modelsOf(settings.smartModeSubProviderId)]}
+            />
+          </>
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.smartModeTurnRouting")}
+          description={t("settings.smartModeTurnRoutingDesc")}
+        >
+          <SettingsToggle
+            checked={settings.smartModeTurnRouting !== false}
+            label={t("settings.smartModeTurnRouting")}
+            onChange={() =>
+              void saveSettings({ smartModeTurnRouting: settings.smartModeTurnRouting === false })
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.smartModeDelegateToSub")}
+          description={t("settings.smartModeDelegateToSubDesc")}
+        >
+          <SettingsToggle
+            checked={settings.smartModeDelegateToSub !== false}
+            label={t("settings.smartModeDelegateToSub")}
+            onChange={() =>
+              void saveSettings({ smartModeDelegateToSub: settings.smartModeDelegateToSub === false })
+            }
+          />
+        </SettingsRow>
       </SettingsCard>
 
       <SettingsCard

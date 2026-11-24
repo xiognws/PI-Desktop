@@ -439,3 +439,5 @@ Each ADR includes:
 | 0402 | [The agent kernel is a Rust crate, not the Node sidecar](0402-rust-agent-core.md) | Accepted |
 | 0403 | [The Rust kernel is the agent runtime](0403-rust-kernel-as-agent-runtime.md) | Accepted (implementation in progress) |
 | 0404 | [Abort releases tools, but the provider loop can still run](0404-turn-abort-provider-traffic.md) | Accepted (limitation recorded; upstream fix pending) |
+| 0405 | [Smart mode runs a conversation on a model pair](0405-smart-mode-model-pair.md) | Accepted for implementation |
+| 0406 | [Windows runs commands in Git Bash by default](0406-windows-default-git-bash.md) | Accepted (amends 0054, 0209) |

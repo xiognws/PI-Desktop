@@ -27,6 +27,7 @@ export type OptimisticSessionConfiguration = {
   mode?: unknown;
   permissionMode?: unknown;
   fastMode?: boolean;
+  smartMode?: unknown;
 };
 
 export type ThinkingProviderLike = {

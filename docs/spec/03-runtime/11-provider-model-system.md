@@ -944,6 +944,37 @@ reapply the old 0.99.1 terminal-event hunk.
    compatibility override; provider defaults must not override a session's
    selected model during turn resolution.
 
+## 17a. Smart mode (model pair)
+
+A session may run on a pair instead of one model: `main` plans, judges and
+answers; `sub` takes mechanical turns and delegated work. ADR 0405.
+
+- **Selection.** The pair is app-wide settings (`smartModeMainProviderId/ModelId`,
+  `smartModeSubProviderId/ModelId`, `smartModeTurnRouting`, `smartModeDelegateToSub`).
+  The composer's `Smart mode` entry exists only when both halves are configured,
+  and writes a snapshot into `sessions.smart_mode_json`. Picking a plain model
+  clears it. A snapshot never follows later settings edits.
+- **Routing.** `decideTurnTier` is deterministic and adds no request: attachments,
+  staged mode, sticky escalation, first turn, prompt length, code markers, and two
+  intent lexicons decide the tier. Quality rules run before cheap rules.
+- **Delegation.** The pair's `sub` binding enters the delegation catalog without
+  the model's own `availableForSubagents` opt-in, and `delegationDefaultModel`
+  makes `Task` without `model` run on it. An explicit `Task.model` still wins and
+  keys outside the catalog are still refused.
+- **Sub availability.** The cheap half must be enabled, reachable (`baseUrl`),
+  listed on its provider and able to sign a request. Otherwise the turn stays on
+  `main` and the decision records `downgradedFrom: "sub"`.
+- **In-turn escalation.** A `sub` turn hands the rest of itself to `main` when
+  it is stuck: `afterToolErrors` consecutive tool failures, or
+  `afterBudgetUsed` of the step budget spent. The launch carries the strong
+  half's provider spec, so the kernel continues with the same transcript and one
+  re-send — no completed tool is replayed, and the hand-over happens at most
+  once per turn. Both halves resolve through the same catalog loop; only the
+  cheap one becomes a `Task` key.
+- **Accounting.** `turns.provider_id/model_id` records the model a turn started
+  on, so the saving is measurable per turn without new storage. A hand-over is
+  logged with both models and the reason.
+
 ## 18. Validation rules
 
 - `name` required

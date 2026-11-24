@@ -3028,9 +3028,26 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "mode required", "INVALID_PARAMS"))?;
             let thinking_level = thinking_level_param(&params)?;
             let fast_mode = fast_mode_param(&params)?;
+            // Three states again, one layer up: an absent key preserves the
+            // stored pair, `null` turns smart mode off, an object turns it on.
+            let smart_mode_json = match params.get("smartMode") {
+                None => None,
+                Some(Value::Null) => Some(None),
+                Some(Value::Object(_)) => Some(Some(
+                    serde_json::to_string(params.get("smartMode").expect("checked above"))
+                        .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?,
+                )),
+                Some(_) => {
+                    return Err(rpc_err(
+                        1002,
+                        "smartMode must be an object or null",
+                        "INVALID_PARAMS",
+                    ))
+                }
+            };
             let st = state.lock().await;
             let prepared = modes_rpc::prepare_configure(&st, id, mode, &params)?;
-            let session = sessions::configure_session_with_mode_snapshot(
+            let session = sessions::configure_session_full(
                 &st.db,
                 id,
                 mode,
@@ -3040,6 +3057,11 @@ async fn handle_request(
                 params.get("permissionMode").and_then(|v| v.as_str()),
                 fast_mode,
                 prepared.snapshot_hash(),
+                match smart_mode_json.as_ref() {
+                    None => sessions::SmartModeWrite::Keep,
+                    Some(None) => sessions::SmartModeWrite::Clear,
+                    Some(Some(raw)) => sessions::SmartModeWrite::Set(raw.as_str()),
+                },
             )
             .map_err(|e| {
                 let message = e.to_string();

@@ -136,7 +136,14 @@ export function useInAppProviderCredits(
   refresh: () => void;
 } {
   const polling = options.polling === true;
-  const snapshot = useSyncExternalStore(subscribe, () => snapshotFor(providerId));
+  // The third argument is what makes this component renderable on the server:
+  // React 19 throws without it when a static render reaches the hook, and the
+  // store is empty there, so the server answer is simply "nothing yet".
+  const snapshot = useSyncExternalStore(
+    subscribe,
+    () => snapshotFor(providerId),
+    () => snapshotFor(providerId),
+  );
   const refresh = useCallback(() => {
     if (!providerId) return;
     void load(providerId, true);
@@ -217,7 +224,11 @@ function loadSurfaces(force: boolean): void {
 
 /** Every in-app provider Main knows about, read once per app run. */
 export function useInAppProviderSurfaces(): InAppProviderSurface[] {
-  const current = useSyncExternalStore(subscribeSurfaces, () => surfaces ?? NO_SURFACES);
+  const current = useSyncExternalStore(
+    subscribeSurfaces,
+    () => surfaces ?? NO_SURFACES,
+    () => surfaces ?? NO_SURFACES,
+  );
   useEffect(() => {
     loadSurfaces(false);
   }, []);

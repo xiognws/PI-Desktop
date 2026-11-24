@@ -290,6 +290,8 @@ export type AppState = {
     thinkingLevel: SessionThinkingLevel;
     permissionMode?: PermissionMode;
     fastMode?: boolean;
+    /** A snapshot turns smart mode on for this chat; `null` turns it off. */
+    smartMode?: import("@pi-workspace/shared").SmartModeSnapshot | null;
   }) => Promise<void>;
   /** Returns true once accepted unless concurrent smart Stop restores it. */
   sendPrompt: (

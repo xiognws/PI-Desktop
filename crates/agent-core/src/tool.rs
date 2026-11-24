@@ -108,6 +108,45 @@ pub trait Tool: Send + Sync {
         call: &'a ToolCall,
         ctx: &'a ToolContext,
     ) -> BoxFuture<'a, Result<String>>;
+
+    /// The same call, keeping the structured details a client renders.
+    ///
+    /// Upstream's tools answer `{ content, details }`: the model reads the text,
+    /// and the renderer (subagent topology, background jobs), Electron's
+    /// persistence layer and host-core read `result.details`. A tool that owns
+    /// structured state overrides this; every other tool keeps the string-only
+    /// contract and reports no details, which is what the default does.
+    fn call_with_details<'a>(
+        &'a self,
+        call: &'a ToolCall,
+        ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<ToolOutcome>> {
+        Box::pin(async move { self.call(call, ctx).await.map(ToolOutcome::text) })
+    }
+}
+
+/// One tool result: the text the model reads, plus what a client may want.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolOutcome {
+    pub content: String,
+    /// Rendered verbatim as `result.details`; `None` leaves the row text-only.
+    pub details: Option<Value>,
+}
+
+impl ToolOutcome {
+    pub fn text(content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            details: None,
+        }
+    }
+
+    pub fn with_details(content: impl Into<String>, details: Value) -> Self {
+        Self {
+            content: content.into(),
+            details: Some(details),
+        }
+    }
 }
 
 /// Outcome of asking the gate. `Ask` is answered by the renderer through the
@@ -218,7 +257,10 @@ impl ToolRegistry {
     /// What every declared tool is, by risk class. A panel can show this; a policy
     /// decision can be made from it.
     pub fn classes(&self) -> Vec<(String, crate::exec_policy::ToolClass)> {
-        let cell = self.exec.clone().unwrap_or_else(|| ExecPolicyCell::new(ExecPolicy::default()));
+        let cell = self
+            .exec
+            .clone()
+            .unwrap_or_else(|| ExecPolicyCell::new(ExecPolicy::default()));
         self.tools
             .values()
             .map(|tool| {
@@ -304,22 +346,40 @@ impl ToolRegistry {
     /// Execute one call. Never returns `Err` for a tool-level failure: the
     /// failure becomes a result the model can read.
     pub async fn call(&self, call: &ToolCall, ctx: &ToolContext) -> ToolResult {
-        let mut result = self.dispatch(call, ctx).await;
-        if let Some(limit) = self.result_limit_chars {
-            let (content, truncated) = truncate_result(&result.content, limit);
-            result.content = content;
-            result.truncated |= truncated;
-        }
-        result
+        self.call_with_details(call, ctx).await.0
     }
 
-    async fn dispatch(&self, call: &ToolCall, ctx: &ToolContext) -> ToolResult {
-        let error = |message: String| ToolResult {
-            call_id: call.id.clone(),
-            name: call.name.clone(),
-            content: message,
-            is_error: true,
-            truncated: false,
+    /// Execute one call, keeping the structured details its client renders.
+    ///
+    /// A transcript reader (the model) needs only the text; a renderer reading
+    /// the same row through `result.details` needs the structure a tool chose to
+    /// publish. Callers that persist or draw a row use this one.
+    pub async fn call_with_details(
+        &self,
+        call: &ToolCall,
+        ctx: &ToolContext,
+    ) -> (ToolResult, Option<Value>) {
+        let mut outcome = self.dispatch(call, ctx).await;
+        if let Some(limit) = self.result_limit_chars {
+            let (content, truncated) = truncate_result(&outcome.0.content, limit);
+            outcome.0.content = content;
+            outcome.0.truncated |= truncated;
+        }
+        outcome
+    }
+
+    async fn dispatch(&self, call: &ToolCall, ctx: &ToolContext) -> (ToolResult, Option<Value>) {
+        let error = |message: String| {
+            (
+                ToolResult {
+                    call_id: call.id.clone(),
+                    name: call.name.clone(),
+                    content: message,
+                    is_error: true,
+                    truncated: false,
+                },
+                None,
+            )
         };
 
         if ctx.cancel.is_cancelled() {
@@ -366,17 +426,20 @@ impl ToolRegistry {
         let outcome = tokio::select! {
             biased;
             _ = ctx.cancel.cancelled() => Err(AgentError::Cancelled),
-            outcome = tool.call(&effective, ctx) => outcome,
+            outcome = tool.call_with_details(&effective, ctx) => outcome,
         };
 
         match outcome {
-            Ok(content) => ToolResult {
-                call_id: call.id.clone(),
-                name: call.name.clone(),
-                content,
-                is_error: false,
-                truncated: false,
-            },
+            Ok(outcome) => (
+                ToolResult {
+                    call_id: call.id.clone(),
+                    name: call.name.clone(),
+                    content: outcome.content,
+                    is_error: false,
+                    truncated: false,
+                },
+                outcome.details,
+            ),
             Err(AgentError::Cancelled) => error("cancelled while running".into()),
             Err(other) => error(other.to_string()),
         }
@@ -485,6 +548,62 @@ mod tests {
         registry.register(Arc::new(Echo));
         registry.register(Arc::new(Failing));
         registry
+    }
+
+    /// Publishes structured details next to its text.
+    struct Detailed;
+
+    impl Tool for Detailed {
+        fn spec(&self) -> ToolSpec {
+            ToolSpec::new(
+                "detailed",
+                "Answers with details",
+                serde_json::json!({"type": "object"}),
+            )
+        }
+
+        fn call<'a>(
+            &'a self,
+            _call: &'a ToolCall,
+            _ctx: &'a ToolContext,
+        ) -> BoxFuture<'a, Result<String>> {
+            Box::pin(async move { Ok("the text".to_string()) })
+        }
+
+        fn call_with_details<'a>(
+            &'a self,
+            _call: &'a ToolCall,
+            _ctx: &'a ToolContext,
+        ) -> BoxFuture<'a, Result<ToolOutcome>> {
+            Box::pin(async move {
+                Ok(ToolOutcome::with_details(
+                    "the text",
+                    serde_json::json!({"delegationId": "d1", "status": "running"}),
+                ))
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn details_reach_the_caller_that_draws_the_row() {
+        let mut registry = ToolRegistry::new(Arc::new(AllowAll));
+        registry.register(Arc::new(Detailed));
+        let (result, details) = registry
+            .call_with_details(&call("detailed", Value::Null), &ctx())
+            .await;
+        assert_eq!(result.content, "the text");
+        assert_eq!(
+            details,
+            Some(serde_json::json!({"delegationId": "d1", "status": "running"}))
+        );
+        // The model-facing path stays string-only, and a tool that publishes
+        // nothing reports no details at all.
+        let text_only = registry.call(&call("detailed", Value::Null), &ctx()).await;
+        assert_eq!(text_only.content, "the text");
+        let (_, no_details) = registry
+            .call_with_details(&call("echo", serde_json::json!({"text": "hi"})), &ctx())
+            .await;
+        assert_eq!(no_details, None);
     }
 
     #[tokio::test]
