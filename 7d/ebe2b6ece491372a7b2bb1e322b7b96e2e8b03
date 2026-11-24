@@ -1,0 +1,16 @@
+crates/agent-core/src/prompt/modes.rs
+  h_201ed4c689ac8b 53,107-118
+packages/agent-runtime/src/mode-prompts.ts
+  h_201ed4c689ac8b 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7debe2b6ece491372a7b2bb1e322b7b96e2e8b03",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
