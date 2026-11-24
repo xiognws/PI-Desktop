@@ -269,3 +269,36 @@ test("a planning_state this contract cannot address is dropped, not guessed", ()
   assert.equal(unknown.event.targetPermissionMode, undefined);
   assert.equal(unknown.event.executionState, undefined);
 });
+
+test("a kernel error keeps its own code and message instead of a generic one", () => {
+  // Recorded shape: the Rust kernel flattens the error onto the event. Reading
+  // only a nested `error` object reported every one of these as
+  // "RUNTIME_ERROR / agent runtime error", which tells a user nothing.
+  const flat = adaptKernelEvent(
+    envelope({
+      type: "error",
+      code: "CONTEXT_TOO_LARGE",
+      message: "request exceeds the model context window",
+    })
+  );
+  assert.deepEqual(flat.event, {
+    type: "error",
+    error: { code: "CONTEXT_TOO_LARGE", message: "request exceeds the model context window" },
+  });
+
+  // The Node sidecar nests the same fields; that shape must keep working.
+  const nested = adaptKernelEvent(
+    envelope({
+      type: "error",
+      error: { code: "PROVIDER_ERROR", message: "429 soft_rate", retriable: true },
+    })
+  );
+  assert.deepEqual(nested.event, {
+    type: "error",
+    error: { code: "PROVIDER_ERROR", message: "429 soft_rate", retriable: true },
+  });
+
+  // Only a frame with neither form falls back to the generic pair.
+  const empty = adaptKernelEvent(envelope({ type: "error" }));
+  assert.deepEqual(empty.event.error, { code: "RUNTIME_ERROR", message: "agent runtime error" });
+});

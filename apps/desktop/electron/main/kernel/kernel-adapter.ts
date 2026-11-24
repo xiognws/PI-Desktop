@@ -269,16 +269,24 @@ function adaptEvent(raw: unknown, envelope: { sessionId: string }): AgentEvent |
       return usage ? { type: "usage", usage } : null;
     }
     case "error": {
-      const error = isWire(raw.error) ? raw.error : {};
-      const code = text(error.code) ?? "RUNTIME_ERROR";
-      const message = text(error.message) ?? "agent runtime error";
+      // Two producers, one vocabulary: the Node sidecar nests the fields
+      // (`error: {code, message}`), while the Rust kernel flattens them onto the
+      // event (`{type: "error", code, message}`). Reading only the nested form
+      // turned every kernel failure into "RUNTIME_ERROR / agent runtime error" —
+      // a report no user can act on and no reader can diagnose.
+      const nested = isWire(raw.error) ? raw.error : null;
+      const field = (key: string): unknown =>
+        nested && nested[key] !== undefined ? nested[key] : raw[key];
+      const code = text(field("code")) ?? "RUNTIME_ERROR";
+      const message = text(field("message")) ?? "agent runtime error";
+      const details = field("details");
       return {
         type: "error",
         error: {
           code,
           message,
-          ...(error.details === undefined ? {} : { details: error.details }),
-          ...(error.retriable === true ? { retriable: true } : {}),
+          ...(details === undefined ? {} : { details }),
+          ...(field("retriable") === true ? { retriable: true } : {}),
         },
       };
     }
