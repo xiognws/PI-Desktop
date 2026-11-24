@@ -1,0 +1,16 @@
+apps/desktop/package.json
+  h_201ed4c689ac8b 60
+pnpm-lock.yaml
+  h_201ed4c689ac8b 284-285,2720-2721,6837
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0ea7ba1e5136484f0fe47a28b3ed505f4b5c6c1a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
