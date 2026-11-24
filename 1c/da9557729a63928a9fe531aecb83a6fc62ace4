@@ -1,0 +1,108 @@
+apps/desktop/electron/main/composer-clipboard-directories.ts
+  h_201ed4c689ac8b 6-21,23,26-59,123-126,128-135
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 91,428-432,447,893-896
+apps/desktop/electron/main/ipc/agent-ipc.ts
+  h_201ed4c689ac8b 343-353
+apps/desktop/electron/main/ipc/session-ipc.ts
+  h_201ed4c689ac8b 733-734
+apps/desktop/electron/main/kernel/kernel-prompt.ts
+  h_201ed4c689ac8b 100-110
+apps/desktop/electron/main/runtime/session-launch.ts
+  h_201ed4c689ac8b 18,53,90-91,108,393-399,415-438,769-787,792-799,807-810,869,873-901,1077-1098
+apps/desktop/electron/main/runtime/smart-routing.ts
+  h_201ed4c689ac8b 1-224
+apps/desktop/package.json
+  h_201ed4c689ac8b 21
+apps/desktop/src/components/Composer.tsx
+  h_201ed4c689ac8b 21-22,323-332,641-657
+apps/desktop/src/features/chat/composer/ComposerModelPicker.tsx
+  h_201ed4c689ac8b 5,27-33,50-51,126-150
+apps/desktop/src/features/chat/composer/ComposerToolbar.tsx
+  h_201ed4c689ac8b 56-58,101-102,207-208
+apps/desktop/src/features/chat/composer/hooks/useComposerModelMenu.ts
+  h_201ed4c689ac8b 55-60,337-339
+apps/desktop/src/features/settings/pages/AgentBehaviorSettings.tsx
+  h_201ed4c689ac8b 28-34,81-163
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 842-843,990-995,2110-2114
+apps/desktop/src/lib/in-app-credits.ts
+  h_201ed4c689ac8b 139-146,227-231
+apps/desktop/src/lib/session-thinking.ts
+  h_201ed4c689ac8b 30
+apps/desktop/src/stores/app-state.ts
+  h_201ed4c689ac8b 293-294
+apps/desktop/src/stores/runtime/session-runtime.ts
+  h_201ed4c689ac8b 4,47-54
+apps/desktop/test/composer-clipboard-directories.test.mjs
+  h_201ed4c689ac8b 26-33,55-67,70-71
+apps/desktop/test/smart-mode-wiring.test.mjs
+  h_201ed4c689ac8b 1-68
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1638-1643,4815-4863
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 109-153,192-194,217,256-261,356-362,444-469,529,555,577,766-774,1338,1340,1467-1521
+crates/host-core/src/db.rs
+  h_201ed4c689ac8b 10,30,58
+crates/host-core/src/db/migrations.rs
+  h_201ed4c689ac8b 816-818
+crates/host-core/src/db/repositories.rs
+  h_201ed4c689ac8b 228-231,335-339
+crates/host-core/src/db/session_smart_mode_migration.rs
+  h_201ed4c689ac8b 1-46
+crates/host-core/src/db/session_smart_mode_test.rs
+  h_201ed4c689ac8b 1-118
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 3031-3047,3050,3060-3064
+crates/host-core/src/session_search.rs
+  h_201ed4c689ac8b 111
+crates/host-core/src/sessions.rs
+  h_201ed4c689ac8b 1412,1945-1946,1949-1950,1981,2080-2145,2173-2179,2192-2201,5497,5552,6809
+docs/adr/0405-smart-mode-model-pair.md
+  h_201ed4c689ac8b 1-80
+docs/adr/README.md
+  h_201ed4c689ac8b 442-443
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 947-977
+docs/zh-CN/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 764-774
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 928,1778-1790
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 940,1790-1802
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 928,1778-1790
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 928,1778-1790
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 937,1786-1798
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 927,1755-1767
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 937,1786-1798
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 933,1776-1788
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 933,1776-1788
+packages/shared/src/index.ts
+  h_201ed4c689ac8b 59
+packages/shared/src/smart-mode.test.ts
+  h_201ed4c689ac8b 1-169
+packages/shared/src/smart-mode.ts
+  h_201ed4c689ac8b 1-463
+packages/shared/src/types/sessions.ts
+  h_201ed4c689ac8b 9,85-91
+packages/shared/src/types/settings.ts
+  h_201ed4c689ac8b 114-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1cda9557729a63928a9fe531aecb83a6fc62ace4",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
