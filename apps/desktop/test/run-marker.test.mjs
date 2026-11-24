@@ -122,3 +122,16 @@ test("a killed run leaves the last time it was alive compacted to one heartbeat"
     );
   });
 });
+
+test("an early marker keeps its start time when the composition root writes again", () => {
+  // `entry.ts` writes the marker before storage preparation, so a death in that
+  // window still leaves a breadcrumb. The later write from the composition root must
+  // not restate the run as starting then.
+  withDirectory(() => {
+    writeRunMarker("0.0.0-early");
+    const first = readRunMarker();
+    assert.ok(first?.startedAt);
+    writeRunMarker("0.0.0-early");
+    assert.equal(readRunMarker()?.startedAt, first.startedAt);
+  });
+});
