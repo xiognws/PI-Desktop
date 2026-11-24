@@ -1,0 +1,14 @@
+crates/host-core/src/sessions.rs
+  h_201ed4c689ac8b 1620
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "10e37dc01e7295e9914bd296f0c981eda91a94c7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
