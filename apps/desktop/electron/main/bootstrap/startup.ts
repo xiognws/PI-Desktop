@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { app, BrowserWindow, crashReporter, Menu, safeStorage } from "electron";
 import { createScheduledRunner } from "../runtime/scheduled-runner";
 import { createCuratorMaintenance } from "../runtime/curator-runner";
@@ -40,10 +41,7 @@ import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PluginRuntime } from "../plugin-runtime";
 import { runSessionListProbe } from "../session-list-probe";
-import {
-  ensureCrashDumpsDirectory,
-  reportPreviousCrashDumps,
-} from "../crash-report";
+import { checkCrashReporterHealth, ensureCrashDumpsDirectory, reportPreviousCrashDumps } from "../crash-report.js";
 
 type IpcInvoker = (
   channel: string,
@@ -154,14 +152,41 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
   // directory so a `PI_DESKTOP_DATA_DIR` profile does not share them. Started
   // before `ready`, so no crash can happen ahead of the handler. A failure
   // here is a warning: it never blocks boot.
+  let crashReporterStarted = false;
+  let crashDumpsDirectory = "";
   try {
-    app.setPath("crashDumps", ensureCrashDumpsDirectory(deps.dataDir));
+    crashDumpsDirectory = ensureCrashDumpsDirectory(deps.dataDir);
+    app.setPath("crashDumps", crashDumpsDirectory);
     crashReporter.start({ uploadToServer: false, productName: APP_NAME });
+    crashReporterStarted = true;
   } catch (error) {
     deps.logger.app("diagnostics", "warn", "crash reporter failed to start", {
       event: "crashReporterStartFailed",
       data: String(error),
     });
+  }
+  // Knowing the reporter started is not the same as knowing it can catch anything:
+  // the handler is a separate executable on Windows and the dumps directory has to
+  // be writable. When either is missing the next unexplained death reads as
+  // `killed` with no dump, which is the report nobody can answer — so this says so
+  // once per boot instead.
+  {
+    const health = checkCrashReporterHealth({
+      crashDumpsDirectory: crashDumpsDirectory || ensureCrashDumpsDirectory(deps.dataDir),
+      executableDirectory: dirname(process.execPath),
+      started: crashReporterStarted,
+    });
+    if (health.ok) {
+      deps.logger.app("diagnostics", "info", "crash reporter ready", {
+        event: "crashReporterReady",
+        data: { dumps: crashDumpsDirectory },
+      });
+    } else {
+      deps.logger.app("diagnostics", "warn", "crash reporter cannot capture a crash", {
+        event: "crashReporterUnavailable",
+        data: { problems: health.problems, dumps: crashDumpsDirectory },
+      });
+    }
   }
 
 
@@ -354,13 +379,9 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // points at it, so they start once the host can answer. The window has
     // already painted and nothing waits on this: a provider that cannot come up
     // logs one line and stays out of the way.
-    if (!bootError) {
-      void startInAppProviders().catch((error: unknown) => {
-        logger.app("provider", "warn", "in-app provider startup failed", {
-          data: String(error),
-        });
-      });
-    }
+    // In-app provider gateways are forked processes with loopback ports; they
+    // come up when the first session is opened (see session-ipc), not here, so an
+    // idle launch holds no child process and no listener.
     const curatorMaintenance = createCuratorMaintenance({
       getHost,
       isBusy: isAnySessionBusy,

@@ -25,18 +25,7 @@
  * their stderr already lands in the `host` / `agent` log channels.
  */
 import { randomUUID } from "node:crypto";
-import {
-  closeSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  readSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 
 import type { Dirent } from "node:fs";
 import { join } from "node:path";
@@ -309,6 +298,69 @@ export function listCrashDumps(directory: string, limit = 20): string[] {
 }
 
 /** Create the installation-local Crashpad root and return it. */
+/**
+ * Whether a crash on this machine would actually leave a dump.
+ *
+ * The verdict already tells a reader `killed` from `crash`, but `killed` also
+ * covers "it crashed and Crashpad was not there to catch it" — which is exactly the
+ * shape of a report we cannot answer: a process that vanished, no dump, no exit
+ * reason, nothing to correlate. On Windows the handler is a separate executable
+ * (`chrome_crashpad_handler.exe`) next to the app, and the dumps directory has to be
+ * writable, so both are checked at boot and reported once. Nothing here creates or
+ * repairs anything: a machine where the handler is missing gets a line in
+ * `diagnostics.log`, not a silent gap in the next crash report.
+ */
+export type CrashReporterHealth = {
+  ok: boolean;
+  problems: string[];
+};
+
+export function checkCrashReporterHealth(options: {
+  /** The dumps directory the reporter was pointed at. */
+  crashDumpsDirectory: string;
+  /** Directory holding the Electron executable, where the handler lives. */
+  executableDirectory: string;
+  /** Whether `crashReporter.start()` ran without throwing. */
+  started: boolean;
+  platform?: NodeJS.Platform;
+}): CrashReporterHealth {
+  const platform = options.platform ?? process.platform;
+  const problems: string[] = [];
+
+  if (!options.started) {
+    problems.push("crashReporter.start() did not run");
+  }
+
+  // A directory that cannot be written cannot receive a dump, and the failure would
+  // only surface on the day someone needs it.
+  const probe = join(options.crashDumpsDirectory, `.crashpad-probe-${process.pid}`);
+  try {
+    mkdirSync(options.crashDumpsDirectory, { recursive: true });
+    writeFileSync(probe, "", "utf8");
+    rmSync(probe, { force: true });
+  } catch (error) {
+    problems.push(
+      `crash dumps directory is not writable (${options.crashDumpsDirectory}): ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  // macOS carries the handler inside the bundle rather than beside the executable,
+  // so the check would report a false gap; the two other platforms do not.
+  if (platform === "win32" || platform === "linux") {
+    const handler = join(
+      options.executableDirectory,
+      platform === "win32" ? "chrome_crashpad_handler.exe" : "chrome_crashpad_handler",
+    );
+    if (!existsSync(handler)) {
+      problems.push(`crash handler is missing: ${handler}`);
+    }
+  }
+
+  return { ok: problems.length === 0, problems };
+}
+
 export function ensureCrashDumpsDirectory(dataDir: string): string {
   const directory = crashDumpsDirectory(dataDir);
   mkdirSync(directory, { recursive: true });
