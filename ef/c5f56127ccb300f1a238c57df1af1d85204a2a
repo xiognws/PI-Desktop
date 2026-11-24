@@ -1,0 +1,16 @@
+crates/agent-core/src/event.rs
+  h_201ed4c689ac8b 14-39,176
+crates/agent-core/src/tool.rs
+  h_201ed4c689ac8b 111-149,260-263,349-362,364-366,368,371-382,429,433-442,553-608
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "efc5f56127ccb300f1a238c57df1af1d85204a2a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
