@@ -39,7 +39,7 @@ apps/desktop/src/features/chat/composer/ComposerToolbar.tsx
 apps/desktop/electron/main/runtime/smart-routing.ts
   h_201ed4c689ac8b 1-224
 crates/host-core/src/sessions.rs
-  h_201ed4c689ac8b 1418,1970-1971,1974-1975,2006,2105-2170,2198-2204,2217-2226,5522,5577,6834
+  h_201ed4c689ac8b 157-162,1397,1418,1423-1441,1970-1971,1974-1975,2006,2105-2170,2198-2204,2217-2226,5522,5577,6834
   h_201ed4c689ac8b 157-162,1397,1423-1441
 apps/desktop/electron/main/ipc/session-ipc.ts
   h_201ed4c689ac8b 733-734
