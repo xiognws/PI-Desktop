@@ -1617,6 +1617,7 @@ pub fn create_session_with_mode_snapshot(
         thinking_level,
         permission_mode,
         fast_mode,
+        smart_mode: None,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
         // The run row that owns this transcript is written after creation.
