@@ -1,0 +1,30 @@
+apps/desktop/electron/main/agent-extensions.ts
+  h_201ed4c689ac8b 30,195-208,252-277,289-300,397,772,775-781,791-793,807-834,859-861,892-924,926-941,943-975,1001-1008
+apps/desktop/electron/main/extension-session-host.ts
+  h_201ed4c689ac8b 19-25,32,49-75,81-87,146-202,211-235,328-396
+apps/desktop/electron/main/runtime/sidecar.ts
+  h_201ed4c689ac8b 129-138
+apps/desktop/test/extension-context-host.test.mjs
+  h_201ed4c689ac8b 1-417
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 64
+crates/agent-core/src/session_surface.rs
+  h_201ed4c689ac8b 1-353
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 288-294,339,483-491,496-502,572-577,1129-1142,1591-1600,1707-1729,2574-2680,4248,4282
+crates/agent-core/src/tool_activation.rs
+  h_201ed4c689ac8b 318-333
+crates/agent-core/tests/extension_surface.rs
+  h_201ed4c689ac8b 1-243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8033bbf307370652c67822926576b4cd84964cff",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
