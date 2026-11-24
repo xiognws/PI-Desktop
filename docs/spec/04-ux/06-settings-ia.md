@@ -347,7 +347,7 @@ so no row repeats it.
 ### Agent behavior (`behavior` tab)
 
 What a new conversation starts with, and what the agent may do while it runs.
-Card order is **Session defaults → Execution**.
+Card order is **Session defaults → Self-improvement review → Execution**.
 
 - **Session defaults** card: the host-backed default operating mode (Agent /
   Plan / Goal), the global permission mode (ask / accept-edits / auto) that
@@ -364,6 +364,19 @@ Card order is **Session defaults → Execution**.
   at least 1000) reverts to the saved one. Absent keeps the builtin Goal
   budget (20 turns, unlimited tokens). Only new Goal runs use it; an open run
   is edited from its status bar.
+- **Self-improvement review** card: the background pass that runs after a turn
+  that used tools, reads the session, and updates the skill library and memory.
+  Three rows. The switch persists as `AppSettings.skillReviewAfterTurn`, on when
+  absent; off stops the automatic pass only — saving a skill or a memory by hand
+  still works. The provider menu persists as
+  `AppSettings.skillReviewProviderId`, whose first entry is "same as the
+  conversation". The model field persists as `AppSettings.skillReviewModelId`,
+  saving on blur or Enter. Both follow the conversation by default, so an
+  untouched card changes nothing. A pinned provider is resolved by Main through
+  the same credential path a session launch uses, and is used only when it is
+  key-backed and has a base URL: vendor (OAuth) accounts, plugin-owned providers,
+  a missing key, and a missing base URL all leave the review on the session's
+  provider rather than failing a launch.
 - **Execution** card: the infinite provider retry switch and the app-wide
   **Scheduled tasks** switch. The retry switch is off by default and explains
   that network/transient provider failures keep retrying until success; Stop
