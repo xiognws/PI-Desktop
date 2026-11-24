@@ -22,10 +22,12 @@ const GATE_REASONS = new Set([
   "no-tool-calls",
   // A fork that never completed never looked, and its status is the scheduler's
   // bookkeeping ("aborted", "stopped", "failed") rather than a reading of the
-  // library. It stays in the log like every other gate.
+  // library. It stays in the log like every other gate. `step-limit` belongs here
+  // for the same reason: the pass spent its budget without reaching a verdict.
   "aborted",
   "stopped",
   "failed",
+  "step-limit",
 ]);
 
 /**

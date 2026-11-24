@@ -477,24 +477,48 @@ impl ReviewNotice {
     /// `nothing-to-save`; a pass that answered without looking is
     /// `no-tool-calls`, which is a failed pass rather than a quiet one.
     pub fn from_collector(collector: &ReviewActionCollector) -> Self {
-        let actions = collector.action_lines();
+        Self::from_run(
+            None,
+            collector.tool_call_count(),
+            collector.action_lines(),
+            collector.action_details(),
+        )
+    }
+
+    /// The notice a finished fork reports, given how the run ended.
+    ///
+    /// A fork that stopped at its step ceiling has not broken: the ceiling is the
+    /// scheduler's own budget, and the reference runtime stops its review fork at
+    /// the same kind of limit. What matters is whether anything landed before it
+    /// stopped — a write stands and has to be reported even when the pass ran out
+    /// of steps afterwards, and a pass that wrote nothing is schedule bookkeeping
+    /// rather than something the reader can act on.
+    pub fn from_run(
+        error_code: Option<&str>,
+        tool_calls: usize,
+        actions: Vec<String>,
+        details: Vec<Value>,
+    ) -> Self {
         if !actions.is_empty() {
             return Self {
                 outcome: ReviewOutcome::Applied,
                 reason: None,
                 actions,
-                details: collector.action_details(),
+                details,
             };
         }
-        if collector.tool_call_count() == 0 {
-            return Self {
+        match error_code {
+            // Out of steps before reaching a verdict: same class as the cooldown.
+            Some("STEP_LIMIT") => Self::skipped("step-limit"),
+            Some(code) => Self::failed(code),
+            None if tool_calls == 0 => Self {
                 outcome: ReviewOutcome::Failed,
                 reason: Some("no-tool-calls".to_string()),
                 actions: Vec::new(),
                 details: Vec::new(),
-            };
+            },
+            None => Self::skipped("nothing-to-save"),
         }
-        Self::skipped("nothing-to-save")
     }
 
     /// Whether this notice is worth telling the user about.
@@ -744,6 +768,40 @@ mod tests {
         let notice = ReviewNotice::from_collector(&ReviewActionCollector::new());
         assert_eq!(notice.outcome, ReviewOutcome::Failed);
         assert_eq!(notice.reason.as_deref(), Some("no-tool-calls"));
+        assert!(notice.is_visible(&policy()));
+    }
+
+    #[test]
+    fn writes_that_landed_still_report_when_the_fork_ran_out_of_steps() {
+        // The ceiling stops the pass, it does not undo it: a skill written three
+        // steps earlier is in the library and the reader has to hear about it.
+        let notice = ReviewNotice::from_run(
+            Some("STEP_LIMIT"),
+            9,
+            vec!["created 'x'".to_string()],
+            vec![json!({"kind": "created", "subject": "x"})],
+        );
+        assert_eq!(notice.outcome, ReviewOutcome::Applied);
+        assert!(notice.reason.is_none());
+        assert_eq!(notice.actions, vec!["created 'x'".to_string()]);
+        assert!(notice.is_visible(&policy()));
+    }
+
+    #[test]
+    fn a_fork_stopped_at_the_step_ceiling_is_bookkeeping_not_a_failure() {
+        let notice = ReviewNotice::from_run(Some("STEP_LIMIT"), 16, Vec::new(), Vec::new());
+        assert_eq!(notice.outcome, ReviewOutcome::Skipped);
+        assert_eq!(notice.reason.as_deref(), Some("step-limit"));
+        // The event still goes out so the skill-review log keeps the reason; the
+        // transcript's own filter is what keeps the row off the conversation.
+        assert!(notice.is_visible(&policy()));
+    }
+
+    #[test]
+    fn any_other_error_still_reports_as_a_failure() {
+        let notice = ReviewNotice::from_run(Some("PROVIDER_ERROR"), 3, Vec::new(), Vec::new());
+        assert_eq!(notice.outcome, ReviewOutcome::Failed);
+        assert_eq!(notice.reason.as_deref(), Some("PROVIDER_ERROR"));
         assert!(notice.is_visible(&policy()));
     }
 

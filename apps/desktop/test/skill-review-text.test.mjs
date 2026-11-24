@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { register } from "node:module";
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
-const { skillReviewText } = await import("../src/features/chat/transcript/skill-review-text.ts");
+const { skillReviewReports, skillReviewText } = await import(
+  "../src/features/chat/transcript/skill-review-text.ts"
+);
 
 /** Echo the key and its options, so the test is about which branch ran. */
 const t = (key, options) => `${key}${options ? ` ${JSON.stringify(options)}` : ""}`;
@@ -40,4 +42,23 @@ test("a pass with nothing to list falls back to the count", () => {
   const text = skillReviewText({ outcome: "applied", actions: [] }, t);
   assert.match(text, /skillReviewApplied/);
   assert.match(text, /"count":0/);
+});
+
+test("a pass that stopped at its step ceiling is not reported", () => {
+  // The ceiling is the scheduler's budget, not a reading of the library: the log
+  // keeps the reason, the conversation does not get a row for it.
+  assert.equal(
+    skillReviewReports({ outcome: "skipped", reason: "step-limit", actions: [] }),
+    false,
+  );
+  // A real write still reports even though the same pass ran out of steps.
+  assert.equal(
+    skillReviewReports({ outcome: "applied", actions: ["created 'x'"] }),
+    true,
+  );
+  // And a genuine breakage still shows.
+  assert.equal(
+    skillReviewReports({ outcome: "failed", reason: "PROVIDER_ERROR", actions: [] }),
+    true,
+  );
 });

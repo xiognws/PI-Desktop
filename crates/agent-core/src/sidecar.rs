@@ -971,6 +971,14 @@ impl Sidecar {
             // delegate runs exactly as before, on the session's own model.
             let models = parse_subagent_models(request);
             let model_keys: Vec<String> = models.keys().cloned().collect();
+            // Smart mode names the cheap half as the delegation default; a key
+            // outside the catalog is dropped here rather than refused later, so a
+            // stale launch cannot fail every `Task` call it makes.
+            let delegation_default = request
+                .str_param("delegationDefaultModel")
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
+                .map(str::to_string);
             let hub = Arc::new(
                 crate::delegate::DelegationHub::new(
                     session.delegations.clone(),
@@ -992,7 +1000,14 @@ impl Sidecar {
                         ),
                     }),
                 )
-                .with_models(model_keys),
+                .with_models(model_keys)
+                .with_default_model(delegation_default)
+                // A delegate settles after the step that started it, so the hub
+                // — not the turn loop — owns the refreshed `Task` row. Same sink
+                // the delegate's own rows go to.
+                .with_sink(Arc::new(NotificationSink {
+                    out: self.out.clone(),
+                })),
             );
             extra.push(Arc::new(crate::delegate::TaskTool::new(hub.clone())));
             extra.push(Arc::new(crate::delegate::TaskWaitTool::new(hub.clone())));
@@ -4373,32 +4388,18 @@ async fn skill_review_pass(input: SkillReviewInput) {
     }
 
     session.review_running.store(false, Ordering::SeqCst);
-    let notice = match outcome {
-        Ok(_) => {
-            if let Ok(mut gate) = session.review_gate.lock() {
-                gate.record_review(std::time::Instant::now());
-            }
-            let (tool_calls, actions, details) = sink.snapshot();
-            if tool_calls == 0 {
-                crate::skill_review::ReviewNotice {
-                    outcome: crate::skill_review::ReviewOutcome::Failed,
-                    reason: Some("no-tool-calls".to_string()),
-                    actions: Vec::new(),
-                    details: Vec::new(),
-                }
-            } else if actions.is_empty() {
-                crate::skill_review::ReviewNotice::skipped("nothing-to-save")
-            } else {
-                crate::skill_review::ReviewNotice {
-                    outcome: crate::skill_review::ReviewOutcome::Applied,
-                    reason: None,
-                    actions,
-                    details,
-                }
-            }
+    let (tool_calls, actions, details) = sink.snapshot();
+    let error_code = outcome.as_ref().err().map(|error| error.code());
+    // The pass spent its budget whenever the fork actually ran, including a run that
+    // stopped at the step ceiling. Recording only clean runs would let a session that
+    // always hits the ceiling buy a fresh fork on every turn.
+    if outcome.is_ok() || error_code == Some("STEP_LIMIT") {
+        if let Ok(mut gate) = session.review_gate.lock() {
+            gate.record_review(std::time::Instant::now());
         }
-        Err(error) => crate::skill_review::ReviewNotice::failed(error.code()),
-    };
+    }
+    let notice =
+        crate::skill_review::ReviewNotice::from_run(error_code, tool_calls, actions, details);
     emit_notice(&notice);
 }
 
