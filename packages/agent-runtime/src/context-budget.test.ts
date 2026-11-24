@@ -25,6 +25,7 @@ describe("contextBudgetFor", () => {
         hardLimit: 224_000,
         requestHeadroom: 32_000,
         keepRecentTokens: 44_800,
+        window: 256_000,
       });
   });
   it("derives an early automatic trigger while preserving the hard guard", () => {
@@ -35,17 +36,33 @@ describe("contextBudgetFor", () => {
     const trigger = automaticCompactionThresholdFor(limits);
 
     expect(AUTO_COMPACTION_TRIGGER_RATIO).toBe(0.5);
-    expect(trigger).toBe(48_000);
+    // A 128K window sits under the small-window ceiling, so the trigger comes
+    // from the floor ratio, not the plain one.
+    expect(trigger).toBe(72_000);
     expect(trigger).toBeLessThan(limits.hardLimit);
     expect(automaticCompactionThresholdFor({ hardLimit: 1 })).toBe(1);
   });
 
-  it("compacts at half the safe budget, so a long turn cannot re-send the window", () => {
-    // A 262,144-token window plans a 229,376 hard limit and compacts at half of it.
+  it("small windows compact at the Hermes floor ratio, large ones at the plain share", () => {
+    // 511,999 is the last window under the ceiling; 512,000 the first above it.
+    expect(
+      automaticCompactionThresholdFor({ hardLimit: 400_000, window: 511_999 }),
+    ).toBe(300_000);
+    expect(
+      automaticCompactionThresholdFor({ hardLimit: 400_000, window: 512_000 }),
+    ).toBe(200_000);
+    // A budget that carries no window keeps the plain ratio (callers that
+    // predate the window field, and the ceiling boundary itself).
+    expect(automaticCompactionThresholdFor({ hardLimit: 96_000 })).toBe(48_000);
+  });
+
+  it("compacts at three quarters of a small window's safe budget", () => {
+    // A 262,144-token window plans a 229,376 hard limit and compacts at the
+    // floor ratio of it, because the window is under the small-window ceiling.
     const limits = contextBudgetLimitsFor({ contextWindow: 262_144, maxTokens: 32_768 });
 
     expect(limits.hardLimit).toBe(229_376);
-    expect(automaticCompactionThresholdFor(limits)).toBe(114_688);
+    expect(automaticCompactionThresholdFor(limits)).toBe(172_032);
     // The retained tail still fits under the trigger, so a checkpoint keeps its window.
     expect(limits.keepRecentTokens).toBeLessThan(automaticCompactionThresholdFor(limits));
   });
@@ -73,6 +90,7 @@ describe("contextBudgetFor", () => {
         hardLimit: 16_000,
         requestHeadroom: 16_000,
         keepRecentTokens: 8_000,
+        window: 32_000,
       });
   });
 
@@ -84,6 +102,7 @@ describe("contextBudgetFor", () => {
         hardLimit: 47_616,
         requestHeadroom: 16_384,
         keepRecentTokens: 9_523,
+        window: 64_000,
       });
   });
 

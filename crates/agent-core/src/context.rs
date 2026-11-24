@@ -33,8 +33,16 @@ pub const COMPACTION_MIN_KEEP_RECENT_TOKENS: u64 = 8_000;
 pub const COMPACTION_MAX_KEEP_RECENT_TOKENS: u64 = 64_000;
 /// Cap on a user message carried across a compaction boundary.
 pub const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS: u64 = 20_000;
-/// Share of `hardLimit` that starts automatic compaction.
+/// Share of `hardLimit` that starts automatic compaction on large windows.
 pub const AUTO_COMPACTION_TRIGGER_RATIO: f64 = 0.5;
+/// Windows below this size compact at the floor ratio instead of the plain
+/// one, mirroring Hermes' threshold floor (`compression.threshold` floored at
+/// 0.75 for windows under 512K, raise-only). Half of a 256K window is only
+/// 128K, so a plain 0.5 trigger lets a long turn grow a small model's context
+/// far past the point where the reference would already have compacted; on
+/// million-token windows the plain ratio is already late enough.
+pub const AUTO_COMPACTION_SMALL_WINDOW_CEILING_TOKENS: u64 = 512_000;
+pub const AUTO_COMPACTION_SMALL_WINDOW_FLOOR_RATIO: f64 = 0.75;
 /// Character-per-token ratio used by the text estimator.
 pub const ESTIMATED_TEXT_CHARS_PER_TOKEN: f64 = 3.5;
 /// What one image costs in the same character currency.
@@ -169,10 +177,15 @@ impl ContextLimits {
         // room, so the min/max clamp above never wins on a small window.
         .min(std::cmp::max(1, hard_limit / 2));
 
-        let trigger = std::cmp::max(
-            1,
-            (hard_limit as f64 * AUTO_COMPACTION_TRIGGER_RATIO) as u64,
-        );
+        // Small windows compact at the floor ratio, not the plain share: the
+        // ratio is raised for sub-ceiling windows so a small model uses most
+        // of its real window before a checkpoint throws detail away.
+        let trigger_ratio = if window < AUTO_COMPACTION_SMALL_WINDOW_CEILING_TOKENS {
+            AUTO_COMPACTION_SMALL_WINDOW_FLOOR_RATIO
+        } else {
+            AUTO_COMPACTION_TRIGGER_RATIO
+        };
+        let trigger = std::cmp::max(1, (hard_limit as f64 * trigger_ratio) as u64);
         let retained_user_message_budget = std::cmp::max(
             1,
             COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS.min(hard_limit / 2),
@@ -366,7 +379,9 @@ mod tests {
         // max(16_384 floor, min(32_768 output, window/4 = 32_000), 6_400) = 32_000.
         assert_eq!(limits.request_headroom, 32_000);
         assert_eq!(limits.hard_limit, 96_000);
-        assert_eq!(limits.trigger, 48_000);
+        // A 128K window sits under the small-window ceiling, so the trigger is
+        // the floor ratio: 96,000 x 0.75, not the plain share.
+        assert_eq!(limits.trigger, 72_000);
         assert_eq!(limits.keep_recent_tokens, 19_200);
     }
 
@@ -377,10 +392,25 @@ mod tests {
         // floor = min(16_384, 4_096) = 4_096; output budget = min(8_192, 2_048).
         assert_eq!(limits.request_headroom, 4_096);
         assert_eq!(limits.hard_limit, 4_096);
-        assert_eq!(limits.trigger, 2_048);
+        // The trigger follows the floor ratio on this sub-ceiling window.
+        assert_eq!(limits.trigger, 3_072);
         // The tail never takes more than half the safe budget.
         assert_eq!(limits.keep_recent_tokens, 2_048);
         assert_eq!(limits.retained_user_message_budget, 2_048);
+    }
+
+    #[test]
+    fn the_trigger_ratio_splits_at_the_small_window_ceiling() {
+        // 511,999 is the last window under the ceiling; 512,000 the first above.
+        let under = ContextLimits::for_model(ModelLimits::new(511_999, 32_768));
+        assert_eq!(under.request_headroom, 32_768);
+        assert_eq!(under.hard_limit, 479_231);
+        assert_eq!(under.trigger, 359_423); // floor ratio: 479,231 x 0.75
+
+        let at = ContextLimits::for_model(ModelLimits::new(512_000, 32_768));
+        assert_eq!(at.request_headroom, 32_768);
+        assert_eq!(at.hard_limit, 479_232);
+        assert_eq!(at.trigger, 239_616); // plain share: 479,232 x 0.5
     }
 
     #[test]

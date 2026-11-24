@@ -95,24 +95,42 @@ function dedupeSort(models: DiscoveredModel[]): DiscoveredModel[] {
 }
 
 /**
- * The first positive safe integer a row of a model list states for a capacity,
- * reading the OpenAI/Anthropic and Google/Gemini spellings side by side the
- * way the service's own console does. Zero, fractional and missing values
- * state nothing: an endpoint that omits a capacity is not evidence it is
- * small, so nothing is guessed in its place.
+ * The first positive capacity a row of a model list states, reading the
+ * OpenAI/Anthropic and Google/Gemini spellings side by side the way the
+ * service's own console does. Numeric rows must be positive safe integers.
+ * String rows ("256K", "1000K", "1M", "131,072") are read as decimal
+ * multiples: underestimating a coarse vendor string is the safe direction —
+ * the budget then compacts before the real window instead of pushing a
+ * request past it. Zero, fractional and unparseable values state nothing: an
+ * endpoint that omits or garbles a capacity is not evidence it is small, so
+ * nothing is guessed in its place.
  */
-function firstPositiveInteger(row: Record<string, unknown> | null | undefined, keys: readonly string[]): number | undefined {
+function parseCapacityString(value: string): number | undefined {
+  const match = /^(\d+)\s*([kKmM])?$/.exec(value.trim().replace(/,/g, ""));
+  if (!match) return undefined;
+  const magnitude = Number(match[1]);
+  if (!Number.isSafeInteger(magnitude) || magnitude <= 0) return undefined;
+  const unit = match[2]?.toLowerCase();
+  const scaled = magnitude * (unit === "k" ? 1_000 : unit === "m" ? 1_000_000 : 1);
+  return Number.isSafeInteger(scaled) && scaled > 0 ? scaled : undefined;
+}
+
+function firstStatedCapacity(row: Record<string, unknown> | null | undefined, keys: readonly string[]): number | undefined {
   if (!row) return undefined;
   for (const key of keys) {
     const value = row[key];
     if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) return value;
+    if (typeof value === "string") {
+      const parsed = parseCapacityString(value);
+      if (parsed !== undefined) return parsed;
+    }
   }
   return undefined;
 }
 
 /** Context capacity the service itself stated on the row, or nothing. */
 function reportedContextWindow(row: Record<string, unknown> | null): number | undefined {
-  return firstPositiveInteger(row, [
+  return firstStatedCapacity(row, [
     "context_window",
     "context_length",
     "inputTokenLimit",
@@ -142,7 +160,7 @@ export function reportedModelLimits(row: unknown): {
 
 /** Output capacity the service itself stated on the row, or nothing. */
 function reportedMaxTokens(row: Record<string, unknown> | null): number | undefined {
-  return firstPositiveInteger(row, [
+  return firstStatedCapacity(row, [
     "max_output_tokens",
     "max_tokens",
     "outputTokenLimit",

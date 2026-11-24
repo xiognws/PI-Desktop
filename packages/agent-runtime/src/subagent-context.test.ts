@@ -309,13 +309,20 @@ describe("prepareDelegateTurnContext", () => {
       automaticCompactionThresholdFor(baseBudget),
     );
     const { factory, prompts } = summaryModels(() => summarySuccess("SUMMARY TEXT"));
+    // The trigger is a share of the safe budget, so the extra charge is sized
+    // from the deficit between the base estimate and the trigger rather than a
+    // magic literal: the pending task, the system prompt and the tool schemas
+    // have to carry the context past it, whatever ratio the budget formula uses
+    // (4 chars per token, under the estimator's 3.5, leaves headroom below the
+    // hard limit so this stays the threshold path, not the synchronous one).
+    const trigger = automaticCompactionThresholdFor(baseBudget);
 
     const outcome = await prepareDelegateTurnContext({
       messages,
       additionalMessages: [userMessage("Continue scanning.")],
       model: smallModel(),
       taskBrief,
-      systemPrompt: "s".repeat(2_600),
+      systemPrompt: "s".repeat((trigger - baseBudget.tokens) * 4),
       tools: [{ name: "Read", description: "t".repeat(800) }],
       retentionMode: "active_turn",
       summaryModels: factory,

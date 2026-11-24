@@ -42,7 +42,9 @@ function generousBudget(): ContextBudgetLimits {
 
 /** Limits with an exact hard limit, for truncation tests. */
 function budgetAt(hardLimit: number): ContextBudgetLimits {
-  return { hardLimit, requestHeadroom: 0, keepRecentTokens: 0 };
+  // window 0 keeps the caller's window out of the trigger: these tests pin
+  // truncation against the given hard limit, not the compaction ratio.
+  return { hardLimit, requestHeadroom: 0, keepRecentTokens: 0, window: 0 };
 }
 
 /** Estimated size of a seeded list, the same heuristic the truncation applies. */

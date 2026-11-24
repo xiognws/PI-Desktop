@@ -157,13 +157,16 @@ export class TurnTokenLedger {
  */
 export function turnTokenBudget(
   ledger: TurnTokenLedger,
-  budget: Pick<ContextBudget, "tokens" | "hardLimit">,
+  budget: Pick<ContextBudget, "tokens" | "hardLimit"> & { window?: number },
   options: { toolResultShare?: number; earlyTriggerFloor?: number } = {},
 ): TurnTokenBudget {
   const counters = ledger.snapshot();
   const contextTokens = Math.max(0, Math.round(budget.tokens));
   const hardLimitTokens = Math.max(1, Math.round(budget.hardLimit));
-  const thresholdTokens = automaticCompactionThresholdFor({ hardLimit: hardLimitTokens });
+  const thresholdTokens = automaticCompactionThresholdFor({
+    hardLimit: hardLimitTokens,
+    window: budget.window,
+  });
   const share = options.toolResultShare ?? TOOL_RESULT_SHARE_TRIGGER;
   const floor = options.earlyTriggerFloor ?? LEDGER_EARLY_TRIGGER_FLOOR;
   const toolResultShare = counters.toolResultTokens / hardLimitTokens;

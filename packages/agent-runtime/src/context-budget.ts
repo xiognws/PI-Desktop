@@ -62,8 +62,8 @@ export const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS = 20_000;
  *
  * `hardLimit` is the safety boundary: the next provider request must not be
  * issued while the context is at or above it. Automatic compaction starts at
- * 90% of that budget, inline at the next turn boundary; there is no
- * off-critical-path variant.
+ * a share of that budget (`AUTO_COMPACTION_*` below), inline at the next turn
+ * boundary; there is no off-critical-path variant.
  */
 export type ContextBudget = {
   /** Estimated tokens in the reconstructed model context. */
@@ -74,6 +74,8 @@ export type ContextBudget = {
   requestHeadroom: number;
   /** Approximate recent-context tokens a checkpoint should retain. */
   keepRecentTokens: number;
+  /** Model window these thresholds derive from, after the package fallback. */
+  window: number;
 };
 
 /**
@@ -92,13 +94,36 @@ export type ContextBudget = {
 export const AUTO_COMPACTION_TRIGGER_RATIO = 0.5;
 
 /**
+ * Windows at or below this size compact at the floor ratio instead of the
+ * plain one, mirroring Hermes' threshold floor (`compression.threshold`
+ * floored at 0.75 for windows under 512K, raise-only). Half of a 256K window
+ * is only 128K, so a plain 0.5 trigger lets a long turn grow a small model's
+ * context far past the point where the reference would already have compacted;
+ * on million-token windows the plain ratio is already late enough.
+ */
+export const AUTO_COMPACTION_SMALL_WINDOW_CEILING_TOKENS = 512_000;
+export const AUTO_COMPACTION_SMALL_WINDOW_FLOOR_RATIO = 0.75;
+
+/**
  * Start compaction before the hard boundary so estimator drift and one-turn
  * growth do not leave the provider request as the first overflow detector.
+ *
+ * When the model window is known and small, the share comes from the floor
+ * ratio instead: the trigger is computed off the safety budget, which is the
+ * window minus headroom, so carrying the window alongside (`ContextBudget`)
+ * is what lets the threshold see it.
  */
 export function automaticCompactionThresholdFor(
-  budget: Pick<ContextBudget, "hardLimit">,
+  budget: Pick<ContextBudget, "hardLimit"> & { window?: number },
 ): number {
-  return Math.max(1, Math.floor(budget.hardLimit * AUTO_COMPACTION_TRIGGER_RATIO));
+  const smallWindow =
+    budget.window !== undefined &&
+    budget.window > 0 &&
+    budget.window < AUTO_COMPACTION_SMALL_WINDOW_CEILING_TOKENS;
+  const ratio = smallWindow
+    ? AUTO_COMPACTION_SMALL_WINDOW_FLOOR_RATIO
+    : AUTO_COMPACTION_TRIGGER_RATIO;
+  return Math.max(1, Math.floor(budget.hardLimit * ratio));
 }
 
 /**
@@ -166,7 +191,7 @@ export function contextBudgetLimitsFor(
     // no room, so the min/max clamp above never wins on a small window.
     Math.max(1, Math.floor(hardLimit * 0.5)),
   );
-  return { hardLimit, requestHeadroom, keepRecentTokens };
+  return { hardLimit, requestHeadroom, keepRecentTokens, window: contextWindow };
 }
 
 /**

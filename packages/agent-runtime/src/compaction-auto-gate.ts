@@ -45,7 +45,7 @@ export type AutomaticCompactionGate = {
 export type AutomaticCompactionGateInput = {
   ledger: TurnTokenLedger;
   /** The estimate for the next request, as `contextBudget()` produced it. */
-  budget: Pick<ContextBudget, "tokens" | "hardLimit">;
+  budget: Pick<ContextBudget, "tokens" | "hardLimit"> & { window?: number };
   cooldowns: CompressionFailureCooldownStore;
   sessionId: string;
   /** Evaluation clock, epoch ms. Injected so expiry is testable. */
