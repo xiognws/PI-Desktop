@@ -45,7 +45,7 @@ export type PreviousRunEvidence =
 
 export type PreviousRunInput = {
   /** The marker file from the previous launch, or null when it was cleared. */
-  marker: { pid: number; startedAt: string; version: string } | null;
+  marker: { pid: number; startedAt: string; version: string; lastSeenAt?: string } | null;
   /** `exit-reasons.log` tail: the most recent deliberate `app.exit()` reason. */
   lastExitReason: { at: string; reason: string } | null;
   /**
@@ -108,6 +108,9 @@ export function judgePreviousRun(input: PreviousRunInput): PreviousRunVerdict {
     pid: marker.pid,
     startedAt: marker.startedAt,
     version: marker.version,
+    // The heartbeat's last beat: it turns "it died somewhere in this run" into a
+    // bounded window a reader can line up against an OS event or a user's account.
+    ...(marker.lastSeenAt ? { lastSeenAt: marker.lastSeenAt } : {}),
   };
 
   // A dump from the browser process, or a fatal record from the main process,

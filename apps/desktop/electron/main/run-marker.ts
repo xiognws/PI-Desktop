@@ -25,7 +25,20 @@ export type RunMarker = {
   /** Local time with the machine's offset, matching the log stamps. */
   startedAt: string;
   version: string;
+  /**
+   * The last time this run was known to be alive, refreshed on a heartbeat.
+   *
+   * `killed` is the verdict that says least: a run that vanished at boot and one
+   * that vanished after three hours of work read identically, and the reader has
+   * nothing to line up against a user's recollection or an OS event. A heartbeat
+   * turns that into a bounded window. It is best-effort and absent on markers
+   * written by older builds — a verifier must treat it as optional.
+   */
+  lastSeenAt?: string;
 };
+
+/** How often the marker is refreshed. Short enough to bound a death to a minute. */
+export const RUN_MARKER_HEARTBEAT_MS = 15_000;
 
 const RUN_MARKER_FILE = "run-marker.json";
 
@@ -59,6 +72,9 @@ export function parseRunMarker(raw: string): RunMarker | null {
     pid: candidate.pid,
     startedAt: candidate.startedAt,
     version: typeof candidate.version === "string" ? candidate.version : "unknown",
+    ...(typeof candidate.lastSeenAt === "string" && candidate.lastSeenAt !== ""
+      ? { lastSeenAt: candidate.lastSeenAt }
+      : {}),
   };
 }
 
@@ -76,20 +92,54 @@ export function readRunMarker(): RunMarker | null {
 /** Best effort: losing the breadcrumb must never stop the app from starting. */
 export function writeRunMarker(version: string): void {
   if (!markerDirectory) return;
+  if (!marker) marker = { pid: process.pid, startedAt: localTimestamp(), version };
+  writeMarker(marker);
+}
+
+/** The identity of this run, kept so a heartbeat does not rewrite the start time. */
+let marker: RunMarker | null = null;
+let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+function writeMarker(next: RunMarker): void {
+  if (!markerDirectory) return;
   try {
     mkdirSync(markerDirectory, { recursive: true });
-    writeFileSync(
-      runMarkerPath(markerDirectory),
-      JSON.stringify({ pid: process.pid, startedAt: localTimestamp(), version } satisfies RunMarker),
-      "utf8",
-    );
+    writeFileSync(runMarkerPath(markerDirectory), JSON.stringify(next), "utf8");
   } catch {
     // A read-only data directory already fails loudly elsewhere.
   }
 }
 
+/**
+ * Refresh `lastSeenAt` while the run is alive.
+ *
+ * The timer is `unref`d: a heartbeat must never be the reason the process stays
+ * up. Writing the same small file every 15 seconds costs one cached page.
+ */
+export function startRunMarkerHeartbeat(
+  intervalMs: number = RUN_MARKER_HEARTBEAT_MS,
+): void {
+  if (!marker || heartbeat) return;
+  const beat = () => {
+    if (!marker) return;
+    marker = { ...marker, lastSeenAt: localTimestamp() };
+    writeMarker(marker);
+  };
+  beat();
+  heartbeat = setInterval(beat, intervalMs);
+  heartbeat.unref?.();
+}
+
+/** Stop the heartbeat. The marker itself is cleared by the quit path. */
+export function stopRunMarkerHeartbeat(): void {
+  if (heartbeat) clearInterval(heartbeat);
+  heartbeat = null;
+}
+
 /** Called once the quit is confirmed; a later start must not report this run. */
 export function clearRunMarker(): void {
+  stopRunMarkerHeartbeat();
+  marker = null;
   if (!markerDirectory) return;
   try {
     rmSync(runMarkerPath(markerDirectory), { force: true });
@@ -106,7 +156,10 @@ export function clearRunMarker(): void {
  */
 export function describeUnfinishedRun(previous: RunMarker | null): string | null {
   if (!previous) return null;
-  return `previous run ended without a graceful quit (pid ${previous.pid}, started ${previous.startedAt}, version ${previous.version})`;
+  // "last seen" is the only witness a killed process leaves: it bounds the death
+  // to the heartbeat interval instead of leaving it anywhere in the run.
+  const seen = previous.lastSeenAt ? `, last seen ${previous.lastSeenAt}` : "";
+  return `previous run ended without a graceful quit (pid ${previous.pid}, started ${previous.startedAt}${seen}, version ${previous.version})`;
 }
 
 /**

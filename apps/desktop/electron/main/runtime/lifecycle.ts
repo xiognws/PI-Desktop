@@ -22,6 +22,7 @@ import {
   readRunMarker,
   setRunMarkerDirectory,
   writeRunMarker,
+  startRunMarkerHeartbeat,
 } from "../run-marker.js";
 import { countCrashDumpsSince } from "../crash-report.js";
 import { judgePreviousRun, previousRunVerdictLevel } from "../run-verdict.js";
@@ -269,6 +270,9 @@ export function createRuntimeLifecycle({
       });
     }
     writeRunMarker(APP_VERSION);
+    // From here the run is alive, and it keeps saying so: without the beat a hard
+    // kill is indistinguishable from a boot that never finished.
+    startRunMarkerHeartbeat();
     try {
       await startHost();
     } catch (error) {

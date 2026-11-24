@@ -16,6 +16,8 @@ const {
   setRunMarkerDirectory,
   writeRunMarker,
   clearRunMarker,
+  startRunMarkerHeartbeat,
+  stopRunMarkerHeartbeat,
 } = await import("../electron/main/run-marker.ts");
 
 function withDirectory(run) {
@@ -91,4 +93,32 @@ test("the marker helpers do nothing when no directory is known", () => {
   assert.doesNotThrow(() => writeRunMarker("0.21.0"));
   assert.doesNotThrow(() => recordExitReason("nowhere"));
   assert.doesNotThrow(() => clearRunMarker());
+});
+
+test("a killed run leaves the last time it was alive compacted to one heartbeat", () => {
+  withDirectory((directory) => {
+    writeRunMarker("0.0.0-test");
+    // Before the beat there is no witness, and the wording must not pretend there is.
+    assert.doesNotMatch(describeUnfinishedRun(readRunMarker()), /last seen/);
+
+    // The beat writes once immediately, so this needs no timer and no sleep.
+    startRunMarkerHeartbeat(5);
+    try {
+      const marker = readRunMarker();
+      assert.ok(marker?.lastSeenAt, "the heartbeat must record when the run was last alive");
+      assert.equal(
+        parseRunMarker(readFileSync(runMarkerPath(directory), "utf8"))?.lastSeenAt,
+        marker.lastSeenAt,
+      );
+      assert.match(describeUnfinishedRun(marker), /last seen \d{4}-\d{2}-\d{2}T/);
+    } finally {
+      stopRunMarkerHeartbeat();
+    }
+
+    // A marker from an older build has no lastSeenAt and still reads correctly.
+    assert.doesNotMatch(
+      describeUnfinishedRun({ pid: 1, startedAt: "2026-01-01T00:00:00.000+08:00", version: "0.0.0" }),
+      /last seen/,
+    );
+  });
 });
