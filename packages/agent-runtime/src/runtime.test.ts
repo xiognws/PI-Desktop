@@ -1553,6 +1553,8 @@ describe("custom system prompt files (issue #542)", () => {
     // to say that independent reads belong together, and that a sequential tool
     // (Bash, skills, plugins) would drag the whole batch back to one at a time.
     expect(prompt).toContain("Batching: when several reads, searches or lookups do not depend on each other");
+    // Anti-pattern the endpoint agent scores: the work passed as a quoted blob.
+    expect(prompt).toContain("Put real work in a file");
     expect(prompt).toContain("A batch that also holds a sequential tool (Bash, skills, plugins) runs one call at a time");
     expect(prompt).toContain("You are operating in Agent mode.");
 

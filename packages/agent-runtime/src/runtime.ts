@@ -6,7 +6,11 @@ import {
   mutationTerminationAdvice, mutationTerminationMessage,
 } from "./mutation-recovery.js";
 import { DESKTOP_AGENT_IDENTITY } from "./agent-identity.js";
+
+/** Tools whose second identical call cannot mean anything different. */
+const REPEAT_GUARDED_TOOLS = new Set(["Read", "Glob", "Grep", "Skill"]);
 import { resolveMcpToolSelection } from "./mcp-tool-selection.js";
+import { RepeatedToolCallGuard } from "./repeated-tool-call.js";
 import { concreteResponseModel } from "./response-model.js";
 import { BatchPlanner, withBatchTurn } from "./batch-planner.js";
 import { TOOL_EXECUTION_SPECS, resolveBatchExecutionMode, toolExecutionMode, withDynamicTaskExecutionMode } from "./tool-execution-policy.js";
@@ -1534,6 +1538,17 @@ export function formatScratchDirForShell(
 const FEWER_SHELL_SPAWNS_GUIDANCE =
   "Never inspect files through the shell: read with Read, locate with Glob, search with Grep, and write with Write or Edit, instead of running cat, head, tail, ls, dir, find, grep, rg, sed -n or wc. When several shell steps are genuinely needed, send them as one multi-line script in a single call rather than one call per step: every call starts a new shell process.";
 
+/**
+ * Where the work should live: a file, not a quoted argument list.
+ *
+ * Multi-line shell commands are already carried by a temporary script file, so
+ * this mainly governs the other interpreters: `python -c "<a page of code>"` is
+ * fragile to quote, invisible in a transcript, and is the exact shape behaviour
+ * based endpoint protection scores as a downloaded payload being executed.
+ */
+const SCRIPT_FILE_GUIDANCE =
+  "Put real work in a file: for anything beyond one or two quick steps, write a .py (or .sh/.ps1) file under the scratch directory and run it by path, instead of passing the code as a quoted argument to python -c or an interpreter flag. Keep the command line short enough that a human can read it in a process list.";
+
 export function commandShellGuidance(
   shell: CommandShellOption,
   scratchDir?: string,
@@ -1550,6 +1565,7 @@ export function commandShellGuidance(
     // Fewer calls, fewer processes: each call pays a shell start-up and shows
     // the operating system one more "application spawns an interpreter" step.
     FEWER_SHELL_SPAWNS_GUIDANCE,
+    SCRIPT_FILE_GUIDANCE,
   ].join(" ");
 }
 
@@ -3021,7 +3037,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   }
 
   private setAgentTools(tools: AgentTool[]): void {
-    this.agent.state.tools = this.declarationPolicy?.tools ?? tools;
+    this.agent.state.tools =
+      this.declarationPolicy?.tools ?? tools.map((tool) => this.guardRepeatedTool(tool));
     if (this.trackToolActivation && this.declarationPolicy) {
       const section = toolActivationSection(this.declarationPolicy.key, this.activeDeferredToolNames);
       this.composedSections = { ...this.composedSections, [TOOL_ACTIVATION_SECTION]: section };
@@ -5050,6 +5067,54 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
    * declarations. Execution activation and Host permissions remain separate
    * from the provider-visible schemas.
    */
+  /** Session memory of read-only calls, so an upstream duplicate is not re-run. */
+  private repeatedCalls = new RepeatedToolCallGuard();
+
+  /**
+   * Refuse a repeated read-only call.
+   *
+   * Duplicates arrive from outside this process: a proxy can put the same
+   * `tool_calls` entry into one response twice, and Pi runs `Read`/`Glob`/`Grep`
+   * in parallel, so both copies execute before either result exists. The guard
+   * reserves before execution, answers the second copy from the first answer and
+   * refuses the third, which keeps a stateless model from re-asking the same
+   * question for the same empty result.
+   *
+   * Only read-only tools are guarded: a repeated `Bash` or `Write` may be
+   * deliberate and may have side effects, so it is always executed.
+   */
+  private guardRepeatedTool(tool: AgentTool): AgentTool {
+    if (!REPEAT_GUARDED_TOOLS.has(tool.name)) return tool;
+    return {
+      ...tool,
+      execute: async (id, args, signal, update) => {
+        const verdict = this.repeatedCalls.reserve(tool.name, args);
+        if (verdict.kind === "refused") {
+          return {
+            content: [{ type: "text", text: `${verdict.notice}\n\n${verdict.previous}` }],
+            details: {},
+            isError: true,
+          };
+        }
+        if (verdict.kind === "duplicate") {
+          const text = verdict.reason === "in-flight"
+            ? verdict.notice
+            : `${verdict.notice}\n\n${verdict.previous}`;
+          return { content: [{ type: "text", text }], details: {} };
+        }
+        try {
+          const result = await tool.execute(id, args, signal, update);
+          this.repeatedCalls.record(tool.name, args, result?.content ?? result);
+          return result;
+        } catch (error) {
+          // The call produced no answer, so a real retry must not be blocked.
+          this.repeatedCalls.release(tool.name, args);
+          throw error;
+        }
+      },
+    };
+  }
+
   private guardSteeredTool(tool: AgentTool): AgentTool {
     return { ...tool, execute: async (id, args, signal, update) => {
       if (tool.name !== SUBAGENT_WAIT_TOOL_NAME && this.pendingSteering.size &&
@@ -7565,6 +7630,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       parameters: Type.Object({}),
       execute: async () => {
         this.pendingModelCompaction = true;
+        // A new window drops the earlier answers from the model's working set, so
+        // the same call is no longer a repeat.
+        this.repeatedCalls.reset();
         return {
           content: [
             {
@@ -8091,6 +8159,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
   setCompactionSettings(settings?: ContextCompactionSettings): void {
     this.compactionEnabled = compactionEnabled(settings);
     this.pendingModelCompaction = false;
+    this.repeatedCalls.reset();
     this.rebuildToolCatalog();
     this.setAgentTools(this.activeTools());
   }
