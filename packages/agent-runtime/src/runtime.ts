@@ -2649,7 +2649,6 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
       finishTurn: async (turn) => {
         this.recordTurnVerdict(turn);
         const { message } = turn;
-        if (!this.gracefulStopRequested) return;
         if (message.stopReason === "error" || message.stopReason === "aborted") return;
         // A paused run's turn has used its wrap-up requests (ADR mode-definitions).
         if (this.modeState.closeoutExhausted()) return { action: "end" };
