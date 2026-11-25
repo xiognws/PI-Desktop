@@ -62,6 +62,9 @@ function fixture(call = vi.fn(async (_method: string, _params?: any): Promise<an
   const runtime = new DesktopAgentRuntime({
     host: { call, onNotification: () => () => {} } as never,
     sessionId: "delegate-boundaries", mode: "agent", thinkingLevel: "off", provider,
+    // A review fork replays a tail of the transcript, which still contains the
+    // parent prompt this test counts requests by.
+    skillReview: { enabled: false },
     commandShell: { id: "bash", label: "Bash", dialect: "posix", available: true, isDefault: true },
     subagents: [definition("inherited")],
     onEvent: (event) => events.push(event),

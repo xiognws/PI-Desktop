@@ -89,6 +89,9 @@ function fixture(steps: Step[], retryAfterMs = 1) {
   const runtime = new DesktopAgentRuntime({
     sessionId: "fixture-session",
     mode: "agent",
+    // The step script is exactly as long as the turn; the skill-review fork would
+    // spend a request the script has no response for.
+    skillReview: { enabled: false },
     provider,
     thinkingLevel: "off",
     commandShell: {

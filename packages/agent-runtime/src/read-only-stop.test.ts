@@ -41,6 +41,9 @@ function fixture(toolName: ToolName) {
   }));
   const runtime = new DesktopAgentRuntime({
     sessionId: "stop-fixture", mode: "agent", thinkingLevel: "off",
+    // The post-turn skill review forks its own provider requests; this fixture
+    // budgets two for the turn itself, so the fork must stay off.
+    skillReview: { enabled: false },
     provider: { id: "fixture", name: "Fixture", modelId: "fixture-model",
       baseUrl: "http://provider.invalid/v1", apiKey: "fixture-only", apiStyle: "chat_completions",
       supportsReasoning: false, supportedThinkingLevels: ["off"] },

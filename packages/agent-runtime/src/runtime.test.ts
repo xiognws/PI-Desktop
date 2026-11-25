@@ -300,7 +300,7 @@ describe("structured memory wiring (ADR 0393)", () => {
     ]);
     // The description is the whole contract a model gets; it must name the gate.
     expect(tool.description).toContain("MEMORY_PROCEDURE_NEEDS_SKILL");
-    expect(tool.description).toContain("belongs in a skill");
+    expect(tool.description).toContain("is a skill, not a memory");
   });
 });
 
