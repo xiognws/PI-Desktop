@@ -1,0 +1,18 @@
+packages/shared/src/protocol.test.ts
+  h_201ed4c689ac8b 84-85
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 533
+packages/shared/src/types/messages.ts
+  h_201ed4c689ac8b 70-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5228a727c3b0fdcd8c841f11a6c3bfa5b64ff1a0",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
