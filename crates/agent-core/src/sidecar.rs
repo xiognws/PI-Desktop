@@ -1120,6 +1120,15 @@ impl Sidecar {
             .or(config.system.as_deref());
         inputs.skills = skills;
         inputs.tool_activation = tool_activation;
+        // `smartTurn.tier` is the host's own routing decision. Only the strong
+        // half is told to orchestrate: the cheap half is the one executing.
+        inputs.smart_orchestrator = request
+            .params
+            .get("smartTurn")
+            .and_then(|turn| turn.get("tier"))
+            .and_then(serde_json::Value::as_str)
+            .filter(|tier| *tier == "main")
+            .map(|_| crate::prompt::smart::SMART_ORCHESTRATOR);
         // The host resolves both of these — it reads the files, applies its byte caps
         // and knows the workspace — so the kernel must not re-read them; it only has to
         // stop dropping what it was handed.

@@ -21,6 +21,7 @@
 
 pub mod instructions;
 pub mod modes;
+pub mod smart;
 
 use std::sync::Arc;
 
@@ -104,6 +105,10 @@ pub struct PromptInputs<'a> {
     /// a tool that is deferred but unlisted is a tool the model will never call,
     /// so the list is part of the prompt, not an appendix to it.
     pub tool_activation: Option<&'a str>,
+    /// Set when the host routed this turn to the strong half of a smart pair.
+    /// The text is [`smart::SMART_ORCHESTRATOR`]; the kernel only decides whether
+    /// the section belongs in this prompt.
+    pub smart_orchestrator: Option<&'a str>,
 }
 
 impl PromptInputs<'_> {
@@ -121,6 +126,7 @@ impl PromptInputs<'_> {
             project: None,
             skills: &[],
             tool_activation: None,
+            smart_orchestrator: None,
         }
     }
 }
@@ -229,6 +235,17 @@ pub fn compose_system_prompt(inputs: &PromptInputs<'_>) -> ComposedPrompt {
         sections.push(PromptSection {
             name: crate::tool_activation::TOOL_ACTIVATION_SECTION,
             text: activation.to_string(),
+        });
+    }
+
+    if let Some(orchestrator) = inputs
+        .smart_orchestrator
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    {
+        sections.push(PromptSection {
+            name: smart::SMART_ORCHESTRATOR_SECTION,
+            text: orchestrator.to_string(),
         });
     }
 
@@ -447,5 +464,40 @@ mod tests {
         assert!(composed.system.starts_with(DEFAULT_RUNTIME_SYSTEM_PROMPT));
         assert!(composed.section("context").is_none());
         assert!(composed.system.contains("Agent mode"));
+    }
+
+    #[test]
+    fn the_orchestrator_section_appears_only_when_the_host_asks_for_it() {
+        let fs = files(&[]);
+        let mut inputs = PromptInputs::new(Some("/w"));
+        let plain = build_system_prompt(&fs, &inputs);
+        assert!(plain.section(smart::SMART_ORCHESTRATOR_SECTION).is_none());
+
+        inputs.smart_orchestrator = Some(smart::SMART_ORCHESTRATOR);
+        let orchestrating = build_system_prompt(&fs, &inputs);
+        let section = orchestrating
+            .section(smart::SMART_ORCHESTRATOR_SECTION)
+            .expect("orchestrator section");
+        // The two halves of the instruction that make the pair save anything:
+        // hand mechanical steps over, and check what comes back.
+        assert!(section.contains("`Task`"));
+        assert!(section.contains("verify it against that step's goal"));
+        // Last, like activation: the tier changes and must not invalidate the
+        // cached prefix of the sections before it.
+        assert_eq!(
+            orchestrating.sections.last().map(|section| section.name),
+            Some(smart::SMART_ORCHESTRATOR_SECTION)
+        );
+    }
+
+    #[test]
+    fn a_whitespace_orchestrator_value_is_not_a_section() {
+        let fs = files(&[]);
+        let mut inputs = PromptInputs::new(Some("/w"));
+        inputs.smart_orchestrator = Some("   \n  ");
+        let composed = build_system_prompt(&fs, &inputs);
+        assert!(composed
+            .section(smart::SMART_ORCHESTRATOR_SECTION)
+            .is_none());
     }
 }

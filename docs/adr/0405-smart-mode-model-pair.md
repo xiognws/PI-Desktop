@@ -72,6 +72,37 @@ which is what made `host-core` build again). Read those two commits together
 when bisecting this decision; the pre-relabel SHAs `49b46c649` and `10e37dc01`
 appear only in older checkouts of this branch.
 
+## Amendment 2026-11-25 — sub-first routing, strong half orchestrates
+
+The first cut ran quality rules before cheap rules, which put the strong half in
+front of most real turns: a shell command, a file path, a first turn or a 700
+character prompt each argued for `main`, and the cheap half mostly served
+delegates. Measured against a session of ordinary requests that split was closer
+to the reverse of what the pair is for.
+
+Two changes, in this order of importance:
+
+1. **Sub-first routing.** The strong half is now paid for judgement
+   (`HEAVY_INTENT`), for a prompt too large to be a quick exchange
+   (`mainPromptChars`), for attachments, for a staged plan/goal run, and for the
+   turn after an escalation. Code markers, file paths, tool verbs, tool
+   follow-ups and the first turn start on `sub`; a turn that stalls escalates
+   inside itself, which costs one hand-over rather than a strong turn up front on
+   every mechanical request. `HEAVY_INTENT` also lost the words that describe
+   ordinary work ("implement", "feature", "analy", "实现", "开发", "功能",
+   "修复", "分析", "方案") because matching them made most requests look hard.
+2. **The strong half orchestrates.** A `main` turn now carries a
+   `smart_orchestrator` prompt section: state the goal, decompose into verifiable
+   steps, hand the mechanical ones to `sub` through `Task`, verify each result
+   before the next step, and correct or take over a step that stalls. The section
+   is appended last, so switching tiers never invalidates the cached prefix.
+
+What this costs: a misclassified hard turn now starts cheap and pays for one
+hand-over (the sub model's tokens plus a re-send of the transcript) instead of
+being right the first time. What it buys: the strong half becomes an orchestrator
+whose own tokens are spent on judgement, and the bulk of tool work runs on the
+cheap half — the split the pair exists for.
+
 ## Consequences
 
 - New optional column `sessions.smart_mode_json` (v33→v34, additive, NULL=off) and

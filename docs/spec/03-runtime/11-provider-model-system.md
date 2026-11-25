@@ -954,9 +954,25 @@ answers; `sub` takes mechanical turns and delegated work. ADR 0405.
   The composer's `Smart mode` entry exists only when both halves are configured,
   and writes a snapshot into `sessions.smart_mode_json`. Picking a plain model
   clears it. A snapshot never follows later settings edits.
-- **Routing.** `decideTurnTier` is deterministic and adds no request: attachments,
-  staged mode, sticky escalation, first turn, prompt length, code markers, and two
-  intent lexicons decide the tier. Quality rules run before cheap rules.
+- **Routing.** `decideTurnTier` is deterministic and adds no request. The default
+  is sub-first: the strong half is paid for a prompt that asks for judgement
+  (`HEAVY_INTENT`), for a job too large to be a quick exchange
+  (`mainPromptChars`, default 1800), for attachments (vision), for a staged
+  plan/goal run, or for the turn after an escalation (`stickyMain`). The first
+  turn, code markers and file paths, tool verbs, and tool follow-ups all start on
+  `sub`, because a small model that stalls escalates inside the turn; the target
+  split is roughly one strong turn in five. `simplePromptChars` keeps its own
+  meaning (above it a turn is never a *simple* turn) but no longer sends the turn
+  to the strong half by itself.
+- **Orchestration.** A turn routed to `main` is the orchestrating half, and the
+  kernel says so: `sidecar` reads `smartTurn.tier` and adds the
+  `smart_orchestrator` prompt section (`crates/agent-core/src/prompt/smart.rs`).
+  It instructs the strong model to state the goal, decompose the work into
+  verifiable steps, hand every mechanical step to `sub` through `Task` (no
+  `model` argument), check each result against its step's goal, and correct or
+  take over a stalled step instead of re-sending the same instruction. The
+  section is last in the prompt, like tool activation, so a tier change cannot
+  invalidate the cached prefix of the sections before it.
 - **Delegation.** The pair's `sub` binding enters the delegation catalog without
   the model's own `availableForSubagents` opt-in, and `delegationDefaultModel`
   makes `Task` without `model` run on it. An explicit `Task.model` still wins and

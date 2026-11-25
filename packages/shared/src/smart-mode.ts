@@ -46,7 +46,7 @@ export type SmartRouteReason =
   | "attachments"
   /** A staged plan/goal run: the run's own definition decides, not the router. */
   | "staged-mode"
-  /** The first turn of a session orients it; the strong model does that. */
+  /** The first turn of a session is usually an instruction, not a hard task. */
   | "first-turn"
   /** A recent turn escalated, so the next one starts strong. */
   | "sticky-main"
@@ -60,6 +60,10 @@ export type SmartRouteReason =
   | "heavy-intent"
   /** Words that ask for a mechanical transformation, with no tool intent. */
   | "mechanical-intent"
+  /** Words that will need tools; a small model can run them, and escalate if stuck. */
+  | "tool-intent"
+  /** The previous turn used tools, so this one continues that work. */
+  | "tool-followup"
   /** Short, no tool intent, and the previous turn needed no tools either. */
   | "simple-turn"
   /** Nothing argued for the cheap model, so quality wins. */
@@ -80,14 +84,23 @@ export type SmartModePolicy = {
   stickyMainTurns: number;
   /** Character count above which a prompt is never a "simple turn". */
   simplePromptChars: number;
+  /**
+   * Character count above which the turn goes to the strong model no matter what
+   * the words say. Separate from `simplePromptChars` because length alone is not
+   * difficulty: a two-line prompt that asks for a 300-line file is the hard case,
+   * and a long paste that says "summarize" is not.
+   */
+  mainPromptChars: number;
   /** `Task` without `model` runs the delegate on the sub model. */
   delegateToSub: boolean;
 };
 
 /**
- * The defaults are deliberately conservative on quality and aggressive on
- * tokens: a short prompt with no tool intent is the cheapest kind of turn, and
- * two tool failures in a row is already a stuck turn.
+ * The defaults are deliberately sub-first: the strong model is paid for a prompt
+ * that asks for judgement (refactor, debug, architecture), for a job too large to
+ * be a quick exchange, or for a turn the cheap model has already stalled on. Every
+ * other turn starts cheap and escalates by itself if it gets stuck, which is what
+ * keeps the split near one strong turn in five.
  */
 export const DEFAULT_SMART_POLICY: SmartModePolicy = {
   turnRouting: true,
@@ -95,6 +108,7 @@ export const DEFAULT_SMART_POLICY: SmartModePolicy = {
   escalateAfterBudgetUsed: 0.6,
   stickyMainTurns: 1,
   simplePromptChars: 600,
+  mainPromptChars: 1800,
   delegateToSub: true,
 };
 
@@ -172,6 +186,9 @@ export function normalizeSmartPolicy(input?: Partial<SmartModePolicy> | null): S
     ),
     simplePromptChars: Math.round(
       clamp(finiteOr(source.simplePromptChars, DEFAULT_SMART_POLICY.simplePromptChars), 80, 20000),
+    ),
+    mainPromptChars: Math.round(
+      clamp(finiteOr(source.mainPromptChars, DEFAULT_SMART_POLICY.mainPromptChars), 200, 40000),
     ),
     delegateToSub: source.delegateToSub ?? DEFAULT_SMART_POLICY.delegateToSub,
   };
@@ -273,11 +290,11 @@ export type SmartTurnDecision = {
  * and every hit is reported with its reason code.
  */
 const HEAVY_INTENT = [
-  "refactor", "architect", "architecture", "design", "debug", "root cause", "diagnose",
-  "why does", "why is", "review", "optimi", "migrat", "trade-off", "tradeoff", "plan",
-  "strategy", "prove", "analy", "implement", "feature", "security", "concurren",
-  "重构", "架构", "设计", "排查", "定位", "为什么", "根因", "评审", "优化", "迁移", "方案",
-  "权衡", "规划", "分析", "实现", "开发", "功能", "安全", "并发", "修复",
+  "refactor", "architect", "design", "debug", "root cause", "diagnose",
+  "why does", "review", "optimi", "migrat", "trade-off", "tradeoff", "strategy",
+  "security", "concurren",
+  "重构", "架构", "设计", "排查", "定位", "为什么", "根因", "评审", "优化", "迁移",
+  "权衡", "规划", "安全", "并发",
 ] as const;
 
 /** Prompts that ask for a transformation with no judgement involved. */
@@ -334,31 +351,45 @@ export function decideTurnTier(
   if (signals.stickyMain > 0) {
     return useMain("sticky-main");
   }
-  if (signals.turnIndex <= 0) {
-    return useMain("first-turn");
-  }
 
   const prompt = signals.prompt ?? "";
   const text = prompt.toLowerCase();
-  if (prompt.length > policy.simplePromptChars) {
+  // Only a prompt too large to be a quick exchange is quality work by size alone;
+  // length is not difficulty, and a cheap turn that stalls escalates by itself.
+  if (prompt.length > policy.mainPromptChars) {
     return degraded("long-prompt");
-  }
-  if (containsAny(prompt, CODE_MARKERS) || FILE_PATH.test(prompt)) {
-    return degraded("code-prompt");
   }
   if (containsAny(text, HEAVY_INTENT)) {
     return degraded("heavy-intent");
   }
-  if (containsAny(text, MECHANICAL_INTENT) && !containsAny(text, TOOL_INTENT)) {
+  // Everything below starts cheap. The pair's whole point is that the strong half
+  // is paid for judgement, not for running commands: a small model that gets stuck
+  // escalates inside the turn, which costs one hand-over instead of a strong turn
+  // up front on every mechanical request.
+  if (containsAny(text, MECHANICAL_INTENT)) {
     return signals.subAvailable
       ? { tier: "sub", reason: "mechanical-intent" }
       : degraded("mechanical-intent");
   }
+  if (containsAny(prompt, CODE_MARKERS) || FILE_PATH.test(prompt)) {
+    return signals.subAvailable
+      ? { tier: "sub", reason: "code-prompt" }
+      : degraded("code-prompt");
+  }
   if (containsAny(text, TOOL_INTENT)) {
-    return degraded("default-main");
+    return signals.subAvailable
+      ? { tier: "sub", reason: "tool-intent" }
+      : degraded("tool-intent");
+  }
+  if (signals.turnIndex <= 0) {
+    return signals.subAvailable
+      ? { tier: "sub", reason: "first-turn" }
+      : degraded("first-turn");
   }
   if (signals.previousTurnUsedTools) {
-    return degraded("default-main");
+    return signals.subAvailable
+      ? { tier: "sub", reason: "tool-followup" }
+      : degraded("tool-followup");
   }
   return signals.subAvailable
     ? { tier: "sub", reason: "simple-turn" }

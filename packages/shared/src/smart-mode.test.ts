@@ -69,7 +69,7 @@ describe("smart mode policy normalization", () => {
 describe("turn routing", () => {
   const cases: Array<[string, Partial<SmartTurnSignals>, string]> = [
     ["an explicit tier outranks every rule", { override: "sub", prompt: "重构整个模块" }, "sub"],
-    ["the first turn orients the session", { turnIndex: 0, prompt: "你好" }, "main"],
+    ["the first turn starts cheap", { turnIndex: 0, prompt: "你好" }, "sub"],
     ["attachments need a model that reads them", { attachments: 2, prompt: "这是什么" }, "main"],
     ["a staged run owns its own definition", { stagedMode: true, prompt: "继续" }, "main"],
     ["a recent escalation sticks", { stickyMain: 1, prompt: "谢谢" }, "main"],
@@ -90,13 +90,64 @@ describe("turn routing", () => {
     });
   });
 
-  it("keeps judgement, code and tool work on the strong model", () => {
-    expect(decideTurnTier(signals({ prompt: "为什么这个测试会间歇失败" })).tier).toBe("main");
-    expect(decideTurnTier(signals({ prompt: "看看 src/app.ts 里的实现" })).tier).toBe("main");
-    expect(decideTurnTier(signals({ prompt: "```ts\nconst a = 1\n```" })).tier).toBe("main");
-    expect(decideTurnTier(signals({ prompt: "跑一下测试" })).tier).toBe("main");
-    expect(decideTurnTier(signals({ prompt: "x".repeat(700) })).tier).toBe("main");
-    expect(decideTurnTier(signals({ prompt: "谢谢", previousTurnUsedTools: true })).tier).toBe("main");
+  it("keeps judgement on the strong model", () => {
+    expect(decideTurnTier(signals({ prompt: "为什么这个测试会间歇失败" }))).toEqual({
+      tier: "main",
+      reason: "heavy-intent",
+    });
+    expect(decideTurnTier(signals({ prompt: "重构这个模块的分层" })).tier).toBe("main");
+    expect(decideTurnTier(signals({ prompt: "design a migration for the settings store" })).tier).toBe("main");
+  });
+
+  it("starts code, tool and follow-up work on the cheap model", () => {
+    // Length is not difficulty and a shell command is not judgement: these all
+    // begin cheap, and a stalled turn escalates inside itself.
+    expect(decideTurnTier(signals({ prompt: "看看 src/app.ts 里的实现" }))).toEqual({
+      tier: "sub",
+      reason: "code-prompt",
+    });
+    expect(decideTurnTier(signals({ prompt: "```ts\nconst a = 1\n```" })).tier).toBe("sub");
+    expect(decideTurnTier(signals({ prompt: "跑一下测试" }))).toEqual({
+      tier: "sub",
+      reason: "tool-intent",
+    });
+    expect(decideTurnTier(signals({ prompt: "谢谢", previousTurnUsedTools: true }))).toEqual({
+      tier: "sub",
+      reason: "tool-followup",
+    });
+    // The first turn is an instruction, not a hard task.
+    expect(decideTurnTier(signals({ prompt: "先看看仓库结构", turnIndex: 0 }))).toEqual({
+      tier: "sub",
+      reason: "first-turn",
+    });
+  });
+
+  it("pays for size only when the prompt is genuinely a big job", () => {
+    expect(decideTurnTier(signals({ prompt: "x".repeat(700) })).tier).toBe("sub");
+    expect(decideTurnTier(signals({ prompt: "x".repeat(DEFAULT_SMART_POLICY.mainPromptChars + 1) }))).toEqual({
+      tier: "main",
+      reason: "long-prompt",
+    });
+  });
+
+  it("one strong turn in five across a typical session", () => {
+    // The split the pair is tuned for: judgement and oversized jobs on the strong
+    // half, everything else executed cheap. Ten representative prompts.
+    const prompts = [
+      "先看看仓库结构",
+      "跑一下测试",
+      "把这段话翻译成英文：今天天气不错",
+      "看看 src/app.ts 里的实现",
+      "Commit 这些改动",
+      "总结一下这个会话",
+      "为什么会间歇失败",
+      "重构 registry 的分层",
+      "帮我把这个函数改名",
+      "谢谢",
+    ];
+    const tiers = prompts.map((prompt, index) => decideTurnTier(signals({ prompt, turnIndex: index })).tier);
+    const main = tiers.filter((tier) => tier === "main").length;
+    expect(main).toBeLessThanOrEqual(2);
   });
 
   it("stays on the strong model when the cheap half is unusable", () => {
