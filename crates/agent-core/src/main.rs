@@ -11,6 +11,23 @@
 //! The sidecar phase replaces `self-check` with the NDJSON JSON-RPC loop, and
 //! the checked-in self-check stays as the smoke test the packaging step runs
 //! after a build.
+//!
+//! # Where the logs go
+//!
+//! **stdout is the protocol.** Every line on it is either a JSON-RPC response or
+//! an `agent.event` notification, so nothing else may be written there — a stray
+//! print would be parsed as a frame and corrupt the stream.
+//!
+//! Diagnostics therefore go to **stderr**, which Electron main captures and files
+//! as `agent/runtime.log` (`child.process.stderr`). They are `tracing` events,
+//! filtered by `RUST_LOG` and defaulting to `warn` for dependencies and `info` for
+//! the kernel itself: a crash report needs the boot/shutdown/request lines without
+//! a user having to reproduce with a special environment. Set
+//! `RUST_LOG=agent_core=debug` (or `trace`) to see the loop in detail.
+//!
+//! A panic also survives into that log: the hook installed by
+//! `install_panic_hook` records thread, file:line and message before the default
+//! hook prints the backtrace, so "the sidecar just died" is attributable.
 
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -201,6 +218,8 @@ fn usage() {
 async fn serve() -> ExitCode {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
+    tracing::info!(target: "agent_core::sidecar", "serving NDJSON JSON-RPC on stdin");
+
     let (writer_tx, mut writer_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let writer = tokio::spawn(async move {
         let mut stdout = tokio::io::stdout();
@@ -263,9 +282,12 @@ async fn serve() -> ExitCode {
             },
             // The peer closed stdin: shut down like a well-behaved child, and
             // fail every host call still waiting before the process exits.
-            Ok(None) => break,
+            Ok(None) => {
+                tracing::info!(target: "agent_core::sidecar", "stdin closed by the host; shutting down");
+                break;
+            }
             Err(error) => {
-                eprintln!("stdin read failed: {error}");
+                tracing::error!(target: "agent_core::sidecar", %error, "stdin read failed");
                 sidecar.bridge().fail_all("stdin closed");
                 return ExitCode::FAILURE;
             }
@@ -281,24 +303,95 @@ async fn serve() -> ExitCode {
     drop(sidecar);
     drop(writer_tx);
     let _ = writer.await;
+    tracing::info!(target: "agent_core::sidecar", "shutdown complete");
     ExitCode::SUCCESS
+}
+
+/// Install the diagnostics subscriber: stderr, `RUST_LOG`, `warn` +
+/// `agent_core=info` by default.
+///
+/// A second call is ignored rather than an error — the binary may install it from
+/// more than one entry path, and `try_init` is the one that tolerates both.
+fn init_tracing() {
+    use tracing_subscriber::EnvFilter;
+
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("warn,agent_core=info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        // stdout belongs to the protocol; only stderr is ours.
+        .with_writer(std::io::stderr)
+        // One line per event: a support log is read with grep, and a multi-line
+        // event breaks that.
+        .with_ansi(false)
+        .try_init();
+}
+
+/// Record a panic in the support log before the default hook prints it.
+///
+/// A kernel panic is the one failure a client reports as "the app closed": the
+/// process dies without answering anything, and without this line the log ends
+/// at the last request with no statement of why. The payload is the panic
+/// message only — never the arguments of the request being handled.
+fn install_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let message = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|text| (*text).to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic payload>".to_string());
+        let location = info
+            .location()
+            .map(|location| {
+                format!(
+                    "{}:{}:{}",
+                    location.file(),
+                    location.line(),
+                    location.column()
+                )
+            })
+            .unwrap_or_else(|| "<unknown location>".to_string());
+        let thread = std::thread::current();
+        tracing::error!(
+            target: "agent_core::panic",
+            thread = thread.name().unwrap_or("<unnamed>"),
+            location = %location,
+            panic = %message,
+            "agent kernel panicked"
+        );
+        default_hook(info);
+    }));
 }
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    match std::env::args().nth(1).as_deref() {
-        Some("--version") | Some("version") => {
+    init_tracing();
+    install_panic_hook();
+    let mode = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "usage".to_string());
+    tracing::info!(
+        target: "agent_core::boot",
+        mode = %mode,
+        version = agent_core::VERSION,
+        pid = std::process::id(),
+        "agent kernel started"
+    );
+    match mode.as_str() {
+        "--version" | "version" => {
             println!("nubo-proto {}", agent_core::VERSION);
             ExitCode::SUCCESS
         }
-        Some("self-check") => {
+        "self-check" => {
             if run_self_check().await {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::FAILURE
             }
         }
-        Some("serve") => serve().await,
+        "serve" => serve().await,
         _ => {
             usage();
             ExitCode::from(2)
