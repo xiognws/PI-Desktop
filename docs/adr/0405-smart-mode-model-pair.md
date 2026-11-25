@@ -61,6 +61,15 @@ Smart mode is off unless both halves are configured and resolve; `null` in the
 session column is the whole meaning of off, and picking a plain model clears it
 (`smartMode: null`), so a chat cannot be "smart" while showing one model.
 
+## Landing record
+
+The change was written in a checkout another session was also committing from, and
+it reached `main`'s branch in two commits that also carry that session's work:
+`49b46c649` (the feature itself, committed under the delegation-accessor subject)
+and `10e37dc01` (the session row's missing field, which is what made `host-core`
+build again). Read those two commits together when bisecting this decision; the
+message on either one describes a different change than this ADR does.
+
 ## Consequences
 
 - New optional column `sessions.smart_mode_json` (v33→v34, additive, NULL=off) and
