@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { register } from "node:module";
@@ -42,8 +42,36 @@ const resolve = (ref, options, resolveOptions) =>
  * root: an exact path or unique complete suffix only.
  */
 
+/**
+ * Fixture base outside any Git work tree.
+ *
+ * The workspace branch of the resolver reads the cached file index, which
+ * carries gitignore semantics — a fixture created inside the checkout (the temp
+ * directory is pointed there so esbuild can write) is ignored, the index comes
+ * back empty, and every basename case fails on a workspace that plainly has the
+ * file. Keeping fixtures beside the checkout, not inside it, measures the
+ * resolver instead of the runner's temp policy.
+ */
+function fixtureBase() {
+  const temp = tmpdir();
+  let dir = temp;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (existsSync(join(dir, ".git"))) {
+      const outside = join(dirname(dir), "pi-chat-ref-fixtures");
+      mkdirSync(outside, { recursive: true });
+      return outside;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return temp;
+}
+
+const FIXTURE_BASE = fixtureBase();
+
 function tempTree(name, files) {
-  const root = mkdtempSync(join(tmpdir(), `pi-chat-ref-${name}-`));
+  const root = mkdtempSync(join(FIXTURE_BASE, `pi-chat-ref-${name}-`));
   for (const file of files) {
     const target = join(root, ...file.split("/"));
     mkdirSync(dirname(target), { recursive: true });
