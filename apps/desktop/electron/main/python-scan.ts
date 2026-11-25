@@ -9,9 +9,9 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
-import { probePythonCapabilities, probePythonVersion } from "./python-runtime.ts";
+import { probePythonVersion } from "./python-runtime.ts";
 
 export type PythonCandidateSource = "bundled" | "configured" | "data-venv" | "launcher" | "path" | "common";
 
@@ -19,8 +19,13 @@ export type PythonCandidate = {
   path: string;
   /** `major.minor`, or absent when the file did not answer. */
   version?: string;
-  /** Whether it already imports the libraries the document tools need. */
-  hasLibraries: boolean;
+  /**
+   * Installed distributions (`*.dist-info`) this interpreter's own
+   * site-packages holds. Counting on disk keeps the answer cheap: probing each
+   * candidate by running it would cost a subprocess per row, and the number is
+   * there to tell "an interpreter" from "an environment".
+   */
+  libraryCount: number;
   source: PythonCandidateSource;
 };
 
@@ -39,8 +44,12 @@ export type ScanOptions = {
   platform?: NodeJS.Platform;
   /** Extra directories to look in, for a caller that knows more than we do. */
   extraRoots?: readonly string[];
+  /**
+   * Drive roots read for `Python*` directories (Windows only). Injected so a
+   * test can point at a fixture instead of the real `C:\`.
+   */
+  driveRoots?: readonly string[];
   probeVersion?: (executable: string) => string | undefined;
-  probeLibraries?: (executable: string) => boolean;
   /** `py -0p` output for the launcher; injected so tests do not spawn anything. */
   launcherPaths?: readonly string[];
   /**
@@ -91,7 +100,7 @@ function commonRoots(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[
   const programFiles = env.ProgramFiles ?? "C:\\Program Files";
   const programFilesX86 = env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
   const home = env.USERPROFILE ?? "";
-  const programData = env.ProgramData ?? "C:\\ProgramData";
+  const programData = env.ProgramData ?? "C:\ProgramData";
   return [
     local ? join(local, "Programs", "Python") : "",
     programFiles ? join(programFiles, "Python") : "",
@@ -105,6 +114,71 @@ function commonRoots(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[
     programData ? join(programData, "miniconda3") : "",
     roaming ? join(roaming, "Python") : "",
   ].filter((root) => root.length > 0);
+}
+
+/**
+ * `Python*` directories sitting directly on a drive root.
+ *
+ * The fixed names above only cover the layout python.org suggests. A user who
+ * unzips or installs a second minor version usually gets a name of their own
+ * (`C:\Python3119`, `C:\Python3147`), and that interpreter is invisible to the
+ * launcher, to `PATH`, and to every hard-coded root — the Settings list showed
+ * only the shipped runtime and one old install until this read the drive.
+ */
+function driveRootPythonDirs(driveRoots: readonly string[]): string[] {
+  const found: string[] = [];
+  for (const drive of driveRoots) {
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(drive, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && /^Python[\d.]+$/i.test(entry.name))
+        .map((entry) => entry.name);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) found.push(join(drive, entry));
+  }
+  return found;
+}
+
+/** Drive roots to read: `SystemDrive`, then `C:`. */
+function defaultDriveRoots(env: NodeJS.ProcessEnv): string[] {
+  const roots = new Set<string>();
+  const systemDrive = (env.SystemDrive ?? "").trim();
+  if (systemDrive) roots.add(`${systemDrive}\\`);
+  roots.add("C:\\");
+  return [...roots];
+}
+
+/**
+ * The site-packages directory an interpreter of this shape uses.
+ *
+ * Windows keeps it at `Lib/site-packages` beside the executable; a POSIX build
+ * nests it under `lib/python<major.minor>`. A path that is not there counts as
+ * zero libraries rather than an error: an embedded or stripped interpreter is a
+ * legitimate answer to "what do I have".
+ */
+function sitePackagesFor(interpreterPath: string, platform: NodeJS.Platform, version?: string): string {
+  const root = dirname(interpreterPath);
+  if (platform === "win32") return join(root, "Lib", "site-packages");
+  return version ? join(root, "lib", `python${version}`, "site-packages") : join(root, "lib");
+}
+
+/**
+ * How many distributions live in one site-packages directory.
+ *
+ * `*.dist-info` is what pip leaves for every installed distribution, so the
+ * count matches what `pip list` reports instead of counting helper modules,
+ * `__pycache__` or a stray `.pth` file as a library.
+ */
+function countInstalledDistributions(sitePackages: string): number {
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(sitePackages);
+  } catch {
+    return 0;
+  }
+  return entries.filter((entry) => /\.(dist|egg)-info$/i.test(entry)).length;
 }
 
 /** Interpreter file names inside one directory, per platform. */
@@ -152,7 +226,6 @@ export function scanPythonInstallations(options: ScanOptions = {}): PythonCandid
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const probeVersion = options.probeVersion ?? probePythonVersion;
-  const probeLibraries = options.probeLibraries ?? probePythonCapabilities;
   const names = interpreterNames(platform);
   const ordered: Array<{ path: string; source: PythonCandidateSource }> = [];
   const push = (path: string, source: PythonCandidateSource) => {
@@ -178,7 +251,10 @@ export function scanPythonInstallations(options: ScanOptions = {}): PythonCandid
       if (existsSync(path)) push(path, "path");
     }
   }
-  for (const root of [...commonRoots(env, platform), ...(options.extraRoots ?? [])]) {
+  const driveRoots =
+    platform === "win32" ? (options.driveRoots ?? defaultDriveRoots(env)) : [];
+  const discovered = platform === "win32" ? driveRootPythonDirs(driveRoots) : [];
+  for (const root of [...commonRoots(env, platform), ...discovered, ...(options.extraRoots ?? [])]) {
     for (const path of interpretersUnder(root, platform)) push(path, "common");
   }
 
@@ -193,10 +269,11 @@ export function scanPythonInstallations(options: ScanOptions = {}): PythonCandid
     const key = bundledPath.toLowerCase();
     if (existsSync(bundledPath)) {
       seen.add(key);
+      const bundledSitePackages = options.bundled.sitePackages ?? "";
       candidates.push({
         path: bundledPath,
         version: options.bundled.version ?? probeVersion(bundledPath),
-        hasLibraries: Boolean(options.bundled.sitePackages && existsSync(options.bundled.sitePackages)),
+        libraryCount: bundledSitePackages ? countInstalledDistributions(bundledSitePackages) : 0,
         source: "bundled",
       });
     }
@@ -208,7 +285,12 @@ export function scanPythonInstallations(options: ScanOptions = {}): PythonCandid
     const version = probeVersion(path);
     // A file that cannot report a version is not an interpreter we can run.
     if (!version) continue;
-    candidates.push({ path, version, hasLibraries: probeLibraries(path), source });
+    candidates.push({
+      path,
+      version,
+      libraryCount: countInstalledDistributions(sitePackagesFor(path, platform, version)),
+      source,
+    });
   }
   return candidates;
 }

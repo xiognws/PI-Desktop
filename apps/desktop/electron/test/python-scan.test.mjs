@@ -53,13 +53,11 @@ test("the shipped runtime is offered first, with its libraries already present",
       // A user interpreter would report missing libraries here; the bundled one
       // must not depend on this probe at all, because its wheels reach it through
       // PYTHONPATH rather than its own site-packages.
-      probeLibraries: () => false,
       bundled: { path: bundledExe, version: "3.12", sitePackages },
     });
 
     assert.equal(candidates[0].path, bundledExe, "the shipped runtime ranks first");
     assert.equal(candidates[0].source, "bundled");
-    assert.equal(candidates[0].hasLibraries, true);
     assert.equal(candidates[0].version, "3.12");
     assert.equal(
       candidates.filter((candidate) => candidate.path === bundledExe).length,
@@ -71,7 +69,7 @@ test("the shipped runtime is offered first, with its libraries already present",
   }
 });
 
-test("a build without a bundled site-packages is not advertised as complete", () => {
+test("a build without a bundled site-packages counts zero libraries", () => {
   const fx = fixture();
   try {
     const bundledExe = join(fx.root, "resources", "python", "runtime", name);
@@ -82,12 +80,13 @@ test("a build without a bundled site-packages is not advertised as complete", ()
       env: { PATH: "" },
       platform: process.platform,
       probeVersion: () => "3.12",
-      probeLibraries: () => false,
       bundled: { path: bundledExe, sitePackages: join(fx.root, "nowhere") },
     });
 
     assert.equal(candidates[0].source, "bundled");
-    assert.equal(candidates[0].hasLibraries, false, "an unfinished build must not claim the libraries");
+    // A missing site-packages is a zero, not a crash: the row still offers the
+    // interpreter, the count just says there is nothing beside it.
+    assert.equal(candidates[0].libraryCount, 0);
   } finally {
     fx.cleanup();
   }
@@ -101,7 +100,6 @@ test("finds PATH and common install roots, deduped, best first", () => {
       platform: process.platform,
       extraRoots: [join(fx.root, "Programs", "Python")],
       probeVersion: () => "3.12",
-      probeLibraries: () => true,
     });
     const paths = candidates.map((candidate) => candidate.path);
     // The machine may hold real interpreters in the usual roots (this one has a
@@ -131,7 +129,6 @@ test("a file that cannot report a version is not offered", () => {
       env: { PATH: fx.bin },
       platform: process.platform,
       probeVersion: (executable) => (executable === fx.onPath ? undefined : "3.11"),
-      probeLibraries: () => false,
     });
     assert.equal(
       candidates.some((candidate) => candidate.path === fx.onPath),
@@ -151,7 +148,6 @@ test("the configured interpreter is listed first and marked as such", () => {
       platform: process.platform,
       configured: fx.inPrograms,
       probeVersion: () => "3.12",
-      probeLibraries: () => true,
     });
     assert.equal(candidates[0].path, fx.inPrograms);
     assert.equal(candidates[0].source, "configured");
@@ -174,7 +170,6 @@ test("a venv beside the data directory is offered before PATH", () => {
       env: { PATH: fx.bin },
       platform: process.platform,
       probeVersion: () => "3.12",
-      probeLibraries: () => true,
     });
     assert.equal(candidates[0].path, venvExe);
     assert.equal(candidates[0].source, "data-venv");
@@ -193,7 +188,6 @@ test("the Microsoft Store alias directory is not scanned", () => {
       env: { PATH: store },
       platform: "win32",
       probeVersion: () => "3.12",
-      probeLibraries: () => true,
     });
     assert.equal(
       candidates.some((candidate) => candidate.path.startsWith(store)),
@@ -213,11 +207,77 @@ test("interpreter roots from the py launcher are offered as launcher entries", (
       platform: "win32",
       launcherPaths: [fx.inPrograms],
       probeVersion: () => "3.12",
-      probeLibraries: () => true,
     });
     const launcher = candidates.find((candidate) => candidate.path === fx.inPrograms);
     assert.ok(launcher, "the launcher-registered interpreter is missing");
     assert.equal(launcher.source, "launcher");
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("a Python directory of the user's own naming is found on the drive root", () => {
+  // `C:\Python3119` is what a machine looks like after a second minor version:
+  // the launcher does not know it, PATH does not carry it, and no hard-coded root
+  // matches. Reading the drive root is the only way the Settings list sees it.
+  const fx = fixture();
+  try {
+    const custom = join(fx.root, "Python3119");
+    mkdirSync(custom, { recursive: true });
+    const exe = join(custom, name);
+    writeFileSync(exe, "");
+
+    const candidates = scanPythonInstallations({
+      env: { PATH: "" },
+      platform: process.platform,
+      probeVersion: (path) => (path === exe ? "3.11" : undefined),
+      driveRoots: [fx.root],
+    });
+
+    const found = candidates.find((candidate) => candidate.path === exe);
+    assert.ok(found, "the custom-named install is offered");
+    assert.equal(found.source, "common");
+    assert.equal(found.version, "3.11");
+  } finally {
+    fx.cleanup();
+  }
+});
+
+test("counts the distributions each interpreter can actually see", () => {
+  const fx = fixture();
+  try {
+    // The bundled tree counts what ships in resources/python/site-packages.
+    const bundledRoot = join(fx.root, "resources", "python");
+    const bundledExe = join(bundledRoot, "runtime", name);
+    const bundledSite = join(bundledRoot, "site-packages");
+    mkdirSync(join(bundledRoot, "runtime"), { recursive: true });
+    for (const dist of ["lxml-6.1.3.dist-info", "openpyxl-3.1.5.dist-info", "pip-26.2.1.dist-info"]) {
+      mkdirSync(join(bundledSite, dist), { recursive: true });
+    }
+    writeFileSync(bundledExe, "");
+
+    // A user interpreter counts the dist-info directories beside its own exe.
+    const userRoot = join(fx.root, "Python3119");
+    mkdirSync(join(userRoot, "Lib", "site-packages", "pandas-2.2.3.dist-info"), { recursive: true });
+    mkdirSync(join(userRoot, "Lib", "site-packages", "numpy-2.5.4.dist-info"), { recursive: true });
+    // A plain module and a cache directory are not libraries.
+    mkdirSync(join(userRoot, "Lib", "site-packages", "__pycache__"), { recursive: true });
+    writeFileSync(join(userRoot, "Lib", "site-packages", "single_file.py"), "");
+    const userExe = join(userRoot, name);
+    writeFileSync(userExe, "");
+
+    const candidates = scanPythonInstallations({
+      env: { PATH: "" },
+      platform: "win32",
+      probeVersion: (path) => (path === bundledExe ? "3.12" : path === userExe ? "3.11" : undefined),
+      driveRoots: [fx.root],
+      bundled: { path: bundledExe, version: "3.12", sitePackages: bundledSite },
+    });
+
+    assert.equal(candidates[0].libraryCount, 3, "the bundled tree counts its own wheel set");
+    const user = candidates.find((candidate) => candidate.path === userExe);
+    assert.ok(user, "the user interpreter is listed");
+    assert.equal(user.libraryCount, 2, "only dist-info directories count as libraries");
   } finally {
     fx.cleanup();
   }
