@@ -46,7 +46,16 @@ function message(id, role, content, extra = {}) {
   return { id, role, content, createdAt: "2026-11-12T00:00:00.000Z", ...extra };
 }
 
-async function withReview(run) {
+/**
+ * One Vite server for the whole file.
+ *
+ * Booting a server costs ~35s here, so a per-case server made ten cases take six
+ * minutes and the runner had to be given a generous file deadline just to finish.
+ */
+let reviewRuntime;
+
+async function loadReviewRuntime() {
+  if (reviewRuntime) return reviewRuntime;
   const server = await createServer({
     root: ROOT,
     configFile: false,
@@ -55,15 +64,21 @@ async function withReview(run) {
     appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
-  try {
-    const [review, store, turns, slots] = await Promise.all([
+  const [review, store, turns, slots] = await Promise.all([
       server.ssrLoadModule("/src/features/chat/transcript/SkillReviewRow.tsx"),
       server.ssrLoadModule("/src/stores/app-store.ts"),
       server.ssrLoadModule("/src/lib/assistant-turns.ts"),
       server.ssrLoadModule("/src/plugins/renderer-slots/use-slots.tsx"),
     ]);
-    const i18n = createInstance();
-    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+  const i18n = createInstance();
+  await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+  reviewRuntime = { server, review, store, turns, slots, i18n };
+  return reviewRuntime;
+}
+
+async function withReview(run) {
+  const { review, store, turns, slots, i18n } = await loadReviewRuntime();
+  try {
     const useAppStore = store.useAppStore;
     const frame = (node) =>
       renderToStaticMarkup(
@@ -99,16 +114,20 @@ async function withReview(run) {
           isRunning: false,
         }),
       );
-    await run({
+    return await run({
       render,
       renderTranscript,
       project,
       layoutSkillReviews: review.layoutSkillReviews,
     });
   } finally {
-    await server.close();
+    // Nothing per-case to unwind; the server is closed once, in `test.after`.
   }
 }
+
+test.after(async () => {
+  await reviewRuntime?.server.close();
+});
 
 /** Where each needle sits, so an ordering claim is one assert. */
 function assertInOrder(html, needles) {
