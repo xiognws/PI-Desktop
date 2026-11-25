@@ -17,6 +17,13 @@
   "//duplicate-browser": "Retired 2026-11-06: pi.browser is the tracked browser plugin; a second browser plugin doubles the CDP surface for no extra capability.",
   "//market-translator": "Retired 2026-11-06: the marketplace feed is not reachable from this deployment, so a catalog translator has nothing to translate.",
   "//billion-context": "Retired 2026-11-24: the function is already in the kernel, and the plugin's implementation is the shape this deployment gets flagged for. crates/agent-core/src/aging.rs ages old tool results inside the request (tool output measured at 94.6% of a 40-turn transcript's tokens) once the window is under pressure, and crates/agent-core/src/compaction.rs asks the model for a checkpoint summary with a retained-tail fallback, chunking and a re-anchor directive - the same class of capability, with no extra process. The plugin added an out-of-process compressor instead: a detached node proxy daemon, a loopback listener, global fetch/WebSocket interception and request-body rewriting. That daemon is what the endpoint agent reported on this machine - 9 x 4662 events with Confidence 00000006 on 2026-11-24, one of them escalating into the PDM verdict that quarantined the app. Lost capability: the upstream SQLite-backed folding store and its per-range bookkeeping, which survived restarts independently of the transcript. Nothing is lost from the conversation itself - the kernel keeps every message and re-derives the request on each send.",
+  "//local.pi-markdown": "Retired 2026-11-24: the transcript already renders markdown and owns its own prose/code-block styling, so this was an 18.2 MB second copy of a renderer responsibility - the single largest item in the bundle, for a surface nothing in the product links to. Lost: its markdown file view and the pi-markdown.open command.",
+  "//local.diff-view": "Retired 2026-11-24: the review panel in the core shows the same working-tree diff; this plugin contributed a view, a command and an agentExtensions hook for that same surface. Lost: the standalone diff view and its diff-view.open command.",
+  "//io.github.liushunqiu.pi-idea-git": "Retired 2026-11-24: two views and two commands that shell out to an IDE for git actions, duplicating the host's open-in-editor action with their own spawn path. Lost: the in-IDE git shortcuts.",
+  "//cc.mcii.session-notify": "Retired 2026-11-24: notification delivery belongs to the host, which already raises session events; this plugin registered a service and a command for it. Its foreground-window probe had already been reduced to answering \"unknown\" on Windows, because the hidden inline-C# probe it replaced was itself a scored shape. Lost: the opt-in notify command.",
+  "//io.github.eureka-0x01.open-with": "Retired 2026-11-24: one host API (shell.openPath) behind a plugin with a single permission, called by nothing in the product. Lost: the open-with command.",
+  "//io.github.w1ndys.pi-open-in-vscode": "Retired 2026-11-24: a one-command wrapper around opening a path in VS Code, already covered by the host's open-in-editor action. Lost: that command.",
+  "//io.github.w1ndys.pi-open-git-web": "Retired 2026-11-24: a one-command wrapper that opens the repository host's web page, already covered by shell.openExternal. Lost: that command.",
   "excluded": [
     "cn.star.jianying-assistant",
     "icedly.moyu-games",
@@ -51,6 +58,13 @@
     "community.workbuddy-connect",
     "pi.clipboard-history",
     "cn.star.computer-use",
-    "billion-context"
+    "billion-context",
+    "local.pi-markdown",
+    "local.diff-view",
+    "io.github.liushunqiu.pi-idea-git",
+    "cc.mcii.session-notify",
+    "io.github.eureka-0x01.open-with",
+    "io.github.w1ndys.pi-open-in-vscode",
+    "io.github.w1ndys.pi-open-git-web"
   ]
 }
