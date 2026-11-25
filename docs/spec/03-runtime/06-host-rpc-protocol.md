@@ -556,6 +556,13 @@ Electron main after plugin permission and manifest-source checks:
 - `plugin.usage.listTurns` — keyset page of completed-turn facts (identifiers
   and token counters, never a message body) for non-deleted sessions. Gated
   in Electron main by `usage.read`. Additive; no protocol version bump.
+- `plugin.usage.summary` — the same ledger already summed for a window:
+  token and USD totals plus per-provider and per-model rows, with priced,
+  reported and unpriced request counts. Rows reconcile with the totals; an
+  unattributable record lands in an id-less row rather than being dropped.
+  Same `usage.read` gate, same window rules as `plugin.usage.listTurns`
+  (default 30 days, at most 365, re-validated host-side), no write path and no
+  protocol version bump.
 - Successful plugin session mutations cause Electron main to emit one
   `sessionsChanged` renderer event; the renderer refreshes the session list,
   and plugins do not emit this UI synchronization event.
@@ -633,6 +640,18 @@ deletes per 60 seconds. P2/P3 methods are not present in protocol v11.
   assistant messages plus settled subagent usage, not a rewrite of
   `message.usage`. The user-facing dashboard is plugin `pi.token-insights`
   (D335 / ADR 0173), not a Settings destination.
+- `stats.getUsageSummary({ startDate?, endDate? })` — the money side of the same
+  ledger, across every session: token and USD totals for the window, split by
+  `providerId` and by `modelId`, plus how many requests were priced by the
+  provider, by the catalog, or not at all. Sums reconcile with the rows; an
+  unattributable record lands in an id-less row instead of being dropped. A
+  request with no usable price is counted, never guessed, so a total is a lower
+  bound while `unpricedRequests` is nonzero. Window defaults to the last 30 days
+  and is bounded on a turn's `started_at`; every turn status counts, because an
+  aborted or failed request was still billed. Additive RPC; no protocol version,
+  schema, or migration change. Like the token history it feeds plugin
+  `pi.token-insights` and the `statsGetUsageSummary` desktop tool rather than a
+  Settings destination (D335).
 
 ### Plan and Goal state and approvals
 

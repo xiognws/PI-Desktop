@@ -748,6 +748,14 @@ handleWithEvent(
   );
 
   handle(
+    IPC.invoke.statsGetUsageSummary,
+    async (input?: { startDate?: number; endDate?: number }) => {
+      if (!host) throw new Error("host unavailable");
+      return host.call("stats.getUsageSummary", input ?? {});
+    },
+  );
+
+  handle(
     IPC.invoke.browserNavigate,
     async (input: { url?: string; sessionId?: string } = {}) => {
       if (!plugins.getLoaded(BROWSER_PLUGIN_ID)) {

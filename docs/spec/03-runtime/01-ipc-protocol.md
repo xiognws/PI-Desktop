@@ -1276,6 +1276,7 @@ plus `subagentUsage` into `session.endTurn.usage`.
 ### stats
 
 - `pi-desktop/stats/getTokenUsageHistory({ startDate?, endDate?, bucket? }) -> TokenUsageHistoryResult`
+- `pi-desktop/stats/getUsageSummary({ startDate?, endDate? }) -> UsageSummary`
 
 `bucket` is `day` | `week` | `month`. Omitted dates use the host default window
 (53 weeks / 52 weeks / 24 months) in the host's local calendar. `week` keys use

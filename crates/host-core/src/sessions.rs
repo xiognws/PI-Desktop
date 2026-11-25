@@ -17,7 +17,7 @@ pub use history_mutations::{
 };
 mod model_system;
 mod usage;
-pub use usage::{record_usage, session_totals, session_usage_cost};
+pub use usage::{record_usage, session_totals, session_usage_cost, spend_summary};
 
 pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
 
@@ -154,10 +154,10 @@ pub struct SessionSummary {
     /// use the priority tier only when the model binding also allows it.
     #[serde(default)]
     pub fast_mode: bool,
-    /// Smart mode (ADR 0405): the model pair this conversation runs on and the
-    /// routing policy that picked each turn's tier. A snapshot, not a reference —
-    /// editing the template afterwards must not rewrite a conversation that
-    /// already ran on the old pair. `None` is smart mode off.
+    /// Smart mode (ADR smart-mode): the model pair this conversation runs on and
+    /// the routing policy that picked each turn's tier. A snapshot, not a
+    /// reference — editing the template afterwards must not rewrite a
+    /// conversation that already ran on the old pair. `None` is smart mode off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub smart_mode: Option<Value>,
     pub updated_at: String,
@@ -1617,6 +1617,8 @@ pub fn create_session_with_mode_snapshot(
         thinking_level,
         permission_mode,
         fast_mode,
+        // A new session starts without smart mode; selecting a template writes
+        // the snapshot through `configure_session_smart_mode`.
         smart_mode: None,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
@@ -5520,7 +5522,7 @@ mod tests {
             // Ownership is derived from `task_runs`, so an import is never one.
             scheduled_run: false,
             fast_mode: false,
-        smart_mode: None,
+            smart_mode: None,
             worktree: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
@@ -5575,7 +5577,7 @@ mod tests {
             // Ownership is derived from `task_runs`, so an import is never one.
             scheduled_run: false,
             fast_mode: false,
-        smart_mode: None,
+            smart_mode: None,
             worktree: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
@@ -6832,7 +6834,7 @@ mod tests {
             // Ownership is derived from `task_runs`, so an import is never one.
             scheduled_run: false,
             fast_mode: false,
-        smart_mode: None,
+            smart_mode: None,
             worktree: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),

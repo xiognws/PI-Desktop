@@ -361,6 +361,215 @@ pub fn session_usage_cost(db: &Database, session_id: &str) -> Result<Value> {
     }))
 }
 
+/// One provider's or one model's share of a spend window.
+///
+/// Token fields are per-record sums, so a row can be read on its own: a spend
+/// review that showed only dollars would hide the case where most of the windows
+/// spend came from cache reads, which is billed differently by every provider.
+#[derive(Default)]
+struct SpendBucket {
+    requests: i64,
+    input_tokens: i64,
+    output_tokens: i64,
+    cache_read_tokens: i64,
+    cache_write_tokens: i64,
+    reasoning_tokens: i64,
+    total_tokens: i64,
+    cost_total: f64,
+    priced_requests: i64,
+    reported_requests: i64,
+    unpriced_requests: i64,
+}
+
+impl SpendBucket {
+    /// Fold one ledger record in. `counted` is false for a token-only leftover
+    /// that belongs to no request of its own: its tokens are money-relevant, its
+    /// request count is not its to claim.
+    fn add(&mut self, record: &Value, counted: bool) {
+        let token = |key: &str| count(record, key);
+        let input = token("inputTokens");
+        let output = token("outputTokens");
+        let cache_read = token("cacheReadTokens");
+        let cache_write = token("cacheWriteTokens");
+        self.input_tokens = self.input_tokens.saturating_add(input);
+        self.output_tokens = self.output_tokens.saturating_add(output);
+        self.cache_read_tokens = self.cache_read_tokens.saturating_add(cache_read);
+        self.cache_write_tokens = self.cache_write_tokens.saturating_add(cache_write);
+        self.reasoning_tokens = self
+            .reasoning_tokens
+            .saturating_add(token("reasoningTokens"));
+        let reported = token("totalTokens");
+        let derived = input
+            .saturating_add(output)
+            .saturating_add(cache_read)
+            .saturating_add(cache_write);
+        self.total_tokens = self.total_tokens.saturating_add(reported.max(derived));
+        if counted {
+            self.requests = self.requests.saturating_add(1);
+        }
+        if known_cost(record) {
+            if counted {
+                self.priced_requests = self.priced_requests.saturating_add(1);
+                if record.get("costStatus").and_then(Value::as_str) == Some("reported") {
+                    self.reported_requests = self.reported_requests.saturating_add(1);
+                }
+            }
+            self.cost_total += record
+                .get("cost")
+                .and_then(|cost| cost.get("total"))
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
+        } else if counted {
+            self.unpriced_requests = self.unpriced_requests.saturating_add(1);
+        }
+    }
+
+    fn to_json(&self) -> Value {
+        json!({
+            "requests": self.requests,
+            "inputTokens": self.input_tokens,
+            "outputTokens": self.output_tokens,
+            "cacheReadTokens": self.cache_read_tokens,
+            "cacheWriteTokens": self.cache_write_tokens,
+            "reasoningTokens": self.reasoning_tokens,
+            "totalTokens": self.total_tokens,
+            "costTotal": self.cost_total,
+            "pricedRequests": self.priced_requests,
+            "reportedRequests": self.reported_requests,
+            "unpricedRequests": self.unpriced_requests,
+        })
+    }
+}
+
+fn spend_rows(
+    map: std::collections::BTreeMap<Option<String>, SpendBucket>,
+    key: &str,
+) -> Vec<Value> {
+    let mut items: Vec<Value> = map
+        .into_iter()
+        .map(|(id, bucket)| {
+            let mut value = bucket.to_json();
+            if let Some(id) = id {
+                value[key] = json!(id);
+            }
+            value
+        })
+        .collect();
+    // The rows a user opens this page for are the expensive ones; a stable
+    // tie-break on tokens keeps two equal-dollar providers from swapping places
+    // between refreshes.
+    items.sort_by(|a, b| {
+        let cost = |value: &Value| value["costTotal"].as_f64().unwrap_or(0.0);
+        let tokens = |value: &Value| value["totalTokens"].as_i64().unwrap_or(0);
+        cost(b).total_cmp(&cost(a)).then(tokens(b).cmp(&tokens(a)))
+    });
+    items
+}
+
+/// What every session in a window has spent, split by provider and by model.
+///
+/// `session_usage_cost` answers "what did this session cost". A spend review
+/// asks the same question across sessions and over a date range, which is the
+/// one thing a per-session rollup cannot answer, and it asks it about money
+/// rather than about one number: which provider took it, which model took it,
+/// and how much of the total is a lower bound because a request had no price.
+///
+/// The window is on `started_at`, and every turn status counts — an aborted or
+/// failed request was still billed, and a running turn has already paid for the
+/// requests it completed. Sums always reconcile: the totals are accumulated from
+/// the same records that feed the rows below them, a turn whose usage document
+/// never arrived is read from its token columns and the provider/model on its
+/// turn row, and a record nobody can attribute lands in an id-less row instead
+/// of being dropped.
+pub fn spend_summary(db: &Database, range_start: i64, range_end: i64) -> Result<Value> {
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT provider_id, model_id, input_tokens, output_tokens, usage_json
+         FROM turns
+         WHERE started_at >= ?1 AND started_at <= ?2
+         ORDER BY started_at ASC",
+    )?;
+    let rows = stmt.query_map(params![range_start, range_end], |row| {
+        Ok((
+            row.get::<_, Option<String>>(0)?,
+            row.get::<_, Option<String>>(1)?,
+            row.get::<_, Option<i64>>(2)?.unwrap_or(0).max(0),
+            row.get::<_, Option<i64>>(3)?.unwrap_or(0).max(0),
+            row.get::<_, Option<String>>(4)?,
+        ))
+    })?;
+    let mut totals = SpendBucket::default();
+    let mut by_provider: std::collections::BTreeMap<Option<String>, SpendBucket> =
+        Default::default();
+    let mut by_model: std::collections::BTreeMap<Option<String>, SpendBucket> = Default::default();
+    let mut turn_count = 0_i64;
+    for row in rows {
+        let (turn_provider, turn_model, input_tokens, output_tokens, usage_json) = row?;
+        let usage = usage_json
+            .as_deref()
+            .and_then(|raw| serde_json::from_str::<Value>(raw).ok());
+        let mut records = usage.as_ref().map(operations).unwrap_or_default();
+        if records.is_empty() {
+            // No ledger, only columns. Two zero columns mean this turn never
+            // reached a provider, so it is not a request to report.
+            if input_tokens == 0 && output_tokens == 0 {
+                continue;
+            }
+            records.push(json!({
+                "inputTokens": input_tokens,
+                "outputTokens": output_tokens,
+                "totalTokens": input_tokens + output_tokens,
+                "costStatus": "unknown",
+            }));
+        }
+        turn_count += 1;
+        let recorded = sum_counts(&records, "totalTokens");
+        let reported = usage
+            .as_ref()
+            .map(|value| count(value, "totalTokens"))
+            .unwrap_or(0)
+            .max(input_tokens.saturating_add(output_tokens));
+        let residual = reported.saturating_sub(recorded);
+        for record in &records {
+            let provider = record
+                .get("providerId")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+                .map(str::to_owned)
+                .or_else(|| turn_provider.clone());
+            let model = record
+                .get("modelId")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+                .map(str::to_owned)
+                .or_else(|| turn_model.clone());
+            totals.add(record, true);
+            by_provider.entry(provider).or_default().add(record, true);
+            by_model.entry(model).or_default().add(record, true);
+        }
+        if residual > 0 {
+            // Legacy totals recorded beside a ledger cannot be split across
+            // requests; they still belong to this turn's provider and model.
+            let leftover = json!({ "totalTokens": residual, "costStatus": "unknown" });
+            totals.add(&leftover, false);
+            by_provider
+                .entry(turn_provider)
+                .or_default()
+                .add(&leftover, false);
+            by_model
+                .entry(turn_model)
+                .or_default()
+                .add(&leftover, false);
+        }
+    }
+    let mut summary = totals.to_json();
+    summary["rangeStart"] = json!(range_start);
+    summary["rangeEnd"] = json!(range_end);
+    summary["turnCount"] = json!(turn_count);
+    summary["byProvider"] = json!(spend_rows(by_provider, "providerId"));
+    summary["byModel"] = json!(spend_rows(by_model, "modelId"));
+    Ok(summary)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -561,6 +770,92 @@ mod tests {
         let totals = session_totals(&db, &session.id).unwrap();
         assert_eq!(totals.turns, 3);
         assert_eq!(totals.input_tokens, 40);
+
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn spend_summary_rolls_up_a_window_across_sessions() {
+        let dir = std::env::temp_dir().join(format!("pi-usage-spend-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::open(&dir.join("test.sqlite")).unwrap();
+        let session = super::super::create_session(&db, None, None, None, None, None).unwrap();
+        let other = super::super::create_session(&db, None, None, None, None, None).unwrap();
+
+        // One session, one billed request and one classifier with no price.
+        let turn = super::super::begin_turn(&db, &session.id, Some("api"), Some("m1")).unwrap();
+        let mut billed = priced("a", "api", "reported", 0.25);
+        billed["modelId"] = json!("m1");
+        record_usage(&db, &session.id, &turn, &billed).unwrap();
+        record_usage(
+            &db,
+            &session.id,
+            &turn,
+            &json!({
+                "operationId": "classifier", "providerId": "api", "modelId": "m1",
+                "inputTokens": 4, "outputTokens": 1, "totalTokens": 5,
+                "costStatus": "unknown",
+            }),
+        )
+        .unwrap();
+        super::super::end_turn(&db, &turn, "completed", None, None, false).unwrap();
+
+        // A second session's subscription-backed request is in the same window.
+        let second = super::super::begin_turn(&db, &other.id, Some("sub"), Some("m2")).unwrap();
+        record_usage(
+            &db,
+            &other.id,
+            &second,
+            &priced("b", "sub", "estimated", 0.5),
+        )
+        .unwrap();
+        super::super::end_turn(&db, &second, "completed", None, None, false).unwrap();
+
+        // Spend from before the window must not leak into it.
+        let old = super::super::begin_turn(&db, &other.id, Some("api"), Some("m1")).unwrap();
+        record_usage(&db, &other.id, &old, &priced("c", "api", "reported", 9.0)).unwrap();
+        super::super::end_turn(&db, &old, "completed", None, None, false).unwrap();
+        db.conn()
+            .execute(
+                "UPDATE turns SET started_at = 0 WHERE id = ?1",
+                params![old],
+            )
+            .unwrap();
+
+        let now = crate::db::now_ms();
+        let summary = spend_summary(&db, now - 60_000, now + 60_000).unwrap();
+        assert_eq!(summary["turnCount"], 2);
+        assert_eq!(summary["requests"], 3);
+        assert_eq!(summary["costTotal"], json!(0.75));
+        assert_eq!(summary["pricedRequests"], 2);
+        assert_eq!(summary["reportedRequests"], 1);
+        assert_eq!(summary["unpricedRequests"], 1);
+        // 12 + 5 + 12: two priced records at 10 in / 2 out, one 4 / 1 leftover.
+        assert_eq!(summary["totalTokens"], 29);
+
+        // Rows are ordered by money, so the expensive provider leads.
+        let providers = summary["byProvider"].as_array().unwrap();
+        assert_eq!(providers.len(), 2);
+        assert_eq!(providers[0]["providerId"], json!("sub"));
+        assert_eq!(providers[0]["costTotal"], json!(0.5));
+        assert_eq!(providers[1]["providerId"], json!("api"));
+        assert_eq!(providers[1]["costTotal"], json!(0.25));
+        assert_eq!(providers[1]["unpricedRequests"], 1);
+        let models = summary["byModel"].as_array().unwrap();
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0]["modelId"], json!("m2"));
+
+        // The rows reconcile with the total: nothing is counted twice or dropped.
+        let row_tokens: i64 = providers
+            .iter()
+            .map(|row| row["totalTokens"].as_i64().unwrap())
+            .sum();
+        assert_eq!(row_tokens, 29);
+
+        let all = spend_summary(&db, 0, now + 60_000).unwrap();
+        assert_eq!(all["turnCount"], 3);
+        assert_eq!(all["costTotal"], json!(9.75));
 
         drop(db);
         std::fs::remove_dir_all(dir).unwrap();

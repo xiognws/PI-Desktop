@@ -539,6 +539,14 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
 /// Keep this slightly beyond the shared 130s client deadline (issue #1071).
 const RPC_REQUEST_BUDGET_MS: u64 = 135_000;
 
+/// Default look-back for `stats.getUsageSummary` when the caller sends neither
+/// bound: one month, which is the window a person means by "what have I spent".
+const USAGE_SUMMARY_WINDOW_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
+
+/// Widest window `plugin.usage.summary` serves, matching `plugin.usage.listTurns`
+/// so a plugin cannot ask the aggregate for a span its page transport refuses.
+const PLUGIN_USAGE_MAX_WINDOW_MS: i64 = 365 * 24 * 60 * 60 * 1_000;
+
 /// Grace window added on top of a tool's own effective timeout. A
 /// `tools.execute` may legitimately run for hours (Bash allows up to 6h), so
 /// its budget is derived from the tool timeout rather than the fixed budget;
@@ -3576,6 +3584,45 @@ async fn handle_request(
             Ok(page)
         }
 
+        // The money half of the same read-only surface: one call returns the
+        // spend rollup a dashboard would otherwise re-derive from every page of
+        // `plugin.usage.listTurns`. Same `usage.read` permission (checked in
+        // Electron main before dispatch), same window rules as that page
+        // transport, and no write path.
+        "plugin.usage.summary" => {
+            let plugin_id = params
+                .get("pluginId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "pluginId required", "INVALID_PARAMS"))?;
+            let to_ms = params
+                .get("toMs")
+                .and_then(Value::as_i64)
+                .unwrap_or_else(crate::db::now_ms);
+            let from_ms = params
+                .get("fromMs")
+                .and_then(Value::as_i64)
+                .unwrap_or(to_ms - USAGE_SUMMARY_WINDOW_MS);
+            if from_ms > to_ms {
+                return Err(rpc_err(1002, "fromMs must be <= toMs", "INVALID_PARAMS"));
+            }
+            if to_ms - from_ms > PLUGIN_USAGE_MAX_WINDOW_MS {
+                return Err(rpc_err(
+                    1002,
+                    "usage window must span at most 365 days",
+                    "INVALID_PARAMS",
+                ));
+            }
+            let st = state.lock().await;
+            let summary = sessions::spend_summary(&st.db, from_ms, to_ms)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            tracing::debug!(
+                method = "plugin.usage.summary",
+                plugin_id,
+                "plugin usage rpc served"
+            );
+            Ok(summary)
+        }
+
         "session.beginTurn" => {
             let session_id = params
                 .get("sessionId")
@@ -3860,6 +3907,24 @@ async fn handle_request(
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(history)
+        }
+
+        // The spend review: every session's billed requests in one window, split
+        // by provider and by model. `endDate` defaults to now and `startDate` to
+        // 30 days before it, so a caller that only wants "this month" sends
+        // neither and still gets a bounded query.
+        "stats.getUsageSummary" => {
+            let range_end = params
+                .get("endDate")
+                .and_then(|v| v.as_i64())
+                .unwrap_or_else(crate::db::now_ms);
+            let range_start = params
+                .get("startDate")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(range_end - USAGE_SUMMARY_WINDOW_MS);
+            let st = state.lock().await;
+            sessions::spend_summary(&st.db, range_start, range_end)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
         }
 
         "artifacts.list" => {
@@ -8740,6 +8805,107 @@ mod tests {
         assert_eq!(summary["providers"][0]["providerId"], "p");
         assert_eq!(summary["providers"][0]["total"], 0.03);
         assert_eq!(summary["providers"][0]["reportedRequests"], 0);
+    }
+
+    #[tokio::test]
+    async fn stats_usage_summary_rpc_sums_the_window_and_names_its_rows() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        {
+            let st = state.lock().await;
+            for (provider, model, total) in [("api", "m1", 0.25_f64), ("sub", "m2", 0.5)] {
+                let session =
+                    sessions::create_session(&st.db, None, None, None, None, None).unwrap();
+                let turn =
+                    sessions::begin_turn(&st.db, &session.id, Some(provider), Some(model)).unwrap();
+                let usage = json!({
+                    "operationId": format!("op-{provider}"), "usageOrigin": "pi",
+                    "providerId": provider, "modelId": model,
+                    "inputTokens": 10, "outputTokens": 2, "totalTokens": 12,
+                    "costStatus": "reported",
+                    "cost": {"input": total, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": total},
+                });
+                sessions::record_usage(&st.db, &session.id, &turn, &usage).unwrap();
+                sessions::end_turn(&st.db, &turn, "completed", None, None, false).unwrap();
+            }
+        }
+        // Absent bounds mean "the last 30 days", which includes the turns above.
+        let summary = handle_request(
+            state.clone(),
+            "stats.getUsageSummary",
+            json!({}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(summary["requests"], 2);
+        assert_eq!(summary["costTotal"], 0.75);
+        assert_eq!(summary["byProvider"][0]["providerId"], "sub");
+        assert_eq!(summary["byModel"][0]["modelId"], "m2");
+        // An explicit window still bounds the query.
+        let empty = handle_request(
+            state.clone(),
+            "stats.getUsageSummary",
+            json!({ "startDate": 0, "endDate": 1 }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(empty["requests"], 0);
+        assert_eq!(empty["byProvider"], json!([]));
+    }
+
+    #[tokio::test]
+    async fn plugin_usage_summary_rpc_serves_the_rollup_and_bounds_the_window() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        {
+            let st = state.lock().await;
+            let session = sessions::create_session(&st.db, None, None, None, None, None).unwrap();
+            let turn = sessions::begin_turn(&st.db, &session.id, Some("api"), Some("m1")).unwrap();
+            let usage = json!({
+                "operationId": "op", "usageOrigin": "pi",
+                "providerId": "api", "modelId": "m1",
+                "inputTokens": 10, "outputTokens": 2, "totalTokens": 12,
+                "costStatus": "reported",
+                "cost": {"input": 0.25, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0.25},
+            });
+            sessions::record_usage(&st.db, &session.id, &turn, &usage).unwrap();
+            sessions::end_turn(&st.db, &turn, "completed", None, None, false).unwrap();
+        }
+        // A plugin id is required, like every plugin-domain RPC.
+        let error = handle_request(state.clone(), "plugin.usage.summary", json!({}), tx.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, 1002);
+        // An inverted or oversized window is refused before the ledger is read.
+        for params in [
+            json!({ "pluginId": "p", "fromMs": 10, "toMs": 1 }),
+            json!({ "pluginId": "p", "fromMs": 0, "toMs": super::PLUGIN_USAGE_MAX_WINDOW_MS + 1 }),
+        ] {
+            let error = handle_request(state.clone(), "plugin.usage.summary", params, tx.clone())
+                .await
+                .unwrap_err();
+            assert_eq!(error.code, 1002);
+        }
+        let summary = handle_request(
+            state.clone(),
+            "plugin.usage.summary",
+            json!({ "pluginId": "p", "fromMs": crate::db::now_ms() - 60_000 }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(summary["requests"], 1);
+        assert_eq!(summary["costTotal"], 0.25);
+        assert_eq!(summary["byProvider"][0]["providerId"], "api");
+        assert_eq!(summary["byModel"][0]["modelId"], "m1");
     }
 
     #[tokio::test]
