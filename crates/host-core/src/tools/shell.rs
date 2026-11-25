@@ -193,6 +193,114 @@ pub fn resolve_shell_for_platform(
     }
 }
 
+/// The PowerShell body a command runs inside, shared by both carriers.
+///
+/// Inline (`-Command <script>`) and file (`-File <script.ps1>`) must behave the
+/// same: the wrapper sets the encoding, keeps native stderr lines from turning
+/// into PowerShell failures, and renders objects the way the console would.
+fn powershell_wrapper(command: &str) -> String {
+    format!(
+                    "$OutputEncoding = New-Object System.Text.UTF8Encoding($false); [Console]::OutputEncoding = $OutputEncoding; $ErrorActionPreference = 'Continue'; $ProgressPreference = 'SilentlyContinue'; $global:LASTEXITCODE = 0; $script:piPowerShellError = $false; $script:piFmt = New-Object System.Collections.ArrayList; $script:piRender = {{ param($item) $r = @(); $item | Out-String -Stream | ForEach-Object {{ $r += $_ }}; while ($r.Count -and -not $r[0].Trim()) {{ $r = @($r | Select-Object -Skip 1) }}; while ($r.Count -and -not $r[-1].Trim()) {{ $r = @($r | Select-Object -SkipLast 1) }}; if ($r.Count) {{ [Console]::Out.WriteLine(($r -join [Environment]::NewLine)) }} }}; & {{ {command} }} 2>&1 | ForEach-Object {{ if ($_ -is [System.Management.Automation.ErrorRecord]) {{ if ($_.FullyQualifiedErrorId -notlike 'NativeCommandError*') {{ $script:piPowerShellError = $true }}; [Console]::Error.WriteLine($_.Exception.Message) }} elseif ($_ -is [string]) {{ [Console]::Out.WriteLine($_) }} elseif ($_.GetType().FullName -like 'Microsoft.PowerShell.Commands.Internal.Format.*') {{ [void]$script:piFmt.Add($_); if ($_.GetType().Name -eq 'FormatEndData') {{ & $script:piRender $script:piFmt; $script:piFmt.Clear() }} }} else {{ & $script:piRender $_ }} }}; $piNativeExitCode = $LASTEXITCODE; if ($script:piPowerShellError) {{ exit 1 }}; exit $piNativeExitCode"
+                )
+}
+
+/// Characters at which a command is written to a script file instead of the
+/// command line.
+///
+/// The number is deliberately low. A long inline argument list is the shape
+/// behaviour engines score hardest (a quoted blob mixing an interpreter with the
+/// work it was told to do), and it is also what hits the Windows command-line
+/// limit. A short `git status` stays inline: no file churn for the ordinary case.
+pub const SCRIPT_FILE_THRESHOLD_CHARS: usize = 120;
+
+/// Whether this command should be carried by a script file.
+pub fn wants_script_file(command: &str) -> bool {
+    command.len() >= SCRIPT_FILE_THRESHOLD_CHARS || command.contains('\n') || command.contains('\r')
+}
+
+/// Extension and contents for the script file that carries `command`.
+///
+/// PowerShell scripts are written as UTF-8 **with** a BOM by the caller: Windows
+/// PowerShell 5.1 decodes a BOM-less script with the ANSI code page, so a command
+/// containing non-ASCII text would be mangled before it is parsed.
+pub fn script_file_contents(
+    platform: ShellPlatform,
+    shell_id: &str,
+    command: &str,
+) -> Option<(&'static str, String)> {
+    match platform {
+        ShellPlatform::Windows => match shell_id {
+            WINDOWS_POWERSHELL_ID | PWSH_ID => Some(("ps1", powershell_wrapper(command))),
+            CMD_ID => Some(("cmd", format!("@echo off\r\nchcp 65001>nul\r\n{command}\r\n"))),
+            GIT_BASH_ID => Some(("sh", command.to_string())),
+            _ => None,
+        },
+        ShellPlatform::Unix => match shell_id {
+            BASH_ID => Some(("sh", command.to_string())),
+            _ => None,
+        },
+    }
+}
+
+/// Invocation that runs an existing script file, with no command text on the
+/// command line.
+pub fn build_file_invocation_for_platform(
+    platform: ShellPlatform,
+    shell_id: &str,
+    program: PathBuf,
+    script: &std::path::Path,
+) -> Result<ShellInvocation, String> {
+    let script = script.to_string_lossy().to_string();
+    let args = match platform {
+        ShellPlatform::Windows => match shell_id {
+            WINDOWS_POWERSHELL_ID | PWSH_ID => vec![
+                "-NoLogo".to_string(),
+                "-NoProfile".to_string(),
+                "-NonInteractive".to_string(),
+                // A script file is subject to the execution policy, which is
+                // Restricted on a host that never changed it; inline text is not.
+                // Bypass applies to this process only.
+                "-ExecutionPolicy".to_string(),
+                "Bypass".to_string(),
+                "-InputFormat".to_string(),
+                "Text".to_string(),
+                "-OutputFormat".to_string(),
+                "Text".to_string(),
+                "-File".to_string(),
+                script,
+            ],
+            CMD_ID => vec![
+                "/D".to_string(),
+                "/Q".to_string(),
+                "/V:OFF".to_string(),
+                "/S".to_string(),
+                "/C".to_string(),
+                script,
+            ],
+            GIT_BASH_ID => vec![
+                "--noprofile".to_string(),
+                "--norc".to_string(),
+                script,
+            ],
+            _ => {
+                return Err(format!(
+                    "command shell '{shell_id}' is not available on Windows"
+                ))
+            }
+        },
+        ShellPlatform::Unix => match shell_id {
+            BASH_ID => vec![script],
+            _ => {
+                return Err(format!(
+                    "command shell '{shell_id}' is not available on this platform"
+                ))
+            }
+        },
+    };
+
+    Ok(ShellInvocation { program, args })
+}
+
 /// Pure invocation builder used by runtime code and cross-platform tests.
 pub fn build_invocation_for_platform(
     platform: ShellPlatform,
@@ -216,9 +324,7 @@ pub fn build_invocation_for_platform(
             // Remaining output passes through `Out-String -Stream`, so objects
             // keep their console formatting instead of becoming type names.
             WINDOWS_POWERSHELL_ID | PWSH_ID => {
-                let script = format!(
-                    "$OutputEncoding = New-Object System.Text.UTF8Encoding($false); [Console]::OutputEncoding = $OutputEncoding; $ErrorActionPreference = 'Continue'; $ProgressPreference = 'SilentlyContinue'; $global:LASTEXITCODE = 0; $script:piPowerShellError = $false; $script:piFmt = New-Object System.Collections.ArrayList; $script:piRender = {{ param($item) $r = @(); $item | Out-String -Stream | ForEach-Object {{ $r += $_ }}; while ($r.Count -and -not $r[0].Trim()) {{ $r = @($r | Select-Object -Skip 1) }}; while ($r.Count -and -not $r[-1].Trim()) {{ $r = @($r | Select-Object -SkipLast 1) }}; if ($r.Count) {{ [Console]::Out.WriteLine(($r -join [Environment]::NewLine)) }} }}; & {{ {command} }} 2>&1 | ForEach-Object {{ if ($_ -is [System.Management.Automation.ErrorRecord]) {{ if ($_.FullyQualifiedErrorId -notlike 'NativeCommandError*') {{ $script:piPowerShellError = $true }}; [Console]::Error.WriteLine($_.Exception.Message) }} elseif ($_ -is [string]) {{ [Console]::Out.WriteLine($_) }} elseif ($_.GetType().FullName -like 'Microsoft.PowerShell.Commands.Internal.Format.*') {{ [void]$script:piFmt.Add($_); if ($_.GetType().Name -eq 'FormatEndData') {{ & $script:piRender $script:piFmt; $script:piFmt.Clear() }} }} else {{ & $script:piRender $_ }} }}; $piNativeExitCode = $LASTEXITCODE; if ($script:piPowerShellError) {{ exit 1 }}; exit $piNativeExitCode"
-                );
+                let script = powershell_wrapper(command);
                 vec![
                     "-NoLogo".into(),
                     "-NoProfile".into(),
@@ -998,5 +1104,67 @@ mod tests {
             Some(FILE_ATTRIBUTE_ARCHIVE),
             None,
         ));
+    }
+}
+
+#[cfg(test)]
+mod script_file_tests {
+    use super::*;
+
+    #[test]
+    fn a_short_single_line_command_stays_on_the_command_line() {
+        assert!(!wants_script_file("git status"));
+        assert!(!wants_script_file("cargo test -p host-core"));
+    }
+
+    #[test]
+    fn a_long_or_multi_line_command_goes_to_a_file() {
+        assert!(wants_script_file(&("echo ".to_string() + &"x".repeat(SCRIPT_FILE_THRESHOLD_CHARS))));
+        assert!(wants_script_file("echo one\necho two"));
+        assert!(wants_script_file("echo one\r\necho two"));
+    }
+
+    #[test]
+    fn the_powershell_file_carries_the_same_wrapper_as_the_inline_form() {
+        let (extension, contents) =
+            script_file_contents(ShellPlatform::Windows, PWSH_ID, "Get-ChildItem").expect("plan");
+        assert_eq!(extension, "ps1");
+        assert!(contents.contains("Get-ChildItem"));
+        // The wrapper is what keeps UTF-8 output and native exit codes intact.
+        assert!(contents.contains("$OutputEncoding"));
+        assert!(contents.contains("$piNativeExitCode"));
+    }
+
+    #[test]
+    fn cmd_keeps_the_code_page_and_bash_takes_the_command_verbatim() {
+        let (extension, contents) =
+            script_file_contents(ShellPlatform::Windows, CMD_ID, "dir").expect("cmd plan");
+        assert_eq!(extension, "cmd");
+        assert!(contents.contains("chcp 65001"));
+        assert!(contents.contains("dir"));
+
+        let (extension, contents) =
+            script_file_contents(ShellPlatform::Unix, BASH_ID, "ls -la").expect("sh plan");
+        assert_eq!(extension, "sh");
+        assert_eq!(contents, "ls -la");
+    }
+
+    #[test]
+    fn a_file_invocation_names_the_script_and_never_the_command_text() {
+        let path = std::path::Path::new("C:/data/tmp/bash-1-2.ps1");
+        let invocation =
+            build_file_invocation_for_platform(ShellPlatform::Windows, PWSH_ID, PathBuf::from("pwsh.exe"), path)
+                .expect("invocation");
+        assert!(invocation.args.iter().any(|arg| arg == "-File"));
+        // Without this, -File is refused on a host whose policy is Restricted.
+        assert!(invocation.args.iter().any(|arg| arg == "-ExecutionPolicy"));
+        assert!(invocation.args.iter().any(|arg| arg == "Bypass"));
+        assert!(!invocation.args.iter().any(|arg| arg == "-Command"));
+        assert!(invocation.args.iter().any(|arg| arg.ends_with("bash-1-2.ps1")));
+
+        let invocation =
+            build_file_invocation_for_platform(ShellPlatform::Unix, BASH_ID, PathBuf::from("/bin/bash"), path)
+                .expect("invocation");
+        assert_eq!(invocation.args, vec!["C:/data/tmp/bash-1-2.ps1".to_string()]);
     }
 }
