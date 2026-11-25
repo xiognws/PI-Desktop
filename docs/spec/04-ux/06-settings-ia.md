@@ -391,7 +391,9 @@ Card order is **Session defaults → Self-improvement review → Execution**.
 - The **Command shell** row in Session defaults uses the host-discovered catalog of native
   PowerShell 5.1, PowerShell 7, cmd, Git Bash, and Bash with IDs
   `windows-powershell`, `windows-pwsh`, `cmd`, `git-bash`, and
-  `bash` where supported. The selected `defaultCommandShell` persists across
+  `bash` where supported. The default marker sits on the entry the platform
+  defaults to — Git Bash on Windows (ADR 0406), bash elsewhere — and the
+  selected `defaultCommandShell` persists across
   restart; writes reject unavailable or wrong-platform IDs. If a persisted
   choice later becomes unavailable, the first available platform shell is used
   and the fallback state is shown. When the selected shell is available, the
@@ -416,7 +418,10 @@ Token usage is **not a Settings destination** (D335 / ADR 0173). Completed-turn
 history stays host-owned (`session.endTurn.usage`, `stats.getTokenUsageHistory`).
 The user-facing dashboard is marketplace plugin `pi.token-insights`, opened from
 the command palette (`usage`, `tokens`, `用量`). Settings search does not index
-a usage tab.
+a usage tab. Spend follows the same rule: `stats.getUsageSummary` is the host's
+money rollup over the same ledger (`03-runtime/06-host-rpc-protocol.md`), and
+the desktop tool `statsGetUsageSummary` exposes it to the agent — neither is a
+destination here.
 
 ### Shortcuts (`shortcuts` tab)
 - **Keyboard shortcuts** card:

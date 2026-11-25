@@ -13,8 +13,6 @@ use std::sync::{
     Arc,
 };
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-#[cfg(not(test))]
-use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::{ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, watch};
@@ -468,6 +466,7 @@ async fn spawn_with_retries(
     Err((code.into(), format!("shell runner spawn failed: {error}")))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn encode_runner_config(config: &ToolRunnerStartConfig) -> Result<Vec<u8>, String> {
     validate_runner_config(config)?;
     let json = serde_json::to_vec(config)
@@ -3134,48 +3133,35 @@ pub(crate) struct SpawnedToolRunner {
 pub(crate) async fn spawn_tool_runner(
     config: &ToolRunnerStartConfig,
 ) -> Result<SpawnedToolRunner, (String, String)> {
-    #[cfg(not(test))]
-    let config_frame =
-        encode_runner_config(config).map_err(|error| ("TOOL_FAILED".to_string(), error))?;
-
-    #[cfg(not(test))]
-    let mut command = {
-        let executable = std::env::current_exe().map_err(|error| {
-            (
-                "TOOL_FAILED".to_string(),
-                format!("failed to resolve host-core executable: {error}"),
-            )
-        })?;
-        let mut command = Command::new(executable);
-        command.arg(INTERNAL_TOOL_RUNNER_FLAG);
-        command
-    };
-
-    // Unit tests run inside libtest's harness rather than the host binary. A
-    // direct resolved-shell child keeps those tests focused on ownership and
-    // descendant cleanup while production always uses the hidden runner mode.
-    #[cfg(test)]
+    // The interpreter is spawned directly. This path used to spawn a copy of
+    // this executable with `--internal-tool-runner` and hand that copy the
+    // config over a private stdin frame; the copy then started the interpreter
+    // and relayed its pipes. An unsigned application copying itself and feeding
+    // a child through a private protocol is the shape behaviour-based endpoint
+    // protection scores as a loader, and the one-shot path needs no such
+    // process: the command already travels in the interpreter arguments, or in
+    // the script file those arguments name. Session runs start the interpreter
+    // directly in the same way (`shell_session.rs`), so this path now matches
+    // them and the host keeps owning the tree it started.
     let mut command = Command::new(&config.program);
-
-    #[cfg(test)]
-    {
-        command.args(&config.args).current_dir(&config.workspace);
-        if let Some(scratch_dir) = config.scratch_dir.as_deref() {
-            command.env("PI_SCRATCH_DIR", scratch_dir);
-        }
-        if let Some(path) = config.env_path.as_deref() {
-            command.env("PATH", path);
-        }
-        for (name, value) in &config.extra_env {
-            command.env(name, value);
-        }
+    command.args(&config.args).current_dir(&config.workspace);
+    // The removed runner used to strip these from its own environment before
+    // starting the interpreter. The host inherits Electron's environment, so it
+    // has to strip them here instead - a leaked PYTHONHOME poisons every later
+    // call in the same app session.
+    strip_inherited_python_env(&mut command);
+    if let Some(scratch_dir) = config.scratch_dir.as_deref() {
+        command.env("PI_SCRATCH_DIR", scratch_dir);
+    }
+    if let Some(path) = config.env_path.as_deref() {
+        command.env("PATH", path);
+    }
+    for (name, value) in &config.extra_env {
+        command.env(name, value);
     }
 
-    #[cfg(not(test))]
-    command.stdin(Stdio::piped());
-    #[cfg(test)]
-    command.stdin(Stdio::null());
     command
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
@@ -3201,36 +3187,11 @@ pub(crate) async fn spawn_tool_runner(
         }
     };
 
-    #[allow(unused_mut)]
-    let mut control = child.stdin.take();
-    #[cfg(not(test))]
-    {
-        let Some(mut control_pipe) = control.take() else {
-            let _ = ownership.terminate_fail_closed(pid);
-            let _ = child.kill().await;
-            let _ = child.wait().await;
-            return Err((
-                "TOOL_FAILED".into(),
-                "shell runner did not expose its control pipe".into(),
-            ));
-        };
-        let write_result = control_pipe.write_all(&config_frame).await;
-        let flush_result = if write_result.is_ok() {
-            control_pipe.flush().await
-        } else {
-            Ok(())
-        };
-        if let Err(error) = write_result.and(flush_result) {
-            let _ = ownership.terminate_fail_closed(pid);
-            let _ = child.kill().await;
-            let _ = child.wait().await;
-            return Err((
-                "TOOL_FAILED".into(),
-                format!("failed to start shell runner: {error}"),
-            ));
-        }
-        control = Some(control_pipe);
-    }
+    // No control pipe: the interpreter owns stdin, so there is no private
+    // channel to hand the config to. Termination goes through the owned job /
+    // process group (`terminate_runner_tree`), which is what the closed pipe
+    // used to trigger.
+    let control: Option<ChildStdin> = None;
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();

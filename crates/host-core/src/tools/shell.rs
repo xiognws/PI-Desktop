@@ -87,10 +87,7 @@ pub fn current_platform() -> ShellPlatform {
 }
 
 pub fn default_shell_id() -> &'static str {
-    match current_platform() {
-        ShellPlatform::Windows => WINDOWS_POWERSHELL_ID,
-        ShellPlatform::Unix => BASH_ID,
-    }
+    default_for_platform(current_platform())
 }
 
 pub fn is_known_shell_id(id: &str) -> bool {
@@ -281,9 +278,21 @@ pub fn build_invocation_for_platform(
     Ok(ShellInvocation { program, args })
 }
 
+/// The shell a machine runs commands in when the user has not chosen one.
+///
+/// Windows prefers Git Bash, POSIX uses bash. Hermes parity: the reference
+/// agent runs every command through `bash -lc`, so bash is the one dialect both
+/// implementations share. It also keeps the default off PowerShell, whose only
+/// persistent form is `-Command -` — an interpreter reading its script from
+/// stdin, which behaviour-based endpoint protection scores as a hidden payload
+/// channel.
+///
+/// A machine without Git Bash is not left broken: `catalog_for_platform` keeps
+/// the configured id and falls back to the first available choice (Windows
+/// PowerShell), reporting `fallback: true` so the UI can say so.
 fn default_for_platform(platform: ShellPlatform) -> &'static str {
     match platform {
-        ShellPlatform::Windows => WINDOWS_POWERSHELL_ID,
+        ShellPlatform::Windows => GIT_BASH_ID,
         ShellPlatform::Unix => BASH_ID,
     }
 }
@@ -296,7 +305,7 @@ fn choices_for_platform(platform: ShellPlatform) -> Vec<ShellOption> {
                 label: "Windows PowerShell".into(),
                 dialect: "powershell".into(),
                 available: false,
-                is_default: true,
+                is_default: false,
             },
             ShellOption {
                 id: PWSH_ID.into(),
@@ -317,7 +326,9 @@ fn choices_for_platform(platform: ShellPlatform) -> Vec<ShellOption> {
                 label: "Git Bash".into(),
                 dialect: "posix".into(),
                 available: false,
-                is_default: false,
+                // Git Bash is the Windows default: one command language on
+                // every platform, and the dialect the reference agent uses.
+                is_default: true,
             },
         ],
         ShellPlatform::Unix => vec![ShellOption {
@@ -666,14 +677,36 @@ mod tests {
         assert_eq!(unix.choices.len(), 1);
 
         let windows = catalog_for_platform(ShellPlatform::Windows, None, |_| true);
-        assert_eq!(windows.configured_id, WINDOWS_POWERSHELL_ID);
+        // Hermes parity: Windows defaults to Git Bash (the dialect the
+        // reference agent runs), with PowerShell kept as an explicit choice.
+        assert_eq!(windows.configured_id, GIT_BASH_ID);
+        assert_eq!(
+            windows.effective.as_ref().map(|option| option.id.as_str()),
+            Some(GIT_BASH_ID)
+        );
         assert_eq!(windows.choices.len(), 4);
         assert_eq!(windows.choices[0].label, "Windows PowerShell");
-        assert!(windows.choices[0].is_default);
+        assert!(!windows.choices[0].is_default);
         assert_eq!(windows.choices[1].id, PWSH_ID);
         assert_eq!(windows.choices[1].label, "PowerShell 7");
         assert_eq!(windows.choices[1].dialect, "powershell");
         assert!(!windows.choices[1].is_default);
+        assert_eq!(windows.choices[3].id, GIT_BASH_ID);
+        assert!(
+            windows.choices[3].is_default,
+            "Git Bash carries the default marker on Windows"
+        );
+
+        // A machine without Git Bash still runs: the configured id stays (so
+        // the UI can report fallback) and the first available choice - Windows
+        // PowerShell - takes over.
+        let no_bash = catalog_for_platform(ShellPlatform::Windows, None, |id| id != GIT_BASH_ID);
+        assert_eq!(no_bash.configured_id, GIT_BASH_ID);
+        assert_eq!(
+            no_bash.effective.as_ref().map(|option| option.id.as_str()),
+            Some(WINDOWS_POWERSHELL_ID)
+        );
+        assert!(no_bash.fallback);
 
         // The fallback follows catalog order, so PowerShell 7 — placed directly
         // after the in-box 5.1 entry — is the first available choice once 5.1 is

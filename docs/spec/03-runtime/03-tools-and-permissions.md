@@ -696,11 +696,13 @@ project changes are not copied; git-ignored files listed in
   `PI_WORKTREE_ROOT`;
 - the optional per-project setup command runs once in each new worktree, with
   the same variables, in the user's default command shell
-  (`defaultCommandShell`, otherwise the platform default: Windows PowerShell on
-  Windows, bash elsewhere). It is not translated between dialects, so on
-  Windows it must use PowerShell syntax (`$env:PI_PORT`, `;` rather than
-  `&&` on Windows PowerShell 5.1) unless a POSIX shell such as Git Bash is
-  the configured default;
+  (`defaultCommandShell`, otherwise the platform default: Git Bash on Windows
+  when it resolves — Windows PowerShell if Git Bash is not installed — and bash
+  elsewhere, ADR 0406). It is not translated between dialects, so a Windows
+  setup command must use the syntax of the shell that will run it: POSIX
+  (`$PI_PORT`, `&&`) under the default Git Bash, or PowerShell syntax
+  (`$env:PI_PORT`, `;` rather than `&&` on Windows PowerShell 5.1) when the
+  default is pinned to a PowerShell entry;
 - git hooks and fsmonitor are disabled for host-run git commands in the
   worktree, and removal never follows links out of it;
 - the registered worktree folder must be a real directory: if it (or a

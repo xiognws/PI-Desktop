@@ -107,7 +107,16 @@ export function isCommandShellCatalog(value: unknown): value is CommandShellCata
   );
 }
 
-/** Defaults preserve the host's native shell on Windows and POSIX Bash elsewhere. */
+/**
+ * Default command shell per platform: Bash everywhere the host can provide it.
+ *
+ * Windows defaults to Git Bash rather than Windows PowerShell. Hermes parity is
+ * the reason: the reference agent runs every command through `bash -lc`, so one
+ * command language across platforms also keeps this app's behaviour identical to
+ * the implementation it is a port of. A machine without Git Bash keeps the
+ * configured id and reports `fallback: true` from the host catalog, which then
+ * runs Windows PowerShell.
+ */
 export function defaultCommandShellForPlatform(platform: string): CommandShellId {
-  return platform === "win32" ? "windows-powershell" : "bash";
+  return platform === "win32" ? "git-bash" : "bash";
 }

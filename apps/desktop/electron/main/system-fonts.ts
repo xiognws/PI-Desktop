@@ -12,10 +12,13 @@
  * The Windows and Linux approaches mirror the MIT-licensed `font-list`
  * package (https://github.com/oldj/font-list). Callers cache the result.
  */
-import { exec, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { promisify } from "node:util";
 
-const execAsync = promisify(exec);
+import { runtimeTempPath } from "./runtime-tmp";
+
 const execFileAsync = promisify(execFile);
 
 async function darwinFontFamilies(): Promise<string[]> {
@@ -59,13 +62,59 @@ async function darwinFontFamilies(): Promise<string[]> {
   return [...families];
 }
 
+/**
+ * Fixed script file for the Windows font query.
+ *
+ * The query used to travel as a quoted blob: `chcp 65001|powershell -NoProfile
+ * -Command "<script>"` handed to `exec`. That is a shell layer plus a hidden
+ * interpreter carrying an inline payload — the shape behaviour-based endpoint
+ * protection scores hardest, and none of it is needed: the script is a
+ * constant, so it lives in a file the interpreter is pointed at with `-File`
+ * (arguments, of which this query has none, would travel as argv). Written with
+ * a BOM because Windows PowerShell 5.1 decodes a BOM-less script with the ANSI
+ * code page. It lives under `<dataDir>/tmp` like every other runtime scratch
+ * file, and is rewritten on first use in each process so a stale copy from an
+ * older build cannot survive.
+ */
+const FONT_QUERY_SCRIPT = [
+  "$ErrorActionPreference = 'Stop'",
+  "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
+  "Add-Type -AssemblyName PresentationCore",
+  "$zh = [Windows.Markup.XmlLanguage]::GetLanguage('zh-cn')",
+  "$en = [Windows.Markup.XmlLanguage]::GetLanguage('en-us')",
+  "foreach ($family in [Windows.Media.Fonts]::SystemFontFamilies) {",
+  "  $name = ''",
+  "  if (-not $family.FamilyNames.TryGetValue($zh, [ref]$name)) { $name = $family.FamilyNames[$en] }",
+  "  if ($name) { Write-Output $name }",
+  "}",
+].join("\n");
+
+let fontQueryScriptPath: string | undefined;
+
+function win32FontScript(): string {
+  if (fontQueryScriptPath) return fontQueryScriptPath;
+  const path = runtimeTempPath("pi-list-system-fonts.ps1");
+  writeFileSync(path, `\ufeff${FONT_QUERY_SCRIPT}`, "utf8");
+  fontQueryScriptPath = path;
+  return path;
+}
+
 async function win32FontFamilies(): Promise<string[]> {
-  const command =
-    "chcp 65001|powershell -NoProfile -Command \"chcp 65001|Out-Null;Add-Type -AssemblyName PresentationCore;$families=[Windows.Media.Fonts]::SystemFontFamilies;foreach($family in $families){$name='';if(!$family.FamilyNames.TryGetValue([Windows.Markup.XmlLanguage]::GetLanguage('zh-cn'),[ref]$name)){$name=$family.FamilyNames[[Windows.Markup.XmlLanguage]::GetLanguage('en-us')]}echo $name}\"";
-  const { stdout } = await execAsync(command, {
-    maxBuffer: 10 * 1024 * 1024,
-    windowsHide: true,
-  });
+  const powershell = join(
+    process.env.SystemRoot || "C:\\Windows",
+    "System32",
+    "WindowsPowerShell",
+    "v1.0",
+    "powershell.exe",
+  );
+  // `-ExecutionPolicy Bypass` is required for `-File` on a machine whose policy
+  // scope is undefined, and the script path must end in `.ps1` — PowerShell
+  // rejects any other extension.
+  const { stdout } = await execFileAsync(
+    powershell,
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", win32FontScript()],
+    { maxBuffer: 10 * 1024 * 1024, windowsHide: true, timeout: 20_000 },
+  );
   return stdout
     .split("\n")
     .map((line) => line.trim())
