@@ -67,6 +67,50 @@ export type SessionUsageCost = {
   providers: ProviderUsageCost[];
 };
 
+/**
+ * Money and tokens for a set of physical requests.
+ *
+ * The two are summed from the same ledger records, so a caller can read either
+ * without re-deriving the other. `costTotal` covers priced requests only and is
+ * a lower bound whenever `unpricedRequests` is nonzero — a request whose price
+ * no provider reported is counted, never guessed.
+ */
+export type UsageSpendTotals = {
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+  /** USD of the priced requests only. */
+  costTotal: number;
+  pricedRequests: number;
+  /** Priced requests the provider billed rather than the catalog estimated. */
+  reportedRequests: number;
+  unpricedRequests: number;
+};
+
+/** One provider's (or one model's) share of a spend window. */
+export type UsageSpendRow = UsageSpendTotals & {
+  /** Desktop provider row; absent when the records cannot be attributed. */
+  providerId?: string;
+  /** Model the requests ran on; absent when the records cannot be attributed. */
+  modelId?: string;
+};
+
+/** Every session's spend in one window (`stats.getUsageSummary`). */
+export type UsageSummary = UsageSpendTotals & {
+  /** Inclusive window bounds, epoch milliseconds on the turn's start. */
+  rangeStart: number;
+  rangeEnd: number;
+  /** Turns that reached a provider; a turn with no tokens is not one. */
+  turnCount: number;
+  /** Rows are ordered by money, so the expensive provider comes first. */
+  byProvider: UsageSpendRow[];
+  byModel: UsageSpendRow[];
+};
+
 export { addUsage, contextOccupancyTokens, withUsageIdentity } from "../message-usage.js";
 
 export type MessageAttachment = {
