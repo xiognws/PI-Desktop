@@ -1,0 +1,14 @@
+apps/desktop/src/features/settings/PythonSettingsSection.tsx
+  h_201ed4c689ac8b 61-65,151-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c32bae7b5386525b5107ab1658a98d087e5b4287",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
