@@ -45,13 +45,6 @@ pub const MAX_SUBAGENT_REPORT_CHARS: usize = 12_000;
 
 const REPORT_TRUNCATION_MARKER: &str = "\n\n[subagent report truncated]\n\n";
 
-/// Steps a delegate may take before it has to hand back a report.
-///
-/// A delegate is a bounded run, not a second session: without a ceiling one that
-/// loops on a broken command would spend the turn's whole budget in the
-/// background.
-pub const SUBAGENT_MAX_STEPS: usize = 24;
-
 /// Budget of one resumed delegation report block.
 ///
 /// Wider than a single report because several can settle together, and still

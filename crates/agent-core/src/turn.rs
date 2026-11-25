@@ -3,14 +3,15 @@
 //! Upstream counterpart: `agent/conversation_loop.py` plus `turn_context.py`.
 //! One *turn* is one user request; inside it the loop may take several *steps*,
 //! each one provider request followed by the tool calls it asked for. The loop
-//! ends when the model answers without calling a tool, when the step budget is
-//! exhausted, or when the turn is cancelled.
+//! ends when the model answers without calling a tool, when the turn is
+//! cancelled, or when a caller that named a step ceiling reached it. The kernel
+//! itself names none: a turn runs until the work is done.
 //!
 //! Responsibilities kept here on purpose:
 //! * ordering of the events the renderer sees;
 //! * transcript mutation (assistant message, then one result per call);
 //! * pairing repair before every provider request;
-//! * cancellation and the step budget.
+//! * cancellation and any step ceiling the caller named;
 //!
 //! Responsibilities deliberately *not* here: retry/backoff policy, compaction,
 //! prompt composition, subagents. Each arrives with its own subsystem so this
@@ -46,9 +47,16 @@ use crate::verify::{CompletionPolicy, CompletionTracker, GateVerdict, VERIFICATI
 pub struct TurnConfig {
     pub model: String,
     pub system: Option<String>,
-    /// Provider requests per turn. A tool-heavy turn needs a handful; the
-    /// ceiling exists so a looping model cannot burn the budget forever.
-    pub max_steps: usize,
+    /// Provider requests per turn. `None` — the default — is no ceiling: the turn
+    /// ends when the model stops calling tools, when the user stops it, or when
+    /// the provider fails.
+    ///
+    /// A ceiling stays available to a caller that genuinely has one (the
+    /// background review, a bounded probe, an explicit `stepBudget`), but it is
+    /// never imposed on the conversation. A working turn cut off at an arbitrary
+    /// count loses the work it was about to finish, and that count says nothing
+    /// about whether the work was worth doing.
+    pub max_steps: Option<usize>,
     pub temperature: Option<f32>,
     pub max_output_tokens: Option<u32>,
     pub thinking: ThinkingLevel,
@@ -67,7 +75,7 @@ impl TurnConfig {
         Self {
             model: model.into(),
             system: None,
-            max_steps: 24,
+            max_steps: None,
             temperature: None,
             max_output_tokens: None,
             thinking: ThinkingLevel::Off,
@@ -138,15 +146,19 @@ impl EscalationTarget {
         &self,
         consecutive_tool_errors: usize,
         step: usize,
-        max_steps: usize,
+        max_steps: Option<usize>,
     ) -> Option<&'static str> {
         if self.after_tool_errors > 0 && consecutive_tool_errors >= self.after_tool_errors {
             return Some("tool-errors");
         }
-        if self.after_budget_used > 0.0 && max_steps > 0 {
-            let used = step as f32 / max_steps as f32;
-            if used >= self.after_budget_used {
-                return Some("budget");
+        // A turn with no ceiling has no share of one to measure, so this signal
+        // cannot fire; the hand-over still happens on repeated tool failures.
+        if self.after_budget_used > 0.0 {
+            if let Some(max_steps) = max_steps.filter(|limit| *limit > 0) {
+                let used = step as f32 / max_steps as f32;
+                if used >= self.after_budget_used {
+                    return Some("budget");
+                }
             }
         }
         None
@@ -366,7 +378,12 @@ impl TurnEngine {
         let mut escalated = false;
         let mut consecutive_tool_errors: usize = 0;
 
-        for step in 0..config.max_steps {
+        // The ceiling this turn was given, if any. `None` is an unbounded turn:
+        // the loop ends when the model answers without a tool call, when the user
+        // stops it, or when a provider or tool failure ends it — never on a count
+        // of steps.
+        let step_ceiling = config.max_steps.unwrap_or(usize::MAX);
+        for step in 0..step_ceiling {
             steps_taken += 1;
             if cancel.is_cancelled() {
                 self.emit(
@@ -810,10 +827,10 @@ impl TurnEngine {
                     .await;
             }
 
-            if step + 1 == config.max_steps {
-                let error = AgentError::StepLimit {
-                    limit: config.max_steps,
-                };
+            // Only a ceiling the caller named stops the loop here. Without one
+            // the range above ends at `usize::MAX`, so this never fires.
+            if let Some(limit) = config.max_steps.filter(|limit| *limit == step + 1) {
+                let error = AgentError::StepLimit { limit };
                 self.emit(
                     session_id,
                     turn_id,
@@ -1539,21 +1556,23 @@ mod escalation_tests {
 
     #[test]
     fn a_single_failure_is_not_evidence() {
-        assert_eq!(target(2, 0.6).trigger(1, 0, 10), None);
-        assert_eq!(target(2, 0.6).trigger(2, 0, 10), Some("tool-errors"));
+        assert_eq!(target(2, 0.6).trigger(1, 0, Some(10)), None);
+        assert_eq!(target(2, 0.6).trigger(2, 0, Some(10)), Some("tool-errors"));
     }
 
     #[test]
     fn a_spent_budget_hands_over_even_without_failures() {
-        assert_eq!(target(2, 0.6).trigger(0, 5, 10), None);
-        assert_eq!(target(2, 0.6).trigger(0, 6, 10), Some("budget"));
-        // A turn with no declared budget never escalates on a ratio it cannot compute.
-        assert_eq!(target(2, 0.6).trigger(0, 5, 0), None);
+        assert_eq!(target(2, 0.6).trigger(0, 5, Some(10)), None);
+        assert_eq!(target(2, 0.6).trigger(0, 6, Some(10)), Some("budget"));
+        // A turn with no declared ceiling never escalates on a ratio it cannot
+        // compute; the tool-error threshold still applies to it.
+        assert_eq!(target(2, 0.6).trigger(0, 5, None), None);
+        assert_eq!(target(2, 0.6).trigger(3, 5, None), Some("tool-errors"));
     }
 
     #[test]
     fn either_threshold_can_be_switched_off() {
-        assert_eq!(target(0, 0.0).trigger(99, 9, 10), None);
-        assert_eq!(target(1, 0.0).trigger(1, 0, 10), Some("tool-errors"));
+        assert_eq!(target(0, 0.0).trigger(99, 9, Some(10)), None);
+        assert_eq!(target(1, 0.0).trigger(1, 0, Some(10)), Some("tool-errors"));
     }
 }

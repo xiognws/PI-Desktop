@@ -209,7 +209,9 @@ struct RuntimeConfig {
     network_proxy: Option<Value>,
     model: String,
     system: Option<String>,
-    max_steps: usize,
+    /// The step ceiling a launch inherits when it names none. `None` — the
+    /// default — leaves the turn uncapped; `sidecar.configure` can still set one.
+    max_steps: Option<usize>,
     temperature: Option<f32>,
     max_output_tokens: Option<u32>,
     /// The reasoning budget a prompt inherits when it names none. Set once by
@@ -219,10 +221,7 @@ struct RuntimeConfig {
 
 impl RuntimeConfig {
     fn new() -> Self {
-        Self {
-            max_steps: 24,
-            ..Self::default()
-        }
+        Self::default()
     }
 }
 
@@ -658,7 +657,7 @@ impl Sidecar {
             config.model = model.to_string();
         }
         if let Some(steps) = request.params.get("maxSteps").and_then(Value::as_u64) {
-            config.max_steps = steps.max(1) as usize;
+            config.max_steps = Some(steps.max(1) as usize);
         }
         config.temperature = request
             .params
@@ -4369,7 +4368,7 @@ async fn skill_review_pass(input: SkillReviewInput) {
     let config = TurnConfig {
         model,
         system,
-        max_steps: crate::skill_review::REVIEW_MAX_ITERATIONS as usize,
+        max_steps: Some(crate::skill_review::REVIEW_MAX_ITERATIONS as usize),
         temperature: None,
         max_output_tokens: None,
         cache: crate::provider::CacheRetention::None,
@@ -4517,7 +4516,11 @@ impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
             let config = TurnConfig {
                 model,
                 system: Some(prompt),
-                max_steps: crate::delegate::SUBAGENT_MAX_STEPS,
+                // No step ceiling. A delegate used to be cut off at 24 steps,
+                // which failed the delegation with its work half done and handed
+                // the parent a failure instead of a report; the parent already
+                // bounds it through `TaskWait`/`TaskStop` and can ask again.
+                max_steps: None,
                 temperature: None,
                 max_output_tokens: None,
                 thinking: ThinkingLevel::Off,

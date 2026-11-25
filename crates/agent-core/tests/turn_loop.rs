@@ -195,7 +195,7 @@ async fn step_budget_stops_a_model_that_keeps_calling_tools() {
     transcript.push(Message::user_text("loop"));
 
     let mut config = TurnConfig::new("test-model");
-    config.max_steps = 2;
+    config.max_steps = Some(2);
     let error = engine
         .run_turn("s1", "t1", &mut transcript, &config, CancelToken::new())
         .await
@@ -206,6 +206,43 @@ async fn step_budget_stops_a_model_that_keeps_calling_tools() {
         event,
         AgentEvent::Error { code, .. } if code == "STEP_LIMIT"
     )));
+}
+
+/// The kernel names no ceiling of its own: a turn that needs more requests than
+/// the old fixed 24 runs all of them and answers, instead of being cut off with
+/// the work half done.
+#[tokio::test]
+async fn a_turn_without_a_named_ceiling_runs_past_the_old_fixed_limit() {
+    let mut scripted: Vec<Vec<StreamEvent>> = (0..40)
+        .map(|index| tool_call_events(&format!("call_{index}"), "echo", "{\"text\":\"x\"}"))
+        .collect();
+    scripted.push(answer_events("done"));
+    let provider = Arc::new(ScriptedProvider::new(scripted));
+    let sink = Arc::new(RecordingSink::new());
+    let engine = engine(provider.clone(), sink.clone());
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("work"));
+
+    let outcome = engine
+        .run_turn(
+            "s1",
+            "t1",
+            &mut transcript,
+            &TurnConfig::new("test-model"),
+            CancelToken::new(),
+        )
+        .await
+        .expect("a turn with no ceiling must reach its answer");
+
+    assert_eq!(outcome.steps, 41, "40 tool steps and the answer");
+    assert_eq!(provider.requests().len(), 41);
+    assert!(
+        !sink.events().iter().any(|event| matches!(
+            event,
+            AgentEvent::Error { code, .. } if code == "STEP_LIMIT"
+        )),
+        "STEP_LIMIT may only be emitted for a ceiling the caller named"
+    );
 }
 
 /// Provider that never delivers an event, so cancellation is the only exit.

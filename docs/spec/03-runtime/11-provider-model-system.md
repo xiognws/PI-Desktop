@@ -966,7 +966,8 @@ answers; `sub` takes mechanical turns and delegated work. ADR 0405.
   `main` and the decision records `downgradedFrom: "sub"`.
 - **In-turn escalation.** A `sub` turn hands the rest of itself to `main` when
   it is stuck: `afterToolErrors` consecutive tool failures, or
-  `afterBudgetUsed` of the step budget spent. The launch carries the strong
+  `afterBudgetUsed` of the step budget spent when the launch named a ceiling
+  (`stepBudget`; none is named by default — §5 of `02-agent-runtime.md`). The launch carries the strong
   half's provider spec, so the kernel continues with the same transcript and one
   re-send — no completed tool is replayed, and the hand-over happens at most
   once per turn. Both halves resolve through the same catalog loop; only the

@@ -204,8 +204,10 @@ impl TurnWorker {
 
         let mut config = self.config.clone();
         config.system = Some(compose_worker_system_prompt(&request.spec));
+        // `0` in the request keeps the worker's own config, which has no
+        // ceiling unless the host that built it named one.
         if request.max_steps > 0 {
-            config.max_steps = request.max_steps;
+            config.max_steps = Some(request.max_steps);
         }
 
         let engine = TurnEngine::new(self.provider.clone(), self.tools.clone(), self.sink.clone());

@@ -209,6 +209,16 @@ and clears it when assistant or tool activity starts, or when the turn
 terminates. This is observability only; it does not add a second agent loop or
 a completion percentage.
 
+**No step ceiling.** How long a turn runs is decided by the work, not by a
+count. The loop ends when the model answers without calling a tool, when the
+user stops it, or when a provider or tool failure ends it. There used to be an
+implicit 24-provider-request ceiling on the loop; it failed long tool sequences
+and every delegate that needed one more request with `STEP_LIMIT`, with the work
+half done, so the kernel names no ceiling now. `STEP_LIMIT` is emitted only for a
+ceiling a caller passes explicitly (`stepBudget`), which the background skill
+review does. Repeated tool failures, the token budget, compaction and
+cancellation remain what bound a turn.
+
 The runtime constructs exactly one pi `Agent` per durable session. Plan does
 not select a second model, planner service, permission implementation, or
 runtime. The same Agent changes its planning state and tool registry after a
@@ -1255,7 +1265,10 @@ parses so old documents load, but those values are not armed. A delegate runs
 until it finishes, fails, is `TaskStop`'d, or the user Stops / the runtime is
 disposed. The parent agent judges whether to cancel via `TaskStop`; a one-line
 heartbeat (who, status, elapsed, turns, last tool) is what it has to go on while
-the delegate is running.
+the delegate is running. A delegate also has no fixed step ceiling: the
+24-provider-request cap that used to settle it as `failed` at the step limit is
+gone, so it is bounded by `TaskStop`, the user's Stop, and runtime disposal —
+not by a request count.
 
 When the parent stops calling tools while delegates are still running, the
 runtime swallows that `agent_end`, keeps the durable turn open, waits for the
