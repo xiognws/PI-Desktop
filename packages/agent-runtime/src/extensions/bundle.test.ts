@@ -14,6 +14,53 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 let work: string;
 
+/**
+ * Can this host write a built bundle anywhere outside the workspace?
+ *
+ * Both suites below must stage their bundle outside the repository: the first
+ * runs it with `cwd` there, and the second asserts the child cannot resolve
+ * `typebox` from an ancestor - a directory inside the checkout would satisfy that
+ * through the repository's own `node_modules` and make the assertion meaningless.
+ *
+ * That is not always possible. A managed Windows host whose endpoint agent allows
+ * writes only under the workspace fails the build itself with `Access is denied`
+ * (measured: `%TEMP%`, a sibling of the repo and another drive are all refused,
+ * the checkout is allowed), so the two suites skip there with a printed reason
+ * instead of failing for a host policy that says nothing about the code.
+ *
+ * The probe runs the real build rather than checking a flag: only the spawn knows
+ * whether its output is allowed, and a genuine build error still throws.
+ */
+async function canStageOutsideWorkspace(): Promise<boolean> {
+  const probe = mkdtempSync(join(tmpdir(), "pi-ext-probe-"));
+  try {
+    await build({
+      stdin: { contents: "export const probe = 1;", loader: "js" },
+      bundle: true,
+      outfile: join(probe, "out.js"),
+      logLevel: "silent",
+    });
+    return true;
+  } catch (error) {
+    const detail = [
+      ...((error as { errors?: { text: string }[] }).errors ?? []).map((entry) => entry.text),
+      String(error),
+    ].join(" ");
+    if (!/access is denied|eperm|eacces/i.test(detail)) throw error;
+    console.warn(
+      "[E2E-245] skipping the out-of-workspace bundle suites: this host's endpoint " +
+        "agent refuses writes outside the workspace, which is what these tests stage into.",
+    );
+    return false;
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+}
+
+const stageOutside = await canStageOutsideWorkspace();
+/** `describe` normally, `describe.skip` on a host that cannot stage outside the repo. */
+const outsideWorkspaceSuite = stageOutside ? describe : describe.skip;
+
 beforeEach(() => {
   // Deliberately the platform temp directory, not `testTempRoot()`: the
   // typebox case below asserts the bundle does not resolve from above it, which
@@ -27,7 +74,7 @@ afterEach(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-describe("bundled loader (E2E-245)", () => {
+outsideWorkspaceSuite("bundled loader (E2E-245)", () => {
   it("loads a TypeScript extension through split ESM chunks outside the repo", async () => {
     const entry = join(work, "entry.ts");
     writeFileSync(
@@ -103,7 +150,7 @@ export default function (pi: any) {
  * sidecar fails every native Pi extension with
  * `Cannot find module 'typebox'`.
  */
-describe("packaged sidecar extension loader", () => {
+outsideWorkspaceSuite("packaged sidecar extension loader", () => {
   // pi-coding-agent ships an import-only export map, so locate its directory
   // through the workspace layout the sidecar bundle resolves from.
   const extensionLoader = resolve(
