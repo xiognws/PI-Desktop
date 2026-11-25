@@ -30,6 +30,8 @@ import {
   type WidgetSummary,
 } from "@pi-workspace/shared";
 
+import { startPythonEntry } from "./python-entry.js";
+
 import type {
   WidgetActionHandler,
   WidgetActionInput,
@@ -41,6 +43,18 @@ import type {
 const LOG_LIMIT = 200;
 /** Entry module candidates, in resolution order. */
 const ENTRY_CANDIDATES = ["index.js", "index.mjs", "index.cjs"];
+
+export type WidgetRunnerOptions = {
+  /**
+   * Resolve the interpreter for `runtime.kind: "python"` packages.
+   *
+   * Interpreter policy stays with the caller: this process may run in a
+   * sandbox where the user's preferred interpreter is only known to main.
+   * Returning undefined makes a Python package fail with a message instead of
+   * silently never loading.
+   */
+  pythonInterpreter?: () => string | undefined;
+};
 
 export type WidgetRunnerHost = {
   /** Ask host-core for something; the caller has already checked `host`. */
@@ -174,8 +188,11 @@ export class WidgetRunner {
   private loaded = new Map<string, LoadedWidget>();
   private host: WidgetRunnerHost;
 
-  constructor(host: WidgetRunnerHost) {
+  private options: WidgetRunnerOptions;
+
+  constructor(host: WidgetRunnerHost, options: WidgetRunnerOptions = {}) {
     this.host = host;
+    this.options = options;
   }
 
   /** Packages currently held, by id. */
@@ -203,6 +220,10 @@ export class WidgetRunner {
    * re-derives trust from the filesystem on its own.
    */
   async load(summaries: WidgetSummary[]): Promise<WidgetRuntimeState[]> {
+    // Every package is re-created below, so the previous generation is disposed
+    // first: a Python package owns a child process, and a sync that only swapped
+    // the map would leak one process per package per reload.
+    for (const entry of this.loaded.values()) entry.python?.dispose();
     const next = new Map<string, LoadedWidget>();
     for (const summary of summaries) {
       if (!summary.enabled) continue;
@@ -217,7 +238,79 @@ export class WidgetRunner {
 
   /** Drop every package; used when the client disables the whole feature. */
   clear(): void {
+    for (const entry of this.loaded.values()) entry.python?.dispose();
     this.loaded.clear();
+  }
+
+  /**
+   * Start a Python package and forward its declared actions to the process.
+   *
+   * Only declared actions are reachable: an undeclared action is refused here,
+   * which keeps the manifest the single list of what a package may be asked to
+   * do - the same rule the JavaScript loader enforces by checking registration.
+   */
+  private async loadPythonPackage(
+    summary: WidgetSummary,
+    manifest: ManifestShape,
+    dir: string,
+    runtime: WidgetRuntime,
+  ): Promise<LoadedWidget> {
+    const declared = declaredActions(manifest);
+    const resolved = resolveRuntimeEntry(dir, runtime);
+    if (!resolved.entry) {
+      return {
+        summary,
+        actions: new Map(),
+        declared,
+        state: "error",
+        error: resolved.error ?? "python entry is missing",
+        logs: [],
+      };
+    }
+    const interpreter = this.options.pythonInterpreter?.();
+    if (!interpreter) {
+      return {
+        summary,
+        actions: new Map(),
+        declared,
+        state: "error",
+        error: "no Python interpreter is configured for widget packages",
+        logs: [],
+      };
+    }
+    const python = startPythonEntry({
+      interpreter,
+      entry: resolved.entry,
+      cwd: dir,
+      pythonPath: runtime.pythonPath ?? [],
+    });
+    try {
+      await python.ready;
+    } catch (cause) {
+      python.dispose();
+      return {
+        summary,
+        actions: new Map(),
+        declared,
+        state: "error",
+        error: cause instanceof Error ? cause.message : String(cause),
+        logs: python.stderr(),
+      };
+    }
+    const actions = new Map<string, WidgetActionHandler>();
+    for (const action of declared) {
+      actions.set(action.name, (input: WidgetActionInput) =>
+        python.request(action.name, input.args, WIDGET_INVOKE_TIMEOUT_MS),
+      );
+    }
+    return {
+      summary: summarize(summary, manifest),
+      actions,
+      declared,
+      state: "loaded",
+      logs: python.stderr(),
+      python,
+    };
   }
 
   private async loadOne(summary: WidgetSummary): Promise<LoadedWidget | undefined> {
@@ -232,6 +325,10 @@ export class WidgetRunner {
         error: error ?? "unreadable manifest",
         logs: [],
       };
+    }
+    const runtime = readWidgetRuntime(manifest.runtime) ?? { kind: "javascript" as const };
+    if (runtime.kind === "python") {
+      return await this.loadPythonPackage(summary, manifest, dir, runtime);
     }
     const entry = resolveEntry(dir);
     if (!entry) {

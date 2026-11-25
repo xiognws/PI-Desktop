@@ -1,6 +1,7 @@
 # ADR: Python packages as a widget entry kind
 
-- Status: Proposed
+- Status: Accepted (execution half implemented: `widgets/python-entry.ts`, runtime
+  dispatch in `widgets/runner.ts`)
 - Related: D699 (widget packages), `packages/shared/src/widgets.ts`,
   `packages/agent-runtime/src/widgets/`, `crates/host-core/src/widgets.rs`,
   `packages/python-runtime`

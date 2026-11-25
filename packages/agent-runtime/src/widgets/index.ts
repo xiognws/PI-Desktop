@@ -14,7 +14,7 @@ import type {
 } from "@pi-workspace/shared";
 import { Type } from "typebox";
 
-import { WidgetRunner, type WidgetRunnerHost } from "./runner.js";
+import { WidgetRunner, type WidgetRunnerHost, type WidgetRunnerOptions } from "./runner.js";
 
 /** Agent tool the model uses to reach installed packages. */
 export const WIDGET_TOOL_NAME = "Widget";
@@ -40,8 +40,8 @@ export class WidgetRegistry {
   /** Packages the host reported but the runner refused, for status queries. */
   private rejected = new Map<string, string>();
 
-  constructor(host: WidgetRunnerHost) {
-    this.runner = new WidgetRunner(host);
+  constructor(host: WidgetRunnerHost, options: WidgetRunnerOptions = {}) {
+    this.runner = new WidgetRunner(host, options);
   }
 
   /**

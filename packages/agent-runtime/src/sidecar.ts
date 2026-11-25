@@ -86,9 +86,18 @@ const hostProxy = new ParentHostProxy();
  * main still sees one host-core client and the `permissions.request` filter
  * still applies.
  */
-const widgetRegistry = new WidgetRegistry({
-  call: (method, params) => hostProxy.call(method, params ?? {}),
-});
+const widgetRegistry = new WidgetRegistry(
+  {
+    call: (method, params) => hostProxy.call(method, params ?? {}),
+  },
+  {
+    // Interpreter policy belongs to Electron main (it knows the bundled runtime
+    // and the user's preference); this process only receives the resolved path.
+    // Without it a `runtime.kind: "python"` package reports an error instead of
+    // hanging in a half-loaded state.
+    pythonInterpreter: () => process.env.PI_DESKTOP_WIDGET_PYTHON || undefined,
+  },
+);
 const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
 function testRuntimeIdentity(sessionId: string) {
   if (process.env.PI_DESKTOP_PLAN_UI_PROBE !== "1") {

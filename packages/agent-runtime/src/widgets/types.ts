@@ -66,4 +66,12 @@ export type LoadedWidget = {
   state: WidgetRuntimeState["state"];
   error?: string;
   logs: string[];
+  /**
+   * The out-of-process entry of a Python package. The runner owns its lifetime,
+   * so dropping the package also stops the program.
+   */
+  python?: {
+    dispose(): void;
+    stderr(): string[];
+  };
 };
