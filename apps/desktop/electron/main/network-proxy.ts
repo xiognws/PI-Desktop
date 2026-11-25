@@ -50,7 +50,7 @@ let systemProxyRelay: SystemProxyRelay | null = null;
 let systemProxyRelayStart: Promise<SystemProxyRelay> | null = null;
 
 export async function ensureSystemProxyRelay(
-  options: { force?: boolean } = {},
+  options: { force?: boolean; timeoutMs?: number; onLate?: (relayUrl: string) => void } = {},
 ): Promise<string> {
   // `force` is for a caller that needs a tunnel regardless of the route: the
   // provider-metadata retry borrows the relay to avoid a client certificate, and
@@ -60,6 +60,10 @@ export async function ensureSystemProxyRelay(
       () => session.defaultSession.resolveProxy(SYSTEM_PROXY_PROBE_URL),
       startSystemProxyRelayOnce,
       process.env,
+      {
+        ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+        ...(options.onLate ? { onLate: options.onLate } : {}),
+      },
     );
   }
   return startSystemProxyRelayOnce();

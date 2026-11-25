@@ -61,3 +61,54 @@ test("an unresolvable proxy answer keeps proxy support instead of dropping it", 
   assert.equal(url, "http://127.0.0.1:9/relay");
   assert.equal(started, 1);
 });
+
+test("boot stops waiting for a slow route and applies the relay when it lands", async () => {
+  // The field case: Chromium asks the OS, a WPAD/PAC machine takes seconds to
+  // answer, and the window plus host-core sat behind 7 s of it.
+  let started = 0;
+  const late = [];
+  const startedAt = Date.now();
+  const url = await systemProxyRelayIfNeeded(
+    async () => {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return "PROXY corporate:8080";
+    },
+    async () => {
+      started += 1;
+      return "http://127.0.0.1:9/relay";
+    },
+    {},
+    { timeoutMs: 20, onLate: (relayUrl) => late.push(relayUrl) },
+  );
+  const waited = Date.now() - startedAt;
+  assert.equal(url, "", "boot must carry on without a relay");
+  assert.ok(waited < 100, `boot waited ${waited} ms for the route`);
+  assert.equal(started, 0, "nothing is started while the answer is still out");
+
+  // The answer arrives after boot: the relay starts then, and the caller is told
+  // so host-core can hand it to the children it spawns.
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(started, 1);
+  assert.deepEqual(late, ["http://127.0.0.1:9/relay"]);
+});
+
+test("a deadline that lands on DIRECT starts nothing late", async () => {
+  let started = 0;
+  const late = [];
+  const url = await systemProxyRelayIfNeeded(
+    async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      return "DIRECT";
+    },
+    async () => {
+      started += 1;
+      return "http://127.0.0.1:9/relay";
+    },
+    {},
+    { timeoutMs: 10, onLate: (relayUrl) => late.push(relayUrl) },
+  );
+  assert.equal(url, "");
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.equal(started, 0);
+  assert.deepEqual(late, []);
+});

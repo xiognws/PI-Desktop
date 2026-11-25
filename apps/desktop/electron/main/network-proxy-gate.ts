@@ -68,17 +68,81 @@ export function proxyInUse(
  * Returns the relay URL, or `""` when no relay was started - callers must treat
  * that as "no system proxy route" and not as an error.
  */
+export type ProxyGateOptions = {
+  /**
+   * How long a caller may wait for the route before it carries on without one.
+   *
+   * Chromium answers `resolveProxy` from the OS configuration, and a machine with
+   * WPAD or a PAC script configured can sit there for seconds — DHCP and DNS
+   * probes — before it answers at all. `0` (the default) waits, which is right for
+   * a caller that has nothing else to do; boot is not such a caller.
+   */
+  timeoutMs?: number;
+  /** Called when a late answer turns out to need the relay after all. */
+  onLate?: (relayUrl: string) => void;
+};
+
+/**
+ * The route answer, or `"timeout"` when the caller's deadline wins.
+ *
+ * The losing promise is not cancelled: `resolveProxy` has no cancellation, and the
+ * caller decides what to do with an answer that arrives late.
+ */
+async function resolveWithin(
+  resolve: () => Promise<string>,
+  timeoutMs: number,
+): Promise<{ ok: true; value: string } | { ok: false } | "timeout"> {
+  if (timeoutMs <= 0) {
+    try {
+      return { ok: true, value: await resolve() };
+    } catch {
+      return { ok: false };
+    }
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<"timeout">((settle) => {
+    timer = setTimeout(() => settle("timeout"), timeoutMs);
+    // Never keep the process alive for a probe nobody is waiting on.
+    timer.unref?.();
+  });
+  const answer = resolve().then(
+    (value) => ({ ok: true as const, value }),
+    () => ({ ok: false as const }),
+  );
+  try {
+    return await Promise.race([answer, deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function systemProxyRelayIfNeeded(
   resolve: () => Promise<string>,
   start: () => Promise<string>,
   env: Record<string, string | undefined> = process.env,
+  options: ProxyGateOptions = {},
 ): Promise<string> {
-  let resolved: string;
-  try {
-    resolved = await resolve();
-  } catch {
+  const timeoutMs = Math.max(0, options.timeoutMs ?? 0);
+  if (timeoutMs > 0) {
+    const answer = await resolveWithin(resolve, timeoutMs);
+    if (answer === "timeout") {
+      // Boot carries on without a relay and the relay is applied when the route
+      // does answer: a machine that really routes keeps proxy support, and one
+      // that does not pays nothing for the probe.
+      void resolve()
+        .then(async (resolved) => (proxyInUse(resolved, env) ? await start() : ""))
+        .then((relayUrl) => {
+          if (relayUrl) options.onLate?.(relayUrl);
+        })
+        .catch(() => undefined);
+      return "";
+    }
+    if (!answer.ok) return start();
+    if (!proxyInUse(answer.value, env)) return "";
     return start();
   }
-  if (!proxyInUse(resolved, env)) return "";
+  const answer = await resolveWithin(resolve, 0);
+  if (answer === "timeout" || !answer.ok) return start();
+  if (!proxyInUse(answer.value, env)) return "";
   return start();
 }

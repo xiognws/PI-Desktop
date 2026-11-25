@@ -1204,6 +1204,11 @@ export async function createWindow({
 
   window.once("ready-to-show", () => {
     if (!isLiveWindow()) return;
+    // The one timestamp that answers "why does it take so long to appear": the
+    // interval between the process starting and the window actually showing.
+    logger.app("lifecycle", "info", "window shown", {
+      data: { sinceProcessStartMs: Math.round(process.uptime() * 1000) },
+    });
     // Capture runs need the deterministic Codex footprint; normal launches
     // must respect restored user bounds and only fix real shelf states.
     ensureStableBounds(process.env.PI_DESKTOP_CAPTURE === "1");

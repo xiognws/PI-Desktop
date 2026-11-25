@@ -21,6 +21,15 @@ import {
 import { readPythonInterpreterPreference } from "../python-preferences.ts";
 import { writeCrashForensicsReport } from "../crash-forensics.js";
 
+/**
+ * How long boot may wait for the machine's proxy route.
+ *
+ * Longer than a DIRECT answer takes and far shorter than a PAC/WPAD probe can:
+ * the relay is a convenience for the children host-core spawns, while a late
+ * window is the thing the user sees.
+ */
+const SYSTEM_PROXY_BOOT_PROBE_MS = 400;
+
 export type HostRuntimeDependencies = {
   runtimeState: RuntimeState;
   dataDir: string;
@@ -56,7 +65,13 @@ export type HostRuntimeDependencies = {
   importLegacyScheduled: () => Promise<unknown>;
   superviseRestart: (kind: "host" | "sidecar") => Promise<void>;
   isQuitting: () => boolean;
-  ensureSystemProxyRelay: () => Promise<string>;
+  ensureSystemProxyRelay: (options?: {
+    force?: boolean;
+    /** How long boot may wait for the route; 0 waits forever. */
+    timeoutMs?: number;
+    /** Applied when a late answer turns out to need the relay. */
+    onLate?: (relayUrl: string) => void;
+  }) => Promise<string>;
 };
 
 export function createHostRuntime({
@@ -473,9 +488,32 @@ export function createHostRuntime({
   };
 
   const startHost = async (): Promise<void> => {
-
-  assertLinuxGlibcSupported();
-  const systemProxyRelayUrl = await ensureSystemProxyRelay();
+    assertLinuxGlibcSupported();
+    // Chromium answers the route probe from the OS configuration, and a machine
+    // with WPAD or a PAC script configured can take seconds to do it (DHCP and
+    // DNS probes). host-core — and every screen waiting for its first call — must
+    // not sit behind that, so boot waits 400 ms and applies a relay later if the
+    // answer says the machine routes.
+    const proxyProbeStarted = Date.now();
+    const systemProxyRelayUrl = await ensureSystemProxyRelay({
+      timeoutMs: SYSTEM_PROXY_BOOT_PROBE_MS,
+      onLate: (url) => {
+        logger.app("runtime", "info", "system proxy relay started after boot", { data: { url } });
+        void runtimeState.host
+          ?.call("network.configureSystemProxyRelay", { url })
+          .catch((error: unknown) => {
+            logger.app("runtime", "warn", "late system proxy relay was not applied", {
+              data: String(error),
+            });
+          });
+      },
+    });
+    logger.app("runtime", "info", "system proxy route probed", {
+      data: {
+        elapsedMs: Date.now() - proxyProbeStarted,
+        relayStarted: systemProxyRelayUrl !== "",
+      },
+    });
   // The tool environment is built inside `HostProcess`, before host-core answers
   // anything, so the interpreter chosen in settings is read from its mirror here.
   setPreferredPythonPath(readPythonInterpreterPreference(dataDir));
