@@ -41,7 +41,7 @@ export async function readComposerSource() {
 }
 
 export async function readComposerModule(relativePath) {
-  return readFile(join(composerRoot, relativePath), "utf8");
+  return normalize(await readFile(join(composerRoot, relativePath), "utf8"));
 }
 
 function sourceFilesSync(directory) {

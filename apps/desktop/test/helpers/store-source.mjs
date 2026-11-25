@@ -43,7 +43,7 @@ export async function readStoreSource() {
 }
 
 export async function readStoreModule(relativePath) {
-  return readFile(join(storeRoot, relativePath), "utf8");
+  return normalize(await readFile(join(storeRoot, relativePath), "utf8"));
 }
 
 function sourceFilesSync(directory) {

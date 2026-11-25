@@ -40,7 +40,7 @@ export async function readTranscriptSource() {
 }
 
 export async function readTranscriptModule(relativePath) {
-  return readFile(join(transcriptRoot, relativePath), "utf8");
+  return normalize(await readFile(join(transcriptRoot, relativePath), "utf8"));
 }
 
 function sourceFilesSync(directory) {
