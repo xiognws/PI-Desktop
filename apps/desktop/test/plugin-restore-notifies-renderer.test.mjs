@@ -43,6 +43,9 @@ test("startup plugin restore notifies the renderer after every enabled plugin lo
   const firstStarted = deferred();
   const secondStarted = deferred();
   const createRuntimeLifecycle = loadLifecycle({
+    // `lifecycle.ts` reads the user-data path and subscribes to power events
+    // through `app`; the restore scenario touches neither behaviour.
+    electron: { app: { getPath: () => "/pi-test", on() {}, getVersion: () => "0.0.0-test" } },
     "node:fs": { mkdirSync() {} },
     "node:path": { join: (...parts) => parts.join("/") },
     "@pi-workspace/shared": {
@@ -65,9 +68,20 @@ test("startup plugin restore notifies the renderer after every enabled plugin lo
     // A run marker records an unclean exit and is read on the next start; the
     // lifecycle imports it, so the restore scenario needs it stubbed even
     // though nothing here reads a previous run back.
+    // The restart-forensics trio: the restore scenario asserts on plugin load
+    // order, so these only need to answer "nothing to report".
+    "../crash-report.js": { countCrashDumpsSince: () => 0 },
+    "../crash-forensics.js": { missingDumpForensicsWanted: () => false, writeCrashForensicsReport: () => {} },
+    "../run-verdict.js": { judgePreviousRun: () => null, previousRunVerdictLevel: () => "ok" },
     "../run-marker.js": {
       setRunMarkerDirectory: () => {},
       writeRunMarker: () => {},
+      // Read once at startup to decide whether the previous exit was unclean:
+      // `{ used, marker }` is the shape `bootBackends` reads.
+      capturedPreviousRunMarker: () => ({ used: false, marker: null }),
+      readRunMarker: () => null,
+      readLastExitReason: () => null,
+      startRunMarkerHeartbeat: () => () => {},
       readRunMarker: () => null,
       describeUnfinishedRun: () => null,
       readLastExitReason: () => null,

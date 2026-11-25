@@ -71,6 +71,9 @@ async function launchInstallation(t, { override, development = false, managed = 
     app: {
       isPackaged: !development,
       setName: (name) => calls.push(["name", name]),
+      // The boot breadcrumb records the running version, so the harness has to
+      // answer it the way the real `app` does.
+      getVersion: () => "0.0.0-test",
       getPath: () => join(root, "appData"),
       setPath: (...args) => calls.push(["path", ...args]),
       setAppUserModelId: () => {},
