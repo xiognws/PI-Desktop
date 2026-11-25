@@ -85,11 +85,16 @@ export function latestTurnContextInspector(
   // the session's own model (what the composer is set to) is the answer.
   const windowModel = compactedContextTokens !== undefined && carriesModel(compaction)
     ? compaction
-    : carriesModel(latestUsageMessage)
-      ? latestUsageMessage
-      : carriesModel(currentModel)
-        ? currentModel
-        : latestUsageMessage;
+    // A legacy compaction mark carries no model. The occupancy being measured
+    // still belongs to the session's current model, so the historical usage
+    // record must not win here: it describes the window *before* the compaction.
+    : compactedContextTokens !== undefined && carriesModel(currentModel)
+      ? currentModel
+      : carriesModel(latestUsageMessage)
+        ? latestUsageMessage
+        : carriesModel(currentModel)
+          ? currentModel
+          : latestUsageMessage;
   const knownContextWindow = resolveKnownContextWindow(
     windowModel?.providerId, windowModel?.modelId, providerModels, providers,
   );
