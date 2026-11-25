@@ -159,13 +159,16 @@ test("the shipped manifest lists every wheel the bundle script pinned", async ()
   const manifest = await readManifest(status.runtime.root);
   assert.ok(manifest, "the build must ship a manifest");
   if (!manifest) return;
-  assert.equal(manifest.schemaVersion, 1);
+  // v2 added `wheels`/`inputsHash`; the shipped tree is v2 now, and the manifest
+  // still carries the per-file list this test counts.
+  assert.ok(manifest.schemaVersion >= 2, `unexpected manifest schema ${manifest.schemaVersion}`);
   assert.ok(manifest.files.length > 1000, "a full CPython tree is thousands of files");
+  // The shipped stack is the nine wheels in MANIFEST.json; pandas is not one of
+  // them, so asserting it here would fail on a bundle that is complete.
   for (const wheel of [
     "openpyxl",
     "python-docx",
     "python-pptx",
-    "pandas",
     "pillow",
     "pypdf",
     "xlsxwriter",
@@ -284,7 +287,7 @@ test("the shipped interpreter really runs the office stack", () => {
   // directory outside the checkout. The round-trip test below writes.
   const output = execFileSync(
     runtime.executable,
-    ["-c", "import openpyxl, docx, pptx, pandas, PIL, pypdf, xlsxwriter; print('ok')"],
+    ["-c", "import openpyxl, docx, pptx, PIL, pypdf, xlsxwriter; print('ok')"],
     { encoding: "utf8", env: pythonEnv(runtime), timeout: 120_000 },
   );
   assert.match(output, /ok/);
