@@ -26,6 +26,10 @@ import { fileURLToPath } from "node:url";
  * part of what is under test.
  */
 const sharedServers = new Map();
+// Every server this file opened, shared or private, so `test.after` closes all of
+// them. A private server left open keeps the event loop alive and the runner
+// reports the file as cancelled even though every case passed.
+const openedServers = new Set();
 
 function sharedServerFor(key, create) {
   const existing = sharedServers.get(key);
@@ -38,9 +42,11 @@ function sharedServerFor(key, create) {
 test.after(async () => {
   for (const pending of sharedServers.values()) {
     const server = await pending.catch(() => null);
-    await server?.close();
+    if (server) await server.close();
   }
   sharedServers.clear();
+  for (const server of openedServers) await server.close();
+  openedServers.clear();
 });
 
 export async function slotSsr(t, { translationOverrides = {}, plugins = [] } = {}) {
@@ -55,6 +61,7 @@ export async function slotSsr(t, { translationOverrides = {}, plugins = [] } = {
     optimizeDeps: { noDiscovery: true, include: [] },
   });
   const server = plugins.length === 0 ? await sharedServerFor("default", create) : await create();
+  if (plugins.length > 0) openedServers.add(server);
   const originalDocument = globalThis.document;
   // `useThemeMode` reads the theme off the document during render.
   globalThis.document = { documentElement: { dataset: {} } };
