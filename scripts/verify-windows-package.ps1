@@ -68,22 +68,38 @@ $plugins = (Get-ChildItem -Directory (Join-Path $Root 'resources\plugins') -Erro
 Write-Output ("plugins    {0}" -f $plugins)
 # The expectation is the staged set in this checkout, not a fixed number: plugins are
 # retired on purpose (scripts/bundled-plugins-excluded.json), so a hard-coded floor
-# turned every correct build red the day ten of them were removed. Falling back to a
-# floor only when the checkout is unavailable keeps the check meaningful off-tree.
-$stagedPlugins = Join-Path (Split-Path $PSScriptRoot -Parent) 'apps\desktop\resources\plugins'
+# turned every correct build red the day ten of them were removed. Off-tree there is
+# nothing to compare against, and inventing a floor is how those false FAILs started,
+# so the check says it could not compare instead of guessing.
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$stagedPlugins = Join-Path $repoRoot 'apps\desktop\resources\plugins'
 if (Test-Path -LiteralPath $stagedPlugins) {
   $expectedPlugins = (Get-ChildItem -Directory $stagedPlugins | Measure-Object).Count
   Write-Output ("plugins    expected {0} from the staged set" -f $expectedPlugins)
   if ($plugins -lt $expectedPlugins) { $failures.Add("only $plugins plugins, staged set has $expectedPlugins") }
-} elseif ($plugins -lt 30) {
-  $failures.Add("only $plugins plugins")
+} else {
+  Write-Output 'plugins    count not compared (no checkout to read the staged set from)'
 }
 
-foreach ($retired in @('pi.clipboard-history', 'cn.star.computer-use')) {
-  if (Test-Path -LiteralPath (Join-Path $Root "resources\plugins\$retired")) {
-    $failures.Add("retired plugin still bundled: $retired")
+# Identity, not only the count. Two ids used to be named here because they were the
+# ones retired at the time; the declaration has grown to dozens since, so a package
+# still carrying a later retiree passed this check. The declaration is the single
+# source of truth and every id in it is verified absent.
+$excludedPath = Join-Path $repoRoot 'scripts\bundled-plugins-excluded.json'
+$retired = @()
+if (Test-Path -LiteralPath $excludedPath) {
+  $retired = @((Get-Content -LiteralPath $excludedPath -Raw | ConvertFrom-Json).excluded)
+} else {
+  $failures.Add('cannot verify retired plugins: scripts/bundled-plugins-excluded.json is missing')
+}
+$leaked = 0
+foreach ($id in $retired) {
+  if (Test-Path -LiteralPath (Join-Path $Root "resources\plugins\$id")) {
+    $leaked = $leaked + 1
+    $failures.Add("retired plugin still bundled: $id")
   }
 }
+Write-Output ("retired    {0} declared, {1} still in the package" -f $retired.Count, $leaked)
 
 # 3. Content markers. The agent runtime ships outside the asar; the Settings
 #    panel and the main process ship inside it.
