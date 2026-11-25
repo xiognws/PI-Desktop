@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
 import { catalogs } from "@pi-workspace/i18n";
+import test from "node:test";
 import { createServer } from "vite";
 import { fileURLToPath } from "node:url";
 
@@ -16,8 +17,34 @@ import { fileURLToPath } from "node:url";
  * mount, before any measuring, timer or listener. Behavior that needs those
  * is covered at the logic layer or in the Electron E2E.
  */
+/**
+ * One Vite server per plugin-less call site, reused across the cases in a file.
+ *
+ * Booting costs ~30s here; a file with eight slot cases booted eight of them and
+ * the file-level deadline cancelled the last one, which reads as a hang. A call
+ * that supplies its own plugins still gets its own server, since a plugin list is
+ * part of what is under test.
+ */
+const sharedServers = new Map();
+
+function sharedServerFor(key, create) {
+  const existing = sharedServers.get(key);
+  if (existing) return existing;
+  const pending = create();
+  sharedServers.set(key, pending);
+  return pending;
+}
+
+test.after(async () => {
+  for (const pending of sharedServers.values()) {
+    const server = await pending.catch(() => null);
+    await server?.close();
+  }
+  sharedServers.clear();
+});
+
 export async function slotSsr(t, { translationOverrides = {}, plugins = [] } = {}) {
-  const server = await createServer({
+  const create = () => createServer({
     root: fileURLToPath(new URL("../..", import.meta.url)),
     configFile: false,
     plugins,
@@ -27,14 +54,16 @@ export async function slotSsr(t, { translationOverrides = {}, plugins = [] } = {
     appType: "custom",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
+  const server = plugins.length === 0 ? await sharedServerFor("default", create) : await create();
   const originalDocument = globalThis.document;
   // `useThemeMode` reads the theme off the document during render.
   globalThis.document = { documentElement: { dataset: {} } };
   const disposers = [];
+  // The server outlives the case; only the registrations this case made and the
+  // document shim are restored here.
   t.after(async () => {
     for (const dispose of disposers.splice(0)) dispose();
     globalThis.document = originalDocument;
-    await server.close();
   });
 
   const i18n = createInstance();
