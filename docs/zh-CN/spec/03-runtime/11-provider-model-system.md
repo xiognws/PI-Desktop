@@ -768,6 +768,7 @@ OpenAI Responses 适配器会把 `response.completed` 和
 - **选择。** 这一对属于应用级设置（`smartModeMainProviderId/ModelId`、`smartModeSubProviderId/ModelId`、`smartModeTurnRouting`、`smartModeDelegateToSub`）。输入框的 `智能模式` 条目只在两半都配置好时出现，选中后把快照写入 `sessions.smart_mode_json`；直接选一个模型会清掉它。快照不跟随之后的设置修改。
 - **路由。** `decideTurnTier` 是确定性的、不额外发请求：附件数、分阶段模式、粘连升级、首回合、提示词长度、代码标记与两份意图词表共同决定档位；质量规则先于省钱规则执行。
 - **派发。** 这一对的 `sub` 绑定无需模型自身的 `availableForSubagents` 开关即进入委派目录，`delegationDefaultModel` 让未指定 `model` 的 `Task` 落到它上面；显式 `Task.model` 仍然优先，目录外的键仍然被拒。
+- **拆分是强制的。** 启动参数同时带 `smartTurn.tier == "main"` 与非空 `delegationDefaultModel` 时，`sidecar` 置上 `TurnConfig::delegate_mechanical`：该回合在收到一份 `Task`/`TaskWait` 报告之前，`ORCHESTRATOR_TOOLS`（`Task*` 系列、`TodoWrite`、`ToolSearch`、`Skill`、`memory`、`asktool`）以外的每个工具都被拒，并回一条说清「改用 `Task` 且省略 `model`」的工具错误；委派失败不算报告、不开放工具；拒用不计入工具失败连击。只靠提示词已被实测证伪：三个 `main` 回合里 87 次直接工具调用、零次委派。
 - **可用性。** 便宜的那一半必须已启用、可达（`baseUrl`）、列在该提供商下并可签名请求；否则回合留在 `main`，决策记录 `downgradedFrom: "sub"`。
 - **回合内升级。** `sub` 档的回合卡住时把余下的工作交给 `main`：连续 `afterToolErrors` 次工具失败，或步数预算用掉 `afterBudgetUsed`。启动参数里带着强模型的 provider spec，内核沿用同一份 transcript 继续、只多一次重发——已完成的工具不会重放，且每回合最多升级一次。两半都走同一条目录解析循环，只有便宜那一半会成为 `Task` 的键。
 - **计量。** `turns.provider_id/model_id` 记录回合**起始**的模型，因此不需要新存储就能按回合衡量节省；升级会连同两个模型与触发原因写进日志。

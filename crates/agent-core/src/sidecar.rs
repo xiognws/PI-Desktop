@@ -1733,6 +1733,9 @@ impl Sidecar {
             .get("infiniteProviderRetry")
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        // Smart mode's split, decided here for the same reason: the spawned task
+        // cannot borrow `request`.
+        let delegate_mechanical = delegate_mechanical_from(request);
         let task_asks = self.asks.clone();
         // A background skill review runs after this turn, in the same task: the
         // client has already been told the turn ended, so nothing is held back.
@@ -1791,6 +1794,7 @@ impl Sidecar {
                         // not what the switch was for.
                         thinking,
                         infinite_provider_retry,
+                        delegate_mechanical,
                     },
                     cancel,
                 )
@@ -1929,6 +1933,8 @@ impl Sidecar {
             max_output_tokens: config.max_output_tokens,
             thinking: ThinkingLevel::Off,
             infinite_provider_retry: false,
+            // Compaction is a summary of the transcript, not agent work.
+            delegate_mechanical: false,
             // Prefix caching is the largest token lever on a long session; a
             // caller can turn it off per request, and `PI_CACHE_RETENTION` sets the
             // machine default.
@@ -4383,6 +4389,9 @@ async fn skill_review_pass(input: SkillReviewInput) {
         cache: crate::provider::CacheRetention::None,
         thinking: crate::provider::ThinkingLevel::Off,
         infinite_provider_retry: false,
+        // A review pass reads a transcript and writes one skill: it is the
+        // worker of its own turn, not an orchestrator.
+        delegate_mechanical: false,
     };
     let review_session_id = format!("{session_id}#skill-review");
     let review_turn_id = format!("{turn_id}#skill-review");
@@ -4537,6 +4546,9 @@ impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
                 // fail it, and the same retry that saves the parent saves it.
                 infinite_provider_retry: self.infinite_provider_retry,
                 cache: self.cache,
+                // A delegate is the worker: it runs the tools the orchestrator
+                // refused to run itself.
+                delegate_mechanical: false,
             };
             let outcome = engine
                 .run_turn(
@@ -4864,6 +4876,28 @@ struct SubagentModelBinding {
 /// thresholds the kernel watches. Anything unusable — no binding, no model, a
 /// provider this kernel cannot build — leaves the turn on its own provider: a
 /// failed hand-over must never be the reason a turn fails.
+/// Whether this turn is the orchestrating half of a smart pair with a worker.
+///
+/// Main sends `smartTurn` for every turn it routed and `delegationDefaultModel`
+/// only when the worker half actually resolved, so both together mean the split
+/// is enforceable: there is a cheap half to hand the mechanical steps to. Either
+/// one alone is not enough — a pair without a worker would refuse every tool and
+/// deadlock, and a worker without an orchestrating turn is an ordinary session.
+fn delegate_mechanical_from(request: &Request) -> bool {
+    let orchestrating = request
+        .params
+        .get("smartTurn")
+        .and_then(|turn| turn.get("tier"))
+        .and_then(Value::as_str)
+        .is_some_and(|tier| tier == "main");
+    orchestrating
+        && request
+            .params
+            .get("delegationDefaultModel")
+            .and_then(Value::as_str)
+            .is_some_and(|key| !key.trim().is_empty())
+}
+
 fn escalation_target_from(
     request: &Request,
     compaction_enabled: bool,
@@ -5183,6 +5217,38 @@ mod prompt_parameter_tests {
             "params": params
         }))
         .expect("a prompt")
+    }
+
+    /// The gate needs both halves of main's message: a turn routed to the
+    /// orchestrating half *and* a worker that actually resolved. Either one alone
+    /// is wrong in opposite ways — no worker would refuse every tool in a
+    /// single-model session, no routing decision would never fire at all.
+    #[test]
+    fn the_delegation_gate_needs_an_orchestrating_turn_and_a_worker() {
+        let mut params = json!({"sessionId": "s", "turnId": "t", "content": "hi"});
+        assert!(!delegate_mechanical_from(&prompt_request(params.clone())));
+
+        params["smartTurn"] = json!({"tier": "main", "reason": "smart-off"});
+        assert!(
+            !delegate_mechanical_from(&prompt_request(params.clone())),
+            "a pair with no worker half resolved must keep working as one model"
+        );
+
+        params["delegationDefaultModel"] = json!("changan/9554");
+        assert!(delegate_mechanical_from(&prompt_request(params.clone())));
+
+        params["smartTurn"] = json!({"tier": "sub", "reason": "simple-turn"});
+        assert!(
+            !delegate_mechanical_from(&prompt_request(params.clone())),
+            "the worker half is the one that runs the tools"
+        );
+
+        params["smartTurn"] = json!({"tier": "main", "reason": "smart-off"});
+        params["delegationDefaultModel"] = json!("   ");
+        assert!(
+            !delegate_mechanical_from(&prompt_request(params)),
+            "a blank worker key is not a worker"
+        );
     }
 
     /// The shape main sends: a models.dev window on the provider, and whatever the

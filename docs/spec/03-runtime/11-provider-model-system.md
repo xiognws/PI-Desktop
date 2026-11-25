@@ -973,6 +973,15 @@ answers; `sub` takes mechanical turns and delegated work. ADR 0405.
   take over a stalled step instead of re-sending the same instruction. The
   section is last in the prompt, like tool activation, so a tier change cannot
   invalidate the cached prefix of the sections before it.
+- **The split is enforced.** `sidecar` sets `TurnConfig::delegate_mechanical`
+  when the launch carries `smartTurn.tier == "main"` and a non-empty
+  `delegationDefaultModel`. On such a turn, until a `Task`/`TaskWait` has returned
+  a report, every tool outside `ORCHESTRATOR_TOOLS` (the `Task*` verbs,
+  `TodoWrite`, `ToolSearch`, `Skill`, `memory`, `asktool`) is refused with a tool
+  error that names the fix and the worker is left to do the work. A failed
+  delegation does not open the tools, a refusal is not a tool-error streak, and
+  the prompt section alone was measured to lose: 87 direct tool calls and no
+  delegation across three `main` turns.
 - **Delegation.** The pair's `sub` binding enters the delegation catalog without
   the model's own `availableForSubagents` opt-in, and `delegationDefaultModel`
   makes `Task` without `model` run on it. An explicit `Task.model` still wins and

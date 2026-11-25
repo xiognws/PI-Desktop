@@ -126,6 +126,39 @@ A session that already carries a snapshot keeps the policy it froze, so the pair
 has to be selected again — or the session re-created — before it picks up the new
 default.
 
+## Amendment 2026-11-25 (third) — the split is enforced inside the turn
+
+The second amendment made supervision the default and told the orchestrating half
+to hand its mechanical steps over with `Task`. Measured on the session it was
+written for, that instruction was ignored: three turns routed to `main`, 87 direct
+tool calls (54 `Bash`, 11 `Edit`, 8 `Read`, 2 `Grep`, 1 `TodoWrite`), **zero**
+`Task` calls and not one mention of delegation in the model's own text. Nothing
+reported it either, because the only parts that existed were a prompt section and
+an escalation path that `main` turns never receive.
+
+So the split became a rule the kernel holds, instead of advice the prompt gives:
+
+- `TurnConfig.delegate_mechanical` is set when the launch carries both
+  `smartTurn.tier == "main"` and a non-empty `delegationDefaultModel`. Either one
+  alone is wrong in opposite ways: a pair with no worker would refuse every tool
+  in a single-model session, and a routing decision alone would never fire.
+- While it is set and no delegate has reported in the turn, every tool outside
+  `ORCHESTRATOR_TOOLS` — the `Task*` verbs, `TodoWrite`, `ToolSearch`, `Skill`,
+  `memory`, `asktool` — is refused with a tool error that names the fix. The model
+  reads the refusal, so "you did the mechanical work yourself" is visible inside
+  the turn instead of in a log nobody reads.
+- A `Task`/`TaskWait` that returns a report opens the worker's tools again, for
+  the remainder the report leaves behind; a delegation that fails does not open
+  them.
+- A refusal is not counted as a tool-error streak: the turn's own rule is not the
+  tool's failure.
+
+What this costs: a model that insists on doing the work itself now spends its
+steps on refusals until it delegates — visible, and bounded by the turn's own
+end. What it buys: "the mechanical work runs on the cheap half" stops being a
+hope. The refusal text is the other half of the contract: it says which tool,
+why, and that the fix is `Task` with `model` omitted.
+
 ## Consequences
 
 - New optional column `sessions.smart_mode_json` (v33→v34, additive, NULL=off) and

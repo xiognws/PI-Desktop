@@ -17,6 +17,7 @@
 //! prompt composition, subagents. Each arrives with its own subsystem so this
 //! function stays readable.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -57,6 +58,15 @@ pub struct TurnConfig {
     /// count loses the work it was about to finish, and that count says nothing
     /// about whether the work was worth doing.
     pub max_steps: Option<usize>,
+    /// Refuse the worker's tools on this turn until a delegate has reported.
+    ///
+    /// Set for a smart-mode turn the host routed to the orchestrating half when a
+    /// worker model resolved. The pair only saves anything if the mechanical work
+    /// runs on the cheap half, and asking for that in the prompt alone was
+    /// measured to lose: three turns, 87 tool calls, zero `Task` calls. A refusal
+    /// is a tool error the model reads, so "you did the work yourself" is visible
+    /// inside the turn instead of being discovered afterwards.
+    pub delegate_mechanical: bool,
     pub temperature: Option<f32>,
     pub max_output_tokens: Option<u32>,
     pub thinking: ThinkingLevel,
@@ -76,6 +86,7 @@ impl TurnConfig {
             model: model.into(),
             system: None,
             max_steps: None,
+            delegate_mechanical: false,
             temperature: None,
             max_output_tokens: None,
             thinking: ThinkingLevel::Off,
@@ -83,6 +94,34 @@ impl TurnConfig {
             cache: CacheRetention::default(),
         }
     }
+}
+
+/// The tools the orchestrating half keeps while the pair is split.
+///
+/// Everything else belongs to the worker: reading, searching, editing, running
+/// commands and tests, fetching a page. Planning, asking the user and the
+/// delegation verbs themselves stay with the orchestrator — delegating a
+/// `TodoWrite` costs a worker turn and decides nothing.
+pub const ORCHESTRATOR_TOOLS: &[&str] = &["TodoWrite", "ToolSearch", "Skill", "memory", "asktool"];
+
+/// Whether `name` is one the orchestrating half may call itself.
+///
+/// The delegation verbs are `Task`, `TaskWait`, `TaskStop` and whatever else the
+/// host names in that family, so the prefix is matched rather than listed: a host
+/// that adds a fourth verb must not be read as "not a delegation".
+pub fn keeps_with_orchestrator(name: &str) -> bool {
+    let lowered = name.to_ascii_lowercase();
+    lowered.starts_with("task")
+        || ORCHESTRATOR_TOOLS
+            .iter()
+            .any(|tool| tool.eq_ignore_ascii_case(name))
+}
+
+/// What the model reads when it reaches for a worker's tool itself.
+pub fn delegation_refusal(name: &str) -> String {
+    format!(
+        "Refused: `{name}` is the worker half's job on this turn. Dispatch the step          with `Task` and omit `model` — that runs it on the pair's worker, which is          what this half exists for. Read the report it sends back, then start the          next step. Worker tools are open to you again only after a report has          arrived, and only for the remainder a report leaves behind."
+    )
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -377,6 +416,9 @@ impl TurnEngine {
         let mut active_limits = self.model_limits;
         let mut escalated = false;
         let mut consecutive_tool_errors: usize = 0;
+        // Whether a delegate has reported in this turn, which is what reopens the
+        // worker's tools to the orchestrating half.
+        let mut delegate_reported = false;
 
         // The ceiling this turn was given, if any. `None` is an unbounded turn:
         // the loop ends when the model answers without a tool call, when the user
@@ -781,27 +823,95 @@ impl TurnEngine {
                 );
             }
 
+            // Smart mode's split, enforced rather than requested: until a report
+            // has come back, the orchestrating half may not run the worker's tools
+            // itself. The refusal is a tool result, so the model reads it inside the
+            // turn instead of the user discovering afterwards that the cheap half
+            // was never used.
+            let gate_delegation = config.delegate_mechanical && !delegate_reported;
+            let mut gate_indices: BTreeSet<usize> = BTreeSet::new();
+            let mut gate_refusals: BTreeMap<usize, ToolResult> = BTreeMap::new();
+            let mut runnable: Vec<ToolCall> = Vec::with_capacity(step_calls.len());
+            for (index, call) in step_calls.iter().enumerate() {
+                if gate_delegation && !keeps_with_orchestrator(&call.name) {
+                    gate_indices.insert(index);
+                    gate_refusals.insert(
+                        index,
+                        ToolResult {
+                            call_id: call.id.clone(),
+                            name: call.name.clone(),
+                            content: delegation_refusal(&call.name),
+                            is_error: true,
+                            truncated: false,
+                        },
+                    );
+                } else {
+                    runnable.push(call.clone());
+                }
+            }
+
+            if !gate_refusals.is_empty() {
+                // One line per step, not per call: the evidence that the split was
+                // enforced is this log, and a turn that refuses five tools at once
+                // is still one refusal.
+                tracing::info!(
+                    target: "agent_core::turn",
+                    step,
+                    tools = ?gate_refusals
+                        .values()
+                        .map(|refusal| refusal.name.as_str())
+                        .collect::<Vec<_>>(),
+                    "smart-mode delegation gate refused the worker's tools"
+                );
+            }
+
             // The calls of one step were asked for together, so they run together
             // when the caller allowed it, and the results are recorded in call order
             // either way. A repeated read is answered from this turn's cache.
             let results = self
-                .run_step_calls(session_id, turn_id, &step_calls, &cancel, repeats.as_mut())
+                .run_step_calls(session_id, turn_id, &runnable, &cancel, repeats.as_mut())
                 .await;
+            // A refusal answers for a call that never ran, so the executed results
+            // and the refusals are merged back into call order here: the model must
+            // see its own step answered tool by tool.
+            let mut executed = results.0.into_iter().zip(results.1);
+            let mut refusals = gate_refusals;
+            let results: Vec<(ToolResult, Option<Value>)> = (0..step_calls.len())
+                .map(|index| match refusals.remove(&index) {
+                    Some(refusal) => (refusal, None),
+                    None => executed
+                        .next()
+                        .expect("run_step_calls answers once per dispatched call"),
+                })
+                .collect();
             // Node's `turn_end` fires once this response's calls are done and carries
             // both halves; the results are cloned for the notification because the
             // transcript takes ownership of them below.
-            let extension_results = results.0.clone();
+            let extension_results: Vec<ToolResult> =
+                results.iter().map(|(result, _)| result.clone()).collect();
             // Evidence for the hand-over: a failure streak, reset by any success.
-            // One unlucky call is not a pattern, and a stuck turn is.
-            for result in &results.0 {
+            // One unlucky call is not a pattern, and a stuck turn is. A refusal this
+            // gate issued is the turn's own rule, not the tool's failure, so it is
+            // not counted here.
+            for (index, (result, _)) in results.iter().enumerate() {
+                if gate_indices.contains(&index) {
+                    continue;
+                }
                 if result.is_error {
                     consecutive_tool_errors += 1;
                 } else {
                     consecutive_tool_errors = 0;
                 }
             }
+            // A report that arrived is what reopens the worker's tools for the
+            // remainder — and it has to have arrived, not merely been asked for.
+            if !delegate_reported {
+                delegate_reported = results.iter().any(|(result, _)| {
+                    !result.is_error && result.name.to_ascii_lowercase().starts_with("task")
+                });
+            }
 
-            for (result, details) in results.0.into_iter().zip(results.1) {
+            for (result, details) in results {
                 self.emit(
                     session_id,
                     turn_id,
