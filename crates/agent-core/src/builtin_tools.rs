@@ -945,11 +945,17 @@ mod tests {
         assert_eq!(shell.dialect.as_deref(), Some("posix"));
 
         assert_eq!(
-            ShellIdentity::from_value(&json!("pwsh")).unwrap().dialect.as_deref(),
+            ShellIdentity::from_value(&json!("pwsh"))
+                .unwrap()
+                .dialect
+                .as_deref(),
             Some("powershell")
         );
         assert_eq!(
-            ShellIdentity::from_value(&json!("cmd")).unwrap().dialect.as_deref(),
+            ShellIdentity::from_value(&json!("cmd"))
+                .unwrap()
+                .dialect
+                .as_deref(),
             Some("cmd")
         );
     }
@@ -963,8 +969,8 @@ mod tests {
         assert_eq!(shell.id, "my-custom-sh");
         assert!(shell.dialect.is_none());
 
-        let from_row = ShellIdentity::from_value(&json!({"id": "my-custom-sh"}))
-            .expect("an unlabelled row");
+        let from_row =
+            ShellIdentity::from_value(&json!({"id": "my-custom-sh"})).expect("an unlabelled row");
         assert_eq!(from_row.id, "my-custom-sh");
         assert!(from_row.dialect.is_none());
 

@@ -131,7 +131,12 @@ impl ExtensionSession {
         let tools = value
             .get("tools")
             .and_then(Value::as_array)
-            .map(|items| items.iter().filter_map(ExtensionToolSpec::from_value).collect())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(ExtensionToolSpec::from_value)
+                    .collect()
+            })
             .unwrap_or_default();
         Self {
             events: ExtensionEvents::from_json(Some(value)),
@@ -196,7 +201,10 @@ impl ExtensionHost {
     /// Asked once per prompt, and only for a session main said has extensions —
     /// it sends the trusted set with the prompt, and an empty set is the answer.
     pub async fn describe(&self) -> ExtensionSession {
-        match self.call(DESCRIBE_METHOD, json!({ "sessionId": self.session_id })).await {
+        match self
+            .call(DESCRIBE_METHOD, json!({ "sessionId": self.session_id }))
+            .await
+        {
             Some(value) => ExtensionSession::from_value(&value),
             None => ExtensionSession::default(),
         }
@@ -214,7 +222,10 @@ impl ExtensionHost {
                 json!({ "sessionId": self.session_id, "event": event, "payload": payload }),
             )
             .await?;
-        value.get("result").filter(|result| !result.is_null()).cloned()
+        value
+            .get("result")
+            .filter(|result| !result.is_null())
+            .cloned()
     }
 
     /// One host call with the kernel's outer ceiling and the degrade-and-log
@@ -363,7 +374,12 @@ impl ExtensionHost {
         let _ = self.emit("turn_start", payload).await;
     }
 
-    pub async fn turn_end(&self, turn_index: usize, message: Option<&Message>, results: &[ToolResult]) {
+    pub async fn turn_end(
+        &self,
+        turn_index: usize,
+        message: Option<&Message>,
+        results: &[ToolResult],
+    ) {
         let payload = json!({
             "type": "turn_end",
             "turnIndex": turn_index,
@@ -436,7 +452,11 @@ pub fn apply_tool_result_patch(result: &mut ToolResult, patch: &Value) {
             Value::String(text) => result.content = text.clone(),
             Value::Null => {}
             Value::Array(blocks) => {
-                let text = blocks.iter().filter_map(block_text).collect::<Vec<_>>().join("");
+                let text = blocks
+                    .iter()
+                    .filter_map(block_text)
+                    .collect::<Vec<_>>()
+                    .join("");
                 // An array of nothing but non-text blocks is not a replacement:
                 // an empty result would silently delete what the tool said.
                 if !text.is_empty() || blocks.is_empty() {
@@ -449,7 +469,10 @@ pub fn apply_tool_result_patch(result: &mut ToolResult, patch: &Value) {
     if let Some(is_error) = patch.get("isError").and_then(Value::as_bool) {
         result.is_error = is_error;
     }
-    if patch.get("details").is_some_and(|details| !details.is_null()) {
+    if patch
+        .get("details")
+        .is_some_and(|details| !details.is_null())
+    {
         tracing::debug!(
             target: "agent_core::extensions",
             tool = %result.name,
@@ -460,7 +483,10 @@ pub fn apply_tool_result_patch(result: &mut ToolResult, patch: &Value) {
 
 fn block_text(block: &Value) -> Option<String> {
     if block.get("type").and_then(Value::as_str) == Some("text") {
-        return block.get("text").and_then(Value::as_str).map(str::to_string);
+        return block
+            .get("text")
+            .and_then(Value::as_str)
+            .map(str::to_string);
     }
     None
 }
@@ -556,17 +582,17 @@ fn part_from_wire(block: &Value) -> Option<ContentPart> {
         "toolCall" => Some(ContentPart::ToolCall(ToolCall {
             id: block.get("id").and_then(Value::as_str)?.to_string(),
             name: block.get("name").and_then(Value::as_str)?.to_string(),
-            arguments: block
-                .get("arguments")
-                .cloned()
-                .unwrap_or_else(|| json!({})),
+            arguments: block.get("arguments").cloned().unwrap_or_else(|| json!({})),
             raw_arguments: None,
         })),
         "toolResult" => Some(ContentPart::ToolResult(ToolResult {
             call_id: block.get("toolCallId").and_then(Value::as_str)?.to_string(),
             name: block.get("toolName").and_then(Value::as_str)?.to_string(),
             content: blocks_as_text(block.get("content")),
-            is_error: block.get("isError").and_then(Value::as_bool).unwrap_or(false),
+            is_error: block
+                .get("isError")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
             truncated: false,
         })),
         _ => None,
@@ -604,7 +630,11 @@ impl Tool for ExtensionTool {
         self.spec.clone()
     }
 
-    fn call<'a>(&'a self, call: &'a ToolCall, ctx: &'a ToolContext) -> BoxFuture<'a, Result<String>> {
+    fn call<'a>(
+        &'a self,
+        call: &'a ToolCall,
+        ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
             let params = json!({
                 "sessionId": ctx.session_id,
@@ -613,16 +643,19 @@ impl Tool for ExtensionTool {
                 "toolName": self.spec.name,
                 "args": call.arguments,
             });
-            let value = self
-                .host
-                .call(TOOL_METHOD, params)
-                .await
-                .ok_or_else(|| AgentError::Tool {
-                    tool: self.spec.name.clone(),
-                    message: "the host did not answer the extension tool call".into(),
-                })?;
+            let value =
+                self.host
+                    .call(TOOL_METHOD, params)
+                    .await
+                    .ok_or_else(|| AgentError::Tool {
+                        tool: self.spec.name.clone(),
+                        message: "the host did not answer the extension tool call".into(),
+                    })?;
             let ok = value.get("ok").and_then(Value::as_bool).unwrap_or(true);
-            let is_error = value.get("isError").and_then(Value::as_bool).unwrap_or(false);
+            let is_error = value
+                .get("isError")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
             let content = match value.get("content") {
                 Some(Value::String(text)) => text.clone(),
                 Some(Value::Null) | None => String::new(),
@@ -712,9 +745,16 @@ mod tests {
         }));
         assert!(session.events.has("tool_call"));
         assert!(!session.events.has("turn_end"));
-        assert_eq!(session.tools.len(), 1, "a declaration without a name is not a tool");
+        assert_eq!(
+            session.tools.len(),
+            1,
+            "a declaration without a name is not a tool"
+        );
         assert_eq!(session.tools[0].spec.name, "fx_add");
-        assert_eq!(session.tools[0].spec.parameters["properties"]["a"]["type"], "number");
+        assert_eq!(
+            session.tools[0].spec.parameters["properties"]["a"]["type"],
+            "number"
+        );
     }
 
     #[test]
@@ -749,7 +789,10 @@ mod tests {
             &json!({"content": [{"type": "text", "text": "42 (replaced)"}]}),
         );
         assert_eq!(result.content, "42 (replaced)");
-        assert!(!result.is_error, "isError is only changed when the patch names it");
+        assert!(
+            !result.is_error,
+            "isError is only changed when the patch names it"
+        );
 
         apply_tool_result_patch(&mut result, &json!({"content": "plain"}));
         assert_eq!(result.content, "plain");

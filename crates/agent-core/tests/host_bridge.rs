@@ -298,7 +298,11 @@ async fn a_steer_while_a_tool_runs_asks_the_host_to_stop_it() {
         let events: Vec<String> = lines
             .notifications("agent.event")
             .iter()
-            .filter_map(|frame| frame["params"]["event"]["type"].as_str().map(str::to_string))
+            .filter_map(|frame| {
+                frame["params"]["event"]["type"]
+                    .as_str()
+                    .map(str::to_string)
+            })
             .collect();
         panic!("a steered turn still ends; host calls: {calls:?}; events: {events:?}");
     }
@@ -338,4 +342,3 @@ async fn a_steer_while_a_tool_runs_asks_the_host_to_stop_it() {
         "the steer became a user row: {messages:?}"
     );
 }
-

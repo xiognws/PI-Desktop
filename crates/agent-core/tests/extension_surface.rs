@@ -158,7 +158,13 @@ async fn the_surface_reports_the_turn_that_ran() {
 #[tokio::test]
 async fn an_unknown_session_reports_nothing_rather_than_zeroes() {
     let (sidecar, _lines) = sidecar();
-    let surface = call(&sidecar, 1, "agent.surface", json!({ "sessionId": "never-ran" })).await;
+    let surface = call(
+        &sidecar,
+        1,
+        "agent.surface",
+        json!({ "sessionId": "never-ran" }),
+    )
+    .await;
     let result = &surface["result"];
 
     assert_eq!(result["usage"], Value::Null, "usage: {result}");

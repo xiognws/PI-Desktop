@@ -1449,7 +1449,9 @@ impl Sidecar {
             // reference. An image is the only kind the provider can actually see;
             // the rest become text references so the model is never silently told
             // less than the user attached.
-            message.parts.extend(attachment_parts(&request.params).await);
+            message
+                .parts
+                .extend(attachment_parts(&request.params).await);
             // The renderer already drew this row optimistically; keeping its id
             // is what lets main reconcile instead of duplicating it.
             if let Some(id) = request.str_param("userMessageId") {
@@ -1547,18 +1549,20 @@ impl Sidecar {
         let tools = if extension_session.tools.is_empty() {
             tools
         } else {
-            Arc::new(tools.extended(
-                extension_session
-                    .tools
-                    .iter()
-                    .map(|tool| {
-                        Arc::new(crate::extensions::ExtensionTool::new(
-                            tool.spec.clone(),
-                            extensions.clone(),
-                        )) as Arc<dyn crate::tool::Tool>
-                    })
-                    .collect(),
-            ))
+            Arc::new(
+                tools.extended(
+                    extension_session
+                        .tools
+                        .iter()
+                        .map(|tool| {
+                            Arc::new(crate::extensions::ExtensionTool::new(
+                                tool.spec.clone(),
+                                extensions.clone(),
+                            )) as Arc<dyn crate::tool::Tool>
+                        })
+                        .collect(),
+                ),
+            )
         };
         // Core declarations on every request, the rest on demand. The object is
         // also what refuses a call to a tool the model never activated, so the
@@ -1570,13 +1574,14 @@ impl Sidecar {
         ));
         // `ToolSearch` is the only way a deferred tool becomes declared, and the
         // kernel answers it itself: it changes this session's set, not a file.
-        let tools = if activation.deferred_specs().is_empty() {
-            tools
-        } else {
-            Arc::new(tools.extended(vec![Arc::new(
-                crate::tool_activation::ToolSearchTool::new(activation.clone()),
-            )]))
-        };
+        let tools =
+            if activation.deferred_specs().is_empty() {
+                tools
+            } else {
+                Arc::new(tools.extended(vec![Arc::new(
+                    crate::tool_activation::ToolSearchTool::new(activation.clone()),
+                )]))
+            };
         let activation_section = activation.activation_section();
         // Compose the system prompt for this turn: persona, custom append, tool
         // guidance, the project instruction chain, the skill catalog, the mode's
@@ -2563,13 +2568,8 @@ impl Sidecar {
         // "did *this* turn finish", and that answer needs both halves: the id and
         // `isRunning: false`. Reporting the id only while running left every such
         // poller waiting for a turn that had already completed.
-        let reported_turn = current_turn.or_else(|| {
-            session
-                .last_turn
-                .lock()
-                .ok()
-                .and_then(|turn| turn.clone())
-        });
+        let reported_turn =
+            current_turn.or_else(|| session.last_turn.lock().ok().and_then(|turn| turn.clone()));
         if let Some(turn_id) = reported_turn {
             status["currentTurnId"] = json!(turn_id);
         }
@@ -2662,9 +2662,9 @@ impl Sidecar {
             .ok_or_else(|| RpcError::invalid_params("`names` must be an array of tool names"))?;
         let mut wanted = std::collections::BTreeSet::new();
         for name in names {
-            let name = name
-                .as_str()
-                .ok_or_else(|| RpcError::invalid_params("`names` must be an array of tool names"))?;
+            let name = name.as_str().ok_or_else(|| {
+                RpcError::invalid_params("`names` must be an array of tool names")
+            })?;
             wanted.insert(name.to_string());
         }
         let session = self.session(session_id)?;
@@ -3261,8 +3261,7 @@ impl Sidecar {
             crate::exec::Dialect::Cmd => "cmd",
         }
         .to_string();
-        let shell: Arc<dyn crate::tool::Tool> =
-            Arc::new(crate::exec::ShellTool::new(executor));
+        let shell: Arc<dyn crate::tool::Tool> = Arc::new(crate::exec::ShellTool::new(executor));
 
         let mut tools = self
             .tools
@@ -3285,10 +3284,9 @@ impl Sidecar {
         *self
             .configured_shell
             .lock()
-            .map_err(|_| RpcError::internal("shell identity lock poisoned"))? =
-            Some(crate::builtin_tools::ShellIdentity::for_local_shell(
-                &program, &dialect,
-            ));
+            .map_err(|_| RpcError::internal("shell identity lock poisoned"))? = Some(
+            crate::builtin_tools::ShellIdentity::for_local_shell(&program, &dialect),
+        );
         Ok(())
     }
 
@@ -3544,7 +3542,9 @@ impl Sidecar {
 
     fn delivery_fail(&self, request: &Request) -> Result<Value, RpcError> {
         let id = request.require_str("id")?.to_string();
-        let reason = request.str_param("reason").unwrap_or("the host reported a failure");
+        let reason = request
+            .str_param("reason")
+            .unwrap_or("the host reported a failure");
         let now = self.now_param(request);
         let mut queue = self
             .deliveries
@@ -3736,9 +3736,7 @@ fn build_provider_hooked(
         ProviderWire::AnthropicMessages => {
             http_provider(spec, ProviderWire::AnthropicMessages, hooks)
         }
-        ProviderWire::OpenAiResponses => {
-            http_provider(spec, ProviderWire::OpenAiResponses, hooks)
-        }
+        ProviderWire::OpenAiResponses => http_provider(spec, ProviderWire::OpenAiResponses, hooks),
         ProviderWire::GoogleGenerativeAi => {
             http_provider(spec, ProviderWire::GoogleGenerativeAi, hooks)
         }
@@ -3784,7 +3782,9 @@ async fn extension_provider_spec(
             headers
                 .iter()
                 .filter_map(|(name, value)| {
-                    value.as_str().map(|value| (name.clone(), value.to_string()))
+                    value
+                        .as_str()
+                        .map(|value| (name.clone(), value.to_string()))
                 })
                 .collect()
         })
@@ -4114,7 +4114,11 @@ fn model_limits_from_model_config(model_config: Option<&Value>) -> ModelLimits {
             .and_then(Value::as_u64)
     };
     let limit = model_config.and_then(|config| config.get("limit"));
-    let from_limit = |key: &str| limit.and_then(|limit| limit.get(key)).and_then(Value::as_u64);
+    let from_limit = |key: &str| {
+        limit
+            .and_then(|limit| limit.get(key))
+            .and_then(Value::as_u64)
+    };
     ModelLimits {
         context_window: from_model("contextWindow").or_else(|| from_limit("context")),
         max_tokens: from_model("maxTokens").or_else(|| from_limit("output")),
@@ -4435,7 +4439,11 @@ impl SidecarDelegateRunner {
     fn run_binding(
         &self,
         model_key: Option<&str>,
-    ) -> (Arc<dyn Provider>, String, Option<crate::context::ModelLimits>) {
+    ) -> (
+        Arc<dyn Provider>,
+        String,
+        Option<crate::context::ModelLimits>,
+    ) {
         match model_key.and_then(|key| self.models.get(key)) {
             Some(binding) => (
                 binding.provider.clone(),
@@ -4587,8 +4595,7 @@ fn is_mode_id(value: &str) -> bool {
         Some(first) if first.is_ascii_lowercase() => {}
         _ => return false,
     }
-    value.len() <= 40
-        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    value.len() <= 40 && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// `modeTurn` of one `agent.prompt`: the trusted run context Electron main
@@ -4655,11 +4662,7 @@ fn parse_mode_turn(value: Option<&Value>) -> Result<Option<ModeTurnClaim>, RpcEr
     // definition may declare is not one main can have built.
     if paths.len() > 16
         || paths.iter().any(|(id, path)| {
-            !is_mode_id(id)
-                || path
-                    .as_str()
-                    .map(|path| path.is_empty())
-                    .unwrap_or(true)
+            !is_mode_id(id) || path.as_str().map(|path| path.is_empty()).unwrap_or(true)
         })
     {
         return Err(invalid("artifactPaths".into()));
@@ -4722,10 +4725,7 @@ fn parse_mode_turn_notice(params: &Value) -> Result<ModeTurnNotice, RpcError> {
                 .unwrap_or("agent");
             // `parseModeParam`: absent means Agent, `chat` is the legacy Plan id.
             if !(mode == "chat" || is_mode_id(mode)) {
-                return Err(reject_mode_params(
-                    "MODE_INVALID",
-                    "mode must be a mode id",
-                ));
+                return Err(reject_mode_params("MODE_INVALID", "mode must be a mode id"));
             }
             ModeTurnAction::Release
         }
@@ -4877,10 +4877,18 @@ fn parse_subagent_models(
     request: &Request,
 ) -> std::collections::BTreeMap<String, SubagentModelBinding> {
     let mut models = std::collections::BTreeMap::new();
-    let Some(providers) = request.params.get("subagentProviders").and_then(Value::as_object) else {
+    let Some(providers) = request
+        .params
+        .get("subagentProviders")
+        .and_then(Value::as_object)
+    else {
         return models;
     };
-    let Some(keys) = request.params.get("subagentModelKeys").and_then(Value::as_array) else {
+    let Some(keys) = request
+        .params
+        .get("subagentModelKeys")
+        .and_then(Value::as_array)
+    else {
         return models;
     };
     let compaction_enabled = compaction_enabled_from(request);
@@ -5158,7 +5166,10 @@ mod prompt_parameter_tests {
     #[test]
     fn compaction_is_on_when_the_launch_says_nothing() {
         let limits = limits_of(session_params(None));
-        assert!(limits.compaction_enabled, "automatic protection is the default");
+        assert!(
+            limits.compaction_enabled,
+            "automatic protection is the default"
+        );
         assert_eq!(limits.decide(limits.trigger), BudgetDecision::Compact);
     }
 

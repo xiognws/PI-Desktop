@@ -274,10 +274,7 @@ impl ToolActivation {
     }
 
     pub fn deferred_names(&self) -> Vec<String> {
-        self.deferred
-            .iter()
-            .map(|spec| spec.name.clone())
-            .collect()
+        self.deferred.iter().map(|spec| spec.name.clone()).collect()
     }
 
     pub fn core_names(&self) -> Vec<String> {
@@ -388,11 +385,7 @@ impl ToolActivation {
             })
             .collect();
         scored.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
-        scored
-            .into_iter()
-            .take(4)
-            .map(|(name, _)| name)
-            .collect()
+        scored.into_iter().take(4).map(|(name, _)| name).collect()
     }
 
     /// Switch `names` on, returning the ones that were not active yet.
@@ -647,14 +640,20 @@ mod tests {
 
         let matched = activation.resolve("OfficeRead");
         assert_eq!(matched, vec!["OfficeRead".to_string()]);
-        assert_eq!(activation.activate(&matched), vec!["OfficeRead".to_string()]);
+        assert_eq!(
+            activation.activate(&matched),
+            vec!["OfficeRead".to_string()]
+        );
 
         assert!(names(&activation.declared()).contains(&"OfficeRead".to_string()));
         assert!(!activation.blocks("OfficeRead"));
         // Activating twice is not an error and does not duplicate the declaration.
         assert!(activation.activate(&matched).is_empty());
         let declared = names(&activation.declared());
-        assert_eq!(declared.iter().filter(|name| *name == "OfficeRead").count(), 1);
+        assert_eq!(
+            declared.iter().filter(|name| *name == "OfficeRead").count(),
+            1
+        );
     }
 
     /// The web pair is reachable only through `ToolSearch`, and never from a
@@ -764,17 +763,18 @@ mod tests {
             "Validate a plugin.",
             json!({"type": "object"}),
         ));
-        let activation = ToolActivation::new(
-            &SessionMode::Agent,
-            specs,
-            ToolActivation::empty_active(),
-        );
+        let activation =
+            ToolActivation::new(&SessionMode::Agent, specs, ToolActivation::empty_active());
         // Deferred, so not declared up front and refused until activated...
         assert!(!names(&activation.declared()).contains(&"plugin_alpha".to_string()));
-        assert!(activation.deferred_names().contains(&"plugin_alpha".to_string()));
+        assert!(activation
+            .deferred_names()
+            .contains(&"plugin_alpha".to_string()));
         assert!(activation.blocks("plugin_alpha"));
         // ...but reachable: the catalog finds it and activation declares it.
-        assert!(activation.resolve("plugin_alpha").contains(&"plugin_alpha".to_string()));
+        assert!(activation
+            .resolve("plugin_alpha")
+            .contains(&"plugin_alpha".to_string()));
         activation.activate(&["plugin_alpha".to_string()]);
         assert!(names(&activation.declared()).contains(&"plugin_alpha".to_string()));
         assert!(!activation.blocks("plugin_alpha"));
@@ -788,7 +788,9 @@ mod tests {
     #[test]
     fn a_short_description_finds_the_tool() {
         let activation = activation(SessionMode::Agent);
-        assert!(activation.resolve("validate plugin").contains(&"PluginCheck".to_string()));
+        assert!(activation
+            .resolve("validate plugin")
+            .contains(&"PluginCheck".to_string()));
         assert!(activation.resolve("").is_empty());
         assert!(activation.resolve("nothing matches this").is_empty());
     }
@@ -817,7 +819,11 @@ mod tests {
     fn a_mode_with_nothing_deferred_pays_nothing_for_the_section() {
         let activation = ToolActivation::new(
             &SessionMode::Plan,
-            vec![ToolSpec::new("Read", "Read a file.", json!({"type": "object"}))],
+            vec![ToolSpec::new(
+                "Read",
+                "Read a file.",
+                json!({"type": "object"}),
+            )],
             ToolActivation::empty_active(),
         );
         assert!(activation.activation_section().is_none());
@@ -829,12 +835,20 @@ mod tests {
         let calls: Vec<ToolSpec> = [tool_search_spec()].to_vec();
         let first = ToolActivation::new(
             &SessionMode::Agent,
-            [calls.clone(), vec![ToolSpec::new("Read", "Read a file.", json!({}))]].concat(),
+            [
+                calls.clone(),
+                vec![ToolSpec::new("Read", "Read a file.", json!({}))],
+            ]
+            .concat(),
             ToolActivation::empty_active(),
         );
         let second = ToolActivation::new(
             &SessionMode::Agent,
-            [calls, vec![ToolSpec::new("Read", "Read a file.", json!({}))]].concat(),
+            [
+                calls,
+                vec![ToolSpec::new("Read", "Read a file.", json!({}))],
+            ]
+            .concat(),
             ToolActivation::empty_active(),
         );
         assert_eq!(first.key(), second.key());
@@ -869,9 +883,9 @@ mod tests {
             ToolActivation::empty_active(),
         );
         let section = activation.activation_section().expect("a section");
-        let section_tokens =
-            (section.chars().count() as f64 / crate::context::ESTIMATED_TEXT_CHARS_PER_TOKEN).ceil()
-                as u64;
+        let section_tokens = (section.chars().count() as f64
+            / crate::context::ESTIMATED_TEXT_CHARS_PER_TOKEN)
+            .ceil() as u64;
         let core = tokens(activation.core_specs());
         let search = tokens(&[tool_search_spec()]);
         let after = core + search + section_tokens;

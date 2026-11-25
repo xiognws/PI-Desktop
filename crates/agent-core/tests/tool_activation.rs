@@ -117,7 +117,10 @@ async fn a_report_prices_the_mode_it_was_asked_about() {
         plan["result"]["declarations"]["onDemand"],
         plan["result"]["onDemand"]
             .as_array()
-            .map(|lines| lines.iter().filter_map(|l| l["tokens"].as_u64()).sum::<u64>())
+            .map(|lines| lines
+                .iter()
+                .filter_map(|l| l["tokens"].as_u64())
+                .sum::<u64>())
             .unwrap_or(0),
     );
     println!(
@@ -127,13 +130,22 @@ async fn a_report_prices_the_mode_it_was_asked_about() {
         plan["result"]["declarations"],
     );
     for line in agent["result"]["system"].as_array().unwrap() {
-        println!("  system {}: {} chars / {} tokens", line["name"], line["chars"], line["tokens"]);
+        println!(
+            "  system {}: {} chars / {} tokens",
+            line["name"], line["chars"], line["tokens"]
+        );
     }
     for line in agent["result"]["tools"].as_array().unwrap() {
-        println!("  declared {}: {} chars / {} tokens", line["name"], line["chars"], line["tokens"]);
+        println!(
+            "  declared {}: {} chars / {} tokens",
+            line["name"], line["chars"], line["tokens"]
+        );
     }
     for line in agent["result"]["onDemand"].as_array().unwrap() {
-        println!("  on-demand {}: {} chars / {} tokens", line["name"], line["chars"], line["tokens"]);
+        println!(
+            "  on-demand {}: {} chars / {} tokens",
+            line["name"], line["chars"], line["tokens"]
+        );
     }
     for line in plan["result"]["system"].as_array().unwrap() {
         if line["name"] == "tool_activation" {
@@ -165,7 +177,14 @@ async fn a_report_prices_the_mode_it_was_asked_about() {
             "plan report still declares {writer}: {plan_tools:?}"
         );
     }
-    for reader in ["Read", "Glob", "Grep", "Bash", "BrowserPreview", "SubmitPlan"] {
+    for reader in [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "BrowserPreview",
+        "SubmitPlan",
+    ] {
         assert!(plan_tools.contains(&reader.to_string()), "plan: {reader}");
     }
     assert!(plan_tools.contains(&TOOL_SEARCH_NAME.to_string()));
@@ -192,7 +211,10 @@ async fn a_report_prices_the_mode_it_was_asked_about() {
     )
     .await;
     let after_tools = declared_names(&after["result"]);
-    assert!(after_tools.contains(&"Write".to_string()), "{after_tools:?}");
+    assert!(
+        after_tools.contains(&"Write".to_string()),
+        "{after_tools:?}"
+    );
     assert!(!after_tools.contains(&"OfficeWrite".to_string()));
     assert_eq!(
         after["result"]["declarations"]["declared"],
@@ -323,7 +345,9 @@ async fn activating_a_tool_declares_it_on_the_next_request() {
     // The tool result the model reads says what happened.
     let result = &transcript.messages()[2].tool_results()[0];
     assert!(!result.is_error);
-    assert!(result.content.contains("Activated on-demand tools: OfficeRead"));
+    assert!(result
+        .content
+        .contains("Activated on-demand tools: OfficeRead"));
 }
 
 /// A call to an on-demand tool that was never activated is refused, and the
@@ -331,7 +355,11 @@ async fn activating_a_tool_declares_it_on_the_next_request() {
 #[tokio::test]
 async fn an_unactivated_on_demand_call_is_refused() {
     let provider = Arc::new(agent_core::provider::scripted::ScriptedProvider::new(vec![
-        tool_call("c1", "OfficeRead", json!({"format": "xlsx", "path": "a.xlsx"})),
+        tool_call(
+            "c1",
+            "OfficeRead",
+            json!({"format": "xlsx", "path": "a.xlsx"}),
+        ),
         answer("retrying"),
     ]));
     let engine = engine(provider.clone());

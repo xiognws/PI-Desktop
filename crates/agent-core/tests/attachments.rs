@@ -130,7 +130,9 @@ async fn a_referenced_conversation_arrives_as_its_excerpt() {
 #[tokio::test]
 async fn a_prompt_without_attachments_adds_nothing() {
     assert!(attachment_parts(&json!({})).await.is_empty());
-    assert!(attachment_parts(&json!({ "attachments": [] })).await.is_empty());
+    assert!(attachment_parts(&json!({ "attachments": [] }))
+        .await
+        .is_empty());
     // A malformed entry is skipped rather than failing the whole turn.
     assert!(attachment_parts(&json!({ "attachments": ["nonsense"] }))
         .await

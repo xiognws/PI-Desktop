@@ -194,7 +194,11 @@ async fn a_tool_call_round_trips_over_the_responses_wire() {
     let last = assembler.finish().expect("turn 2 finished");
     println!("--- turn 2 assembled ---\n{last:#?}");
 
-    assert_eq!(last.stop_reason, StopReason::EndTurn, "turn 2 must close the turn");
+    assert_eq!(
+        last.stop_reason,
+        StopReason::EndTurn,
+        "turn 2 must close the turn"
+    );
     assert!(
         last.message.text().contains("42"),
         "the model must repeat what the tool returned, got {:?}",
@@ -243,8 +247,14 @@ async fn cancelling_a_responses_stream_ends_it() {
             while stream.next().await.is_some() {}
             let waited = started.elapsed();
             println!("drain after cancel took {waited:?}");
-            assert!(waited < Duration::from_secs(10), "cancel must not wait for the provider");
-            assert!(!saw_finish, "a cancelled turn must not report a finish reason");
+            assert!(
+                waited < Duration::from_secs(10),
+                "cancel must not wait for the provider"
+            );
+            assert!(
+                !saw_finish,
+                "a cancelled turn must not report a finish reason"
+            );
             return;
         }
     }

@@ -96,10 +96,7 @@ fn peer(sidecar: &Arc<Sidecar>, lines: &RecordingLines, mode: Host) -> Peer {
                         // The system row keeps the prompt inside `modelSystem`, so
                         // the whole message is kept and searched as JSON.
                         if let Some(message) = params.get("message") {
-                            journal
-                                .lock()
-                                .expect("journal")
-                                .push(message.to_string());
+                            journal.lock().expect("journal").push(message.to_string());
                         }
                         Ok(json!({ "ok": true }))
                     }
@@ -257,7 +254,10 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
         }),
     )
     .await;
-    assert!(prompted.get("error").is_none(), "the prompt was accepted: {prompted}");
+    assert!(
+        prompted.get("error").is_none(),
+        "the prompt was accepted: {prompted}"
+    );
 
     lines
         .wait_for_event("agent_end", Duration::from_secs(20))
@@ -311,7 +311,10 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
     }
     assert!(events.contains(&"turn_end"), "turn_end fired: {events:?}");
     assert!(events.contains(&"agent_end"), "agent_end fired: {events:?}");
-    assert!(events.contains(&"before_provider_headers"), "header hook fired: {events:?}");
+    assert!(
+        events.contains(&"before_provider_headers"),
+        "header hook fired: {events:?}"
+    );
 
     // Payload shapes are the Node contract's, field for field
     // (`Runner.emitBeforeAgentStart` / `runtime.ts` emission sites).
@@ -323,7 +326,9 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
     assert_eq!(agent_start.payload["messageType"], "user");
     assert_eq!(agent_start.payload["prompt"], "please add 20 and 22");
     assert!(
-        agent_start.payload["systemPrompt"].as_str().is_some_and(|prompt| !prompt.is_empty()),
+        agent_start.payload["systemPrompt"]
+            .as_str()
+            .is_some_and(|prompt| !prompt.is_empty()),
         "the composed prompt travels with the hook: {}",
         agent_start.payload
     );
@@ -358,7 +363,10 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
     assert_eq!(fx_result.payload["toolName"], "fx_add");
     // Content is pi's block list, and the flag is the tool's own outcome — the
     // replacement is applied after the handler answered.
-    assert_eq!(fx_result.payload["content"], json!([{ "type": "text", "text": "42" }]));
+    assert_eq!(
+        fx_result.payload["content"],
+        json!([{ "type": "text", "text": "42" }])
+    );
     assert_eq!(fx_result.payload["isError"], false);
     assert_eq!(fx_result.payload["input"], json!({ "a": 20, "b": 22 }));
 
@@ -366,7 +374,11 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
     // `ToolSearch`, and the call went back to the extension through
     // `extensions.tools.execute` rather than to host-core.
     let tool_calls = peer.tool_calls.lock().unwrap().clone();
-    assert_eq!(tool_calls.len(), 1, "one extension tool call: {tool_calls:?}");
+    assert_eq!(
+        tool_calls.len(),
+        1,
+        "one extension tool call: {tool_calls:?}"
+    );
     assert_eq!(tool_calls[0]["toolName"], "fx_add");
     assert_eq!(tool_calls[0]["toolCallId"], "call_2");
     assert_eq!(tool_calls[0]["turnId"], "t1");
@@ -378,19 +390,31 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
         journal.iter().any(|row| row.contains("E2E-MARKER-7f3")),
         "the chained system prompt reached the turn: {journal:?}"
     );
-    let session = call(&sidecar, 2, "native.session.get", json!({ "sessionId": "s1" })).await;
+    let session = call(
+        &sidecar,
+        2,
+        "native.session.get",
+        json!({ "sessionId": "s1" }),
+    )
+    .await;
     let rows = tool_rows(&session);
     let fx_add = rows
         .iter()
         .find(|row| row["name"] == "fx_add")
         .unwrap_or_else(|| panic!("an fx_add result: {rows:?}"));
-    assert_eq!(fx_add["content"], "42 (replaced)", "the replacement reached the model");
+    assert_eq!(
+        fx_add["content"], "42 (replaced)",
+        "the replacement reached the model"
+    );
     assert_eq!(fx_add["is_error"], false);
     let bash = rows
         .iter()
         .find(|row| row["name"] == "Bash")
         .unwrap_or_else(|| panic!("a Bash result: {rows:?}"));
-    assert_eq!(bash["content"], "E2E blocked bash", "the block reason is the result");
+    assert_eq!(
+        bash["content"], "E2E blocked bash",
+        "the block reason is the result"
+    );
     assert_eq!(bash["is_error"], true);
     let blocked_call = hooks
         .iter()
@@ -400,7 +424,10 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
         })
         .expect("the Bash tool_call payload");
     assert_eq!(blocked_call.payload["toolName"], "Bash");
-    assert_eq!(blocked_call.payload["input"], json!({ "command": "echo hi" }));
+    assert_eq!(
+        blocked_call.payload["input"],
+        json!({ "command": "echo hi" })
+    );
     assert!(
         !hooks.iter().any(|hook| {
             hook.event == "tool_result"
@@ -410,10 +437,10 @@ async fn hooks_fire_in_turn_order_and_their_answers_reach_the_turn() {
     );
     // A blocked call never ran: `tools.execute` was never asked for it.
     assert!(
-        !lines
-            .host_calls()
-            .iter()
-            .any(|frame| frame.pointer("/params/params/toolName").and_then(Value::as_str) == Some("Bash")),
+        !lines.host_calls().iter().any(|frame| frame
+            .pointer("/params/params/toolName")
+            .and_then(Value::as_str)
+            == Some("Bash")),
         "a blocked call does not reach host-core"
     );
 }
@@ -441,7 +468,10 @@ async fn a_failing_hook_degrades_to_the_unchanged_value() {
         }),
     )
     .await;
-    assert!(prompted.get("error").is_none(), "the prompt was accepted: {prompted}");
+    assert!(
+        prompted.get("error").is_none(),
+        "the prompt was accepted: {prompted}"
+    );
 
     // The turn still finishes: a hook is a diagnostic, never a failed turn
     // (`Runner.dispatch` on the Node side).
@@ -462,13 +492,22 @@ async fn a_failing_hook_degrades_to_the_unchanged_value() {
         !journal.iter().any(|row| row.contains("E2E-MARKER-7f3")),
         "a refused hook leaves the prompt alone: {journal:?}"
     );
-    let session = call(&sidecar, 2, "native.session.get", json!({ "sessionId": "s1" })).await;
+    let session = call(
+        &sidecar,
+        2,
+        "native.session.get",
+        json!({ "sessionId": "s1" }),
+    )
+    .await;
     let rows = tool_rows(&session);
     let fx_add = rows
         .iter()
         .find(|row| row["name"] == "fx_add")
         .unwrap_or_else(|| panic!("an fx_add result: {rows:?}"));
-    assert_eq!(fx_add["content"], "42", "an unapplied replacement keeps the tool's answer");
+    assert_eq!(
+        fx_add["content"], "42",
+        "an unapplied replacement keeps the tool's answer"
+    );
     let bash = rows
         .iter()
         .find(|row| row["name"] == "Bash")

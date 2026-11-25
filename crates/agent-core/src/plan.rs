@@ -190,7 +190,6 @@ impl TodoReceipt {
     }
 }
 
-
 /// The plan/goal negotiation a session is in.
 ///
 /// Wire names match `PlanningState` in `packages/shared/src/types/plans.ts`: the
@@ -362,7 +361,10 @@ impl PlanState {
 
     /// The planning state this session last announced.
     pub fn planning(&self) -> PlanningStatus {
-        self.planning.lock().map(|status| *status).unwrap_or_default()
+        self.planning
+            .lock()
+            .map(|status| *status)
+            .unwrap_or_default()
     }
 
     /// Record the planning state a turn announced, reporting whether it changed.
@@ -434,7 +436,10 @@ fn interpret(name: &str, value: &Value) -> Result<(String, Option<TodoReceipt>)>
     } else {
         text
     };
-    let denied = value.get("denied").and_then(Value::as_bool).unwrap_or(false)
+    let denied = value
+        .get("denied")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
         || error_code == "PERMISSION_DENIED";
     Err(if denied {
         AgentError::ToolDenied {
@@ -644,9 +649,7 @@ impl Tool for SubmitPlanTool {
 /// which is this kernel's registered checklist tool *and* the Node runtime's, so
 /// the sentence points at a tool that exists here instead of at the kernel-only
 /// spelling (`Todo`) it used to have.
-pub fn approved_execution_instruction(
-    execution: &Value,
-) -> std::result::Result<String, String> {
+pub fn approved_execution_instruction(execution: &Value) -> std::result::Result<String, String> {
     let not_found = |what: &str| format!("{what} (PLAN_EXECUTION_NOT_FOUND)");
     let artifact = execution
         .get("artifact")
@@ -808,7 +811,9 @@ mod tests {
         );
 
         // `todoWriteParameters` in `packages/agent-runtime/src/todo-tool.ts`.
-        let properties = spec.parameters["properties"].as_object().expect("properties");
+        let properties = spec.parameters["properties"]
+            .as_object()
+            .expect("properties");
         assert_eq!(properties.len(), 1, "no invented arguments");
         let required: Vec<&str> = spec.parameters["required"]
             .as_array()
@@ -893,7 +898,11 @@ mod tests {
             "{}",
             result.content
         );
-        assert!(result.content.contains("\"revision\": 7"), "{}", result.content);
+        assert!(
+            result.content.contains("\"revision\": 7"),
+            "{}",
+            result.content
+        );
         assert!(
             result.content.contains("Checklist updated: 0/2 completed"),
             "{}",
@@ -1078,12 +1087,18 @@ mod tests {
         assert_eq!(calls[0].1["turnId"], "t1");
         assert_eq!(calls[0].1["toolCallId"], "call_1");
         assert_eq!(calls[0].1["kind"], "plan");
-        assert_eq!(calls[0].1["title"], "Fix the parser", "the argument is trimmed");
+        assert_eq!(
+            calls[0].1["title"], "Fix the parser",
+            "the argument is trimmed"
+        );
         assert_eq!(calls[0].1["question"], "Run this plan?");
 
         let submitted = plan.submitted().expect("the kernel keeps what is pending");
         assert_eq!(submitted.proposal_id, "proposal-1");
-        assert_eq!(submitted.artifact.unwrap()["relativePath"], ".pi/plan/proposal-1.md");
+        assert_eq!(
+            submitted.artifact.unwrap()["relativePath"],
+            ".pi/plan/proposal-1.md"
+        );
         assert_eq!(plan.planning(), PlanningStatus::AwaitingApproval);
 
         let events = sink.events();
@@ -1122,7 +1137,8 @@ mod tests {
             .await;
         assert!(result.is_error);
         assert!(
-            result.content
+            result
+                .content
                 .contains("requires non-empty title, markdown, and question"),
             "{}",
             result.content
@@ -1149,8 +1165,16 @@ mod tests {
             )
             .await;
         assert!(result.is_error);
-        assert!(result.content.contains(PLAN_SUBMIT_FAILED), "{}", result.content);
-        assert!(result.content.contains("no workspace"), "{}", result.content);
+        assert!(
+            result.content.contains(PLAN_SUBMIT_FAILED),
+            "{}",
+            result.content
+        );
+        assert!(
+            result.content.contains("no workspace"),
+            "{}",
+            result.content
+        );
         assert!(sink.is_empty());
         assert!(plan.submitted().is_none());
         assert_eq!(plan.planning(), PlanningStatus::Inactive);
@@ -1203,7 +1227,9 @@ mod tests {
         // runtime.ts `buildSubmitTool("plan")`: title, markdown, question — and no
         // other argument, because the host derives everything else.
         assert_eq!(required, vec!["title", "markdown", "question"]);
-        let properties = spec.parameters["properties"].as_object().expect("properties");
+        let properties = spec.parameters["properties"]
+            .as_object()
+            .expect("properties");
         assert_eq!(properties.len(), 3, "no invented arguments");
     }
 
@@ -1276,7 +1302,10 @@ mod tests {
     fn only_a_changed_planning_state_is_worth_an_event() {
         let plan = PlanState::new();
         assert!(plan.notice_planning(PlanningStatus::Planning));
-        assert!(!plan.notice_planning(PlanningStatus::Planning), "same state");
+        assert!(
+            !plan.notice_planning(PlanningStatus::Planning),
+            "same state"
+        );
         assert!(plan.notice_planning(PlanningStatus::AwaitingApproval));
         assert!(plan.notice_planning(PlanningStatus::Inactive));
         assert_eq!(plan.planning(), PlanningStatus::Inactive);

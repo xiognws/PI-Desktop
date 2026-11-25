@@ -186,7 +186,13 @@ fn planning_states(lines: &RecordingLines) -> Vec<Value> {
 async fn wait_for_idle(sidecar: &Sidecar, session_id: &str) {
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     loop {
-        let status = call(sidecar, 99, "agent.getStatus", json!({ "sessionId": session_id })).await;
+        let status = call(
+            sidecar,
+            99,
+            "agent.getStatus",
+            json!({ "sessionId": session_id }),
+        )
+        .await;
         if status["result"]["status"]["isRunning"] == false {
             return;
         }
@@ -242,11 +248,15 @@ async fn a_plan_turn_can_submit_its_plan_and_the_host_opens_the_approval() {
     assert_eq!(awaiting["kind"], "plan");
     assert_eq!(awaiting["proposalId"], "proposal-1");
     assert_eq!(awaiting["title"], "Fix the parser");
-    assert_eq!(awaiting["artifact"]["relativePath"], ".pi/plan/proposal-1.md");
+    assert_eq!(
+        awaiting["artifact"]["relativePath"],
+        ".pi/plan/proposal-1.md"
+    );
     assert_eq!(awaiting["version"], 1);
     assert!(
-        states.iter().any(|event| event["state"] == "planning"
-            && event["kind"] == "plan"),
+        states
+            .iter()
+            .any(|event| event["state"] == "planning" && event["kind"] == "plan"),
         "a plan turn announces it is planning: {states:?}"
     );
 
@@ -254,7 +264,10 @@ async fn a_plan_turn_can_submit_its_plan_and_the_host_opens_the_approval() {
     // without re-reading the transcript.
     let plan = call(&sidecar, 2, "agent.plan", json!({ "sessionId": "s1" })).await;
     assert_eq!(plan["result"]["plan"]["planning"], "awaiting_approval");
-    assert_eq!(plan["result"]["plan"]["submitted"]["proposalId"], "proposal-1");
+    assert_eq!(
+        plan["result"]["plan"]["submitted"]["proposalId"],
+        "proposal-1"
+    );
 }
 
 #[tokio::test]
@@ -289,7 +302,13 @@ async fn an_approved_plan_runs_as_one_agent_turn_with_the_snapshot_injected() {
 
     // The approved snapshot is this turn's user message: main sent no content,
     // so anything the model sees came from the instruction.
-    let session = call(&sidecar, 2, "native.session.get", json!({ "sessionId": "s1" })).await;
+    let session = call(
+        &sidecar,
+        2,
+        "native.session.get",
+        json!({ "sessionId": "s1" }),
+    )
+    .await;
     let messages = session["result"]["messages"].as_array().expect("messages");
     assert_eq!(messages.len(), 2, "user row plus assistant row");
     assert_eq!(messages[0]["role"], "user");
@@ -299,7 +318,10 @@ async fn an_approved_plan_runs_as_one_agent_turn_with_the_snapshot_injected() {
         "{injected}"
     );
     assert!(injected.contains(".pi/plan/proposal-1.md"), "{injected}");
-    assert!(injected.contains("Approved plan title: Fix the parser"), "{injected}");
+    assert!(
+        injected.contains("Approved plan title: Fix the parser"),
+        "{injected}"
+    );
     assert_eq!(messages[1]["role"], "assistant");
 
     // An approved run is not a negotiation: nothing is awaiting approval.
@@ -432,7 +454,10 @@ async fn an_agent_turn_relays_the_session_checklist_to_the_host() {
     assert_eq!(params["toolCallId"], "todo_1");
     assert_eq!(params["mode"], "agent");
     // Nothing the host must own travels from the kernel as a decision.
-    assert_eq!(params["args"]["todos"][0]["content"], "read the failing test");
+    assert_eq!(
+        params["args"]["todos"][0]["content"],
+        "read the failing test"
+    );
     assert_eq!(params["args"]["todos"][1]["status"], "pending");
 
     lines

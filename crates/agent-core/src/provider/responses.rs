@@ -76,12 +76,12 @@ use std::collections::{HashMap, HashSet};
 use serde_json::{json, Value};
 
 use super::http::HttpProviderConfig;
-use super::CacheRetention;
 use super::sse::SseFramer;
+use super::CacheRetention;
+use super::ChatRequest;
 use super::StreamEvent;
 use crate::error::{AgentError, ProviderErrorKind, Result};
 use crate::message::{ContentPart, Role, StopReason, Usage};
-use super::ChatRequest;
 
 /// Build the request body for one turn.
 pub fn responses_body(config: &HttpProviderConfig, request: &ChatRequest) -> Value {
@@ -444,8 +444,7 @@ impl ResponsesStreamDecoder {
                             parts
                                 .iter()
                                 .filter(|part| {
-                                    part.get("type").and_then(Value::as_str)
-                                        == Some("output_text")
+                                    part.get("type").and_then(Value::as_str) == Some("output_text")
                                 })
                                 .filter_map(|part| part.get("text").and_then(Value::as_str))
                                 .collect::<String>()
@@ -574,11 +573,14 @@ fn readable_error(value: &Value, depth: usize) -> (Option<String>, Option<String
         }
         return (None, None);
     };
-    let code = object.get("code").or_else(|| object.get("type")).and_then(|code| match code {
-        Value::String(code) => Some(code.clone()),
-        Value::Number(code) => Some(code.to_string()),
-        _ => None,
-    });
+    let code = object
+        .get("code")
+        .or_else(|| object.get("type"))
+        .and_then(|code| match code {
+            Value::String(code) => Some(code.clone()),
+            Value::Number(code) => Some(code.to_string()),
+            _ => None,
+        });
     let message = object
         .get("message")
         .or_else(|| object.get("msg"))
@@ -615,7 +617,11 @@ mod tests {
     fn config() -> HttpProviderConfig {
         HttpProviderConfig {
             default_max_tokens: 4096,
-            ..HttpProviderConfig::openai_responses("oai", "https://api.example.test/v1", "sk-secret")
+            ..HttpProviderConfig::openai_responses(
+                "oai",
+                "https://api.example.test/v1",
+                "sk-secret",
+            )
         }
     }
 
@@ -843,9 +849,14 @@ mod tests {
             decode(&raw),
             vec![StreamEvent::Finish(StopReason::MaxOutputTokens)]
         );
-        assert_eq!(map_status(&json!({"status": "completed"})), StopReason::EndTurn);
         assert_eq!(
-            map_status(&json!({"status":"incomplete","incomplete_details":{"reason":"content_filter"}})),
+            map_status(&json!({"status": "completed"})),
+            StopReason::EndTurn
+        );
+        assert_eq!(
+            map_status(
+                &json!({"status":"incomplete","incomplete_details":{"reason":"content_filter"}})
+            ),
             StopReason::ContentFilter
         );
     }
@@ -860,9 +871,15 @@ mod tests {
         let mut decoder = ResponsesStreamDecoder::new();
         let error = decoder.push_chunk(&raw).unwrap_err();
         let text = error.to_string();
-        assert!(text.contains("model [nope] service info not found"), "{text}");
+        assert!(
+            text.contains("model [nope] service info not found"),
+            "{text}"
+        );
         assert!(text.contains("11102"), "{text}");
-        assert!(!text.contains("\\\""), "the envelope must be unwrapped: {text}");
+        assert!(
+            !text.contains("\\\""),
+            "the envelope must be unwrapped: {text}"
+        );
         assert_eq!(error.code(), "PROVIDER_ERROR");
     }
 
@@ -943,10 +960,7 @@ mod tests {
     fn extra_system_rows_join_the_instructions_string() {
         let mut extra = Message::new(Role::System);
         extra.push_text("second rule");
-        let request = ChatRequest::new(
-            "gpt-5",
-            vec![Message::user_text("hi"), extra],
-        );
+        let request = ChatRequest::new("gpt-5", vec![Message::user_text("hi"), extra]);
         let body = responses_body(&config(), &request);
         // A system row in the transcript is still a system prompt: it becomes the
         // instruction string even when the caller set none.
@@ -999,7 +1013,9 @@ mod tests {
             request.thinking = level;
             let body = responses_body(&config(), &request);
             assert_eq!(
-                body.get("reasoning").and_then(|reasoning| reasoning.get("effort")).and_then(Value::as_str),
+                body.get("reasoning")
+                    .and_then(|reasoning| reasoning.get("effort"))
+                    .and_then(Value::as_str),
                 expected,
                 "{level:?}: {body}"
             );

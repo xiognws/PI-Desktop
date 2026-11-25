@@ -315,7 +315,9 @@ impl WireDecoder {
         match wire {
             WireApi::OpenAiCompatible => Self::OpenAi(OpenAiStreamDecoder::new()),
             WireApi::AnthropicMessages => Self::Anthropic(AnthropicStreamDecoder::new()),
-            WireApi::OpenAiResponses => Self::Responses(super::responses::ResponsesStreamDecoder::new()),
+            WireApi::OpenAiResponses => {
+                Self::Responses(super::responses::ResponsesStreamDecoder::new())
+            }
             WireApi::GoogleGenerativeAi => Self::Google(super::google::GoogleStreamDecoder::new()),
         }
     }

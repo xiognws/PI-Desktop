@@ -142,7 +142,10 @@ impl SkillReviewPolicy {
             // Only an object is a provider spec. Anything else follows the session,
             // because a malformed overlay must not leave the review with no provider
             // at all.
-            provider: object.get("provider").filter(|value| value.is_object()).cloned(),
+            provider: object
+                .get("provider")
+                .filter(|value| value.is_object())
+                .cloned(),
             model: text("model"),
         }
     }
@@ -658,7 +661,10 @@ mod tests {
         // The review resets the count; a skipped turn still spends what it used.
         let now = Instant::now();
         let mut gate = ReviewGate::new();
-        assert_eq!(gate.qualify(&policy(), 0, now), Err(ReviewSkip::TooFewTools));
+        assert_eq!(
+            gate.qualify(&policy(), 0, now),
+            Err(ReviewSkip::TooFewTools)
+        );
         gate.record_review(now);
         assert_eq!(
             gate.qualify(&policy(), 0, now + Duration::from_secs(200)),

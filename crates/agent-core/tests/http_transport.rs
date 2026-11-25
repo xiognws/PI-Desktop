@@ -366,12 +366,9 @@ mod common_sidecar {
             .expect("the turn ends");
 
         let raw = fixture.received.lock().expect("received").join("\n");
-        let body = raw
-            .split("\r\n\r\n")
-            .nth(1)
-            .unwrap_or_default()
-            .to_string();
-        serde_json::from_str(&body).unwrap_or_else(|error| panic!("body is not JSON ({error}): {body}"))
+        let body = raw.split("\r\n\r\n").nth(1).unwrap_or_default().to_string();
+        serde_json::from_str(&body)
+            .unwrap_or_else(|error| panic!("body is not JSON ({error}): {body}"))
     }
 
     pub fn openai_fixture() -> Fixture {
@@ -416,14 +413,8 @@ async fn a_prompt_level_reaches_the_openai_request_body() {
 #[tokio::test]
 async fn a_prompt_without_a_level_sends_no_reasoning_field() {
     let fixture = common_sidecar::openai_fixture();
-    let body = common_sidecar::prompt_body(
-        &fixture,
-        "openai",
-        None,
-        16_384,
-        serde_json::json!({}),
-    )
-    .await;
+    let body =
+        common_sidecar::prompt_body(&fixture, "openai", None, 16_384, serde_json::json!({})).await;
     assert!(body.get("reasoning_effort").is_none(), "body: {body}");
 }
 

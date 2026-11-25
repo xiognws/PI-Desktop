@@ -306,7 +306,9 @@ pub enum Verdict {
 impl Verdict {
     pub fn level(&self) -> DangerLevel {
         match self {
-            Self::Allow { level, .. } | Self::Ask { level, .. } | Self::Deny { level, .. } => *level,
+            Self::Allow { level, .. } | Self::Ask { level, .. } | Self::Deny { level, .. } => {
+                *level
+            }
         }
     }
 
@@ -587,7 +589,8 @@ mod tests {
 
     #[test]
     fn an_unattended_session_allows_everything() {
-        let verdict = ApprovalPolicy::unattended().evaluate("Bash", &json!({"command": "rm -rf build"}));
+        let verdict =
+            ApprovalPolicy::unattended().evaluate("Bash", &json!({"command": "rm -rf build"}));
         assert!(verdict.is_allowed(), "{verdict:?}");
     }
 
@@ -661,7 +664,8 @@ mod tests {
 
     #[test]
     fn a_path_rule_allows_edits_under_one_directory() {
-        let policy = ApprovalPolicy::reviewer().allow(AllowRule::for_tool("Write").with_path_prefix("E:/proj/src/"));
+        let policy = ApprovalPolicy::reviewer()
+            .allow(AllowRule::for_tool("Write").with_path_prefix("E:/proj/src/"));
         assert!(policy
             .evaluate("Write", &json!({"path": "E:/proj/src/lib.rs"}))
             .is_allowed());
@@ -692,7 +696,10 @@ mod tests {
         assert_eq!(cell.snapshot().floor, DangerLevel::ReadOnly);
         // With the floor at reads, a write has to be approved.
         assert!(cell.evaluate("Read", &json!({"path": "a"})).is_allowed());
-        assert!(cell.evaluate("Write", &json!({"path": "a"})).refusal().is_some());
+        assert!(cell
+            .evaluate("Write", &json!({"path": "a"}))
+            .refusal()
+            .is_some());
         cell.set_floor(DangerLevel::Dangerous);
         assert!(cell.evaluate("Write", &json!({"path": "a"})).is_allowed());
     }

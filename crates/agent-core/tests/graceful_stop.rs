@@ -138,10 +138,7 @@ async fn release_tool(sidecar: &Arc<Sidecar>, lines: &RecordingLines, content: &
         .wait_for_host_call("tools.execute", Duration::from_secs(10))
         .await
         .expect("the scripted tool call reaches the host");
-    let call_id = pending["id"]
-        .as_str()
-        .expect("a host call id")
-        .to_string();
+    let call_id = pending["id"].as_str().expect("a host call id").to_string();
     sidecar
         .bridge()
         .complete(&call_id, Ok(json!({ "ok": true, "content": content })));
@@ -197,7 +194,10 @@ async fn agent_stop_lets_the_tool_finish_and_ends_the_turn_at_the_boundary() {
         event_types(&lines)
     );
     let events = event_types(&lines);
-    assert!(events.contains(&"turn_end".to_string()), "events: {events:?}");
+    assert!(
+        events.contains(&"turn_end".to_string()),
+        "events: {events:?}"
+    );
     assert!(
         !events.contains(&"error".to_string()),
         "nothing failed, so no error is reported: {events:?}"

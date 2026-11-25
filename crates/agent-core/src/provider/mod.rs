@@ -250,7 +250,8 @@ pub trait Provider: Send + Sync {
 /// nothing and a transport cannot forge an answer.
 pub trait WireHooks: Send + Sync {
     /// The payload to send: the hook's replacement, or the original.
-    fn before_request<'a>(&'a self, payload: serde_json::Value) -> BoxFuture<'a, serde_json::Value>;
+    fn before_request<'a>(&'a self, payload: serde_json::Value)
+        -> BoxFuture<'a, serde_json::Value>;
 
     /// The response arrived, whatever its status.
     fn after_response<'a>(&'a self, status: u16) -> BoxFuture<'a, ()>;
@@ -651,7 +652,8 @@ mod thinking_tests {
     #[test]
     fn every_host_level_round_trips() {
         for name in ThinkingLevel::HOST_LEVELS {
-            let level = ThinkingLevel::parse(name).unwrap_or_else(|| panic!("{name} is not a level"));
+            let level =
+                ThinkingLevel::parse(name).unwrap_or_else(|| panic!("{name} is not a level"));
             assert_eq!(level.as_str(), name);
         }
         assert_eq!(ThinkingLevel::HOST_LEVELS.len(), 8);

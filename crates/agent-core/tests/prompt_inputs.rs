@@ -28,7 +28,9 @@ fn the_instruction_chain_and_custom_prompt_are_read() {
     let project = project.expect("the instruction chain is read");
     assert_eq!(project.entries.len(), 2);
     assert_eq!(project.entries[0].source, "AGENTS.md");
-    assert!(project.entries[1].content.contains("tests are part of the change"));
+    assert!(project.entries[1]
+        .content
+        .contains("tests are part of the change"));
 }
 
 #[test]

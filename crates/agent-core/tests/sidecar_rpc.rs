@@ -1311,7 +1311,10 @@ async fn naming_a_shell_does_not_lift_the_approval_policy() {
     )
     .await;
     let raw = session["result"].to_string();
-    assert!(raw.contains("needs approval"), "the refusal is recorded: {raw}");
+    assert!(
+        raw.contains("needs approval"),
+        "the refusal is recorded: {raw}"
+    );
 }
 
 /// The token report answers where a request's cost goes, per section and per tool.

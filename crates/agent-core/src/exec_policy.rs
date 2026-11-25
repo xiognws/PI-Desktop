@@ -714,7 +714,11 @@ mod tests {
         // The web pair grades as one class: a fetch of a model-chosen host is a
         // network call, not a read of a local file.
         for tool in ["WebSearch", "WebExtract", "web_search", "web_extract"] {
-            assert_eq!(policy.classify(tool, &json!({})), ToolClass::Network, "{tool}");
+            assert_eq!(
+                policy.classify(tool, &json!({})),
+                ToolClass::Network,
+                "{tool}"
+            );
         }
         // The history tool is local: reading the session store is a read, and a
         // network or mutating grade here would ask the user to approve a lookup

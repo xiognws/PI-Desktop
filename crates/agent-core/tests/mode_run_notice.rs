@@ -115,7 +115,8 @@ fn prompt_params(run_id: &str) -> Value {
 }
 
 async fn status(sidecar: &Sidecar, id: i64) -> Value {
-    call(sidecar, id, "agent.getStatus", json!({ "sessionId": "s1" })).await["result"]["status"].clone()
+    call(sidecar, id, "agent.getStatus", json!({ "sessionId": "s1" })).await["result"]["status"]
+        .clone()
 }
 
 async fn notice(sidecar: &Sidecar, id: i64, params: Value) -> Value {
@@ -293,11 +294,17 @@ async fn a_run_claim_the_kernel_cannot_read_refuses_the_prompt() {
     );
 
     // A stage id no definition could declare, and an origin main never sends.
-    for (field, value) in [("stageId", json!("Implement Stage")), ("origin", json!("cron"))] {
+    for (field, value) in [
+        ("stageId", json!("Implement Stage")),
+        ("origin", json!("cron")),
+    ] {
         let mut params = prompt_params("run-1");
         params["modeTurn"][field] = value;
         let response = call(&sidecar, 2, "agent.prompt", params).await;
-        assert_eq!(response["error"]["data"]["errorCode"], "MODE_TURN_INVALID", "got: {response}");
+        assert_eq!(
+            response["error"]["data"]["errorCode"], "MODE_TURN_INVALID",
+            "got: {response}"
+        );
     }
 
     // Nothing started: a refused claim must not leave a turn behind.
@@ -327,7 +334,10 @@ async fn a_malformed_notice_is_refused_by_name() {
     ] {
         let response = notice(&sidecar, 2, params.clone()).await;
         assert_eq!(response["error"]["code"], -32602, "got: {response}");
-        assert_eq!(response["error"]["data"]["errorCode"], error_code, "for {params}");
+        assert_eq!(
+            response["error"]["data"]["errorCode"], error_code,
+            "for {params}"
+        );
     }
 
     // The refused notices changed nothing: the run turn is still closeout-able.
