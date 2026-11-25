@@ -35,7 +35,17 @@ const task = (id, state, exitCode) => ({
   ...(exitCode === undefined ? {} : { exitCode }),
 });
 
-async function withDockRender(run) {
+/**
+ * One Vite SSR server for the whole file.
+ *
+ * Booting a server costs ~34s on this host, and the six cases here read the same
+ * three modules; a server per case ran the file past three minutes and got the
+ * last case cancelled by the file-level deadline.
+ */
+let dockRuntime;
+
+async function loadDockRuntime() {
+  if (dockRuntime) return dockRuntime;
   const server = await createServer({
     root: ROOT,
     configFile: false,
@@ -54,12 +64,18 @@ async function withDockRender(run) {
       },
     ],
   });
+  const { TaskDock } = await server.ssrLoadModule("/src/components/TaskDock.tsx");
+  const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
+  const { useModesStore } = await server.ssrLoadModule("/src/features/modes/modes-store.ts");
+  const i18n = createInstance();
+  await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
+  dockRuntime = { server, TaskDock, useAppStore, useModesStore, i18n };
+  return dockRuntime;
+}
+
+async function withDockRender(run) {
+  const { TaskDock, useAppStore, useModesStore, i18n } = await loadDockRuntime();
   try {
-    const { TaskDock } = await server.ssrLoadModule("/src/components/TaskDock.tsx");
-    const { useAppStore } = await server.ssrLoadModule("/src/stores/app-store.ts");
-    const { useModesStore } = await server.ssrLoadModule("/src/features/modes/modes-store.ts");
-    const i18n = createInstance();
-    await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
     const render = (fixture) => {
       const sessionId = "session-dock-render";
       // The checklist side is the only other content the container can show.
@@ -84,9 +100,12 @@ async function withDockRender(run) {
     await run({ render });
   } finally {
     delete globalThis.__piDockFixture;
-    await server.close();
   }
 }
+
+test.after(async () => {
+  await dockRuntime?.server.close();
+});
 
 test("the container disappears with its last row, even though the host still lists the finished task", async () => {
   await withDockRender(({ render }) => {
