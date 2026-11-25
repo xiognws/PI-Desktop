@@ -378,10 +378,16 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // In-app model providers own a loopback gateway and the provider row that
     // points at it, so they start once the host can answer. The window has
     // already painted and nothing waits on this: a provider that cannot come up
-    // logs one line and stays out of the way.
-    // In-app provider gateways are forked processes with loopback ports; they
-    // come up when the first session is opened (see session-ipc), not here, so an
-    // idle launch holds no child process and no listener.
+    // logs one line and stays out of the way, and `start()` gives a failed one a
+    // single restart before it gives up. Waiting for the first session instead —
+    // which is what this did — left the provider row pointing at a port nothing
+    // listened on, and model discovery answered ERR_CONNECTION_REFUSED until the
+    // user opened a chat.
+    if (!bootError) {
+      void startInAppProviders().catch((error: unknown) => {
+        logger.app("provider", "warn", "in-app gateway start failed", { data: String(error) });
+      });
+    }
     const curatorMaintenance = createCuratorMaintenance({
       getHost,
       isBusy: isAnySessionBusy,

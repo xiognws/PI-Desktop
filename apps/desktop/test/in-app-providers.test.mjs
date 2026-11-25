@@ -84,6 +84,10 @@ function harness({ settings = {}, healthy = true, rows = [], models = ["m-1", "m
     log: () => {},
     healthPollMs: 1,
     healthTimeoutMs: healthy ? 200 : 5,
+    // The cold-start retry is one more attempt per failed gateway; tests drive it
+    // without waiting in real time.
+    coldStartSettleMs: 0,
+    sleep: async () => {},
   });
   return { supervisor, calls, spawned, providerRows, fetchCalls };
 }
@@ -185,11 +189,63 @@ test("credits answer for the descriptor id and for the provider row id", async (
   assert.deepEqual(unknown, { ok: false, reason: "unavailable" });
 });
 
-test("a gateway that never becomes healthy writes no provider", async () => {
+test("a gateway that never becomes healthy gets one restart and writes no provider", async () => {
+  // The startup pass gives a failed gateway exactly one more try, then leaves it
+  // down and reports why. More than one would be a retry loop on every boot.
   const { supervisor, calls, spawned } = harness({ healthy: false });
   await supervisor.start();
-  assert.equal(spawned.length, 1);
-  assert.deepEqual(calls, []);
+  assert.equal(spawned.length, 2);
+  assert.deepEqual(calls.filter((call) => call.method === "providers.create"), []);
+  assert.equal(supervisor.status()[0].running, false);
+  assert.match(supervisor.status()[0].reason, /healthy/);
+});
+
+test("a gateway that publishes no models on the first attempt is restarted into service", async () => {
+  // This is the field failure the restart exists for: on a cold boot the bridge
+  // answers /healthz before its upstream session is ready and publishes nothing,
+  // so WorkBuddy stayed offline until the user toggled the card by hand.
+  let listCalls = 0;
+  const rows = [];
+  const supervisor = new InAppProviders({
+    callHost: async (method, params) => {
+      if (method === "providers.list") return { providers: rows.map((row) => ({ ...row })) };
+      if (method === "providers.create") {
+        const row = { id: "row-1", vendorKey: params.vendorKey };
+        rows.push(row);
+        return { provider: row };
+      }
+      if (method === "providers.update") return { provider: rows[0] ?? null };
+      if (method === "providers.setSecret") return { provider: rows[0] ?? null };
+      return {};
+    },
+    startGateway: async () => ({ stop: async () => {} }),
+    readSettings: async () => ({}),
+    readApiKey: async () => API_KEY,
+    fetchImpl: async (url) => {
+      if (String(url).endsWith(WORKBUDDY.healthPath)) {
+        return { ok: true, json: async () => ({ ok: true, service: "pi-workbuddy-connect" }) };
+      }
+      listCalls += 1;
+      // Nothing on the first read, the real catalog on the restart.
+      return {
+        ok: true,
+        json: async () => ({ object: "list", data: listCalls === 1 ? [] : [{ id: "m-1" }] }),
+      };
+    },
+    log: () => {},
+    healthPollMs: 1,
+    healthTimeoutMs: 50,
+    coldStartSettleMs: 0,
+    sleep: async () => {},
+  });
+
+  await supervisor.start();
+
+  const [status] = supervisor.status();
+  assert.equal(status.running, true, "the startup restart must leave the gateway in service");
+  assert.equal(status.models, 1);
+  assert.equal(status.reason, undefined);
+  assert.equal(listCalls, 2, "one attempt, one restart");
 });
 
 test("the configured port is honoured over the descriptor default", async () => {
@@ -257,7 +313,7 @@ test("a port another bridge already owns moves the gateway instead of failing", 
   assert.equal(status.port, WORKBUDDY.defaultPort + 1);
 });
 
-test("a start failure that is not a busy port is not retried", async () => {
+test("a start failure that is not a busy port is retried once, not per port", async () => {
   const spawned = [];
   const supervisor = new InAppProviders({
     callHost: async () => ({}),
@@ -271,11 +327,14 @@ test("a start failure that is not a busy port is not retried", async () => {
     log: () => {},
     healthPollMs: 1,
     healthTimeoutMs: 5,
+    coldStartSettleMs: 0,
+    sleep: async () => {},
   });
 
   await supervisor.start();
 
-  assert.deepEqual(spawned, [WORKBUDDY.defaultPort]);
+  // The port walk belongs to one attempt; the restart is the cold-start retry.
+  assert.deepEqual(spawned, [WORKBUDDY.defaultPort, WORKBUDDY.defaultPort]);
   assert.equal(supervisor.status()[0].running, false);
 });
 
@@ -358,6 +417,34 @@ test("switching it back on starts the gateway again", async () => {
   assert.equal(supervisor.status()[0].running, true);
 });
 
+test("opening a session tops up a downed gateway and leaves a healthy one alone", async () => {
+  // Boot starts the gateways; the session path only fills gaps, because
+  // restarting a serving gateway would drop the port the session just opened on.
+  const healthy = harness();
+  await healthy.supervisor.start();
+  assert.equal(healthy.spawned.length, 1);
+  await healthy.supervisor.ensure();
+  assert.equal(healthy.spawned.length, 1, "a serving gateway must not be restarted");
+
+  const cold = harness();
+  await cold.supervisor.ensure();
+  assert.equal(cold.spawned.length, 1, "ensure() must start a gateway nothing started");
+  assert.equal(cold.supervisor.status()[0].running, true);
+});
+
+test("the boot starts the gateways instead of waiting for the first session", () => {
+  // The field failure: the provider row pointed at a port nothing listened on, and
+  // model discovery answered ERR_CONNECTION_REFUSED until a chat was opened.
+  const startup = read("../electron/main/bootstrap/startup.ts");
+  const register = read("../electron/main/ipc/register.ts");
+  assert.match(
+    startup,
+    /await bootBackends\(\);[\s\S]{0,2500}?void startInAppProviders\(\)/,
+  );
+  assert.doesNotMatch(startup, /come up when the first session is opened/);
+  assert.match(register, /ensureInAppProviders: \(\) => inAppProviders\.ensure\(\)/);
+});
+
 test("a switched-on gateway that failed to start reports why", async () => {
   const supervisor = new InAppProviders({
     callHost: async () => ({}),
@@ -370,6 +457,8 @@ test("a switched-on gateway that failed to start reports why", async () => {
     log: () => {},
     healthPollMs: 1,
     healthTimeoutMs: 5,
+    coldStartSettleMs: 0,
+    sleep: async () => {},
   });
 
   await supervisor.start();

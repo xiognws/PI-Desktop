@@ -64,6 +64,10 @@ export type InAppProvidersDeps = {
   log: SupervisorLogger;
   healthTimeoutMs?: number;
   healthPollMs?: number;
+  /** Pause before the one restart a cold boot gets, so the bridge can settle. */
+  coldStartSettleMs?: number;
+  /** Injected in tests, so a retry does not wait in real time. */
+  sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   creditsTtlMs?: number;
 };
@@ -223,6 +227,8 @@ export class InAppProviders {
   private readonly log: SupervisorLogger;
   private readonly healthTimeoutMs: number;
   private readonly healthPollMs: number;
+  private readonly coldStartSettleMs: number;
+  private readonly sleep: (ms: number) => Promise<void>;
   private readonly handles = new Map<string, GatewayHandle>();
   private readonly ports = new Map<string, number>();
   private readonly rowIds = new Map<string, string>();
@@ -241,6 +247,9 @@ export class InAppProviders {
     this.log = deps.log;
     this.healthTimeoutMs = deps.healthTimeoutMs ?? 10_000;
     this.healthPollMs = deps.healthPollMs ?? 200;
+    this.coldStartSettleMs = deps.coldStartSettleMs ?? 1_500;
+    this.sleep =
+      deps.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     this.credits = new CreditsCache(
       (providerId) => this.loadCredits(providerId),
       { now: deps.now, ttlMs: deps.creditsTtlMs },
@@ -259,14 +268,99 @@ export class InAppProviders {
    */
   async start(): Promise<void> {
     this.reset();
-    for (const provider of this.providers) {
+    await this.restartAfterColdStart(await this.startMissing(this.providers));
+  }
+
+  /**
+   * Bring up whichever gateways are not serving yet, and leave the rest alone.
+   *
+   * The session path calls this the moment a session is opened. A gateway the
+   * boot already started must not be restarted here — dropping the port under the
+   * session that just asked for it is worse than any staleness it could fix — so
+   * this is the idempotent sibling of {@link start}.
+   */
+  async ensure(): Promise<void> {
+    const missing = this.providers.filter((provider) => !this.handles.has(provider.id));
+    if (missing.length === 0) return;
+    await this.restartAfterColdStart(await this.startMissing(missing));
+  }
+
+  /** Start each provider once and answer the ones that are not serving. */
+  private async startMissing(providers: readonly InAppProvider[]): Promise<InAppProvider[]> {
+    const failed: InAppProvider[] = [];
+    for (const provider of providers) {
+      if (!(await this.startProvider(provider, { refresh: true }))) failed.push(provider);
+    }
+    return failed;
+  }
+
+  /**
+   * A cold boot gets exactly one more attempt per failed gateway.
+   *
+   * The first pass runs before host-core has answered its handshake — the
+   * settings read throws `host unavailable` — and before the bridge's own
+   * upstream session is up, where it answers `/healthz` but publishes no models.
+   * Both settle within seconds, and when they do the gateway is up; when they do
+   * not, the user is looking at WorkBuddy offline until they toggle it by hand.
+   * The host is waited for instead of slept through, so this costs nothing on a
+   * machine where the first pass already worked.
+   */
+  private async restartAfterColdStart(failed: readonly InAppProvider[]): Promise<void> {
+    if (failed.length === 0) return;
+    const ids = failed.map((provider) => provider.id);
+    if (!(await this.waitForHostReady())) {
+      this.log("warn", "[in-app] gateways failed on a cold start and the host never answered", {
+        providers: ids,
+      });
+      return;
+    }
+    await this.sleep(this.coldStartSettleMs);
+    this.log("info", `[in-app] restarting ${ids.length} gateway(s) after a cold start`, {
+      providers: ids,
+    });
+    for (const provider of failed) {
+      await this.forget(provider.id);
+      await this.startProvider(provider, { refresh: true });
+    }
+  }
+
+  /**
+   * Run one start and answer whether the gateway is serving.
+   *
+   * The startup pass turns a failure into a reason on the status row instead of
+   * an exception: a provider that cannot start must not stop the app from booting
+   * or the other providers from starting.
+   */
+  private async startProvider(
+    provider: InAppProvider,
+    options: { refresh?: boolean } = {},
+  ): Promise<boolean> {
+    try {
+      return await this.startOne(provider, options);
+    } catch (error) {
+      this.failureReasons.set(provider.id, describeError(error));
+      this.log("warn", `[in-app] ${provider.id}: gateway start failed`, {
+        error: describeError(error),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Wait until the host answers a read, or give up on the boot's retry.
+   *
+   * `readSettings` is a host call, and it is the first thing every start does, so
+   * it is the cheapest proof that the handshake landed.
+   */
+  private async waitForHostReady(): Promise<boolean> {
+    const deadline = Date.now() + this.healthTimeoutMs;
+    for (;;) {
       try {
-        await this.startOne(provider, { refresh: true });
-      } catch (error) {
-        this.failureReasons.set(provider.id, describeError(error));
-        this.log("warn", `[in-app] ${provider.id}: gateway start failed`, {
-          error: describeError(error),
-        });
+        await this.readSettings();
+        return true;
+      } catch {
+        if (Date.now() >= deadline) return false;
+        await this.sleep(this.healthPollMs);
       }
     }
   }
@@ -356,14 +450,7 @@ export class InAppProviders {
       this.log("info", `[in-app] ${provider.id}: switched off in settings`);
       return this.status();
     }
-    try {
-      await this.startOne(provider);
-    } catch (error) {
-      this.failureReasons.set(providerId, describeError(error));
-      this.log("warn", `[in-app] ${provider.id}: gateway start failed`, {
-        error: describeError(error),
-      });
-    }
+    await this.startProvider(provider);
     return this.status();
   }
 
@@ -421,12 +508,13 @@ export class InAppProviders {
   private async startOne(
     provider: InAppProvider,
     options: { refresh?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<boolean> {
     const settings = resolveProviderSettings(provider, await this.readSettings());
     this.enabledById.set(provider.id, settings.enabled);
     if (!settings.enabled) {
       this.log("info", `[in-app] ${provider.id}: disabled in settings`);
-      return;
+      // A switched-off gateway is not a failed one: nothing to restart.
+      return true;
     }
     const apiKey = await this.readApiKey(provider);
     const started = await this.startOnFreePort(provider, settings.port, apiKey);
@@ -439,13 +527,13 @@ export class InAppProviders {
         port,
       });
       await this.forget(provider.id);
-      return;
+      return false;
     }
     const models = await this.fetchModels(provider, port, apiKey);
     if (models.length === 0) {
       this.failureReasons.set(provider.id, "the gateway published no models");
       this.log("warn", `[in-app] ${provider.id}: gateway published no models`);
-      return;
+      return false;
     }
     const rowId = await this.upsertProviderRow(provider, port, models, apiKey, {
       refresh: options.refresh === true,
@@ -458,6 +546,7 @@ export class InAppProviders {
       providerId: rowId,
       models: models.length,
     });
+    return true;
   }
 
   /**

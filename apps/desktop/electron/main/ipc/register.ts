@@ -298,9 +298,10 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     getSidecar,
     dataDir,
-    // Forked gateways with loopback ports: created on first session use, never
-    // during boot, so an idle launch holds no child process and no listener.
-    ensureInAppProviders: () => inAppProviders.start(),
+    // Forked gateways with loopback ports: boot starts them once the host answers,
+    // and this tops up anything that is not serving (a gateway the user switched
+    // off, a boot that raced the network). A healthy one is left running.
+    ensureInAppProviders: () => inAppProviders.ensure(),
     disposeSessionResources: dependencies.disposeSessionResources,
     activeTurns,
     sessionProjects,
