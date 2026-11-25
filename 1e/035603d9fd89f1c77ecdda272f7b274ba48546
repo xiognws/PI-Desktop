@@ -1,0 +1,16 @@
+apps/desktop/resources/plugins/io.github.xideadev.task-dida/src/audio/focusDetector.ts
+  h_201ed4c689ac8b 7-14,17-26,42-43
+apps/desktop/resources/plugins/io.github.xideadev.task-dida/src/audio/player.ts
+  h_201ed4c689ac8b 141-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1e035603d9fd89f1c77ecdda272f7b274ba48546",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
