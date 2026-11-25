@@ -14,6 +14,25 @@ const transcriptRewrite = {
   isStaleTranscriptEvent: () => false,
 };
 
+/*
+ * Windows can still hold a handle on a file the outbox just wrote, so a recursive
+ * remove of the temp directory fails with ENOTEMPTY/EBUSY/EPERM even though the
+ * test itself passed. Retrying only on those codes keeps the teardown honest: a
+ * genuine failure surfaces on the last attempt.
+ */
+async function removeTree(dir) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await rm(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!["ENOTEMPTY", "EBUSY", "EPERM"].includes(error.code)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+    }
+  }
+  await rm(dir, { recursive: true, force: true });
+}
+
 test("a settled Task snapshot survives outbox recovery with its original turn and metadata", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pi-subagent-settlement-"));
   const silent = () => undefined;
@@ -64,7 +83,7 @@ test("a settled Task snapshot survives outbox recovery with its original turn an
     assert.equal(writes[0].params.turnId, "original-turn");
     assert.deepEqual(writes[0].params.message, message);
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await removeTree(dir);
   }
 });
 
@@ -115,10 +134,68 @@ for (const delegate of [false, true]) {
       assert.equal(writes[0].message.nestedParentToolCallId, "code-1");
       assert.equal(writes[0].message.parentToolCallId, delegate ? "task-1" : undefined);
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await removeTree(dir);
     }
   });
 }
+
+test("a settled delegate republishes its Task row with the call it started", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-subagent-tool-refresh-"));
+  const silent = () => undefined;
+  try {
+    const persistenceOutbox = new PersistenceOutbox(dir, silent);
+    const { persistAgentEvent } = createEventPersistence({
+      runtimeState: { host: null },
+      activeTurns: new Map([["session", "turn-1"]]),
+      activeToolCalls: new Map(),
+      activeToolCallKey: (sessionId, toolCallId) => `${sessionId}:${toolCallId}`,
+      approvedExecutionIdsBySession: new Map(),
+      approvedExecutionTurns: new Map(),
+      pendingExecutionFinishes: new Map(),
+      planSubmissionTurnIds: new Set(),
+      persistenceOutbox,
+      transcriptRewrite,
+      logger: { app: silent },
+    });
+    const args = { agent: "explorer", task: "Inspect the code", description: "look" };
+    persistAgentEvent({ sessionId: "session", turnId: "turn-1", ts: 1_000,
+      event: { type: "tool_start", toolCallId: "task-call", toolName: "Task", args } });
+    // `Task` settles when the delegate starts: the provisional row says running.
+    persistAgentEvent({ sessionId: "session", turnId: "turn-1", ts: 1_010,
+      event: { type: "tool_end", toolCallId: "task-call", result: {
+        content: "Delegation d1 started: the explorer subagent is working in the background",
+        truncated: false,
+        details: { delegationId: "d1", agent: "explorer", status: "running", startedAt: 1_000 },
+      } } });
+    // The runtime republishes the row when the delegate finishes. The frame
+    // carries the settled result and nothing else, so the name and arguments
+    // have to come from the call it replaces.
+    persistAgentEvent({ sessionId: "session", turnId: "turn-1", ts: 9_000,
+      event: { type: "tool_end", toolCallId: "task-call", result: {
+        content: "Delegation d1 settled: the explorer subagent completed after 3 turn(s)",
+        truncated: false,
+        details: {
+          delegationId: "d1", agent: "explorer", status: "completed",
+          startedAt: 1_000, completedAt: 9_000, turns: 3, toolCalls: 5,
+        },
+      } } });
+    const written = [];
+    await persistenceOutbox.flush(() => ({ isAvailable: () => true, call: async (_method, params) => {
+      written.push(params.message);
+      return {};
+    } }));
+    const settled = written.at(-1);
+    assert.equal(settled.toolName, "Task");
+    assert.deepEqual(settled.toolArgs, args);
+    assert.equal(settled.toolResult.details.status, "completed");
+    assert.equal(settled.toolResult.details.delegationId, "d1");
+    // The row's runtime still measures from the call's own start, not the
+    // republish: an elapsed clock that resets would hide a slow delegate.
+    assert.equal(settled.toolDurationMs, 8_000);
+  } finally {
+    await removeTree(dir);
+  }
+});
 
 test("settlement replacing an in-flight Task append is written after the initial snapshot", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pi-subagent-outbox-race-"));
@@ -148,7 +225,7 @@ test("settlement replacing an in-flight Task append is written after the initial
   } finally {
     releaseFirst();
     await outbox.flush(() => host);
-    await rm(dir, { recursive: true, force: true });
+    await removeTree(dir);
   }
 });
 
@@ -179,5 +256,5 @@ test("independent usage aggregates survive an unavailable Host and outbox restar
     await recovered.flush(() => ({ isAvailable: () => true, call: async (method, params) => { if (method === "session.recordUsage") written.push(params); return {}; } }));
     assert.deepEqual(written.flatMap(row => row.usage.operations.map(op => op.operationId)).sort(), ["image-a", "image-b"]);
     assert.ok(written.every(row => row.turnId === "turn"));
-  } finally { await rm(dir, { recursive: true, force: true }); }
+  } finally { await removeTree(dir); }
 });

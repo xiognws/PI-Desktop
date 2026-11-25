@@ -18,6 +18,8 @@
 
 use std::sync::Arc;
 
+use serde_json::Value;
+
 use crate::budget::{BudgetDecision as RunBudgetDecision, BudgetMeter, RunBudget};
 use crate::cancel::CancelToken;
 use crate::compaction::{
@@ -29,8 +31,8 @@ use crate::context::{estimate_context_tokens, BudgetDecision, ContextLimits, Mod
 use crate::delegate::{pending_delegations, DelegationRegistry};
 use crate::error::{AgentError, Result};
 use crate::event::{
-    AgentEvent, AgentEventEnvelope, CompactionFailure, CompactionFallback, CompactionReason,
-    EventSink,
+    tool_result_payload, AgentEvent, AgentEventEnvelope, CompactionFailure, CompactionFallback,
+    CompactionReason, EventSink,
 };
 use crate::message::{ContentPart, Message, Role, StopReason, ToolCall, ToolResult, Usage};
 use crate::provider::{
@@ -223,7 +225,10 @@ impl TurnEngine {
     /// The declarations are re-read on every step, not once per turn: the model
     /// activates a tool mid-turn with `ToolSearch`, and the next request in the
     /// same turn has to carry it or the activation did nothing.
-    pub fn with_tool_activation(mut self, activation: Arc<crate::tool_activation::ToolActivation>) -> Self {
+    pub fn with_tool_activation(
+        mut self,
+        activation: Arc<crate::tool_activation::ToolActivation>,
+    ) -> Self {
         self.activation = Some(activation);
         self
     }
@@ -574,7 +579,13 @@ impl TurnEngine {
             let mut transient_attempts: u32 = 0;
             let assembled = loop {
                 match self
-                    .run_step(session_id, turn_id, request.clone(), &cancel, &active_provider)
+                    .run_step(
+                        session_id,
+                        turn_id,
+                        request.clone(),
+                        &cancel,
+                        &active_provider,
+                    )
                     .await
                 {
                     Ok(assembled) => break assembled,
@@ -762,10 +773,10 @@ impl TurnEngine {
             // Node's `turn_end` fires once this response's calls are done and carries
             // both halves; the results are cloned for the notification because the
             // transcript takes ownership of them below.
-            let extension_results = results.clone();
+            let extension_results = results.0.clone();
             // Evidence for the hand-over: a failure streak, reset by any success.
             // One unlucky call is not a pattern, and a stuck turn is.
-            for result in &results {
+            for result in &results.0 {
                 if result.is_error {
                     consecutive_tool_errors += 1;
                 } else {
@@ -773,16 +784,13 @@ impl TurnEngine {
                 }
             }
 
-            for result in results {
+            for (result, details) in results.0.into_iter().zip(results.1) {
                 self.emit(
                     session_id,
                     turn_id,
                     AgentEvent::ToolEnd {
                         tool_call_id: result.call_id.clone(),
-                        result: serde_json::json!({
-                            "content": result.content,
-                            "truncated": result.truncated,
-                        }),
+                        result: tool_result_payload(&result, details),
                         is_error: result.is_error,
                     },
                 );
@@ -794,7 +802,11 @@ impl TurnEngine {
 
             if let Some(extensions) = &self.extensions {
                 extensions
-                    .turn_end(extension_turns, Some(&assembled.message), &extension_results)
+                    .turn_end(
+                        extension_turns,
+                        Some(&assembled.message),
+                        &extension_results,
+                    )
                     .await;
             }
 
@@ -919,8 +931,9 @@ impl TurnEngine {
         calls: &[ToolCall],
         cancel: &CancelToken,
         mut repeats: Option<&mut crate::tool_use::RepeatGuard>,
-    ) -> Vec<ToolResult> {
-        let mut slots: Vec<Option<ToolResult>> = vec![None; calls.len()];
+    ) -> (Vec<ToolResult>, Vec<Option<Value>>) {
+        let mut slots: Vec<Option<(ToolResult, Option<Value>)>> =
+            calls.iter().map(|_| None).collect();
         let mut pending: Vec<(usize, ToolCall)> = Vec::new();
         // Calls an extension blocked never ran, so they have no result to offer the
         // `tool_result` hook. Everything else does.
@@ -932,13 +945,16 @@ impl TurnEngine {
             // than executed. Node applies the same rule (`runtime.ts:3241`).
             if let Some(activation) = &self.activation {
                 if activation.blocks(&call.name) {
-                    slots[index] = Some(ToolResult {
-                        call_id: call.id.clone(),
-                        name: call.name.clone(),
-                        content: crate::tool_activation::ToolActivation::refusal(&call.name),
-                        is_error: true,
-                        truncated: false,
-                    });
+                    slots[index] = Some((
+                        ToolResult {
+                            call_id: call.id.clone(),
+                            name: call.name.clone(),
+                            content: crate::tool_activation::ToolActivation::refusal(&call.name),
+                            is_error: true,
+                            truncated: false,
+                        },
+                        None,
+                    ));
                     blocked[index] = true;
                     continue;
                 }
@@ -949,13 +965,16 @@ impl TurnEngine {
             // tool itself never runs.
             if let Some(extensions) = &self.extensions {
                 if let Some(reason) = extensions.tool_call(call).await {
-                    slots[index] = Some(ToolResult {
-                        call_id: call.id.clone(),
-                        name: call.name.clone(),
-                        content: reason,
-                        is_error: true,
-                        truncated: false,
-                    });
+                    slots[index] = Some((
+                        ToolResult {
+                            call_id: call.id.clone(),
+                            name: call.name.clone(),
+                            content: reason,
+                            is_error: true,
+                            truncated: false,
+                        },
+                        None,
+                    ));
                     blocked[index] = true;
                     continue;
                 }
@@ -966,7 +985,7 @@ impl TurnEngine {
             match cached {
                 Some(content) => {
                     if let Some(guard) = repeats.as_mut() {
-                        slots[index] = Some(guard.reuse(call, &content));
+                        slots[index] = Some((guard.reuse(call, &content), None));
                     }
                 }
                 None => pending.push((index, call.clone())),
@@ -974,7 +993,8 @@ impl TurnEngine {
         }
 
         if self.parallel_tool_calls && pending.len() > 1 {
-            let mut set: tokio::task::JoinSet<(usize, ToolResult)> = tokio::task::JoinSet::new();
+            let mut set: tokio::task::JoinSet<(usize, (ToolResult, Option<Value>))> =
+                tokio::task::JoinSet::new();
             for (index, call) in pending {
                 let registry = self.tools.clone();
                 let ctx = ToolContext {
@@ -984,7 +1004,7 @@ impl TurnEngine {
                     cancel: cancel.clone(),
                     steering: self.steering.clone(),
                 };
-                set.spawn(async move { (index, registry.call(&call, &ctx).await) });
+                set.spawn(async move { (index, registry.call_with_details(&call, &ctx).await) });
             }
             while let Some(joined) = set.join_next().await {
                 match joined {
@@ -1005,31 +1025,37 @@ impl TurnEngine {
                     cancel: cancel.clone(),
                     steering: self.steering.clone(),
                 };
-                slots[index] = Some(self.tools.call(&call, &ctx).await);
+                slots[index] = Some(self.tools.call_with_details(&call, &ctx).await);
             }
         }
 
         // A call whose task ended without a result still owes the model one: a
         // missing result breaks pairing, and a silent gap is worse than an error.
-        let results: Vec<ToolResult> = calls
+        let completed: Vec<(ToolResult, Option<Value>)> = calls
             .iter()
             .enumerate()
             .map(|(index, call)| match slots[index].take() {
                 Some(result) => result,
-                None => ToolResult {
-                    call_id: call.id.clone(),
-                    name: call.name.clone(),
-                    content: "the tool call produced no result (its task ended abnormally)".into(),
-                    is_error: true,
-                    truncated: false,
-                },
+                None => (
+                    ToolResult {
+                        call_id: call.id.clone(),
+                        name: call.name.clone(),
+                        content: "the tool call produced no result (its task ended abnormally)"
+                            .into(),
+                        is_error: true,
+                        truncated: false,
+                    },
+                    None,
+                ),
             })
             .collect();
+        let (mut results, mut details): (Vec<ToolResult>, Vec<Option<Value>>) =
+            completed.into_iter().unzip();
 
         // `tool_result`: an extension may replace what the tool said. Applied
         // before the transcript stores it and before the repeat cache remembers it,
         // which is exactly where Node's `afterToolCall` sits.
-        let mut results = results;
+        let mut rewritten = vec![false; calls.len()];
         if let Some(extensions) = &self.extensions {
             for (index, call) in calls.iter().enumerate() {
                 if blocked[index] {
@@ -1037,6 +1063,7 @@ impl TurnEngine {
                 }
                 if let Some(patch) = extensions.tool_result(call, &results[index]).await {
                     crate::extensions::apply_tool_result_patch(&mut results[index], &patch);
+                    rewritten[index] = true;
                 }
             }
         }
@@ -1048,7 +1075,14 @@ impl TurnEngine {
                 }
             }
         }
-        results
+        // A refused or rewritten result no longer describes the details the tool
+        // published, so the row must not carry them.
+        for (index, slot) in details.iter_mut().enumerate() {
+            if blocked[index] || rewritten[index] {
+                *slot = None;
+            }
+        }
+        (results, details)
     }
 
     /// Wait for this session's pending delegations and hand their reports to the
@@ -1468,7 +1502,7 @@ fn jitter() -> f64 {
 #[cfg(test)]
 mod escalation_tests {
     use super::EscalationTarget;
-    use crate::provider::{Provider, StreamEvent};
+    use crate::provider::{BoxFuture, ChatRequest, Provider, ProviderStream};
     use std::sync::Arc;
 
     /// The trigger never reads the provider, so a provider that refuses every
@@ -1476,11 +1510,15 @@ mod escalation_tests {
     struct UnusedProvider;
 
     impl Provider for UnusedProvider {
+        fn name(&self) -> &str {
+            "unused"
+        }
+
         fn stream<'a>(
             &'a self,
-            _request: crate::provider::ChatRequest,
+            _request: ChatRequest,
             _cancel: crate::cancel::CancelToken,
-        ) -> crate::error::BoxFuture<'a, crate::error::Result<crate::provider::EventStream>> {
+        ) -> BoxFuture<'a, crate::error::Result<ProviderStream>> {
             Box::pin(async {
                 Err(crate::error::AgentError::Refused(
                     "the trigger policy never sends a request".into(),

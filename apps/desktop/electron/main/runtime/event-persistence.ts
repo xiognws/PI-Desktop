@@ -83,6 +83,25 @@ export function createEventPersistence({
   // turn rarely distils into a procedure worth a completion (ADR 0377).
   const turnToolCalls = new Map<string, number>();
   const pendingWrites = new Set<Promise<void>>();
+  /**
+   * What a settled tool call was, kept after its `tool_end`.
+   *
+   * A background delegate republishes its `Task` row when it finishes — a
+   * second `tool_end` for the same call id carrying the settled result. That
+   * frame knows the result but not the call's name or arguments, so the row
+   * would lose both, and host-core only accepts the replacement while the row
+   * still names `Task`. Bounded: a session's finished calls are cheap but not
+   * free, and only a delegation is ever republished.
+   */
+  const settledToolCalls = new Map<string, any>();
+  const SETTLED_TOOL_CALL_LIMIT = 512;
+  function rememberSettledCall(key: string, call: any): void {
+    if (settledToolCalls.size >= SETTLED_TOOL_CALL_LIMIT) {
+      const oldest = settledToolCalls.keys().next().value;
+      if (oldest !== undefined) settledToolCalls.delete(oldest);
+    }
+    settledToolCalls.set(key, call);
+  }
   function trackWrite(write: Promise<void>): void {
     pendingWrites.add(write);
     void write.then(
@@ -466,6 +485,13 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     const key = activeToolCallKey(envelope.sessionId, event.toolCallId);
     const started = activeToolCalls.get(key);
     activeToolCalls.delete(key);
+    if (started) rememberSettledCall(key, started);
+    // A background delegate republishes its `Task` row when it finishes: a
+    // second `tool_end` for the same call id, carrying the settled result. That
+    // frame has no name and no arguments of its own, and host-core only accepts
+    // the replacement while the row still names `Task`, so the first `tool_end`
+    // must not be the last word on what the call was.
+    const call = started ?? settledToolCalls.get(key);
     const message: UiMessage = {
       id: event.toolCallId,
       role: "tool",
@@ -473,20 +499,20 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
         typeof event.result === "string"
           ? event.result
           : JSON.stringify(event.result),
-      createdAt: started?.createdAt ?? new Date(envelope.ts).toISOString(),
+      createdAt: call?.createdAt ?? new Date(envelope.ts).toISOString(),
       toolCallId: event.toolCallId,
-      toolName: started?.toolName,
-      toolArgs: started?.args,
+      toolName: call?.toolName,
+      toolArgs: call?.args,
       toolStatus: event.isError ? "error" : "success",
       toolResult: event.result,
       ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
       toolCompletedAt: new Date(envelope.ts).toISOString(),
-      toolDurationMs: started
-        ? Math.max(0, envelope.ts - Date.parse(started.createdAt))
+      toolDurationMs: call
+        ? Math.max(0, envelope.ts - Date.parse(call.createdAt))
         : undefined,
       isError: event.isError,
       status: "complete",
-      ...toolCallLineage(started ?? {}, envelope),
+      ...toolCallLineage(call ?? {}, envelope),
     };
     void persistenceOutbox
       .enqueue(
@@ -496,7 +522,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
           message,
           // A late tool_end belongs to the turn that started the tool, even if
           // another prompt has already opened a newer turn for this session.
-          turnId: started?.turnId ?? envelope.turnId ?? turnId,
+          turnId: call?.turnId ?? envelope.turnId ?? turnId,
         },
         () => runtimeState.host,
       )
