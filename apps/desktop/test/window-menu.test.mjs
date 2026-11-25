@@ -349,6 +349,11 @@ test("Windows/Linux explicit minimize paths use the native taskbar", () => {
       from: "../../target/release/pi-desktop-host-core",
       to: "bin/pi-desktop-host-core",
     },
+    // The kernel's protocol binary ships beside the host on every platform.
+    {
+      from: "../../target/release/nubo-proto",
+      to: "agent-core/nubo-proto",
+    },
     {
       from: "build/tray-icon-mac.png",
       to: "tray-icon-mac.png",

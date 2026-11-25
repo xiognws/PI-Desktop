@@ -6,7 +6,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, parse } from "node:path";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -98,11 +98,16 @@ test("nothing is created when there is no predecessor to adopt", () => {
 });
 
 test("adoption falls back to a copy when the source is on another volume", (t) => {
-  if (process.platform !== "win32" || !existsSync("D:\\")) {
-    return t.skip("needs a second Windows volume");
-  }
-  const source = `D:\\piworkspace-adoption-${process.pid}-${Date.now()}`;
+  if (process.platform !== "win32") return t.skip("needs a second Windows volume");
   const base = scratch("cross-volume");
+  // "Another volume" has to be measured, not assumed: this machine keeps its temp
+  // directory on D:, so a hard-coded D: source is the *same* volume as the target
+  // and a plain rename is the correct outcome there.
+  const baseRoot = parse(base).root.toUpperCase();
+  const otherVolume = ["C:\\", "D:\\", "E:\\"]
+    .find((drive) => drive !== baseRoot && existsSync(drive));
+  if (!otherVolume) return t.skip(`no volume other than ${baseRoot}`);
+  const source = `${otherVolume}piworkspace-adoption-${process.pid}-${Date.now()}`;
   try {
     mkdirSync(join(source, "data"), { recursive: true });
     writeFileSync(join(source, "data", "pi.sqlite"), "database");
