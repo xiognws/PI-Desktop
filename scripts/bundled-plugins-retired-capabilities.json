@@ -1,0 +1,10 @@
+{
+  "//": "Files removed from a bundled plugin's expanded copy before it is packaged. apps/desktop/resources/plugins/** is the marketplace sync's output (scripts/sync-bundled-plugins.mjs), so a capability we decide not to ship cannot be removed once and forgotten: the next sync re-expands the package and puts it back. This file is the declarative list the packaging step (scripts/retire-bundled-plugin-capabilities.mjs) applies after the sync and before electron-builder, and re-asserts on every build. Two sibling files decide different things and neither hides inside the other: bundled-plugins-excluded.json = ids that must never be bundled at all; bundled-plugins-default-disabled.json = ids that ship but start switched off; this one removes capabilities from a plugin that still ships.",
+  "//local.pi-bot": "Voice input is retired. The plugin's own entry points already answer `team.microphone` / `microphone.panel` with 'microphone capability disabled', which left the Windows recorder as dead code that any re-wiring would bring back. windows-microphone.js spawned it with windowsHide, a headless interpreter reading JSON frames on stdin and holding an open microphone device - the shape behaviour-based endpoint protection scores as a remote-access tool. The product removed its own voice feature in ADR 0399, so a bundled plugin must not keep the only remaining microphone surface. Lost capability: voice input and local device tests inside PI Bot; text, files, attachments, memory and schedules are unaffected.",
+  "retired": {
+    "local.pi-bot": [
+      "src/windows-microphone.js",
+      "src/windows-microphone.ps1"
+    ]
+  }
+}

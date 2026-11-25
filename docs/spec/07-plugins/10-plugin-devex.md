@@ -81,6 +81,28 @@ unaffected: it already provides on-demand history for anything that needs it.
 surfaces (CLI, agent tools, plugins page) call it, so a rule enforced once holds
 everywhere.
 
+### Shipped capability set: three declarative files, applied in order
+
+`apps/desktop/resources/plugins/**` is the marketplace sync's output, so every
+decision about what ships has to be re-appliable rather than a one-off edit. Three
+files own those decisions, and none of them hides inside another:
+
+| File | Decides | Applied by |
+| --- | --- | --- |
+| `scripts/bundled-plugins-excluded.json` | ids that must never be bundled | `scripts/sync-bundled-plugins.mjs` (skips them, removes an expanded copy) |
+| `scripts/bundled-plugins-default-disabled.json` | ids that ship but start switched off (optionally per platform) | stamped onto the expanded manifest during the same sync |
+| `scripts/bundled-plugins-retired-capabilities.json` | files removed from an expanded plugin that still ships | `scripts/retire-bundled-plugin-capabilities.mjs`, run by every `pack` / `dist*` chain after `stage:manual` and before packaging |
+
+The third file exists because a capability can be wrong for the product while the
+plugin is still wanted. Its current entry retires the Windows microphone recorder
+from `local.pi-bot`: the plugin's own entry points already answer "microphone
+capability disabled", which left a hidden PowerShell/.NET recorder holding an open
+microphone device as dead code that any re-wiring would bring back. The packaging
+step deletes the listed files, prunes their `checksums.json` rows, and then proves
+the result — the files are gone and no remaining source file mentions them. The
+check is idempotent and can be run alone with
+`node scripts/retire-bundled-plugin-capabilities.mjs --check`.
+
 ## 5. Local development commands
 
 The CLI is currently delivered as a private workspace package. From a checkout
