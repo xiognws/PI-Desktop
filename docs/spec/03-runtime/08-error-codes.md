@@ -55,6 +55,7 @@ registered; reserved codes in §3.7 remain intentionally absent from
 | `UNAUTHORIZED` | no | capability/auth boundary rejected call |
 | `NOT_FOUND` | no | entity not found |
 | `SESSION_NOT_FOUND` | no | a session-scoped RPC (including `tools.execute`) named a session the host does not have; an unknown id never inherits the global workspace |
+| `SESSION_SEARCH_UNAVAILABLE` | maybe | a session-search tool run could not use its index (unreadable, or the scan finished without answering); reported instead of an empty result so "nothing matched" is never confused with "the search never ran" |
 | `CONFLICT` | maybe | state conflict / busy resource |
 | `UNSUPPORTED` | no | the operation has no implementation on this surface, e.g. a trusted-extension prompt while no desktop window can show it (spec 16 §9) |
 | `FORBIDDEN` | no | RACP: the principal's roles do not admit the method (spec 19 §13) |

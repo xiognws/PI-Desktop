@@ -262,6 +262,13 @@ export const ErrorCodes = {
   // them unchanged through `AppError.code`.
   INVALID_PARAMS: "INVALID_PARAMS",
   SESSION_NOT_FOUND: "SESSION_NOT_FOUND",
+  /**
+   * A session-search request could not run: the index is unreadable or the scan
+   * behind it finished without answering. The tool reports this instead of an
+   * empty result, so "no conversations matched" is never confused with
+   * "the search never happened".
+   */
+  SESSION_SEARCH_UNAVAILABLE: "SESSION_SEARCH_UNAVAILABLE",
   HOST_SHUTTING_DOWN: "HOST_SHUTTING_DOWN",
   LIMIT_EXCEEDED: "LIMIT_EXCEEDED",
   PLUGIN_NOT_FOUND: "PLUGIN_NOT_FOUND",
