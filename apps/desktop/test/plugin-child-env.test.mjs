@@ -81,10 +81,14 @@ test("a stdio MCP server gets the same identity, and declared values still win",
 });
 
 test("both plugin child environments are built from the one allowlist", () => {
-  const runtimeSrc = readFileSync(join(desktopRoot, "electron/main/plugin-runtime.ts"), "utf8");
+  // The child spawn lives in the shared host now; plugin-runtime keeps the MCP path.
+  const runtimeSrc = [
+    readFileSync(join(desktopRoot, "electron/main/plugin-shared-host.ts"), "utf8"),
+    readFileSync(join(desktopRoot, "electron/main/plugin-runtime.ts"), "utf8"),
+  ].join("\n");
   const mcpSrc = readFileSync(join(desktopRoot, "electron/main/plugin-mcp.ts"), "utf8");
   const envSrc = readFileSync(join(desktopRoot, "electron/main/child-process-env.ts"), "utf8");
-  assert.match(runtimeSrc, /env: pluginChildEnv\(pluginId\)/);
+  assert.match(runtimeSrc, /env: pluginChildEnv\((?:options\.)?pluginId\)/);
   assert.match(mcpSrc, /minimalChildEnv\(\)/);
   assert.match(mcpSrc, /MCP_STDIO_HOST_ENV_KEYS/);
   // A second private allowlist is how the identity variables went missing once.

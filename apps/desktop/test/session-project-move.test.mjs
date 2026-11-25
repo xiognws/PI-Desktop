@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+// Assertions spell multi-line snippets with `\n`; normalize CRLF so a
+// Windows checkout does not silently fail every such needle.
+const read = (path) =>
+  readFileSync(new URL(path, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 const protocol = read("../../../packages/shared/src/protocol.ts");
 const sessions = read("../../../crates/host-core/src/sessions.rs");
@@ -31,7 +34,7 @@ test("session project move is a durable host command, not a renderer-only regrou
   // The running-turn check lives in one shared helper so fork, move, and the
   // bulk project delete cannot drift apart; the move path still has to use it,
   // and the helper still has to ask the database for a running turn.
-  assert.match(moveBlock, /if session_has_running_turn\(db, id\)\?/);
+  assert.match(moveBlock, /if sessions::session_has_running_turn\(&st\.db, id\)/);
   const runningTurnHelper =
     sessions.match(/pub fn session_has_running_turn\([\s\S]*?\n\}\n/)?.[0] ?? "";
   assert.match(runningTurnHelper, /SELECT EXISTS\([\s\S]*?status = 'running'/);

@@ -3,6 +3,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/**
+ * Assertions spell multi-line snippets with `\n`; a CRLF checkout would silently
+ * fail every such needle, so sources are normalized on the way in.
+ */
+const normalize = (text) => text.replace(/\r\n/g, "\n");
+
 const storeRoot = fileURLToPath(new URL("../../src/stores/", import.meta.url));
 
 async function sourceFiles(directory) {
@@ -29,7 +35,7 @@ export async function readStoreSource() {
   ];
   const chunks = await Promise.all(
     order.map(async (path) => {
-      const source = await readFile(path, "utf8");
+      const source = normalize(await readFile(path, "utf8"));
       return `\n/* ${relative(storeRoot, path)} */\n${source}`;
     }),
   );
@@ -58,10 +64,10 @@ export function readStoreSourceSync() {
     ...paths.filter((path) => !path.endsWith("/app-state.ts") && !path.endsWith("/app-store.ts")),
   ];
   return order
-    .map((path) => `\n/* ${relative(storeRoot, path)} */\n${readFileSync(path, "utf8")}`)
+    .map((path) => `\n/* ${relative(storeRoot, path)} */\n${normalize(readFileSync(path, "utf8"))}`)
     .join("\n");
 }
 
 export function readStoreModuleSync(relativePath) {
-  return readFileSync(join(storeRoot, relativePath), "utf8");
+  return normalize(readFileSync(join(storeRoot, relativePath), "utf8"));
 }

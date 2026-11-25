@@ -3,6 +3,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/**
+ * Assertions spell multi-line snippets with `\n`; a CRLF checkout would silently
+ * fail every such needle, so sources are normalized on the way in.
+ */
+const normalize = (text) => text.replace(/\r\n/g, "\n");
+
 const desktopSourceRoot = fileURLToPath(new URL("../../src/", import.meta.url));
 const transcriptRoot = join(desktopSourceRoot, "features/chat/transcript");
 
@@ -26,7 +32,7 @@ export async function readTranscriptSource() {
   const paths = [facade, ...(await sourceFiles(transcriptRoot))];
   const chunks = await Promise.all(
     paths.map(async (path) => {
-      const source = await readFile(path, "utf8");
+      const source = normalize(await readFile(path, "utf8"));
       return `\n/* ${relative(desktopSourceRoot, path)} */\n${source}`;
     }),
   );
@@ -50,10 +56,10 @@ function sourceFilesSync(directory) {
 export function readTranscriptSourceSync() {
   const facade = join(desktopSourceRoot, "components/ChatTranscript.tsx");
   return [facade, ...sourceFilesSync(transcriptRoot)]
-    .map((path) => `\n/* ${relative(desktopSourceRoot, path)} */\n${readFileSync(path, "utf8")}`)
+    .map((path) => `\n/* ${relative(desktopSourceRoot, path)} */\n${normalize(readFileSync(path, "utf8"))}`)
     .join("\n");
 }
 
 export function readTranscriptModuleSync(relativePath) {
-  return readFileSync(join(transcriptRoot, relativePath), "utf8");
+  return normalize(readFileSync(join(transcriptRoot, relativePath), "utf8"));
 }

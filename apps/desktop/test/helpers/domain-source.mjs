@@ -3,6 +3,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/**
+ * Assertions spell multi-line snippets with `\n`; a CRLF checkout would silently
+ * fail every such needle, so sources are normalized on the way in.
+ */
+const normalize = (text) => text.replace(/\r\n/g, "\n");
+
 const desktopSourceRoot = fileURLToPath(new URL("../../src/", import.meta.url));
 
 /**
@@ -34,7 +40,7 @@ async function readDomainSource(facadeRelativePath, domainRelativePath) {
   const paths = [facade, ...(await sourceFiles(domainRoot))];
   const chunks = await Promise.all(
     paths.map(async (path) => {
-      const source = await readFile(path, "utf8");
+      const source = normalize(await readFile(path, "utf8"));
       return `\n/* ${markerPath(path)} */\n${source}`;
     }),
   );
@@ -55,7 +61,7 @@ function readDomainSourceSync(facadeRelativePath, domainRelativePath) {
   const facade = join(desktopSourceRoot, facadeRelativePath);
   const domainRoot = join(desktopSourceRoot, domainRelativePath);
   return [facade, ...sourceFilesSync(domainRoot)]
-    .map((path) => `\n/* ${markerPath(path)} */\n${readFileSync(path, "utf8")}`)
+    .map((path) => `\n/* ${markerPath(path)} */\n${normalize(readFileSync(path, "utf8"))}`)
     .join("\n");
 }
 

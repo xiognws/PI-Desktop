@@ -3,6 +3,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/**
+ * Assertions spell multi-line snippets with `\n`; a CRLF checkout would silently
+ * fail every such needle, so sources are normalized on the way in.
+ */
+const normalize = (text) => text.replace(/\r\n/g, "\n");
+
 const desktopSourceRoot = fileURLToPath(new URL("../../src/", import.meta.url));
 const composerRoot = join(desktopSourceRoot, "features/chat/composer");
 
@@ -27,7 +33,7 @@ export async function readComposerSource() {
   const paths = [facade, autocompleteHook, ...(await sourceFiles(composerRoot))];
   const chunks = await Promise.all(
     paths.map(async (path) => {
-      const source = await readFile(path, "utf8");
+      const source = normalize(await readFile(path, "utf8"));
       return `\n/* ${relative(desktopSourceRoot, path)} */\n${source}`;
     }),
   );
@@ -52,10 +58,10 @@ export function readComposerSourceSync() {
   const facade = join(desktopSourceRoot, "components/Composer.tsx");
   const autocompleteHook = join(desktopSourceRoot, "hooks/use-composer-autocomplete.ts");
   return [facade, autocompleteHook, ...sourceFilesSync(composerRoot)]
-    .map((path) => `\n/* ${relative(desktopSourceRoot, path)} */\n${readFileSync(path, "utf8")}`)
+    .map((path) => `\n/* ${relative(desktopSourceRoot, path)} */\n${normalize(readFileSync(path, "utf8"))}`)
     .join("\n");
 }
 
 export function readComposerModuleSync(relativePath) {
-  return readFileSync(join(composerRoot, relativePath), "utf8");
+  return normalize(readFileSync(join(composerRoot, relativePath), "utf8"));
 }
