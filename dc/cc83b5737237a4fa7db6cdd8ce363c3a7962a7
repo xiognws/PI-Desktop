@@ -1,0 +1,26 @@
+apps/desktop/electron/main/system-fonts.ts
+  h_201ed4c689ac8b 15-17,20-21,65-101,103-117
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 469,3136-3145,3147-3160,3164,3190-3194
+crates/host-core/src/tools/shell.rs
+  h_201ed4c689ac8b 90,281-292,295,308,329-331,680-686,689,694-709
+docs/adr/0406-windows-default-git-bash.md
+  h_201ed4c689ac8b 1-80
+docs/spec/03-runtime/03-tools-and-permissions.md
+  h_201ed4c689ac8b 699-705
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 394-396,421-424
+packages/shared/src/command-shells.ts
+  h_201ed4c689ac8b 110-119,121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "dccc83b5737237a4fa7db6cdd8ce363c3a7962a7",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
