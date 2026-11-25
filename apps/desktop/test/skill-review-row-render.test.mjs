@@ -120,15 +120,16 @@ function assertInOrder(html, needles) {
   assert.deepEqual(found, sorted, `out of order: ${needles.join(" < ")}`);
 }
 
-test("the row reports each write on its own line, the way Hermes does", async () => {
+test("the row says what the pass changed in one line", async () => {
   await withReview(({ render }) => {
     const html = render(APPLIED, { skillReviewVisible: true });
     assert.match(html, /skill-review-row/);
     assert.match(html, /role="status"/);
-    // One line per operation with a glyph, not a summary sentence: the reader
-    // wants to know which skill changed, not that "1 update" happened.
-    assert.match(html, /<li class="skill-review-line">✍ created: alpha<\/li>/);
-    assert.doesNotMatch(html, /Self-improvement review:/);
+    // One line for the whole pass, each write naming itself inside it: a pass
+    // that touched four skills used to print four rows of the same shape and push
+    // the conversation down without saying anything new.
+    assert.match(html, /<span class="skill-review-text">/);
+    assert.match(html, /Self-improvement review: created: alpha/);
   });
 });
 
@@ -282,6 +283,10 @@ test("a review that never ran stays out of the transcript", async () => {
       // A fork that never completed never looked; its status is the scheduler's.
       "aborted",
       "stopped",
+      // An upstream hiccup: the fork never got a verdict, and the reason carries
+      // the provider's own code for the skill-review log.
+      "provider-error:INCOMPLETE_STREAM",
+      "provider-error:TRANSPORT_ERROR",
     ]) {
       const value = { id: "notice-1", outcome: "skipped", reason, actions: [] };
       assert.equal(render(value, { skillReviewVisible: true }), "", reason);

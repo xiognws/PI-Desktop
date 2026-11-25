@@ -53,22 +53,7 @@ impl OpenAiStreamDecoder {
     fn decode(&mut self, value: &Value, events: &mut Vec<StreamEvent>) -> Result<()> {
         // Provider error frames ride the same channel as content.
         if let Some(error) = value.get("error") {
-            let message = error
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("provider reported an error");
-            let status = error
-                .get("status")
-                .and_then(Value::as_u64)
-                .map(|v| v as u16);
-            return Err(match status {
-                Some(code) => AgentError::provider_status(
-                    ProviderErrorKind::Retryable,
-                    code,
-                    message.to_string(),
-                ),
-                None => AgentError::provider(ProviderErrorKind::Fatal, message.to_string()),
-            });
+            return Err(stream_error(error));
         }
 
         if let Some(usage) = value.get("usage").and_then(parse_usage) {
@@ -135,6 +120,90 @@ impl OpenAiStreamDecoder {
         }
         Ok(())
     }
+}
+
+/// The failure an error frame reports, classified the way the other wires do it.
+///
+/// The frame may carry a numeric `status` (OpenAI's own servers), a `code` or
+/// `type` string (`server_error`, `rate_limit_exceeded`, ...), a numeric `code`, or
+/// nothing but a message: a compatible gateway sends whatever it has. Only the
+/// classes re-sending cannot fix stay `Fatal` -- auth, a malformed request, an
+/// unknown model. A server-side failure, an overload and a rate limit are
+/// transient, and the retry policy is the whole recovery.
+///
+/// Getting this wrong costs in both directions: calling a 5xx fatal turns one
+/// upstream hiccup into a request the reader has to repeat by hand, and calling a
+/// 401 retryable spends the whole retry budget on something that cannot succeed.
+fn stream_error(error: &Value) -> AgentError {
+    let message = error
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or("provider reported an error")
+        .to_string();
+    let status = error
+        .get("status")
+        .and_then(numeric_status)
+        .or_else(|| error.get("code").and_then(numeric_status));
+    let code = error
+        .get("code")
+        .or_else(|| error.get("type"))
+        .and_then(Value::as_str);
+    let kind = match (status, code) {
+        (Some(429 | 500 | 502 | 503 | 504), _) => ProviderErrorKind::Retryable,
+        (Some(_), _) => ProviderErrorKind::Fatal,
+        (None, Some(code)) if is_transient_error_code(code) => ProviderErrorKind::Retryable,
+        (None, Some(_)) => ProviderErrorKind::Fatal,
+        // Nothing but prose. The wording list is deliberately short: a guess that
+        // matches too much would retry a request that cannot succeed.
+        (None, None) if is_server_side_wording(&message) => ProviderErrorKind::Retryable,
+        (None, None) => ProviderErrorKind::Fatal,
+    };
+    match status {
+        Some(status) => AgentError::provider_status(kind, status, message),
+        None => AgentError::provider(kind, message),
+    }
+}
+
+/// A `status`/`code` that arrived as a number or as a numeric string.
+fn numeric_status(value: &Value) -> Option<u16> {
+    match value {
+        Value::Number(number) => number.as_u64().and_then(|code| u16::try_from(code).ok()),
+        Value::String(text) => text.trim().parse().ok(),
+        _ => None,
+    }
+}
+
+/// Code spellings that mean "the provider failed", not "the request is wrong".
+fn is_transient_error_code(code: &str) -> bool {
+    matches!(
+        code,
+        "server_error"
+            | "internal_server_error"
+            | "api_error"
+            | "overloaded_error"
+            | "rate_limit_error"
+            | "rate_limit_exceeded"
+            | "service_unavailable"
+            | "temporarily_unavailable"
+            | "timeout"
+    )
+}
+
+/// Server-side wording, for the gateways whose error frame is only a sentence.
+fn is_server_side_wording(message: &str) -> bool {
+    let text = message.to_ascii_lowercase();
+    [
+        "internal server error",
+        "server error",
+        "service unavailable",
+        "overloaded",
+        "try again",
+        "temporarily",
+        "timed out",
+        "timeout",
+    ]
+    .iter()
+    .any(|needle| text.contains(needle))
 }
 
 fn map_finish_reason(reason: &str) -> StopReason {
@@ -269,6 +338,61 @@ mod tests {
             .unwrap_err();
         assert!(error.is_retryable());
         assert!(error.to_string().contains("rate limited"));
+    }
+
+    #[test]
+    fn a_status_less_server_error_frame_is_retryable() {
+        // A gateway may send nothing but `{"error":{"message":"Internal server
+        // error"}}`. Calling that fatal turns one upstream hiccup into a request
+        // the reader has to repeat by hand; the retry policy is the recovery.
+        let error = OpenAiStreamDecoder::new()
+            .push_chunk("data: {\"error\":{\"message\":\"Internal server error\"}}\n\n")
+            .expect_err("an error frame is not a completion");
+        assert!(error.is_retryable(), "{error}");
+        assert!(matches!(
+            error,
+            AgentError::Provider {
+                kind: ProviderErrorKind::Retryable,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn a_typed_server_error_frame_is_retryable() {
+        let error = OpenAiStreamDecoder::new()
+            .push_chunk(
+                "data: {\"error\":{\"message\":\"upstream\",\"type\":\"server_error\"}}\n\n",
+            )
+            .expect_err("an error frame is not a completion");
+        assert!(error.is_retryable(), "{error}");
+    }
+
+    #[test]
+    fn a_status_less_bad_key_frame_stays_fatal() {
+        let error = OpenAiStreamDecoder::new()
+            .push_chunk(
+                "data: {\"error\":{\"message\":\"invalid api key\",\"code\":\"invalid_api_key\"}}\n\n",
+            )
+            .expect_err("an error frame is not a completion");
+        assert!(!error.is_retryable(), "{error}");
+    }
+
+    #[test]
+    fn a_client_error_status_is_fatal_not_retryable() {
+        // Every status used to be called retryable; ten identical requests for a
+        // 400 is not a recovery.
+        let error = OpenAiStreamDecoder::new()
+            .push_chunk("data: {\"error\":{\"message\":\"no such model\",\"status\":400}}\n\n")
+            .expect_err("an error frame is not a completion");
+        assert!(!error.is_retryable(), "{error}");
+        assert!(matches!(
+            error,
+            AgentError::Provider {
+                status: Some(400),
+                ..
+            }
+        ));
     }
 
     #[test]

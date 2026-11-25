@@ -4014,7 +4014,16 @@ fn scripted_provider(spec: &Value) -> Result<Arc<dyn Provider>, RpcError> {
                             .unwrap_or_default()
                             .to_string(),
                     ));
-                    events.push(StreamEvent::Finish(crate::message::StopReason::EndTurn));
+                    // `{"truncated": true}` is a body that ends without a finish
+                    // frame. A harness needs that shape to exercise the paths that
+                    // recover from an upstream cut, which the review retries.
+                    if !step
+                        .get("truncated")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false)
+                    {
+                        events.push(StreamEvent::Finish(crate::message::StopReason::EndTurn));
+                    }
                 }
                 events
             })
@@ -4380,6 +4389,26 @@ async fn skill_review_pass(input: SkillReviewInput) {
         )
         .await;
 
+    // One background request can be cut by the upstream while nothing is wrong with
+    // the pass itself. A retry costs one request and is worth far more than losing
+    // the only review of this session; it is one retry rather than a backoff loop
+    // because the review is a convenience, not a turn someone is waiting on.
+    if outcome
+        .as_ref()
+        .err()
+        .is_some_and(crate::skill_review::is_upstream_failure)
+    {
+        outcome = engine
+            .run_turn(
+                &review_session_id,
+                &format!("{review_turn_id}#retry"),
+                &mut transcript,
+                &config,
+                cancel.clone(),
+            )
+            .await;
+    }
+
     // A pass that answered without reading anything has not seen what the
     // library already covers. Correct it once, then accept the answer.
     if outcome.is_ok() && sink.snapshot().0 == 0 {
@@ -4399,17 +4428,22 @@ async fn skill_review_pass(input: SkillReviewInput) {
 
     session.review_running.store(false, Ordering::SeqCst);
     let (tool_calls, actions, details) = sink.snapshot();
-    let error_code = outcome.as_ref().err().map(|error| error.code());
+    let failure = outcome.as_ref().err();
     // The pass spent its budget whenever the fork actually ran, including a run that
-    // stopped at the step ceiling. Recording only clean runs would let a session that
-    // always hits the ceiling buy a fresh fork on every turn.
-    if outcome.is_ok() || error_code == Some("STEP_LIMIT") {
+    // stopped at the step ceiling or that the upstream cut. Recording only clean runs
+    // would let a session whose upstream is flaky buy a fresh fork on every turn.
+    let spent = match failure {
+        None => true,
+        Some(error) => {
+            error.code() == "STEP_LIMIT" || crate::skill_review::is_upstream_failure(error)
+        }
+    };
+    if spent {
         if let Ok(mut gate) = session.review_gate.lock() {
             gate.record_review(std::time::Instant::now());
         }
     }
-    let notice =
-        crate::skill_review::ReviewNotice::from_run(error_code, tool_calls, actions, details);
+    let notice = crate::skill_review::ReviewNotice::from_run(failure, tool_calls, actions, details);
     emit_notice(&notice);
 }
 

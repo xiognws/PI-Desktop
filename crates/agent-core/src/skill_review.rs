@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
+use crate::error::{AgentError, ProviderErrorKind};
 use crate::message::Message;
 
 /// Tools the review fork may call. Dispatch stays behind this list.
@@ -455,6 +456,29 @@ impl ReviewOutcome {
     }
 }
 
+/// Whether the fork failed in the transport rather than in the library.
+///
+/// The review is one background request. When the upstream cuts the stream, drops
+/// the connection, or answers 5xx/429 until the retry budget is spent, the pass
+/// never reached a verdict: there is no reading of the library to report, and the
+/// reader cannot act on an upstream hiccup. Those failures stay in the
+/// skill-review log instead of costing a "failed" row in the conversation.
+///
+/// A rejected request or a bad credential is *not* this class: it names something
+/// a person can fix, and it keeps reporting as a failure.
+pub fn is_upstream_failure(error: &AgentError) -> bool {
+    match error {
+        AgentError::IncompleteStream | AgentError::Transport(_) => true,
+        AgentError::Provider { kind, .. } => {
+            matches!(
+                kind,
+                ProviderErrorKind::Transport | ProviderErrorKind::Retryable
+            )
+        }
+        _ => false,
+    }
+}
+
 impl ReviewNotice {
     pub fn skipped(reason: impl Into<String>) -> Self {
         Self {
@@ -497,7 +521,7 @@ impl ReviewNotice {
     /// of steps afterwards, and a pass that wrote nothing is schedule bookkeeping
     /// rather than something the reader can act on.
     pub fn from_run(
-        error_code: Option<&str>,
+        error: Option<&AgentError>,
         tool_calls: usize,
         actions: Vec<String>,
         details: Vec<Value>,
@@ -510,10 +534,15 @@ impl ReviewNotice {
                 details,
             };
         }
-        match error_code {
+        match error {
             // Out of steps before reaching a verdict: same class as the cooldown.
-            Some("STEP_LIMIT") => Self::skipped("step-limit"),
-            Some(code) => Self::failed(code),
+            Some(error) if error.code() == "STEP_LIMIT" => Self::skipped("step-limit"),
+            // The upstream never delivered a verdict; the code travels in the
+            // reason so the log still says which way it broke.
+            Some(error) if is_upstream_failure(error) => {
+                Self::skipped(format!("provider-error:{}", error.code()))
+            }
+            Some(error) => Self::failed(error.code()),
             None if tool_calls == 0 => Self {
                 outcome: ReviewOutcome::Failed,
                 reason: Some("no-tool-calls".to_string()),
@@ -782,7 +811,7 @@ mod tests {
         // The ceiling stops the pass, it does not undo it: a skill written three
         // steps earlier is in the library and the reader has to hear about it.
         let notice = ReviewNotice::from_run(
-            Some("STEP_LIMIT"),
+            Some(&AgentError::StepLimit { limit: 16 }),
             9,
             vec!["created 'x'".to_string()],
             vec![json!({"kind": "created", "subject": "x"})],
@@ -795,7 +824,12 @@ mod tests {
 
     #[test]
     fn a_fork_stopped_at_the_step_ceiling_is_bookkeeping_not_a_failure() {
-        let notice = ReviewNotice::from_run(Some("STEP_LIMIT"), 16, Vec::new(), Vec::new());
+        let notice = ReviewNotice::from_run(
+            Some(&AgentError::StepLimit { limit: 16 }),
+            16,
+            Vec::new(),
+            Vec::new(),
+        );
         assert_eq!(notice.outcome, ReviewOutcome::Skipped);
         assert_eq!(notice.reason.as_deref(), Some("step-limit"));
         // The event still goes out so the skill-review log keeps the reason; the
@@ -805,10 +839,59 @@ mod tests {
 
     #[test]
     fn any_other_error_still_reports_as_a_failure() {
-        let notice = ReviewNotice::from_run(Some("PROVIDER_ERROR"), 3, Vec::new(), Vec::new());
+        // A rejected request names something a person can fix, so it stays a
+        // failure in the conversation.
+        let fatal = AgentError::provider_status(ProviderErrorKind::Fatal, 401, "invalid api key");
+        let notice = ReviewNotice::from_run(Some(&fatal), 3, Vec::new(), Vec::new());
         assert_eq!(notice.outcome, ReviewOutcome::Failed);
         assert_eq!(notice.reason.as_deref(), Some("PROVIDER_ERROR"));
         assert!(notice.is_visible(&policy()));
+    }
+
+    #[test]
+    fn a_stream_the_upstream_cut_is_a_gate_reason_not_a_failure() {
+        // One request whose stream ended early says nothing about the library or
+        // about this session: the row would be noise the reader cannot act on.
+        let notice = ReviewNotice::from_run(
+            Some(&AgentError::IncompleteStream),
+            3,
+            Vec::new(),
+            Vec::new(),
+        );
+        assert_eq!(notice.outcome, ReviewOutcome::Skipped);
+        assert_eq!(
+            notice.reason.as_deref(),
+            Some("provider-error:INCOMPLETE_STREAM")
+        );
+        // Still emitted, so the skill-review log keeps the reason.
+        assert!(notice.is_visible(&policy()));
+    }
+
+    #[test]
+    fn a_dropped_connection_is_a_gate_reason_too() {
+        let notice = ReviewNotice::from_run(
+            Some(&AgentError::Transport("connection reset".into())),
+            3,
+            Vec::new(),
+            Vec::new(),
+        );
+        assert_eq!(notice.outcome, ReviewOutcome::Skipped);
+        assert_eq!(
+            notice.reason.as_deref(),
+            Some("provider-error:TRANSPORT_ERROR")
+        );
+    }
+
+    #[test]
+    fn writes_that_landed_still_report_when_the_stream_broke() {
+        let notice = ReviewNotice::from_run(
+            Some(&AgentError::IncompleteStream),
+            9,
+            vec!["created 'x'".to_string()],
+            vec![json!({"kind": "created", "subject": "x"})],
+        );
+        assert_eq!(notice.outcome, ReviewOutcome::Applied);
+        assert_eq!(notice.actions, vec!["created 'x'".to_string()]);
     }
 
     #[test]

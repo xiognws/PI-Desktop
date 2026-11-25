@@ -41,6 +41,12 @@ export function skillReviewReports(notice: SkillReviewNotice): boolean {
   if (notice.outcome === "failed") return true;
   const reason = notice.reason ?? "";
   if (reason.startsWith("no-skill-tools")) return false;
+  // An upstream hiccup is not a reading of the library either: the fork never
+  // reached a verdict, and the reason carries the provider's own code
+  // (`provider-error:INCOMPLETE_STREAM`) so the skill-review log still says which
+  // way it broke. A rejected request stays a visible failure — it names something
+  // the reader can fix.
+  if (reason.startsWith("provider-error")) return false;
   return !GATE_REASONS.has(reason);
 }
 

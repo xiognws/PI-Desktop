@@ -62,3 +62,26 @@ test("a pass that stopped at its step ceiling is not reported", () => {
     true,
   );
 });
+
+test("an upstream hiccup is not reported as a failed review", () => {
+  // The fork never got a verdict: the stream was cut or the provider spent its
+  // retry budget on 5xx. That is the upstream's state, not a reading of the
+  // library, so the row stays out of the conversation and the log keeps the code.
+  assert.equal(
+    skillReviewReports({
+      outcome: "skipped",
+      reason: "provider-error:INCOMPLETE_STREAM",
+      actions: [],
+    }),
+    false,
+  );
+  assert.equal(
+    skillReviewReports({ outcome: "skipped", reason: "provider-error:TRANSPORT_ERROR", actions: [] }),
+    false,
+  );
+  // A rejected request still names something the reader can fix.
+  assert.equal(
+    skillReviewReports({ outcome: "failed", reason: "PROVIDER_ERROR", actions: [] }),
+    true,
+  );
+});

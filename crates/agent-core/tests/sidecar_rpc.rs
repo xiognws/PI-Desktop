@@ -1112,6 +1112,122 @@ async fn a_turn_that_used_tools_earns_a_skill_review() {
     assert_eq!(review["event"]["actions"][0], "created 'learned-skill'");
 }
 
+/// The upstream cut the review's stream, and one retry landed the write.
+///
+/// A single background request ending early says nothing about the library, and
+/// losing the only review of a session to it costs more than one more request. The
+/// script makes the cut unavoidable: the fork's first attempt stops mid-stream, so
+/// either the retry happens and the write lands, or the notice is a gate reason.
+#[tokio::test]
+async fn a_cut_review_stream_is_retried_once_before_anything_is_reported() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "Bash", "arguments": {"command": "echo hi"}}},
+                {"text": "the turn is done"},
+                // The review's first attempt: text, then the body ends with no
+                // finish frame, which is exactly an upstream that closed the socket.
+                {"truncated": true, "text": "half an answer"},
+                // The retry answers the way a healthy fork does.
+                {"toolCall": {"id": "call_2", "name": "Skill", "arguments": {}}},
+                {"toolCall": {"id": "call_3", "name": "skill_manage", "arguments": {
+                    "action": "create",
+                    "name": "learned-skill",
+                    "description": "A skill the retried review wrote."
+                }}},
+                {"text": "Nothing to save."}
+            ]},
+            "model": "scripted-model",
+            "tools": [{
+                "name": "Bash",
+                "description": "Run a shell command",
+                "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}
+            }]
+        }),
+    )
+    .await;
+
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "review-retried",
+            "turnId": "t1",
+            "prompt": "do the thing",
+            "mode": "agent",
+            // Without a declared skill the fork has no `Skill` tool and the gate
+            // answers `no-skill-tools` before it ever reaches the provider.
+            "pluginSkills": [{"id": "existing", "name": "Existing", "description": "A skill"}]
+        }),
+    )
+    .await;
+
+    let review = lines
+        .wait_for_event("skill_review", Duration::from_secs(30))
+        .await
+        .expect("the review reports");
+    assert_eq!(
+        review["event"]["outcome"], "applied",
+        "the retry's write is what the pass reports: {review}"
+    );
+    assert_eq!(review["event"]["actions"][0], "created 'learned-skill'");
+}
+
+/// Cut twice: the pass reached no verdict, so it is a gate reason, not a failure.
+#[tokio::test]
+async fn a_review_cut_twice_is_a_gate_reason_not_a_failure() {
+    let (sidecar, lines) = sidecar();
+    call(
+        &sidecar,
+        1,
+        "sidecar.configure",
+        json!({
+            "provider": {"kind": "scripted", "script": [
+                {"toolCall": {"id": "call_1", "name": "Bash", "arguments": {"command": "echo hi"}}},
+                {"text": "the turn is done"},
+                {"truncated": true, "text": "half an answer"},
+                {"truncated": true, "text": "half again"}
+            ]},
+            "model": "scripted-model",
+            "tools": [{
+                "name": "Bash",
+                "description": "Run a shell command",
+                "parameters": {"type": "object", "properties": {"command": {"type": "string"}}}
+            }]
+        }),
+    )
+    .await;
+
+    call(
+        &sidecar,
+        2,
+        "agent.prompt",
+        json!({
+            "sessionId": "review-cut-twice",
+            "turnId": "t1",
+            "prompt": "do the thing",
+            "mode": "agent",
+            "pluginSkills": [{"id": "existing", "name": "Existing", "description": "A skill"}]
+        }),
+    )
+    .await;
+
+    let review = lines
+        .wait_for_event("skill_review", Duration::from_secs(30))
+        .await
+        .expect("the gate reason is reported");
+    assert_eq!(review["event"]["outcome"], "skipped", "{review}");
+    assert_eq!(
+        review["event"]["reason"], "provider-error:INCOMPLETE_STREAM",
+        "the log keeps the provider's own code: {review}"
+    );
+}
+
 /// A session can turn the review off, and then nothing forks.
 #[tokio::test]
 async fn a_disabled_review_says_so_and_does_not_fork() {
