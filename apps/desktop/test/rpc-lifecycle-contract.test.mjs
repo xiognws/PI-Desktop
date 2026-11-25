@@ -16,6 +16,12 @@ const hostSource = await readFile(
   "utf8",
 );
 const mainSource = await readMainSource();
+// The turn-end mapping moved into the host-runtime package; the assertion
+// below reads it where it lives rather than where it used to.
+const turnEventsSource = await readFile(
+  new URL("../../../packages/host-runtime/src/turn-events.ts", import.meta.url),
+  "utf8",
+).then((text) => text.replace(/\r\n/g, "\n"));
 const plansSource = await readMainModule("runtime/plans.ts");
 const shutdownModuleSource = await readMainModule("bootstrap/shutdown.ts");
 const mainIndexSource = await readMainModule("index.ts");
@@ -201,7 +207,7 @@ test("late tool metadata cleanup is scoped to the turn that started the call", (
     /key\.startsWith\(toolPrefix\) && call\.turnId === turnId/,
   );
   assert.match(
-    mainSource,
+    turnEventsSource,
     /turnId: started\?\.turnId \?\? envelope\.turnId \?\? turnId/,
   );
   assert.match(
@@ -248,7 +254,7 @@ test("app quit waits for one idempotent teardown before allowing the follow-up q
   assert.match(shutdownSource, /await hostShutdown/);
   assert.match(
     shutdownSource,
-    /await Promise\.allSettled\(\[\s*pluginShutdown,\s*sidecarShutdown,\s*mcpShutdown,\s*remoteHostsShutdown,\s*\]\)/,
+    /await Promise\.allSettled\(\[\s*pluginShutdown,\s*sidecarShutdown,\s*mcpShutdown,\s*remoteHostsShutdown,[\s\S]{0,120}?\]\)/,
   );
   const releaseQuit = shutdownSource.match(
     /const releaseQuit = \(\) => \{[\s\S]*?shutdownComplete = true;[\s\S]*?app\.quit\(\);[\s\S]*?\};/,

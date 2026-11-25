@@ -303,6 +303,11 @@ function loadApi(bridge) {
     "./plan-history": { projectPlanHistory: (messages) => messages },
     "./remote-session-safety": safety,
     "./remote-ipc-safety": { guardRemoteInvocation() {} },
+    // Channel names only: this test drives the mode endpoints, and `api.ts`
+    // imports the in-app provider channel table for the rows beside them.
+    "./in-app-provider-channels": {
+      IN_APP_PROVIDER_CHANNELS: new Proxy({}, { get: (_t, key) => `in-app/${String(key)}` }),
+    },
   };
   const module = { exports: {} };
   new Function("require", "exports", "module", "window", outputText)(

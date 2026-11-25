@@ -98,7 +98,7 @@ test("persisted subagent rows keep their attribution", () => {
   );
   assert.match(eventPersistenceSource, /message: subagentTagged\(event\.message, envelope\),/);
   assert.match(eventPersistenceSource, /tagMessageToolLineage\(message, envelope\)/);
-  assert.match(eventPersistenceSource, /toolCallLineage\(started \?\? \{\}, envelope\)/);
+  assert.match(eventPersistenceSource, /toolCallLineage\(call \?\? \{\}, envelope\)/);
   // host-core round-trips both through the message `meta` object.
   assert.match(hostSessionsSource, /pub parent_tool_call_id: Option<String>/);
   assert.match(hostSessionsSource, /meta_obj\.insert\("parentToolCallId"\.into\(\)/);
