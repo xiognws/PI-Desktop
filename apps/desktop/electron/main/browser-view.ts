@@ -5,6 +5,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BrowserState } from "@pi-workspace/shared";
 import { isAllowedHttpUrl, parseAllowedExternalUrl } from "./safe-open-external";
 import { BrowserBackingHost } from "./browser-backing-host";
+import { attachRendererConsoleLogging } from "./renderer-console";
+import type { Logger } from "./logger";
 
 /**
  * Work panel embedded preview browser (D100, ADR 0019).
@@ -145,15 +147,19 @@ export class BrowserPane {
 
   private readonly onOpenUrl?: (url: string) => void;
   private readonly backingHost: BrowserBackingHost;
+  /** Where this view's console warnings and errors are recorded, when wired. */
+  private readonly logger?: Logger;
 
   constructor(
     onState: (state: BrowserState) => void,
     onOpenUrl?: (url: string) => void,
     backingHost = BrowserPane.sharedBackingHost,
+    logger?: Logger,
   ) {
     this.onState = onState;
     this.onOpenUrl = onOpenUrl;
     this.backingHost = backingHost;
+    this.logger = logger;
   }
 
   setWindow(window: BrowserWindow | null): void {
@@ -502,6 +508,27 @@ export class BrowserPane {
     surface.setBounds(this.bounds);
     this.surface = surface;
     const wc = view.webContents;
+    // The embedded browser is its own web contents: the main window's console
+    // listener hears nothing from a page loaded here.
+    if (this.logger) {
+      attachRendererConsoleLogging(wc, this.logger, "browser-view");
+    }
+    // A failed load and a dead page only reach the renderer as state; support
+    // needs them next to the URL that caused them.
+    wc.on("did-fail-load", (_event, errorCode, errorDescription, validatedUrl, isMainFrame) => {
+      // ERR_ABORTED is the superseded request of a navigation the user replaced.
+      if (!isMainFrame || errorCode === -3) return;
+      this.logger?.app("diagnostics", "warn", "browser view load failed", {
+        event: "browserViewLoadFailed",
+        data: { code: errorCode, reason: errorDescription, url: validatedUrl },
+      });
+    });
+    wc.on("render-process-gone", (_event, details) => {
+      this.logger?.app("diagnostics", "error", "browser view process gone", {
+        event: "browserViewProcessGone",
+        data: { reason: details.reason, exitCode: details.exitCode },
+      });
+    });
     wc.setWindowOpenHandler(({ url }) => {
       const allowed = parseAllowedExternalUrl(url);
       if (allowed) {

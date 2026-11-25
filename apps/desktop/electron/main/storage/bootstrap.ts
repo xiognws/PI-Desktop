@@ -11,6 +11,7 @@ import { clearCaches, migrateFiles, removeBackups } from "./files";
 import { readStoragePreferences, STORAGE_PREFERENCE_FILE, writeStoragePreferences, type StoragePreferences } from "./preferences";
 import { recoverMissingDefaultStorage, sameStorageRoots } from "./startup-recovery";
 import { recordExitReason } from "../run-marker.js";
+import { attachRendererConsoleToStderr } from "../renderer-console";
 
 export type StorageBootstrap = { file: string; anchor: string; managed: boolean; preferences: StoragePreferences };
 class StorageRecoveryCancelled extends Error {}
@@ -83,6 +84,9 @@ export async function prepareStorage(defaultData: string, overridden: boolean): 
   window.setMenu(null);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => event.preventDefault());
+  // No file logger exists yet (it would write into the directory being moved),
+  // so this surface reports to stderr.
+  attachRendererConsoleToStderr(window.webContents, "storage-maintenance");
   await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>body{font:15px system-ui;margin:36px;background:#17191d;color:#f0f1f3}h1{font-size:21px}p{line-height:1.6;color:#b8bdc7}progress{width:100%;height:12px;accent-color:#a3bffa}#detail{font-variant-numeric:tabular-nums}</style></head><body><h1>${escapeHtml(copy.progressTitle)}</h1><p>${escapeHtml(copy.progressHint)}</p><p id="stage" role="status" aria-live="polite"></p><progress aria-label="${escapeHtml(copy.progressTitle)}"></progress><p id="detail"></p></body></html>`)}`);
   let lastPaint = 0;
   let paint: Promise<unknown> = Promise.resolve();

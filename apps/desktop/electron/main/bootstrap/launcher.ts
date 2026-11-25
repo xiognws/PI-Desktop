@@ -12,6 +12,7 @@ import {
 } from "@pi-workspace/shared";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
+import { attachRendererConsoleLogging } from "../renderer-console";
 import type { WindowLifecycleState } from "./window";
 import { suppressLinuxFramelessSystemMenu } from "../frameless-system-menu";
 import {
@@ -154,6 +155,9 @@ export function createLauncher({
       });
       state.pluginLauncherWindow = window;
       suppressLinuxFramelessSystemMenu(window);
+      // The launcher is its own web contents; without this subscription its
+      // console failures never reach the diagnostics log.
+      attachRendererConsoleLogging(window.webContents, logger, "plugin-launcher");
 
       if (process.platform === "darwin") {
         // Join every Space and float above this app's own fullscreen window, but

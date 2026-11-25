@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { getModuleDirectory } from "./module-path";
 import { parseAllowedExternalUrl } from "./safe-open-external";
 import { PanelSenders, pageGoneWithin } from "./plugin-panel-senders";
+import { attachRendererConsoleLogging } from "./renderer-console";
+import type { Logger } from "./logger";
 import {
   PLUGIN_VIEW_LOCATION_EVENT,
   PLUGIN_VIEW_LOCATION_PARAM,
@@ -132,9 +134,12 @@ export class PluginViewHost {
    * still belongs to its own plugin.
    */
   private senders = new PanelSenders();
+  /** Where a docked view's console warnings and errors are recorded, when wired. */
+  private logger?: Logger;
 
-  constructor(onBlockedRequest?: PluginPanelBlockedRequest) {
+  constructor(onBlockedRequest?: PluginPanelBlockedRequest, logger?: Logger) {
     this.onBlockedRequest = onBlockedRequest;
+    this.logger = logger;
   }
 
   /**
@@ -535,6 +540,15 @@ export class PluginViewHost {
       },
     });
     const wc = view.webContents;
+    // A docked view is its own web contents, so the main window's console
+    // listener hears nothing from it: subscribe while the view is created.
+    if (this.logger) {
+      attachRendererConsoleLogging(
+        wc,
+        this.logger,
+        `plugin-view:${request.pluginId}`,
+      );
+    }
     // A docked view gets exactly one web contents. `window.open` would mint a
     // chromeless window outside the egress policy applied above.
     wc.setWindowOpenHandler(({ url }) => {

@@ -9,6 +9,8 @@ import {
 import { builtinWindowBackground } from "@pi-workspace/shared";
 import { suppressLinuxFramelessSystemMenu } from "./frameless-system-menu";
 import { getModuleDirectory } from "./module-path";
+import { attachRendererConsoleLogging } from "./renderer-console";
+import type { Logger } from "./logger";
 import { PanelSenders, panelReadyWithin, pageGoneWithin, resolvePanelInvocation } from "./plugin-panel-senders";
 import { PanelOperationSerializer } from "./plugin-panel-senders";
 import {
@@ -206,6 +208,8 @@ export class PluginPanelHost {
    */
   private widgetLocales = new Map<number, string>();
   private serializer = new PanelOperationSerializer();
+  /** Where a panel page's console warnings and errors are recorded, when wired. */
+  private logger?: Logger;
   /**
    * Identity of the panel pages allowed to use the bridge, keyed by web
    * contents. A page belongs to its plugin for as long as it exists, not only
@@ -218,10 +222,12 @@ export class PluginPanelHost {
     bridge: BridgeHandler,
     onBlockedRequest?: PluginPanelBlockedRequest,
     onBridgeError?: (pluginId: string, channel: string, error: unknown) => void,
+    logger?: Logger,
   ) {
     this.bridge = bridge;
     this.onBlockedRequest = onBlockedRequest;
     this.onBridgeError = onBridgeError;
+    this.logger = logger;
     this.ensureHandlers();
   }
 
@@ -532,6 +538,16 @@ export class PluginPanelHost {
       // A panel gets exactly one web contents. `window.open` would otherwise mint
       // a chromeless window outside the egress policy applied above.
       win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+      // A panel page is its own web contents, so the main window's console
+      // listener hears nothing from it: subscribe while the page is built.
+      if (this.logger) {
+        attachRendererConsoleLogging(
+          win.webContents,
+          this.logger,
+          `plugin-panel:${request.pluginId}`,
+        );
+      }
 
       const sendWindowState = () => {
         if (win.isDestroyed() || win.webContents.isDestroyed()) return;

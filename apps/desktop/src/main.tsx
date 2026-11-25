@@ -9,6 +9,7 @@ import { MAC_TRAFFIC_LIGHT_EDGE_DIP } from "@pi-workspace/shared";
 import App from "./App";
 import { ErrorBoundary, RoutePending } from "./features/app/chrome";
 import { initLanguageSync } from "./lib/app-language";
+import { installRendererErrorReporting } from "./lib/renderer-errors";
 import { installScrollbarReveal } from "./lib/scrollbar-reveal";
 import "./styles/globals.css";
 
@@ -33,6 +34,10 @@ if (document.documentElement.dataset.platform === "darwin") {
     `${MAC_TRAFFIC_LIGHT_EDGE_DIP}px`,
   );
 }
+// Errors outside React's tree — a throw in an event handler, a rejected promise —
+// reach the diagnostics log only through console, so install this before React
+// takes over the page.
+installRendererErrorReporting();
 // Scrollbars are transparent at rest (base.css); this marks the scrolling
 // element so the thumb shows while it moves, not only under the pointer.
 installScrollbarReveal(document);

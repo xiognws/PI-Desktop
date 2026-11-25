@@ -37,6 +37,7 @@ import {
   type WorkPanelReservationState,
 } from "../work-panel-window";
 import { readWindowState, writeWindowState } from "../window-preferences";
+import { attachRendererConsoleLogging } from "../renderer-console";
 import { suppressLinuxFramelessSystemMenu } from "../frameless-system-menu";
 import { isWindowFullScreen } from "../window-fullscreen";
 import { DEFAULT_WINDOW_CORNER_RADIUS, installWindowShape } from "../window-shape";
@@ -208,6 +209,13 @@ export async function createWindow({
     ? null
     : windowState.startupAnimation;
   if (startupAnimation) windowState.startupAnimationPlayed = true;
+  const windowIconPath = (): string | undefined => {
+    const resourceRoot = app.isPackaged
+      ? process.resourcesPath
+      : join(app.getAppPath(), "build");
+    const candidates = [join(resourceRoot, "icon.ico"), join(resourceRoot, app.isPackaged ? "tray-icon.png" : "icon.png")];
+    return candidates.find((candidate) => existsSync(candidate));
+  };
   const windows11NativeCorners = usesWindows11NativeCorners(
     process.platform,
     process.getSystemVersion(),
@@ -217,6 +225,9 @@ export async function createWindow({
     minWidth: initialMinWidth,
     minHeight: initialMinHeight,
     title: APP_NAME,
+    // The taskbar and Alt-Tab take the window icon, not the .exe resource. An
+    // empty `icon` silently falls back to Electron's logo.
+    icon: windowIconPath(),
     show: false,
     // Keep native edge/corner resizing explicit. Frameless chrome owns the
     // titlebar only; the OS remains responsible for the resize hit regions.
@@ -568,6 +579,11 @@ export async function createWindow({
     windowState.notificationViewingSessionId = null;
     if (windowState.mainWindow === window) resetMenuRendererReady(window);
   });
+  // Renderer-side failures reach this log only if the console is listened to:
+  // React error boundaries and the global error hooks report through `console`,
+  // and main is the only side that can write a file. Plugin surfaces subscribe
+  // separately, at the point they create their own web contents.
+  attachRendererConsoleLogging(window.webContents, logger, "main-window");
   window.webContents.on("render-process-gone", (_event, details) => {
     windowState.notificationViewingSessionId = null;
     recoverRendererAfterGone(details, {
