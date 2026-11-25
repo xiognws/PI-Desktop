@@ -221,6 +221,14 @@ if (runtime !== 0) process.exit(runtime);
 // Re-linking host-core for a JS-only change is minutes of a build that otherwise
 // takes seconds, so the binary is reused while it is newer than every Rust input.
 // `--rebuild-rust` forces a compile and `--verify-only` never reaches this point.
+//
+// A thin-LTO profile (`release-pack`, `lto = "thin"`, `codegen-units = 16`) was
+// written to cut the 7-9 minute fat-LTO link and dropped again: any profile whose
+// artifacts are not already cached compiles the C dependencies from source, and
+// that fails here with `c1xx: fatal error C1083: cannot open compiler intermediate
+// file ...\_CL_*: Permission denied` — cl.exe cannot write its middle file where
+// this agent's terminal allows it, and redirecting TMP/TEMP does not help. Run the
+// profile from a normal shell before offering it again.
 const hostExe = join(REPO, "target", "release", "pi-desktop-host-core.exe");
 if (rustBinaryIsCurrent(hostExe)) {
   step("build host-core (release): binary is newer than the sources");
