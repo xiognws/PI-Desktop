@@ -18,6 +18,10 @@ never leaves this device.
 - **Hero** — total tokens in the selected window, the change against the
   previous window of equal length, your best day and your busiest hour.
 - **Four counters** — input, output, cache read, reasoning.
+- **Spend** — for the window you picked: what it cost, how many requests were
+  priced by the provider versus estimated from the catalog, how many had no
+  price at all, and a per-provider breakdown. The money is summed by
+  PI-Desktop's own ledger, not guessed in the panel.
 - **Activity** — a 53-week heatmap; days outside the current filter stay dimmed
   so the window you picked is visible at a glance.
 - **Models / Tools / Providers / Sessions** — rankings with share of total.
@@ -94,8 +98,9 @@ Everything is local and read-only:
 It never reads message text, tool arguments, project paths or credentials. Full
 session ids are never kept — only an 8-character prefix, enough to tell two
 sessions apart. The plugin writes nothing except its own settings, and makes no
-network request. Requested permissions are `ui.panel` and `agent.tool.register`
-only.
+network request. The spend card adds one read of the same `turns` ledger, as a
+single aggregate summed by the host. Requested permissions are `ui.panel`,
+`agent.tool.register` and `usage.read`.
 
 ## Notes
 
@@ -108,6 +113,13 @@ only.
   cards can add up to more than the total. The footer says so on screen.
 - Token counts are what the tools recorded. They are not a statement about your
   remaining subscription balance.
+- The spend card counts every completed turn the host recorded, whatever its
+  status — an aborted or failed request is still billed. A request the host has
+  no price for is counted rather than dropped, so when any exist the total is
+  labelled a lower bound instead of inventing a number. Requests priced from the
+  catalog rather than reported by the provider are called out separately, which
+  is what separates a metered key from a subscription plan. The panel asks the
+  host once per window; a host too old to answer leaves the card out entirely.
 - Opening the panel triggers a rescan in the background; the page renders the
   previous cube immediately and swaps in the fresh one when it lands. While a
   scan runs you see the real file count and a progress bar, not a spinner.

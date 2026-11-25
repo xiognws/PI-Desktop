@@ -130,6 +130,21 @@ const STRINGS = {
     rhythmNoteEmpty: "No activity to read a rhythm from",
     sourcesTitle: "Tools",
     providersNote: (count) => `${count} providers`,
+    /* spend card: the host's money rollup for the same window */
+    spendTitle: "Spend",
+    spendNote: (count) => `${count} requests in this window`,
+    spendNoteCapped: (count) => `${count} requests in the last 365 days (a spend window spans at most a year)`,
+    spendBilled: "Billed",
+    spendBilledNote: "USD the provider reported or the catalog estimated",
+    spendRequests: "Requests",
+    spendRequestsNote: "Every turn status counts",
+    spendPriced: "Priced",
+    spendPricedNote: (reported, estimated) => `${reported} reported · ${estimated} estimated`,
+    spendUnpriced: "Unpriced",
+    spendUnpricedNote: "No price reported; the total is a lower bound",
+    spendProviders: "By provider",
+    spendProviderRequests: (count) => `${count} req`,
+    spendLowerBound: (count) => `Lower bound: ${count} requests have no price`,
     sessionsTitle: "Busiest sessions",
     sessionsNote: (count) => `${count} sessions`,
     sessionLabel: (short) => `Session ${short}`,
@@ -236,6 +251,21 @@ const STRINGS = {
     rhythmNoteEmpty: "还看不出节奏",
     sourcesTitle: "工具",
     providersNote: (count) => `${count} 个提供商`,
+    /* 花费卡：同一时间窗内由宿主汇总的金额 */
+    spendTitle: "花费",
+    spendNote: (count) => `本窗口共 ${count} 个请求`,
+    spendNoteCapped: (count) => `最近 365 天共 ${count} 个请求（单次花费窗口上限一年）`,
+    spendBilled: "已计费",
+    spendBilledNote: "供应商实际计费或按价目估算的美元合计",
+    spendRequests: "请求数",
+    spendRequestsNote: "所有状态的轮次都计入",
+    spendPriced: "有价格",
+    spendPricedNote: (reported, estimated) => `${reported} 个供应商计费 · ${estimated} 个按价目估算`,
+    spendUnpriced: "未计价",
+    spendUnpricedNote: "供应商没报价格，合计只是下限",
+    spendProviders: "按供应商",
+    spendProviderRequests: (count) => `${count} 个请求`,
+    spendLowerBound: (count) => `合计为下限：${count} 个请求没有价格`,
     sessionsTitle: "消耗最多的会话",
     sessionsNote: (count) => `${count} 段对话`,
     sessionLabel: (short) => `会话 ${short}`,
@@ -279,6 +309,12 @@ const state = {
   lastFactsAt: 0,
   lastAppearanceKey: "",
   pollTimer: null,
+  /* Host money rollup for the selected window; null until asked, then either
+     the summary or null when this host cannot serve it. */
+  spend: null,
+  spendWindowKey: "",
+  /** True when the selected range is wider than the host's maximum window. */
+  spendCapped: false,
 };
 
 function defaultFilter() {
@@ -1006,6 +1042,153 @@ function renderTiles() {
   }
 }
 
+/* --------------------------------------------------------------- spend card */
+
+/**
+ * The widest window the host serves for spend, mirroring
+ * `PLUGIN_USAGE_MAX_WINDOW_MS` in host-core. An "all time" range is usually
+ * wider, so the card asks for this and labels the span it really got.
+ */
+const MAX_SPEND_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * The window the card asks about, in epoch milliseconds.
+ *
+ * The dashboard's ranges are local day keys; the host bounds a turn's
+ * `started_at`, so the whole first and last day must sit inside the window or a
+ * turn that started at 00:10 would fall outside the range the user picked.
+ */
+function spendWindowMs() {
+  const window = windowForRange(state.filter.range);
+  const fromDay = window.from || A.todayKey();
+  const toDay = window.to || fromDay;
+  const fromMs = new Date(`${fromDay}T00:00:00`).getTime();
+  const toMs = new Date(`${toDay}T23:59:59.999`).getTime();
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs < fromMs) return null;
+  return { fromMs, toMs };
+}
+
+/**
+ * Ask the plugin process for the host's money rollup.
+ *
+ * The panel bridge is read-only and carries no ledger channel, so this rides the
+ * plugin's own `spend` operation. Asked once per window: the poll loop re-renders
+ * often, but the answer only moves when the ledger or the range does.
+ */
+async function refreshSpend() {
+  const window = spendWindowMs();
+  if (!window) return;
+  // The host refuses a window wider than a year, and an "all time" range can be
+  // wider than that: ask for the widest window it does serve and let the card
+  // say so, rather than dropping the card or silently reporting a shorter span.
+  const capped = window.toMs - window.fromMs > MAX_SPEND_WINDOW_MS;
+  const fromMs = capped ? window.toMs - MAX_SPEND_WINDOW_MS : window.fromMs;
+  const key = `${fromMs}:${window.toMs}`;
+  if (state.spendWindowKey === key) return;
+  state.spendWindowKey = key;
+  state.spendCapped = capped;
+  try {
+    const reply = await bridge.invoke("spend", { fromMs, toMs: window.toMs });
+    state.spend = reply?.ok ? reply.spend || null : null;
+  } catch {
+    // No channel, permission refused, or an older host: the card stays away
+    // rather than showing a figure nobody can explain.
+    state.spend = null;
+  }
+  renderSpendCard();
+}
+
+/** Enough precision to see a single request's price without four decimals of noise. */
+function formatUsd(amount) {
+  const value = Number.isFinite(amount) && amount > 0 ? amount : 0;
+  if (value === 0) return "$0.00";
+  if (value < 0.01) return `$${value.toFixed(4)}`;
+  if (value < 1) return `$${value.toFixed(3)}`;
+  return `$${value.toFixed(2)}`;
+}
+
+/** Provider display name from the fact cube; the host rollup carries only ids. */
+function providerLabelFor(id) {
+  if (!id) return state.t.spendProviders;
+  const entry = state.facts?.providers?.find((provider) => provider.id === id);
+  return entry?.label || id;
+}
+
+function renderSpendCard() {
+  const t = state.t;
+  const card = el("spendCard");
+  const spend = state.spend;
+  if (!spend || !(Number(spend.requests) > 0)) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const priced = Number(spend.pricedRequests) || 0;
+  const reported = Number(spend.reportedRequests) || 0;
+  const estimated = Math.max(0, priced - reported);
+
+  el("spendTitle").textContent = t.spendTitle;
+  el("spendNote").textContent = state.spendCapped
+    ? t.spendNoteCapped(grouped(Number(spend.requests) || 0))
+    : t.spendNote(grouped(Number(spend.requests) || 0));
+
+  el("spendBilledLabel").textContent = t.spendBilled;
+  el("spendBilled").textContent = formatUsd(spend.costTotal);
+  el("spendBilled").title = grouped(Math.round((Number(spend.costTotal) || 0) * 100) / 100);
+  el("spendBilledNote").textContent = t.spendBilledNote;
+
+  el("spendRequestsLabel").textContent = t.spendRequests;
+  el("spendRequests").textContent = grouped(Number(spend.requests) || 0);
+  el("spendRequestsNote").textContent = t.spendRequestsNote;
+
+  el("spendPricedLabel").textContent = t.spendPriced;
+  el("spendPriced").textContent = grouped(priced);
+  el("spendPricedNote").textContent = t.spendPricedNote(reported, estimated);
+
+  el("spendUnpricedLabel").textContent = t.spendUnpriced;
+  el("spendUnpriced").textContent = grouped(Number(spend.unpricedRequests) || 0);
+  el("spendUnpricedNote").textContent = t.spendUnpricedNote;
+  el("spendProvidersTitle").textContent = t.spendProviders;
+
+  renderSpendProviders(spend.byProvider || []);
+
+  const unpriced = Number(spend.unpricedRequests) || 0;
+  const lowerNote = el("spendLowerNote");
+  lowerNote.hidden = unpriced === 0;
+  lowerNote.textContent = unpriced === 0 ? "" : t.spendLowerBound(grouped(unpriced));
+}
+
+/** Provider rows arrive ordered by money; the bar is each row's share of them. */
+function renderSpendProviders(rows) {
+  const t = state.t;
+  const host = el("spendProviderRanking");
+  clear(host);
+  const visible = rows.slice(0, 5);
+  if (!visible.length) {
+    host.appendChild(make("div", "empty-row", t.empty));
+    return;
+  }
+  const total = visible.reduce((sum, row) => sum + (Number(row.costTotal) || 0), 0) || 1;
+  for (const row of visible) {
+    const cost = Number(row.costTotal) || 0;
+    const node = make("div", "row");
+    const label = make("div", "row-label");
+    label.appendChild(make("span", null, providerLabelFor(row.providerId)));
+    label.appendChild(
+      make("span", "muted", ` ${t.spendProviderRequests(Number(row.requests) || 0)}`),
+    );
+    label.title = `${providerLabelFor(row.providerId)} · ${formatUsd(cost)}`;
+    node.appendChild(label);
+    node.appendChild(make("div", "row-value", formatUsd(cost)));
+    const bar = make("div", "row-bar");
+    const fill = make("i");
+    fill.style.width = `${Math.max(1, Math.round((cost / total) * 100))}%`;
+    bar.appendChild(fill);
+    node.appendChild(bar);
+    host.appendChild(node);
+  }
+}
+
 function heatLevels(values) {
   const sorted = values.filter((value) => value > 0).sort((left, right) => left - right);
   if (!sorted.length) return [0, 0, 0, 0];
@@ -1223,6 +1406,10 @@ function render() {
   const t = state.t;
   renderHero();
   renderTiles();
+  // The card reads whatever the last answer was and, once per window, asks for
+  // a fresh one; the host owns the money, this file only shows it.
+  renderSpendCard();
+  void refreshSpend();
   renderHeatmap();
   renderRanking("modelRanking", state.summary.models, { sub: (row) => t.replies(grouped(row.messages)) });
   el("modelsNote").textContent = t.modelsNote(state.summary.models.length);

@@ -15395,6 +15395,38 @@ are withdrawn with ADR 0165.
 - **Status**: Unit/RPC/wiring-covered (`plugin-session-api.test.mjs`,
   host-core `plugin_usage`); full UI journey Draft
 
+#### E2E-PLUGIN-usage-summary: Plugin spend rollup
+
+- **Preconditions**: A test plugin is granted `usage.read`. The host database
+  has completed turns from at least two providers, one of them with a
+  provider-reported price and one without.
+- **Steps**: 1) Call `pi.usage.summary` without the permission. 2) Call it with
+  no bounds, then with an explicit window, then with an inverted window and one
+  longer than 365 days. 3) Compare `byProvider` rows against the totals and
+  against `pi.usage.listTurns` over the same window. 4) Open the Token Insights
+  panel: the spend card shows the selected range's billed total, request count,
+  priced/unpriced split and provider rows; switch 30D → 7D → 90D and watch the
+  card ask for the new window; then have the host refuse the rollup.
+- **Expected**: Missing permission returns `PERMISSION_DENIED` and does not
+  hit the host. Absent bounds return the host's 30-day default rather than a
+  client-computed one. Invalid windows return `INVALID_PARAMS`. Provider rows
+  sum to the totals, `unpricedRequests` counts the price-less turn instead of
+  pricing it, and no message body appears anywhere in the result. The panel's
+  card follows the range control, labels the total a lower bound when any
+  request is unpriced, and disappears without an error when the rollup is
+  refused.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`,
+  `03-runtime/06-host-rpc-protocol.md`, ADR 0173, D335
+- **Acceptance**: Security, Quality
+- **Milestone**: M6+
+- **Status**: Unit/RPC/wiring-covered
+  (`plugin-session-api.test.mjs`, host-core
+  `plugin_usage_summary_rpc_serves_the_rollup_and_bounds_the_window`,
+  `token-insights-spend.test.mjs`); panel rendering verified against a stubbed
+  host in Chromium (range-following, lower-bound label, refusal hides the card);
+  full Electron journey Draft
+
 #### E2E-216: Explicit plugin project binding and host-owned sidebar refresh
 
 - **Preconditions**: A test plugin has `project.create` and `session.import`

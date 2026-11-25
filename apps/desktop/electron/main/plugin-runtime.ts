@@ -576,6 +576,8 @@ export type PluginHostServices = {
   /** Read-only completed-turn facts served by host-core's usage domain. */
   usage?: {
     listTurns: (pluginId: string, input: Record<string, unknown>) => Promise<unknown>;
+    /** Aggregated tokens and spend for a window; same grant as `listTurns`. */
+    summary: (pluginId: string, input: Record<string, unknown>) => Promise<unknown>;
   };
 };
 
@@ -683,6 +685,7 @@ const HOST_API_ALLOWLIST = new Set([
   "session.deleteMessage",
   "session.truncateFrom",
   "usage.listTurns",
+  "usage.summary",
   "agent.complete",
   "providers.oauth.prompt",
   "providers.oauth.notify",
@@ -1213,6 +1216,41 @@ function normalizePluginUsageListTurnsInput(input: unknown): Record<string, unkn
       throw apiError("INVALID_PARAMS", "limit must be an integer between 1 and 500");
     }
     normalized.limit = limit;
+  }
+  return normalized;
+}
+
+/**
+ * Mirrors the host-side validation for `usage.summary`: only the two window
+ * bounds exist here. Absent bounds stay absent (the host applies the 30-day
+ * default), and the implied bounds are used to reject an inverted window or one
+ * wider than the 365-day cap before a round-trip.
+ */
+function normalizePluginUsageSummaryInput(input: unknown): Record<string, unknown> {
+  if (input === undefined || input === null) return {};
+  if (typeof input !== "object" || Array.isArray(input)) {
+    throw apiError("INVALID_PARAMS", "usage input must be an object");
+  }
+  const value = input as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {};
+  const bound = (key: string): number | undefined => {
+    const raw = value[key];
+    if (raw === undefined || raw === null) return undefined;
+    if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0) {
+      throw apiError("INVALID_PARAMS", `${key} must be a non-negative integer`);
+    }
+    normalized[key] = raw;
+    return raw;
+  };
+  const fromMs = bound("fromMs");
+  const toMs = bound("toMs");
+  const resolvedTo = toMs ?? Date.now();
+  const resolvedFrom = fromMs ?? resolvedTo - PLUGIN_USAGE_DEFAULT_WINDOW_MS;
+  if (resolvedTo < resolvedFrom) {
+    throw apiError("INVALID_PARAMS", "toMs must be >= fromMs");
+  }
+  if (resolvedTo - resolvedFrom > PLUGIN_USAGE_MAX_WINDOW_MS) {
+    throw apiError("INVALID_PARAMS", "usage window must span at most 365 days");
   }
   return normalized;
 }
@@ -3251,6 +3289,17 @@ export class PluginRuntime {
           throw apiError("UNSUPPORTED", "host api not available: usage.listTurns");
         }
         return this.services.usage.listTurns(loaded.manifest.id, input);
+      }
+      case "usage.summary": {
+        // The host already sums the ledger, so the plugin gets money and tokens
+        // per provider/model instead of paging turns to add them up. Read-only,
+        // same grant as `usage.listTurns`.
+        this.assertPermission(loaded, "usage.read");
+        const input = normalizePluginUsageSummaryInput(args[0]);
+        if (!this.services.usage?.summary) {
+          throw apiError("UNSUPPORTED", "host api not available: usage.summary");
+        }
+        return this.services.usage.summary(loaded.manifest.id, input);
       }
       case "agent.complete": {
         return this.runAgentComplete(loaded, (args[0] ?? {}) as PluginCompleteInput);

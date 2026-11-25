@@ -149,6 +149,9 @@ export function createPluginServices({
         data: { channel, error: String(error) },
       });
     },
+    // A panel page is its own web contents; its console only reaches the
+    // diagnostics log if this host subscribes to it.
+    logger,
   );
   const callPluginSessionHost = async (
     method: string,
@@ -438,6 +441,11 @@ export function createPluginServices({
     usage: {
       listTurns: (pluginId, input) =>
         callPluginSessionHost("plugin.usage.listTurns", pluginId, input),
+      // Same read-only transport as `listTurns`: the host aggregates the ledger
+      // (tokens plus money per provider/model), so no mutation and no
+      // `sessionsChanged` fan-out.
+      summary: (pluginId, input) =>
+        callPluginSessionHost("plugin.usage.summary", pluginId, input),
     },
     complete: async (input): Promise<PluginCompleteResult> => {
       if (!getHost()) {
@@ -687,17 +695,24 @@ export function createPluginServices({
     getActiveSession: () => pluginSession.snapshot(),
     log: (message, data) => logger.app("plugin", "warn", message, { data }),
   });
-  const pluginViews = new PluginViewHost(({ pluginId, url }) => {
-    logger.app("plugin", "warn", "plugin.api", {
-      pluginId,
-      code: "PERMISSION_DENIED",
-      data: { api: "view.egress", ok: false, url, ts: Date.now() },
-    });
-  });
+  const pluginViews = new PluginViewHost(
+    ({ pluginId, url }) => {
+      logger.app("plugin", "warn", "plugin.api", {
+        pluginId,
+        code: "PERMISSION_DENIED",
+        data: { api: "view.egress", ok: false, url, ts: Date.now() },
+      });
+    },
+    // Same reason as the panel host: a docked view is a separate web contents.
+    logger,
+  );
   pluginPanels.addSenderResolver((senderId) => pluginViews.pluginIdForSender(senderId));
   const browserBackingHost = new BrowserBackingHost();
   const browserHost = new BrowserHost({
-    createPane: (onState, onOpenUrl) => new BrowserPane(onState, onOpenUrl, browserBackingHost),
+    createPane: (onState, onOpenUrl) =>
+      // The embedded browser is a separate web contents; its console only
+      // reaches the diagnostics log when the pane is given the logger.
+      new BrowserPane(onState, onOpenUrl, browserBackingHost, logger),
     onOpenUrl: (url, sessionId) => {
       void (async () => {
         const settings = await getHost()?.call<AppSettings>("settings.get");

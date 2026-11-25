@@ -481,6 +481,47 @@ export type PluginUsageTurnPage = {
   nextCursor: string | null;
 };
 
+/**
+ * Money and tokens for a set of physical requests, as the host sums them
+ * (`usage.read`). `costTotal` covers priced requests only, so it is a lower
+ * bound while `unpricedRequests` is nonzero — a request whose price no provider
+ * reported is counted, never guessed.
+ */
+export type PluginUsageSpendTotal = {
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
+  /** USD of the priced requests only. */
+  costTotal: number;
+  pricedRequests: number;
+  /** Priced requests the provider billed rather than the catalog estimated. */
+  reportedRequests: number;
+  unpricedRequests: number;
+};
+
+/** One provider's (or one model's) share of a spend window. */
+export type PluginUsageSpendRow = PluginUsageSpendTotal & {
+  /** Desktop provider row; absent when the records cannot be attributed. */
+  providerId?: string;
+  /** Model the requests ran on; absent when the records cannot be attributed. */
+  modelId?: string;
+};
+
+/** Every session's spend in one window (`usage.summary`). */
+export type PluginUsageSpend = PluginUsageSpendTotal & {
+  rangeStart: number;
+  rangeEnd: number;
+  /** Turns that reached a provider; a turn with no tokens is not one. */
+  turnCount: number;
+  /** Ordered by money spent, most expensive first. */
+  byProvider: PluginUsageSpendRow[];
+  byModel: PluginUsageSpendRow[];
+};
+
 export type PluginSessionMessageResult = {
   id: string;
   role: "user" | "assistant" | "tool";
@@ -1540,6 +1581,18 @@ export type PluginHostApi = {
       /** 1..=500 rows per page; default 200. */
       limit?: number;
     }) => Promise<PluginUsageTurnPage>;
+    /**
+     * The same ledger, already summed: totals plus per-provider and per-model
+     * rows for one window, so a dashboard does not page every turn to add up
+     * dollars. Same `usage.read` grant, same window rules as `listTurns`
+     * (default the last 30 days, span at most 365 days), and no write path.
+     */
+    summary: (input?: {
+      /** Inclusive window start in epoch ms. Default: `toMs` minus 30 days. */
+      fromMs?: number;
+      /** Inclusive window end in epoch ms. Default: now. */
+      toMs?: number;
+    }) => Promise<PluginUsageSpend>;
   };
   services: {
     /**

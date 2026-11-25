@@ -28,7 +28,7 @@ A plugin can contribute one or more of these capabilities:
 | Composer suggestion | One dismissible line offered to the input box, taken with Tab | `pi.composer.suggest`, `composer.suggest` permission |
 | Provider | API-key, no-auth, or OAuth model service | `contributes.providers`, `provider.register`; OAuth also needs `provider.oauth` |
 | Session import | Import, read, rename, and delete this plugin's own history | `contributes.sessionSources`, matching `session.*` grants |
-| Usage facts | Compute your own usage dashboard | `pi.usage.listTurns`, `usage.read` |
+| Usage facts | Compute your own usage dashboard | `pi.usage.listTurns`, `pi.usage.summary`, `usage.read` |
 | Composer transform | An explicit draft-text action with undo | `contributes.composerTransforms`, `onComposerTransform`, `composer.transform` |
 | Global shortcut | Invoke your command while the app is unfocused | `contributes.globalShortcuts`, `pi.keyboard`, `keyboard.globalShortcut` |
 | Trusted agent extension | pi ExtensionAPI hooks, tools, commands, and custom agents | `contributes.agentExtensions`, `agent.extension` |
@@ -1055,6 +1055,7 @@ History management is a separate ownership boundary. Declare
 | Create/reuse an explicit project binding | `project.create`; import with `projectId` | `project.create` |
 | Generate a default title | `session.getAutoTitleContext`, `setAutoTitle` | `session.autoTitle` |
 | Read completed-turn usage facts | `usage.listTurns` | `usage.read` |
+| Read a windowed spend rollup (tokens + USD per provider/model) | `usage.summary` | `usage.read` |
 
 Import is idempotent on `(pluginId, source, externalId)`. Use strict RFC3339
 timestamps, monotonic message times, and the host-generated ids returned by

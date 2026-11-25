@@ -452,6 +452,9 @@ function buildApi(tenant) {
     // counters and identifiers only, so no message body crosses this bridge.
     usage: {
       listTurns: (input) => call("usage.listTurns", [input ?? {}]),
+      // The host already aggregates the ledger (tokens plus money per
+      // provider/model), so a dashboard does not page turns to add dollars.
+      summary: (input) => call("usage.summary", [input ?? {}]),
     },
     /**
      * Resident background workers (spec 07 §3). Registration is local: the

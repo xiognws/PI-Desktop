@@ -317,6 +317,7 @@ Metadata reads need no permission; file operations require their declared grants
 - `pi.session.rename()` // `session.update.own`
 - `pi.session.delete()` // `session.delete.own`
 - `pi.usage.listTurns()` // `usage.read`; read-only completed-turn facts, no message bodies
+- `pi.usage.summary()` // `usage.read`; the same ledger summed per provider/model, with USD
 - `pi.agent.complete(input)` // `agent.complete`; host-owned one-shot
 
 Skills are contributed declaratively (`contributes.skills` + `agent.prompt.inject`),

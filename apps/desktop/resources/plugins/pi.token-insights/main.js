@@ -10,6 +10,11 @@
  * The panel bridge has no channel for usage or appearance, which is why the
  * plugin process resolves both and the panel only reads settings. Nothing here
  * writes outside the plugin's own settings, and nothing reaches the network.
+ *
+ * Money is the one fact this plugin does not derive: what a request cost lives
+ * in the host's ledger, so the panel's spend card asks this process for one
+ * window (`spend`), and this process relays it to `pi.usage.summary`. Tokens are
+ * counted here; money is counted by the host.
  */
 
 const path = require("node:path");
@@ -476,14 +481,52 @@ async function onUnload() {
   await pi.agent.unregisterTool("token_usage_summary");
 }
 
+/**
+ * Panel channels.
+ *
+ * The panel bridge is read-only and has no channel for the host's ledger, so a
+ * spend question arrives here: the panel asks for one window and the plugin
+ * process asks the host. The host owns what a request cost — its `usage.summary`
+ * already sums the ledger per provider and model — so nothing in this plugin
+ * re-derives money from rows.
+ *
+ * A host too old to serve the rollup answers a plain "no": the panel then hides
+ * the card instead of showing a number nobody can explain.
+ */
+const SPEND_MAX_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+
+async function onPanelInvoke(channel, payload) {
+  if (channel !== "spend") {
+    return { ok: false, code: "UNSUPPORTED", message: `unknown channel: ${channel}` };
+  }
+  const fromMs = Number(payload?.fromMs);
+  const toMs = Number(payload?.toMs);
+  if (!Number.isInteger(fromMs) || !Number.isInteger(toMs) || toMs <= fromMs) {
+    return { ok: false, code: "INVALID_PARAMS", message: "a window needs integer fromMs < toMs" };
+  }
+  if (toMs - fromMs > SPEND_MAX_WINDOW_MS) {
+    return { ok: false, code: "INVALID_PARAMS", message: "window must span at most 365 days" };
+  }
+  if (typeof pi.usage?.summary !== "function") {
+    return { ok: false, code: "UNAVAILABLE", message: "this host has no spend rollup" };
+  }
+  try {
+    return { ok: true, spend: await pi.usage.summary({ fromMs, toMs }) };
+  } catch (error) {
+    return { ok: false, code: "UNAVAILABLE", message: String(error?.message || error) };
+  }
+}
+
 module.exports = {
   onLoad,
   onUnload,
+  onPanelInvoke,
   __test: {
     aggregate,
     buildFacts,
     buildReport,
     collectFacts,
+    onPanelInvoke,
     progressReporter,
     refreshFacts,
     sourceRoots,

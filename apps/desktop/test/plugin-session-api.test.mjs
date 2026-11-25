@@ -490,6 +490,70 @@ test("plugin usage listTurns requires usage.read and forwards the plugin id", as
   ]);
 });
 
+test("plugin usage summary forwards the window with the plugin id", async (t) => {
+  const calls = [];
+  const runtime = new PluginRuntime({
+    hostEntry: hostProcessEntry,
+    spawnProcess: forkPluginProcess,
+    usage: {
+      listTurns: async () => ({ turns: [], nextCursor: null }),
+      summary: async (pluginId, input) => {
+        calls.push([pluginId, input]);
+        return {
+          requests: 2,
+          costTotal: 0.75,
+          unpricedRequests: 0,
+          byProvider: [],
+          byModel: [],
+        };
+      },
+    },
+  });
+  t.after(async () => {
+    for (const loaded of runtime.listLoaded()) await runtime.unload(loaded.manifest.id);
+  });
+  const dir = writePlugin({
+    id: "demo.usage-summary",
+    permissions: ["usage.read"],
+    main: `
+      module.exports = {
+        async onLoad() {
+          await pi.commands.register({
+            id: "read-spend",
+            title: "Read spend",
+            run: async () => {
+              const spend = await pi.usage.summary();
+              await pi.ui.showToast("requests:" + spend.requests);
+              await pi.usage.summary({ fromMs: 1, toMs: 2 });
+              for (const [name, call] of [
+                ["badWindow", () => pi.usage.summary({ fromMs: 0, toMs: 1 + 365 * 86400000 })],
+                ["badOrder", () => pi.usage.summary({ fromMs: 10, toMs: 1 })],
+                ["badFrom", () => pi.usage.summary({ fromMs: -1 })]
+              ]) {
+                try { await call(); }
+                catch (error) { await pi.ui.showToast(name + ":" + error.code); }
+              }
+            }
+          });
+        }
+      };
+    `,
+  });
+  await runtime.loadFromPath(dir, ["usage.read"]);
+  await runCommand(runtime, "read-spend");
+  // Absent bounds stay absent: the host, not the plugin process, owns the default.
+  assert.deepEqual(calls, [
+    ["demo.usage-summary", {}],
+    ["demo.usage-summary", { fromMs: 1, toMs: 2 }],
+  ]);
+  assert.deepEqual(runtime.drainToasts(), [
+    "requests:2",
+    "badWindow:INVALID_PARAMS",
+    "badOrder:INVALID_PARAMS",
+    "badFrom:INVALID_PARAMS",
+  ]);
+});
+
 test("plugin usage listTurns is refused without the usage.read permission", async (t) => {
   const calls = [];
   const runtime = new PluginRuntime({

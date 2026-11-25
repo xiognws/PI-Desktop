@@ -930,6 +930,40 @@ Semantics:
 - A missing or malformed `usage_json` yields zero cache/reasoning counters —
   never a partial row.
 
+`pi.usage.summary` is the same ledger, already summed, for the case a dashboard
+wants money rather than rows: paging every turn to add up dollars moves a
+computation the host can do in one pass into the plugin.
+
+```ts
+pi.usage.summary(input?: {
+  fromMs?: number      // inclusive window start, epoch ms; default toMs - 30 days
+  toMs?: number        // inclusive window end, epoch ms; default now
+}): Promise<{
+  rangeStart: number; rangeEnd: number; turnCount: number
+  requests: number
+  inputTokens: number; outputTokens: number
+  cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number
+  totalTokens: number
+  costTotal: number          // USD of the priced requests only
+  pricedRequests: number; reportedRequests: number; unpricedRequests: number
+  byProvider: Array<{ providerId?: string } & Totals>  // ordered by cost, top first
+  byModel: Array<{ modelId?: string } & Totals>
+}>
+```
+
+Semantics:
+
+- Every turn status counts, not only completed ones: an aborted or failed
+  request was still billed, and a running turn has already paid for what it
+  finished. The window bounds a turn's start time.
+- `costTotal` covers priced requests only. A request whose price no provider
+  reported increments `unpricedRequests` instead, so the total is a lower bound
+  while that count is nonzero — the host never guesses a price.
+- Rows reconcile with the total: a record that cannot be attributed lands in a
+  row without `providerId`/`modelId` rather than being dropped.
+- Same grant (`usage.read`) and the same window rules as `listTurns`: default
+  30 days, at most 365, validated on both sides. Read-only; no write path.
+
 ### session collaboration (requires `desktop.control`)
 
 The official Session Orchestrator composes the reviewed desktop-control
