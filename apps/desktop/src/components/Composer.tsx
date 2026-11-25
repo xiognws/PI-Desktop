@@ -28,6 +28,7 @@ import { headAsk, queuedAskCount } from "../lib/pending-asks";
 import type { QueuedPrompt } from "../lib/queued-prompts";
 import { composerModelDisplayName, sameComposerModelId } from "../lib/composer-models";
 import { sessionFastModeActive } from "../lib/fast-mode-command";
+import { providerDisplayName } from "../lib/provider-display";
 import {
   resolveComposerThinkingProvider,
 } from "../lib/session-thinking";
@@ -323,11 +324,20 @@ export function Composer({
   // Smart mode's pair, from settings. `null` unless both halves are configured,
   // so a half-set template never becomes a selectable mode.
   const smartTemplate = smartTemplateFromSettings(settings);
+  const smartPairActive = (activeSession?.smartMode ?? null) !== null;
+  // Provider labels for the pair: the two halves may come from different providers,
+  // so the model ids alone are ambiguous once that is allowed.
+  const providerLabelOf = (id: string) => {
+    const candidate = providers.find((entry) => entry.id === id);
+    return candidate ? providerDisplayName(candidate) : "";
+  };
   const smartEntry = smartTemplate
     ? {
-        active: (activeSession?.smartMode ?? null) !== null,
+        active: smartPairActive,
         main: smartTemplate.main.modelId,
         sub: smartTemplate.sub.modelId,
+        mainProvider: providerLabelOf(smartTemplate.main.providerId),
+        subProvider: providerLabelOf(smartTemplate.sub.providerId),
       }
     : null;
   const draftConfiguration = useAppStore((s) => s.draftConfiguration);
@@ -404,9 +414,13 @@ export function Composer({
     configuredThinkingLevel,
   );
   const thinkingLabel = thinkingLevel;
-  const modelLabel = modelId
-    ? composerModelDisplayName(provider, modelId)
-    : t("chat.model");
+  // The chip names the mode, not the model: with a pair running, "which model"
+  // is a decision the router makes per turn, so showing one id would be a lie.
+  const modelLabel = smartPairActive
+    ? t("chat.smartModeEntry")
+    : modelId
+      ? composerModelDisplayName(provider, modelId)
+      : t("chat.model");
   const modelMenu = useComposerModelMenu({
     configureActiveSession,
     mode,

@@ -101,9 +101,22 @@ export function ComposerModelList({
   t, query, setQuery, modelSearchRef, modelListRef, modelGroups,
   modelHighlight, setModelHighlight, selectedProviderId, selectedModelId, selectModel,
   recentEntries, sections, activeSection, sectionStep, selectSection, showSectionRail, searching, paneRows,
-  onOpenModelSettings,
+  onOpenModelSettings, smartMode, onSelectSmartMode,
 }: {
   onOpenModelSettings?: () => void;
+  /**
+   * The app-wide model pair, when both halves are configured. It is a mode rather
+   * than a model, so it heads the recent group instead of joining the model rows:
+   * it answers "how does this chat run", which is the first thing a user changes.
+   */
+  smartMode?: {
+    active: boolean;
+    main: string;
+    sub: string;
+    mainProvider?: string;
+    subProvider?: string;
+  } | null;
+  onSelectSmartMode?: () => void;
   paneRows: number;
   recentEntries: Array<{ provider: ProviderPublic; model: ModelInfo }>;
   sections: ComposerModelSection[];
@@ -217,8 +230,39 @@ export function ComposerModelList({
           className="composer-model-pane"
           data-step={sectionStep === 0 ? undefined : sectionStep < 0 ? "back" : "forward"}
         >
-          {recentEntries.length > 0 ? (
+          {recentEntries.length > 0 || smartMode ? (
             <div className="composer-model-group" role="group" aria-label={t("chat.recentModels")}>
+              {smartMode && !searching ? (
+                <button
+                  type="button"
+                  className={`composer-plus-item composer-model-option ${smartMode.active ? "active" : ""}`}
+                  aria-pressed={smartMode.active}
+                  title={
+                    smartMode.mainProvider && smartMode.subProvider
+                      ? `${smartMode.mainProvider}/${smartMode.main} → ${smartMode.subProvider}/${smartMode.sub}`
+                      : `${smartMode.main} → ${smartMode.sub}`
+                  }
+                  onClick={() => onSelectSmartMode?.()}
+                >
+                  <span className="composer-model-option-main">
+                    <span className="composer-model-label">{t("chat.smartModeEntry")}</span>
+                    <span className="composer-model-option-meta">
+                      {smartMode.mainProvider ? (
+                        <span className="composer-model-option-provider">{smartMode.mainProvider}</span>
+                      ) : null}
+                      <span className="composer-model-option-provider">{smartMode.main}</span>
+                      <span aria-hidden="true">{" \u2192 "}</span>
+                      {smartMode.subProvider ? (
+                        <span className="composer-model-option-provider">{smartMode.subProvider}</span>
+                      ) : null}
+                      <span className="composer-model-option-provider">{smartMode.sub}</span>
+                    </span>
+                  </span>
+                  <span className="composer-model-check-slot" aria-hidden="true">
+                    {smartMode.active ? <IconCheck size={13} className="composer-model-check" /> : null}
+                  </span>
+                </button>
+              ) : null}
               {recentEntries.map(({ provider, model }, index) => (
                 <ModelRow
                   key={`${provider.id}:${model.modelId}`}

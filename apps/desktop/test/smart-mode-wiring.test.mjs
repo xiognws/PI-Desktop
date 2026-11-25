@@ -12,12 +12,13 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [launch, prompt, ipc, router, picker, hook, composer] = await Promise.all([
+const [launch, prompt, ipc, router, picker, list, hook, composer] = await Promise.all([
   read("../electron/main/runtime/session-launch.ts"),
   read("../electron/main/kernel/kernel-prompt.ts"),
   read("../electron/main/ipc/agent-ipc.ts"),
   read("../electron/main/runtime/smart-routing.ts"),
   read("../src/features/chat/composer/ComposerModelPicker.tsx"),
+  read("../src/features/chat/composer/ComposerModelList.tsx"),
   read("../src/features/chat/composer/hooks/useComposerModelMenu.ts"),
   read("../src/components/Composer.tsx"),
 ]);
@@ -61,8 +62,19 @@ test("a stuck cheap turn has a strong half to continue on", () => {
 });
 
 test("the composer can enter the mode and leave it", () => {
-  assert.match(picker, /chat\.smartModeEntry/);
+  // The row heads the recent group in the list; the picker only forwards the pair.
+  assert.match(list, /chat\.smartModeEntry/);
+  assert.match(list, /recentEntries\.length > 0 \|\| smartMode/);
+  assert.match(picker, /smartMode=\{smartMode\}/);
   assert.match(composer, /snapshotFromTemplate\(smartTemplate\)/);
   // Picking one model is picking one model: the mode must clear.
   assert.match(hook, /smartMode: null/);
+});
+
+test("the chip names the mode rather than one of its models", () => {
+  assert.match(composer, /const smartPairActive = /);
+  assert.match(composer, /const modelLabel = smartPairActive[\s\S]{0,120}chat\.smartModeEntry/);
+  // A pair may cross providers, so the row carries both labels.
+  assert.match(composer, /mainProvider: providerLabelOf\(smartTemplate\.main\.providerId\)/);
+  assert.match(composer, /subProvider: providerLabelOf\(smartTemplate\.sub\.providerId\)/);
 });
