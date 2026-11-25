@@ -4,6 +4,12 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const mainRoot = fileURLToPath(new URL("../../electron/main/", import.meta.url));
+/**
+ * Assertions spell multi-line snippets with `\n`. A checkout whose files carry
+ * CRLF would otherwise miss every such needle, so sources are normalized on the
+ * way in — line endings are not what a source-contract test is about.
+ */
+const normalize = (text) => text.replace(/\r\n/g, "\n");
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -27,7 +33,7 @@ export async function readMainSource() {
   const paths = await sourceFiles(mainRoot);
   const chunks = await Promise.all(
     paths.map(async (path) => {
-      const source = await readFile(path, "utf8");
+      const source = normalize(await readFile(path, "utf8"));
       return `\n/* ${relative(mainRoot, path)} */\n${source}`;
     }),
   );
@@ -35,7 +41,7 @@ export async function readMainSource() {
 }
 
 export async function readMainModule(relativePath) {
-  return readFile(join(mainRoot, relativePath), "utf8");
+  return normalize(await readFile(join(mainRoot, relativePath), "utf8"));
 }
 
 function sourceFilesSync(directory) {
@@ -50,10 +56,10 @@ function sourceFilesSync(directory) {
 
 export function readMainSourceSync() {
   return sourceFilesSync(mainRoot)
-    .map((path) => `\n/* ${relative(mainRoot, path)} */\n${readFileSync(path, "utf8")}`)
+    .map((path) => `\n/* ${relative(mainRoot, path)} */\n${normalize(readFileSync(path, "utf8"))}`)
     .join("\n");
 }
 
 export function readMainModuleSync(relativePath) {
-  return readFileSync(join(mainRoot, relativePath), "utf8");
+  return normalize(readFileSync(join(mainRoot, relativePath), "utf8"));
 }
