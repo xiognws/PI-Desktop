@@ -26,6 +26,8 @@
   "//io.github.w1ndys.pi-open-git-web": "Retired 2026-11-24: a one-command wrapper that opens the repository host's web page, already covered by shell.openExternal. Lost: that command.",
   "//local.terminal": "Retired 2026-11-24: the last shipped carrier of the shape the kernel work removed. spawn(\"python3\", [\"-c\", RELAY_SRC, cwd, cols, rows]) puts an entire Python program on a command line - the inline-interpreter-payload pattern - to build a PTY relay. It is also macOS-only in practice: the relay imports pty, termios, fcntl and pwd, spawns with a /usr/bin:/bin PATH, the IME helper returns unsupported outside darwin, and the package has no win32/conpty branch at all, so on Windows the panel cannot work even when enabled (it was already default-disabled there). Lost: the embedded xterm.js terminal panel on the platforms where it worked.",
   "//local.pi-bot": "Retired 2026-11-24: 7.67 MB, the second-largest bundled plugin and the only one still able to touch a capture device. renderer/speech-capture.mjs calls getUserMedia and is imported by voice.mjs, microphone-panel.mjs and attachment-upload.mjs, so opening the voice view asks for the microphone; the backend also starts powershell -File for DPAPI/OCR and opens loopback listeners for its MCP bridges. Its hidden microphone recorder had already been deleted at packaging time and the plugin shipped switched off on Windows - retiring it removes the capability instead of hiding it. Lost: the bot's browser-extension integration, voice input and its MCP bridges.",
+  "//com.vastsa.side-chat": "Retired 2026-11-25: the deployment asked for it out of the bundle. A second chat surface that reads the current session's transcript and posts a reply back into it costs a host plugin for a conversation the main transcript already covers. Lost: the docked side chat view and its reply-into-session action.",
+  "//io.github.muzimu217.session-import": "Retired 2026-11-25: the deployment asked for it out of the bundle, named for its second view (会话熔炉 / Session Forge). One plugin carried both surfaces, so retiring the plugin retires the importer with it. Lost: importing sessions from ZCode, WorkBuddy, Claude Code, Codex, OpenCode and Pi; the declarative JSON custom-source extension; the forge's distillation of those sessions into project conventions and reusable practices; both commands and their settings pages. Its session.import / project.create / agent.complete surfaces go with it.",
   "excluded": [
     "cn.star.jianying-assistant",
     "icedly.moyu-games",
@@ -69,6 +71,8 @@
     "io.github.w1ndys.pi-open-in-vscode",
     "io.github.w1ndys.pi-open-git-web",
     "local.terminal",
-    "local.pi-bot"
+    "local.pi-bot",
+    "com.vastsa.side-chat",
+    "io.github.muzimu217.session-import"
   ]
 }
