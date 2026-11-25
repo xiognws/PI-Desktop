@@ -11,6 +11,11 @@ import {
   guardNativePiSessionManager,
 } from "./native-pi-session-lease.js";
 
+// These tests walk real session directories, copy files and lease on disk: the
+// slowest case here runs in ~1.5s on an idle machine, so the default 5s ceiling
+// turns a busy worker into a red test that says nothing about the service.
+vi.setConfig({ testTimeout: 15_000 });
+
 const roots: string[] = [];
 
 beforeEach(() => {
