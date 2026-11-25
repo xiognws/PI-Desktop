@@ -58,7 +58,11 @@ function windowsAppUserModelId(): string | undefined {
   }
 }
 
-const windowsAumid = process.platform === "win32" ? windowsAppUserModelId() : undefined;
+// Windows groups taskbar buttons by app user model id. A portable build used to
+// leave it unset, so the button was grouped under Electron and painted with
+// Electron's icon no matter what resource the executable carried.
+const windowsAumid =
+  process.platform === "win32" ? (windowsAppUserModelId() ?? APP_ID) : undefined;
 if (windowsAumid) app.setAppUserModelId(windowsAumid);
 
 export const singleInstanceRequired = !dataDirWasExplicit;
