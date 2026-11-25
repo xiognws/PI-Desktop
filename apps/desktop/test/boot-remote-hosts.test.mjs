@@ -361,6 +361,9 @@ test("bootstrapHost closes its unadopted outcome when shutdown rejects its queue
     log: (_level, message) => { if (message === "ssh bootstrap completed") completed.resolve(); },
     tunnels: { close: async () => undefined, dispose: async () => undefined, adopt: async () => { adoptions++; } },
     sshBootstrap: {
+      // This build names no artifact feed (`PI_HOST_ARTIFACT_BASE_URL` is null
+      // on purpose), so provisioning tests have to point at one.
+      artifactBaseUrl: "https://artifacts.test/pi-host",
       buildTransport: () => ({
         exec: async () => ({ code: 0, stdout: "Linux\nx86_64\n", stderr: "" }),
         execWithInput: async () => ({ code: 0, stderr: "", stdout: `PI_HOST_READY ${JSON.stringify({ hostId: "host", host: "127.0.0.1", port: 1234, version })}\nPI_HOST_PAIRING_TOKEN ${JSON.stringify({ token: "fixture-token", expiresAt: 1893456000000 })}` }),
