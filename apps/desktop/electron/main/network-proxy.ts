@@ -30,6 +30,15 @@ import {
   startSystemProxyRelay,
   type SystemProxyRelay,
 } from "@pi-workspace/agent-runtime/system-proxy-relay";
+import { systemProxyRelayIfNeeded } from "./network-proxy-gate";
+
+/**
+ * A stable https URL to ask Chromium about. `resolveProxy` answers from the
+ * machine's own settings (a PAC script is evaluated locally), so this address is
+ * never contacted - it only has to be a URL a PAC rule would recognise as web
+ * traffic rather than something with a special-case answer.
+ */
+const SYSTEM_PROXY_PROBE_URL = "https://example.com/";
 
 const originalEnv = snapshotProxyEnv(process.env);
 let applied: NetworkProxySettings = { mode: "system" };
@@ -40,20 +49,46 @@ let relayUpstreamHref: string | null = null;
 let systemProxyRelay: SystemProxyRelay | null = null;
 let systemProxyRelayStart: Promise<SystemProxyRelay> | null = null;
 
-export async function ensureSystemProxyRelay(): Promise<string> {
-  if (!systemProxyRelay) {
-    const starting =
-      systemProxyRelayStart ??
-      (systemProxyRelayStart = startSystemProxyRelay((url) =>
-        session.defaultSession.resolveProxy(url),
-      ));
-    try {
-      systemProxyRelay = await starting;
-    } finally {
-      if (systemProxyRelayStart === starting) systemProxyRelayStart = null;
-    }
+export async function ensureSystemProxyRelay(
+  options: { force?: boolean } = {},
+): Promise<string> {
+  // `force` is for a caller that needs a tunnel regardless of the route: the
+  // provider-metadata retry borrows the relay to avoid a client certificate, and
+  // without one it has no fallback at all. Boot is not such a caller.
+  if (!options.force) {
+    return systemProxyRelayIfNeeded(
+      () => session.defaultSession.resolveProxy(SYSTEM_PROXY_PROBE_URL),
+      startSystemProxyRelayOnce,
+      process.env,
+    );
   }
-  return systemProxyRelay.url;
+  return startSystemProxyRelayOnce();
+}
+
+/**
+ * Start the relay and keep it, so the URL stays stable for the process lifetime.
+ *
+ * Memoised on the promise: two callers that arrive while the listener is binding
+ * must share one relay, and a failed start must not be cached as the answer.
+ */
+function startSystemProxyRelayOnce(): Promise<string> {
+  if (systemProxyRelay) return Promise.resolve(systemProxyRelay.url);
+  const starting =
+    systemProxyRelayStart ??
+    (systemProxyRelayStart = startSystemProxyRelay((url) =>
+      session.defaultSession.resolveProxy(url),
+    ));
+  return starting.then(
+    (relay) => {
+      systemProxyRelay = relay;
+      if (systemProxyRelayStart === starting) systemProxyRelayStart = null;
+      return relay.url;
+    },
+    (error) => {
+      if (systemProxyRelayStart === starting) systemProxyRelayStart = null;
+      throw error;
+    },
+  );
 }
 
 export function currentSystemProxyRelayUrl(): string | null {

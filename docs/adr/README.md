@@ -442,3 +442,4 @@ Each ADR includes:
 | 0405 | [Smart mode runs a conversation on a model pair](0405-smart-mode-model-pair.md) | Accepted for implementation |
 | 0406 | [Windows runs commands in Git Bash by default](0406-windows-default-git-bash.md) | Accepted (amends 0054, 0209) |
 | 0407 | [Bundled plugins stay plugins](0407-bundled-plugins-stay-plugins.md) | Accepted (related 0383, 0402) |
+| 0408 | [The system proxy relay starts only when the machine routes](0408-system-proxy-relay-gate.md) | Accepted (related 0177, 0406) |

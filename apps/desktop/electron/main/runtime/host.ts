@@ -485,9 +485,15 @@ export function createHostRuntime({
   runtimeState.host = h;
   try {
     await h.handshake();
-    await h.call("network.configureSystemProxyRelay", {
-      url: systemProxyRelayUrl,
-    });
+    // `ensureSystemProxyRelay` answers "" when the machine routes DIRECT, and
+    // host-core rejects an empty relay URL - so the call is skipped rather than
+    // sent. Nothing to configure is the correct state there: the children simply
+    // keep the direct route they already have.
+    if (systemProxyRelayUrl) {
+      await h.call("network.configureSystemProxyRelay", {
+        url: systemProxyRelayUrl,
+      });
+    }
     logger.app("runtime", "info", "host-core handshake ok", {
       data: { generation: h.generation },
     });
