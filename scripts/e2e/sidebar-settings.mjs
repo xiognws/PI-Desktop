@@ -144,7 +144,14 @@ export async function checkSidebarSettings({ cdp, check, waitFor, artifactDir })
 
   try {
     await cdp.evaluate("window.dispatchEvent(new Event('focus'))");
-    for (const platform of ["darwin", "win32", "linux"]) {
+    // Same rule as the layout suite: a platform emulation changes CSS classes
+    // only, and the material rules plus component rendering keep following the
+    // real platform. Assert on the running platform; others are opt-in through
+    // PI_LAYOUT_PLATFORMS on a genuine macOS or Linux runner.
+    const platforms = process.env.PI_LAYOUT_PLATFORMS
+      ? process.env.PI_LAYOUT_PLATFORMS.split(",").map((name) => name.trim()).filter(Boolean)
+      : [process.platform];
+    for (const platform of platforms) {
       for (const theme of ["dark", "light"]) {
         await cdp.evaluate(`Object.assign(document.documentElement.dataset, ${JSON.stringify({ platform, theme })})`);
         const home = await material('.sidebar');
