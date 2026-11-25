@@ -58,6 +58,11 @@ export function PythonSettingsSection() {
       // The app resolves the interpreter for the next launch, so the answer comes
       // back as a fresh status rather than being patched locally.
       setStatus(await api.pythonSetPath(path));
+      // The list is a scan result, not a list of choices: an interpreter added
+      // with "Browse" only appears once the scan runs again, and without this it
+      // looked like the pick had been refused.
+      const rescanned = await api.pythonScan();
+      setCandidates(rescanned.candidates);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -143,12 +148,9 @@ export function PythonSettingsSection() {
                   {candidate.version ? t("settings.pythonVersion", { version: candidate.version }) : "—"}
                   {" · "}
                   {t(SOURCE_LABEL[candidate.source])}
+                  {" · "}
+                  {t("settings.pythonLibraryCount", { count: String(candidate.libraryCount ?? 0) })}
                 </span>
-                <Badge tone={candidate.hasLibraries ? "neutral" : "warning"}>
-                  {candidate.hasLibraries
-                    ? t("settings.pythonHasLibraries")
-                    : t("settings.pythonMissingLibraries")}
-                </Badge>
               </button>
             );
           })}
