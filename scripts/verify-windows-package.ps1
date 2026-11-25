@@ -105,8 +105,9 @@ $py = Join-Path $Root 'resources\python\runtime\python.exe'
 $pyConfigured = $false
 $manifestPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'apps\desktop\package.json'
 if (Test-Path -LiteralPath $manifestPath) {
-  $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-  $pyConfigured = @($manifest.build.extraResources | Where-Object { $_ -match 'resources[/\\]python' }).Count -gt 0
+  # A plain text match, not ConvertFrom-Json: 5.1's parser throws on this manifest
+  # (duplicate dependency keys), and a failed parse would quietly disable the check.
+  $pyConfigured = (Get-Content -LiteralPath $manifestPath -Raw) -match 'resources[/\\]python'
 }
 if (Test-Path -LiteralPath $py) {
   $sig = Get-AuthenticodeSignature -LiteralPath $py
