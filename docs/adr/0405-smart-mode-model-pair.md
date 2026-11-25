@@ -64,11 +64,13 @@ session column is the whole meaning of off, and picking a plain model clears it
 ## Landing record
 
 The change was written in a checkout another session was also committing from, and
-it reached `main`'s branch in two commits that also carry that session's work:
-`49b46c649` (the feature itself, committed under the delegation-accessor subject)
-and `10e37dc01` (the session row's missing field, which is what made `host-core`
-build again). Read those two commits together when bisecting this decision; the
-message on either one describes a different change than this ADR does.
+it first landed in two commits that also carried that session's work. The commit
+messages were corrected afterwards on the user's instruction (trees unchanged,
+messages only): `7bb845d90` (the feature itself, originally committed under the
+delegation-accessor subject) and `259f01385` (the session row's missing field,
+which is what made `host-core` build again). Read those two commits together
+when bisecting this decision; the pre-relabel SHAs `49b46c649` and `10e37dc01`
+appear only in older checkouts of this branch.
 
 ## Consequences
 
