@@ -1,0 +1,16 @@
+scripts/bundled-plugins-default-disabled.json
+  h_201ed4c689ac8b 6-7
+scripts/bundled-plugins-excluded.json
+  h_201ed4c689ac8b 27-28,70-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c554d82d77e15462c2e247106dcf4b38ac02430b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
