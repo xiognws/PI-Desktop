@@ -20,6 +20,7 @@ import {
 } from "../plugin-runtime";
 import { PluginViewHost } from "../plugin-view-host";
 import { rendererCallError } from "../plugin-renderer-extension";
+import { callAfterHandshake } from "../host-handshake-retry.ts";
 import type { IpcRegistrar } from "./types";
 
 export type PluginIpcDependencies = {
@@ -199,8 +200,24 @@ export function registerPluginIpc({
     };
   };
   handle(IPC.invoke.pluginList, async () => {
-    if (!host) throw new Error("host unavailable");
-    const result = await host.call<{ plugins: any[] }>("plugins.list");
+    // The shell mounts before host-core has finished its handshake, and this is
+    // the first host call it makes. One refusal here used to leave the plugin
+    // list empty for the rest of the session — no sidebar entries, no panels —
+    // and reached the renderer as an unhandled rejection the user reads as a
+    // crash. The host is up seconds later, so wait for it: a cold start takes
+    // several seconds on a loaded machine, and only that race is retried.
+    const result = await callAfterHandshake(
+      async () => {
+        // `getHost()` first, every attempt: the captured handle may belong to a
+        // host generation that already closed, and retrying that one would never
+        // succeed. The captured handle is only the fallback for a fleet whose
+        // registrar wired `getHost` late.
+        const current = getHost() ?? host;
+        if (!current) throw new Error("host-core is unavailable");
+        return current.call<{ plugins: any[] }>("plugins.list");
+      },
+      { attempts: 40, delayMs: 250 },
+    );
     rememberPluginScopes(result.plugins ?? []);
     const pluginsWithSettings = await Promise.all(
       (result.plugins ?? []).map(async (plugin) => {

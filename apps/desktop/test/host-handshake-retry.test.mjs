@@ -107,3 +107,29 @@ test("the corner controller waits instead of warning on every cold start", async
     /host-core handshake ok"[\s\S]{0,400}reapplyWindowCorners\(\);/,
   );
 });
+
+test("the plugin list waits for the host instead of reporting it as broken", async () => {
+  const pluginIpc = await read("../electron/main/ipc/plugin-ipc.ts");
+  assert.match(pluginIpc, /import \{ callAfterHandshake \} from "\.\.\/host-handshake-retry\.ts";/);
+  // The first host call the shell makes on a cold start is this one, so it has to
+  // wait the handshake out — and the null-host half of the race must be thrown
+  // inside the retried call, or it still fails on the first attempt.
+  assert.match(pluginIpc, /await callAfterHandshake\(/);
+  assert.match(
+    pluginIpc,
+    /const current = getHost\(\) \?\? host;\s*if \(!current\) throw new Error\("host-core is unavailable"\);/,
+  );
+  assert.match(pluginIpc, /current\.call<\{ plugins: any\[\] \}>\("plugins\.list"\)/);
+  // A cold start on a loaded machine took ~8s in the field; a one-second budget
+  // would still hand the shell an empty list.
+  const budget = /\{ attempts: (\d+), delayMs: (\d+) \}/.exec(pluginIpc);
+  assert.ok(budget, "the plugin list retry must state its budget");
+  assert.ok(
+    Number(budget[1]) * Number(budget[2]) >= 5000,
+    `the retry budget must cover a slow cold start, got ${budget[1]}x${budget[2]}ms`,
+  );
+  // The store keeps the previous list and warns instead of raising an unhandled
+  // rejection the shell paints as a red error box.
+  const store = await read("../src/stores/slices/catalog-slice.ts");
+  assert.match(store, /catch \(error\) \{\s*console\.warn\("\[plugins\] list refresh failed"/);
+});

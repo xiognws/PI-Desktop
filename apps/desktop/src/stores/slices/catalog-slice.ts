@@ -171,8 +171,16 @@ export function createCatalogSlice({
       const existing = catalogRuntime.getPluginRefresh();
       if (existing) return existing;
       const load = (async () => {
-        const plugins = await api.listPlugins();
-        set({ plugins: plugins.plugins });
+        // Main waits out the host-core handshake for this call, so a rejection
+        // here means the host is genuinely down. Keeping the previous list and
+        // recording a warning beats an unhandled rejection, which the shell
+        // paints as a red error box the user reads as a crash.
+        try {
+          const plugins = await api.listPlugins();
+          set({ plugins: plugins.plugins });
+        } catch (error) {
+          console.warn("[plugins] list refresh failed", error);
+        }
       })();
       catalogRuntime.setPluginRefresh(load);
       try {
