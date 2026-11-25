@@ -28,6 +28,8 @@
   "//local.pi-bot": "Retired 2026-11-24: 7.67 MB, the second-largest bundled plugin and the only one still able to touch a capture device. renderer/speech-capture.mjs calls getUserMedia and is imported by voice.mjs, microphone-panel.mjs and attachment-upload.mjs, so opening the voice view asks for the microphone; the backend also starts powershell -File for DPAPI/OCR and opens loopback listeners for its MCP bridges. Its hidden microphone recorder had already been deleted at packaging time and the plugin shipped switched off on Windows - retiring it removes the capability instead of hiding it. Lost: the bot's browser-extension integration, voice input and its MCP bridges.",
   "//com.vastsa.side-chat": "Retired 2026-11-25: the deployment asked for it out of the bundle. A second chat surface that reads the current session's transcript and posts a reply back into it costs a host plugin for a conversation the main transcript already covers. Lost: the docked side chat view and its reply-into-session action.",
   "//io.github.muzimu217.session-import": "Retired 2026-11-25: the deployment asked for it out of the bundle, named for its second view (会话熔炉 / Session Forge). One plugin carried both surfaces, so retiring the plugin retires the importer with it. Lost: importing sessions from ZCode, WorkBuddy, Claude Code, Codex, OpenCode and Pi; the declarative JSON custom-source extension; the forge's distillation of those sessions into project conventions and reusable practices; both commands and their settings pages. Its session.import / project.create / agent.complete surfaces go with it.",
+  "//adoin.panel.anywhere": "Retired 2026-11-25: the deployment asked for it out of the bundle — this is the plugin the plugin page lists as \"Agents Anywhere 远程连接\". It holds a standing outbound WebSocket from the app to api.agents-anywhere.com / web.agents-anywhere.com and gives that server the workspace chat, the session list and the approval prompts, so a deployment that does not use the service keeps a remote-control surface open for nothing. Lost: the connection-settings panel, its connector, its per-project profiles and the remote approval channel.",
+  "//pi.agents-anywhere": "Retired 2026-11-25: the deployment asked for it out of the bundle — this is the earlier carrier of the same bridge, listed as \"Agents Anywhere 远程助手\". Keeping it would re-open the outbound socket the panel above gives up, from a second process with its own sandbox. Lost: phone/web remote viewing of a Pi session, remote questions and remote approval.",
   "excluded": [
     "cn.star.jianying-assistant",
     "icedly.moyu-games",
@@ -73,6 +75,8 @@
     "local.terminal",
     "local.pi-bot",
     "com.vastsa.side-chat",
-    "io.github.muzimu217.session-import"
+    "io.github.muzimu217.session-import",
+    "adoin.panel.anywhere",
+    "pi.agents-anywhere"
   ]
 }
