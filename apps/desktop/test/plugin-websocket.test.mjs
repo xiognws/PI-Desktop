@@ -301,10 +301,20 @@ test("a timed-out connect refuses and leaves nothing behind", async () => {
     connectTimeoutMs: 20,
   });
 
-  await assert.rejects(
-    registry.connect({ pluginId: PLUGIN_ID, url: "wss://voice.example.com/live" }),
-    (error) => error.code === "TIMEOUT",
-  );
+  // The registry unrefs its connect timer on purpose — a socket timeout must not
+  // keep the host process alive. That leaves this test as the only pending work,
+  // so the event loop would drain and the runner would cancel the case instead of
+  // letting the timer fire; the interval holds the loop for the wait and is
+  // cleared as soon as the rejection lands.
+  const keepLoopAlive = setInterval(() => {}, 25);
+  try {
+    await assert.rejects(
+      registry.connect({ pluginId: PLUGIN_ID, url: "wss://voice.example.com/live" }),
+      (error) => error.code === "TIMEOUT",
+    );
+  } finally {
+    clearInterval(keepLoopAlive);
+  }
   assert.deepEqual(registry.list(PLUGIN_ID), []);
   assert.deepEqual(transport.calls.terminates, ["wss://voice.example.com/live"]);
 });
