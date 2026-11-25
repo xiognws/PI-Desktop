@@ -441,3 +441,4 @@ Each ADR includes:
 | 0404 | [Abort releases tools, but the provider loop can still run](0404-turn-abort-provider-traffic.md) | Accepted (limitation recorded; upstream fix pending) |
 | 0405 | [Smart mode runs a conversation on a model pair](0405-smart-mode-model-pair.md) | Accepted for implementation |
 | 0406 | [Windows runs commands in Git Bash by default](0406-windows-default-git-bash.md) | Accepted (amends 0054, 0209) |
+| 0407 | [Bundled plugins stay plugins](0407-bundled-plugins-stay-plugins.md) | Accepted (related 0383, 0402) |
