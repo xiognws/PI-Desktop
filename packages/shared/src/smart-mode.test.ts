@@ -32,6 +32,17 @@ const signals = (patch: Partial<SmartTurnSignals> = {}): SmartTurnSignals => ({
   ...patch,
 });
 
+/**
+ * The turn router as an opt-in policy.
+ *
+ * Routing whole turns to the cheap model is no longer the default — the main
+ * model supervises and delegates the execution instead — so every routing rule
+ * below has to ask for the router explicitly.
+ */
+const ROUTING_ON = { ...DEFAULT_SMART_POLICY, turnRouting: true };
+const routeTurn = (patch: Partial<SmartTurnSignals> = {}) =>
+  decideTurnTier(signals(patch), ROUTING_ON);
+
 describe("smart mode policy normalization", () => {
   it("keeps defaults for a missing policy and clamps an unreasonable one", () => {
     expect(normalizeSmartPolicy(null)).toEqual(DEFAULT_SMART_POLICY);
@@ -67,6 +78,19 @@ describe("smart mode policy normalization", () => {
 });
 
 describe("turn routing", () => {
+  it("keeps every turn on the main model unless the router is switched on", () => {
+    // The pair's default shape: the main model owns the turn and supervises,
+    // `Task` on the cheap half does the execution. A whole turn only leaves the
+    // main model when the user opts into routing.
+    expect(DEFAULT_SMART_POLICY.turnRouting).toBe(false);
+    expect(DEFAULT_SMART_POLICY.delegateToSub).toBe(true);
+    expect(decideTurnTier(signals())).toEqual({ tier: "main", reason: "smart-off" });
+    expect(decideTurnTier(signals({ prompt: "重构这个模块的分层" }))).toEqual({
+      tier: "main",
+      reason: "smart-off",
+    });
+  });
+
   const cases: Array<[string, Partial<SmartTurnSignals>, string]> = [
     ["an explicit tier outranks every rule", { override: "sub", prompt: "重构整个模块" }, "sub"],
     ["the first turn starts cheap", { turnIndex: 0, prompt: "你好" }, "sub"],
@@ -76,55 +100,55 @@ describe("turn routing", () => {
   ];
 
   it.each(cases)("%s", (_label, patch, tier) => {
-    expect(decideTurnTier(signals(patch)).tier).toBe(tier);
+    expect(routeTurn(patch).tier).toBe(tier);
   });
 
   it("routes a short mechanical prompt to the cheap model", () => {
-    expect(decideTurnTier(signals({ prompt: "把这段话翻译成英文：今天天气不错" }))).toEqual({
+    expect(routeTurn({ prompt: "把这段话翻译成英文：今天天气不错" })).toEqual({
       tier: "sub",
       reason: "mechanical-intent",
     });
-    expect(decideTurnTier(signals({ prompt: "谢谢，很有帮助" }))).toEqual({
+    expect(routeTurn({ prompt: "谢谢，很有帮助" })).toEqual({
       tier: "sub",
       reason: "simple-turn",
     });
   });
 
   it("keeps judgement on the strong model", () => {
-    expect(decideTurnTier(signals({ prompt: "为什么这个测试会间歇失败" }))).toEqual({
+    expect(routeTurn({ prompt: "为什么这个测试会间歇失败" })).toEqual({
       tier: "main",
       reason: "heavy-intent",
     });
-    expect(decideTurnTier(signals({ prompt: "重构这个模块的分层" })).tier).toBe("main");
-    expect(decideTurnTier(signals({ prompt: "design a migration for the settings store" })).tier).toBe("main");
+    expect(routeTurn({ prompt: "重构这个模块的分层" }).tier).toBe("main");
+    expect(routeTurn({ prompt: "design a migration for the settings store" }).tier).toBe("main");
   });
 
   it("starts code, tool and follow-up work on the cheap model", () => {
     // Length is not difficulty and a shell command is not judgement: these all
     // begin cheap, and a stalled turn escalates inside itself.
-    expect(decideTurnTier(signals({ prompt: "看看 src/app.ts 里的实现" }))).toEqual({
+    expect(routeTurn({ prompt: "看看 src/app.ts 里的实现" })).toEqual({
       tier: "sub",
       reason: "code-prompt",
     });
-    expect(decideTurnTier(signals({ prompt: "```ts\nconst a = 1\n```" })).tier).toBe("sub");
-    expect(decideTurnTier(signals({ prompt: "跑一下测试" }))).toEqual({
+    expect(routeTurn({ prompt: "```ts\nconst a = 1\n```" }).tier).toBe("sub");
+    expect(routeTurn({ prompt: "跑一下测试" })).toEqual({
       tier: "sub",
       reason: "tool-intent",
     });
-    expect(decideTurnTier(signals({ prompt: "谢谢", previousTurnUsedTools: true }))).toEqual({
+    expect(routeTurn({ prompt: "谢谢", previousTurnUsedTools: true })).toEqual({
       tier: "sub",
       reason: "tool-followup",
     });
     // The first turn is an instruction, not a hard task.
-    expect(decideTurnTier(signals({ prompt: "先看看仓库结构", turnIndex: 0 }))).toEqual({
+    expect(routeTurn({ prompt: "先看看仓库结构", turnIndex: 0 })).toEqual({
       tier: "sub",
       reason: "first-turn",
     });
   });
 
   it("pays for size only when the prompt is genuinely a big job", () => {
-    expect(decideTurnTier(signals({ prompt: "x".repeat(700) })).tier).toBe("sub");
-    expect(decideTurnTier(signals({ prompt: "x".repeat(DEFAULT_SMART_POLICY.mainPromptChars + 1) }))).toEqual({
+    expect(routeTurn({ prompt: "x".repeat(700) }).tier).toBe("sub");
+    expect(routeTurn({ prompt: "x".repeat(DEFAULT_SMART_POLICY.mainPromptChars + 1) })).toEqual({
       tier: "main",
       reason: "long-prompt",
     });
@@ -145,16 +169,16 @@ describe("turn routing", () => {
       "帮我把这个函数改名",
       "谢谢",
     ];
-    const tiers = prompts.map((prompt, index) => decideTurnTier(signals({ prompt, turnIndex: index })).tier);
+    const tiers = prompts.map((prompt, index) => routeTurn({ prompt, turnIndex: index }).tier);
     const main = tiers.filter((tier) => tier === "main").length;
     expect(main).toBeLessThanOrEqual(2);
   });
 
   it("stays on the strong model when the cheap half is unusable", () => {
-    const decision = decideTurnTier(signals({ prompt: "谢谢", subAvailable: false }));
+    const decision = routeTurn({ prompt: "谢谢", subAvailable: false });
     expect(decision).toEqual({ tier: "main", reason: "simple-turn", downgradedFrom: "sub" });
     // An explicit override is the user's call, not the router's to overrule.
-    expect(decideTurnTier(signals({ prompt: "谢谢", subAvailable: false, override: "sub" })).tier).toBe("sub");
+    expect(routeTurn({ prompt: "谢谢", subAvailable: false, override: "sub" }).tier).toBe("sub");
   });
 
   it("turns routing off without turning smart mode off", () => {
@@ -207,14 +231,14 @@ describe("the app-wide pair", () => {
     expect(template?.main).toEqual({ providerId: "strong", modelId: "strong-1" });
     expect(template?.policy.turnRouting).toBe(false);
     expect(template?.policy.delegateToSub).toBe(false);
-    // An unset switch keeps the default; only an explicit `false` turns it off.
-    expect(
-      smartTemplateFromSettings({
-        smartModeMainProviderId: "a",
-        smartModeMainModelId: "a-1",
-        smartModeSubProviderId: "b",
-        smartModeSubModelId: "b-1",
-      })?.policy.turnRouting,
-    ).toBe(true);
+    // An unset switch keeps the default: routing off, delegation on.
+    const fromSettings = smartTemplateFromSettings({
+      smartModeMainProviderId: "a",
+      smartModeMainModelId: "a-1",
+      smartModeSubProviderId: "b",
+      smartModeSubModelId: "b-1",
+    });
+    expect(fromSettings?.policy.turnRouting).toBe(false);
+    expect(fromSettings?.policy.delegateToSub).toBe(true);
   });
 });

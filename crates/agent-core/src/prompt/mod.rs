@@ -482,6 +482,9 @@ mod tests {
         // hand mechanical steps over, and check what comes back.
         assert!(section.contains("`Task`"));
         assert!(section.contains("verify it against that step's goal"));
+        // And the rule a routed turn learned the hard way: a turn that only
+        // announces the next step ends with the work undone.
+        assert!(section.contains("Never end a turn by announcing the next step"));
         // Last, like activation: the tier changes and must not invalidate the
         // cached prefix of the sections before it.
         assert_eq!(

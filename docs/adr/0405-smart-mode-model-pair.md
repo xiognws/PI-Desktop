@@ -103,6 +103,29 @@ being right the first time. What it buys: the strong half becomes an orchestrato
 whose own tokens are spent on judgement, and the bulk of tool work runs on the
 cheap half — the split the pair exists for.
 
+## Amendment 2026-11-25 (second) — supervision is the default, routing is the experiment
+
+Sub-first routing was measured on the long session it was meant for, and it fails
+where it matters. A cheap turn that answers with a sentence ("let me look at
+…") instead of calling a tool ends the turn — a turn ends when the model stops
+calling tools — and nothing escalates, because escalation only watches a turn
+that is still running. The strong half, which is supposed to own the work, never
+sees it. In that session all six turns were routed to `sub` and two of them ended
+that way, with the user typing 继续 to restart work that had never started.
+
+So the pair's supported shape is the one it was designed around: **the main model
+supervises, the sub model executes.** `turnRouting` now defaults to `false`.
+Every turn stays on `main`, `delegateToSub` stays on, and `Task` without `model`
+runs on the cheap half, so execution is the delegated path and every report comes
+back to the model that owns the turn. Whole-turn routing stays behind the switch
+it always was — a way to measure that trade-off, not the default — and the
+orchestrator section gained one rule: never end a turn by announcing the next
+step; dispatch the `Task` or call the tool in the same reply.
+
+A session that already carries a snapshot keeps the policy it froze, so the pair
+has to be selected again — or the session re-created — before it picks up the new
+default.
+
 ## Consequences
 
 - New optional column `sessions.smart_mode_json` (v33→v34, additive, NULL=off) and

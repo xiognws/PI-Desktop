@@ -980,8 +980,18 @@ answers; `sub` takes mechanical turns and delegated work. ADR 0405.
 - **Sub availability.** The cheap half must be enabled, reachable (`baseUrl`),
   listed on its provider and able to sign a request. Otherwise the turn stays on
   `main` and the decision records `downgradedFrom: "sub"`.
-- **In-turn escalation.** A `sub` turn hands the rest of itself to `main` when
-  it is stuck: `afterToolErrors` consecutive tool failures, or
+- **Supervision is the default.** With `turnRouting` off — the default — every
+  turn stays on `main`: the strong model owns the turn, and the pair's `sub`
+  binding is reached only through `Task` (`delegationDefaultModel`). Its prompt
+  carries the `smart_orchestrator` section: state the goal, decompose into
+  checkable steps, hand the mechanical ones to the cheap half, verify each report
+  before the next step, take a step over when it stalls, and never end a turn by
+  announcing the next step. Routing whole turns to the cheap half is an opt-in
+  cost experiment, because a routed turn that stalls has no supervisor: it ends
+  where a turn always ends — when the model stops calling tools — and nothing
+  escalates a turn that is no longer running.
+- **In-turn escalation.** With routing on, a `sub` turn hands the rest of itself
+  to `main` when it is stuck: `afterToolErrors` consecutive tool failures, or
   `afterBudgetUsed` of the step budget spent when the launch named a ceiling
   (`stepBudget`; none is named by default — §5 of `02-agent-runtime.md`). The launch carries the strong
   half's provider spec, so the kernel continues with the same transcript and one

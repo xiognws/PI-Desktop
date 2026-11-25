@@ -140,10 +140,10 @@ export function AgentBehaviorSettings({
           description={t("settings.smartModeTurnRoutingDesc")}
         >
           <SettingsToggle
-            checked={settings.smartModeTurnRouting !== false}
+            checked={settings.smartModeTurnRouting === true}
             label={t("settings.smartModeTurnRouting")}
             onChange={() =>
-              void saveSettings({ smartModeTurnRouting: settings.smartModeTurnRouting === false })
+              void saveSettings({ smartModeTurnRouting: settings.smartModeTurnRouting !== true })
             }
           />
         </SettingsRow>

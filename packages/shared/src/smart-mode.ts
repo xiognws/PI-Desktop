@@ -38,7 +38,11 @@ export type SmartTier = "main" | "sub";
  * is a data migration rather than a refactor.
  */
 export type SmartRouteReason =
-  /** Smart mode is off for this session (no snapshot, or turn routing disabled). */
+  /**
+   * The turn stays on the main model: no snapshot, or turn routing disabled.
+   * The name predates the supervisor/worker split and is kept because these
+   * strings are logged and counted.
+   */
   | "smart-off"
   /** The user named the tier for this turn. */
   | "user-override"
@@ -72,8 +76,11 @@ export type SmartRouteReason =
 /** Turn-level policy. Every field has a default; the renderer edits a copy. */
 export type SmartModePolicy = {
   /**
-   * Route whole turns to the sub model. Off keeps every turn on the main model
-   * and leaves only delegation routing, which is the conservative setting.
+   * Route whole turns to the sub model. Off — the default — keeps every turn on
+   * the main model, which supervises and delegates the execution to the sub
+   * model through `Task`. Switching it on hands entire turns to the cheap model
+   * instead: a cost experiment, not the intended shape, because nothing
+   * supervises a cheap turn that stalls.
    */
   turnRouting: boolean;
   /** Consecutive tool failures inside a sub turn that escalate it. */
@@ -96,14 +103,22 @@ export type SmartModePolicy = {
 };
 
 /**
- * The defaults are deliberately sub-first: the strong model is paid for a prompt
- * that asks for judgement (refactor, debug, architecture), for a job too large to
- * be a quick exchange, or for a turn the cheap model has already stalled on. Every
- * other turn starts cheap and escalates by itself if it gets stuck, which is what
- * keeps the split near one strong turn in five.
+ * The pair is a supervisor and a worker, not two turn routers.
+ *
+ * The main model owns every turn: it holds the plan, makes the calls that need
+ * judgement or deep reasoning, and supervises the rest. The work itself —
+ * searching, reading, running commands, editing — goes to the sub model through
+ * `Task`, and every report comes back to the main model for review. That is what
+ * `delegateToSub` configures, and it is on by default.
+ *
+ * Routing whole turns to the cheap half is therefore off by default. It was the
+ * first shape of this feature and it failed in the field: a cheap turn that
+ * answered with a sentence instead of calling a tool ended the turn, nothing
+ * escalated, and the strong half never saw the work it was supposed to own. The
+ * switch stays for measuring that trade-off, not as a supported default.
  */
 export const DEFAULT_SMART_POLICY: SmartModePolicy = {
-  turnRouting: true,
+  turnRouting: false,
   escalateAfterToolErrors: 2,
   escalateAfterBudgetUsed: 0.6,
   stickyMainTurns: 1,
