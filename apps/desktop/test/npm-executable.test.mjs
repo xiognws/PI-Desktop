@@ -178,7 +178,9 @@ test("missing default npm and missing default Node produce structured unavailabl
   assert.equal(missingNode.reason, "npm-unavailable");
 });
 
-test("npm --version nonzero and timeout reject the selected tool", { timeout: 15_000 }, async (t) => {
+// The validation budget is ten seconds and the Windows process-tree teardown
+// costs ~3s on this host, so the case needs its own generous ceiling.
+test("npm --version nonzero and timeout reject the selected tool", { timeout: 60_000 }, async (t) => {
   const bad = fixture(t, "process.stderr.write('broken tool'); process.exit(2);");
   const failed = await validateNpmExecutable(bad.npm);
   assert.equal(failed.ok, false);
@@ -188,7 +190,7 @@ test("npm --version nonzero and timeout reject the selected tool", { timeout: 15
   const result = await validateNpmExecutable(slow.npm);
   assert.equal(result.ok, false);
   assert.match(result.error, /exceeded .*ms/);
-  assert.ok(Date.now() - started < 12_000);
+  assert.ok(Date.now() - started < 20_000, "the default validation budget must fire");
   assert.equal(existsSync(calls(slow)[0].cwd), false);
 });
 
@@ -300,7 +302,14 @@ test("short install budgets cap validation and include its time in both install 
   const started = Date.now();
   const result = await installExtensionDependencies(slow.plugin, { npmPath: slow.npm, timeoutMs: 150 });
   assert.equal(result.reason, "npm-unavailable");
-  assert.ok(Date.now() - started < 2_000, "validation does not consume its default five seconds");
+  // The budget kills the child, but tearing down the Windows process tree costs
+  // ~3s on this host (measured 3294 ms for a 150 ms budget), so the window is
+  // set to prove containment relative to the ten-second default, not to assert
+  // that teardown is free.
+  assert.ok(
+    Date.now() - started < 6_000,
+    "validation must not consume its default ten-second timeout",
+  );
   const f = fixture(t, "if (args[0] === '--version') Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);");
   const budgets = [];
   // Validation spawns two real processes, so these short budgets only prove the
