@@ -138,10 +138,10 @@ export class NativeAudioPlayer {
           });
           proc.on('spawn', () => safeResolve(true));
         } else if (platform === 'win32') {
-          // Windows PowerShell SoundPlayer with strictly escaped single quotes
-          const escapedPath = soundPath.replace(/'/g, "''");
-          const script = `(New-Object Media.SoundPlayer '${escapedPath}').PlaySync()`;
-          const proc = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+          // Static script on disk, sound path as argv: an inline `-Command` string would
+          // make the interpreter carry its payload on the command line (see the AV notes).
+          const scriptPath = path.join(__dirname, 'play-sound.ps1');
+          const proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, soundPath], {
             stdio: 'ignore',
             detached: true
           });
