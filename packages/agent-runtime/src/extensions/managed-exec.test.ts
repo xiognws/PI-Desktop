@@ -1,3 +1,4 @@
+import { testTempRoot } from "../test-temp-root.js";
 import { mkdtempSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,7 +6,7 @@ import { expect, it } from "vitest";
 import { managedExec } from "./managed-exec.js";
 
 it("cancels an owned process tree after an explicit readiness signal", async () => {
-  const root = mkdtempSync(join(tmpdir(), "pi-owned-exec-"));
+  const root = mkdtempSync(join(testTempRoot(), "pi-owned-exec-"));
   const ready = join(root, "ready.json");
   const owner = new AbortController();
   const childSource = `require('node:fs').writeFileSync(${JSON.stringify(ready)}, JSON.stringify([process.ppid,process.pid])); setInterval(()=>{},1000);`;
@@ -28,10 +29,10 @@ it("cancels an owned process tree after an explicit readiness signal", async () 
 
 it("never starts an already-cancelled exec and keeps normal command output", async () => {
   const owner = new AbortController();
-  expect(await managedExec(process.execPath, ["-e", "process.stdout.write('ok')"], tmpdir(), owner.signal))
+  expect(await managedExec(process.execPath, ["-e", "process.stdout.write('ok')"], testTempRoot(), owner.signal))
     .toMatchObject({ stdout: "ok", code: 0, killed: false, truncated: false });
   owner.abort();
-  expect(() => managedExec(process.execPath, ["-e", "process.exit(9)"], tmpdir(), owner.signal))
+  expect(() => managedExec(process.execPath, ["-e", "process.exit(9)"], testTempRoot(), owner.signal))
     .toThrow();
 });
 
@@ -39,7 +40,7 @@ it("decodes a multi-byte character split across output chunks", async () => {
   const owner = new AbortController();
   // "中" is three UTF-8 bytes; write them as two separate chunks.
   const source = "const b=Buffer.from('中文');process.stdout.write(b.subarray(0,1));setTimeout(()=>process.stdout.write(b.subarray(1)),50);";
-  expect(await managedExec(process.execPath, ["-e", source], tmpdir(), owner.signal))
+  expect(await managedExec(process.execPath, ["-e", source], testTempRoot(), owner.signal))
     .toMatchObject({ stdout: "中文", code: 0, killed: false, truncated: false });
 });
 
@@ -62,7 +63,7 @@ it("drops an incomplete UTF-8 suffix at the truncation boundary", async () => {
 
 it("resolves a missing executable as a failed command with the spawn error", async () => {
   const owner = new AbortController();
-  const result = await managedExec("pi-desktop-missing-executable-e2e", [], tmpdir(), owner.signal);
+  const result = await managedExec("pi-desktop-missing-executable-e2e", [], testTempRoot(), owner.signal);
   expect(result.code).toBe(1);
   expect(result.truncated).toBe(false);
   expect(result.stderr).toContain("ENOENT");

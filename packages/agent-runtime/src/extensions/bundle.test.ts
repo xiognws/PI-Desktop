@@ -15,6 +15,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 let work: string;
 
 beforeEach(() => {
+  // Deliberately the platform temp directory, not `testTempRoot()`: the
+  // typebox case below asserts the bundle does not resolve from above it, which
+  // a path under the repository would satisfy through the repo's node_modules.
+  // A host whose endpoint agent blocks writes outside the workspace cannot run
+  // this file at all - the spawn fails before the assertion is reached.
   work = mkdtempSync(join(tmpdir(), "pi-ext-bundle-"));
 });
 

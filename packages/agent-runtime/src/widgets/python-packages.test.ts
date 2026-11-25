@@ -7,6 +7,7 @@
  * and these tests must pass on a machine with no Python installed. What they pin
  * down is the contract, not the language.
  */
+import { testTempRoot } from "../test-temp-root.js";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,7 +26,7 @@ let root: string;
 let registries: WidgetRegistry[];
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "pi-widget-py-"));
+  root = mkdtempSync(join(testTempRoot(), "pi-widget-py-"));
   registries = [];
 });
 

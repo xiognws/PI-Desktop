@@ -2,6 +2,9 @@ import { once } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+// esbuild stages real output; the platform temp directory is blocked on a
+// managed Windows host, so tests stage inside the repository instead.
+import { testTempRoot } from "../src/test-temp-root.js";
 import { deflateSync } from "node:zlib";
 import { Worker } from "node:worker_threads";
 import { expect, it } from "vitest";
@@ -42,7 +45,7 @@ function onePixelPng() {
 }
 
 it("bundles a runnable image-resize worker and its Photon WASM asset", async () => {
-  const root = await mkdtemp(join(tmpdir(), "pi-runtime-image-resize-"));
+  const root = await mkdtemp(join(testTempRoot(), "pi-runtime-image-resize-"));
   const bundle = join(root, "bundle");
 
   try {

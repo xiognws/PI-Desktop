@@ -74,6 +74,7 @@ apps/desktop/resources/manual/
 electron.vite.config.*.mjs
 
 .playwright-cli
+.pi-test-tmp/
 worktrees
 .worktrees/
 
