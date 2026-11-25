@@ -1,0 +1,14 @@
+docs/adr/0405-smart-mode-model-pair.md
+  h_201ed4c689ac8b 67-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bb18f963dfa424bd770634c7460e64f40f522282",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
