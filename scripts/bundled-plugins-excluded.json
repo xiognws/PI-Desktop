@@ -16,6 +16,7 @@
   "//community.workbuddy-connect": "Retired 2026-11-14: WorkBuddy is a built-in provider now (ADR 0397). The app starts the very same bridge out of apps/desktop/resources/in-app-providers and registers the provider row itself, so the plugin is a second gateway for one account - it cannot bind the loopback port the app owns, and a user who still has it enabled gets a provider row pointing at a key that is not theirs. The plugin's dashboard and its credential directory (~/.pi-workbuddy-connect) stay in use by the in-app gateway.",
   "//duplicate-browser": "Retired 2026-11-06: pi.browser is the tracked browser plugin; a second browser plugin doubles the CDP surface for no extra capability.",
   "//market-translator": "Retired 2026-11-06: the marketplace feed is not reachable from this deployment, so a catalog translator has nothing to translate.",
+  "//billion-context": "Retired 2026-11-24: the function is already in the kernel, and the plugin's implementation is the shape this deployment gets flagged for. crates/agent-core/src/aging.rs ages old tool results inside the request (tool output measured at 94.6% of a 40-turn transcript's tokens) once the window is under pressure, and crates/agent-core/src/compaction.rs asks the model for a checkpoint summary with a retained-tail fallback, chunking and a re-anchor directive - the same class of capability, with no extra process. The plugin added an out-of-process compressor instead: a detached node proxy daemon, a loopback listener, global fetch/WebSocket interception and request-body rewriting. That daemon is what the endpoint agent reported on this machine - 9 x 4662 events with Confidence 00000006 on 2026-11-24, one of them escalating into the PDM verdict that quarantined the app. Lost capability: the upstream SQLite-backed folding store and its per-range bookkeeping, which survived restarts independently of the transcript. Nothing is lost from the conversation itself - the kernel keeps every message and re-derives the request on each send.",
   "excluded": [
     "cn.star.jianying-assistant",
     "icedly.moyu-games",
@@ -49,6 +50,7 @@
     "io.github.wenziji-hub.market-translator",
     "community.workbuddy-connect",
     "pi.clipboard-history",
-    "cn.star.computer-use"
+    "cn.star.computer-use",
+    "billion-context"
   ]
 }
