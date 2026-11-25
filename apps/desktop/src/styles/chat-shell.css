@@ -214,7 +214,7 @@
   top: 0;
   z-index: 4;
   content-visibility: visible;
-  background: var(--ds-bg);
+  background: var(--ds-bg-primary);
 }
 /* Destination pages have ordinary document scrolling. Keep this separate from
  * `.thread-scroll`, whose Composer reserve, follow behavior, and occlusion mask
@@ -1016,7 +1016,7 @@
   gap: 6px;
   max-width: calc(100% - 32px);
   padding: 5px 6px 5px 8px;
-  border: 1px solid var(--ds-border);
+  border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-full);
   background: var(--ds-panel, var(--ds-tile));
   box-shadow: var(--shadow-md, 0 6px 20px rgb(0 0 0 / 0.18));
