@@ -1,0 +1,22 @@
+apps/desktop/package.json
+  h_201ed4c689ac8b 32-36
+apps/desktop/test/retire-bundled-plugin-capabilities.test.mjs
+  h_201ed4c689ac8b 1-111
+docs/spec/07-plugins/10-plugin-devex.md
+  h_201ed4c689ac8b 84-105
+scripts/bundled-plugins-retired-capabilities.json
+  h_201ed4c689ac8b 1-10
+scripts/retire-bundled-plugin-capabilities.mjs
+  h_201ed4c689ac8b 1-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "183aeb8765925cd627dee0cff29b47862e51d7f1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
