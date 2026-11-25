@@ -1,0 +1,16 @@
+docs/adr/0407-bundled-plugins-stay-plugins.md
+  h_201ed4c689ac8b 1-79
+docs/adr/README.md
+  h_201ed4c689ac8b 444
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "814fd18f29c79bef2b8f870893a4ac293e07c86d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
