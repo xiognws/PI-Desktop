@@ -24,6 +24,8 @@
   "//io.github.eureka-0x01.open-with": "Retired 2026-11-24: one host API (shell.openPath) behind a plugin with a single permission, called by nothing in the product. Lost: the open-with command.",
   "//io.github.w1ndys.pi-open-in-vscode": "Retired 2026-11-24: a one-command wrapper around opening a path in VS Code, already covered by the host's open-in-editor action. Lost: that command.",
   "//io.github.w1ndys.pi-open-git-web": "Retired 2026-11-24: a one-command wrapper that opens the repository host's web page, already covered by shell.openExternal. Lost: that command.",
+  "//local.terminal": "Retired 2026-11-24: the last shipped carrier of the shape the kernel work removed. spawn(\"python3\", [\"-c\", RELAY_SRC, cwd, cols, rows]) puts an entire Python program on a command line - the inline-interpreter-payload pattern - to build a PTY relay. It is also macOS-only in practice: the relay imports pty, termios, fcntl and pwd, spawns with a /usr/bin:/bin PATH, the IME helper returns unsupported outside darwin, and the package has no win32/conpty branch at all, so on Windows the panel cannot work even when enabled (it was already default-disabled there). Lost: the embedded xterm.js terminal panel on the platforms where it worked.",
+  "//local.pi-bot": "Retired 2026-11-24: 7.67 MB, the second-largest bundled plugin and the only one still able to touch a capture device. renderer/speech-capture.mjs calls getUserMedia and is imported by voice.mjs, microphone-panel.mjs and attachment-upload.mjs, so opening the voice view asks for the microphone; the backend also starts powershell -File for DPAPI/OCR and opens loopback listeners for its MCP bridges. Its hidden microphone recorder had already been deleted at packaging time and the plugin shipped switched off on Windows - retiring it removes the capability instead of hiding it. Lost: the bot's browser-extension integration, voice input and its MCP bridges.",
   "excluded": [
     "cn.star.jianying-assistant",
     "icedly.moyu-games",
@@ -65,6 +67,8 @@
     "cc.mcii.session-notify",
     "io.github.eureka-0x01.open-with",
     "io.github.w1ndys.pi-open-in-vscode",
-    "io.github.w1ndys.pi-open-git-web"
+    "io.github.w1ndys.pi-open-git-web",
+    "local.terminal",
+    "local.pi-bot"
   ]
 }
