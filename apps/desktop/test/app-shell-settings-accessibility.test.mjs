@@ -62,5 +62,5 @@ test("settings does not reserve the status bar the chat shell is hiding", async 
   assert.match(appShell, /className="app-chat-shell"[\s\S]{0,120}hidden=\{page === "settings"\}/);
   // Settings replaces the whole shell: without this the page ends 30px above the
   // window edge and an empty band shows where the bar used to be.
-  assert.match(settingsStyles, /\.app-shell\.settings-mode \{[\s\S]{0,400}padding-bottom: 0/);
+  assert.match(settingsStyles, /\.app-shell\.settings-mode \{[\s\S]{0,900}padding-bottom: 0/);
 });

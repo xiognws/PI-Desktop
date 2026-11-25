@@ -95,7 +95,9 @@ test("the total comes from the host ledger, not from the loaded transcript", asy
 
   assert.match(rust, /pub fn session_totals\(db: &Database, session_id: &str\)/);
   assert.match(rust, /FROM turns WHERE session_id = \?1/);
-  assert.match(sessions, /pub use usage::session_totals;/);
+  // The re-export may group several usage helpers; what matters is that the
+  // host-core crate root exposes `session_totals` from that module.
+  assert.match(sessions, /pub use usage::\{?[^;]*\bsession_totals\b/);
   assert.match(rustRpc, /"session\.usageTotals" =>[\s\S]{0,400}sessions::session_totals/);
 
   assert.match(bar, /api\.sessionUsageTotals\(sessionId\)/);

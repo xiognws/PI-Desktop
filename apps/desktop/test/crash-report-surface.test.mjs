@@ -309,11 +309,11 @@ test("ensureCrashDumpsDirectory is the installation-local Crashpad root", () => 
 test("startup starts Crashpad local-only, under dataDir, before ready", () => {
   assert.match(startupSource, /crashReporter\.start\(\{\s*uploadToServer: false,/);
   assert.match(startupSource, /productName: APP_NAME/);
-  assert.match(
-    startupSource,
-    /app\.setPath\(\s*"crashDumps",\s*ensureCrashDumpsDirectory\(deps\.dataDir\)\s*\)/,
-  );
-  assert.match(startupSource, /try \{\s*app\.setPath\(\s*"crashDumps"/);
+  // The directory is computed first so a failure can be reported, then handed to
+  // Crashpad; what the contract cares about is that the path comes from dataDir.
+  assert.match(startupSource, /crashDumpsDirectory = ensureCrashDumpsDirectory\(deps\.dataDir\);/);
+  assert.match(startupSource, /app\.setPath\(\s*"crashDumps",\s*crashDumpsDirectory\s*\)/);
+  assert.match(startupSource, /try \{[\s\S]{0,160}app\.setPath\(\s*"crashDumps"/);
   assert.match(startupSource, /event: "crashReporterStartFailed"/);
   const setAt = startupSource.indexOf('app.setPath("crashDumps"');
   const startAt = startupSource.indexOf("crashReporter.start(");

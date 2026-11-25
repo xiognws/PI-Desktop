@@ -20,7 +20,7 @@ function constMs(src, name) {
 const pluginRuntime = source("apps/desktop/electron/main/plugin-runtime.ts");
 const pluginMcp = source("apps/desktop/electron/main/plugin-mcp.ts");
 const sharedTimeouts = source("packages/shared/src/rpc-timeouts.ts");
-const hostTools = source("crates/host-core/src/tools/mod.rs");
+const hostTools = source("crates/host-core/src/tools/timeout_policy.rs");
 const hostToolBudget = source("crates/host-core/src/tool_budget.rs");
 const hostRpc = source("crates/host-core/src/rpc/mod.rs");
 

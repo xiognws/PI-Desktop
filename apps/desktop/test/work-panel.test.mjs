@@ -82,7 +82,8 @@ test("work panel code is preloaded on demand behind an accessible dock fallback"
     appSource,
     /const loadWorkPanel = \(\) => import\("\.\.\/\.\.\/components\/workpanel\/WorkPanel"\)/,
   );
-  assert.match(appSource, /const WorkPanel = lazy\(\(\) =>\s*loadWorkPanel\(\)/);
+  // The lazy route helper wraps the loader; the panel still only loads on demand.
+  assert.match(appSource, /lazyRoute\(loadWorkPanel\)\(\)/);
   assert.match(
     appSource,
     /if \(!ready \|\| page !== "chat" \|\| !workPanelOpen\) return;[\s\S]*?loadWorkPanel\(\)\.catch/,

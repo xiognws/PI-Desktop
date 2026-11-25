@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+// Assertions spell multi-line rules with `\n`; a CRLF checkout would miss them,
+// so line endings are normalized here rather than in every needle.
+const read = (path) =>
+  readFile(new URL(path, import.meta.url), "utf8").then((text) => text.replace(/\r\n/g, "\n"));
 
 const LOCALES = ["en", "zh-CN", "zh-TW", "tr", "de", "es", "fr", "ko", "pt-BR"];
 
