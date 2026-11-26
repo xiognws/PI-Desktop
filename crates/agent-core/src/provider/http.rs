@@ -402,6 +402,9 @@ async fn pump(
                     Ok(events) => events,
                     Err(error) => {
                         tracing::warn!(target: "agent_core::provider::http", %error, "stream decode failed");
+                        // The provider said why. A turn that ends as "no finish frame"
+                        // throws that away and retries into the same wall.
+                        let _ = tx.send(provider_error_event(&error)).await;
                         return;
                     }
                 }
@@ -409,6 +412,13 @@ async fn pump(
             Ok(None) => break,
             Err(error) => {
                 tracing::warn!(target: "agent_core::provider::http", %error, "stream read failed");
+                let _ = tx
+                    .send(StreamEvent::ProviderError {
+                        kind: ProviderErrorKind::Transport,
+                        status: None,
+                        message: error.to_string(),
+                    })
+                    .await;
                 return;
             }
         };
@@ -421,6 +431,25 @@ async fn pump(
     }
 
     if !finished {
+        // A body can end mid-frame: the gateway's last line had no terminator, so the
+        // framer never handed it over and the decoder never saw what it said. Flush
+        // the pending line before deciding the stream was cut — an error that arrived
+        // this way is still an error.
+        match decoder.push_chunk("\n\n") {
+            Ok(events) => {
+                for event in events {
+                    finished |= matches!(event, StreamEvent::Finish(_));
+                    if tx.send(event).await.is_err() {
+                        return;
+                    }
+                }
+            }
+            Err(error) => {
+                // The pending line was an error frame after all.
+                let _ = tx.send(provider_error_event(&error)).await;
+                return;
+            }
+        }
         // A body that ends without a terminator is a truncated response; the
         // assembler turns the missing finish into `IncompleteStream`. The body's own
         // shape goes with it: status, size, and the tail the provider actually wrote.
@@ -458,6 +487,27 @@ pub(crate) fn body_error(body: &str, wire: WireApi) -> Option<AgentError> {
                 message.to_string(),
             ))
         }
+    }
+}
+
+/// The `StreamEvent` that carries `error` to the turn.
+fn provider_error_event(error: &AgentError) -> StreamEvent {
+    match error {
+        AgentError::Provider {
+            kind,
+            message,
+            status,
+            ..
+        } => StreamEvent::ProviderError {
+            kind: *kind,
+            status: *status,
+            message: message.clone(),
+        },
+        other => StreamEvent::ProviderError {
+            kind: ProviderErrorKind::Protocol,
+            status: None,
+            message: other.to_string(),
+        },
     }
 }
 

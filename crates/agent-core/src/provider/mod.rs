@@ -24,7 +24,7 @@ use std::pin::Pin;
 use tokio::sync::mpsc;
 
 use crate::cancel::CancelToken;
-use crate::error::{AgentError, Result};
+use crate::error::{AgentError, ProviderErrorKind, Result};
 use crate::message::{ContentPart, Message, Role, StopReason, ToolCall, Usage};
 use crate::tool::ToolSpec;
 
@@ -224,6 +224,15 @@ pub enum StreamEvent {
     },
     Usage(Usage),
     Finish(StopReason),
+    /// The provider reported a failure, or the transport broke, while the body was
+    /// being read. It travels as an event because a streaming adapter's error has
+    /// nowhere else to go: returning it would drop what already arrived, and logging
+    /// it only made the turn end as "stream ended without a finish frame".
+    ProviderError {
+        kind: ProviderErrorKind,
+        status: Option<u16>,
+        message: String,
+    },
 }
 
 /// A provider produces a channel of [`StreamEvent`]s. The channel ends when
@@ -336,6 +345,16 @@ impl ResponseAssembler {
 
     pub fn push(&mut self, event: StreamEvent) -> Result<()> {
         match event {
+            StreamEvent::ProviderError {
+                kind,
+                status,
+                message,
+            } => {
+                return Err(match status {
+                    Some(status) => AgentError::provider_status(kind, status, message),
+                    None => AgentError::provider(kind, message),
+                });
+            }
             StreamEvent::TextDelta(delta) => {
                 self.text.push_str(&delta);
             }
@@ -572,6 +591,23 @@ mod tests {
         assert_eq!(
             response.message.tool_calls()[0].arguments,
             serde_json::json!({})
+        );
+    }
+
+    #[test]
+    fn a_provider_error_event_becomes_the_error_the_retry_policy_reads() {
+        let mut assembler = ResponseAssembler::new();
+        let error = assembler
+            .push(StreamEvent::ProviderError {
+                kind: ProviderErrorKind::Retryable,
+                status: Some(429),
+                message: "quota".into(),
+            })
+            .expect_err("a reported failure is not content");
+        assert_eq!(
+            crate::retry::budget_for(&error),
+            Some(crate::retry::RetryBudget::RateLimit),
+            "a quota reported mid-stream has to wait like a 429"
         );
     }
 
