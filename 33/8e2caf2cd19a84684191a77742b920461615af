@@ -1,0 +1,14 @@
+crates/agent-core/src/context.rs
+  h_201ed4c689ac8b 36-43,197-216,219-221,389-391,417-421,431-432,434-438,452-455,458-459
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "338e2caf2cd19a84684191a77742b920461615af",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
