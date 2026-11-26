@@ -1,0 +1,18 @@
+docs/adr/0409-token-budget-defaults.md
+  h_201ed4c689ac8b 1-109
+docs/adr/README.md
+  h_201ed4c689ac8b 446
+docs/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 589-601
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a5966f4eb6dce4968770e60d39e21641dead4ddc",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
