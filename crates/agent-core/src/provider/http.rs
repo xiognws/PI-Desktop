@@ -435,6 +435,13 @@ async fn pump(
         // framer never handed it over and the decoder never saw what it said. Flush
         // the pending line before deciding the stream was cut — an error that arrived
         // this way is still an error.
+        // The body may not be SSE at all: the Changan gateway answers a quota with a
+        // bare `{"error":…}` JSON object under `text/event-stream`, which no frame
+        // parser will ever emit. Read the raw tail before calling this a cut stream.
+        if let Some(error) = bare_body_error(&tail) {
+            let _ = tx.send(provider_error_event(&error)).await;
+            return;
+        }
         match decoder.push_chunk("\n\n") {
             Ok(events) => {
                 for event in events {
@@ -488,6 +495,22 @@ pub(crate) fn body_error(body: &str, wire: WireApi) -> Option<AgentError> {
             ))
         }
     }
+}
+
+/// The provider error a raw body tail carries, ignoring SSE framing.
+///
+/// `tail` is the last few hundred characters the provider wrote, which is exactly the
+/// size of an error envelope — and a gateway may send one without the `data:` prefix
+/// the framer requires, or without a terminating newline.
+fn bare_body_error(tail: &str) -> Option<AgentError> {
+    let text = tail.trim();
+    let body = text
+        .strip_prefix("data:")
+        .map(str::trim_start)
+        .unwrap_or(text);
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let error = value.get("error")?;
+    Some(super::openai::stream_error(error))
 }
 
 /// The `StreamEvent` that carries `error` to the turn.
