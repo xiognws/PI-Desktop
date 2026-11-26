@@ -118,7 +118,9 @@ export type SmartModePolicy = {
  * switch stays for measuring that trade-off, not as a supported default.
  */
 export const DEFAULT_SMART_POLICY: SmartModePolicy = {
-  turnRouting: false,
+  // On by default: a pair whose cheap half never serves a turn is just an
+  // expensive single model. Turning this off is the explicit choice.
+  turnRouting: true,
   escalateAfterToolErrors: 2,
   escalateAfterBudgetUsed: 0.6,
   stickyMainTurns: 1,
@@ -488,7 +490,8 @@ export function smartTemplateFromSettings(
     main: { providerId: mainProviderId, modelId: mainModelId },
     sub: { providerId: subProviderId, modelId: subModelId },
     policy: normalizeSmartPolicy({
-      turnRouting: settings?.smartModeTurnRouting,
+      // Unset means on: the saving is the default and the switch exists to opt out.
+      turnRouting: settings?.smartModeTurnRouting ?? true,
       delegateToSub: settings?.smartModeDelegateToSub,
     }),
   };

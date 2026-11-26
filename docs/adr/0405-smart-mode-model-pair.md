@@ -176,3 +176,22 @@ why, and that the fix is `Task` with `model` omitted.
   (`smart-mode turn escalated`, with both models and the reason) rather than
   modelled as a second row. Splitting usage per model inside one turn is a
   separate change to the accounting, not to this decision.
+
+
+### Amendment 2026-11-26: routing is on by default
+
+The default above was set while the only measurement was a session whose routed
+turns stalled. A later measurement of the same client changed the balance: with
+`turnRouting` off, three turns with 100+ tool calls each cost 2.4M, 775k and 972k
+prompt tokens, every step re-sending the whole transcript, and the paid half did
+the executing itself (`Task` fired 9 times in 824 tool calls). A switched-off router
+means the cheap half never serves a turn, which makes a paid pair cost exactly what
+the paid single model costs.
+
+So `turnRouting` now defaults to `on`, together with the request budget, ageing and
+Bash-output limits that landed in the same change. The stall risk the original
+default was protecting against is handled by what the router does now: a cheap turn
+that trips `escalateAfterToolErrors` hands the turn to the main half mid-flight
+rather than ending where the model stopped calling tools, and the orchestrator
+section still governs every turn that runs on `main`. Turning the switch off
+remains supported — it is the explicit choice, not the default.

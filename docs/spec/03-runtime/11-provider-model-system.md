@@ -989,9 +989,12 @@ answers; `sub` takes mechanical turns and delegated work. ADR 0405.
 - **Sub availability.** The cheap half must be enabled, reachable (`baseUrl`),
   listed on its provider and able to sign a request. Otherwise the turn stays on
   `main` and the decision records `downgradedFrom: "sub"`.
-- **Supervision is the default.** With `turnRouting` off — the default — every
-  turn stays on `main`: the strong model owns the turn, and the pair's `sub`
-  binding is reached only through `Task` (`delegationDefaultModel`). Its prompt
+- **Supervision is the default; routing is on.** `turnRouting` defaults to `on`:
+  a simple, mechanical or first turn is served by the `sub` half, and a turn that
+  trips `escalateAfterToolErrors` or outgrows the prompt budget hands over to
+  `main` mid-flight. With routing switched off, every turn stays on `main`: the
+  strong model owns the turn, and the pair's `sub` binding is reached only through
+  `Task` (`delegationDefaultModel`). Its prompt
   carries the `smart_orchestrator` section: state the goal, decompose into
   checkable steps, hand the mechanical ones to the cheap half, verify each report
   before the next step, take a step over when it stalls, and never end a turn by

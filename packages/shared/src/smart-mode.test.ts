@@ -78,16 +78,16 @@ describe("smart mode policy normalization", () => {
 });
 
 describe("turn routing", () => {
-  it("keeps every turn on the main model unless the router is switched on", () => {
-    // The pair's default shape: the main model owns the turn and supervises,
-    // `Task` on the cheap half does the execution. A whole turn only leaves the
-    // main model when the user opts into routing.
-    expect(DEFAULT_SMART_POLICY.turnRouting).toBe(false);
+  it("routes by default: the cheap half serves the turn unless the user opts out", () => {
+    // Saving tokens is the default, not an option to discover: a pair whose cheap
+    // half never serves a turn is just an expensive single model. Turning routing
+    // off is the explicit choice, and it is asserted below.
+    expect(DEFAULT_SMART_POLICY.turnRouting).toBe(true);
     expect(DEFAULT_SMART_POLICY.delegateToSub).toBe(true);
-    expect(decideTurnTier(signals())).toEqual({ tier: "main", reason: "smart-off" });
+    expect(decideTurnTier(signals())).toEqual({ tier: "sub", reason: "simple-turn" });
     expect(decideTurnTier(signals({ prompt: "重构这个模块的分层" }))).toEqual({
       tier: "main",
-      reason: "smart-off",
+      reason: "heavy-intent",
     });
   });
 
@@ -231,14 +231,15 @@ describe("the app-wide pair", () => {
     expect(template?.main).toEqual({ providerId: "strong", modelId: "strong-1" });
     expect(template?.policy.turnRouting).toBe(false);
     expect(template?.policy.delegateToSub).toBe(false);
-    // An unset switch keeps the default: routing off, delegation on.
+    // An explicit `false` is honoured; only an unset switch takes the default.
     const fromSettings = smartTemplateFromSettings({
       smartModeMainProviderId: "a",
       smartModeMainModelId: "a-1",
       smartModeSubProviderId: "b",
       smartModeSubModelId: "b-1",
     });
-    expect(fromSettings?.policy.turnRouting).toBe(false);
+    // Unset switches keep the defaults: routing on, delegation on.
+    expect(fromSettings?.policy.turnRouting).toBe(true);
     expect(fromSettings?.policy.delegateToSub).toBe(true);
   });
 });
