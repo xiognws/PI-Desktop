@@ -1,0 +1,26 @@
+apps/desktop/src/features/settings/pages/AgentBehaviorSettings.tsx
+  h_201ed4c689ac8b 143,146
+crates/agent-core/src/prompt/mod.rs
+  h_201ed4c689ac8b 485-487
+crates/agent-core/src/prompt/smart.rs
+  h_201ed4c689ac8b 34-36
+docs/adr/0405-smart-mode-model-pair.md
+  h_201ed4c689ac8b 106-128
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 983-994
+packages/shared/src/smart-mode.test.ts
+  h_201ed4c689ac8b 35-45,81-93,103,107,111,118,122-123,129,133-134,138,143,150-151,172,178,181,234-242
+packages/shared/src/smart-mode.ts
+  h_201ed4c689ac8b 41-45,79-83,106-118,121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9fe51743b8388a39ba13a0ef165b7d1e6df209ae",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
