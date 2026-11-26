@@ -1,0 +1,14 @@
+packages/shared/src/types/sessions.ts
+  h_201ed4c689ac8b 2,4,8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3e2e6047068b8532c297404b9f92240c9972014a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
