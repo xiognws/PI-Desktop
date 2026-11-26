@@ -119,6 +119,9 @@ and transient 5xx envelopes retain their existing classifications.
 | `EMPTY_MODEL_RESPONSE` | yes | the model ended its turn with no tool call and no visible text twice: once as streamed, once after the automatic re-run; the first reply to a Host-ledger completion notice is exempt (spec 02-agent-runtime §5e, D446) |
 | `TOOL_CALL_NOT_EXECUTED` | no | a complete known-tool Qwen call was emitted as assistant text; the message shows a format diagnostic without executing text, retrying the provider or interrupting valid structured siblings |
 | `PROMPT_ENHANCEMENT_EMPTY` | no | the one-shot enhancement model returned no text |
+| `SPEECH_NOT_CONFIGURED` | no | no transcription or speech binding is configured in settings (retired voice capability; retained for stored errors) |
+| `SPEECH_PROTOCOL_UNSUPPORTED` | no | the speech protocol is unknown, or it does not support the requested role (retired voice capability; retained for stored errors) |
+| `SPEECH_INPUT_TOO_LARGE` | no | speech input exceeded 25 MB (retired voice capability; retained for stored errors) |
 | `SUBAGENT_IDLE_TIMEOUT` | no | withdrawn (D328): idle watchdogs are not armed; the code remains for stored results |
 | `SUBAGENT_DURATION_TIMEOUT` | no | withdrawn (D328): duration watchdogs are not armed; the code remains for stored results |
 | `SUBAGENT_CONTEXT_OVERFLOW` | no | a delegate's own model context exceeded its safe budget and neither automatic turn-boundary compaction nor the degraded retry that keeps only the task brief and the most recent messages brought it back below the limit; the failure names the actionable recovery instead of the provider's overflow text |
@@ -322,6 +325,44 @@ codes surface through the same error object as any other call.
 | `PAIRING_FAILED` | no | `connection/pair` could not mint a device credential |
 | `PAIRING_TOKEN_EXPIRED` | no | the single-use pairing token expired before pairing completed |
 | `CAPABILITY_UNAVAILABLE` | no | an operation was requested for a capability the host advertised as unavailable (e.g. attachments, tool relay) |
+
+### 3.9 Realtime voice (retired; retained for stored calls and logs)
+
+Realtime voice errors were returned through the app's IPC and provider-adapter
+events and never meant an agent turn had failed. A retriable error meant the
+same call could be retried once the transient condition cleared; the app never
+switched provider or billing path on its own. ADR 0399 removed the capability,
+so no new call emits these codes; they stay documented because stored calls and
+logs still carry them.
+
+| code | retriable | meaning |
+|---|---|---|
+| `LIVE_DISABLED` | no | realtime voice was switched off in settings |
+| `LIVE_NOT_CONFIGURED` | no | no valid realtime-voice binding was selected |
+| `LIVE_PROVIDER_NOT_FOUND` | no | the selected provider does not exist, is disabled, or changed while credentials were being resolved |
+| `LIVE_AUTH_KIND_UNSUPPORTED` | no | the selected provider's credential kind is not compatible with the adapter |
+| `LIVE_AUTH_REQUIRED` | no | the required OAuth/API key is missing, or the credential was rejected |
+| `LIVE_ACCOUNT_ID_MISSING` | no | the Codex OAuth account identity is missing or inconsistent |
+| `LIVE_ACCESS_DENIED` | no | the provider refused access, or the account has no permission |
+| `LIVE_RATE_LIMITED` | yes | the provider returned a rate-limit response |
+| `LIVE_PROTOCOL_UNSUPPORTED` | no | the endpoint, model, or selected protocol profile is unsupported |
+| `LIVE_PROTOCOL_ERROR` | no | a provider or IPC message was malformed, or violated the selected protocol |
+| `LIVE_ALREADY_ACTIVE` | no | another realtime voice call, or a microphone release still isolating, held the single call slot |
+| `LIVE_REQUEST_CONFLICT` | no | the same idempotent request id was reused with different call parameters |
+| `LIVE_SETTINGS_IN_USE` | no | settings changed during preparation, or the active binding is not editable |
+| `LIVE_MEDIA_RELEASE_UNCONFIRMED` | no | the renderer never confirmed media release; main isolated the microphone lease |
+| `LIVE_STALE_CALL` | no | the call, request, or capture epoch is no longer current |
+| `LIVE_INVALID_OWNER` | no | the IPC or media-port owner does not match the trusted main frame |
+| `LIVE_MICROPHONE_BUSY` | no | dictation, another live call, or an unconfirmed release held the shared capture lease |
+| `LIVE_MICROPHONE_DENIED` | no | the user or the operating system denied microphone permission |
+| `LIVE_MICROPHONE_UNAVAILABLE` | no | no microphone device is available |
+| `LIVE_MEDIA_UNSUPPORTED` | no | browser media or AudioWorklet support is unavailable |
+| `LIVE_PLAYBACK_BLOCKED` | maybe | browser playback needs a user gesture to start or resume |
+| `LIVE_TIMEOUT` | yes | a time-bounded start, handshake, heartbeat, control, or cleanup phase timed out |
+| `LIVE_NETWORK_ERROR` | yes | the provider transport hit a transient connection failure |
+| `LIVE_NETWORK_POLICY_UNSUPPORTED` | no | desktop proxy routing cannot be represented safely by the live transport |
+| `LIVE_AUDIO_BACKPRESSURE` | no | the bounded PCM or playback credit capacity is exhausted |
+| `LIVE_EXECUTION_NOT_CONNECTED` | no | the provider requested a function/delegation execution path that was not supported then |
 
 ### 3.10 Computer use — reserved (ADR 0342; capability removed 2026-11-17)
 

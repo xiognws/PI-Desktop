@@ -537,6 +537,7 @@ D164, and D260. GitHub release notes are not a substitute.
 | Skipping e2e doc for user-visible changes | Violates R3; traceability gap |
 | Declaring a code-bearing change complete without successful relevant E2E after incorporating latest `origin/main` | Violates R7 and leaves cross-process behavior unverified |
 | Treating the full local test/check suite as an automatic pre-push requirement | Ignores risk-based validation and delays delivery without evidence of need |
+| Developing, committing, or pushing directly on `main` | Violates R4 only under the retired branch-based flow; R4 now requires delivering on `main`, so this row survives in the Chinese page as history rather than as a rule |
 | Creating a task branch or worktree for a request | Violates R4; the main line is the delivery line |
 | Force-pushing or rewriting commits that are already on `origin/main` | Violates R4 and destroys published history |
 | Staging with `git add .` / `git add -A`, or committing another session's hunks | Violates R4; a shared checkout would carry unrelated changes into the commit |

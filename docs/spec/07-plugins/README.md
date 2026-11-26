@@ -26,6 +26,7 @@ this directory define the normative contracts and implementation boundaries.
 | [16-trusted-extensions.md](16-trusted-extensions.md) | Trusted extensions (in-sidecar extension surface) |
 | [17-plugin-glossary.md](17-plugin-glossary.md) | English–Chinese plugin terminology and usage |
 | [18-plugin-launcher.md](18-plugin-launcher.md) | Plugin launcher surface (`Alt+Space`), triggers, and local applications |
+| [19-widget-packages.md](19-widget-packages.md) | Widget packages: user-directory scan, execution inside the agent sidecar, bidirectional calls, and digest trust |
 
 ## Read the code behind the contract
 

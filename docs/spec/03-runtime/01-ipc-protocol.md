@@ -48,6 +48,7 @@ Principles:
 | `menu` | Allowlisted application-menu commands and native editing/window actions |
 | `notification` | Durable inbox list/read/clear, new/activated events, and native-notification sound cues |
 | `stats` | Completed-turn token history (host RPC; dashboard is plugin-owned) |
+| `voice/live` | App-managed realtime voice calls, credential-free status/settings DTOs, and a per-call media port |
 
 ## 3. Channel Conventions
 
@@ -2561,6 +2562,19 @@ attachments. Electron main resolves the provider/model and credentials, so the
 renderer never receives a secret. Empty drafts, slash-command drafts, missing
 models, and provider failures return the common `Result` error envelope.
 
+### speech/getStatus, speech/transcribe, speech/synthesize
+
+```ts
+speech/getStatus() -> SpeechStatus
+speech/transcribe({ sessionId?, path, mimeType?, language? }) -> { text }
+speech/synthesize({ sessionId?, text, voice?, format? }) -> { path, mimeType, dataUrl? }
+```
+
+Host speech was independent of chat. Bindings lived in `AppSettings.speech`.
+Audio bytes never entered the renderer. Retired with the voice capability
+(ADR 0399); the channels are kept here because the Chinese page still lists
+them.
+
 ### app/openFeedback (withdrawn, D313)
 
 No feedback channel exists. The Info panel exposes no external destination, so
@@ -2802,3 +2816,55 @@ done and total for that phase, and the bytes when they are known. A long upload
 of many resource objects is therefore not an interface with nothing to show.
 Background polls report nothing, since only the manual path has a caller
 watching.
+
+## 16. Realtime voice API
+
+Realtime voice was the app-managed call path whose ownership was bound to the
+main window; see live-voice.md. The DTOs were defined in
+`packages/shared/src/types/live-voice.ts`; preload exposed only the allowlisted
+channels in the table below. Main derived the owner from the trusted frame that
+called the IPC, and sent call events only to that frame. A payload could not
+supply owner identity or a credential. The docked widget window only drew the
+call controls and did not own the call, so its three channels were validated
+separately and never entered owner derivation. ADR 0399 removed the capability;
+the section is kept because the Chinese page still documents it as current and
+stored logs reference these channels.
+
+| IPC channel | Direction | Contract |
+|---|---|---|
+| `pi-desktop/voice/live/status` | Renderer → Main | Redacted capability status, binding readiness, and settings version |
+| `pi-desktop/voice/live/prepare` | Renderer → Main | Prepare a call idempotently by request ID; synchronously reserves the shared microphone lease |
+| `pi-desktop/voice/live/connect` | Renderer → Main | Connect a prepared call; Codex may attach a bounded SDP offer |
+| `pi-desktop/voice/live/setMuted` | Renderer → Main | Set mute through a monotonically increasing capture epoch |
+| `pi-desktop/voice/live/reportMedia` | Renderer → Main | Report capture, connection, and release lifecycle; only a confirmed release frees the lease for reuse |
+| `pi-desktop/voice/live/reportPlayback` | Renderer → Main | Bounded list of played PCM cursors, used for interruption and truncation |
+| `pi-desktop/voice/live/reportDelegation` | Renderer → Main | Report a delegation the provider asked for; v1 refused to execute it and never forwarded it to the agent or MCP |
+| `pi-desktop/voice/live/reportControlApplied` | Renderer → Main | Confirm a supported provider control, or report that an unsupported operation was refused |
+| `pi-desktop/voice/live/end` | Renderer → Main | End the active call idempotently, or cancel a pending request |
+| `pi-desktop/voice/live/heartbeat` | Renderer → Main | Keep the owner's call alive while the renderer responds normally |
+| `pi-desktop/voice/live/event/changed` | Main → Renderer | Redacted call phase, errors, hints, and active state |
+| `pi-desktop/voice/live/event/port` | Main → Renderer | Hand over a call-specific `MessagePort` with the call ID and a single-use nonce |
+| `pi-desktop/voice/live/event/control` | Main → Renderer | Provider control request, limited to the control kinds v1 explicitly allowed |
+| `pi-desktop/voice/live/event/transcript` | Main → Renderer | Transient, bounded transcript events for the current call |
+| `pi-desktop/voice/live/widget/visibility` | Widget → Main | The widget's own visibility decision and required content-box size; Main shows or hides that window accordingly |
+| `pi-desktop/voice/live/widget/action` | Widget → Main | A call action pressed in the widget; Main validates the sender and forwards it to the owner frame for execution |
+| `pi-desktop/voice/live/widget/ownerState` | Main window → Main | Information only the owner frame knows: its own error code (a refused mute, for example) and whether the bound work session awaits a decision; neither is in the call view |
+| `pi-desktop/voice/live/event/widgetState` | Main → Widget | The authoritative call view plus the owner's own error code and awaiting-decision marker, pushed to the docked widget window |
+| `pi-desktop/voice/live/event/widgetAction` | Main → Main window | A widget action that needs the owner frame to execute it |
+
+The `MessagePort` was created only after owner validation succeeded, and preload
+then relayed it into the renderer window. The owner returned the per-call nonce
+in the first `hello`; Main accepted that port once, and only when both the call
+ID and the nonce matched. Binary frames carried bounded PCM audio, the capture
+epoch, release confirmations, playback cursors, and protocol-ready signals. It
+was not a general IPC tunnel: provider credentials, arbitrary commands,
+workspace paths, agent messages, and persisted transcripts never crossed it. The
+port was closed when the call ended or the owner was lost.
+
+The docked widget window is not the call owner and cannot become one: on every
+owner-validated channel it is refused with `PERMISSION_DENIED` like any other
+renderer. Main answers only its two channels, and only when that window is the
+sender; the owner's own error codes arrive through the main window, because that
+is the frame performing the operation. A widget action never changes call state
+by itself: it is forwarded to the owner frame, and the resulting state returns
+to the widget through the same authoritative view the owner receives.

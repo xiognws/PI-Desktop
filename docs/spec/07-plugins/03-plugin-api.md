@@ -250,6 +250,24 @@ pi.events.on("session:turnEnded", async (event) => {
 });
 ```
 
+### speech (removed by ADR 0399)
+
+```ts
+pi.speech.registerAdapter(adapter: {
+  protocol: string
+  label: string
+  roles: Array<"transcribe" | "synthesize">
+  handle: (input) => Promise<{ kind: "text"; text: string } | { kind: "audio"; mimeType: string; data: string } | { kind: "http"; call: SpeechHttpCall }>
+}): Promise<void>
+pi.speech.unregisterAdapter(protocol: string): Promise<void>
+```
+
+`handle` stayed in the plugin process. The built-in protocol ids `openai_audio`
+and `openai_chat_audio` were reserved. The host issued an HTTP plan with the
+bound provider's key, and the request had to stay on that origin. ADR 0399
+removed the voice capability together with this surface; the contract is kept
+here because the Chinese page still documents it as current.
+
 ### ui
 
 ```ts
@@ -1503,6 +1521,7 @@ Additional host-originated errors:
 |---|---|
 | `PLUGIN_INVALID_RESULT` | `onComposerTransform` returned a non-string, or the host received a string whose JavaScript `length` exceeds 100,000 UTF-16 code units. Return a string within that bound. |
 | `PLUGIN_TOOL_ABORTED` | A plugin tool invocation is cancelled, finished, unknown/expired, or no longer belongs to the calling plugin process. Pending and late host calls in that invocation are refused. An explicit Error abort reason may retain its own code. |
+| `SPEECH_PROTOCOL_UNSUPPORTED` | `runSpeechAdapter` found no registered adapter for the bound protocol. An adapter response of invalid shape used `INVALID_ARGUMENT`; empty text or audio used `PROVIDER_ERROR`. The code is also listed in the [shared registry](../03-runtime/08-error-codes.md). Retired with the voice capability (ADR 0399); kept for stored errors. |
 
 Implementation evidence: `apps/desktop/electron/main/plugin-runtime.ts`
 (`MAX_COMPOSER_TRANSFORM_TEXT_LENGTH`, `runComposerTransform`,

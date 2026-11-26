@@ -782,6 +782,38 @@ pi.usage.listTurns(input?: {
   `null`。
 - `usage_json` 缺失或畸形时 cache/reasoning 计数记 0——绝不返回残缺行。
 
+`pi.usage.summary` 是同一份账本已汇总后的形态，用于仪表盘想要金额而不是行的
+场景：把每个 turn 翻页再加总美元金额，等于把宿主一次扫描就能完成的计算搬进
+插件里。
+
+```ts
+pi.usage.summary(input?: {
+  fromMs?: number      // inclusive window start, epoch ms; default toMs - 30 days
+  toMs?: number        // inclusive window end, epoch ms; default now
+}): Promise<{
+  rangeStart: number; rangeEnd: number; turnCount: number
+  requests: number
+  inputTokens: number; outputTokens: number
+  cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number
+  totalTokens: number
+  costTotal: number          // USD of the priced requests only
+  pricedRequests: number; reportedRequests: number; unpricedRequests: number
+  byProvider: Array<{ providerId?: string } & Totals>  // ordered by cost, top first
+  byModel: Array<{ modelId?: string } & Totals>
+}>
+```
+
+语义：
+
+- 计入每个 turn 状态，而不只是已完成的：被中止或失败的请求同样已经计费，
+  运行中的 turn 也已为它完成的部分付过钱。窗口以 turn 的开始时间界定。
+- `costTotal` 只覆盖已定价的请求。没有任何 provider 报告价格的请求改为累加
+  `unpricedRequests`，因此只要该计数非零，总额就只是下限——宿主绝不猜价格。
+- 行与总额可对账：无法归属到 provider/model 的记录落在没有 `providerId`/
+  `modelId` 的行里，而不是被丢弃。
+- 与 `listTurns` 相同的授权（`usage.read`）、相同的窗口规则：默认 30 天、
+  至多 365 天，两侧都校验。只读，没有写入路径。
+
 ### 会话协作（需要 `desktop.control`）
 
 官方 Session Orchestrator 组合了已审查的 desktop-control 目录；这不是第二套 session API，

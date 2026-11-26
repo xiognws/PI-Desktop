@@ -166,8 +166,30 @@ Main 会将动态诊断信息另起一行追加。
 
 ### 4.1 扩展在哪里运行
 
-扩展在 Agent sidecar 进程（`packages/agent-runtime`）内加载，永远不在 Electron
-main、渲染层或插件宿主进程中。
+扩展永远不会在渲染层或插件宿主进程中运行。*哪一个*宿主进程运行它们，取决于会话
+所在的 agent 运行时：
+
+| Agent 运行时 | 扩展宿主 | Agent 如何到达它 |
+| --- | --- | --- |
+| Node sidecar（`packages/agent-runtime`） | sidecar 自身 | 进程内：适配器直接实现 `ExtensionAPI` |
+| Rust 内核（`crates/agent-core`） | Electron main，它持有同一个 `TrustedExtensionRunner` | 经宿主桥：`extensions.session.describe`、`extensions.hooks.emit`、`extensions.tools.execute` |
+
+内核没有 JavaScript runner，也不会增加一个。它向宿主请求 hook 的方式与请求工具
+一致，由 main 运行 Node 路径上的同一个 Runner，因此 hook 只有一份实现而不是两份。
+两条路径上的 hook 名称、载荷字段与顺序完全相同——`before_agent_start`、
+`context`、`before_provider_request`、`after_provider_response`、`tool_call`、
+`tool_result`、`turn_start`、`turn_end`、`agent_end`——失败、超时或没有宿主的
+hook 会让 prompt 和工具结果保持不变，回合仍然结束。
+
+有两点后果值得说明：
+
+- 扩展自带的 **agent 工具**在启动时向内核声明，并像其他延迟工具一样通过
+  `ToolSearch` 激活；激活之后模型才能调用它们。
+- 插件拥有的**模型提供商**无法被内核直接访问，因为提供它意味着运行插件的
+  JavaScript 流。Main 会在回环 Chat Completions 端点上服务该 agent——绑定
+  `127.0.0.1` 的临时端口，位于每进程随机的 bearer key 之后，退出时关闭——启动
+  时把内核指向那里。`modelRegistry` 只报告 id、限制与鉴权可用性；端点、头部与
+  token 从不跨越该边界。
 
 ### 4.2 Loader
 

@@ -57,6 +57,7 @@ type AppError = {
 | `UNAUTHORIZED` | 不 | capability/auth 边界拒绝呼叫 |
 | `NOT_FOUND` | 不 | 未找到实体 |
 | `SESSION_NOT_FOUND` | 不 | 会话作用域的 RPC（包括 `tools.execute`）点名了主机没有的会话；未知 id 永远不会继承全局工作区 |
+| `SESSION_SEARCH_UNAVAILABLE` | 也许 | 会话搜索工具的某次运行无法使用其索引（索引不可读，或扫描结束时没有给出答案）；以此代替空结果上报，避免把「没有匹配」与「搜索从未执行」混为一谈 |
 | `CONFLICT` | 也许 | 状态冲突/资源繁忙 |
 | `UNSUPPORTED` | 不 | 该操作在此界面上没有实现，例如没有桌面窗口时的受信任扩展提示（规格 16 §9） |
 | `FORBIDDEN` | 不 | RACP：主体的角色不允许该方法（规格 19 §13） |
