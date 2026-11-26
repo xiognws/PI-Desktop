@@ -1,0 +1,14 @@
+apps/desktop/test/helpers/main-source.mjs
+  h_201ed4c689ac8b 7-12,36,44,59,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "23cb128358fa617ad9c2f2259c750f5d9b9f3cfe",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
