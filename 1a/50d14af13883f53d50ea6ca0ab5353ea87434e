@@ -1,0 +1,14 @@
+apps/desktop/test/boot-remote-hosts.test.mjs
+  h_201ed4c689ac8b 364-366
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1a50d14af13883f53d50ea6ca0ab5353ea87434e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
