@@ -302,3 +302,36 @@ test("a kernel error keeps its own code and message instead of a generic one", (
   const empty = adaptKernelEvent(envelope({ type: "error" }));
   assert.deepEqual(empty.event.error, { code: "RUNTIME_ERROR", message: "agent runtime error" });
 });
+
+test("keeps the request timings the kernel measured", () => {
+  // Without these the inspector reports "unavailable" forever, even though the kernel
+  // timed the request and the host stored the numbers.
+  const message = adaptKernelMessage({
+    id: "m-1", role: "assistant", parts: [{ type: "text", text: "answer" }],
+    created_at_ms: 1_700_000_000_000,
+    provider_wait_ms: 640, model_stream_duration_ms: 2_360, response_duration_ms: 3_000,
+  });
+  assert.equal(message.providerWaitMs, 640);
+  assert.equal(message.modelStreamDurationMs, 2_360);
+  assert.equal(message.responseDurationMs, 3_000);
+});
+
+test("leaves the timings off a message that was never timed", () => {
+  const message = adaptKernelMessage({
+    id: "m-2", role: "assistant", parts: [{ type: "text", text: "answer" }],
+    created_at_ms: 1_700_000_000_000,
+  });
+  assert.equal("providerWaitMs" in message, false);
+  assert.equal("responseDurationMs" in message, false);
+});
+
+test("accepts camelCase timings from a host-shaped message", () => {
+  // The persisted row comes back camelCase; the same adapter reads both directions.
+  const message = adaptKernelMessage({
+    id: "m-3", role: "assistant", parts: [{ type: "text", text: "answer" }],
+    createdAtMs: 1_700_000_000_000,
+    providerWaitMs: 100, modelStreamDurationMs: 200, responseDurationMs: 300,
+  });
+  assert.equal(message.responseDurationMs, 300);
+  assert.equal(message.providerWaitMs, 100);
+});

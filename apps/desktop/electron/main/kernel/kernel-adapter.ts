@@ -116,6 +116,13 @@ export function adaptKernelMessage(raw: unknown): UiMessage | null {
   const createdAtMs = count(raw.created_at_ms) ?? count(raw.createdAtMs) ?? Date.now();
   const usage = adaptKernelUsage(raw.usage) ?? undefined;
   const stop = statusForStopReason(text(raw.stop_reason));
+  // The kernel measures these per request and writes them snake_case, like every other
+  // field on the wire. The inspector's throughput, network-wait and model-response rows
+  // read them off the message, so they have to survive this adapter.
+  const providerWaitMs = count(raw.provider_wait_ms) ?? count(raw.providerWaitMs);
+  const modelStreamDurationMs =
+    count(raw.model_stream_duration_ms) ?? count(raw.modelStreamDurationMs);
+  const responseDurationMs = count(raw.response_duration_ms) ?? count(raw.responseDurationMs);
 
   return {
     id,
@@ -126,6 +133,9 @@ export function adaptKernelMessage(raw: unknown): UiMessage | null {
     ...(stop.status ? { status: stop.status } : {}),
     ...(stop.outputTruncated ? { outputTruncated: true } : {}),
     ...(usage ? { usage } : {}),
+    ...(providerWaitMs === undefined ? {} : { providerWaitMs }),
+    ...(modelStreamDurationMs === undefined ? {} : { modelStreamDurationMs }),
+    ...(responseDurationMs === undefined ? {} : { responseDurationMs }),
   };
 }
 
