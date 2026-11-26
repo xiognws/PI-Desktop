@@ -1,0 +1,26 @@
+apps/desktop/test/helpers/composer-source.mjs
+  h_201ed4c689ac8b 6-11,36,61,66
+apps/desktop/test/helpers/domain-source.mjs
+  h_201ed4c689ac8b 6-11,43,64
+apps/desktop/test/helpers/shared-types-source.mjs
+  h_201ed4c689ac8b 6-11,35,55
+apps/desktop/test/helpers/store-source.mjs
+  h_201ed4c689ac8b 6-11,38,67,72
+apps/desktop/test/helpers/transcript-source.mjs
+  h_201ed4c689ac8b 6-11,35,59,64
+apps/desktop/test/plugin-child-env.test.mjs
+  h_201ed4c689ac8b 84-88,91
+apps/desktop/test/session-project-move.test.mjs
+  h_201ed4c689ac8b 6-9,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "90ab0b4601cb501016528dc377d1930c3672fe25",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
