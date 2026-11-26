@@ -1,0 +1,52 @@
+docs/adr/0239-session-collaboration-messages.md
+  h_201ed4c689ac8b 63-73
+docs/adr/0240-independent-session-discovery-and-navigable-projections.md
+  h_201ed4c689ac8b 44-55
+docs/adr/0384-widget-packages-run-in-the-agent-sidecar.md
+  h_201ed4c689ac8b 1
+docs/adr/0389-skill-consolidation-by-absorb.md
+  h_201ed4c689ac8b 3
+docs/adr/0390-learning-map-from-two-stores.md
+  h_201ed4c689ac8b 3
+docs/adr/0391-writers-are-declared-not-deferred.md
+  h_201ed4c689ac8b 3
+docs/adr/0392-procedure-lives-in-the-skill.md
+  h_201ed4c689ac8b 1
+docs/adr/0393-structured-memory-is-the-store.md
+  h_201ed4c689ac8b 1
+docs/adr/0399-remove-voice-feature.md
+  h_201ed4c689ac8b 1
+docs/adr/0402-rust-agent-core.md
+  h_201ed4c689ac8b 1
+docs/adr/0403-rust-kernel-as-agent-runtime.md
+  h_201ed4c689ac8b 1
+docs/adr/0404-turn-abort-provider-traffic.md
+  h_201ed4c689ac8b 1
+docs/adr/README.md
+  h_201ed4c689ac8b 406,425-426
+docs/adr/chronological-system-transcript.md
+  h_201ed4c689ac8b 93
+docs/adr/floating-annotation-index.md
+  h_201ed4c689ac8b 61-72
+docs/adr/image-generation-capability.md
+  h_201ed4c689ac8b 29
+docs/adr/subagent-model-fallback.md
+  h_201ed4c689ac8b 58-68
+docs/handover/DEFECT_LEDGER.md
+  h_201ed4c689ac8b 20,266
+docs/handover/TEST_REPORT.md
+  h_201ed4c689ac8b 244
+docs/zh-CN/spec/NAV.md
+  h_201ed4c689ac8b 104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bec769711350822a7cd220ac7df928c88e0e8803",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
