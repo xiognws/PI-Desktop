@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1-pi.4
+
+- Fix: collapsing the file list no longer hides the editor. `0.9.1-pi.3` moved
+  the list to the right but kept the collapse gate on the editor, so hiding the
+  list — which opening a file does on purpose — removed the code view and left
+  only the tree. The gate now covers the file list and its resize handle, and the
+  editor always renders.
+
 ## 0.9.1-pi.3
 
 - Put the file list on the right and the editor on the left, so the editor keeps
