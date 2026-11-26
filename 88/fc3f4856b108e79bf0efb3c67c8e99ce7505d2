@@ -1,0 +1,16 @@
+docs/spec/03-runtime/08-error-codes.md
+  h_201ed4c689ac8b 58
+packages/shared/src/errors.ts
+  h_201ed4c689ac8b 265-271
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "88fc3f4856b108e79bf0efb3c67c8e99ce7505d2",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
