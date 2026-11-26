@@ -1,0 +1,14 @@
+apps/desktop/test/plugin-websocket.test.mjs
+  h_201ed4c689ac8b 304-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9168b21cb1f4d581237d5e153745d6d3ba33acd1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
