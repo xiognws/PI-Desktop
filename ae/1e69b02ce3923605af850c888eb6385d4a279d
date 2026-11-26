@@ -1,0 +1,20 @@
+apps/desktop/src/components/Composer.tsx
+  h_201ed4c689ac8b 31,327-333,336,339-340,417-423
+apps/desktop/src/features/chat/composer/ComposerModelList.tsx
+  h_201ed4c689ac8b 104,107-119,233,235-265
+apps/desktop/src/features/chat/composer/ComposerModelPicker.tsx
+  h_201ed4c689ac8b 5,31-38,142-150
+apps/desktop/test/smart-mode-wiring.test.mjs
+  h_201ed4c689ac8b 15,21,65-68,73-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ae1e69b02ce3923605af850c888eb6385d4a279d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
