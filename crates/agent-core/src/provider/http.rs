@@ -292,6 +292,35 @@ impl Provider for HttpProvider {
                 .with_retry_after(retry_after));
             }
 
+            // A successful response does not have to be an event stream. The Changan
+            // gateway answers an exhausted quota with `200` and a bare JSON error,
+            // which parses as neither SSE nor content: the turn used to end as
+            // "stream ended without a finish frame" and retried straight into the
+            // same quota wall. Read that body once and report what it says.
+            let content_type = response
+                .headers()
+                .get("content-type")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_ascii_lowercase);
+            let declared_json = content_type
+                .as_deref()
+                .is_some_and(|value| !value.contains("event-stream"));
+            if declared_json {
+                let body = response.text().await.unwrap_or_default();
+                if let Some(error) = body_error(&body, wire) {
+                    return Err(error);
+                }
+                // Not an error and not a stream: hand the body to the decoder as one
+                // chunk so a gateway that ignores `stream: true` still works.
+                let (tx, rx) = mpsc::channel(64);
+                let mut decoder = WireDecoder::new(wire);
+                let events = decoder.push_chunk(&body)?;
+                for event in events {
+                    let _ = tx.send(event).await;
+                }
+                return Ok(ProviderStream::new(rx));
+            }
+
             let (tx, rx) = mpsc::channel(64);
             tokio::spawn(async move {
                 pump(response, wire, tx, cancel).await;
@@ -403,6 +432,32 @@ async fn pump(
             tail = %tail.replace('\n', " ").chars().take(240).collect::<String>(),
             "stream ended without a finish frame"
         );
+    }
+}
+
+/// The provider error a non-stream body carries, if it carries one.
+///
+/// The shape seen in the wild on a `200` is an OpenAI-compatible gateway's
+/// `{"error":{...}}`; Google answers with its own envelope and already has a reader
+/// for it. Anything without an `error` object is content, not a failure.
+pub(crate) fn body_error(body: &str, wire: WireApi) -> Option<AgentError> {
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let error = value.get("error")?;
+    match wire {
+        WireApi::OpenAiCompatible | WireApi::OpenAiResponses => {
+            Some(super::openai::stream_error(error))
+        }
+        WireApi::GoogleGenerativeAi => Some(super::google::error_from_body(&value)),
+        WireApi::AnthropicMessages => {
+            let message = error
+                .get("message")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("provider reported an error");
+            Some(AgentError::provider(
+                ProviderErrorKind::Retryable,
+                message.to_string(),
+            ))
+        }
     }
 }
 
@@ -794,6 +849,36 @@ fn mark_last_breakpoint(messages: &mut [Value], control: &Value) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// The exact body the Changan gateway returns once its per-endpoint quota is
+    /// gone — with `200`, so nothing in the status line says "quota".
+    const QUOTA_BODY: &str = r#"{"error":{"message":"请求频率(QPM)超限：当前 11 次/分钟，已超过上限 10 次/分钟，接入点[9554/9554]，请稍后重试","type":"rate_limit_error","param":null,"code":null}}"#;
+
+    #[test]
+    fn a_quota_body_on_a_success_status_is_a_rate_limit_error() {
+        let error = body_error(QUOTA_BODY, WireApi::OpenAiCompatible).expect("an error");
+        assert!(error.is_retryable(), "a quota is worth waiting out");
+        assert!(
+            matches!(
+                crate::retry::budget_for(&error),
+                Some(crate::retry::RetryBudget::RateLimit)
+            ),
+            "the retry has to wait for the quota, not re-send in half a second"
+        );
+        let message = error.to_string();
+        assert!(
+            message.contains("QPM") || message.contains("请求频率"),
+            "the provider's own sentence is what a person needs: {message}"
+        );
+    }
+
+    #[test]
+    fn a_body_without_an_error_object_is_content() {
+        assert!(body_error(r#"{"choices":[{"message":{"content":"hi"}}]}"#, WireApi::OpenAiCompatible).is_none());
+        assert!(body_error("plain text", WireApi::OpenAiCompatible).is_none());
+    }
+
     use super::*;
     use crate::message::{Message, ToolCall, ToolResult};
 

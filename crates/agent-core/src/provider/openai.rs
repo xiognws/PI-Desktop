@@ -134,7 +134,13 @@ impl OpenAiStreamDecoder {
 /// Getting this wrong costs in both directions: calling a 5xx fatal turns one
 /// upstream hiccup into a request the reader has to repeat by hand, and calling a
 /// 401 retryable spends the whole retry budget on something that cannot succeed.
-fn stream_error(error: &Value) -> AgentError {
+/// Whether an error `type`/`code` says "quota", whatever the transport did.
+pub(crate) fn is_rate_limit_code(code: &str) -> bool {
+    let code = code.to_ascii_lowercase();
+    code.contains("rate_limit") || code.contains("rate limit") || code.contains("qpm")
+}
+
+pub(crate) fn stream_error(error: &Value) -> AgentError {
     let message = error
         .get("message")
         .and_then(Value::as_str)
@@ -143,11 +149,23 @@ fn stream_error(error: &Value) -> AgentError {
     let status = error
         .get("status")
         .and_then(numeric_status)
-        .or_else(|| error.get("code").and_then(numeric_status));
+        .or_else(|| error.get("code").and_then(numeric_status))
+        .or_else(|| error.get("type").and_then(numeric_status));
+    // `code` is often present and null, which used to stop the chain before `type`
+    // was read: a gateway that names the failure only in `type` ("rate_limit_error")
+    // then classified as fatal, because the prose was Chinese and matched no wording.
     let code = error
         .get("code")
-        .or_else(|| error.get("type"))
-        .and_then(Value::as_str);
+        .and_then(Value::as_str)
+        .or_else(|| error.get("type").and_then(Value::as_str));
+    // A gateway can name the failure only in `type` (`rate_limit_error`) with no
+    // status at all. Treating that as a plain transient error loses the one thing
+    // the response said: this is a quota, wait. `429` here is what routes the retry
+    // to the rate-limit budget instead of re-sending in half a second.
+    let status = match (status, code) {
+        (None, Some(code)) if is_rate_limit_code(code) => Some(429),
+        (status, _) => status,
+    };
     let kind = match (status, code) {
         (Some(429 | 500 | 502 | 503 | 504), _) => ProviderErrorKind::Retryable,
         (Some(_), _) => ProviderErrorKind::Fatal,
