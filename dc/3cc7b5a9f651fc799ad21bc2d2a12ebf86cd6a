@@ -1,0 +1,14 @@
+apps/desktop/test/chat-ref-resolve.test.mjs
+  h_201ed4c689ac8b 3,45-72,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "dc3cc7b5a9f651fc799ad21bc2d2a12ebf86cd6a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
