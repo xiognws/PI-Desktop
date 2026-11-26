@@ -1,0 +1,14 @@
+scripts/e2e/sidebar-settings.mjs
+  h_201ed4c689ac8b 147-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "816cf66efb7e1e11317af332e46a3ff687bd195e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
