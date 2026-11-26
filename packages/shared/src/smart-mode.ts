@@ -327,7 +327,7 @@ const TOOL_INTENT = [
   "run ", "test", "build", "install", "git ", "commit", "push", "grep", "search the repo",
   "open the file", "read the file", "edit", "write the file", "delete", "execute",
   "运行", "测试", "构建", "编译", "安装", "提交", "推送", "搜索", "查一下代码", "打开",
-  "读取", "修改", "删除", "执行", "跑一下", "跑一下测试",
+  "读取", "修改", "删除", "执行", "跑一下", "跑一下测试", "改名", "重命名", "重构一下",
 ] as const;
 
 const CODE_MARKERS = ["```", "Traceback", "Exception", " at ", "\n    at ", "SELECT ", "def ", "function ", "class "] as const;
@@ -379,6 +379,19 @@ export function decideTurnTier(
   if (containsAny(text, HEAVY_INTENT)) {
     return degraded("heavy-intent");
   }
+  // A request to change code or run something is a *work* turn, and work turns are
+  // orchestrated: the strong half plans, dispatches each package to the worker, and
+  // judges the report before the next package starts. The shell, the file edits and
+  // the test runs still happen on the worker, so the paid half spends a handful of
+  // steps on judgement rather than the whole turn on typing — which is cheaper than
+  // handing the turn to the worker unsupervised and discovering a wrong path or a
+  // half-finished edit afterwards.
+  if (containsAny(prompt, CODE_MARKERS) || FILE_PATH.test(prompt)) {
+    return degraded("code-prompt");
+  }
+  if (containsAny(text, TOOL_INTENT)) {
+    return degraded("tool-intent");
+  }
   // Everything below starts cheap. The pair's whole point is that the strong half
   // is paid for judgement, not for running commands: a small model that gets stuck
   // escalates inside the turn, which costs one hand-over instead of a strong turn
@@ -387,16 +400,6 @@ export function decideTurnTier(
     return signals.subAvailable
       ? { tier: "sub", reason: "mechanical-intent" }
       : degraded("mechanical-intent");
-  }
-  if (containsAny(prompt, CODE_MARKERS) || FILE_PATH.test(prompt)) {
-    return signals.subAvailable
-      ? { tier: "sub", reason: "code-prompt" }
-      : degraded("code-prompt");
-  }
-  if (containsAny(text, TOOL_INTENT)) {
-    return signals.subAvailable
-      ? { tier: "sub", reason: "tool-intent" }
-      : degraded("tool-intent");
   }
   if (signals.turnIndex <= 0) {
     return signals.subAvailable

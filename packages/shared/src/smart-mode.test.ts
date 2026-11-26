@@ -123,16 +123,18 @@ describe("turn routing", () => {
     expect(routeTurn({ prompt: "design a migration for the settings store" }).tier).toBe("main");
   });
 
-  it("starts code, tool and follow-up work on the cheap model", () => {
-    // Length is not difficulty and a shell command is not judgement: these all
-    // begin cheap, and a stalled turn escalates inside itself.
+  it("orchestrates code and tool work on the strong model", () => {
+    // A work turn is dispatched and judged, not typed by the paid half: the strong
+    // model plans, hands each package to the worker, and verifies the report. That
+    // keeps the shell, the edits and the test runs on the free half while the paid
+    // half spends a few steps on judgement instead of the whole turn on typing.
     expect(routeTurn({ prompt: "看看 src/app.ts 里的实现" })).toEqual({
-      tier: "sub",
+      tier: "main",
       reason: "code-prompt",
     });
-    expect(routeTurn({ prompt: "```ts\nconst a = 1\n```" }).tier).toBe("sub");
+    expect(routeTurn({ prompt: "```ts\nconst a = 1\n```" }).tier).toBe("main");
     expect(routeTurn({ prompt: "跑一下测试" })).toEqual({
-      tier: "sub",
+      tier: "main",
       reason: "tool-intent",
     });
     expect(routeTurn({ prompt: "谢谢", previousTurnUsedTools: true })).toEqual({
@@ -154,24 +156,33 @@ describe("turn routing", () => {
     });
   });
 
-  it("one strong turn in five across a typical session", () => {
-    // The split the pair is tuned for: judgement and oversized jobs on the strong
-    // half, everything else executed cheap. Ten representative prompts.
-    const prompts = [
-      "先看看仓库结构",
+  it("pays for orchestration on work turns and nothing on conversation", () => {
+    // The split the pair is tuned for: a turn that changes the workspace is
+    // *dispatched* by the strong half (plan, hand a package to the worker, judge the
+    // report), while a turn that only talks stays free. The paid half therefore does
+    // a few steps of judgement per work turn instead of the whole turn of typing.
+    const work = [
       "跑一下测试",
-      "把这段话翻译成英文：今天天气不错",
       "看看 src/app.ts 里的实现",
       "Commit 这些改动",
-      "总结一下这个会话",
       "为什么会间歇失败",
       "重构 registry 的分层",
       "帮我把这个函数改名",
+    ];
+    for (const prompt of work) {
+      const decision = routeTurn({ prompt, turnIndex: 2 });
+      expect({ prompt, tier: decision.tier }).toEqual({ prompt, tier: "main" });
+    }
+    const conversation = [
+      "先看看仓库结构",
+      "把这段话翻译成英文：今天天气不错",
+      "总结一下这个会话",
       "谢谢",
     ];
-    const tiers = prompts.map((prompt, index) => routeTurn({ prompt, turnIndex: index }).tier);
-    const main = tiers.filter((tier) => tier === "main").length;
-    expect(main).toBeLessThanOrEqual(2);
+    for (const prompt of conversation) {
+      const decision = routeTurn({ prompt, turnIndex: 2 });
+      expect({ prompt, tier: decision.tier }).toEqual({ prompt, tier: "sub" });
+    }
   });
 
   it("stays on the strong model when the cheap half is unusable", () => {
