@@ -59,11 +59,17 @@ it("folds a settled delegation's spend into the turn that asked for it", () => {
     } }],
   };
   const usage = usageForEvent(envelope({ details: settled }));
+  // A single settled operation folds to itself, so the record carries the id the
+  // ledger unions by; a replayed settle therefore counts once.
   expect(usage?.operationId).toBe("delegation:del-7");
   expect(usage?.inputTokens).toBe(12_000);
-  expect(usage?.cacheReadTokens).toBe(41_000, "cache reads are the biggest bucket in practice");
+  // Vitest takes the explanation as the expectation's message, not a second
+  // argument to `toBe` (which is Jest's shape).
+  expect(usage?.cacheReadTokens, "cache reads are the biggest bucket in practice").toBe(41_000);
   expect(usage?.totalTokens).toBe(12_800);
-  expect(usage?.agentName).toBe("test-runner");
+  // The worker's name belongs to the delegation (`details.agent`), not to the
+  // usage record: one turn can fold several workers' requests.
+  expect(settled.agent).toBe("test-runner");
 });
 
 it("keeps one record per delegation when the settle event repeats", () => {
@@ -75,5 +81,5 @@ it("keeps one record per delegation when the settle event repeats", () => {
     { usage: operation }, { usage: operation },
   ] } }));
   expect(usage?.operations).toHaveLength(1);
-  expect(usage?.inputTokens).toBe(12_000, "a replayed settle must not double the bill");
+  expect(usage?.inputTokens, "a replayed settle must not double the bill").toBe(12_000);
 });
