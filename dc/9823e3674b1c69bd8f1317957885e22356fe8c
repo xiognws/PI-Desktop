@@ -1,0 +1,16 @@
+crates/agent-core/src/retry.rs
+  h_201ed4c689ac8b 32-38,44,46-47,52-55,64-70,98,184-201
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 639,664-675,679
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "dc9823e3674b1c69bd8f1317957885e22356fe8c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
