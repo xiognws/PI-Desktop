@@ -66,13 +66,16 @@ pub struct ToolResultAging {
 impl Default for ToolResultAging {
     fn default() -> Self {
         Self {
-            // Two: the request the model is composing right now, plus the one before
-            // it. Three kept a whole 96KB command output alive across two more steps.
-            keep_recent: 2,
+            // One: only the result the model is answering right now stays whole. The
+            // step before it is usually already read, and keeping it whole was the
+            // difference between ~40k and ~25k per request on long turns.
+            keep_recent: 1,
             head_chars: 400,
             tail_chars: 400,
-            trigger_tokens: 48_000,
-            oversize_chars: 12_000,
+            // 32k: the system prompt alone is ~9.4k tokens here, so this starts
+            // eliding while the request is still small.
+            trigger_tokens: 32_000,
+            oversize_chars: 8_000,
         }
     }
 }
@@ -228,11 +231,11 @@ mod tests {
 
     fn policy() -> ToolResultAging {
         ToolResultAging {
-            keep_recent: 2,
+            keep_recent: 1,
             head_chars: 400,
             tail_chars: 400,
-            trigger_tokens: 48_000,
-            oversize_chars: 12_000,
+            trigger_tokens: 32_000,
+            oversize_chars: 8_000,
         }
     }
 
@@ -310,8 +313,8 @@ mod tests {
         let messages = transcript(20, 4_000);
         let outcome = age_tool_results(&messages, Some(&limit(20_000)), policy());
         assert!(outcome.changed(), "20 turns of 4k output is over the limit");
-        // 20 results, the newest 2 stay whole.
-        assert_eq!(outcome.aged, 18);
+        // 20 results, the newest one stays whole.
+        assert_eq!(outcome.aged, 19);
         let tool_rows: Vec<&Message> = outcome
             .messages
             .iter()
@@ -319,7 +322,7 @@ mod tests {
             .collect();
         for (index, message) in tool_rows.iter().enumerate() {
             let content = &message.tool_results()[0].content;
-            let whole = index >= tool_rows.len() - 2;
+            let whole = index >= tool_rows.len() - 1;
             assert_eq!(
                 !content.contains("are not in this context"),
                 whole,
@@ -362,9 +365,9 @@ mod tests {
             after * 3 < before,
             "aging should cut most of the old output: {before} -> {after}"
         );
-        // 18 aged results lose everything except both ends (400 + 400 characters).
+        // 19 aged results lose everything except both ends (400 + 400 characters).
         assert!(
-            outcome.chars_elided > 18 * 3_000,
+            outcome.chars_elided > 19 * 3_000,
             "elided {} chars",
             outcome.chars_elided
         );

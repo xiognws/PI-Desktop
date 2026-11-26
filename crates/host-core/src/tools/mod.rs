@@ -758,11 +758,14 @@ pub struct OutputBudget {
     pub direction: Direction,
 }
 
-/// Read / Glob / Grep. 128KB fits a 2000-line window of typical source; 4000
-/// lines is the explicit ceiling so a default window is not also the max.
+/// Read / Glob / Grep. 40KB is ~10k tokens and still several hundred lines of
+/// source; a bigger file is read in windows, which costs one more call but keeps
+/// every later step of the turn cheaper. Every byte here is re-sent on each step
+/// until it is aged, and measured sessions showed `Read` averaging 7k characters
+/// per call at a 128KB ceiling — a large share of a request that bought nothing.
 pub const BUDGET_SEARCH: OutputBudget = OutputBudget {
-    max_bytes: 128 * 1024,
-    max_lines: 4000,
+    max_bytes: 40 * 1024,
+    max_lines: 1500,
     direction: Direction::Head,
 };
 

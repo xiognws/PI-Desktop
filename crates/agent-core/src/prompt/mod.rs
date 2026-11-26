@@ -478,10 +478,11 @@ mod tests {
         let section = orchestrating
             .section(smart::SMART_ORCHESTRATOR_SECTION)
             .expect("orchestrator section");
-        // The two halves of the instruction that make the pair save anything:
-        // hand mechanical steps over, and check what comes back.
+        // The three parts that make the pair save anything: hand the work over in
+        // packages, judge each report once, and never end a turn announcing one.
         assert!(section.contains("`Task`"));
-        assert!(section.contains("verify it against that step's goal"));
+        assert!(section.contains("one to three packages"));
+        assert!(section.contains("Verify a package once"));
         // And the rule a routed turn learned the hard way: a turn that only
         // announces the next step ends with the work undone.
         assert!(section.contains("Never end a turn by announcing the next step"));

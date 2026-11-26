@@ -289,12 +289,14 @@ mod tests {
     }
 
     #[test]
-    fn a_default_window_takes_a_single_result_to_a_sixth_of_the_constant() {
+    fn a_default_window_never_exceeds_the_search_constant() {
         let ledger = TurnOutputLedger::new();
         let plan = ledger.plan("s", Some("t"), Some(DEFAULT_WINDOW));
-        // 128,000 * 3.5 * 15% = 67,200 chars, versus the 131,072-byte cap.
-        assert_eq!(plan.resolve(BUDGET_SEARCH).max_bytes, 67_200);
-        assert!(plan.resolve(BUDGET_SEARCH).max_bytes < BUDGET_SEARCH.max_bytes);
+        // The window's own share is 128,000 * 3.5 * 15% = 67,200 chars, which is now
+        // *above* the 40,960-byte constant: the constant binds, so the window share
+        // is only ever an upper bound.
+        assert_eq!(plan.resolve(BUDGET_SEARCH).max_bytes, BUDGET_SEARCH.max_bytes);
+        assert_eq!(plan.resolve(BUDGET_SEARCH).max_bytes, 40_960);
     }
 
     #[test]
@@ -312,7 +314,7 @@ mod tests {
         let plan = ledger.plan("s", Some("t"), Some(DEFAULT_WINDOW));
         // 128,000 * 3.5 * 30% = 134,400 chars for the whole turn.
         let first = plan.resolve(BUDGET_SEARCH);
-        assert_eq!(first.max_bytes, 67_200);
+        assert_eq!(first.max_bytes, 40_960);
         plan.record(130_000);
         let second = plan.resolve(BUDGET_SEARCH);
         assert_eq!(second.max_bytes, 4_400, "what is left of the turn");
@@ -336,12 +338,12 @@ mod tests {
     fn a_turn_without_an_id_is_charged_to_nobody() {
         let ledger = TurnOutputLedger::new();
         let first = ledger.plan("s", None, Some(DEFAULT_WINDOW));
-        assert_eq!(first.resolve(BUDGET_SEARCH).max_bytes, 67_200);
+        assert_eq!(first.resolve(BUDGET_SEARCH).max_bytes, 40_960);
         first.record(1_000_000);
         // No boundary to reset on, so no cumulative cap either: the next call in
         // the same session keeps its full per-result allowance.
         let second = ledger.plan("s", None, Some(DEFAULT_WINDOW));
-        assert_eq!(second.resolve(BUDGET_SEARCH).max_bytes, 67_200);
+        assert_eq!(second.resolve(BUDGET_SEARCH).max_bytes, 40_960);
     }
 
     #[test]
@@ -355,8 +357,8 @@ mod tests {
             turn_one.resolve(BUDGET_SEARCH).max_bytes,
             TURN_RESULT_FLOOR_CHARS
         );
-        assert_eq!(turn_two.resolve(BUDGET_SEARCH).max_bytes, 67_200);
-        assert_eq!(other_session.resolve(BUDGET_SEARCH).max_bytes, 67_200);
+        assert_eq!(turn_two.resolve(BUDGET_SEARCH).max_bytes, 40_960);
+        assert_eq!(other_session.resolve(BUDGET_SEARCH).max_bytes, 40_960);
     }
 
     #[test]
