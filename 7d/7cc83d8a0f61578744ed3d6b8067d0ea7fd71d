@@ -1,0 +1,36 @@
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 51,2565-2577,2819-2870
+docs/spec/03-runtime/08-error-codes.md
+  h_201ed4c689ac8b 122-124,329-366
+docs/spec/03-runtime/README.md
+  h_201ed4c689ac8b 24-25
+docs/spec/06-delivery/03-ai-development-workflow.md
+  h_201ed4c689ac8b 540
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 11035,11039,11123
+docs/spec/07-plugins/03-plugin-api.md
+  h_201ed4c689ac8b 253-270,1524
+docs/spec/07-plugins/13-plugin-permissions-matrix.md
+  h_201ed4c689ac8b 61,190
+docs/spec/07-plugins/README.md
+  h_201ed4c689ac8b 29
+docs/zh-CN/spec/03-runtime/08-error-codes.md
+  h_201ed4c689ac8b 60
+docs/zh-CN/spec/07-plugins/03-plugin-api.md
+  h_201ed4c689ac8b 785-816
+docs/zh-CN/spec/07-plugins/16-trusted-extensions.md
+  h_201ed4c689ac8b 169-192
+docs/zh-CN/spec/07-plugins/19-widget-packages.md
+  h_201ed4c689ac8b 3-140,142-143,145,147-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7d7cc83d8a0f61578744ed3d6b8067d0ea7fd71d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
