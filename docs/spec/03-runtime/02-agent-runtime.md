@@ -586,14 +586,19 @@ reference only, not a linked or copied dependency.
 
 Compaction follows Codex's mechanism (ADR 0064, amended by D623): it remains
 inline at turn boundaries, and the model can request it through `new_context`.
-Automatic compaction starts at half of the derived `hardLimit` — the same 0.5
-share Hermes uses for `compression.threshold` — and the window that budget is
-derived from is the model's configured context window (Settings → Models), so
-the number the settings page shows is the number the turn is budgeted on. There
-used to be a 262,144-token ceiling here, inherited from the Node runtime; it made
-a model configured at a million plan against a quarter of it, so the settings page
-and the session budget disagreed, and the ceiling was removed. Compacting at half
-of the safe budget is what bounds a long turn now. There is no background
+The window a turn is budgeted on is the model's configured context window
+(Settings → Models) capped by the request ceiling `PROMPT_BUDGET_CEILING`
+(200,000): planning against a million meant never compacting, and a measured
+session reached 755,678 tokens in a single step with no checkpoint at all.
+Automatic compaction starts at `min(window share, 60,000)` — a size, not a share,
+because the bill for a turn is the sum of every step's context and a large window
+is not a licence to fill it. A window below the ceiling keeps its own ratio, so a
+32k model still compacts at roughly 12k rather than being asked to hold 60k it
+cannot. The retained tail and the carried user message are clamped to the trigger
+for the same reason: a checkpoint that keeps half a 600k window cannot bring the
+transcript back under it. Thresholds, ageing and every related budget are recorded
+with their measured justification in [ADR 0409](../adr/0409-token-budget-defaults.md);
+they apply to single-model sessions as well as smart mode. There is no background
 pre-computation.
 
 pi 0.84.4+ invokes `prepareNextTurn` only when the loop will start another

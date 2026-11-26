@@ -443,3 +443,4 @@ Each ADR includes:
 | 0406 | [Windows runs commands in Git Bash by default](0406-windows-default-git-bash.md) | Accepted (amends 0054, 0209) |
 | 0407 | [Bundled plugins stay plugins](0407-bundled-plugins-stay-plugins.md) | Accepted (related 0383, 0402) |
 | 0408 | [The system proxy relay starts only when the machine routes](0408-system-proxy-relay-gate.md) | Accepted (related 0177, 0406) |
+| 0409 | [Token budget defaults are global, and they are sized, not inherited](0409-token-budget-defaults.md) | Accepted (related 0405, 0404) |
