@@ -1,0 +1,44 @@
+apps/desktop/src/components/ContextUsageInspector.tsx
+  h_201ed4c689ac8b 35-36,155-160,387,389-393
+apps/desktop/src/features/chat/context-usage/SessionTokenTotals.tsx
+  h_201ed4c689ac8b 1-25
+apps/desktop/src/features/chat/context-usage/useSessionTokenTotals.ts
+  h_201ed4c689ac8b 1-46
+crates/agent-core/src/message.rs
+  h_201ed4c689ac8b 151-160,172-174
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 1561-1565,1567,1581-1583,1638-1640,1642-1644,1673-1695,1765-1789
+crates/host-core/src/plugin_sessions.rs
+  h_201ed4c689ac8b 296-297
+crates/host-core/src/sessions.rs
+  h_201ed4c689ac8b 269-274,494-499,689-690,797-798,857-858,4726-4727,5697-5698,6568-6569,6717-6718,9269-9304
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 660-662
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 675-677
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 660-662
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 660-662
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 672-674
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 662-664
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 672-674
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 665-667
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 665-667
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0e0b76851f14b9ef7fd609d753e0ba8a71ab461e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
