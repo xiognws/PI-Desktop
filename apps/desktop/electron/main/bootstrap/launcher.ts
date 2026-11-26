@@ -12,6 +12,7 @@ import {
 } from "@pi-workspace/shared";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
+import { loadLauncherSurface } from "../launcher-surface-load";
 import { attachRendererConsoleLogging } from "../renderer-console";
 import type { WindowLifecycleState } from "./window";
 import { suppressLinuxFramelessSystemMenu } from "../frameless-system-menu";
@@ -50,6 +51,15 @@ export type LauncherDependencies = {
  * the user rebinds the app shortcut away.
  */
 const hostGlobalBindings = new Map<string, string>();
+
+/**
+ * How long the launcher's first navigation waits before it is tried again.
+ *
+ * The warm-up races boot; a retry a fraction of a second later lands on a settled
+ * process. Three attempts at this spacing cover a slow start without holding the
+ * window for a second when the failure is real.
+ */
+const LAUNCHER_LOAD_RETRY_MS = 700;
 
 /** Live view of the app's own global accelerators, for the plugin runtime. */
 export function hostGlobalShortcutBindings(): string[] {
@@ -196,6 +206,23 @@ export function createLauncher({
         if (state.pluginLauncherWindow === window) state.pluginLauncherWindow = null;
       });
 
+      // A surface that fails to load must say why: this window is the only route
+      // into a plugin's own panel, so "warm-up failed" without a code, a URL and
+      // whether the renderer went away is not enough to act on.
+      const failure: { current: { code: number; description: string; url: string } | null } = {
+        current: null,
+      };
+      window.webContents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+        if (isMainFrame === false) return;
+        failure.current = { code, description, url };
+        logger.app("diagnostics", "warn", "plugin.launcher.load.failed", {
+          data: { code, description, url },
+        });
+      });
+      window.webContents.on("render-process-gone", (_event, details) => {
+        logger.app("diagnostics", "warn", "plugin.launcher.renderer.gone", { data: details });
+      });
+
       try {
         // The surface travels in the HASH, not the query string.
         //
@@ -206,18 +233,38 @@ export function createLauncher({
         // warm-up logged a failure on every boot and the launcher opened late or not
         // at all. A fragment never takes part in path resolution, so it works in both
         // the dev server and the asar.
-        if (process.env.ELECTRON_RENDERER_URL) {
-          const url = new URL(process.env.ELECTRON_RENDERER_URL);
-          url.hash = "surface=plugin-launcher";
-          await window.loadURL(url.toString());
-        } else {
-          await window.loadFile(
-            join(getModuleDirectory(import.meta.url), "../renderer/index.html"),
-            { hash: "surface=plugin-launcher" },
-          );
-        }
+        //
+        // The fragment fixed the every-boot failure, not every failure: the warm-up
+        // runs while boot is still allocating the first window and the plugin host, and
+        // on a small fraction of starts the navigation is aborted within milliseconds
+        // (`ERR_FAILED (-2)`) and the same load succeeds on the next attempt. Without
+        // that retry the launcher stays unbuilt for the session, which the user reads as
+        // "the plugin panels do nothing". See `launcher-surface-load.ts`.
+        await loadLauncherSurface(
+          () => {
+            if (process.env.ELECTRON_RENDERER_URL) {
+              const url = new URL(process.env.ELECTRON_RENDERER_URL);
+              url.hash = "surface=plugin-launcher";
+              return window.loadURL(url.toString());
+            }
+            return window.loadFile(
+              join(getModuleDirectory(import.meta.url), "../renderer/index.html"),
+              { hash: "surface=plugin-launcher" },
+            );
+          },
+          {
+            delayMs: LAUNCHER_LOAD_RETRY_MS,
+            onRetry: ({ attempt, error }) =>
+              logger.app("diagnostics", "warn", "plugin launcher load retry", {
+                data: { attempt, error: String(error), lastFailure: failure.current },
+              }),
+          },
+        );
         return window;
       } catch (error) {
+        logger.app("diagnostics", "error", "plugin launcher warm-up failed", {
+          data: { error: String(error), lastFailure: failure.current },
+        });
         if (!window.isDestroyed()) window.destroy();
         throw error;
       }

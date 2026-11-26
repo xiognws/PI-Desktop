@@ -35,9 +35,19 @@ split; the launcher never reads session or workspace data.
   `apps/desktop/electron/main/bootstrap/launcher.ts`: frameless, transparent,
   `alwaysOnTop`, unminimizable/unmaximizable, skipped from the taskbar, and (on
   macOS) joined to every Space above this app's own fullscreen window.
-- It loads the ordinary renderer bundle with `?surface=plugin-launcher`; the
-  renderer picks that surface in `apps/desktop/src/main.tsx` and mounts only
-  `PluginLauncher` (`apps/desktop/src/components/PluginLauncher.tsx`).
+- It loads the ordinary renderer bundle with `#surface=plugin-launcher` (a
+  fragment, not a query: a `?query` on an `app.asar` path failed the load in a
+  packaged build); the renderer picks that surface in
+  `apps/desktop/src/main.tsx` and mounts only `PluginLauncher`
+  (`apps/desktop/src/components/PluginLauncher.tsx`).
+- The warm-up races boot: on a small fraction of starts the navigation is
+  aborted within milliseconds (`ERR_FAILED (-2)`) and succeeds on a retry, so
+  the load is attempted up to three times, `700 ms` apart, and only an aborted
+  navigation is retried (`electron/main/launcher-surface-load.ts`). A load that
+  still fails logs `plugin.launcher.load.failed` / `plugin launcher warm-up
+  failed` with the error code, the URL and whether the renderer went away.
+  Without the retry an unbuilt launcher stays dead for the whole session, and
+  the launcher is the only route into a plugin's own panel window.
 - Focus loss hides the panel. It is hidden, never destroyed, so reopening is
   immediate and a dragged size survives.
 
