@@ -1,0 +1,20 @@
+apps/desktop/electron/main/bootstrap/startup.ts
+  h_201ed4c689ac8b 381-390
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 301-304
+apps/desktop/electron/main/providers/in-app-providers.ts
+  h_201ed4c689ac8b 67-70,230-231,250-252,271-357,359-363,453,511,516-517,530,536,549
+apps/desktop/test/in-app-providers.test.mjs
+  h_201ed4c689ac8b 87-90,192-194,197-248,316,330-331,336-337,420-447,460-461
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ffd4273543e99a44bd3205f07d7e20f1da266034",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
