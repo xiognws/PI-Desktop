@@ -1,0 +1,16 @@
+.gitignore
+  h_201ed4c689ac8b 105
+scripts/bundled-plugins-excluded.json
+  h_201ed4c689ac8b 31-32,78-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8a58901dfb01e530d60212e2f571558c60693809",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
