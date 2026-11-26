@@ -1,0 +1,14 @@
+apps/desktop/test/skill-review-row-render.test.mjs
+  h_201ed4c689ac8b 49-58,67,73-81,117,124,128-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1595f575aeb54fa6f6711ed175a0bcbbf98a9205",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
