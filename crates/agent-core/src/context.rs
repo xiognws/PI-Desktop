@@ -33,6 +33,14 @@ pub const COMPACTION_MIN_KEEP_RECENT_TOKENS: u64 = 8_000;
 pub const COMPACTION_MAX_KEEP_RECENT_TOKENS: u64 = 64_000;
 /// Cap on a user message carried across a compaction boundary.
 pub const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS: u64 = 20_000;
+/// Absolute size that starts automatic compaction, whatever the window is.
+///
+/// A share of the window makes a large window a cost trap: the trigger sits so high
+/// that a working turn never reaches it, so the whole transcript is re-sent on every
+/// step. 60k holds a long coding turn and keeps the steps after it an order of
+/// magnitude cheaper than a 600k-token context would.
+pub const AUTO_COMPACTION_TRIGGER_CEILING_TOKENS: u64 = 60_000;
+
 /// Share of `hardLimit` that starts automatic compaction on large windows.
 pub const AUTO_COMPACTION_TRIGGER_RATIO: f64 = 0.5;
 /// Windows below this size compact at the floor ratio instead of the plain
@@ -178,15 +186,6 @@ impl ContextLimits {
 
         let hard_limit = std::cmp::max(1, window - request_headroom);
 
-        let keep_recent_tokens = std::cmp::max(
-            COMPACTION_MIN_KEEP_RECENT_TOKENS,
-            COMPACTION_MAX_KEEP_RECENT_TOKENS
-                .min((hard_limit as f64 * COMPACTION_KEEP_RECENT_RATIO) as u64),
-        )
-        // A retained tail wider than half the safe budget leaves the summary no
-        // room, so the min/max clamp above never wins on a small window.
-        .min(std::cmp::max(1, hard_limit / 2));
-
         // Small windows compact at the floor ratio, not the plain share: the
         // ratio is raised for sub-ceiling windows so a small model uses most
         // of its real window before a checkpoint throws detail away.
@@ -195,10 +194,31 @@ impl ContextLimits {
         } else {
             AUTO_COMPACTION_TRIGGER_RATIO
         };
-        let trigger = std::cmp::max(1, (hard_limit as f64 * trigger_ratio) as u64);
+        // Whichever comes first: the window's own share, or the fixed ceiling that
+        // keeps a large window from becoming the most expensive possible session.
+        let trigger = std::cmp::max(
+            1,
+            (hard_limit as f64 * trigger_ratio)
+                .min(AUTO_COMPACTION_TRIGGER_CEILING_TOKENS as f64) as u64,
+        );
+
+        // The retained tail is measured against the trigger, not the window: a
+        // checkpoint that keeps a third of the trigger can bring the transcript back
+        // under it, and one that keeps half of a 600k window cannot.
+        let keep_recent_tokens = std::cmp::max(
+            COMPACTION_MIN_KEEP_RECENT_TOKENS.min(trigger / 2),
+            COMPACTION_MAX_KEEP_RECENT_TOKENS.min((trigger as f64 * COMPACTION_KEEP_RECENT_RATIO) as u64),
+        )
+        // A retained tail wider than half the safe budget leaves the summary no
+        // room, so the min/max clamp above never wins on a small window.
+        .min(std::cmp::max(1, hard_limit / 2))
+        .min(std::cmp::max(1, trigger / 2))
+        .max(1);
         let retained_user_message_budget = std::cmp::max(
             1,
-            COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS.min(hard_limit / 2),
+            COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS
+                .min(hard_limit / 2)
+                .min(std::cmp::max(1, trigger / 2)),
         );
 
         Self {
@@ -366,7 +386,9 @@ mod tests {
         // The model's own 32K output budget dominates the reserve floor and 5%.
         assert_eq!(limits.request_headroom, 32_768);
         assert_eq!(limits.hard_limit, 167_232);
-        assert_eq!(limits.trigger, 125_424);
+        // The fixed ceiling wins over the window share: a 200k plan would otherwise
+        // compact at 125k, and every step until then re-sends 125k tokens.
+        assert_eq!(limits.trigger, AUTO_COMPACTION_TRIGGER_CEILING_TOKENS);
         assert_eq!(limits.retained_user_message_budget, 20_000);
     }
 
@@ -392,10 +414,11 @@ mod tests {
         // max(16_384 floor, min(32_768 output, window/4 = 32_000), 6_400) = 32_000.
         assert_eq!(limits.request_headroom, 32_000);
         assert_eq!(limits.hard_limit, 96_000);
-        // A 128K window sits under the small-window ceiling, so the trigger is
-        // the floor ratio: 96,000 x 0.75, not the plain share.
-        assert_eq!(limits.trigger, 72_000);
-        assert_eq!(limits.keep_recent_tokens, 19_200);
+        // 96,000 x 0.75 would be 72,000; the fixed ceiling starts the checkpoint
+        // earlier, because the tail of the window is what a session pays for twice.
+        assert_eq!(limits.trigger, AUTO_COMPACTION_TRIGGER_CEILING_TOKENS);
+        // A third of the trigger, clamped by the window's own keep-recent rule.
+        assert_eq!(limits.keep_recent_tokens, 12_000);
     }
 
     #[test]
@@ -405,11 +428,14 @@ mod tests {
         // floor = min(16_384, 4_096) = 4_096; output budget = min(8_192, 2_048).
         assert_eq!(limits.request_headroom, 4_096);
         assert_eq!(limits.hard_limit, 4_096);
-        // The trigger follows the floor ratio on this sub-ceiling window.
+        // The trigger follows the floor ratio on this sub-ceiling window; the fixed
+        // ceiling is far above it here, so the small window keeps its ratio.
         assert_eq!(limits.trigger, 3_072);
-        // The tail never takes more than half the safe budget.
-        assert_eq!(limits.keep_recent_tokens, 2_048);
-        assert_eq!(limits.retained_user_message_budget, 2_048);
+        // The tail never takes more than half of the trigger, which keeps a
+        // checkpoint able to bring the transcript back under it.
+        assert_eq!(limits.keep_recent_tokens, 1_536);
+        // Same rule for the carried user message: half the trigger, not half the window.
+        assert_eq!(limits.retained_user_message_budget, 1_536);
     }
 
     #[test]
@@ -423,10 +449,14 @@ mod tests {
                 limits.window <= PROMPT_BUDGET_CEILING,
                 "advertised {advertised} must be capped"
             );
+            // The window's own ratio, or the fixed ceiling — whichever is smaller.
+            // A planned window is never given up before it is full, and a large one
+            // is never filled just because it could be.
+            let by_ratio = std::cmp::max(1, (limits.hard_limit as f64 * 0.75) as u64);
             assert_eq!(
                 limits.trigger,
-                std::cmp::max(1, (limits.hard_limit as f64 * 0.75) as u64),
-                "advertised {advertised} must compact at the floor ratio"
+                by_ratio.min(AUTO_COMPACTION_TRIGGER_CEILING_TOKENS),
+                "advertised {advertised} must compact at the floor ratio or the ceiling"
             );
         }
     }
