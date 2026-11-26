@@ -1,0 +1,20 @@
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 232-248,304-306,346,391,463-468
+crates/agent-core/src/provider/mod.rs
+  h_201ed4c689ac8b 16
+crates/agent-core/src/provider/pacing.rs
+  h_201ed4c689ac8b 1-90
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 644-670
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f219dfc4b9827bd192702554db46371810238a25",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
