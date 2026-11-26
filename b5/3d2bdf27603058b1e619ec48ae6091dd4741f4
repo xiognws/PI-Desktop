@@ -1,0 +1,22 @@
+apps/desktop/electron/main/bootstrap/window.ts
+  h_201ed4c689ac8b 1207-1211
+apps/desktop/electron/main/network-proxy-gate.ts
+  h_201ed4c689ac8b 71-118,123,125-141,144-146
+apps/desktop/electron/main/network-proxy.ts
+  h_201ed4c689ac8b 53,63-66
+apps/desktop/electron/main/runtime/host.ts
+  h_201ed4c689ac8b 24-32,68-74,491-516
+apps/desktop/test/network-proxy-gate.test.mjs
+  h_201ed4c689ac8b 64-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b53d2bdf27603058b1e619ec48ae6091dd4741f4",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
