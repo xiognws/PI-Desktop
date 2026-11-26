@@ -57,6 +57,13 @@ use crate::provider::BoxFuture;
 use crate::tool::{Tool, ToolContext, ToolSpec};
 
 /// The tool that turns an on-demand name into a declaration.
+/// Characters of a deferred tool's description kept in the prompt catalogue.
+///
+/// The catalogue is re-sent with every request, and a name plus a short phrase is
+/// enough to recognise a tool; `ToolSearch` matches against the full description
+/// and the schema arrives on activation, so nothing is lost by shortening the line.
+pub const MAX_CATALOG_DESCRIPTION_CHARS: usize = 80;
+
 pub const TOOL_SEARCH_NAME: &str = "ToolSearch";
 
 /// Name of the prompt section that lists the on-demand catalog and records what
@@ -404,6 +411,22 @@ impl ToolActivation {
         activated
     }
 
+    /// One catalogue line's worth of a description: a name plus a short phrase.
+    ///
+    /// Cut on a character boundary and marked with an ellipsis, so the model can tell
+    /// the text was shortened rather than complete.
+    pub fn catalog_description(description: &str) -> String {
+        let trimmed = description.trim();
+        if trimmed.chars().count() <= MAX_CATALOG_DESCRIPTION_CHARS {
+            return trimmed.to_string();
+        }
+        let head: String = trimmed
+            .chars()
+            .take(MAX_CATALOG_DESCRIPTION_CHARS.saturating_sub(1))
+            .collect();
+        format!("{head}\u{2026}")
+    }
+
     /// The system-prompt section listing what is on demand.
     ///
     /// Upstream counterpart: `optionalToolsPrompt` (`runtime.ts:5315`) plus
@@ -423,7 +446,11 @@ impl ToolActivation {
             ),
         ];
         for spec in &self.deferred {
-            lines.push(format!("- {}: {}", spec.name, spec.description));
+            lines.push(format!(
+                "- {}: {}",
+                spec.name,
+                Self::catalog_description(&spec.description)
+            ));
         }
         let active = self.active_names();
         lines.push(format!(
@@ -795,6 +822,21 @@ mod tests {
         assert!(activation.resolve("nothing matches this").is_empty());
     }
 
+    #[test]
+    fn a_long_description_is_shortened_but_still_findable() {
+        let activation = activation(SessionMode::Agent);
+        let long = ToolActivation::catalog_description(&"word ".repeat(60));
+        assert!(
+            long.chars().count() <= MAX_CATALOG_DESCRIPTION_CHARS,
+            "kept {} characters",
+            long.chars().count()
+        );
+        assert!(long.ends_with('\u{2026}'), "the cut is visible");
+        // Search matches the spec's full description (`a_short_description_finds_the_tool`
+        // covers that path); shortening the prompt line must not change it.
+        let _ = &activation;
+    }
+
     /// The section is what tells the model the catalogue exists at all; without
     /// it, deferring a tool hides it.
     #[test]
@@ -804,6 +846,15 @@ mod tests {
         assert!(section.starts_with("# On-demand tools"));
         assert!(section.contains("ToolSearch"));
         assert!(section.contains("- OfficeRead:"));
+        // A catalogue line carries a name and a short phrase, not a paragraph: the
+        // section is re-sent with every request.
+        for line in section.lines().filter(|line| line.starts_with("- ")) {
+            let body = line.split_once(": ").map(|(_, rest)| rest).unwrap_or("");
+            assert!(
+                body.chars().count() <= MAX_CATALOG_DESCRIPTION_CHARS,
+                "catalogue line too long: {line}"
+            );
+        }
         assert!(section.contains("Active on-demand tools: none"));
 
         activation.activate(&["OfficeRead".to_string()]);

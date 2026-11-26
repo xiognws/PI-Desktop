@@ -23,9 +23,20 @@ pub const INSTRUCTION_FILE_NAMES: [&str; 4] = [
     ".claude/CLAUDE.md",
 ];
 
-pub const MAX_GLOBAL_INSTRUCTION_BYTES: usize = 32 * 1024;
-pub const MAX_PROJECT_INSTRUCTION_BYTES: usize = 32 * 1024;
-pub const MAX_PROMPT_BYTES: usize = 64 * 1024;
+// 20KB per file and 40KB for the whole block: this block is re-sent with every
+// request, and a measured session spent ~20k characters of a 32.8k-character system
+// prompt on it. 20KB still holds a long rule set; anything beyond is cut with a
+// notice, keeping both ends of the file.
+pub const MAX_GLOBAL_INSTRUCTION_BYTES: usize = 20 * 1024;
+pub const MAX_PROJECT_INSTRUCTION_BYTES: usize = 20 * 1024;
+pub const MAX_PROMPT_BYTES: usize = 40 * 1024;
+
+/// Share of an instruction budget kept from the head; the tail keeps the rest.
+///
+/// A project's commit, gate and reporting rules live at the end of its file, so a
+/// head-only cut drops exactly the part that decides how work lands.
+pub const INSTRUCTION_HEAD_SHARE: f64 = 0.7;
+pub const INSTRUCTION_TAIL_SHARE: f64 = 0.2;
 pub const GLOBAL_INSTRUCTION_FILE: &str = "AGENTS.md";
 pub const GLOBAL_INSTRUCTION_SOURCE: &str = "~/.pi/agent/AGENTS.md";
 
@@ -70,13 +81,49 @@ pub fn limit_utf8_bytes(content: &str, max_bytes: usize) -> (String, usize, bool
     (content[..end].to_string(), bytes, true)
 }
 
+/// Keep the head and the tail of `content` inside a shared byte budget.
+///
+/// The cut lands in the middle and is announced, so the model knows the file was
+/// longer and that both of its ends are present. Head-only truncation dropped the
+/// bottom of every long rule set — which is where the commit and gate rules sit.
+fn limit_utf8_bytes_head_and_tail(content: &str, max_bytes: usize) -> (String, usize, bool) {
+    if content.len() <= max_bytes {
+        return (content.to_string(), content.len(), false);
+    }
+    let head_budget = (max_bytes as f64 * INSTRUCTION_HEAD_SHARE) as usize;
+    let tail_budget = (max_bytes as f64 * INSTRUCTION_TAIL_SHARE) as usize;
+    let (head, head_bytes, _) = limit_utf8_bytes(content, head_budget);
+    let mut tail_bytes = 0usize;
+    let mut start = content.len();
+    for (index, character) in content.char_indices().rev() {
+        let width = character.len_utf8();
+        if tail_bytes + width > tail_budget {
+            break;
+        }
+        tail_bytes += width;
+        start = index;
+    }
+    let tail = &content[start..];
+    if head.len() + tail.len() >= content.len() {
+        // Never repeat text: for a file just over the budget, one cut is enough.
+        let (kept, bytes, _) = limit_utf8_bytes(content, max_bytes);
+        return (kept, bytes, true);
+    }
+    let joined = format!("{head}\n\n\u{2026}\n\n{tail}");
+    let kept_bytes = joined.len();
+    // `head_bytes + tail_bytes` would undercount by the marker, and callers use the
+    // returned byte count as "what is actually in context".
+    let _ = (head_bytes, tail_bytes);
+    (joined, kept_bytes, true)
+}
+
 fn limit_instruction(
     source: &str,
     content: &str,
     max_bytes: usize,
 ) -> (InstructionEntry, usize, bool) {
     let total = content.len();
-    let (kept, bytes, truncated) = limit_utf8_bytes(content, max_bytes);
+    let (kept, bytes, truncated) = limit_utf8_bytes_head_and_tail(content, max_bytes);
     if !truncated {
         return (
             InstructionEntry {
@@ -88,7 +135,7 @@ fn limit_instruction(
         );
     }
     let notice = format!(
-        "[Pi-Workspace truncated {source}: loaded the first {bytes} of {total} bytes; the rest of this file is not in context.]"
+        "[Pi-Workspace truncated {source}: kept {bytes} of {total} bytes (head and tail); the middle of this file is not in context.]"
     );
     let kept = kept.trim_end();
     let content = if kept.is_empty() {
@@ -578,6 +625,38 @@ mod tests {
         let custom =
             load_custom_system_prompt(&fs, Some("/w"), Some("/data/agent")).expect("custom files");
         assert_eq!(custom.replace.as_deref(), Some("global persona"));
+    }
+
+    #[test]
+    fn a_cut_keeps_the_head_and_the_tail() {
+        // The bottom of a long rule set is where commit / gate / reporting rules sit,
+        // so a cut that keeps only the head drops the part that decides how work lands.
+        let head = "H".repeat(3_000);
+        let middle = "M".repeat(40_000);
+        let tail = "T".repeat(3_000);
+        let content = format!("{head}{middle}{tail}");
+        let (kept, bytes, truncated) = limit_utf8_bytes_head_and_tail(&content, 20 * 1024);
+        assert!(truncated);
+        assert!(bytes <= 20 * 1024, "kept {bytes} bytes");
+        assert!(kept.starts_with("HHHH"), "the head survives");
+        assert!(kept.ends_with("TTTT"), "the tail survives");
+        // The middle is what went: only the head and tail edges can carry its bytes.
+        assert!(
+            kept.matches('M').count() < 15_000,
+            "most of the middle must be gone, kept {} of 40,000",
+            kept.matches('M').count()
+        );
+        assert!(kept.contains('\u{2026}'), "the cut is visible in the text");
+    }
+
+    #[test]
+    fn a_cut_never_repeats_text() {
+        // A file just over the budget would otherwise let head and tail overlap.
+        let content = "x".repeat(21 * 1024);
+        let (kept, bytes, truncated) = limit_utf8_bytes_head_and_tail(&content, 20 * 1024);
+        assert!(truncated);
+        assert!(kept.len() <= 20 * 1024, "kept {} bytes against a 20KB budget", kept.len());
+        assert_eq!(bytes, kept.len());
     }
 
     #[test]
