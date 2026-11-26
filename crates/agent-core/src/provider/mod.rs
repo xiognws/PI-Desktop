@@ -13,6 +13,7 @@
 pub mod anthropic;
 pub mod google;
 pub mod http;
+pub mod pacing;
 pub mod openai;
 pub mod responses;
 pub mod scripted;

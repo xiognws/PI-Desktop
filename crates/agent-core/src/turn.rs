@@ -641,6 +641,33 @@ impl TurnEngine {
             request.max_output_tokens = config.max_output_tokens;
             request.thinking = config.thinking;
             request.cache = config.cache;
+            // What this step actually costs, itemised. A "trivial" task once measured
+            // 177k prompt tokens over eleven steps and nothing on the wire said where
+            // it went: the per-step floor is the system prompt, and a jump is either a
+            // large message or a wider tool set. Both are counts, not guesses.
+            if tracing::enabled!(target: "agent_core::turn", tracing::Level::INFO) {
+                let messages_chars = serde_json::to_string(&request.messages)
+                    .map(|text| text.chars().count())
+                    .unwrap_or(0);
+                let tools_chars = serde_json::to_string(&request.tools)
+                    .map(|text| text.chars().count())
+                    .unwrap_or(0);
+                let system_chars = request
+                    .system
+                    .as_ref()
+                    .map(|text| text.chars().count())
+                    .unwrap_or(0);
+                tracing::info!(
+                    target: "agent_core::turn",
+                    messages = request.messages.len(),
+                    messages_chars,
+                    tools = request.tools.len(),
+                    tools_chars,
+                    system_chars,
+                    approx_tokens = (messages_chars + tools_chars + system_chars) / 4,
+                    "request composition for this step"
+                );
+            }
             // A transient provider failure is not the end of the turn. Quota,
             // auth, a malformed request and a cancellation are terminal; a 502,
             // a dropped socket and a 429 are not, and re-sending the same request

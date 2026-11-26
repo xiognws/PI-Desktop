@@ -229,6 +229,23 @@ impl Provider for HttpProvider {
             let headers = self.headers()?;
             let url = self.config.endpoint(&request.model);
             let wire = self.config.wire;
+            // A gateway that already said "quota" gets its wait honoured before the
+            // next request, so a step does not have to fail to learn what the previous
+            // step already learned.
+            let pace_key = format!("{url}|{}", request.model);
+            let wait = super::pacing::wait_remaining(&pace_key);
+            if !wait.is_zero() {
+                tracing::info!(
+                    target: "agent_core::provider::http",
+                    wait_ms = wait.as_millis() as u64,
+                    "pacing a request against a known quota"
+                );
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return Err(AgentError::Cancelled),
+                    _ = tokio::time::sleep(wait) => {}
+                }
+            }
 
             // The request is sent here, not inside the stream task, so an HTTP
             // failure surfaces as an error from `stream()` instead of an
@@ -284,6 +301,9 @@ impl Provider for HttpProvider {
                 } else {
                     ProviderErrorKind::Fatal
                 };
+                if status.as_u16() == 429 || kind == ProviderErrorKind::Retryable {
+                    super::pacing::note_quota(&pace_key, retry_after.map(Duration::from_millis));
+                }
                 return Err(AgentError::provider_status(
                     kind,
                     status.as_u16(),
@@ -323,7 +343,7 @@ impl Provider for HttpProvider {
 
             let (tx, rx) = mpsc::channel(64);
             tokio::spawn(async move {
-                pump(response, wire, tx, cancel).await;
+                pump(response, wire, tx, cancel, pace_key).await;
             });
             Ok(ProviderStream::new(rx))
         })
@@ -368,6 +388,7 @@ async fn pump(
     wire: WireApi,
     tx: mpsc::Sender<StreamEvent>,
     cancel: CancelToken,
+    pace_key: String,
 ) {
     let mut decoder = WireDecoder::new(wire);
     let mut finished = false;
@@ -439,6 +460,12 @@ async fn pump(
         // bare `{"error":…}` JSON object under `text/event-stream`, which no frame
         // parser will ever emit. Read the raw tail before calling this a cut stream.
         if let Some(error) = bare_body_error(&tail) {
+            if matches!(
+                crate::retry::budget_for(&error),
+                Some(crate::retry::RetryBudget::RateLimit)
+            ) {
+                super::pacing::note_quota(&pace_key, None);
+            }
             let _ = tx.send(provider_error_event(&error)).await;
             return;
         }
