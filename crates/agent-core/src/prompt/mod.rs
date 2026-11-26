@@ -131,6 +131,29 @@ impl PromptInputs<'_> {
     }
 }
 
+/// Name of the composed section that keeps a turn's step count down.
+pub const WORKING_STYLE_SECTION: &str = "working_style";
+
+/// How to spend a turn: few, verifiable units instead of many micro-steps.
+///
+/// Every round trip re-sends the whole conversation, so the bill for a turn is
+/// steps x context. Measured on a live client: a 52-step turn and a 15-step turn
+/// doing comparable work cost about the same, and the 118-step turn cost 6.7M prompt
+/// tokens. Wording that asks for packages rather than steps is therefore a cost
+/// control, not a style preference — which is why it is not left to one mode.
+pub const WORKING_STYLE: &str = "\
+## Working style — few units, each verifiable
+
+1. Before touching anything, name the outcome and the check that will decide it
+   (a command, a test, a file that must exist).
+2. Cut the work into the fewest units that each end in a result you can verify:
+   read-and-report, change-and-test, investigate-and-answer. Not one call per step.
+3. Batch independent reads: when several files, searches or commands answer the
+   same question, issue them in one reply instead of one at a time.
+4. Finish a unit before starting the next. Verify it with the check from step 1, then
+   move on; do not re-read what the last result already told you.
+5. Never end a reply by announcing the next step. Take it.";
+
 /// One composed section, in the order it appears in the prompt.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PromptSection {
@@ -222,6 +245,13 @@ pub fn compose_system_prompt(inputs: &PromptInputs<'_>) -> ComposedPrompt {
             text: mode_text.trim().to_string(),
         });
     }
+    // Before the activation block, because this text never changes and the
+    // activation block does: a stable section placed after it would invalidate the
+    // cached prefix on every `ToolSearch`.
+    sections.push(PromptSection {
+        name: WORKING_STYLE_SECTION,
+        text: WORKING_STYLE.to_string(),
+    });
     // Last, deliberately: activation changes while the rest of the prompt does
     // not, and a block that moves would invalidate the cached prefix of every
     // section before it. Node appends its activation state for the same reason
@@ -377,7 +407,11 @@ mod tests {
             .iter()
             .map(|section| section.name)
             .collect();
-        assert_eq!(names, vec!["runtime", "context", "mode"]);
+        assert_eq!(
+            names,
+            vec!["runtime", "context", "mode", WORKING_STYLE_SECTION],
+            "working style sits after the mode and before the activation block"
+        );
         let context = composed.section("context").unwrap();
         let append_at = context.find("APPENDED").unwrap();
         let tools_at = context.find("TOOL RULES").unwrap();
@@ -391,7 +425,11 @@ mod tests {
         inputs.tool_instructions = Some("   \n  ");
         let composed = compose_system_prompt(&inputs);
         assert!(composed.section("context").is_none());
-        assert_eq!(composed.sections.len(), 2, "runtime + mode only");
+        assert_eq!(
+            composed.sections.len(),
+            3,
+            "runtime + mode + working style; the working style is never empty"
+        );
         assert!(!composed.system.contains("\n\n\n"));
     }
 
