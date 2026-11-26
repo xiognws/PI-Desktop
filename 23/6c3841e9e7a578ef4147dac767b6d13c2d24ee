@@ -1,0 +1,21 @@
+packages/agent-runtime/src/runtime.ts
+  h_201ed4c689ac8b 9-11,13,1541-1550,1568,3040-3041,5070-5117,7633-7635,8162
+  h_201ed4c689ac8b 1551
+packages/agent-runtime/src/repeated-tool-call.test.ts
+  h_201ed4c689ac8b 1-101
+packages/agent-runtime/src/repeated-tool-call.ts
+  h_201ed4c689ac8b 1-185
+packages/agent-runtime/src/runtime.test.ts
+  h_201ed4c689ac8b 1556-1557
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "236c3841e9e7a578ef4147dac767b6d13c2d24ee",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
