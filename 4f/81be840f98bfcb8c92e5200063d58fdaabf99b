@@ -1,0 +1,20 @@
+packages/agent-runtime/src/parent-stop-retirement.test.ts
+  h_201ed4c689ac8b 65-67
+packages/agent-runtime/src/provider-recovery-flow.test.ts
+  h_201ed4c689ac8b 92-94
+packages/agent-runtime/src/read-only-stop.test.ts
+  h_201ed4c689ac8b 44-46
+packages/agent-runtime/src/runtime.test.ts
+  h_201ed4c689ac8b 303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4f81be840f98bfcb8c92e5200063d58fdaabf99b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
