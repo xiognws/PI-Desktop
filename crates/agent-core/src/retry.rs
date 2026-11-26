@@ -29,12 +29,17 @@ pub const RATE_LIMIT_JITTER_FACTOR: f64 = 0.25;
 pub const TRANSIENT_INITIAL_DELAY_MS: u64 = 1_000;
 pub const TRANSIENT_MAX_DELAY_MS: u64 = 8_000;
 
-/// A body that ends without a terminator is not congestion, so it gets few
-/// attempts and almost no wait: the request is re-sent immediately, and a provider
-/// that truncates every long response fails fast instead of burning ten tries.
-pub const TRUNCATED_MAX_RETRIES: u32 = 2;
-pub const TRUNCATED_INITIAL_DELAY_MS: u64 = 500;
-pub const TRUNCATED_MAX_DELAY_MS: u64 = 2_000;
+/// A body that ends without a terminator costs a re-send of the same prompt, so the
+/// budget stays small — but the *spacing* matters more than the count.
+///
+/// Measured: three attempts 500ms and 1s apart all died inside a second, while a
+/// request issued nine seconds later completed. A gateway that sheds a burst answers
+/// by closing the body at once, and retrying in half a second only re-enters the same
+/// burst. Four attempts at 2s, 4s, 8s, 8s leave that window, and still fail fast
+/// (under half a minute) when the provider truncates every response.
+pub const TRUNCATED_MAX_RETRIES: u32 = 4;
+pub const TRUNCATED_INITIAL_DELAY_MS: u64 = 2_000;
+pub const TRUNCATED_MAX_DELAY_MS: u64 = 8_000;
 
 /// Which budget a failure draws from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,11 +197,23 @@ mod tests {
         );
         assert!(
             TRUNCATED_MAX_RETRIES < PROVIDER_MAX_RETRIES,
-            "truncation is not congestion"
+            "a cut body is retried fewer times than a dropped socket"
         );
         // Retried immediately: waiting cannot make a provider finish a body.
         assert_eq!(delay_ms(budget, 1, None, 0.0), TRUNCATED_INITIAL_DELAY_MS);
-        assert_eq!(delay_ms(budget, 9, None, 0.0), TRUNCATED_MAX_DELAY_MS);
+        assert_eq!(delay_ms(budget, 2, None, 0.0), 4_000);
+        assert_eq!(delay_ms(budget, 3, None, 0.0), 8_000);
+        assert_eq!(
+            delay_ms(budget, 9, None, 0.0),
+            TRUNCATED_MAX_DELAY_MS,
+            "the curve stays capped"
+        );
+        // Measured failure: three attempts inside two seconds all died, so the first
+        // wait has to be long enough to leave the burst that caused the cut.
+        assert!(
+            TRUNCATED_INITIAL_DELAY_MS >= 2_000,
+            "half a second re-entered the same burst"
+        );
     }
 
     #[test]

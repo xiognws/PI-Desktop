@@ -342,6 +342,13 @@ async fn pump(
 ) {
     let mut decoder = WireDecoder::new(wire);
     let mut finished = false;
+    // What arrived before the body ended, so a cut stream is diagnosable from the
+    // log alone: a refusing gateway closes before sending anything, a truncating one
+    // closes after a prefix, and the two need different fixes.
+    let status = response.status().as_u16();
+    let mut chunks = 0usize;
+    let mut bytes = 0usize;
+    let mut tail = String::new();
 
     loop {
         if cancel.is_cancelled() {
@@ -353,8 +360,15 @@ async fn pump(
             chunk = response.chunk() => chunk,
         };
         let events = match chunk {
-            Ok(Some(bytes)) => {
-                let text = String::from_utf8_lossy(&bytes);
+            Ok(Some(chunk_bytes)) => {
+                chunks += 1;
+                bytes += chunk_bytes.len();
+                let text = String::from_utf8_lossy(&chunk_bytes);
+                tail.push_str(&text);
+                if tail.chars().count() > 400 {
+                    let keep: String = tail.chars().rev().take(400).collect();
+                    tail = keep.chars().rev().collect();
+                }
                 match decoder.push_chunk(&text) {
                     Ok(events) => events,
                     Err(error) => {
@@ -379,8 +393,16 @@ async fn pump(
 
     if !finished {
         // A body that ends without a terminator is a truncated response; the
-        // assembler turns the missing finish into `IncompleteStream`.
-        tracing::warn!(target: "agent_core::provider::http", "stream ended without a finish frame");
+        // assembler turns the missing finish into `IncompleteStream`. The body's own
+        // shape goes with it: status, size, and the tail the provider actually wrote.
+        tracing::warn!(
+            target: "agent_core::provider::http",
+            status,
+            chunks,
+            bytes,
+            tail = %tail.replace('\n', " ").chars().take(240).collect::<String>(),
+            "stream ended without a finish frame"
+        );
     }
 }
 
