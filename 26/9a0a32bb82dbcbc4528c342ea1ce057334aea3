@@ -1,0 +1,98 @@
+apps/desktop/electron/autotest/workbench-view.ts
+  h_201ed4c689ac8b 1-183
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 7,77-80,1006-1010,1231-1237,1261-1298,1300
+apps/desktop/electron/main/ipc/autotest-ipc.ts
+  h_201ed4c689ac8b 1-111
+apps/desktop/electron/main/ipc/register.ts
+  h_201ed4c689ac8b 14-16,100-110,439-447
+apps/desktop/electron/test/autotest-workbench-view.test.mjs
+  h_201ed4c689ac8b 1-163
+apps/desktop/src/features/app/AppShell.tsx
+  h_201ed4c689ac8b 1,9,14-17,20-34,44,57-58,65,96-174
+apps/desktop/src/features/app/useAppShellRuntime.tsx
+  h_201ed4c689ac8b 19,68,981-986,1151-1157,1161,1168,1178,1198,1222-1229
+apps/desktop/src/features/surfaces/SurfaceHost.tsx
+  h_201ed4c689ac8b 1-41
+apps/desktop/src/features/surfaces/SurfaceRail.tsx
+  h_201ed4c689ac8b 1-48
+apps/desktop/src/features/surfaces/autotest/AutoTestSurfaceShell.tsx
+  h_201ed4c689ac8b 1-198
+apps/desktop/src/features/surfaces/chat/ChatSurfaceShell.tsx
+  h_201ed4c689ac8b 1-291
+apps/desktop/src/features/surfaces/rail-metrics.ts
+  h_201ed4c689ac8b 1-10
+apps/desktop/src/features/surfaces/registry.tsx
+  h_201ed4c689ac8b 1-97
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 41,2383-2402
+apps/desktop/src/lib/surface-preferences.ts
+  h_201ed4c689ac8b 1-48
+apps/desktop/src/stores/app-state.ts
+  h_201ed4c689ac8b 31,255-263,439-440
+apps/desktop/src/stores/slices/initial-state.ts
+  h_201ed4c689ac8b 6,24-27
+apps/desktop/src/stores/slices/interaction-slice.ts
+  h_201ed4c689ac8b 22,52,101-122
+apps/desktop/src/styles/globals.css
+  h_201ed4c689ac8b 23
+apps/desktop/src/styles/surfaces.css
+  h_201ed4c689ac8b 1-249
+apps/desktop/test/app-shell-settings-accessibility.test.mjs
+  h_201ed4c689ac8b 1-10,19-22,29-32,35-36,51-52,58-59,61-62,64-65,67-73,83-86
+apps/desktop/test/artifacts-page.test.mjs
+  h_201ed4c689ac8b 19,35
+apps/desktop/test/helpers/domain-source.mjs
+  h_201ed4c689ac8b 37-55,87-100,104
+apps/desktop/test/sidebar-settings-return.test.mjs
+  h_201ed4c689ac8b 9-14,16-20,25-32,35-39,41-43
+apps/desktop/test/surface-registry.test.mjs
+  h_201ed4c689ac8b 1-102
+apps/desktop/test/work-panel.test.mjs
+  h_201ed4c689ac8b 83,706-709
+docs/adr/0410-surface-model.md
+  h_201ed4c689ac8b 1-87
+docs/adr/README.md
+  h_201ed4c689ac8b 450
+docs/spec/04-ux/01-ui-ia.md
+  h_201ed4c689ac8b 18-27,30-36,514-521,552-553
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 322-333,341-345
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 329-340,348-352
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 322-333,341-345
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 322-333,341-345
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 331-342,350-354
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 321-332,340-344
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 331-342,350-354
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 324-335,343-347
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 324-335,343-347
+packages/shared/src/index.ts
+  h_201ed4c689ac8b 16
+packages/shared/src/keyboard-shortcuts.ts
+  h_201ed4c689ac8b 13-14,65-69
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 558-571
+packages/shared/src/surfaces.test.ts
+  h_201ed4c689ac8b 1-32
+packages/shared/src/surfaces.ts
+  h_201ed4c689ac8b 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "269a0a32bb82dbcbc4528c342ea1ce057334aea3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
