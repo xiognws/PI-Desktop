@@ -1,0 +1,18 @@
+apps/desktop/electron/main/ipc/plugin-ipc.ts
+  h_201ed4c689ac8b 23,203-220
+apps/desktop/src/stores/slices/catalog-slice.ts
+  h_201ed4c689ac8b 174-183
+apps/desktop/test/host-handshake-retry.test.mjs
+  h_201ed4c689ac8b 110-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5af06144a8333e2722d75138d5bb003a2566b1ff",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
