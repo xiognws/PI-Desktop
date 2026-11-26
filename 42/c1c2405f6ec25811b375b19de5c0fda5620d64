@@ -1,0 +1,60 @@
+crates/agent-core/src/approval.rs
+  h_201ed4c689ac8b 309-311,592-593,667-668,699-702
+crates/agent-core/src/builtin_tools.rs
+  h_201ed4c689ac8b 948-951,955-958,972-973
+crates/agent-core/src/exec_policy.rs
+  h_201ed4c689ac8b 717-721
+crates/agent-core/src/extensions.rs
+  h_201ed4c689ac8b 134-139,204-207,225-228,377-382,455-459,472-475,486-489,585,592-595,633-637,646-653,655-658,748-752,754-757,792-795
+crates/agent-core/src/lib.rs
+  h_201ed4c689ac8b 33
+crates/agent-core/src/plan.rs
+  h_201ed4c689ac8b 364-367,439-442,652,814-816,901-905,1090-1093,1098-1101,1140-1141,1168-1177,1230-1232,1305-1308
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 318-320
+crates/agent-core/src/provider/mod.rs
+  h_201ed4c689ac8b 253-254,655-656
+crates/agent-core/src/provider/responses.rs
+  h_201ed4c689ac8b 80-81,447,576-583,620-624,853-859,874-877,879-882,963,1016-1018
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1452-1454,1552-1565,1577-1584,2571-2572,2665-2667,3264,3287-3289,3545-3547,3739,3785-3787,4117-4121,4442-4446,4598,4665,4728,4880-4884,4887-4891,5169-5172
+crates/agent-core/src/skill_review.rs
+  h_201ed4c689ac8b 145-148,664-667
+crates/agent-core/src/tool_activation.rs
+  h_201ed4c689ac8b 277,388,643-646,653-656,766-767,770-772,775-777,791-793,822-826,838-842,847-851,886-888
+crates/agent-core/tests/attachments.rs
+  h_201ed4c689ac8b 133-135
+crates/agent-core/tests/extension_hooks.rs
+  h_201ed4c689ac8b 99,257-260,314-317,329-331,366-369,377-381,393-399,405-408,414-417,427-430,440-443,471-474,495-501,507-510
+crates/agent-core/tests/extension_surface.rs
+  h_201ed4c689ac8b 161-167
+crates/agent-core/tests/graceful_stop.rs
+  h_201ed4c689ac8b 141,197-200
+crates/agent-core/tests/host_bridge.rs
+  h_201ed4c689ac8b 301-305
+crates/agent-core/tests/http_transport.rs
+  h_201ed4c689ac8b 369-371,416-417
+crates/agent-core/tests/mode_run_notice.rs
+  h_201ed4c689ac8b 118-119,297-300,304-307,337-340
+crates/agent-core/tests/plan_flow.rs
+  h_201ed4c689ac8b 189-195,251-254,257-259,267-270,305-311,321-324,457-460
+crates/agent-core/tests/prompt_inputs.rs
+  h_201ed4c689ac8b 31-33
+crates/agent-core/tests/responses_live.rs
+  h_201ed4c689ac8b 197-201,250-257
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 1314-1317
+crates/agent-core/tests/tool_activation.rs
+  h_201ed4c689ac8b 120-123,133-136,139-142,145-148,180-187,214-217,348-350,358-362
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "42c1c2405f6ec25811b375b19de5c0fda5620d64",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
