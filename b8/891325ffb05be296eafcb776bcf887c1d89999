@@ -1,0 +1,14 @@
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 438-444,500-515
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b8891325ffb05be296eafcb776bcf887c1d89999",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
