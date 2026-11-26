@@ -1,0 +1,14 @@
+packages/agent-runtime/src/native-pi-session.test.ts
+  h_201ed4c689ac8b 14-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "76ab2134a5387593ad98e1fa23bd4aafc05d51ed",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
