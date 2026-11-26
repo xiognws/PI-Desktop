@@ -532,6 +532,17 @@ impl TurnEngine {
 
             if let Some(model_limits) = active_limits {
                 let limits = ContextLimits::for_model(model_limits);
+                // Once per step, cheap, and it answers the question a cost
+                // investigation starts with: what window is this turn actually
+                // planning against, and when will it compact?
+                tracing::info!(
+                    target: "agent_core::turn",
+                    window = limits.window,
+                    hard_limit = limits.hard_limit,
+                    trigger = limits.trigger,
+                    compaction_enabled = limits.compaction_enabled,
+                    "context limits for this step"
+                );
                 // Age first, then decide. A single oversized tool result is often the
                 // whole overrun, and a summary cannot shrink it: the same bytes come
                 // back on the next step and trigger another compaction, which is how a

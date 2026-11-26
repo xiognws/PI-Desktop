@@ -4186,7 +4186,14 @@ fn model_limits_from(request: &Request) -> Option<ModelLimits> {
     if limits.max_tokens.is_none() {
         limits.max_tokens = request.params.get("maxTokens").and_then(Value::as_u64);
     }
+    // A missing window is a deliberate "no automatic protection" (the Node
+    // reference behaves the same), so it is not guessed here — but it is the first
+    // thing a cost investigation needs, and silence cost a full session once.
     if limits.context_window.is_none() && limits.max_tokens.is_none() {
+        tracing::warn!(
+            target: "agent_core::sidecar",
+            "prompt carries no model window: no ageing, no compaction, no budget"
+        );
         return None;
     }
     Some(limits.with_compaction_enabled(compaction_enabled_from(request)))
