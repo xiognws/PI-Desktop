@@ -1,0 +1,26 @@
+crates/agent-core/src/prompt/mod.rs
+  h_201ed4c689ac8b 24,108-111,129,241-251,468-502
+crates/agent-core/src/prompt/smart.rs
+  h_201ed4c689ac8b 1-36
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1123-1131
+docs/adr/0405-smart-mode-model-pair.md
+  h_201ed4c689ac8b 75-105
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 957-975
+packages/shared/src/smart-mode.test.ts
+  h_201ed4c689ac8b 72,93-150
+packages/shared/src/smart-mode.ts
+  h_201ed4c689ac8b 49,63-66,87-93,99-103,111,190-192,293-297,357-359,365-369,374-378,380-387,390-392
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "32405193d69b18ed5dc0c318a92194603c8d4a80",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
