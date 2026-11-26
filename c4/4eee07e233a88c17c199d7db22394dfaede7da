@@ -1,0 +1,18 @@
+apps/desktop/test/helpers/composer-source.mjs
+  h_201ed4c689ac8b 44
+apps/desktop/test/helpers/store-source.mjs
+  h_201ed4c689ac8b 46
+apps/desktop/test/helpers/transcript-source.mjs
+  h_201ed4c689ac8b 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c44eee07e233a88c17c199d7db22394dfaede7da",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
