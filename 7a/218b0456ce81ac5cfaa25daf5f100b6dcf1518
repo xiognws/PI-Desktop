@@ -1,0 +1,22 @@
+crates/agent-core/src/aging.rs
+  h_201ed4c689ac8b 69-72,75-78,234,237-238,316-317,325,368,370
+crates/agent-core/src/prompt/mod.rs
+  h_201ed4c689ac8b 481-482,484-485
+crates/agent-core/src/prompt/smart.rs
+  h_201ed4c689ac8b 5-13,31-50,54-55
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 761-765,767-768
+crates/host-core/src/tools/output_budget.rs
+  h_201ed4c689ac8b 292,295-299,317,341,346,360-361
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7a218b0456ce81ac5cfaa25daf5f100b6dcf1518",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
