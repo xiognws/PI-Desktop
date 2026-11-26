@@ -29,18 +29,30 @@ pub const RATE_LIMIT_JITTER_FACTOR: f64 = 0.25;
 pub const TRANSIENT_INITIAL_DELAY_MS: u64 = 1_000;
 pub const TRANSIENT_MAX_DELAY_MS: u64 = 8_000;
 
+/// A body that ends without a terminator is not congestion, so it gets few
+/// attempts and almost no wait: the request is re-sent immediately, and a provider
+/// that truncates every long response fails fast instead of burning ten tries.
+pub const TRUNCATED_MAX_RETRIES: u32 = 2;
+pub const TRUNCATED_INITIAL_DELAY_MS: u64 = 500;
+pub const TRUNCATED_MAX_DELAY_MS: u64 = 2_000;
+
 /// Which budget a failure draws from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetryBudget {
     /// The provider said "too many requests".
     RateLimit,
-    /// A dropped socket, an upstream 502, a stream that ended early.
+    /// A dropped socket, an upstream 502.
     Transient,
+    /// The provider ended a response before sending a terminator.
+    Truncated,
 }
 
 impl RetryBudget {
     pub fn max_retries(&self) -> u32 {
-        PROVIDER_MAX_RETRIES
+        match self {
+            RetryBudget::Truncated => TRUNCATED_MAX_RETRIES,
+            _ => PROVIDER_MAX_RETRIES,
+        }
     }
 }
 
@@ -49,6 +61,13 @@ impl RetryBudget {
 /// `None` means the failure is terminal: quota, auth, a malformed request and a
 /// cancellation are all things re-sending cannot fix.
 pub fn budget_for(error: &AgentError) -> Option<RetryBudget> {
+    // A body that stops before its terminator is the provider dropping half a
+    // response. The step that failed executed no tool call, so re-sending the same
+    // request repeats nothing — and without this arm the documented transient
+    // policy never applied to the most common way a long turn dies.
+    if matches!(error, AgentError::IncompleteStream) {
+        return Some(RetryBudget::Truncated);
+    }
     let AgentError::Provider { kind, status, .. } = error else {
         return None;
     };
@@ -76,6 +95,7 @@ pub fn delay_ms(
     let (initial, cap) = match budget {
         RetryBudget::RateLimit => (RATE_LIMIT_INITIAL_DELAY_MS, RATE_LIMIT_MAX_DELAY_MS),
         RetryBudget::Transient => (TRANSIENT_INITIAL_DELAY_MS, TRANSIENT_MAX_DELAY_MS),
+        RetryBudget::Truncated => (TRUNCATED_INITIAL_DELAY_MS, TRUNCATED_MAX_DELAY_MS),
     };
     if let Some(server) = retry_after_ms {
         return server.min(cap);
@@ -159,6 +179,24 @@ mod tests {
             budget_for(&provider(ProviderErrorKind::Retryable, Some(502))),
             Some(RetryBudget::Transient)
         );
+    }
+
+    #[test]
+    fn a_truncated_stream_is_retried_from_its_own_small_budget() {
+        let budget = budget_for(&AgentError::IncompleteStream).expect("a cut stream is worth another try");
+        assert_eq!(budget, RetryBudget::Truncated);
+        assert_eq!(
+            budget.max_retries(),
+            TRUNCATED_MAX_RETRIES,
+            "a provider that cuts every response must fail fast"
+        );
+        assert!(
+            TRUNCATED_MAX_RETRIES < PROVIDER_MAX_RETRIES,
+            "truncation is not congestion"
+        );
+        // Retried immediately: waiting cannot make a provider finish a body.
+        assert_eq!(delay_ms(budget, 1, None, 0.0), TRUNCATED_INITIAL_DELAY_MS);
+        assert_eq!(delay_ms(budget, 9, None, 0.0), TRUNCATED_MAX_DELAY_MS);
     }
 
     #[test]

@@ -636,6 +636,7 @@ impl TurnEngine {
             // is the whole recovery.
             let mut rate_limit_attempts: u32 = 0;
             let mut transient_attempts: u32 = 0;
+            let mut truncated_attempts: u32 = 0;
             let assembled = loop {
                 match self
                     .run_step(
@@ -660,9 +661,22 @@ impl TurnEngine {
                             );
                             return Err(error);
                         };
+                        // A cut stream leaves nothing behind, so record what the request
+                        // looked like: the next occurrence can then be compared instead of
+                        // guessed at.
+                        tracing::warn!(
+                            target: "agent_core::turn",
+                            code = error.code(),
+                            messages = request.messages.len() as u64,
+                            tools = request.tools.len() as u64,
+                            system_chars = request.system.as_ref().map(|text| text.chars().count() as u64).unwrap_or(0),
+                            max_output_tokens = request.max_output_tokens.unwrap_or(0),
+                            "provider request failed"
+                        );
                         let used = match budget {
                             crate::retry::RetryBudget::RateLimit => &mut rate_limit_attempts,
                             crate::retry::RetryBudget::Transient => &mut transient_attempts,
+                            crate::retry::RetryBudget::Truncated => &mut truncated_attempts,
                         };
                         if !config.infinite_provider_retry && *used >= budget.max_retries() {
                             self.emit(
