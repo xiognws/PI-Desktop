@@ -1,0 +1,20 @@
+apps/desktop/electron/main/runtime/event-persistence.ts
+  h_201ed4c689ac8b 86-104,488-494,502,504-505,510-511,515,525
+apps/desktop/test/subagent-settlement-persistence.test.mjs
+  h_201ed4c689ac8b 17-35,86,137,142-199,228,259
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 21-22,34-35,228-231,582-588,776,779,787,793,805-809,934-936,948-957,968-977,988,996-997,1007,1028,1034,1039-1049,1052-1053,1058,1066,1078-1085,1505,1513-1516,1519,1521
+crates/agent-core/tests/delegation_frames.rs
+  h_201ed4c689ac8b 1-319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f49ad741f9eeefbaa2b378f61d38e9f705cb7272",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
