@@ -1572,12 +1572,23 @@ impl Sidecar {
                 ),
             )
         };
+        // An orchestrating turn may not run the worker's tools — the gate refuses
+        // them — so it is not shown them either. Declaring a tool the turn cannot
+        // call costs its schema on every step and, measured on a real pairing, one
+        // wasted step: the model tried `Bash`, read the refusal, and only then
+        // dispatched. Half the paid tokens of that turn went to a call the split had
+        // already forbidden.
+        let specs = if delegate_mechanical_from(request) {
+            orchestrator_specs(tools.specs())
+        } else {
+            tools.specs()
+        };
         // Core declarations on every request, the rest on demand. The object is
         // also what refuses a call to a tool the model never activated, so the
         // turn below gets it too.
         let activation = Arc::new(crate::tool_activation::ToolActivation::new(
             &mode,
-            tools.specs(),
+            specs,
             session.active_tools.clone(),
         ));
         // `ToolSearch` is the only way a deferred tool becomes declared, and the
@@ -4902,6 +4913,21 @@ struct SubagentModelBinding {
 /// is enforceable: there is a cheap half to hand the mechanical steps to. Either
 /// one alone is not enough — a pair without a worker would refuse every tool and
 /// deadlock, and a worker without an orchestrating turn is an ordinary session.
+/// The tools an orchestrating turn is allowed to see.
+///
+/// The gate refuses a worker's tools on that turn, so declaring them only costs a
+/// schema on every step and invites the model to try one. What stays: planning and
+/// delegation (`TodoWrite`, `ToolSearch`, `Skill`, `memory`, `asktool`, `Task…`).
+fn orchestrator_specs(specs: Vec<crate::tool::ToolSpec>) -> Vec<crate::tool::ToolSpec> {
+    specs
+        .into_iter()
+        .filter(|spec| {
+            crate::turn::keeps_with_orchestrator(&spec.name)
+                || crate::delegate::is_delegation_verb(&spec.name)
+        })
+        .collect()
+}
+
 fn delegate_mechanical_from(request: &Request) -> bool {
     let orchestrating = request
         .params
@@ -5098,6 +5124,29 @@ mod provider_wire_tests {
         let limits = model_limits_from(&request).expect("the window is known");
         assert_eq!(limits.context_window, Some(262_144));
         assert_eq!(limits.max_tokens, Some(32_768));
+    }
+
+    #[test]
+    fn an_orchestrating_turn_is_shown_only_the_tools_it_may_use() {
+        // Measured on a real pairing: with the worker's tools still declared, the
+        // orchestrator tried `Bash`, read the refusal, and only then dispatched —
+        // half of that turn's paid tokens went to a call the split forbids.
+        let spec = |name: &str| {
+            crate::tool::ToolSpec::new(name, "x", serde_json::json!({"type": "object"}))
+        };
+        let names: Vec<String> = orchestrator_specs(vec![
+            spec("Bash"),
+            spec("Read"),
+            spec("Edit"),
+            spec("TodoWrite"),
+            spec("ToolSearch"),
+            spec("Task"),
+            spec("TaskWait"),
+        ])
+        .into_iter()
+        .map(|spec| spec.name)
+        .collect();
+        assert_eq!(names, vec!["TodoWrite", "ToolSearch", "Task", "TaskWait"]);
     }
 
     #[test]
