@@ -1,0 +1,24 @@
+.gitignore
+  h_201ed4c689ac8b 77
+packages/agent-runtime/scripts/bundle-assets.test.mjs
+  h_201ed4c689ac8b 5-7,48
+packages/agent-runtime/src/extensions/bundle.test.ts
+  h_201ed4c689ac8b 18-22
+packages/agent-runtime/src/extensions/managed-exec.test.ts
+  h_201ed4c689ac8b 1,9,32,35,43,66
+packages/agent-runtime/src/test-temp-root.ts
+  h_201ed4c689ac8b 1-38
+packages/agent-runtime/src/widgets/python-packages.test.ts
+  h_201ed4c689ac8b 10,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e7a971745ba3d6b463c4db3da8a3f48cc9f65399",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
