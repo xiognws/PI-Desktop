@@ -1,0 +1,26 @@
+apps/desktop/src/features/chat/transcript/skill-review-text.ts
+  h_201ed4c689ac8b 44-49
+apps/desktop/test/skill-review-row-render.test.mjs
+  h_201ed4c689ac8b 123,128-132,286-289
+apps/desktop/test/skill-review-text.test.mjs
+  h_201ed4c689ac8b 65-87
+crates/agent-core/src/provider/openai.rs
+  h_201ed4c689ac8b 56,125-208,343-397
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 4017-4026,4392-4411,4431,4433-4441,4446
+crates/agent-core/src/skill_review.rs
+  h_201ed4c689ac8b 22,459-481,524,537,539-545,814,827-832,842-845,851-896
+crates/agent-core/tests/sidecar_rpc.rs
+  h_201ed4c689ac8b 1115-1230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8847f903113b737b59dac4f0382df339b0bfcfe8",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
