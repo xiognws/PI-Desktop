@@ -4525,7 +4525,19 @@ impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
                 &self.guidance,
                 &request.definition.tools,
             );
-            let scoped = Arc::new(self.tools.restricted(&request.definition.tools));
+            // Depth is one: a worker gets the tools its definition lists, minus the
+            // delegation verbs, so it cannot start workers of its own. The reference
+            // product spells this out as "maximum recursion depth: 1"; here it is the
+            // only depth the kernel offers, because a worker that delegates turns one
+            // paid hand-over into an unbounded chain.
+            let allowed: Vec<String> = request
+                .definition
+                .tools
+                .iter()
+                .filter(|name| !crate::delegate::is_delegation_verb(name))
+                .cloned()
+                .collect();
+            let scoped = Arc::new(self.tools.restricted(&allowed));
             let sink: Arc<dyn crate::EventSink> = Arc::new(DelegateSink {
                 inner: self.sink.clone(),
                 parent_tool_call_id: request.parent_tool_call_id.clone(),

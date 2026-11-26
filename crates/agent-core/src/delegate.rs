@@ -136,6 +136,23 @@ pub fn compose_subagent_system_prompt(
         .join("\n\n")
 }
 
+/// Ceiling on workers running at once, for one session.
+///
+/// The reference product exposes this as a setting and defaults it to eight. A single
+/// assistant message may name several `Task` calls, which is how parallelism is
+/// asked for; without a ceiling it is also how a session discovers its own quota.
+pub const DEFAULT_MAX_ACTIVE_DELEGATIONS: usize = 8;
+
+/// Whether a tool name is one of the delegation verbs.
+///
+/// Letting a worker hold these is what makes delegation recursive: depth 1 means the
+/// worker gets the tools its definition lists, minus the verbs that would let it
+/// start workers of its own.
+pub fn is_delegation_verb(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower == "task" || lower.starts_with("task")
+}
+
 /// Bound a report, keeping both ends.
 ///
 /// The head says what the delegate did and the tail is usually where it says
@@ -361,6 +378,22 @@ impl DelegationRegistry {
     }
 
     /// One delegation, or `None` when this session never started it.
+    /// How many delegations of this session are still running.
+    ///
+    /// The concurrency ceiling counts these: a settled delegate no longer holds a
+    /// slot, so a turn that waits for reports can keep starting new work.
+    pub fn running_count(&self) -> usize {
+        self.handles()
+            .iter()
+            .filter(|handle| {
+                handle
+                    .lock()
+                    .map(|record| !record.status.is_settled())
+                    .unwrap_or(false)
+            })
+            .count()
+    }
+
     pub fn view(&self, delegation_id: &str) -> Option<DelegationView> {
         let handle = self
             .records
@@ -787,6 +820,9 @@ pub struct DelegationHub {
     /// itself. Without a sink the row keeps saying `running`, which is exactly
     /// what a test harness wants and what a client must never see.
     sink: Option<Arc<dyn EventSink>>,
+    /// How many workers may run at once. The reference product's "subagent
+    /// concurrency limit"; eight by default.
+    max_active: usize,
 }
 
 impl DelegationHub {
@@ -802,6 +838,7 @@ impl DelegationHub {
             models: Vec::new(),
             default_model: None,
             sink: None,
+            max_active: DEFAULT_MAX_ACTIVE_DELEGATIONS,
         }
     }
 
@@ -819,6 +856,16 @@ impl DelegationHub {
 
     /// Smart mode: make the cheap half the default for a delegate that names no
     /// model. `None` restores the reference default.
+    /// Set the concurrency ceiling (the reference product's setting).
+    pub fn with_max_active(mut self, max_active: usize) -> Self {
+        self.max_active = max_active.max(1);
+        self
+    }
+
+    pub fn max_active(&self) -> usize {
+        self.max_active
+    }
+
     pub fn with_default_model(mut self, key: Option<String>) -> Self {
         self.default_model = key;
         self
@@ -1036,6 +1083,16 @@ impl Tool for TaskTool {
             // means the cheap half, not the orchestrator's own model. Explicit
             // still wins, and a session without a pair keeps the old default.
             let model_key = explicit_model.or_else(|| self.hub.default_model_key());
+            // The ceiling is checked before a record exists: a refused request must
+            // not leave a slot occupied by a worker that never ran.
+            let active = self.hub.registry.running_count();
+            if active >= self.hub.max_active() {
+                return Err(AgentError::Refused(format!(
+                    "{} workers are already running (limit {}). Wait with `TaskWait` or cancel one with `TaskStop` before starting another.",
+                    active,
+                    self.hub.max_active()
+                )));
+            }
             let delegation_id = uuid::Uuid::new_v4().to_string();
             let delegate_cancel = ctx.cancel.child();
             let handle = self.hub.registry.insert(DelegationRecord {
@@ -1591,6 +1648,71 @@ mod tests {
                 }
             })
         }
+    }
+
+    /// A runner that never settles: the concurrency ceiling counts exactly these.
+    struct HangingRunner;
+
+    impl DelegateRunner for HangingRunner {
+        fn run<'a>(&'a self, request: DelegateRunRequest) -> BoxFuture<'a, DelegateOutcome> {
+            Box::pin(async move {
+                request.cancel.cancelled().await;
+                DelegateOutcome::failed("CANCELLED", "cancelled")
+            })
+        }
+    }
+
+    /// A worker cannot start workers: the verbs are stripped, whatever its definition
+    /// lists. The reference product calls this "maximum recursion depth: 1".
+    #[test]
+    fn the_delegation_verbs_are_recognised_and_nothing_else_is() {
+        for verb in ["Task", "task", "TaskWait", "TaskStop"] {
+            assert!(is_delegation_verb(verb), "{verb} is a delegation verb");
+        }
+        for tool in ["Read", "Bash", "Grep", "Todos", "memory"] {
+            assert!(!is_delegation_verb(tool), "{tool} is a worker tool");
+        }
+    }
+
+    /// The ceiling the reference product exposes as a setting: past it, a start is
+    /// refused with a sentence that tells the model what to do instead.
+    #[tokio::test]
+    async fn starting_more_workers_than_the_ceiling_is_refused() {
+        let hub = Arc::new(
+            DelegationHub::new(
+                Arc::new(DelegationRegistry::new("s1")),
+                vec![definition()],
+                Arc::new(HangingRunner),
+            )
+            .with_max_active(2),
+        );
+        let task = TaskTool::new(hub.clone());
+        let cancel = CancelToken::new();
+        for index in 0..2 {
+            let mut tool_call = call("explorer", start_args());
+            tool_call.id = format!("call_{index}");
+            task.call(&tool_call, &context(cancel.clone()))
+                .await
+                .expect("within the ceiling");
+        }
+        let mut third = call("explorer", start_args());
+        third.id = "call_third".into();
+        let refused = task
+            .call(&third, &context(cancel.clone()))
+            .await
+            .expect_err("the third worker is over the ceiling");
+        let message = refused.to_string();
+        assert!(
+            message.contains("limit 2") && message.contains("TaskWait"),
+            "the refusal has to say the ceiling and the way out: {message}"
+        );
+        assert_eq!(
+            hub.registry.running_count(),
+            2,
+            "a refused start must not occupy a slot"
+        );
+        hub.registry.stop(None);
+        cancel.cancel();
     }
 
     /// A runner that answers immediately, for tests that need a settled record.
