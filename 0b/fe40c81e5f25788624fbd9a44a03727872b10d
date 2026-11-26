@@ -1,0 +1,24 @@
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 212-214,224,660,4371,4519-4523
+crates/agent-core/src/super_agent/runtime.rs
+  h_201ed4c689ac8b 207-208,210
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 6-8,14,50-59,78,149,154-161,381-386,830-833,1559-1560,1565-1570,1575-1576
+crates/agent-core/tests/turn_loop.rs
+  h_201ed4c689ac8b 198,211-247
+docs/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 212-221,1268-1271
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 969-970
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0bfe40c81e5f25788624fbd9a44a03727872b10d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
