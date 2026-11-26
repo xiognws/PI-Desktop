@@ -102,6 +102,8 @@ export const ptBR = {
     tokenCacheWrite: "Escrita de cache",
     tokenReasoning: "Raciocínio",
     tokenTurns: "Turnos",
+    tokenMainModel: "Modelo principal",
+    tokenWorkerModel: "Subagentes",
     customize: "Personalizar barra de status",
     hideBar: "Ocultar barra de status",
     showBar: "Mostrar barra de status",

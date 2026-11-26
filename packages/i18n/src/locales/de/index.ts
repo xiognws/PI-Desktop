@@ -102,6 +102,8 @@ export const de = {
     tokenCacheWrite: "Cache-Schreiben",
     tokenReasoning: "Reasoning",
     tokenTurns: "Runden",
+    tokenMainModel: "Hauptmodell",
+    tokenWorkerModel: "Subagenten",
     customize: "Statusleiste anpassen",
     hideBar: "Statusleiste ausblenden",
     showBar: "Statusleiste einblenden",

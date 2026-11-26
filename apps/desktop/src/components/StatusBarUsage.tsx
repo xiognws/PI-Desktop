@@ -9,7 +9,7 @@ import {
   contextUsageView,
   resolveContextUsageDisplay,
 } from "../lib/context-usage";
-import { compactTokens, formatElapsed, sessionTokensUsed } from "../lib/status-bar";
+import { compactTokens, formatElapsed, sessionTokensSplit, sessionTokensUsed } from "../lib/status-bar";
 import { IPC } from "@pi-workspace/shared/protocol";
 import { ContextUsageInspector } from "./ContextUsageInspector";
 
@@ -255,6 +255,9 @@ export function StatusBarTokens() {
   // the four add up to what the provider actually processed.
   const used = sessionTokensUsed(totals);
   if (used <= 0) return null;
+  // Smart mode pays two models in one turn: the orchestrator and the workers it
+  // delegated to. The total covers both, so the split says where it went.
+  const split = sessionTokensSplit(totals);
   const breakdown = [
     `${t("statusBar.tokenInput")} ${compactTokens(totals.inputTokens)}`,
     `${t("statusBar.tokenOutput")} ${compactTokens(totals.outputTokens)}`,
@@ -262,6 +265,12 @@ export function StatusBarTokens() {
     `${t("statusBar.tokenCacheWrite")} ${compactTokens(totals.cacheWriteTokens)}`,
     `${t("statusBar.tokenReasoning")} ${compactTokens(totals.reasoningTokens)}`,
     `${t("statusBar.tokenTurns")} ${totals.turns}`,
+    ...(split.worker > 0
+      ? [
+          `${t("statusBar.tokenMainModel")} ${compactTokens(split.main)}`,
+          `${t("statusBar.tokenWorkerModel")} ${compactTokens(split.worker)}`,
+        ]
+      : []),
   ].join(" · ");
   return (
     <span className="statusbar-metric" title={breakdown}>

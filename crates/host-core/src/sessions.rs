@@ -9241,6 +9241,47 @@ mod tests {
     }
 
     #[test]
+    fn session_totals_include_the_delegated_half_and_name_it() {
+        // Smart mode pays two models in one turn. The worker's operation rides on the
+        // parent turn, so it is already inside input/output/cache; these fields only
+        // say how much of that was the worker, which is what the status bar splits.
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        let usage = serde_json::json!({
+            "inputTokens": 30_000,
+            "outputTokens": 2_000,
+            "totalTokens": 32_000,
+            "cacheReadTokens": 10_000,
+            "operations": [
+                {
+                    "operationId": "message:s1:m1",
+                    "inputTokens": 18_000,
+                    "outputTokens": 1_200,
+                    "totalTokens": 19_200,
+                    "cacheReadTokens": 10_000
+                },
+                {
+                    "operationId": "delegation:del-7",
+                    "inputTokens": 12_000,
+                    "outputTokens": 800,
+                    "totalTokens": 12_800,
+                    "cacheReadTokens": 0
+                }
+            ],
+            "aggregation": "aggregate"
+        });
+        end_turn_settling(&db, &turn, "completed", None, Some(&usage), false, false).unwrap();
+
+        let totals = session_totals(&db, &session.id).expect("totals");
+
+        assert_eq!(totals.input_tokens, 30_000, "the total covers both models");
+        assert_eq!(totals.worker_input_tokens, 12_000, "and names the delegated share");
+        assert_eq!(totals.worker_output_tokens, 800);
+        assert_eq!(totals.worker_cache_read_tokens, 0);
+    }
+
+    #[test]
     fn token_usage_history_aggregation() {
         let db = test_db();
         let session = create_session(&db, None, None, None, None, None).unwrap();

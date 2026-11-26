@@ -102,6 +102,8 @@ export const zhTW = {
     tokenCacheWrite: "快取寫",
     tokenReasoning: "推理",
     tokenTurns: "輪次",
+    tokenMainModel: "主模型",
+    tokenWorkerModel: "副模型（子代理）",
     customize: "自訂狀態列",
     hideBar: "隱藏狀態列",
     showBar: "顯示狀態列",

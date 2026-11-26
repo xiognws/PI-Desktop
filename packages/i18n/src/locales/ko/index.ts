@@ -102,6 +102,8 @@ export const ko = {
     tokenCacheWrite: "캐시 쓰기",
     tokenReasoning: "추론",
     tokenTurns: "턴",
+    tokenMainModel: "주 모델",
+    tokenWorkerModel: "하위 에이전트",
     customize: "상태 표시줄 사용자 지정",
     hideBar: "상태 표시줄 숨기기",
     showBar: "상태 표시줄 표시",

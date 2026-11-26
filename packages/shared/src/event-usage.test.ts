@@ -43,3 +43,37 @@ it("ignores invalid counts in provider-supplied tool operations", () => {
     }
   }
 });
+
+it("folds a settled delegation's spend into the turn that asked for it", () => {
+  // The shape `delegation_details` writes: the plain counts, plus one atomic
+  // operation whose id marks it as delegated work.
+  const settled = {
+    delegationId: "del-7", agent: "test-runner", status: "completed",
+    turns: 4, toolCalls: 9, modelId: "9554",
+    usage: { inputTokens: 12_000, outputTokens: 800, cacheReadTokens: 41_000,
+      cacheWriteTokens: 0, reasoningTokens: 0 },
+    operations: [{ usage: {
+      operationId: "delegation:del-7", inputTokens: 12_000, outputTokens: 800,
+      totalTokens: 12_800, cacheReadTokens: 41_000, cacheWriteTokens: 0,
+      reasoningTokens: 0, agentName: "test-runner", modelId: "9554",
+    } }],
+  };
+  const usage = usageForEvent(envelope({ details: settled }));
+  expect(usage?.operationId).toBe("delegation:del-7");
+  expect(usage?.inputTokens).toBe(12_000);
+  expect(usage?.cacheReadTokens).toBe(41_000, "cache reads are the biggest bucket in practice");
+  expect(usage?.totalTokens).toBe(12_800);
+  expect(usage?.agentName).toBe("test-runner");
+});
+
+it("keeps one record per delegation when the settle event repeats", () => {
+  const operation = {
+    operationId: "delegation:del-7", inputTokens: 12_000, outputTokens: 800,
+    totalTokens: 12_800, cacheReadTokens: 41_000,
+  };
+  const usage = usageForEvent(envelope({ details: { operations: [
+    { usage: operation }, { usage: operation },
+  ] } }));
+  expect(usage?.operations).toHaveLength(1);
+  expect(usage?.inputTokens).toBe(12_000, "a replayed settle must not double the bill");
+});

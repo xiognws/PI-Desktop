@@ -102,6 +102,8 @@ export const zhCN = {
     tokenCacheWrite: "缓存写",
     tokenReasoning: "推理",
     tokenTurns: "轮次",
+    tokenMainModel: "主模型",
+    tokenWorkerModel: "副模型（子代理）",
     customize: "自定义状态栏",
     hideBar: "隐藏状态栏",
     showBar: "显示状态栏",

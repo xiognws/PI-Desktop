@@ -205,6 +205,9 @@ pub fn record_usage(db: &Database, session_id: &str, turn_id: &str, usage: &Valu
     Ok(true)
 }
 
+/// Operation id prefix the kernel gives a settled delegation's spend.
+pub const DELEGATION_OPERATION_PREFIX: &str = "delegation:";
+
 /// What one session has spent, summed over every turn it has run.
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -216,6 +219,15 @@ pub struct SessionTotals {
     pub cache_write_tokens: i64,
     /// Already part of `outputTokens`; reported for the breakdown only.
     pub reasoning_tokens: i64,
+    /// The delegated share of the five counts above, from `delegation:<id>`
+    /// operations. Subtracting these leaves the orchestrating model's own spend, so
+    /// the status bar can show both halves of a smart-mode turn without a second
+    /// query or a second total.
+    pub worker_input_tokens: i64,
+    pub worker_output_tokens: i64,
+    pub worker_cache_read_tokens: i64,
+    pub worker_cache_write_tokens: i64,
+    pub worker_reasoning_tokens: i64,
 }
 
 /// Token totals for one session, from its first turn.
@@ -248,6 +260,39 @@ pub fn session_totals(db: &Database, session_id: &str) -> Result<SessionTotals> 
             continue;
         };
         let token = |key: &str| parsed.get(key).and_then(Value::as_i64).unwrap_or(0).max(0);
+        // A delegated request is a physical request like any other: it is already in
+        // the totals above. Counting it again here would inflate the session, so this
+        // only sizes the worker's share of what was just added.
+        if let Some(operations) = parsed.get("operations").and_then(Value::as_array) {
+            for operation in operations {
+                let id = operation.get("operationId").and_then(Value::as_str).unwrap_or("");
+                if !id.starts_with(DELEGATION_OPERATION_PREFIX) {
+                    continue;
+                }
+                let count = |key: &str| {
+                    operation
+                        .get(key)
+                        .and_then(Value::as_i64)
+                        .unwrap_or(0)
+                        .max(0)
+                };
+                totals.worker_input_tokens = totals
+                    .worker_input_tokens
+                    .saturating_add(count("inputTokens"));
+                totals.worker_output_tokens = totals
+                    .worker_output_tokens
+                    .saturating_add(count("outputTokens"));
+                totals.worker_cache_read_tokens = totals
+                    .worker_cache_read_tokens
+                    .saturating_add(count("cacheReadTokens"));
+                totals.worker_cache_write_tokens = totals
+                    .worker_cache_write_tokens
+                    .saturating_add(count("cacheWriteTokens"));
+                totals.worker_reasoning_tokens = totals
+                    .worker_reasoning_tokens
+                    .saturating_add(count("reasoningTokens"));
+            }
+        }
         totals.cache_read_tokens = totals
             .cache_read_tokens
             .saturating_add(token("cacheReadTokens"));

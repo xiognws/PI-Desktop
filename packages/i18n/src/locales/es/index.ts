@@ -102,6 +102,8 @@ export const es = {
     tokenCacheWrite: "Escritura de caché",
     tokenReasoning: "Razonamiento",
     tokenTurns: "Turnos",
+    tokenMainModel: "Modelo principal",
+    tokenWorkerModel: "Subagentes",
     customize: "Personalizar barra de estado",
     hideBar: "Ocultar barra de estado",
     showBar: "Mostrar barra de estado",

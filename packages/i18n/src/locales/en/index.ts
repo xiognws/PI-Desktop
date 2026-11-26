@@ -100,6 +100,8 @@ export const en = {
     tokenCacheWrite: "Cache write",
     tokenReasoning: "Reasoning",
     tokenTurns: "Turns",
+    tokenMainModel: "Orchestrator",
+    tokenWorkerModel: "Sub-agents",
     customize: "Customize status bar",
     hideBar: "Hide status bar",
     showBar: "Show status bar",

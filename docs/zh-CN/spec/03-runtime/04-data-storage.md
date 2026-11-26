@@ -1528,11 +1528,23 @@ Task remain separate optional transcript/event fields.
 `turns.input_tokens` / `turns.output_tokens` and the cache/reasoning counters in
 the merged `usage_json` for every turn the session has run, oldest first, and
 returns `{ turns, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens,
-reasoningTokens }`. Zero turns is an empty total, not an error, so the status bar
-can poll a freshly created session. It exists because a client cannot derive the
-number from a transcript it renders: that window is bounded, and the total is
-defined as the whole session. Turns the user deleted are deleted with their rows,
-which is what the ledger itself reports.
+reasoningTokens, workerInputTokens, workerOutputTokens, workerCacheReadTokens,
+workerCacheWriteTokens, workerReasoningTokens }`. Zero turns is an empty total,
+not an error, so the status bar can poll a freshly created session. It exists
+because a client cannot derive the number from a transcript it renders: that
+window is bounded, and the total is defined as the whole session. Turns the user
+deleted are deleted with their rows, which is what the ledger itself reports.
+
+A smart-mode turn pays two models: the orchestrator that dispatches and the
+subagents it delegated to. The five counts are every physical request in the
+session, both halves included — a settled delegation publishes its spend as an
+atomic operation with the id `delegation:<delegationId>` on the turn that asked
+for it, so the ordinary ledger already carries it and a replayed settle counts
+once. The `worker*` fields are the delegated share of those same counts, not an
+addition to them; subtracting them leaves the orchestrating model's own spend.
+The status bar shows the whole figure and names the split in its breakdown, so
+the user can see where a turn's tokens went without a second total to reconcile.
+A host that predates these fields simply omits them and the client reads zero.
 ### 末尾压缩检查点读取（#2163）
 
 有界末尾页包含最后一条消息之后追加的压缩记录，重新打开或重启后立即返回

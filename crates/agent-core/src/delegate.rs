@@ -584,6 +584,8 @@ pub struct DelegationView {
     pub error: Option<DelegationError>,
     /// True once some answer already carried this report to the parent.
     pub report_delivered: bool,
+    /// What the worker spent. Settled at `settle`, zero while it still runs.
+    pub usage: Usage,
 }
 
 impl From<&DelegationRecord> for DelegationView {
@@ -601,6 +603,7 @@ impl From<&DelegationRecord> for DelegationView {
             report: record.report.clone(),
             error: record.error.clone(),
             report_delivered: record.report_delivered,
+            usage: record.usage,
         }
     }
 }
@@ -636,6 +639,29 @@ pub fn delegation_details(view: &DelegationView) -> Value {
             "error".into(),
             json!({ "code": error.code, "message": error.message }),
         );
+    }
+    // The worker's tokens belong to the turn that asked for them, and this result is
+    // emitted on that turn. `operations[].usage` is the shape the usage ingester folds
+    // into the turn ledger, keyed by `operationId`, so a replayed settle counts once.
+    let spent = view.usage;
+    if spent.total_tokens() > 0 || spent.cache_read_tokens > 0 || spent.cache_write_tokens > 0 {
+        details.insert("usage".into(), json!(spent));
+        let mut operation = serde_json::Map::new();
+        operation.insert(
+            "operationId".into(),
+            json!(format!("delegation:{}", view.delegation_id)),
+        );
+        operation.insert("inputTokens".into(), json!(spent.input_tokens));
+        operation.insert("outputTokens".into(), json!(spent.output_tokens));
+        operation.insert("totalTokens".into(), json!(spent.total_tokens()));
+        operation.insert("cacheReadTokens".into(), json!(spent.cache_read_tokens));
+        operation.insert("cacheWriteTokens".into(), json!(spent.cache_write_tokens));
+        operation.insert("reasoningTokens".into(), json!(spent.reasoning_tokens));
+        operation.insert("agentName".into(), json!(view.agent_name));
+        if !view.model_id.is_empty() {
+            operation.insert("modelId".into(), json!(view.model_id));
+        }
+        details.insert("operations".into(), json!([{ "usage": Value::Object(operation) }]));
     }
     Value::Object(details)
 }
@@ -1905,6 +1931,73 @@ mod tests {
     }
 
     #[test]
+    fn a_settled_delegation_publishes_what_the_worker_spent() {
+        // The status bar sums the session's turn ledger. A worker's own usage events
+        // are attributed to its delegation id, which is not a turn row, so the only
+        // durable route into that ledger is this result: an atomic operation the
+        // ingester folds in and keys by id.
+        let view = DelegationView {
+            delegation_id: "del-7".into(),
+            agent_name: "test-runner".into(),
+            label: None,
+            status: DelegationStatus::Completed,
+            model_id: "9554".into(),
+            turns: 4,
+            tool_calls: 9,
+            started_at_ms: 0,
+            completed_at_ms: Some(1),
+            report: Some("tests pass".into()),
+            error: None,
+            report_delivered: false,
+            usage: Usage {
+                input_tokens: 12_000,
+                output_tokens: 800,
+                cache_read_tokens: 41_000,
+                cache_write_tokens: 0,
+                reasoning_tokens: 0,
+            },
+        };
+
+        let (_, details) = settled_tool_result("call-9", &view);
+
+        assert_eq!(details["usage"]["inputTokens"], 12_000, "the plain counts stay readable");
+        let operation = &details["operations"][0]["usage"];
+        assert_eq!(operation["operationId"], "delegation:del-7");
+        assert_eq!(operation["inputTokens"], 12_000);
+        assert_eq!(operation["outputTokens"], 800);
+        assert_eq!(operation["totalTokens"], 12_800);
+        assert_eq!(operation["cacheReadTokens"], 41_000);
+        assert_eq!(operation["agentName"], "test-runner");
+        assert_eq!(operation["modelId"], "9554");
+    }
+
+    #[test]
+    fn a_delegation_that_spent_nothing_adds_no_operation() {
+        // A refused or immediately failed delegation must not put a zero row in the
+        // ledger: the merge would keep it forever and count it as a request.
+        let view = DelegationView {
+            delegation_id: "del-8".into(),
+            agent_name: "scout".into(),
+            label: None,
+            status: DelegationStatus::Failed,
+            model_id: String::new(),
+            turns: 0,
+            tool_calls: 0,
+            started_at_ms: 0,
+            completed_at_ms: Some(1),
+            report: None,
+            error: None,
+            report_delivered: false,
+            usage: Usage::default(),
+        };
+
+        let (_, details) = settled_tool_result("call-10", &view);
+
+        assert!(details.get("operations").is_none(), "no spend, no operation");
+        assert!(details.get("usage").is_none(), "no spend, no counts");
+    }
+
+    #[test]
     fn a_step_limit_settlement_tells_the_parent_why_and_what_next() {
         let view = DelegationView {
             delegation_id: "del-1".into(),
@@ -1922,6 +2015,7 @@ mod tests {
                 message: "turn exceeded its 24-step budget".into(),
             }),
             report_delivered: false,
+            usage: Usage::default(),
         };
 
         let (result, _) = settled_tool_result("call-1", &view);
@@ -1971,6 +2065,7 @@ mod tests {
                 message: "the gateway reset the stream".into(),
             }),
             report_delivered: false,
+            usage: Usage::default(),
         };
 
         let (result, _) = settled_tool_result("call-3", &view);
@@ -2000,6 +2095,7 @@ mod tests {
             report: Some("done".into()),
             error: None,
             report_delivered: false,
+            usage: Usage::default(),
         };
 
         let (result, _) = settled_tool_result("call-2", &view);

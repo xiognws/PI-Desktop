@@ -39,6 +39,34 @@ export function sessionTokensUsed(totals: {
   );
 }
 
+/**
+ * The session total and which model half of it was.
+ *
+ * Smart mode pays two models in one turn — the orchestrator that dispatches and the
+ * workers it delegates to — so the status bar's figure covers both. `worker` is the
+ * delegated share the host reports; `main` is what is left, never negative even if a
+ * host ever reported a worker total larger than the session it belongs to.
+ */
+export function sessionTokensSplit(totals: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  workerInputTokens?: number;
+  workerOutputTokens?: number;
+  workerCacheReadTokens?: number;
+  workerCacheWriteTokens?: number;
+}): { total: number; main: number; worker: number } {
+  const total = sessionTokensUsed(totals);
+  const worker = sessionTokensUsed({
+    inputTokens: totals.workerInputTokens ?? 0,
+    outputTokens: totals.workerOutputTokens ?? 0,
+    cacheReadTokens: totals.workerCacheReadTokens ?? 0,
+    cacheWriteTokens: totals.workerCacheWriteTokens ?? 0,
+  });
+  return { total, main: Math.max(0, total - worker), worker };
+}
+
 /** `0:42`, `12:05`, `1:02:33`. */
 export function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));

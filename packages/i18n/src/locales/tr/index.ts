@@ -102,6 +102,8 @@ export const tr = {
     tokenCacheWrite: "Önbellek yazma",
     tokenReasoning: "Akıl yürütme",
     tokenTurns: "Turlar",
+    tokenMainModel: "Ana model",
+    tokenWorkerModel: "Alt ajanlar",
     customize: "Durum çubuğunu özelleştir",
     hideBar: "Durum çubuğunu gizle",
     showBar: "Durum çubuğunu göster",

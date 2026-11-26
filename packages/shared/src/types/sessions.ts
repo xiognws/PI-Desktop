@@ -36,6 +36,17 @@ export type SessionUsageTotals = {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   reasoningTokens: number;
+  /**
+   * The delegated share of the five counts above, from `delegation:<id>` operations.
+   * The counts themselves cover every physical request in the session, main and
+   * delegated, so subtracting these leaves the orchestrating model's own spend.
+   * Absent on an older host, or when the session never delegated.
+   */
+  workerInputTokens?: number;
+  workerOutputTokens?: number;
+  workerCacheReadTokens?: number;
+  workerCacheWriteTokens?: number;
+  workerReasoningTokens?: number;
 };
 
 export type SessionCapabilities = {
