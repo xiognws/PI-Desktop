@@ -1,0 +1,16 @@
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 960-966,969-970
+crates/agent-core/tests/delegation_gate.rs
+  h_201ed4c689ac8b 78-84,147-148,153-154,166,186-188,190,235-291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "05a0a17808dce3bcdd779932e21325bb375e47d1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
