@@ -1,0 +1,44 @@
+apps/desktop/electron/main/plugin-host-process.mjs
+  h_201ed4c689ac8b 455-457
+apps/desktop/electron/main/plugin-runtime.ts
+  h_201ed4c689ac8b 579-580,688,1223-1257,3293-3303
+apps/desktop/electron/main/services/plugin-services.ts
+  h_201ed4c689ac8b 152-154,444-448,698-708,712-715
+apps/desktop/resources/plugins/pi.token-insights/README.md
+  h_201ed4c689ac8b 21-24,101-103,116-122
+apps/desktop/resources/plugins/pi.token-insights/main.js
+  h_201ed4c689ac8b 13-17,484-519,523,529
+apps/desktop/resources/plugins/pi.token-insights/manifest.json
+  h_201ed4c689ac8b 8,77,85-86,90-91,100-101,103,114
+apps/desktop/resources/plugins/pi.token-insights/renderer/index.html
+  h_201ed4c689ac8b 166-197
+apps/desktop/resources/plugins/pi.token-insights/renderer/panel.js
+  h_201ed4c689ac8b 133-147,254-268,312-317,1045-1191,1409-1412
+apps/desktop/test/plugin-session-api.test.mjs
+  h_201ed4c689ac8b 493-556
+apps/desktop/test/token-insights-spend.test.mjs
+  h_201ed4c689ac8b 1-106
+docs/plugin-development.md
+  h_201ed4c689ac8b 31,1058
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 15398-15429
+docs/spec/07-plugins/01-plugin-system.md
+  h_201ed4c689ac8b 320
+docs/spec/07-plugins/03-plugin-api.md
+  h_201ed4c689ac8b 933-966
+docs/spec/07-plugins/13-plugin-permissions-matrix.md
+  h_201ed4c689ac8b 59
+packages/plugin-sdk/src/index.ts
+  h_201ed4c689ac8b 484-524,1584-1595
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "71f864189419ea3a7ed717b9430d309d90a68637",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
