@@ -1,12 +1,12 @@
 /** Shared public types grouped by the owning application domain. */
-import type { RemoteWorkspace } from "./workspace.js";
+import type { SmartModeSnapshot } from "../smart-mode.js";
 import type { Mode } from "./common.js";
+import type { UiMessage } from "./messages.js";
 import type { SessionThinkingLevel, ThinkingLevel } from "./models.js";
 import type { PermissionMode } from "./permissions.js";
-import type { UiMessage } from "./messages.js";
 import type { PlanHistoryEntry, PlanningState } from "./plans.js";
+import type { RemoteWorkspace } from "./workspace.js";
 import type { SessionWorktreeSummary } from "./worktree.js";
-import type { SmartModeSnapshot } from "../smart-mode.js";
 
 /**
  * Which authority owns a session's transcript.
