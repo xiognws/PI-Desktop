@@ -1,0 +1,14 @@
+apps/desktop/test/npm-executable.test.mjs
+  h_201ed4c689ac8b 181-183,193,305-312
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a8d37a0b098900c1dc21e7888e3b377a39b75bad",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
