@@ -1,0 +1,34 @@
+apps/desktop/electron/main/bootstrap/launcher.ts
+  h_201ed4c689ac8b 15,158-160
+apps/desktop/electron/main/bootstrap/window.ts
+  h_201ed4c689ac8b 40,212-218,228-230,582-586
+apps/desktop/electron/main/browser-view.ts
+  h_201ed4c689ac8b 8-9,150-151,157,162,511-531
+apps/desktop/electron/main/plugin-panel-host.ts
+  h_201ed4c689ac8b 12-13,211-212,225,230,542-551
+apps/desktop/electron/main/plugin-view-host.ts
+  h_201ed4c689ac8b 12-13,137-138,140,142,543-551
+apps/desktop/electron/main/renderer-console.ts
+  h_201ed4c689ac8b 1-108
+apps/desktop/electron/main/storage/bootstrap.ts
+  h_201ed4c689ac8b 14,87-89
+apps/desktop/electron/test/renderer-console.test.mjs
+  h_201ed4c689ac8b 1-139
+apps/desktop/src/lib/renderer-errors.ts
+  h_201ed4c689ac8b 1-52
+apps/desktop/src/main.tsx
+  h_201ed4c689ac8b 12,37-40
+apps/desktop/test/renderer-errors.test.mjs
+  h_201ed4c689ac8b 1-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "089b624fa3719ae46528c827bd11ca5fa5ed6c44",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
