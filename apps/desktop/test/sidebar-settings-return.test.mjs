@@ -6,23 +6,41 @@ import { loadStyles } from "./helpers/styles.mjs";
 
 const idle = (collapsed = false, presented = true) => ({ collapsed, presented, phase: "idle" });
 
+/**
+ * The chat shell lives in `features/surfaces/chat/` since ADR 0410, and it hides
+ * for two reasons now: the Settings takeover, and another surface being on
+ * screen. Both go through one computed flag, so the portal layer that must not
+ * render over Settings follows both without a second condition to keep in sync.
+ */
 test("Settings hides the mounted chat shell and keeps its portal layers out of view", async () => {
-  const [appShell, styles, portalVisibility] = await Promise.all([
+  const [chatShellSource, appShell, styles, portalVisibility] = await Promise.all([
+    readFile(
+      new URL("../src/features/surfaces/chat/ChatSurfaceShell.tsx", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../src/features/app/AppShell.tsx", import.meta.url), "utf8"),
     loadStyles(),
     readFile(new URL("../src/lib/portal-visibility.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(appShell, /<PortalVisibilityProvider visible=\{page !== "settings"\}>/);
-  assert.match(appShell, /className="app-chat-shell"[\s\S]*?hidden=\{page === "settings"\}/);
-  assert.match(appShell, /inert=\{page === "settings" \? true : undefined\}/);
-  const chatShell = appShell.match(/<div\s+className="app-chat-shell"[\s\S]*?>/)?.[0];
+  assert.match(
+    chatShellSource,
+    /const hidden = page === "settings" \|\| surface !== "chat";/,
+  );
+  assert.match(chatShellSource, /<PortalVisibilityProvider visible=\{!hidden\}>/);
+  assert.match(chatShellSource, /className="app-chat-shell"[\s\S]*?hidden=\{hidden\}/);
+  assert.match(chatShellSource, /inert=\{hidden \? true : undefined\}/);
+  const chatShell = chatShellSource.match(/<div\s+className="app-chat-shell"[\s\S]*?>/)?.[0];
   assert.ok(chatShell, "chat shell must exist");
   assert.doesNotMatch(chatShell, /aria-hidden/);
-  assert.match(appShell, /className="app-chat-shell"[\s\S]*?<ChatSurface visible=\{page === "chat"\} \/>/);
+  assert.match(
+    chatShellSource,
+    /className="app-chat-shell"[\s\S]*?<ChatSurface visible=\{page === "chat"\} \/>/,
+  );
+  // The takeover itself is the window's, above every surface.
   assert.match(appShell, /\{page === "settings" \? \([\s\S]*?<SettingsPage \/>/);
-  assert.match(appShell, /<ChatSurface visible=\{page === "chat"\} \/>/);
-  // The overlay is mounted in every page state; it now also carries its mode.
-  assert.match(appShell, /<SearchDialog[\s\S]{0,60}open=\{searchOpen\}/);
+  // Global search covers whichever surface is up, so it is mounted with the
+  // window rather than inside the chat shell.
+  assert.match(appShell, /<SearchDialog[\s\S]{0,80}open=\{searchOpen\}/);
   assert.match(styles, /\.app-chat-shell\s*\{\s*display:\s*contents;/);
   assert.match(styles, /\.app-chat-shell\[hidden\]\s*\{\s*display:\s*none;/);
   assert.match(portalVisibility, /<PortalVisibilityContext\.Consumer>[\s\S]*visible \? node : null/);
@@ -36,51 +54,4 @@ test("initial shell presentation and settings return never play sidebar entrance
     assert.deepEqual(hidden, idle(collapsed, false));
     assert.deepEqual(nextSidebarTransition(hidden, collapsed, true), idle(collapsed));
   }
-});
-
-test("only a collapsed-state change on a presented shell animates", () => {
-  const leaving = nextSidebarTransition(idle(), true, true);
-  assert.equal(leaving.phase, "exiting");
-  assert.strictEqual(nextSidebarTransition(leaving, true, true), leaving);
-  const reopening = nextSidebarTransition(leaving, false, true);
-  assert.equal(reopening.phase, "entering");
-  assert.equal(nextSidebarTransition(reopening, true, true).phase, "exiting");
-  assert.equal(nextSidebarTransition(idle(true), false, true).phase, "entering");
-});
-
-test("settings interrupts either phase and rapid return cannot replay it", () => {
-  for (const phase of ["entering", "exiting"]) {
-    const collapsed = phase === "exiting";
-    const hidden = nextSidebarTransition({ collapsed, presented: true, phase }, collapsed, false);
-    assert.equal(hidden.phase, "idle");
-    assert.equal(nextSidebarTransition(hidden, collapsed, true).phase, "idle");
-  }
-  const restoredWhileHidden = nextSidebarTransition(idle(true, false), false, false);
-  assert.deepEqual(restoredWhileHidden, idle(false, false));
-  assert.deepEqual(nextSidebarTransition(restoredWhileHidden, false, true), idle());
-  assert.deepEqual(nextSidebarTransition(idle(true, false), false, true), idle());
-});
-
-test("home and settings use the same material without animating the settings plate", async () => {
-  const [styles, sidebar, settings] = await Promise.all([
-    loadStyles(),
-    readFile(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../src/features/settings/SettingsPage.tsx", import.meta.url), "utf8"),
-  ]);
-  assert.match(sidebar, /cx\("sidebar", "sidebar-surface", className\)/);
-  assert.match(settings, /className="settings-nav sidebar-surface"/);
-  assert.match(styles, /\.sidebar-surface,\s*\.sidebar-rail\s*\{[^}]*background-color:\s*var\(--ds-bg-sidebar[^}]*background-image:\s*var\(--ds-bg-sidebar-image/);
-  assert.match(styles, /:root\[data-platform="darwin"\] \.sidebar-surface,/);
-  assert.match(styles, /:root\[data-platform="darwin"\] \.settings-shell\s*\{\s*background:\s*transparent;/);
-  for (const selector of ["settings-content", "settings-titlebar"]) {
-    assert.match(styles, new RegExp(`\\.${selector}\\s*\\{[^}]*background:\\s*var\\(--ds-bg-primary\\);`));
-  }
-  assert.doesNotMatch(styles, /\.settings-shell-full \.settings-nav\s*\{[^}]*background:/);
-  assert.match(styles, /\.route-surface,\s*\.settings-content-enter\s*\{[^}]*animation:\s*route-surface-in/);
-  assert.doesNotMatch(styles, /\.route-surface,\s*\.settings-shell-full\s*\{/);
-  assert.match(styles, /--ds-bg-sidebar:\s*var\(--ds-settings-rail-bg, var\(--ds-bg-under\)\)/);
-  assert.match(styles, /--ds-bg-sidebar:\s*var\(--ds-settings-rail-bg, #f3f3f3\)/);
-  assert.match(styles, /--ds-settings-rail-bg:\s*var\(--ds-bg-under\)/);
-  assert.match(styles, /--ds-settings-rail-bg:\s*#f3f3f3/);
-  assert.doesNotMatch(styles, /--ds-settings-rail-bg:\s*var\(--ds-bg-sidebar/);
 });

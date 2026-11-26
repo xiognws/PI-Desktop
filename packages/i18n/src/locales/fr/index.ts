@@ -319,12 +319,29 @@ export const fr = {
     "autotestWorkbench": "Atelier de test",
   },
   "autotest": {
+    surface: {
+      "title": "Atelier AutoTest",
+      "starting": "Démarrage du service de test local…",
+      "startingTitle": "Démarrage du service de test",
+      "startingDetail": "La première visite démarre un service Python local et son atelier web. Il reste actif tant que l'application est ouverte.",
+      "ready": "Service de test sur le port {port}",
+      "failed": "Le service de test n'a pas démarré",
+      "failedTitle": "Le service de test est indisponible",
+      "failedDetail": "Le service n'a pas répondu à /api/health. Redémarrer réessaie ; la raison est écrite dans le journal de l'application.",
+      "restart": "Redémarrer le service",
+      "openWindow": "Ouvrir dans sa propre fenêtre",
+    },
     "unavailableTitle": "Atelier de test indisponible",
     "unavailableMessage": "Le service de test local n'est pas encore prêt (état : {status}).",
     "unavailableDetail":
       "Le backend ne répond pas à /api/health. « Réessayer » relance le service ; en cas d'échec persistant, la raison est écrite dans le journal de l'application.",
     "retry": "Réessayer",
     "close": "Fermer",
+  },
+  surface: {
+    "switcher": "Changer d'interface",
+    "chat": "Discussion",
+    "autotest": "AutoTest",
   },
   "updates": {
     "title": "Mises à jour",

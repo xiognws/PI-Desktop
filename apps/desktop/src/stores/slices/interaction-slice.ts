@@ -19,6 +19,7 @@ import type { AppState } from "../app-state";
 import type { InteractionRuntime } from "../runtime/interaction-runtime";
 import type { SessionRuntime } from "../runtime/session-runtime";
 import { resolveSettingsTab } from "../../lib/settings-search";
+import { saveSurfacePreference } from "../../lib/surface-preferences";
 import type { StoreAccess } from "./types";
 
 const PLAN_APPROVAL_TIMEOUT = "PLAN_APPROVAL_TIMEOUT";
@@ -48,6 +49,7 @@ export function createInteractionSlice({
 }: InteractionSliceDependencies): Pick<
   AppState,
   | "setPage"
+  | "setSurface"
   | "setSettingsTab"
   | "setSettingsAnchor"
   | "canNavBack"
@@ -94,6 +96,28 @@ export function createInteractionSlice({
           navIndex: nextStack.length - 1,
         };
       });
+    },
+
+    /**
+     * Switch the whole interface.
+     *
+     * Chat is the surface that owns `page`, so its destination survives the
+     * switch: leaving from Artifacts and coming back returns to Artifacts.
+     * Settings is a window takeover rather than a destination, so it is left
+     * on the way out — the same result as pressing Back from it.
+     */
+    setSurface: (surface) => {
+      runtime.beginNavigationIntent();
+      const leavingSettings = get().page === "settings";
+      set((state) =>
+        state.surface === surface && !leavingSettings
+          ? {}
+          : {
+              surface,
+              ...(leavingSettings ? { page: "chat" as const } : {}),
+            },
+      );
+      if (get().surface === surface) saveSurfacePreference(surface);
     },
 
     setSettingsTab: (requested) => {

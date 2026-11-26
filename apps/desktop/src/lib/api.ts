@@ -38,6 +38,7 @@ import type {
   JevKeyCheckResult,
   CommandShellCatalog,
   AppVersionInfo,
+  AutotestWorkbenchSnapshot,
   ArtifactListFilter,
   ArtifactRow,
   ToolPackageSummary,
@@ -2379,6 +2380,26 @@ export const api = {
       listener(payload as { host: string }),
     );
   },
+  /**
+   * The AutoTest surface composite: main owns the workbench view and the
+   * service behind it, the renderer only says "show it here" and "hide it".
+   * `attach` brings the service up when it is stopped — opening the interface
+   * is itself the first use, exactly as opening the old window was.
+   */
+  autotestWorkbenchStatus: () =>
+    invoke<AutotestWorkbenchSnapshot>(IPC.invoke.autotestWorkbenchStatus),
+  autotestWorkbenchAttach: () =>
+    invoke<AutotestWorkbenchSnapshot>(IPC.invoke.autotestWorkbenchAttach),
+  autotestWorkbenchDetach: () => invoke<void>(IPC.invoke.autotestWorkbenchDetach),
+  autotestWorkbenchBounds: (bounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) => invoke<void>(IPC.invoke.autotestWorkbenchBounds, bounds),
+  autotestWorkbenchRestart: () =>
+    invoke<AutotestWorkbenchSnapshot>(IPC.invoke.autotestWorkbenchRestart),
+  autotestWorkbenchOpenWindow: () => invoke<void>(IPC.invoke.autotestWorkbenchOpenWindow),
   onHostStatus: (listener: (status: HostStatusEvent) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.hostStatus, (payload) =>

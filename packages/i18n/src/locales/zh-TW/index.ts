@@ -321,12 +321,29 @@ export const zhTW = {
     autotestWorkbench: "測試工作臺",
   },
   autotest: {
+    surface: {
+      title: "AutoTest 工作台",
+      starting: "正在啟動本機測試服務…",
+      startingTitle: "正在啟動測試服務",
+      startingDetail: "首次進入會啟動本機 Python 服務與它的 Web 工作台；應用程式開啟期間持續執行。",
+      ready: "測試服務連接埠 {port}",
+      failed: "測試服務未啟動",
+      failedTitle: "測試服務無法使用",
+      failedDetail: "服務沒有回應 /api/health。重新啟動會再試一次，失敗原因寫入應用程式日誌。",
+      restart: "重新啟動服務",
+      openWindow: "在獨立視窗開啟",
+    },
     unavailableTitle: "測試工作臺暫不可用",
     unavailableMessage: "本機測試服務尚未就緒（目前狀態：{status}）。",
     unavailableDetail:
       "後端沒有回應 /api/health。點「重試啟動」會重新拉起服務；仍然失敗時原因會寫進應用程式日誌。",
     retry: "重試啟動",
     close: "關閉",
+  },
+  surface: {
+    switcher: "切換介面",
+    chat: "會話",
+    autotest: "AutoTest",
   },
   updates: {
     title: "軟體更新",

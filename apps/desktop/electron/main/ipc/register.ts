@@ -11,6 +11,9 @@ import { readNpmPath, writeNpmPath } from "../npm-preferences";
 import { registerAgentIpc } from "./agent-ipc";
 import { registerAppIpc } from "./app-ipc";
 import { registerArtifactsIpc } from "./artifacts-ipc";
+import { registerAutotestIpc } from "./autotest-ipc";
+import type { AutotestService } from "../../autotest/service";
+import type { AutotestWorkbenchView } from "../../autotest/workbench-view";
 import { registerToolPackagesIpc } from "./tool-packages-ipc";
 import { registerWidgetsIpc } from "./widgets-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
@@ -94,6 +97,17 @@ export type RegisterIpcDependencies = {
   completionNoticeTurns: Set<string>;
   /** Mode definition catalog and staged run coordination (ADR mode-definitions). */
   modeServices: ModeServices;
+  /**
+   * The AutoTest surface's composite (ADR 0410): the loopback service, the one
+   * view that renders its workbench inside the main window, and the detached
+   * window the menu still opens. Optional so the IPC surface can be registered
+   * without the service in tests or a host-less shell.
+   */
+  autotest?: {
+    service: AutotestService;
+    view: AutotestWorkbenchView;
+    openWindow: () => void;
+  };
   restartForStorage: () => void;
   mcpOAuth?: McpOAuthManager;
   markLifecycleDialogRendererReady: (window: BrowserWindow) => boolean;
@@ -422,6 +436,15 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
 
   registerMemoryIpc({ registrar, getHost });
   registerArtifactsIpc({ registrar, getHost });
+  if (dependencies.autotest) {
+    registerAutotestIpc({
+      registrar,
+      service: dependencies.autotest.service,
+      view: dependencies.autotest.view,
+      openWindow: dependencies.autotest.openWindow,
+      logger,
+    });
+  }
   registerToolPackagesIpc({ registrar, getHost });
   registerWidgetsIpc({ registrar, getHost, getSidecar });
 

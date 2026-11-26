@@ -4,6 +4,7 @@ import {
   dialog,
   ipcMain,
   session,
+  WebContentsView,
 } from "electron";
 import { join } from "node:path";
 import {
@@ -73,6 +74,10 @@ import {
   registerAutotestWorkbenchOpener,
   type AutotestWindowLike,
 } from "../autotest/window";
+import {
+  AutotestWorkbenchView,
+  type WorkbenchViewLike,
+} from "../autotest/workbench-view";
 import { getActiveRemoteHostsBoot } from "./bootstrap/remote-hosts";
 import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
@@ -998,6 +1003,11 @@ function registerIpc() {
     // takes its servers with it, and the IPC layer only forwards the call.
     disposeSessionResources: shutdownLspSessions,
     getPluginLauncherWindow: () => mainState.pluginLauncherWindow,
+    autotest: {
+      service: autotestService,
+      view: autotestWorkbenchView,
+      openWindow: openAutotestWorkbenchWindow,
+    },
     togglePluginLauncher,
     /** Same delivery path as the application menu, so readiness and focus are
      * handled once instead of by the launcher IPC. */
@@ -1218,7 +1228,13 @@ async function promptAutotestUnavailable(snapshot: { status: string; error: stri
   }
 }
 
-registerAutotestWorkbenchOpener(() => {
+/**
+ * Open the detached workbench window.
+ *
+ * Shared by the application menu and by the AutoTest surface's "open in its own
+ * window" action — one path, so both report an unavailable service the same way.
+ */
+function openAutotestWorkbenchWindow(): void {
   const snapshot = autotestService.state();
   const url = autotestWorkbenchUrl(snapshot.port);
   if (snapshot.status === "ready" && url) {
@@ -1242,7 +1258,46 @@ registerAutotestWorkbenchOpener(() => {
     `[autotest] workbench unavailable: ${snapshot.status}${snapshot.error ? ` (${snapshot.error})` : ""}`,
   );
   void promptAutotestUnavailable(snapshot);
+}
+
+registerAutotestWorkbenchOpener(openAutotestWorkbenchWindow);
+
+/*
+ * The AutoTest *surface* shows the same page composited inside the main window
+ * instead of in a window of its own (ADR 0410). The module owns one view and its
+ * lifecycle; the renderer only measures the pane and says when to show it, since
+ * a `WebContentsView` always paints above renderer content.
+ */
+const autotestWorkbenchView = new AutotestWorkbenchView({
+  addView: (view) => {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed()) return;
+    window.contentView.addChildView(view as unknown as WebContentsView);
+  },
+  removeView: (view) => {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed()) return;
+    window.contentView.removeChildView(view as unknown as WebContentsView);
+  },
+  zoomFactor: () => {
+    const window = getMainWindow();
+    return window && !window.isDestroyed() ? window.webContents.getZoomFactor() : 1;
+  },
+  createView: () =>
+    new WebContentsView({
+      webPreferences: {
+        // The page is the local FastAPI service, not our renderer: no Node, no
+        // webview, and only the minimal preload that hands a text snippet over.
+        preload: join(getModuleDirectory(import.meta.url), "../preload/autotest.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        webviewTag: false,
+      },
+    }) as unknown as WorkbenchViewLike,
+  log: (message) => logger.app("runtime", "warn", `[autotest] ${message}`),
 });
+app.once("will-quit", () => autotestWorkbenchView.reload());
 
 registerApplicationStartup({
   hasSingleInstanceLock,

@@ -16,7 +16,7 @@ const read = (rel) => readFile(new URL(rel, import.meta.url), "utf8");
 const pageSource = await read("../src/pages/ArtifactsPage.tsx");
 const hookSource = await read("../src/features/artifacts/use-artifacts.ts");
 const styles = await read("../src/features/artifacts/artifacts.css");
-const shellSource = await read("../src/features/app/AppShell.tsx");
+const shellSource = await read("../src/features/surfaces/chat/ChatSurfaceShell.tsx");
 const runtimeSource = await read("../src/features/app/useAppShellRuntime.tsx");
 const stateSource = await read("../src/stores/app-state.ts");
 const sidebarSource = await read("../src/components/Sidebar.tsx");
@@ -32,7 +32,7 @@ test("the artifacts page is reachable from the shell, the sidebar and global sea
   // the surface gives up.
   assert.match(
     shellSource,
-    /const ArtifactsPage = lazy\(\s*lazyRoute\(\(\) =>\s*import\("\.\.\/\.\.\/pages\/ArtifactsPage"\)/,
+    /const ArtifactsPage = lazy\(\s*lazyRoute\(\(\) =>\s*import\("\.\.\/\.\.\/\.\.\/pages\/ArtifactsPage"\)/,
   );
   assert.match(shellSource, /page === "artifacts" \? \(/);
   // The page type has to carry the id, or the route cannot be typed. The union

@@ -319,12 +319,29 @@ export const de = {
     "autotestWorkbench": "Autotest-Workbench",
   },
   "autotest": {
+    surface: {
+      "title": "AutoTest-Workbench",
+      "starting": "Der lokale Testdienst wird gestartet …",
+      "startingTitle": "Testdienst wird gestartet",
+      "startingDetail": "Der erste Aufruf startet einen lokalen Python-Dienst samt Weboberfläche. Er läuft, solange die App geöffnet ist.",
+      "ready": "Testdienst auf Port {port}",
+      "failed": "Der Testdienst wurde nicht gestartet",
+      "failedTitle": "Der Testdienst ist nicht verfügbar",
+      "failedDetail": "Der Dienst antwortet nicht auf /api/health. Ein Neustart versucht es erneut; der Grund steht im Anwendungsprotokoll.",
+      "restart": "Dienst neu starten",
+      "openWindow": "In eigenem Fenster öffnen",
+    },
     "unavailableTitle": "Autotest-Workbench nicht verfügbar",
     "unavailableMessage": "Der lokale Testdienst ist noch nicht bereit (Status: {status}).",
     "unavailableDetail":
       "Das Backend antwortet nicht auf /api/health. „Neu starten“ startet den Dienst erneut; schlägt es weiterhin fehl, steht der Grund im Anwendungsprotokoll.",
     "retry": "Neu starten",
     "close": "Schließen",
+  },
+  surface: {
+    "switcher": "Oberfläche wechseln",
+    "chat": "Chat",
+    "autotest": "AutoTest",
   },
   "updates": {
     "title": "Updates",

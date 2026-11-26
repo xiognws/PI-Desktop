@@ -318,12 +318,29 @@ export const ptBR = {
     autotestWorkbench: "Bancada de testes",
   },
   autotest: {
+    surface: {
+      title: "AutoTest workbench",
+      starting: "Starting the local test service…",
+      startingTitle: "Starting the test service",
+      startingDetail: "The first visit starts a local Python service and its web workbench. It keeps running while the app is open.",
+      ready: "Test service on port {port}",
+      failed: "The test service did not start",
+      failedTitle: "The test service is not available",
+      failedDetail: "The service did not answer /api/health. Restarting tries again; the reason is written to the application log.",
+      restart: "Restart service",
+      openWindow: "Open in its own window",
+    },
     unavailableTitle: "Bancada de testes indisponível",
     unavailableMessage: "O serviço local de testes ainda não está pronto (status: {status}).",
     unavailableDetail:
       "O backend não respondeu a /api/health. “Tentar novamente” inicia o serviço outra vez; se ainda falhar, o motivo é gravado no log do aplicativo.",
     retry: "Tentar novamente",
     close: "Fechar",
+  },
+  surface: {
+    switcher: "Switch interface",
+    chat: "Chat",
+    autotest: "AutoTest",
   },
   updates: {
     title: "Atualizações",

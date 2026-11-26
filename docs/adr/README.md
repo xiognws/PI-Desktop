@@ -447,3 +447,4 @@ Each ADR includes:
 | 0407 | [Bundled plugins stay plugins](0407-bundled-plugins-stay-plugins.md) | Accepted (related 0383, 0402) |
 | 0408 | [The system proxy relay starts only when the machine routes](0408-system-proxy-relay-gate.md) | Accepted (related 0177, 0406) |
 | 0409 | [Token budget defaults are global, and they are sized, not inherited](0409-token-budget-defaults.md) | Accepted (related 0405, 0404) |
+| 0410 | [The window has surfaces, and the chat sidebar is not the window](0410-surface-model.md) | Accepted |

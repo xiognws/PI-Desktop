@@ -555,6 +555,20 @@ export const IPC = {
      * 输入框。传文本不是传对象 —— 渲染层只认字符串，多一层结构只会多一个越界面。
      */
     autotestInsertContext: "pi-desktop/autotest/insertContext",
+    /**
+     * The AutoTest surface embeds the loopback workbench in the main window.
+     * The renderer measures where it belongs and stays the visibility
+     * authority, exactly as it does for a plugin work-panel view: a
+     * `WebContentsView` draws above renderer content, so it must be detached
+     * whenever a blocking overlay is up or another surface is active.
+     */
+    autotestWorkbenchAttach: "pi-desktop/autotest/workbench/attach",
+    autotestWorkbenchDetach: "pi-desktop/autotest/workbench/detach",
+    autotestWorkbenchBounds: "pi-desktop/autotest/workbench/bounds",
+    autotestWorkbenchStatus: "pi-desktop/autotest/workbench/status",
+    autotestWorkbenchRestart: "pi-desktop/autotest/workbench/restart",
+    /** Pop the same workbench out into the window it used to open by itself. */
+    autotestWorkbenchOpenWindow: "pi-desktop/autotest/workbench/openWindow",
   },
   event: {
     pluginChanged: "pi-desktop/event/pluginChanged",

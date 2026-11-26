@@ -15,20 +15,25 @@ destination, chat as the home surface, tools and permissions inline.
 ```text
 +----------------------------------------------------------------------+
 | Platform titlebar: macOS traffic lights / Windows/Linux actions     |
-+------------------+--------------------------------+------------------+
-| Sidebar (275px) | Main pane (active destination) | Work panel       |
-|                  |  chat home / transcript        |  (optional,      |
-|                  |  or Extensions page            |   resizable      |
-|                  |                                |   ≥244px, dynamic|
-|  Sessions     +↕ |                                | surface          |
-|   Recent rows ↕  |                                |                  |
-|  Projects      + |                                | ◫ | App.tsx  ⌄ × |
-|   Project A      |                                | > |              |
-|   Project B      |                                | ◎ | Active       |
-| Footer [⚙][plug][☾][bell] |  Floating composer (chat) |   | resource     |
-+------------------+--------------------------------+------------------+
++------+------------------+------------------------------+-------------+
+| Rail | Sidebar (275px) | Main pane (active            | Work panel  |
+| (48) |                 | destination of the surface)  |  (optional) |
+|      |  Sessions     + |  chat home / transcript      |             |
+|  ◧   |   Recent rows ↕ |  or Extensions page          | ◫ | App.tsx ⌄ |
+|  ⌘   |  Projects      + |                             | > |         |
+|      |   Project A     |                             | ◎ | Active  |
+|      |   Project B     |                             |             |
+|      | Footer [⚙][plug][☾][bell] | Floating composer  |             |
++------+------------------+------------------------------+-------------+
 ```
 
+- **Surface rail**: one glyph per working interface (D0410), 48px wide, at the
+  window's left edge. Chat is the home surface; AutoTest is the second; further
+  interfaces are appended to the shared id list. Selecting another surface
+  replaces that surface's sidebar and main pane, so the rail sits outside every
+  sidebar. It is hidden during the Settings takeover, whose whole window it would
+  otherwise divide. The rail's column is reserved in the chat shell's width
+  budget, so the sidebar, main pane and work panel keep their existing floors.
 - **Sidebar**: primary navigation — path-less conversations under a compact
   **Sessions** section with new-session and sort actions, retained open-project
   groups under a following **Projects** section with a persistent new-project
@@ -506,9 +511,14 @@ shared capability contract:
 
 ## 5. Navigation model
 
-- `page` state: `chat | scheduled | plugins | settings`; `chat` is the
-  conversation-surface route, not an operating mode. The project
-  archive is the `projects` settings tab rather than a standalone page.
+- Two levels of state (D0410). `surface` names the working interface —
+  `chat | autotest` — and is what the rail selects and the launch restores.
+  `page` stays the destination *inside* the chat surface (`chat | scheduled |
+  plugins | artifacts | tools | settings`), which is why a switch to AutoTest and
+  back returns to the destination the user left. Settings is a window takeover
+  rather than a destination, so switching surfaces leaves it. `chat` is the
+  conversation route, not an operating mode. The project archive is the `projects`
+  settings tab rather than a standalone surface.
 - Destination history is linear; `Cmd/Ctrl+[` and `Cmd/Ctrl+]` traverse it
   without persistent back/forward chrome. While Extensions is active, the
   footer Plugins button reuses one Back step (§2 shell regions); no separate
@@ -539,6 +549,8 @@ shared capability contract:
 | Cmd/Ctrl+Shift+P | command palette |
 | Cmd/Ctrl+K | global search |
 | Cmd/Ctrl+B | toggle sidebar |
+| Cmd/Ctrl+1 | switch to the chat surface |
+| Cmd/Ctrl+2 | switch to the AutoTest surface |
 | Cmd/Ctrl+[ | previous destination |
 | Cmd/Ctrl+] | next destination |
 | Cmd/Ctrl+N | new task |

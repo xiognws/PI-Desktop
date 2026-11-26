@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS_TAB } from "../../lib/settings-search";
 import type { AppState, AppStateData } from "../app-state";
 import { projectWorkspaceFromPath } from "../../lib/sidebar-preferences";
 import { loadSidebarPreferences } from "../../lib/sidebar-preferences";
+import { loadSurfacePreference } from "../../lib/surface-preferences";
 import { loadWorkPanelWidth } from "./work-panel-slice";
 
 export const initialSidebarPreferences = loadSidebarPreferences();
@@ -20,6 +21,10 @@ function withProjectDisplayName(
 export function createInitialState(): AppStateData {
   return {
     ready: false,
+    // The interface the last launch was on. Restoring it before the first host
+    // response means a window that reopens where the user left it instead of
+    // flashing chat first.
+    surface: loadSurfacePreference(),
     recentModels: loadRecentModels(),
     healthOk: false,
     sessions: [],

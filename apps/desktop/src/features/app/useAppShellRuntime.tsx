@@ -16,6 +16,7 @@ import { installRendererApi } from "../../capture/renderer-api";
 import { StartupAnimation } from "../../components/StartupAnimation";
 import { StartupSplash } from "../../components/StartupSplash";
 import { api } from "../../lib/api";
+import { SURFACE_RAIL_WIDTH } from "../surfaces/rail-metrics";
 import { scheduledWorkspaceCache } from "../scheduled/scheduled-workspace-cache";
 import { composerSuggestion } from "../chat/composer/plugins/suggestion-bridge";
 import { composerDraftBridge } from "../chat/composer/plugins/draft-bridge";
@@ -64,6 +65,7 @@ export function useAppShellRuntime() {
   const bootstrap = useAppStore((s) => s.bootstrap);
   const ready = useAppStore((s) => s.ready);
   const page = useAppStore((s) => s.page);
+  const surface = useAppStore((s) => s.surface);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const acknowledgeSessionOutcome = useAppStore(
     (s) => s.acknowledgeSessionOutcome,
@@ -976,6 +978,12 @@ export function useAppShellRuntime() {
             }
             break;
           }
+          case "surfaceChat":
+            useAppStore.getState().setSurface("chat");
+            break;
+          case "surfaceAutotest":
+            useAppStore.getState().setSurface("autotest");
+            break;
           case "abort":
             void abort().catch((error) => {
               showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
@@ -1140,17 +1148,24 @@ export function useAppShellRuntime() {
     : workPanelToggleLabel;
 
 
+  // The surface rail occupies a column of its own, so everything the chat shell
+  // budgets — sidebar, main pane, work panel — shares what is left of the
+  // window. The Settings takeover replaces the whole window, so the rail (and
+  // its column) is not drawn there.
+  const railWidth = page === "settings" ? 0 : SURFACE_RAIL_WIDTH;
+  const contentWidth = Math.max(0, shellWidth - railWidth);
+
   // What the panel asks of the shared budget, including a width it lent to a
   // reopened sidebar; the stored preference may be wider.
   const requestedWorkPanelWidth = workPanelRequestedWidth({
-    containerWidth: shellWidth,
+    containerWidth: contentWidth,
     sidebarWidth,
     sidebarCollapsed: sidebarCollapsed && !sidebarExiting,
     preferredWidth: workPanelWidth,
     yieldedWidth: workPanelYieldedWidth,
   });
   const sidebarWidthMax = sidebarWidthBudget({
-    containerWidth: shellWidth,
+    containerWidth: contentWidth,
     workPanelOpen: workPanelVisible || presentedWorkPanelOpen,
     workPanelWidth: requestedWorkPanelWidth,
     workPanelMaximized,
@@ -1160,6 +1175,7 @@ export function useAppShellRuntime() {
     t,
     ready,
     page,
+    surface,
     activeSessionId,
     workPanelOpen,
     searchOpen,
@@ -1179,6 +1195,7 @@ export function useAppShellRuntime() {
     autoCollapseSidebar,
     appShellRef,
     shellWidth,
+    contentWidth,
     requestedWorkPanelWidth,
     runMenuCommand,
     handleSidebarAnimationEnd,
@@ -1202,3 +1219,11 @@ export function useAppShellRuntime() {
     workPanelToggleTooltip,
   };
 }
+
+/**
+ * The shell runtime's public shape.
+ *
+ * Surfaces receive the instance the window booted with instead of calling the
+ * hook again: a second call would install every window-level listener twice.
+ */
+export type AppShellRuntime = ReturnType<typeof useAppShellRuntime>;

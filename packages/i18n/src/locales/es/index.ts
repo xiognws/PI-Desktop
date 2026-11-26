@@ -319,12 +319,29 @@ export const es = {
     "autotestWorkbench": "Banco de pruebas",
   },
   "autotest": {
+    surface: {
+      "title": "Banco de trabajo AutoTest",
+      "starting": "Iniciando el servicio de pruebas local…",
+      "startingTitle": "Iniciando el servicio de pruebas",
+      "startingDetail": "La primera visita inicia un servicio Python local y su banco de trabajo web. Sigue en marcha mientras la aplicación esté abierta.",
+      "ready": "Servicio de pruebas en el puerto {port}",
+      "failed": "El servicio de pruebas no se inició",
+      "failedTitle": "El servicio de pruebas no está disponible",
+      "failedDetail": "El servicio no respondió a /api/health. Reiniciar lo intenta de nuevo; el motivo queda en el registro de la aplicación.",
+      "restart": "Reiniciar servicio",
+      "openWindow": "Abrir en su propia ventana",
+    },
     "unavailableTitle": "Banco de pruebas no disponible",
     "unavailableMessage": "El servicio local de pruebas aún no está listo (estado: {status}).",
     "unavailableDetail":
       "El backend no respondió a /api/health. «Reintentar» inicia el servicio de nuevo; si vuelve a fallar, el motivo queda en el registro de la aplicación.",
     "retry": "Reintentar",
     "close": "Cerrar",
+  },
+  surface: {
+    "switcher": "Cambiar interfaz",
+    "chat": "Chat",
+    "autotest": "AutoTest",
   },
   "updates": {
     "title": "Actualizaciones",

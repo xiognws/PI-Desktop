@@ -328,12 +328,29 @@ export const ko = {
     autotestWorkbench: "자동 테스트 워크벤치",
   },
   autotest: {
+    surface: {
+      title: "AutoTest workbench",
+      starting: "Starting the local test service…",
+      startingTitle: "Starting the test service",
+      startingDetail: "The first visit starts a local Python service and its web workbench. It keeps running while the app is open.",
+      ready: "Test service on port {port}",
+      failed: "The test service did not start",
+      failedTitle: "The test service is not available",
+      failedDetail: "The service did not answer /api/health. Restarting tries again; the reason is written to the application log.",
+      restart: "Restart service",
+      openWindow: "Open in its own window",
+    },
     unavailableTitle: "자동 테스트 워크벤치를 사용할 수 없음",
     unavailableMessage: "로컬 자동 테스트 서비스가 아직 준비되지 않았습니다(상태: {status}).",
     unavailableDetail:
       "백엔드가 /api/health에 응답하지 않았습니다. ‘다시 시작’을 누르면 서비스를 다시 띄웁니다. 계속 실패하면 원인이 애플리케이션 로그에 기록됩니다.",
     retry: "다시 시작",
     close: "닫기",
+  },
+  surface: {
+    switcher: "Switch interface",
+    chat: "Chat",
+    autotest: "AutoTest",
   },
   updates: {
     title: "업데이트",

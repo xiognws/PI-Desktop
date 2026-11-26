@@ -326,12 +326,29 @@ export const en = {
     autotestWorkbench: "Autotest Workbench",
   },
   autotest: {
+    surface: {
+      title: "AutoTest workbench",
+      starting: "Starting the local test service…",
+      startingTitle: "Starting the test service",
+      startingDetail: "The first visit starts a local Python service and its web workbench. It keeps running while the app is open.",
+      ready: "Test service on port {port}",
+      failed: "The test service did not start",
+      failedTitle: "The test service is not available",
+      failedDetail: "The service did not answer /api/health. Restarting tries again; the reason is written to the application log.",
+      restart: "Restart service",
+      openWindow: "Open in its own window",
+    },
     unavailableTitle: "Autotest Workbench Unavailable",
     unavailableMessage: "The local Autotest service is not ready (status: {status}).",
     unavailableDetail:
       "The backend did not answer /api/health. Retrying starts it again; if it still fails, the reason is written to the application log.",
     retry: "Retry Start",
     close: "Close",
+  },
+  surface: {
+    switcher: "Switch interface",
+    chat: "Chat",
+    autotest: "AutoTest",
   },
   updates: {
     title: "Updates",

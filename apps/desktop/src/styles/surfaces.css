@@ -1,0 +1,249 @@
+/* First-column surface switcher and the surfaces that are not chat.
+   The rail is one flex column of `.app-shell`; everything else in the window
+   keeps its existing geometry (see `features/surfaces/rail-metrics.ts`, which
+   reserves the same width in the chat shell's three-column budget). */
+
+.surface-rail {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 8px;
+  background: var(--ds-bg-under);
+  border-right: 1px solid var(--ds-border-subtle);
+  position: relative;
+  z-index: 2;
+}
+
+/* The 46px window-title lane the expanded sidebar also opens with, so the
+   window stays draggable above the first icon. */
+.surface-rail-spacer {
+  flex: none;
+  height: 46px;
+  width: 100%;
+  -webkit-app-region: drag;
+}
+
+.surface-rail-button {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--ds-text-muted);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.surface-rail-button:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.surface-rail-button:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+}
+
+.surface-rail-button.is-active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+/* The active marker is a 2px bar on the window edge, not a fill: the icon rail
+   has to stay quiet next to the sidebar it sits beside. */
+.surface-rail-button.is-active::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 18px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--ds-accent);
+}
+
+/* --- AutoTest surface ------------------------------------------------- */
+
+.app-surface-autotest {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+}
+
+.app-surface-autotest[hidden] {
+  display: none;
+}
+
+.autotest-sidebar {
+  flex: 0 0 244px;
+  width: 244px;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ds-bg-sidebar);
+  border-right: 1px solid var(--ds-border-subtle);
+}
+
+.autotest-sidebar-header {
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+.autotest-sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-text-primary);
+}
+
+.autotest-sidebar-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 12px 16px;
+}
+
+.autotest-service {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--ds-bg-chip);
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.autotest-service-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-round, 999px);
+  background: var(--ds-text-faint);
+}
+
+.autotest-service[data-state="ready"] .autotest-service-dot {
+  background: var(--ds-success, #3fb950);
+}
+
+.autotest-service[data-state="starting"] .autotest-service-dot {
+  background: var(--ds-warning);
+  animation: pulse-soft 1.2s ease-in-out infinite;
+}
+
+.autotest-service[data-state="failed"] .autotest-service-dot {
+  background: var(--ds-error);
+}
+
+.autotest-service-detail {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ds-text-muted);
+  word-break: break-word;
+}
+
+.autotest-sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.autotest-main-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.autotest-titlebar {
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.autotest-titlebar-title {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+/* The rect the native workbench view is placed on. It keeps its own size when
+   the view is detached, so the placeholder and the embedded page share one
+   box and nothing jumps on attach. */
+.autotest-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.autotest-pane-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  color: var(--ds-text-secondary);
+}
+
+.autotest-pane-heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ds-text-primary);
+}
+
+.autotest-pane-detail {
+  margin: 0;
+  max-width: 460px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ds-text-muted);
+  word-break: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface-rail-button {
+    transition: none;
+  }
+  .autotest-service[data-state="starting"] .autotest-service-dot {
+    animation: none;
+  }
+}

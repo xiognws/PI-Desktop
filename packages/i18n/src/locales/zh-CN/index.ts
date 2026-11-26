@@ -321,12 +321,29 @@ export const zhCN = {
     autotestWorkbench: "测试工作台",
   },
   autotest: {
+    surface: {
+      title: "AutoTest 工作台",
+      starting: "正在启动本地测试服务…",
+      startingTitle: "正在启动测试服务",
+      startingDetail: "首次进入会启动本机 Python 服务与它的 Web 工作台；应用打开期间一直运行。",
+      ready: "测试服务端口 {port}",
+      failed: "测试服务未启动",
+      failedTitle: "测试服务不可用",
+      failedDetail: "服务没有响应 /api/health。重新启动会再试一次，失败原因写入应用日志。",
+      restart: "重启服务",
+      openWindow: "在独立窗口打开",
+    },
     unavailableTitle: "测试工作台暂不可用",
     unavailableMessage: "本地测试服务尚未就绪（当前状态：{status}）。",
     unavailableDetail:
       "后端没有响应 /api/health。点「重试启动」会重新拉起服务；仍然失败时原因会写进应用日志。",
     retry: "重试启动",
     close: "关闭",
+  },
+  surface: {
+    switcher: "切换界面",
+    chat: "会话",
+    autotest: "AutoTest",
   },
   updates: {
     title: "软件更新",

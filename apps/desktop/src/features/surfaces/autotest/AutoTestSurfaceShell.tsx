@@ -1,0 +1,205 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { AutotestWorkbenchSnapshot } from "@pi-workspace/shared";
+import { Button } from "../../../components/ui";
+import { api } from "../../../lib/api";
+import { useAppStore } from "../../../stores/app-store";
+import type { SurfaceShellProps } from "../registry";
+
+/**
+ * The AutoTest surface.
+ *
+ * The workbench is not a React application — it is a Vue app served by the local
+ * FastAPI service the main process supervises — so this surface composites it
+ * instead of reimplementing it: it reserves a pane, measures it, and asks main
+ * to place the `WebContentsView` there. That is the same seam the plugin work
+ * panel uses for its docked views.
+ *
+ * Three rules follow from "a WebContentsView draws above renderer content":
+ *
+ * 1. the renderer owns visibility — the view is detached whenever this surface
+ *    is not on screen, Settings takes the window, or a blocking overlay opens;
+ * 2. the pane keeps a native placeholder underneath, so a slow start or a failed
+ *    service is explained instead of leaving a hole;
+ * 3. detaching hides rather than destroys, so switching interfaces and coming
+ *    back leaves the workbench where the user left it.
+ *
+ * The sidebar column is the surface's own: the chat sidebar is keyed by
+ * conversations, and a test platform navigates by tests, plans and runs.
+ */
+
+/** Re-check a failed service without the user having to click anything. */
+const FAILED_RETRY_MS = 25_000;
+
+export function AutoTestSurfaceShell({ overlaysOpen }: SurfaceShellProps) {
+  const { t } = useTranslation();
+  const surface = useAppStore((s) => s.surface);
+  const page = useAppStore((s) => s.page);
+  const active = surface === "autotest" && page !== "settings";
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  const [snapshot, setSnapshot] = useState<AutotestWorkbenchSnapshot | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const attach = useCallback(async () => {
+    setBusy(true);
+    try {
+      setSnapshot(await api.autotestWorkbenchAttach());
+    } catch (error) {
+      setSnapshot({
+        status: "failed",
+        port: null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const measure = useCallback(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    const rect = pane.getBoundingClientRect();
+    void api
+      .autotestWorkbenchBounds({
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Show while this surface owns the window; hide the moment it does not. An
+  // overlay also hides it, because the view would otherwise paint over the
+  // dialog instead of behind it. The cleanup matters as much as the branch: this
+  // component unmounts when another surface takes over, and a native view left
+  // attached would keep drawing the workbench over that surface.
+  const visible = active && !overlaysOpen;
+  useEffect(() => {
+    if (!visible) {
+      void api.autotestWorkbenchDetach().catch(() => undefined);
+      return;
+    }
+    void attach().then(() => requestAnimationFrame(measure));
+    return () => {
+      // surface.unmounted.detach — one marker, so the packaged bundle can be
+      // checked for this behaviour without reading the whole chunk.
+      void api.autotestWorkbenchDetach().catch(() => undefined);
+    };
+  }, [attach, measure, visible]);
+
+  // The view is positioned from a measured rect, so it follows resizes.
+  useEffect(() => {
+    if (!visible || snapshot?.status !== "ready") return;
+    const pane = paneRef.current;
+    if (!pane || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [measure, snapshot?.status, visible]);
+
+  useEffect(() => {
+    if (!visible || snapshot?.status !== "failed") return;
+    const timer = window.setTimeout(() => void attach(), FAILED_RETRY_MS);
+    return () => window.clearTimeout(timer);
+  }, [attach, snapshot?.status, visible]);
+
+  const restart = async () => {
+    setBusy(true);
+    try {
+      setSnapshot(await api.autotestWorkbenchRestart());
+    } catch (error) {
+      setSnapshot({
+        status: "failed",
+        port: null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const state = snapshot?.status ?? "starting";
+
+  return (
+    <div
+      className="app-surface-autotest"
+      hidden={!active}
+      inert={!active ? true : undefined}
+    >
+      <aside className="autotest-sidebar no-drag">
+        <div className="autotest-sidebar-header">
+          <span className="autotest-sidebar-title">{t("surface.autotest")}</span>
+        </div>
+        <div className="autotest-sidebar-body">
+          <div className="autotest-service" data-state={state}>
+            <span className="autotest-service-dot" aria-hidden />
+            <span className="autotest-service-label">
+              {state === "ready"
+                ? t("autotest.surface.ready", { port: snapshot?.port ?? "?" })
+                : state === "failed"
+                  ? t("autotest.surface.failed")
+                  : t("autotest.surface.starting")}
+            </span>
+          </div>
+          {state === "failed" && snapshot?.error ? (
+            <p className="autotest-service-detail">{snapshot.error}</p>
+          ) : null}
+          <div className="autotest-sidebar-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={busy}
+              onClick={() => void restart()}
+            >
+              {t("autotest.surface.restart")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void api.autotestWorkbenchOpenWindow()}
+            >
+              {t("autotest.surface.openWindow")}
+            </Button>
+          </div>
+        </div>
+      </aside>
+      <section className="autotest-main-pane">
+        <header className="autotest-titlebar no-drag">
+          <span className="autotest-titlebar-title">
+            {t("autotest.surface.title")}
+          </span>
+        </header>
+        <div ref={paneRef} className="autotest-pane" data-state={state}>
+          {state === "ready" ? null : (
+            <div className="autotest-pane-placeholder" role="status">
+              <p className="autotest-pane-heading">
+                {state === "failed"
+                  ? t("autotest.surface.failedTitle")
+                  : t("autotest.surface.startingTitle")}
+              </p>
+              <p className="autotest-pane-detail">
+                {state === "failed"
+                  ? snapshot?.error || t("autotest.surface.failedDetail")
+                  : t("autotest.surface.startingDetail")}
+              </p>
+              {state === "failed" ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void restart()}
+                >
+                  {t("autotest.surface.restart")}
+                </Button>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -28,6 +28,7 @@ import type {
   SessionSummary,
   SessionThinkingLevel,
   SessionTodoSnapshot,
+  SurfaceId,
   UiMessage,
 } from "@pi-workspace/shared";
 import type { SettingsTabId } from "../lib/settings-search";
@@ -251,6 +252,15 @@ export type AppState = {
     | "artifacts"
     | "tools"
     | "settings";
+  /**
+   * The whole interface the window is showing (`chat` home, `autotest`, …).
+   *
+   * `surface` is the outer level and `page` is the inner one: `page` names a
+   * destination *within* the chat surface, which is why leaving chat keeps it
+   * and returning restores it. Settings is the exception — it takes over the
+   * window, so switching surfaces leaves it.
+   */
+  surface: SurfaceId;
   /** Tab ids come from the shared settings index. */
   settingsTab: SettingsTabId;
   /** Pending row anchor (i18n key) to flash after landing on a settings tab. */
@@ -426,6 +436,8 @@ export type AppState = {
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   handlePlansChanged: (event: PlanningStateEvent) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
+  /** Switch the whole interface; chat keeps its destination across the switch. */
+  setSurface: (surface: SurfaceId) => void;
   setSettingsTab: (tab: AppState["settingsTab"]) => void;
   setSettingsAnchor: (key: string | null) => void;
   navBack: () => void;

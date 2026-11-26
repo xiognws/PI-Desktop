@@ -10,6 +10,8 @@ export const KEYBOARD_SHORTCUT_IDS = [
   "openPluginLauncher",
   "toggleSidebar",
   "openWorkPanel",
+  "surfaceChat",
+  "surfaceAutotest",
   "abort",
   "toggleWindow",
   "resetZoom",
@@ -60,6 +62,11 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
   },
   { id: "toggleSidebar", group: "navigation", defaultBinding: "Mod+B" },
   { id: "openWorkPanel", group: "navigation", defaultBinding: "Mod+J" },
+  // Surfaces are addressed by position: one keystroke per interface, matching
+  // the rail's top-to-bottom order. Adding a surface means adding a binding
+  // here and a descriptor in the renderer registry, never a new switch chain.
+  { id: "surfaceChat", group: "navigation", defaultBinding: "Mod+1" },
+  { id: "surfaceAutotest", group: "navigation", defaultBinding: "Mod+2" },
   { id: "abort", group: "agent", defaultBinding: "Mod+Period" },
   { id: "toggleWindow", group: "window", defaultBinding: "Alt+Shift+W" },
   { id: "resetZoom", group: "window", defaultBinding: "Mod+0" },

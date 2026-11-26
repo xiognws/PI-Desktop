@@ -328,12 +328,29 @@ export const tr = {
     autotestWorkbench: "Test tezgahı",
   },
   autotest: {
+    surface: {
+      title: "AutoTest workbench",
+      starting: "Starting the local test service…",
+      startingTitle: "Starting the test service",
+      startingDetail: "The first visit starts a local Python service and its web workbench. It keeps running while the app is open.",
+      ready: "Test service on port {port}",
+      failed: "The test service did not start",
+      failedTitle: "The test service is not available",
+      failedDetail: "The service did not answer /api/health. Restarting tries again; the reason is written to the application log.",
+      restart: "Restart service",
+      openWindow: "Open in its own window",
+    },
     unavailableTitle: "Test tezgahı kullanılamıyor",
     unavailableMessage: "Yerel test servisi henüz hazır değil (durum: {status}).",
     unavailableDetail:
       "Arka uç /api/health isteğine yanıt vermedi. “Yeniden başlat” servisi tekrar başlatır; yine başarısız olursa nedeni uygulama günlüğüne yazılır.",
     retry: "Yeniden başlat",
     close: "Kapat",
+  },
+  surface: {
+    switcher: "Switch interface",
+    chat: "Chat",
+    autotest: "AutoTest",
   },
   updates: {
     title: "Güncellemeler",

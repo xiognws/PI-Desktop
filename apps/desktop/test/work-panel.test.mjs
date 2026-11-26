@@ -80,7 +80,7 @@ test("work panel replaces the context panel overlay", async () => {
 test("work panel code is preloaded on demand behind an accessible dock fallback", () => {
   assert.match(
     appSource,
-    /const loadWorkPanel = \(\) => import\("\.\.\/\.\.\/components\/workpanel\/WorkPanel"\)/,
+    /const loadWorkPanel = \(\) => import\("\.\.\/\.\.\/\.\.\/components\/workpanel\/WorkPanel"\)/,
   );
   // The lazy route helper wraps the loader; the panel still only loads on demand.
   assert.match(appSource, /lazyRoute\(loadWorkPanel\)\(\)/);
@@ -703,7 +703,10 @@ test("the shell budgets the three columns inside the fixed client area", () => {
   assert.match(panelSource, /sidebarOccupiesBudget = !sidebarCollapsed \|\| sidebarExiting/);
   assert.match(panelSource, /layout\.shouldCollapseSidebar\) onAutoCollapseSidebar/);
   assert.match(appSource, /onAutoCollapseSidebar=\{autoCollapseSidebar\}/);
-  assert.match(appSource, /containerWidth=\{shellWidth\}/);
+  // The width the three columns share is the window minus the surface rail's
+  // own column (ADR 0410), so the panel and sidebar floors still hold.
+  assert.match(appSource, /containerWidth=\{contentWidth\}/);
+  assert.match(appSource, /const contentWidth = Math\.max\(0, shellWidth - railWidth\)/);
   assert.match(appSource, /sidebarExiting=\{sidebarExiting\}/);
   assert.match(appSource, /workPanelWidthForSidebarReopen/);
   assert.match(appSource, /if \(sidebarCollapsedRef\.current\) reopenSidebar\(\)/);

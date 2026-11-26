@@ -13,6 +13,7 @@ export * from "./tool-packages.js";
 export * from "./transcript-find.js";
 export * from "./transcript-truncation.js";
 export * from "./keyboard-shortcuts.js";
+export * from "./surfaces.js";
 export * from "./changelog.js";
 export * from "./composer-trigger.js";
 export * from "./inline-attachments.js";
