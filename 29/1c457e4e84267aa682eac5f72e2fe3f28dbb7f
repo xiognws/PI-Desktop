@@ -1,0 +1,20 @@
+apps/desktop/electron/main/plugin-read-coalescing.ts
+  h_201ed4c689ac8b 1-140
+apps/desktop/electron/main/plugin-runtime.ts
+  h_201ed4c689ac8b 22-26,863-897,1565-1568,2514-2515,2517-2526,2803,2863-2884,3813
+apps/desktop/test/plugin-read-coalescing.test.mjs
+  h_201ed4c689ac8b 1-140
+docs/spec/07-plugins/12-plugin-ipc-and-host-services.md
+  h_201ed4c689ac8b 314-333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "291c457e4e84267aa682eac5f72e2fe3f28dbb7f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
