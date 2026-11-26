@@ -75,6 +75,13 @@ fn harness(scripted: Vec<Vec<StreamEvent>>, gate: bool) -> (Harness, TurnConfig)
         runs: todo_runs.clone(),
         fails: false,
     }));
+    // The report verb: `Task` starts a worker, `TaskWait` is what brings its answer
+    // back, and only the answer reopens the gate.
+    registry.register(Arc::new(CountingTool {
+        name: "TaskWait",
+        runs: Arc::new(AtomicUsize::new(0)),
+        fails: false,
+    }));
     let sink = Arc::new(RecordingSink::new());
     let engine = TurnEngine::new(
         Arc::new(ScriptedProvider::new(scripted)),
@@ -137,11 +144,14 @@ fn tool_results(transcript: &agent_core::session::Transcript) -> Vec<(String, St
 /// names the fix, and the tool never runs.
 #[tokio::test]
 async fn the_workers_tools_are_refused_until_a_report_arrives() {
+    // `Task` only starts the worker; `TaskWait` is what brings a report back, so
+    // the script waits for one before the gate is expected to open.
     let (mut h, config) = harness(
         vec![
             call("Bash", "c1"),
             call("Task", "c2"),
-            call("Bash", "c3"),
+            call("TaskWait", "c3"),
+            call("Bash", "c4"),
             answer(),
         ],
         true,
@@ -153,7 +163,7 @@ async fn the_workers_tools_are_refused_until_a_report_arrives() {
         .expect("the turn completes: refusals are answers, not failures");
 
     let results = tool_results(&h.transcript);
-    assert_eq!(results.len(), 3, "one result per call, in call order");
+    assert_eq!(results.len(), 4, "one result per call, in call order");
     assert_eq!(results[0].0, "Bash");
     assert!(results[0].2, "the orchestrator's own Bash must be an error");
     assert!(
@@ -173,9 +183,11 @@ async fn the_workers_tools_are_refused_until_a_report_arrives() {
     );
     assert_eq!(results[1].0, "Task");
     assert!(!results[1].2);
-    assert_eq!(results[2].0, "Bash");
+    assert_eq!(results[2].0, "TaskWait");
+    assert!(!results[2].2, "the wait itself is allowed");
+    assert_eq!(results[3].0, "Bash");
     assert!(
-        !results[2].2,
+        !results[3].2,
         "after a report the remainder is the orchestrator's"
     );
 }
@@ -218,6 +230,63 @@ async fn a_failed_delegation_does_not_open_the_gate() {
     assert_eq!(bash_runs.load(Ordering::SeqCst), 0, "no report, no Bash");
     let results = tool_results(&transcript);
     assert!(results[1].2, "the second Bash call is refused as well");
+}
+
+/// Dispatching is not reporting: `Task` answers "started, working in the
+/// background", so the gate stays shut until `TaskWait` brings a report back.
+///
+/// Measured on a real pairing before this rule: the orchestrator dispatched the
+/// worker and then ran the same two Bash commands itself, 19k paid tokens for a
+/// turn the split exists to keep cheap.
+#[tokio::test]
+async fn a_started_delegation_does_not_open_the_gate() {
+    let bash_runs = Arc::new(AtomicUsize::new(0));
+    let task_wait_runs = Arc::new(AtomicUsize::new(0));
+    let mut registry = ToolRegistry::new(Arc::new(AllowAll));
+    registry.register(Arc::new(CountingTool {
+        name: "Bash",
+        runs: bash_runs.clone(),
+        fails: false,
+    }));
+    registry.register(Arc::new(CountingTool {
+        name: "Task",
+        runs: Arc::new(AtomicUsize::new(0)),
+        fails: false,
+    }));
+    registry.register(Arc::new(CountingTool {
+        name: "TaskWait",
+        runs: task_wait_runs.clone(),
+        fails: false,
+    }));
+    let sink = Arc::new(RecordingSink::new());
+    let engine = TurnEngine::new(
+        Arc::new(ScriptedProvider::new(vec![
+            call("Task", "c1"),
+            call("Bash", "c2"),
+            call("TaskWait", "c3"),
+            call("Bash", "c4"),
+            answer(),
+        ])),
+        Arc::new(registry),
+        sink.clone() as Arc<dyn EventSink>,
+    );
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("count the files"));
+    let mut config = TurnConfig::new("orchestrator-model");
+    config.delegate_mechanical = true;
+
+    engine
+        .run_turn("s1", "t1", &mut transcript, &config, CancelToken::new())
+        .await
+        .expect("the turn ends");
+
+    let results = tool_results(&transcript);
+    assert_eq!(results.len(), 4);
+    assert!(!results[0].2, "the dispatch itself is allowed");
+    assert!(results[1].2, "Bash before a report is refused");
+    assert_eq!(bash_runs.load(Ordering::SeqCst), 1, "only the second Bash ran");
+    assert_eq!(task_wait_runs.load(Ordering::SeqCst), 1);
+    assert!(!results[3].2, "after the report the worker's tools reopen");
 }
 
 /// Planning stays with the orchestrator: a `TodoWrite` is not the worker's job.

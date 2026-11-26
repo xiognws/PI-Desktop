@@ -957,9 +957,17 @@ impl TurnEngine {
             }
             // A report that arrived is what reopens the worker's tools for the
             // remainder — and it has to have arrived, not merely been asked for.
+            //
+            // `Task` is the dispatch verb: it answers "started, working in the
+            // background", which is a success and is not a report. Counting it
+            // reopened the gate on the very next step, so the orchestrator ran the
+            // worker's own commands itself — measured on a real pairing, two Bash
+            // calls the worker was already running, and 19k paid tokens for a turn
+            // the split exists to keep cheap.
             if !delegate_reported {
                 delegate_reported = results.iter().any(|(result, _)| {
-                    !result.is_error && result.name.to_ascii_lowercase().starts_with("task")
+                    let name = result.name.to_ascii_lowercase();
+                    !result.is_error && name.starts_with("task") && name != "task"
                 });
             }
 
