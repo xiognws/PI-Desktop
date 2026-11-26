@@ -1,0 +1,16 @@
+apps/desktop/test/data-adoption.test.mjs
+  h_201ed4c689ac8b 9,101,103-110
+apps/desktop/test/window-menu.test.mjs
+  h_201ed4c689ac8b 352-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8e006267b185cb5a3f0a4c5cf8c586ad3e701ed0",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
