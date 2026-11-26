@@ -1,0 +1,16 @@
+apps/desktop/electron/main/python-scan.ts
+  h_201ed4c689ac8b 12,14,22-28,47-51,103,119-183,254-257,272,276,288-293
+apps/desktop/electron/test/python-scan.test.mjs
+  h_201ed4c689ac8b 72,87-89,218-284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6bb775beea9bdd753eb02fcf98f118be3e20ad80",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
