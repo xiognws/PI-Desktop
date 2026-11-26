@@ -1,0 +1,16 @@
+crates/agent-core/src/provider/http.rs
+  h_201ed4c689ac8b 295-323,438-463,852-881
+crates/agent-core/src/provider/openai.rs
+  h_201ed4c689ac8b 137-143,152-156,159-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "bbcc47061d3e44d1d763ffe6d4c959b67a76212d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
