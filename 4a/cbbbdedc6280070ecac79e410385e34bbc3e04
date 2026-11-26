@@ -1,0 +1,26 @@
+apps/desktop/electron/main/network-proxy-gate.ts
+  h_201ed4c689ac8b 1-84
+apps/desktop/electron/main/network-proxy.ts
+  h_201ed4c689ac8b 33-41,52-63,65-91
+apps/desktop/electron/main/provider-certificate-retry.ts
+  h_201ed4c689ac8b 11
+apps/desktop/electron/main/runtime/host.ts
+  h_201ed4c689ac8b 488-496
+apps/desktop/test/network-proxy-gate.test.mjs
+  h_201ed4c689ac8b 1-63
+docs/adr/0408-system-proxy-relay-gate.md
+  h_201ed4c689ac8b 1-69
+docs/adr/README.md
+  h_201ed4c689ac8b 445
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4acbbbdedc6280070ecac79e410385e34bbc3e04",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
