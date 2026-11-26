@@ -1,0 +1,50 @@
+apps/desktop/src/components/StatusBarUsage.tsx
+  h_201ed4c689ac8b 12,258-260,268-273
+apps/desktop/src/lib/status-bar.ts
+  h_201ed4c689ac8b 42-69
+apps/desktop/test/session-token-split.test.mjs
+  h_201ed4c689ac8b 1-39
+crates/agent-core/src/delegate.rs
+  h_201ed4c689ac8b 587-588,606,643-665,1933-1999,2018,2068,2098
+crates/host-core/src/sessions.rs
+  h_201ed4c689ac8b 9243-9283
+crates/host-core/src/sessions/usage.rs
+  h_201ed4c689ac8b 208-210,222-230,263-295
+docs/spec/03-runtime/04-data-storage.md
+  h_201ed4c689ac8b 2172-2188
+docs/zh-CN/spec/03-runtime/04-data-storage.md
+  h_201ed4c689ac8b 1531-1547
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 105-106
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 103-104
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 105-106
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 105-106
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 105-106
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 105-106
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 105-106
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 105-106
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 105-106
+packages/shared/src/event-usage.test.ts
+  h_201ed4c689ac8b 46-79
+packages/shared/src/types/sessions.ts
+  h_201ed4c689ac8b 39-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "135eed565677ec5974121d91604edf3dcd89f6a6",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
