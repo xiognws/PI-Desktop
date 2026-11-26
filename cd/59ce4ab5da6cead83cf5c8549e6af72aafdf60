@@ -1,0 +1,26 @@
+apps/desktop/electron/main/ipc/workspace-ipc.ts
+  h_201ed4c689ac8b 750-757
+apps/desktop/electron/main/mcp-control.ts
+  h_201ed4c689ac8b 236
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 542-549,3587-3625,3912-3929,8810-8910
+crates/host-core/src/sessions.rs
+  h_201ed4c689ac8b 20,157-160,1620-1621,5525,5580,6837
+crates/host-core/src/sessions/usage.rs
+  h_201ed4c689ac8b 364-572,777-862
+docs/spec/03-runtime/01-ipc-protocol.md
+  h_201ed4c689ac8b 1279
+docs/spec/03-runtime/06-host-rpc-protocol.md
+  h_201ed4c689ac8b 559-565,643-654
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "cd59ce4ab5da6cead83cf5c8549e6af72aafdf60",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
