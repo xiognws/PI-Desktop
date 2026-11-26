@@ -1,0 +1,30 @@
+docs/adr/python-widget-entry-kind.md
+  h_201ed4c689ac8b 3-4
+packages/agent-runtime/src/sidecar.ts
+  h_201ed4c689ac8b 89-100
+packages/agent-runtime/src/widgets/__fixtures__/python-echo.mjs
+  h_201ed4c689ac8b 1-30
+packages/agent-runtime/src/widgets/index.ts
+  h_201ed4c689ac8b 17,43-44
+packages/agent-runtime/src/widgets/python-entry.test.ts
+  h_201ed4c689ac8b 1-94
+packages/agent-runtime/src/widgets/python-entry.ts
+  h_201ed4c689ac8b 1-202
+packages/agent-runtime/src/widgets/python-packages.test.ts
+  h_201ed4c689ac8b 1-165
+packages/agent-runtime/src/widgets/runner.ts
+  h_201ed4c689ac8b 33-34,47-58,191-193,195,223-226,241,245-315,329-332
+packages/agent-runtime/src/widgets/types.ts
+  h_201ed4c689ac8b 69-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "79847949d404c94784961ba5522bcf9866592d1a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
