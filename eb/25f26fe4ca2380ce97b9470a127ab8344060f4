@@ -1,0 +1,22 @@
+apps/desktop/src/styles/chat-shell.css
+  h_201ed4c689ac8b 217,1019
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 3876,3883
+apps/desktop/src/styles/plugin-launcher.css
+  h_201ed4c689ac8b 312
+apps/desktop/src/styles/ui-kit.css
+  h_201ed4c689ac8b 554,566
+apps/desktop/test/css-undefined-tokens.test.mjs
+  h_201ed4c689ac8b 1-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "eb25f26fe4ca2380ce97b9470a127ab8344060f4",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
