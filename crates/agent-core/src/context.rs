@@ -49,6 +49,16 @@ pub const ESTIMATED_TEXT_CHARS_PER_TOKEN: f64 = 3.5;
 pub const IMAGE_EQUIVALENT_CHARS: u64 = 4_800;
 
 pub const DEFAULT_CONTEXT_WINDOW: u64 = 128_000;
+
+/// The largest request this kernel plans against, whatever the provider advertises.
+///
+/// A window is what the model *can* accept; the bill is what it actually accepts. A
+/// 1M-token model with no ceiling kept 740k tokens of history in the request for every
+/// step of a turn — twelve times the same transcript — because compaction never
+/// triggered. 200k is deep enough for a long coding turn and five times cheaper per
+/// step than the advertised limit. Aging (free) starts far below this, so a turn that
+/// outgrows the budget loses old tool output before it ever reaches a summary request.
+pub const PROMPT_BUDGET_CEILING: u64 = 200_000;
 pub const DEFAULT_MAX_TOKENS: u64 = 32_768;
 
 /// The model facts the budget needs, plus the turn's compaction switch.
@@ -143,10 +153,10 @@ impl ContextLimits {
             .context_window
             .unwrap_or(DEFAULT_CONTEXT_WINDOW)
             .max(1);
-        // The configured window is the budget. Nothing caps it here: the number the
-        // user set in Settings → Models is what a turn plans against, and a silent
-        // second bound is what made the two disagree.
-        let window = reported_window;
+        // The configured window is the budget, capped by what this product is willing
+        // to send in one request. The cap is not silent: it is [`PROMPT_BUDGET_CEILING`]
+        // and it exists because planning against a 1M window meant never compacting.
+        let window = reported_window.min(PROMPT_BUDGET_CEILING);
 
         let model_output_budget = model
             .max_tokens
@@ -347,29 +357,32 @@ mod tests {
     use crate::message::{ContentPart, Message, StopReason, ToolCall, ToolResult, Usage};
 
     #[test]
-    fn a_large_window_is_planned_against_the_configured_value() {
+    fn a_large_window_is_capped_by_the_request_budget() {
         let limits = ContextLimits::for_model(ModelLimits::new(1_000_000, 32_768));
-        // Settings → Models says a million; the turn plans against a million.
-        assert_eq!(limits.window, 1_000_000);
-        // The model's own 32K output budget dominates the 16,384 floor; 5% of the
-        // window dominates both at this size.
-        assert_eq!(limits.request_headroom, 50_000);
-        assert_eq!(limits.hard_limit, 950_000);
-        assert_eq!(limits.trigger, 475_000);
-        // 20% of the safe budget, clamped at the 64k maximum.
-        assert_eq!(limits.keep_recent_tokens, 64_000);
+        // The provider accepts a million; the product plans against the ceiling,
+        // because a 1M plan meant compaction never fired and every step of a turn
+        // re-sent ~740k tokens of history.
+        assert_eq!(limits.window, PROMPT_BUDGET_CEILING);
+        // The model's own 32K output budget dominates the reserve floor and 5%.
+        assert_eq!(limits.request_headroom, 32_768);
+        assert_eq!(limits.hard_limit, 167_232);
+        assert_eq!(limits.trigger, 125_424);
         assert_eq!(limits.retained_user_message_budget, 20_000);
     }
 
     #[test]
     fn a_window_edited_between_turns_moves_the_budget() {
         // The settings page writes the model row; the next turn reads it. Same
-        // model, two configurations, two budgets — no restart, no stale cap.
-        let small = ContextLimits::for_model(ModelLimits::new(200_000, 32_768));
+        // model, two configurations, two budgets — no restart, no stale cap. Above
+        // the ceiling two large windows collapse onto the same budget.
+        let small = ContextLimits::for_model(ModelLimits::new(100_000, 32_768));
+        let at_ceiling = ContextLimits::for_model(ModelLimits::new(200_000, 32_768));
         let large = ContextLimits::for_model(ModelLimits::new(1_000_000, 32_768));
-        assert_eq!(small.window, 200_000);
-        assert_eq!(large.window, 1_000_000);
-        assert!(large.trigger > small.trigger);
+        assert_eq!(small.window, 100_000);
+        assert_eq!(at_ceiling.window, PROMPT_BUDGET_CEILING);
+        assert_eq!(large.window, PROMPT_BUDGET_CEILING);
+        assert!(at_ceiling.trigger > small.trigger);
+        assert_eq!(at_ceiling.trigger, large.trigger);
     }
 
     #[test]
@@ -400,17 +413,22 @@ mod tests {
     }
 
     #[test]
-    fn the_trigger_ratio_splits_at_the_small_window_ceiling() {
-        // 511,999 is the last window under the ceiling; 512,000 the first above.
-        let under = ContextLimits::for_model(ModelLimits::new(511_999, 32_768));
-        assert_eq!(under.request_headroom, 32_768);
-        assert_eq!(under.hard_limit, 479_231);
-        assert_eq!(under.trigger, 359_423); // floor ratio: 479,231 x 0.75
-
-        let at = ContextLimits::for_model(ModelLimits::new(512_000, 32_768));
-        assert_eq!(at.request_headroom, 32_768);
-        assert_eq!(at.hard_limit, 479_232);
-        assert_eq!(at.trigger, 239_616); // plain share: 479,232 x 0.5
+    fn the_small_window_ratio_applies_to_every_planned_window() {
+        // The 512k boundary between the floor ratio and the plain share is above the
+        // request budget now, so a planned window always uses the floor ratio: a
+        // window is never given up before it is actually full.
+        for advertised in [16_000, 128_000, 511_999, 512_000, 1_000_000] {
+            let limits = ContextLimits::for_model(ModelLimits::new(advertised, 32_768));
+            assert!(
+                limits.window <= PROMPT_BUDGET_CEILING,
+                "advertised {advertised} must be capped"
+            );
+            assert_eq!(
+                limits.trigger,
+                std::cmp::max(1, (limits.hard_limit as f64 * 0.75) as u64),
+                "advertised {advertised} must compact at the floor ratio"
+            );
+        }
     }
 
     #[test]

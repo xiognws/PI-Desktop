@@ -767,19 +767,23 @@ pub const BUDGET_SEARCH: OutputBudget = OutputBudget {
 };
 
 /// Bash stdout: a command's output is usually the whole point of the call and
-/// cannot be re-derived by narrowing a pattern, so it keeps a larger share.
+/// cannot be re-derived by narrowing a pattern, so it keeps a larger share than a
+/// search result — but every byte here is re-sent on every later step of the turn,
+/// and the newest results are exempt from ageing. 24KB is ~6k tokens: enough for a
+/// build log's head and a failure's tail, while the spill file still holds the whole
+/// output when the model needs to grep it back.
 pub const BUDGET_SHELL: OutputBudget = OutputBudget {
-    max_bytes: 96 * 1024,
-    max_lines: 4000,
+    max_bytes: 24 * 1024,
+    max_lines: 2000,
     direction: Direction::Head,
 };
 
 /// Bash stderr keeps the tail: when a command fails, the actionable message is
-/// the last thing it printed. Dropping it to retain 96KB of progress noise is
+/// the last thing it printed. Dropping it to retain 24KB of progress noise is
 /// exactly what makes the model retry blindly.
 pub const BUDGET_SHELL_ERR: OutputBudget = OutputBudget {
-    max_bytes: 96 * 1024,
-    max_lines: 4000,
+    max_bytes: 24 * 1024,
+    max_lines: 2000,
     direction: Direction::Tail,
 };
 
@@ -4007,17 +4011,19 @@ mod tests {
 
     #[tokio::test]
     async fn bash_large_output_does_not_deadlock() {
-        // >64KB (OS pipe buffer) must not deadlock the child; reader tasks
-        // drain concurrently with wait(). Single line under BUDGET_SHELL so
-        // full drainage is observable in the returned stdout.
+        // >64KB (OS pipe buffer) must not deadlock the child; reader tasks drain
+        // concurrently with wait(). The returned stdout is bounded by BUDGET_SHELL
+        // now, so full drainage is observed on the spilled copy: a reader that
+        // stopped early would leave the child blocked and the spill short.
         let dir = tempfile::tempdir().unwrap();
+        let scratch = dir.path().join("scratch/session-spill");
         #[cfg(windows)]
         let command = "[Console]::Out.Write('a' * 80000)";
         #[cfg(not(windows))]
         let command = "head -c 80000 /dev/zero | tr '\\0' 'a'";
         let result = execute_tool(
             Some(dir.path()),
-            None,
+            Some(&scratch),
             "Bash",
             &serde_json::json!({ "command": command }),
             15_000,
@@ -4025,8 +4031,20 @@ mod tests {
         .await;
         assert!(result.ok, "bash tool failed: {:?}", result.content);
         let stdout = result.content["stdout"].as_str().unwrap_or_default();
-        assert_eq!(stdout.len(), 80_000, "stdout fully drained");
-        assert_eq!(result.content["truncated"].as_bool(), Some(false));
+        assert!(
+            stdout.len() <= BUDGET_SHELL.max_bytes,
+            "returned stdout must stay inside the budget, got {} bytes",
+            stdout.len()
+        );
+        assert_eq!(result.content["truncated"].as_bool(), Some(true));
+        let spilled = std::fs::read_dir(&scratch)
+            .expect("the spill directory exists")
+            .filter_map(|entry| entry.ok())
+            .map(|entry| std::fs::read_to_string(entry.path()).unwrap_or_default())
+            .map(|text| text.chars().filter(|c| *c == 'a').count())
+            .max()
+            .unwrap_or(0);
+        assert_eq!(spilled, 80_000, "the child wrote every byte: {spilled}");
     }
 
     #[tokio::test]

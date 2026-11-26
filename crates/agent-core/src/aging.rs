@@ -23,6 +23,10 @@
 //!   second comparison sees the same bytes.
 
 use crate::context::{estimate_context_tokens, ContextLimits};
+
+/// The share of the compaction trigger below which a *small* window still asks
+/// for aging. Only ever lowers the absolute threshold, never raises it.
+const LEGACY_TRIGGER_SHARE: f64 = 0.6;
 use crate::message::Message;
 
 /// How much of an aged tool result is kept.
@@ -40,31 +44,35 @@ pub struct ToolResultAging {
     /// diagnose the next step, so an aged result keeps both ends and loses the
     /// middle.
     pub tail_chars: usize,
-    /// Share of the compaction trigger at which aging starts.
+    /// Prompt size, in tokens, at which aging starts.
     ///
-    /// Deliberately below the trigger: aging is free and compaction costs a summary
-    /// request, so the cheap relief has to arrive first. Below the threshold the
-    /// request is sent byte-identical to last time, which keeps the cached prefix.
-    pub trigger_share: f64,
-    /// Share of the window a single tool result may occupy.
+    /// Absolute on purpose. A share of the window made the relief arrive *later* on a
+    /// bigger model — a 1M-token window kept 740k tokens of history in every step for
+    /// the whole turn, paying for the whole transcript a dozen times, because 0.6 of a
+    /// ~800k trigger meant nothing aged until the request was already enormous. Aging
+    /// costs no request at all, so it should start as soon as the prompt is no longer
+    /// small; compaction (which does cost a summary request) keeps its own, later
+    /// trigger.
+    pub trigger_tokens: u64,
+    /// Characters above which one result is aged **even when it is one of the newest**.
     ///
-    /// Anything larger is aged **even when it is one of the newest results**: leaving
-    /// it whole guarantees the next request is over budget, and compaction cannot fix
-    /// that — the same bytes come back on the next step and trigger another compaction.
-    /// Observed before this rule: 5 compaction rounds and then `STEP_LIMIT`, with the
-    /// model re-running the same command each time because every output was compacted
-    /// away before it could use it.
-    pub oversize_share: f64,
+    /// Also absolute. As a share of the window this was 600k characters on a 1M model,
+    /// so a 110KB Bash result — 27k tokens, re-sent on every later step — counted as
+    /// normal. A result that large is never needed whole in the request: the head and
+    /// tail carry the command and the failure, and the spill file still holds the rest.
+    pub oversize_chars: usize,
 }
 
 impl Default for ToolResultAging {
     fn default() -> Self {
         Self {
-            keep_recent: 3,
-            head_chars: 200,
-            tail_chars: 200,
-            trigger_share: 0.6,
-            oversize_share: 0.15,
+            // Two: the request the model is composing right now, plus the one before
+            // it. Three kept a whole 96KB command output alive across two more steps.
+            keep_recent: 2,
+            head_chars: 400,
+            tail_chars: 400,
+            trigger_tokens: 48_000,
+            oversize_chars: 12_000,
         }
     }
 }
@@ -109,13 +117,18 @@ pub fn age_tool_results(
     limits: Option<&ContextLimits>,
     policy: ToolResultAging,
 ) -> AgingOutcome {
-    let Some(limits) = limits else {
-        return AgingOutcome::untouched(messages);
-    };
     let estimate = estimate_context_tokens(messages).tokens;
-    // Measure against the compaction trigger, not the hard limit: the point of
-    // aging is to keep the session below the point where a summary is needed.
-    let threshold = (limits.trigger as f64 * policy.trigger_share) as u64;
+    // The absolute threshold is the one that pays the bills; the window only ever
+    // makes the relief arrive *earlier* than the absolute rule would, never later.
+    // An unknown window therefore no longer disables aging: the estimate is still
+    // meaningful, and leaving a 700k-token request untouched because the model did
+    // not report its limits is the expensive default.
+    let threshold = match limits {
+        Some(limits) => policy
+            .trigger_tokens
+            .min((limits.trigger as f64 * LEGACY_TRIGGER_SHARE) as u64),
+        None => policy.trigger_tokens,
+    };
     if estimate < threshold {
         return AgingOutcome::untouched(messages);
     }
@@ -132,7 +145,7 @@ pub fn age_tool_results(
     // and trigger another compaction). Measured before this rule: five compaction
     // rounds followed by `STEP_LIMIT`, with the model re-running the same command each
     // step because every output was compacted away before it could be used.
-    let oversize_chars = (limits.window as f64 * policy.oversize_share * 4.0) as usize;
+    let oversize_chars = policy.oversize_chars;
     let keep_from = results.len().saturating_sub(policy.keep_recent);
     let ageable: Vec<usize> = results
         .iter()
@@ -215,11 +228,11 @@ mod tests {
 
     fn policy() -> ToolResultAging {
         ToolResultAging {
-            keep_recent: 3,
-            head_chars: 200,
-            tail_chars: 200,
-            trigger_share: 0.6,
-            oversize_share: 0.15,
+            keep_recent: 2,
+            head_chars: 400,
+            tail_chars: 400,
+            trigger_tokens: 48_000,
+            oversize_chars: 12_000,
         }
     }
 
@@ -270,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_window_is_not_an_excuse_to_truncate() {
+    fn a_small_request_stays_untouched_even_without_limits() {
         let messages = transcript(20, 4_000);
         let outcome = age_tool_results(&messages, None, policy());
         assert_eq!(outcome.aged, 0);
@@ -278,12 +291,27 @@ mod tests {
     }
 
     #[test]
+    fn an_unknown_window_still_ages_past_the_absolute_threshold() {
+        // The absolute threshold is what pays the bills: a model that never reported
+        // its window used to keep every byte, so the request grew without relief.
+        let messages = transcript(20, 20_000);
+        let outcome = age_tool_results(&messages, None, policy());
+        assert!(
+            outcome.changed(),
+            "past the absolute threshold aging must run with or without limits"
+        );
+        // Every result here is 20k characters, past the absolute oversize rule, so
+        // even the newest two are aged — that is the point of an absolute size.
+        assert_eq!(outcome.aged, 20);
+    }
+
+    #[test]
     fn under_pressure_only_the_recent_working_set_stays_whole() {
         let messages = transcript(20, 4_000);
         let outcome = age_tool_results(&messages, Some(&limit(20_000)), policy());
         assert!(outcome.changed(), "20 turns of 4k output is over the limit");
-        // 20 results, the newest 3 stay whole.
-        assert_eq!(outcome.aged, 17);
+        // 20 results, the newest 2 stay whole.
+        assert_eq!(outcome.aged, 18);
         let tool_rows: Vec<&Message> = outcome
             .messages
             .iter()
@@ -291,7 +319,7 @@ mod tests {
             .collect();
         for (index, message) in tool_rows.iter().enumerate() {
             let content = &message.tool_results()[0].content;
-            let whole = index >= tool_rows.len() - 3;
+            let whole = index >= tool_rows.len() - 2;
             assert_eq!(
                 !content.contains("are not in this context"),
                 whole,
@@ -334,9 +362,9 @@ mod tests {
             after * 3 < before,
             "aging should cut most of the old output: {before} -> {after}"
         );
-        // 17 aged results lose everything except both ends.
+        // 18 aged results lose everything except both ends (400 + 400 characters).
         assert!(
-            outcome.chars_elided > 17 * 3_500,
+            outcome.chars_elided > 18 * 3_000,
             "elided {} chars",
             outcome.chars_elided
         );
