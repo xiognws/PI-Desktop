@@ -1,0 +1,14 @@
+apps/desktop/test/kernel-prompt.test.mjs
+  h_201ed4c689ac8b 162-163,174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3a2880c3f87126e5c91097231fd05ab4a899c498",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
