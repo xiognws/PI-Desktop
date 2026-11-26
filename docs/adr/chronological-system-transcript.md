@@ -90,7 +90,7 @@ when later cache-hit ratios improve. Acceptance compares cold and subsequent
 uncached tokens and cumulative input cost across both short and longer synthetic
 conversations; no universal savings or hit-rate guarantee is made.
 
-## Alternatives and consequences
+## Alternatives and Consequences
 
 Prepending a reconstructed snapshot was rejected because it changes history on
 ordinary continuation. A new persistence store or adopting Pi AgentSession

@@ -58,6 +58,18 @@ not requested persistent review history or movable/native windows; the panel is
 an in-app floating surface. Model-authored citation rendering is unchanged and is
 separate from these user-owned source badges.
 
+## Consequences
+
+- One owner for annotation state: the floating index lists, locates, edits and removes
+  excerpts, and collapsing it keeps every annotation and source badge.
+- Composer typing reduces pane height instead of moving the index, and an empty
+  conversation collapses the index to a single header line.
+- The prompt payload keeps the same one-based array order the list and the badges show,
+  so numbering cannot drift between what the reader sees and what the model receives.
+- The modal comment editor stays for editing one comment; the index governs the set.
+- A saved selection that no longer resolves stays visible as an annotation and is
+  reported as unresolved rather than silently dropped.
+
 ## Validation
 
 Executable tests cover duplicate occurrences, ambiguous/stale anchors, split text

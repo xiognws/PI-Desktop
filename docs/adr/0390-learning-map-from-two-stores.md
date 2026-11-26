@@ -1,6 +1,6 @@
 # ADR 0390 — A learning map drawn from the two stores
 
-Status: Accepted
+- Status: Accepted
 Date: 2026-11-09
 Amended: the map still draws skills and memories together, but its memory half now
 reads `memory.list` — the flat entry store this ADR read through `memory.entries`

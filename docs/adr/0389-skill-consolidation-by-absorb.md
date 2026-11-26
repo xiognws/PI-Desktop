@@ -1,6 +1,6 @@
 # ADR 0389 — Consolidating skills by absorbing one into another
 
-Status: Accepted
+- Status: Accepted
 Date: 2026-11-09
 
 ## Context

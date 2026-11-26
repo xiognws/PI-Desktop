@@ -1,4 +1,4 @@
-# ADR: Abort releases tools, but the provider loop can still run
+# ADR 0404: Abort releases tools, but the provider loop can still run
 
 - Status: Accepted (limitation recorded; not fixed in this repository)
 - Related: ADR `tool-abort-abandons-host-call`, issue #1767,

@@ -1,6 +1,6 @@
 # ADR 0391 — The two writers are declared, not deferred
 
-Status: Accepted (amends ADR 0048)
+- Status: Accepted (amends ADR 0048)
 Date: 2026-11-09
 
 ## Context

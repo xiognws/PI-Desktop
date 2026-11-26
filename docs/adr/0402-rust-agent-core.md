@@ -1,4 +1,4 @@
-# 0402 — The agent kernel is a Rust crate, not the Node sidecar
+# ADR 0402: The agent kernel is a Rust crate, not the Node sidecar
 
 - **Status:** Accepted
 - **Date:** 2026-11-17

@@ -1,4 +1,4 @@
-# 0393 - The structured memory table is the store; the flat list retires
+# ADR 0393: The structured memory table is the store; the flat list retires
 
 - Status: Accepted
 - Date: 2026-11-11

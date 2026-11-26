@@ -60,6 +60,17 @@ creation source, current task, recent exchanges, current status, and turn-bound
 result. The projection is bounded, supports keyboard focus, and does not load
 complete transcripts or add a read for every sidebar row.
 
+## Consequences
+
+- A delivery is idempotent by message ID: re-recording the same message replaces its row
+  instead of posting a second time, so a retried send cannot duplicate work.
+- A result is read from the bound turn's persisted terminal state. A worker that crashed
+  reports `interrupted`; it is never inferred from a missing reply.
+- Session IDs stay the only session identity. The ledger adds messages between existing
+  sessions rather than reintroducing a second worker or work identity.
+- Host-core remains the only writer, so the renderer reads deliveries as projections and
+  cannot compose a delivery state of its own.
+
 ## Compatibility and validation
 
 The storage migration is additive. Existing conversations, plugin settings, and

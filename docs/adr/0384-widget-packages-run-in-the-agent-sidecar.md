@@ -1,4 +1,4 @@
-# ADR: Capability packages run in the agent sidecar
+# ADR 0384: Capability packages run in the agent sidecar
 
 - Status: Implemented candidate
 - Related: D699, D695 (tool packages), ADR 0214, ADR 0215, spec 07-plugins/16, spec 07-plugins/19

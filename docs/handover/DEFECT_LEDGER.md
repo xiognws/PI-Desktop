@@ -17,7 +17,7 @@ Electron 二进制由 apps/desktop/node_modules/electron/install.js 补齐。
 ### A1. Windows/PowerShell 下工具 stdout 的流式通知完全缺失（tools.output）
 **证据（确定性复现）**
 ```
-# 探针：Host → session.create → session.configure → tools.execute
+## 探针：Host → session.create → session.configure → tools.execute
 command = "[Console]::Out.WriteLine('e2e114-stdout'); [Console]::Error.WriteLine('e2e114-stderr')"
 fast 命令，等待 50 / 500 / 2000 ms 三次
 wait=50   | notifications=0 [] | content.stdout="e2e114-stdout\r\n"
@@ -263,7 +263,7 @@ header 撑到 1200。测试侧缺陷，非产品缺陷。
 
 ---
 
-# batch-4 与实时模型联调（2026-11-07 14:40–15:25）
+## batch-4 与实时模型联调（2026-11-07 14:40–15:25）
 
 ## ✅ 实时模型联调（权威）
 - 端点 https://api-mew.me/v1，模型 deepseek-v4.1-flash（唯一），key 已由用户提供，**未写入仓库**（探针从 C:\Users\Administrator\.dsh\.credentials.yaml 的 MEW_API_KEY 读入临时文件）。

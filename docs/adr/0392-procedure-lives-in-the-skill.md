@@ -1,4 +1,4 @@
-# 0392 — A procedure lives in the skill, and memory says so
+# ADR 0392: A procedure lives in the skill, and memory says so
 
 - Status: Accepted
 - Date: 2026-11-11

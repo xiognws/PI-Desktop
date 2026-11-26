@@ -41,6 +41,18 @@ does not dismiss the card before the click. Renderer code remains read-only;
 Rust remains authoritative for persistence and provenance, and Electron remains
 the thin projection/orchestration layer.
 
+## Consequences
+
+- Discovery is read-only and bounded: at most 100 non-deleted Agent sessions per call,
+  with the real Session ID, title, status, updated time and readable provider/model
+  labels — and no project paths, credentials, transcripts or message previews.
+- `send` stays the single authenticated mutation, and it accepts any existing Agent
+  Session ID. It creates no worker relationship and replaces no target session.
+- The surface does not widen for a helper that can only list: it receives real IDs it may
+  address, not titles it could turn into arbitrary access.
+- Nothing is persisted differently — the catalog operation is additive, so existing
+  callers see the same behaviour they did before it existed.
+
 ## Compatibility and validation
 
 The new operation and projection fields are additive. Existing `status`,

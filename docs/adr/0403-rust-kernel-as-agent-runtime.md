@@ -1,4 +1,4 @@
-# ADR: The Rust kernel is the agent runtime
+# ADR 0403: The Rust kernel is the agent runtime
 
 - Status: Accepted (implementation in progress: kernel built in this workspace,
   main-process adapter landed, headless e2e green)

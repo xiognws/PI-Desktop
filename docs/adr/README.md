@@ -403,6 +403,7 @@ Each ADR includes:
 | 0341 | [Explicit actions on reviewed files](0341-explicit-reviewed-file-actions.md) | Accepted |
 | 0338 | [A user-supplied video owns the boot surface, served over a host-owned scheme](0338-user-supplied-startup-animation.md) | Accepted (D679) |
 | 0339 | [Chat file references open absolute files outside the managed roots](0339-chat-file-refs-open-absolute-files-outside-managed-roots.md) | Accepted (amends ADR 0262 §4) |
+| python-widget-entry-kind | [Python widget entry kind](python-widget-entry-kind.md) | Accepted |
 
 | model-reasoning-effort-override | [Model reasoning effort override](model-reasoning-effort-override.md) | Proposed |
 | 0340 | [Let a granted plugin reach every session, not only its imports](0340-plugin-session-all-scope.md) | Accepted (D680; amends ADR 0200 and ADR 0323) |
@@ -421,6 +422,8 @@ Each ADR includes:
 | 0382 | [Ship a pinned Python runtime for Office and file work](0382-bundled-python-runtime.md) | Accepted |
 | 0383 | [Curate the bundled plugin set](0383-bundled-plugin-curation.md) | Accepted (extends ADR 0241 and ADR 0378) |
 | 0384 | [Widget packages run in the agent sidecar](0384-widget-packages-run-in-the-agent-sidecar.md) | Implemented candidate |
+| 0385 | [The sidebar workline strip](0385-sidebar-workline-strip.md) | Accepted |
+| 0386 | [Session task delegation card](0386-sessiontask-delegation-card.md) | Accepted |
 | 0387 | [Skill curation by idle days](0387-skill-curation-by-idle-days.md) | Accepted (extends ADR 0377 and ADR 0379) |
 | 0388 | [A skill owns four resource containers](0388-skill-resource-containers.md) | Accepted (extends ADR 0379 and ADR 0303) |
 | 0389 | [Consolidating skills by absorbing one into another](0389-skill-consolidation-by-absorb.md) | Accepted (extends ADR 0387) |

@@ -26,7 +26,7 @@ result is authorization, while the sidecar result records actual generated files
 Local tools gain an abort signal so this path can stop requests on cancellation,
 timeout and process loss. Existing tools retain their deadlines and behavior.
 
-## Alternatives and consequences
+## Alternatives and Consequences
 
 - An independent image workspace would duplicate conversation/history ownership;
   use existing chat and previews first.

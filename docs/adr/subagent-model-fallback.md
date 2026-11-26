@@ -55,6 +55,17 @@ priority order. Each fallback can be moved up/down or removed.
 
 ![Subagent editor showing the primary model and two ordered fallback models](../public/screenshots/app/zh/subagent-model-fallback.png)
 
+## Consequences
+
+- A definition without `fallbackModels` behaves exactly as it did: the list is opt-in per
+  definition, and single-model sessions are untouched.
+- `[]` clears the list while omitting the field preserves it, so a partial update cannot
+  silently drop a configured chain.
+- Priority is unchanged: the primary `model`, then the per-call `Task` override, and only
+  then the fallback chain — an explicit choice is never overridden by a fallback.
+- No database or protocol version change: the list rides existing managed Markdown and
+  host RPC fields, so an older record simply has no chain.
+
 ## Validation
 
 Shared parser and provider-resolution tests, host registry round trips,
