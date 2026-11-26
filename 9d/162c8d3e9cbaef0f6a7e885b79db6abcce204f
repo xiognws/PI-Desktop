@@ -1,0 +1,14 @@
+apps/desktop/test/background-tasks-dock-render.test.mjs
+  h_201ed4c689ac8b 38-48,67-77,106-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "9d162c8d3e9cbaef0f6a7e885b79db6abcce204f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
