@@ -1,0 +1,20 @@
+apps/desktop/test/mode-definitions-renderer.test.mjs
+  h_201ed4c689ac8b 306-310
+apps/desktop/test/rpc-lifecycle-contract.test.mjs
+  h_201ed4c689ac8b 19-24,210,257
+apps/desktop/test/session-project-move.test.mjs
+  h_201ed4c689ac8b 37-39
+apps/desktop/test/subagent-wiring.test.mjs
+  h_201ed4c689ac8b 101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1d0af619cd0d4fc49e08145cb66b142d80a7b222",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
