@@ -1,0 +1,28 @@
+apps/desktop/test/app-shell-settings-accessibility.test.mjs
+  h_201ed4c689ac8b 65
+apps/desktop/test/crash-report-surface.test.mjs
+  h_201ed4c689ac8b 312-316
+apps/desktop/test/field-control-height.test.mjs
+  h_201ed4c689ac8b 22-25
+apps/desktop/test/helpers/styles.mjs
+  h_201ed4c689ac8b 7-14,24,33,42,44
+apps/desktop/test/plugin-timeout-budgets.test.mjs
+  h_201ed4c689ac8b 23
+apps/desktop/test/session-usage-totals.test.mjs
+  h_201ed4c689ac8b 98-100
+apps/desktop/test/turn-usage-capsule.test.mjs
+  h_201ed4c689ac8b 5-8
+apps/desktop/test/work-panel.test.mjs
+  h_201ed4c689ac8b 85-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1c9239ddc90af22367eaeef680d487a1114f6450",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
