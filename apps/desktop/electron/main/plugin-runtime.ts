@@ -13,6 +13,12 @@ import { open as openFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pluginNetFetch, parseFetchRedirect, type PluginFetchTransport } from "./plugin-net-fetch";
+import {
+  DEFAULT_PLUGIN_API_BURST,
+  DEFAULT_PLUGIN_API_MAX_WAIT_MS,
+  DEFAULT_PLUGIN_API_PER_SECOND,
+  PluginApiRateLimiter,
+} from "./plugin-api-rate-limit";
 import type { LoadedSkillDocument } from "./skill-document";
 import { assertLocalPluginRoot, pluginFsReadOptions, readRemotePluginFiles, type PluginRemoteFilesRead } from "./plugin-remote-files";
 import { getModuleDirectory } from "./module-path";
@@ -843,6 +849,12 @@ export const MAX_COMPLETES_PER_WINDOW = 8;
 const COMPLETE_RATE_WINDOW_MS = 60_000;
 export const MAX_COMPLETE_SYSTEM_CHARS = 32 * 1024;
 export const MAX_COMPLETE_MESSAGE_CHARS = 200_000;
+/**
+ * One rate-limit warning per plugin per this interval. The warning has to stay
+ * cheaper than the behaviour it reports, or the alarm becomes the flood: the
+ * plugins this budget exists for make thousands of calls a minute.
+ */
+const API_RATE_WARNING_INTERVAL_MS = 5_000;
 /** Kept from the pre-scope implementation: a listing is not a search index. */
 const MAX_GLOB_MATCHES = 500;
 /** Maximum bytes one plugin range call may cross the broker with. */
@@ -1498,6 +1510,18 @@ export class PluginRuntime {
   private busSubscriptions = new Map<string, BusSubscription>();
   private busRate = new Map<string, { windowStart: number; count: number }>();
   private readonly toolInvocations = new PluginToolInvocations();
+  /**
+   * Fair share of the broker per plugin. Every plugin's calls are served by the
+   * same main process and the same shared plugin host, so one polling loop slows
+   * every other plugin down; this holds the loop back instead of refusing it.
+   */
+  private readonly apiRateLimiter = new PluginApiRateLimiter({
+    perSecond: DEFAULT_PLUGIN_API_PER_SECOND,
+    burst: DEFAULT_PLUGIN_API_BURST,
+    maxWaitMs: DEFAULT_PLUGIN_API_MAX_WAIT_MS,
+  });
+  /** Last rate-limit warning per plugin, so the warning itself cannot flood. */
+  private readonly apiRateWarnings = new Map<string, number>();
   private readonly rendererCalls = new RendererCallRelay();
   private completeRate = new Map<string, { windowStart: number; count: number }>();
   /**
@@ -2441,6 +2465,10 @@ export class PluginRuntime {
     payload?: Record<string, unknown>,
     context?: PluginPanelBridgeContext,
   ): Promise<unknown> {
+    // A view polling the bridge costs the host exactly what a plugin's own
+    // process polling the broker costs — the same `session/get` in the same loop
+    // is what slowed the install down — so it draws on the same budget.
+    await this.acquireBrokerBudget(pluginId, channel);
     return this.toolInvocations.withoutContext(() => this.invokePanelWithoutToolContext(pluginId, channel, payload, context));
   }
 
@@ -2717,6 +2745,7 @@ export class PluginRuntime {
         if (this.loaded.get(loaded.manifest.id) !== loaded) {
           throw apiError("PLUGIN_UNLOADED", "Plugin host process is no longer active");
         }
+        await this.acquireBrokerBudget(loaded.manifest.id, String(message.api ?? ""));
         return this.dispatchHostCall(loaded, String(message.api ?? ""), message.args ?? []);
       })
         .then((value) =>
@@ -2741,6 +2770,40 @@ export class PluginRuntime {
           }),
         );
     }
+  }
+
+  /**
+   * Hold a plugin's call when it is over its fair share of the broker.
+   *
+   * Every plugin API call funnels through `dispatchHostCall`, and host work — the
+   * main process, host-core, the shared plugin host — is shared by all plugins.
+   * A plugin polling in a loop therefore slows down every other plugin, which the
+   * user reads as "the plugins are slow", not as one plugin misbehaving. The call
+   * is delayed rather than refused: a bulk scan still finishes and a busy panel
+   * still renders, it just shares the broker while doing so.
+   *
+   * Rejection is deliberately not used here. The budgets that do reject
+   * (`bus.publish`, `agent.complete`, deletes) are spent by actions with a
+   * meaning; a read that is merely late has none.
+   */
+  private async acquireBrokerBudget(pluginId: string, api: string): Promise<void> {
+    const decision = await this.apiRateLimiter.acquire(pluginId);
+    if (!decision.limited) return;
+    const now = Date.now();
+    const last = this.apiRateWarnings.get(decision.pluginId) ?? 0;
+    if (now - last < API_RATE_WARNING_INTERVAL_MS) return;
+    this.apiRateWarnings.set(decision.pluginId, now);
+    this.services.audit?.({
+      pluginId: decision.pluginId,
+      api: "plugin.api.rate-limited",
+      level: "warn",
+      ok: true,
+      operation: api,
+      waitedMs: decision.waitedMs,
+      observedInWindow: decision.observedInWindow,
+      limitPerSecond: DEFAULT_PLUGIN_API_PER_SECOND,
+      ts: now,
+    });
   }
 
   /**
@@ -3669,6 +3732,8 @@ export class PluginRuntime {
       if (subscription.pluginId === pluginId) this.busSubscriptions.delete(id);
     }
     this.busRate.delete(pluginId);
+    // A gone plugin keeps no broker budget either: a reload starts fair.
+    this.apiRateWarnings.delete(pluginId);
     // A system-wide accelerator outlives every renderer, so it is released on
     // the same path that clears commands — disable, unload, and crash alike.
     this.services.pluginShortcuts?.releasePlugin(pluginId);

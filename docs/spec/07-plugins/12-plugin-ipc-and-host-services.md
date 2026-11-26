@@ -294,6 +294,23 @@ and tools, closes its panel, writes a `plugin.crash` audit entry, and emits a
 toast plus `pluginChanged` to the renderer. Declared resident services may
 trigger supervised restarts with bounded backoff.
 
+**Plugin-to-host call budget (2026-11-26).** Every plugin API call crosses
+`dispatchHostCall`, and the main process, host-core and the shared plugin host
+are one pool of work for every plugin. A plugin that polls in a loop therefore
+slows down all other plugins — a real install logged one plugin issuing 20 039
+calls in 80 minutes (`session/get` every 37 ms) and another 11 848 `fs.list`
+calls in four minutes. The broker now holds each plugin to a token bucket of 20
+calls/second with a 40-call burst (`electron/main/plugin-api-rate-limit.ts`).
+Over the ceiling the call is **delayed, never refused**: a bulk scan still
+finishes and a panel that renders slowly still renders, it just shares the
+broker while doing so. One call is held at most 750 ms, so an over-limit plugin
+cannot be stalled into timeouts. The first hold in each 5 s window per plugin is
+recorded as `plugin.api.rate-limited` (warning level) with `operation`,
+`waitedMs`, `observedInWindow` and `limitPerSecond`; the warning itself is
+bounded so it cannot become the flood. The budgets that reject —
+`bus.publish`, `agent.complete`, deletes — are unchanged: those are actions with
+a meaning, while a read that is merely late has none.
+
 ## 9. Acceptance
 
 1. The plugin list IPC works

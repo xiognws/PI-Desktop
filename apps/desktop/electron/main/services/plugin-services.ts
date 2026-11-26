@@ -335,7 +335,11 @@ export function createPluginServices({
     // egress allowlist before every hop. A plain `fetch` service would let an
     // allowlisted host 30x the request straight out to an undeclared one.
     audit: (entry) => {
-      logger.app("plugin", "info", "plugin.api", entry);
+      // Most entries are informational; a budget breach is not. The audit sink
+      // carries the level the caller asked for so a rate-limit warning lands in
+      // the log as a warning instead of being buried among the calls it counts.
+      const level = entry.level === "warn" || entry.level === "error" ? entry.level : "info";
+      logger.app("plugin", level, "plugin.api", entry);
     },
     // A file access the manifest did not cover is decided by the user, natively
     // and synchronously: the plugin's call is still waiting on the answer, so
