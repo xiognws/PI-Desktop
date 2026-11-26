@@ -1,0 +1,22 @@
+apps/desktop/electron/main/plugin-api-rate-limit.ts
+  h_201ed4c689ac8b 1-139
+apps/desktop/electron/main/plugin-runtime.ts
+  h_201ed4c689ac8b 16-21,852-857,1513-1524,2468-2471,2748,2775-2808,3735-3736
+apps/desktop/electron/main/services/plugin-services.ts
+  h_201ed4c689ac8b 338-342
+apps/desktop/test/plugin-api-rate-limit.test.mjs
+  h_201ed4c689ac8b 1-142
+docs/spec/07-plugins/12-plugin-ipc-and-host-services.md
+  h_201ed4c689ac8b 297-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ee43618b48852d00413b90a3c075c3a390aa54a1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
