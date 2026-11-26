@@ -1,0 +1,20 @@
+apps/desktop/electron/main/bootstrap/launcher.ts
+  h_201ed4c689ac8b 15,55-63,209-225,236-262,265-267
+apps/desktop/electron/main/launcher-surface-load.ts
+  h_201ed4c689ac8b 1-82
+apps/desktop/test/launcher-surface-load.test.mjs
+  h_201ed4c689ac8b 1-120
+docs/spec/07-plugins/18-plugin-launcher.md
+  h_201ed4c689ac8b 38-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "c16e2dae45fdd03de78f424e78107ccabdf8089a",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
