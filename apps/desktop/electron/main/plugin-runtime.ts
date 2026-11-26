@@ -19,6 +19,11 @@ import {
   DEFAULT_PLUGIN_API_PER_SECOND,
   PluginApiRateLimiter,
 } from "./plugin-api-rate-limit";
+import {
+  DEFAULT_COALESCED_READ_WINDOW_MS,
+  PluginReadCoalescer,
+  stableArgsKey,
+} from "./plugin-read-coalescing";
 import type { LoadedSkillDocument } from "./skill-document";
 import { assertLocalPluginRoot, pluginFsReadOptions, readRemotePluginFiles, type PluginRemoteFilesRead } from "./plugin-remote-files";
 import { getModuleDirectory } from "./module-path";
@@ -855,6 +860,41 @@ export const MAX_COMPLETE_MESSAGE_CHARS = 200_000;
  * plugins this budget exists for make thousands of calls a minute.
  */
 const API_RATE_WARNING_INTERVAL_MS = 5_000;
+/**
+ * Reads a plugin can repeat faster than the host needs to answer them.
+ *
+ * Each of these returns a whole state snapshot, so a polling panel pays for a
+ * full read every tick while the answer can only change so fast. Identical reads
+ * from one plugin inside the coalescing window share a single host call; the
+ * window is short enough to stay invisible in a UI and long enough to turn a
+ * 37 ms poll into one read per quarter second.
+ */
+const COALESCED_READ_APIS = new Set([
+  "session/get",
+  "agent/getStatus",
+  "desktop.listOperations",
+  "fs.readText",
+]);
+
+/**
+ * The coalescing key for one call, or null when the call is not a repeated read.
+ *
+ * `desktop.invoke` names its read in `args[0].operation`, so the snapshot it
+ * returns is keyed by that operation plus its own arguments — two different
+ * operations must never share an answer.
+ */
+function coalescedReadKey(api: string, args: unknown[]): string | null {
+  if (api === "desktop.invoke") {
+    const input = args[0];
+    if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+    const record = input as Record<string, unknown>;
+    const operation = typeof record.operation === "string" ? record.operation : "";
+    if (!COALESCED_READ_APIS.has(operation)) return null;
+    return `desktop.invoke:${operation}:${stableArgsKey(record.args ?? [])}`;
+  }
+  if (!COALESCED_READ_APIS.has(api)) return null;
+  return `${api}:${stableArgsKey(args)}`;
+}
 /** Kept from the pre-scope implementation: a listing is not a search index. */
 const MAX_GLOB_MATCHES = 500;
 /** Maximum bytes one plugin range call may cross the broker with. */
@@ -1522,6 +1562,10 @@ export class PluginRuntime {
   });
   /** Last rate-limit warning per plugin, so the warning itself cannot flood. */
   private readonly apiRateWarnings = new Map<string, number>();
+  /** Snapshot reads a plugin repeats inside a burst share one host call. */
+  private readonly readCoalescer = new PluginReadCoalescer({
+    windowMs: DEFAULT_COALESCED_READ_WINDOW_MS,
+  });
   private readonly rendererCalls = new RendererCallRelay();
   private completeRate = new Map<string, { windowStart: number; count: number }>();
   /**
@@ -2467,9 +2511,19 @@ export class PluginRuntime {
   ): Promise<unknown> {
     // A view polling the bridge costs the host exactly what a plugin's own
     // process polling the broker costs — the same `session/get` in the same loop
-    // is what slowed the install down — so it draws on the same budget.
+    // is what slowed the install down — so it draws on the same budget, and the
+    // same repeated-read sharing.
     await this.acquireBrokerBudget(pluginId, channel);
-    return this.toolInvocations.withoutContext(() => this.invokePanelWithoutToolContext(pluginId, channel, payload, context));
+    const invoke = () =>
+      this.toolInvocations.withoutContext(() =>
+        this.invokePanelWithoutToolContext(pluginId, channel, payload, context),
+      );
+    const key = coalescedReadKey(channel, [payload ?? {}]);
+    if (!key) {
+      this.readCoalescer.clear(pluginId);
+      return invoke();
+    }
+    return this.readCoalescer.run(pluginId, key, invoke);
   }
 
   private async invokePanelWithoutToolContext(
@@ -2746,7 +2800,7 @@ export class PluginRuntime {
           throw apiError("PLUGIN_UNLOADED", "Plugin host process is no longer active");
         }
         await this.acquireBrokerBudget(loaded.manifest.id, String(message.api ?? ""));
-        return this.dispatchHostCall(loaded, String(message.api ?? ""), message.args ?? []);
+        return this.dispatchCoalesced(loaded, String(message.api ?? ""), message.args ?? []);
       })
         .then((value) =>
           loaded.child?.postMessage({
@@ -2804,6 +2858,28 @@ export class PluginRuntime {
       limitPerSecond: DEFAULT_PLUGIN_API_PER_SECOND,
       ts: now,
     });
+  }
+
+  /**
+   * Dispatch one plugin call, sharing it with an identical read already answered.
+   *
+   * A polling panel re-asks for the same snapshot far faster than the snapshot
+   * can change — the install this came from asked for `session/get` every 37 ms
+   * — and every one of those is a full read of host state that every other plugin
+   * waits behind. Identical reads inside the coalescing window share one call.
+   *
+   * Anything that is not a coalesced read may be a write, so it drops this
+   * plugin's remembered answers: "save, then read back" must read what was
+   * written rather than the pre-save snapshot.
+   */
+  private dispatchCoalesced(loaded: LoadedPlugin, api: string, args: unknown[]): Promise<unknown> {
+    const pluginId = loaded.manifest.id;
+    const key = coalescedReadKey(api, args);
+    if (!key) {
+      this.readCoalescer.clear(pluginId);
+      return this.dispatchHostCall(loaded, api, args);
+    }
+    return this.readCoalescer.run(pluginId, key, () => this.dispatchHostCall(loaded, api, args));
   }
 
   /**
@@ -3734,6 +3810,7 @@ export class PluginRuntime {
     this.busRate.delete(pluginId);
     // A gone plugin keeps no broker budget either: a reload starts fair.
     this.apiRateWarnings.delete(pluginId);
+    this.readCoalescer.clear(pluginId);
     // A system-wide accelerator outlives every renderer, so it is released on
     // the same path that clears commands — disable, unload, and crash alike.
     this.services.pluginShortcuts?.releasePlugin(pluginId);

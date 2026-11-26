@@ -311,6 +311,26 @@ bounded so it cannot become the flood. The budgets that reject —
 `bus.publish`, `agent.complete`, deletes — are unchanged: those are actions with
 a meaning, while a read that is merely late has none.
 
+**Repeated-read sharing (2026-11-26).** The budget above does not catch a poll
+that is slow but steady: `session/get` every 37 ms is 4.3 calls/second, well under
+20/s, and each call is a full session snapshot. `session/get`,
+`agent/getStatus`, `desktop.listOperations` and `fs.readText` are therefore
+shared per plugin inside a 250 ms window
+(`electron/main/plugin-read-coalescing.ts`): an identical call from the same
+plugin gets the answer that is in flight or was produced within the window, so a
+37 ms poll costs one host read per quarter second. Replayed against the recorded
+burst, the 12 716 `session/get` calls become 3 790 host reads (−70%); the poll
+that ran every 1.1 s (`agent/getStatus`, `desktop.listOperations`) is unaffected,
+because its spacing is outside the window.
+
+The key is `(plugin, operation, arguments)`, so a shared answer can never cross a
+permission boundary or answer a different question. Failures are never stored.
+Any call that is not one of those reads may write, so it drops that plugin's
+remembered answers: "save, then read back" reads what was written. A 250 ms
+answer is also why the window is not longer: it is the same order of staleness
+every file watcher in this app already applies, and it is invisible in a panel
+that renders on the next tick anyway.
+
 ## 9. Acceptance
 
 1. The plugin list IPC works
