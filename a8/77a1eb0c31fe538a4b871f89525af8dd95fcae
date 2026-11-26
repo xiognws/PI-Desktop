@@ -1,0 +1,26 @@
+crates/agent-core/src/prompt/smart.rs
+  h_201ed4c689ac8b 17-21,23-25,27-38,40-42,44-45
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1736-1738,1797,1936-1937,4392-4394,4549-4551,4879-4900,5222-5253
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 20,61-69,89,99-126,419-421,826-867,872,874-886,890-891,893-899,906-912,914
+crates/agent-core/tests/delegation_gate.rs
+  h_201ed4c689ac8b 1-267
+docs/adr/0405-smart-mode-model-pair.md
+  h_201ed4c689ac8b 129-161
+docs/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 976-984
+docs/zh-CN/spec/03-runtime/11-provider-model-system.md
+  h_201ed4c689ac8b 771
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "a877a1eb0c31fe538a4b871f89525af8dd95fcae",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
