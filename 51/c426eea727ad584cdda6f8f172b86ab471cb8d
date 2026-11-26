@@ -1,0 +1,16 @@
+crates/agent-core/src/prompt/instructions.rs
+  h_201ed4c689ac8b 26-39,84-119,126,138,630-661
+crates/agent-core/src/tool_activation.rs
+  h_201ed4c689ac8b 60-66,414-429,449-453,825-839,849-857
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "51c426eea727ad584cdda6f8f172b86ab471cb8d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
