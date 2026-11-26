@@ -1,0 +1,14 @@
+packages/agent-runtime/src/extensions/bundle.test.ts
+  h_201ed4c689ac8b 17-63,77,153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4d604bdcf656845c3a24081914e20fa332ec6ae3",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
