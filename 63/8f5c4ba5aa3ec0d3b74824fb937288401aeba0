@@ -1,0 +1,14 @@
+scripts/verify-windows-package.ps1
+  h_201ed4c689ac8b 71-75,80-81,84-99,102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "638f5c4ba5aa3ec0d3b74824fb937288401aeba0",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
