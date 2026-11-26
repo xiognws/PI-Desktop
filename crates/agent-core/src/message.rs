@@ -148,6 +148,16 @@ pub struct Message {
     pub usage: Option<Usage>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
+    /// How long the provider took to start answering (request sent → first byte).
+    /// This is the part a user reads as "the network is slow".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_wait_ms: Option<i64>,
+    /// How long the model took to finish after it started (first byte → last byte).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_stream_duration_ms: Option<i64>,
+    /// Both together: what one request cost in wall time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_duration_ms: Option<i64>,
     pub created_at_ms: i64,
 }
 
@@ -159,6 +169,9 @@ impl Message {
             parts: Vec::new(),
             usage: None,
             stop_reason: None,
+            provider_wait_ms: None,
+            model_stream_duration_ms: None,
+            response_duration_ms: None,
             created_at_ms: now_ms(),
         }
     }

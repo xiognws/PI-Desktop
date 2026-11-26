@@ -32,6 +32,8 @@ import {
 } from "../lib/context-inspector-position";
 import { useSessionTiming } from "../features/chat/context-usage/useSessionTiming";
 import { ContextCostKpis } from "../features/chat/context-usage/ContextCostKpis";
+import { SessionTokenTotals } from "../features/chat/context-usage/SessionTokenTotals";
+import { useSessionTokenTotals } from "../features/chat/context-usage/useSessionTokenTotals";
 
 const CONTEXT_RING_RADIUS = 9;
 const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_RING_RADIUS;
@@ -150,6 +152,12 @@ export function ContextUsageInspector({
     timingBreakdown?.toolCallMs,
     timingBreakdown?.toolCallPercent,
   );
+  const sessionRefreshKey = `${session?.updatedAt ?? ""}:${isSessionRunning}:${turnUsage.totalTokens}:${turnUsage.cost?.total ?? ""}`;
+  const sessionTotals = useSessionTokenTotals({
+    enabled: open,
+    sessionId: sessionId ?? undefined,
+    refreshKey: sessionRefreshKey,
+  });
   const toolRows = aggregateToolTokenUsage(tools);
   const toolTotal = toolRows.reduce(
     (total, row) => total + row.totalTokens,
@@ -376,8 +384,13 @@ export function ContextUsageInspector({
         open={open}
         sessionId={sessionId ?? undefined}
         turnUsage={turnUsage}
-        refreshKey={`${session?.updatedAt ?? ""}:${isSessionRunning}:${turnUsage.totalTokens}:${turnUsage.cost?.total ?? ""}`}
+        refreshKey={sessionRefreshKey}
       />
+      {sessionTotals ? (
+        <div className="context-inspector-summary">
+          <SessionTokenTotals totals={sessionTotals} />
+        </div>
+      ) : null}
       {sessionTiming.timing ? (
         <div className="context-inspector-kpis">
           <div>

@@ -293,6 +293,8 @@ fn parse_message(
         provider_id,
         usage: None,
         response_duration_ms: None,
+        provider_wait_ms: None,
+        model_stream_duration_ms: None,
         response_output_tokens: None,
         response_model_id: None,
         error: None,

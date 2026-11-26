@@ -1558,7 +1558,13 @@ impl TurnEngine {
         cancel: &CancelToken,
         provider: &Arc<dyn Provider>,
     ) -> Result<crate::provider::AssembledResponse> {
+        // The user reads three different things from these numbers: how long the
+        // network held the request before answering, how long the model then spent
+        // producing tokens, and the two together. Only the first and last boundaries
+        // are observable here, so they are captured where they happen.
+        let request_sent = std::time::Instant::now();
         let mut stream = provider.stream(request, cancel.clone()).await?;
+        let mut first_byte_at: Option<std::time::Instant> = None;
         let mut assembler = ResponseAssembler::new();
         let mut live = Message::new(Role::Assistant);
         let mut started = false;
@@ -1572,6 +1578,9 @@ impl TurnEngine {
             let Some(event) = next else {
                 break;
             };
+            if first_byte_at.is_none() {
+                first_byte_at = Some(std::time::Instant::now());
+            }
 
             match &event {
                 StreamEvent::TextDelta(delta) => {
@@ -1626,7 +1635,13 @@ impl TurnEngine {
             assembler.push(event)?;
         }
 
+        let stream_closed = std::time::Instant::now();
+        let (provider_wait_ms, model_stream_duration_ms, response_duration_ms) =
+            step_timings(request_sent, first_byte_at, stream_closed);
         let mut assembled = assembler.finish()?;
+        assembled.message.provider_wait_ms = Some(provider_wait_ms);
+        assembled.message.model_stream_duration_ms = Some(model_stream_duration_ms);
+        assembled.message.response_duration_ms = Some(response_duration_ms);
         // One row identity for the whole step: the streamed message and the
         // stored message must be the same id, or the renderer keeps a ghost.
         if started {
@@ -1652,6 +1667,29 @@ impl TurnEngine {
             },
         );
         Ok(assembled)
+    }
+}
+
+/// (provider wait, model stream, total) for one request, in milliseconds.
+///
+/// A provider that answers without a single streamed frame never starts the clock for
+/// "model response", so its wait is the whole request: reporting zero there would tell
+/// the user the model answered instantly.
+pub fn step_timings(
+    request_sent: std::time::Instant,
+    first_byte_at: Option<std::time::Instant>,
+    stream_closed: std::time::Instant,
+) -> (i64, i64, i64) {
+    let ms = |from: std::time::Instant, to: std::time::Instant| {
+        to.saturating_duration_since(from).as_millis() as i64
+    };
+    let total = ms(request_sent, stream_closed);
+    match first_byte_at {
+        Some(first) => {
+            let wait = ms(request_sent, first);
+            (wait, ms(first, stream_closed), total)
+        }
+        None => (total, 0, total),
     }
 }
 
@@ -1722,6 +1760,31 @@ mod escalation_tests {
             after_tool_errors,
             after_budget_used,
         }
+    }
+
+    #[test]
+    fn step_timings_split_the_wait_from_the_answer() {
+        let sent = std::time::Instant::now();
+        let first = sent + std::time::Duration::from_millis(400);
+        let closed = first + std::time::Duration::from_millis(1_600);
+
+        let (wait, stream, total) = crate::turn::step_timings(sent, Some(first), closed);
+
+        assert_eq!(wait, 400, "the user blames the network for this part");
+        assert_eq!(stream, 1_600, "and the model for this part");
+        assert_eq!(total, 2_000, "the row that adds them up");
+    }
+
+    #[test]
+    fn a_response_without_a_streamed_frame_is_all_wait() {
+        // A provider that answers in one piece never starts the generation clock.
+        // Reporting a zero wait there would claim the model answered instantly.
+        let sent = std::time::Instant::now();
+        let closed = sent + std::time::Duration::from_millis(900);
+
+        let (wait, stream, total) = crate::turn::step_timings(sent, None, closed);
+
+        assert_eq!((wait, stream, total), (900, 0, 900));
     }
 
     #[test]

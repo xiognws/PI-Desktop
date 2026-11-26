@@ -266,6 +266,12 @@ pub struct UiMessage {
     /// Elapsed model streaming time for the response throughput statistic.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_duration_ms: Option<i64>,
+    /// Request sent → first streamed frame, i.e. what the user blames on the network.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_wait_ms: Option<i64>,
+    /// First frame → last frame, i.e. what the user blames on the model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_stream_duration_ms: Option<i64>,
     /// Partial output estimate used when a user stops before final usage arrives.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_output_tokens: Option<i64>,
@@ -485,6 +491,12 @@ pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String
     if let Some(duration) = message.response_duration_ms {
         meta_obj.insert("responseDurationMs".into(), json!(duration));
     }
+    if let Some(wait) = message.provider_wait_ms {
+        meta_obj.insert("providerWaitMs".into(), json!(wait));
+    }
+    if let Some(stream) = message.model_stream_duration_ms {
+        meta_obj.insert("modelStreamDurationMs".into(), json!(stream));
+    }
     if let Some(tokens) = message.response_output_tokens {
         meta_obj.insert("responseOutputTokens".into(), json!(tokens));
     }
@@ -674,6 +686,8 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
     });
     let error = meta.get("error").cloned();
     let response_duration_ms = meta.get("responseDurationMs").and_then(|v| v.as_i64());
+    let provider_wait_ms = meta.get("providerWaitMs").and_then(|v| v.as_i64());
+    let model_stream_duration_ms = meta.get("modelStreamDurationMs").and_then(|v| v.as_i64());
     let response_output_tokens = meta.get("responseOutputTokens").and_then(|v| v.as_i64());
     let output_truncated = meta.get("outputTruncated").and_then(Value::as_bool);
     let response_model_id = meta
@@ -780,6 +794,8 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             provider_id,
             usage,
             response_duration_ms,
+            provider_wait_ms,
+            model_stream_duration_ms,
             response_output_tokens,
             response_model_id: response_model_id.clone(),
             error,
@@ -838,6 +854,8 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             provider_id,
             usage,
             response_duration_ms,
+            provider_wait_ms,
+            model_stream_duration_ms,
             response_output_tokens,
             response_model_id: response_model_id.clone(),
             error,
@@ -4705,6 +4723,8 @@ mod tests {
             provider_id: None,
             usage: None,
             response_duration_ms: None,
+            provider_wait_ms: None,
+            model_stream_duration_ms: None,
             response_output_tokens: None,
             response_model_id: None,
             error: None,
@@ -5674,6 +5694,8 @@ mod tests {
             provider_id: None,
             usage: None,
             response_duration_ms: None,
+            provider_wait_ms: None,
+            model_stream_duration_ms: None,
             response_output_tokens: None,
             response_model_id: None,
             error: None,
@@ -6543,6 +6565,8 @@ mod tests {
                 accounting: serde_json::Map::new(),
             }),
             response_duration_ms: Some(2_000),
+            provider_wait_ms: Some(700),
+            model_stream_duration_ms: Some(1_300),
             response_output_tokens: Some(34),
             response_model_id: Some("vendor/concrete-model".into()),
             error: None,
@@ -6690,6 +6714,8 @@ mod tests {
             provider_id: Some("provider-1".into()),
             usage: None,
             response_duration_ms: None,
+            provider_wait_ms: None,
+            model_stream_duration_ms: None,
             response_output_tokens: None,
             response_model_id: None,
             error: None,
@@ -9238,6 +9264,42 @@ mod tests {
         assert!(delete_session(&db, &session.id).unwrap());
         assert!(!path.exists());
         assert!(recover_inflight_messages(&db, true).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_message_keeps_how_long_the_provider_took_to_answer() {
+        // The inspector reads these to fill "network wait" and "model response".
+        // They are additive meta: an older row simply has neither.
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let message: UiMessage = serde_json::from_value(json!({
+            "id": "a-timed",
+            "role": "assistant",
+            "content": "answer",
+            "status": "complete",
+            "createdAt": "2026-11-26T12:00:00Z",
+            "providerWaitMs": 640,
+            "modelStreamDurationMs": 2_360,
+            "responseDurationMs": 3_000
+        }))
+        .unwrap();
+        append_message(&db, &session.id, &message, None).unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        let stored = detail
+            .messages
+            .iter()
+            .find(|row| row.id == "a-timed")
+            .expect("the row is there");
+
+        assert_eq!(stored.provider_wait_ms, Some(640));
+        assert_eq!(stored.model_stream_duration_ms, Some(2_360));
+        assert_eq!(stored.response_duration_ms, Some(3_000));
+        assert_eq!(
+            stored.provider_wait_ms.unwrap() + stored.model_stream_duration_ms.unwrap(),
+            stored.response_duration_ms.unwrap(),
+            "the two halves must add up to the whole, or the rows contradict each other"
+        );
     }
 
     #[test]
