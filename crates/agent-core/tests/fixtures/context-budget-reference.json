@@ -1,0 +1,647 @@
+{
+  "source": "packages/agent-runtime/src/context-budget.ts · contextBudgetLimitsFor",
+  "recorded_by": "rust-anything record rust/context-budget-rs (2026-11-27, 218 cases)",
+  "note": "Only the cases ModelLimits (Option<u64>) can carry exactly: NaN, ±Infinity, negative and fractional windows cannot cross into the kernel, and a case whose reference result is itself NaN/Infinity has no integer to assert against.",
+  "cases": [
+    {
+      "contextWindow": null,
+      "maxTokens": null,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 0,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 1,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 2,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 3,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 10,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 42,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 100,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 1000,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 1000000,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 2147483648,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": null,
+      "maxTokens": 9007199254740992,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": null,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 0,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 1,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 2,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 3,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 10,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 100,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 1000,
+      "hardLimit": 111616,
+      "requestHeadroom": 16384,
+      "keepRecentTokens": 22323,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 1000000,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 2147483648,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": 0,
+      "maxTokens": 9007199254740992,
+      "hardLimit": 96000,
+      "requestHeadroom": 32000,
+      "keepRecentTokens": 19200,
+      "window": 128000
+    },
+    {
+      "contextWindow": 1,
+      "maxTokens": null,
+      "hardLimit": 1,
+      "requestHeadroom": 0,
+      "keepRecentTokens": 1,
+      "window": 1
+    },
+    {
+      "contextWindow": 1,
+      "maxTokens": 0,
+      "hardLimit": 1,
+      "requestHeadroom": 0,
+      "keepRecentTokens": 1,
+      "window": 1
+    },
+    {
+      "contextWindow": 1,
+      "maxTokens": 10,
+      "hardLimit": 1,
+      "requestHeadroom": 0,
+      "keepRecentTokens": 1,
+      "window": 1
+    },
+    {
+      "contextWindow": 1,
+      "maxTokens": 42,
+      "hardLimit": 1,
+      "requestHeadroom": 0,
+      "keepRecentTokens": 1,
+      "window": 1
+    },
+    {
+      "contextWindow": 1,
+      "maxTokens": 2147483648,
+      "hardLimit": 1,
+      "requestHeadroom": 0,
+      "keepRecentTokens": 1,
+      "window": 1
+    },
+    {
+      "contextWindow": 2,
+      "maxTokens": null,
+      "hardLimit": 1,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 2
+    },
+    {
+      "contextWindow": 2,
+      "maxTokens": 1,
+      "hardLimit": 1,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 2
+    },
+    {
+      "contextWindow": 2,
+      "maxTokens": 2,
+      "hardLimit": 1,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 2
+    },
+    {
+      "contextWindow": 2,
+      "maxTokens": 10,
+      "hardLimit": 1,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 2
+    },
+    {
+      "contextWindow": 2,
+      "maxTokens": 42,
+      "hardLimit": 1,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 2
+    },
+    {
+      "contextWindow": 2,
+      "maxTokens": 100,
+      "hardLimit": 1,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 2
+    },
+    {
+      "contextWindow": 2,
+      "maxTokens": 1000000,
+      "hardLimit": 1,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 2
+    },
+    {
+      "contextWindow": 3,
+      "maxTokens": null,
+      "hardLimit": 2,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 3
+    },
+    {
+      "contextWindow": 3,
+      "maxTokens": 42,
+      "hardLimit": 2,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 3
+    },
+    {
+      "contextWindow": 3,
+      "maxTokens": 1000,
+      "hardLimit": 2,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 3
+    },
+    {
+      "contextWindow": 3,
+      "maxTokens": 1000000,
+      "hardLimit": 2,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 3
+    },
+    {
+      "contextWindow": 3,
+      "maxTokens": 2147483648,
+      "hardLimit": 2,
+      "requestHeadroom": 1,
+      "keepRecentTokens": 1,
+      "window": 3
+    },
+    {
+      "contextWindow": 10,
+      "maxTokens": null,
+      "hardLimit": 5,
+      "requestHeadroom": 5,
+      "keepRecentTokens": 2,
+      "window": 10
+    },
+    {
+      "contextWindow": 10,
+      "maxTokens": 0,
+      "hardLimit": 5,
+      "requestHeadroom": 5,
+      "keepRecentTokens": 2,
+      "window": 10
+    },
+    {
+      "contextWindow": 10,
+      "maxTokens": 1,
+      "hardLimit": 5,
+      "requestHeadroom": 5,
+      "keepRecentTokens": 2,
+      "window": 10
+    },
+    {
+      "contextWindow": 10,
+      "maxTokens": 3,
+      "hardLimit": 5,
+      "requestHeadroom": 5,
+      "keepRecentTokens": 2,
+      "window": 10
+    },
+    {
+      "contextWindow": 10,
+      "maxTokens": 100,
+      "hardLimit": 5,
+      "requestHeadroom": 5,
+      "keepRecentTokens": 2,
+      "window": 10
+    },
+    {
+      "contextWindow": 42,
+      "maxTokens": null,
+      "hardLimit": 21,
+      "requestHeadroom": 21,
+      "keepRecentTokens": 10,
+      "window": 42
+    },
+    {
+      "contextWindow": 42,
+      "maxTokens": 0,
+      "hardLimit": 21,
+      "requestHeadroom": 21,
+      "keepRecentTokens": 10,
+      "window": 42
+    },
+    {
+      "contextWindow": 42,
+      "maxTokens": 1,
+      "hardLimit": 21,
+      "requestHeadroom": 21,
+      "keepRecentTokens": 10,
+      "window": 42
+    },
+    {
+      "contextWindow": 42,
+      "maxTokens": 2,
+      "hardLimit": 21,
+      "requestHeadroom": 21,
+      "keepRecentTokens": 10,
+      "window": 42
+    },
+    {
+      "contextWindow": 42,
+      "maxTokens": 1000,
+      "hardLimit": 21,
+      "requestHeadroom": 21,
+      "keepRecentTokens": 10,
+      "window": 42
+    },
+    {
+      "contextWindow": 100,
+      "maxTokens": null,
+      "hardLimit": 50,
+      "requestHeadroom": 50,
+      "keepRecentTokens": 25,
+      "window": 100
+    },
+    {
+      "contextWindow": 100,
+      "maxTokens": 0,
+      "hardLimit": 50,
+      "requestHeadroom": 50,
+      "keepRecentTokens": 25,
+      "window": 100
+    },
+    {
+      "contextWindow": 100,
+      "maxTokens": 3,
+      "hardLimit": 50,
+      "requestHeadroom": 50,
+      "keepRecentTokens": 25,
+      "window": 100
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": null,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": 2,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": 3,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": 10,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": 42,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": 1000,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": 1000000,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000,
+      "maxTokens": 2147483648,
+      "hardLimit": 500,
+      "requestHeadroom": 500,
+      "keepRecentTokens": 250,
+      "window": 1000
+    },
+    {
+      "contextWindow": 1000000,
+      "maxTokens": null,
+      "hardLimit": 950000,
+      "requestHeadroom": 50000,
+      "keepRecentTokens": 64000,
+      "window": 1000000
+    },
+    {
+      "contextWindow": 1000000,
+      "maxTokens": 0,
+      "hardLimit": 950000,
+      "requestHeadroom": 50000,
+      "keepRecentTokens": 64000,
+      "window": 1000000
+    },
+    {
+      "contextWindow": 1000000,
+      "maxTokens": 2,
+      "hardLimit": 950000,
+      "requestHeadroom": 50000,
+      "keepRecentTokens": 64000,
+      "window": 1000000
+    },
+    {
+      "contextWindow": 1000000,
+      "maxTokens": 10,
+      "hardLimit": 950000,
+      "requestHeadroom": 50000,
+      "keepRecentTokens": 64000,
+      "window": 1000000
+    },
+    {
+      "contextWindow": 1000000,
+      "maxTokens": 42,
+      "hardLimit": 950000,
+      "requestHeadroom": 50000,
+      "keepRecentTokens": 64000,
+      "window": 1000000
+    },
+    {
+      "contextWindow": 1000000,
+      "maxTokens": 100,
+      "hardLimit": 950000,
+      "requestHeadroom": 50000,
+      "keepRecentTokens": 64000,
+      "window": 1000000
+    },
+    {
+      "contextWindow": 1000000,
+      "maxTokens": 1000000,
+      "hardLimit": 750000,
+      "requestHeadroom": 250000,
+      "keepRecentTokens": 64000,
+      "window": 1000000
+    },
+    {
+      "contextWindow": 2147483648,
+      "maxTokens": null,
+      "hardLimit": 2040109465,
+      "requestHeadroom": 107374183,
+      "keepRecentTokens": 64000,
+      "window": 2147483648
+    },
+    {
+      "contextWindow": 2147483648,
+      "maxTokens": 2,
+      "hardLimit": 2040109465,
+      "requestHeadroom": 107374183,
+      "keepRecentTokens": 64000,
+      "window": 2147483648
+    },
+    {
+      "contextWindow": 2147483648,
+      "maxTokens": 10,
+      "hardLimit": 2040109465,
+      "requestHeadroom": 107374183,
+      "keepRecentTokens": 64000,
+      "window": 2147483648
+    },
+    {
+      "contextWindow": 2147483648,
+      "maxTokens": 42,
+      "hardLimit": 2040109465,
+      "requestHeadroom": 107374183,
+      "keepRecentTokens": 64000,
+      "window": 2147483648
+    },
+    {
+      "contextWindow": 2147483648,
+      "maxTokens": 1000,
+      "hardLimit": 2040109465,
+      "requestHeadroom": 107374183,
+      "keepRecentTokens": 64000,
+      "window": 2147483648
+    },
+    {
+      "contextWindow": 2147483648,
+      "maxTokens": 1000000,
+      "hardLimit": 2040109465,
+      "requestHeadroom": 107374183,
+      "keepRecentTokens": 64000,
+      "window": 2147483648
+    },
+    {
+      "contextWindow": 9007199254740992,
+      "maxTokens": null,
+      "hardLimit": 8556839292003942,
+      "requestHeadroom": 450359962737050,
+      "keepRecentTokens": 64000,
+      "window": 9007199254740992
+    },
+    {
+      "contextWindow": 9007199254740992,
+      "maxTokens": 3,
+      "hardLimit": 8556839292003942,
+      "requestHeadroom": 450359962737050,
+      "keepRecentTokens": 64000,
+      "window": 9007199254740992
+    },
+    {
+      "contextWindow": 9007199254740992,
+      "maxTokens": 10,
+      "hardLimit": 8556839292003942,
+      "requestHeadroom": 450359962737050,
+      "keepRecentTokens": 64000,
+      "window": 9007199254740992
+    },
+    {
+      "contextWindow": 9007199254740992,
+      "maxTokens": 100,
+      "hardLimit": 8556839292003942,
+      "requestHeadroom": 450359962737050,
+      "keepRecentTokens": 64000,
+      "window": 9007199254740992
+    },
+    {
+      "contextWindow": 9007199254740992,
+      "maxTokens": 1000,
+      "hardLimit": 8556839292003942,
+      "requestHeadroom": 450359962737050,
+      "keepRecentTokens": 64000,
+      "window": 9007199254740992
+    },
+    {
+      "contextWindow": 9007199254740992,
+      "maxTokens": 9007199254740992,
+      "hardLimit": 6755399441055744,
+      "requestHeadroom": 2251799813685248,
+      "keepRecentTokens": 64000,
+      "window": 9007199254740992
+    }
+  ]
+}

@@ -157,8 +157,13 @@ pub struct ContextLimits {
 impl ContextLimits {
     /// Derive the thresholds for a model window.
     pub fn for_model(model: ModelLimits) -> Self {
+        // The reference reads `model.contextWindow || DEFAULT_CONTEXT_WINDOW`, so a
+        // missing *and* a zero window both fall back. `Some(0)` must not become a
+        // window of 1: that puts `hard_limit` at 1, and every turn then classifies
+        // as Overflow (or compacts) against a model that never reported a window.
         let reported_window = model
             .context_window
+            .filter(|window| *window > 0)
             .unwrap_or(DEFAULT_CONTEXT_WINDOW)
             .max(1);
         // The configured window is the budget, capped by what this product is willing
@@ -166,8 +171,11 @@ impl ContextLimits {
         // and it exists because planning against a 1M window meant never compacting.
         let window = reported_window.min(PROMPT_BUDGET_CEILING);
 
+        // Same `||` rule for the output budget: `maxTokens: 0` falls back to the
+        // default rather than reserving a single token of headroom.
         let model_output_budget = model
             .max_tokens
+            .filter(|tokens| *tokens > 0)
             .unwrap_or(DEFAULT_MAX_TOKENS)
             .max(1)
             .min(std::cmp::max(1, window / 4));
@@ -198,8 +206,8 @@ impl ContextLimits {
         // keeps a large window from becoming the most expensive possible session.
         let trigger = std::cmp::max(
             1,
-            (hard_limit as f64 * trigger_ratio)
-                .min(AUTO_COMPACTION_TRIGGER_CEILING_TOKENS as f64) as u64,
+            (hard_limit as f64 * trigger_ratio).min(AUTO_COMPACTION_TRIGGER_CEILING_TOKENS as f64)
+                as u64,
         );
 
         // The retained tail is measured against the trigger, not the window: a
@@ -207,7 +215,8 @@ impl ContextLimits {
         // under it, and one that keeps half of a 600k window cannot.
         let keep_recent_tokens = std::cmp::max(
             COMPACTION_MIN_KEEP_RECENT_TOKENS.min(trigger / 2),
-            COMPACTION_MAX_KEEP_RECENT_TOKENS.min((trigger as f64 * COMPACTION_KEEP_RECENT_RATIO) as u64),
+            COMPACTION_MAX_KEEP_RECENT_TOKENS
+                .min((trigger as f64 * COMPACTION_KEEP_RECENT_RATIO) as u64),
         )
         // A retained tail wider than half the safe budget leaves the summary no
         // room, so the min/max clamp above never wins on a small window.
