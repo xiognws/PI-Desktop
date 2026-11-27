@@ -1,0 +1,16 @@
+apps/desktop/test/test-assertion-shape.test.mjs
+  h_201ed4c689ac8b 1-68
+packages/shared/src/event-usage.test.ts
+  h_201ed4c689ac8b 104-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "27d867ba7c03e87588d4c311f738b8595c614017",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
