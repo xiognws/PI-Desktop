@@ -1,0 +1,30 @@
+apps/desktop/electron/main/bootstrap/shutdown.ts
+  h_201ed4c689ac8b 45-46,75,227-230
+apps/desktop/electron/main/index.ts
+  h_201ed4c689ac8b 436-439,1355
+apps/desktop/electron/main/runtime/session-launch.ts
+  h_201ed4c689ac8b 1094-1098
+apps/desktop/electron/main/runtime/smart-routing.ts
+  h_201ed4c689ac8b 10-11,70-77,80-101,120-172,175-177,181-188,195-203,212,218,223,251-252,261-262,267-269,300-335,338-339,342
+apps/desktop/test/smart-routing-sticky.test.mjs
+  h_201ed4c689ac8b 96-141
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 5416-5425,5431-5432
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 175-182,195,202-211,456,551-556,573,998,1827-1828,1834-1835,1840-1848,1876-1877,1882-1883,1886-1887,1892-1914
+packages/shared/src/smart-mode.test.ts
+  h_201ed4c689ac8b 2,151-168,236-250
+packages/shared/src/smart-mode.ts
+  h_201ed4c689ac8b 71-76,82-90,103-111,149-150,222-235,333-334,437-443,474-475,484,501-509
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "063d18d49a8f0eed3f262dcef65caa50ee168edf",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
