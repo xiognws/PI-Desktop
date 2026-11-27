@@ -440,10 +440,13 @@ impl LocalExecutor {
 
         let stdout = join_reader(stdout_reader).await;
         let stderr = join_reader(stderr_reader).await;
+        // A child that never chose an encoding writes the ANSI code page (GBK on a
+        // Chinese Windows box), and `from_utf8_lossy` answered one replacement
+        // character per byte of every Chinese character it printed.
         let (stdout, stdout_truncated) =
-            tail_capped(&String::from_utf8_lossy(&stdout), request.max_stdout_chars);
+            tail_capped(&native_text::decode_native_text(&stdout), request.max_stdout_chars);
         let (stderr, stderr_truncated) =
-            tail_capped(&String::from_utf8_lossy(&stderr), request.max_stderr_chars);
+            tail_capped(&native_text::decode_native_text(&stderr), request.max_stderr_chars);
 
         Ok(ExecOutcome {
             // Scrubbed before it is capped, so a credential cannot survive as a
@@ -623,6 +626,24 @@ mod tests {
         assert!(outcome.is_success());
         assert!(!outcome.timed_out);
         assert!(outcome.render().contains("[exit code 0]"));
+    }
+
+    /// A child that writes the ANSI code page is not broken output: it is what
+    /// every unconfigured program on a Chinese Windows box does. The kernel must
+    /// read it back as text, not as one replacement character per byte.
+    #[tokio::test]
+    async fn gbk_output_from_a_child_is_decoded_as_text() {
+        if !sh_available() {
+            eprintln!("SKIP (no working `sh` on this host: MSYS shared-memory 0xC0000022)");
+            return;
+        }
+        // printf with octal escapes emits the raw bytes: 265 253 = GBK for 但.
+        let outcome = executor()
+            .run(ExecRequest::new("printf '\\265\\253\\n'"))
+            .await
+            .expect("the command runs");
+        assert_eq!(outcome.stdout.trim_end(), "但", "{outcome:?}");
+        assert!(!outcome.stdout.contains('\u{FFFD}'), "{outcome:?}");
     }
 
     #[tokio::test]

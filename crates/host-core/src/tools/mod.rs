@@ -1245,7 +1245,7 @@ impl<R: BufRead> LineReader<R> {
         if buf.last() == Some(&b'\r') {
             buf.pop();
         }
-        let text = String::from_utf8_lossy(&buf).into_owned();
+        let text = native_text::decode_native_text(&buf);
         let (text, char_clipped) = clip_chars(text, max_chars);
         Ok(Some(ScannedLine {
             text,
@@ -2943,7 +2943,10 @@ impl CapturedOutput {
     }
 
     fn result(&self) -> (String, bool) {
-        let mut text = String::from_utf8_lossy(&self.bytes).to_string();
+        // The whole captured buffer is decoded at once, per line, so a command that
+        // wrote its Chinese in the ANSI code page reads back as Chinese instead of
+        // one replacement character per byte.
+        let mut text = native_text::decode_native_text(&self.bytes);
         if self.truncated {
             text.push_str(&format!(
                 "\n\n[truncated: output exceeded {}KB or {} lines; omitted {} bytes and {} lines]",

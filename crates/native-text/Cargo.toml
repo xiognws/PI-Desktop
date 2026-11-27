@@ -1,0 +1,11 @@
+[package]
+name = "native-text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Decode text a Windows program produced, without assuming it is UTF-8"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Globalization"] }
