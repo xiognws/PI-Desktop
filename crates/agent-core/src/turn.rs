@@ -655,6 +655,28 @@ impl TurnEngine {
                         },
                     )
                     .await?;
+
+                    // A checkpoint cannot make the request smaller than the prompt
+                    // itself. When this turn's own row is still at or over the hard
+                    // boundary afterwards — the prompt alone can be, or its summary
+                    // plus a retained tail can — the request is refused instead of
+                    // sent, which is what the reference does with its post-compaction
+                    // `automaticCompactionWouldExceedHardLimit([incomingUserMessage])`
+                    // and `CONTEXT_TOO_LARGE`. Sending it produces a provider error the
+                    // user reads as a broken model rather than an oversized prompt.
+                    let after_compaction = estimate_context_tokens(transcript.messages()).tokens;
+                    if limits.decide(after_compaction) == BudgetDecision::Overflow {
+                        let error = AgentError::ContextTooLarge;
+                        self.emit(
+                            session_id,
+                            turn_id,
+                            AgentEvent::Error {
+                                code: error.code().into(),
+                                message: error.to_string(),
+                            },
+                        );
+                        return Err(error);
+                    }
                 }
             }
 

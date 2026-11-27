@@ -961,3 +961,54 @@ async fn a_prompt_over_the_trigger_reaches_the_provider_intact() {
         "the user row and the answer: the prompt row was never dropped"
     );
 }
+
+/// A prompt larger than the model's whole hard boundary is refused, not sent.
+///
+/// The checkpoint cannot shrink the prompt itself, and the reference refuses here
+/// too: after compaction it re-measures `[incomingUserMessage]` with
+/// `automaticCompactionWouldExceedHardLimit` and fails with `CONTEXT_TOO_LARGE`.
+/// Sending it instead trades a clear error for whatever the provider says about an
+/// oversized request, which reads like a broken model rather than a long prompt.
+#[tokio::test]
+async fn a_prompt_over_the_hard_limit_is_refused_instead_of_sent() {
+    // 700,000 characters ≈ 200,000 tokens: over this window's 111,616 hard limit and
+    // over a checkpoint's ability to help, since the prompt is all there is.
+    let document = "x".repeat(700_000);
+
+    let provider = Arc::new(ScriptedProvider::new(vec![
+        answer_events("READY"),
+        answer_events("READY"),
+    ]));
+    let sink = Arc::new(RecordingSink::new());
+    let engine = engine(provider.clone(), sink.clone())
+        .with_model_limits(agent_core::context::ModelLimits::new(128_000, 8_192));
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text(document));
+
+    let result = engine
+        .run_turn(
+            "s1",
+            "t1",
+            &mut transcript,
+            &TurnConfig::new("test-model"),
+            CancelToken::new(),
+        )
+        .await;
+
+    assert!(
+        matches!(result, Err(AgentError::ContextTooLarge)),
+        "expected ContextTooLarge, got {:?}",
+        result.map(|outcome| outcome.stop_reason)
+    );
+    assert_eq!(
+        provider.requests().len(),
+        0,
+        "an oversized request must not reach the provider"
+    );
+    assert!(
+        sink.events()
+            .iter()
+            .any(|event| matches!(event, AgentEvent::Error { .. })),
+        "the refusal is reported to the client"
+    );
+}
