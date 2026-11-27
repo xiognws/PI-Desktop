@@ -1,0 +1,26 @@
+apps/desktop/electron/autotest/workbench-theme.ts
+  h_201ed4c689ac8b 84,90-104
+apps/desktop/electron/autotest/workbench-view.ts
+  h_201ed4c689ac8b 223-261
+apps/desktop/electron/main/ipc/autotest-ipc.ts
+  h_201ed4c689ac8b 120-132
+apps/desktop/src/features/surfaces/autotest/AutoTestSurfaceShell.tsx
+  h_201ed4c689ac8b 35-86,110-111,187-234,339-370,376-386
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 2407-2414
+apps/desktop/src/styles/surfaces.css
+  h_201ed4c689ac8b 31-44,94-185
+packages/shared/src/protocol.ts
+  h_201ed4c689ac8b 570-571
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ed9059678570b2f6f732c451761e851cd6bda51d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
