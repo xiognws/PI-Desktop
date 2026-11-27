@@ -16,7 +16,7 @@ unpublished plugin contribution as an official upstream release.
 | Integration source | https://github.com/Seraph-x/pi-desktop-plugin-file-manager/tree/f47ce21fab3c59f3f4b94d30f3e3a0c8124447e1 |
 | Integration commit | `f47ce21fab3c59f3f4b94d30f3e3a0c8124447e1` |
 | Companion upstream proposal | https://github.com/Tioit-Wang/pi-desktop-plugin-file-manager/pull/5 |
-| Bundled version | `0.9.1-pi.5` — Desktop hotfix, not an upstream release |
+| Bundled version | `0.9.1-pi.6` — Desktop hotfix, not an upstream release |
 | License | MIT; preserve the bundled `LICENSE` and PDF.js notices |
 | Locally packed runtime | `pi.file-manager-0.9.1-pi.1.piplug`, 6921923 bytes, SHA-256 `e8b6041cb5d3d4eab2b68a1e7fa61a8c7089235d9918f4a418541bd60cd109b3` |
 | Marketplace publication | Not published; no marketplace artifact or accepted upstream tag is claimed for this hotfix |
@@ -26,11 +26,11 @@ separate, immutable contribution commit. Its remote consumer uses public
 `pi.fs.list` / `pi.fs.readPreview`, not local filesystem reads for opaque remote
 identities. Remote editing/search/Git/watch remain unavailable explicitly.
 
-The hotfix is strictly newer than the previous bundled `0.9.1-pi.4`,
-`0.9.1-pi.3`, `0.9.1-pi.2` and `0.9.1-pi.1` (and still than the older
-`0.5.3-pi.1` and marketplace `0.9.0`), so `sync_builtin` can repair any of those
-installations. A future stable upstream `0.9.1` remains strictly newer than the
-`-pi.5` prerelease and can replace it normally. The source candidate version `0.9.1` is
+The hotfix is strictly newer than the previous bundled `0.9.1-pi.5`,
+`0.9.1-pi.4`, `0.9.1-pi.3`, `0.9.1-pi.2` and `0.9.1-pi.1` (and still than the
+older `0.5.3-pi.1` and marketplace `0.9.0`), so `sync_builtin` can repair any of
+those installations. A future stable upstream `0.9.1` remains strictly newer
+than the `-pi.6` prerelease and can replace it normally. The source candidate version `0.9.1` is
 not reused as a supposedly released version.
 
 ## Build inputs
@@ -81,14 +81,14 @@ is recorded here. `UPSTREAM.md` is the provenance record, not a runtime input.
 
 | File | Bytes | SHA-256 |
 | --- | --- | --- |
-| `CHANGELOG.md` | 35743 | `8be83506eb27873fea983b90bbfeb0102fb3e869391599dc69035c6a6a242f75` |
+| `CHANGELOG.md` | 36529 | `38673f024e4e49fc603da76d9ee766d54893ad3bd059b7c6e0e6cae730520201` |
 | `LICENSE` | 1067 | `ebaec3ae096498a39f6b86e3ac8017e39818fb5aaff80b452349f94bc275ec0d` |
 | `README.md` | 38470 | `4ecf6e3afa2051b59b479907c485d156caca54ef6d1f4e3c410805807942a268` |
 | `main.js` | 127192 | `8858a834a3ecb085280477202830f692a8a7e6afe193249fa2e5acb69881d183` |
-| `manifest.json` | 40093 | `9be8ba7da522b84460dd0251ab76e622fbb352b99f4d742fa6e04c02488dad24` |
+| `manifest.json` | 40093 | `42a474328eeb5751ad5a1f1d7fe2f10e0172abef2ef7212bd953a4fa56a2f4d2` |
 | `package.json` | 25 | `8005a3491db7d92f36ac66369861589f9c47123d3a7c71e643fc2c06168cd45a` |
 | `remote-workspace.js` | 3757 | `931a579801fd4b334c3d96231aafc7ff52e0c03e7baebbabaf00b4c5e17cc366` |
-| `views/assets/index.js` | 6617635 | `ffc33deb673d48a5166765ca9191d6886f602cf01360182193bd43d25141ef22` |
+| `views/assets/index.js` | 6618641 | `01da2c18a9c0f69c99b9a179aa8e12c2413165b9e8ce610b999128e5bcaf6dfb` |
 | `views/assets/pdfjs-LICENSES.txt` | 61789 | `a8b04e2e9022721482079ee5c85b9f05ae129e6a2cfd59ea67f2629a3fc23640` |
 | `views/index.html` | 345 | `771fd3d8afdea7fca75ed1f1918c1ce93ad1c87babdb321cfb85e910465cd2c1` |
 
@@ -167,8 +167,10 @@ is exported again, then delete this section. Each edit is anchored and asserted
 to match exactly once, and `file-manager-layout-contract.test.mjs` fails if the
 gate ever moves back onto the editor, so a lost edit cannot ship silently.
 
-`CHANGELOG.md`, `main.js` and `manifest.json` checksums above reflect this
-version; `manifest.json` only gained the version bump, `main.js` gained the
-UTF-16 preview fix (BOM-identified UTF-16 decodes as read-only text instead of
-being condemned as binary by its NUL bytes), pinned by
-`file-manager-text-encodings.test.mjs`.
+`CHANGELOG.md`, `manifest.json` and `views/assets/index.js` checksums above
+reflect this version. `-pi.5` changed `main.js` (BOM-identified UTF-16 decodes
+as read-only text instead of being condemned as binary by its NUL bytes, pinned
+by `file-manager-text-encodings.test.mjs`). `-pi.6` changed only the built view:
+`tok-*` rules for the `classHighlighter`, markdown preview by default, and
+`.env` bound to the Properties grammar, pinned by
+`file-manager-code-highlight.test.mjs`.

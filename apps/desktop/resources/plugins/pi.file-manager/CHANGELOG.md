@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.1-pi.6
+
+- Code files are coloured. The view has always classified tokens with
+  CodeMirror's `classHighlighter` — which emits `tok-keyword`, `tok-string`,
+  `tok-comment` and 22 more class names — but the bundle shipped no rules for
+  those classes, so every grammar (C, C++, Python, Rust, Go, Java, YAML, TOML,
+  INI/`.env`, Dockerfile, SQL, Shell, PowerShell, Diff…) rendered as one flat
+  colour and read as plain text. The rules now exist, themed through the palette
+  the view already uses, with two new hues (`--tok-type`, `--tok-macro`) per theme.
+- Markdown opens **rendered**; the toolbar's Edit/Preview switch still shows the
+  source, and an existing preference keeps whatever a user has chosen.
+- `.env` joins the config files that get the Properties grammar.
+
 ## 0.9.1-pi.5
 
 - Fix: a UTF-16 text file was judged binary and refused by the viewer with
