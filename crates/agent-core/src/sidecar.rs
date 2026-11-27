@@ -402,6 +402,13 @@ pub struct Sidecar {
     /// says otherwise: a worker inheriting the permissive reading is the safe default
     /// only because the gate, not this field, is what refuses a call.
     mode: Arc<std::sync::RwLock<crate::prompt::SessionMode>>,
+    /// The session's permission mode as the host names it: `auto`, `ask`,
+    /// `accept-edits` or `inherit`.
+    ///
+    /// Read here because it decides whether the model may stop and ask, which is a
+    /// tool-set and prompt question. The permission *gate* is a different thing and
+    /// does not consult it.
+    permission_mode: Arc<std::sync::RwLock<String>>,
     config: Mutex<RuntimeConfig>,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
     /// The ask cards waiting for an answer. One broker per sidecar: a card is
@@ -448,6 +455,7 @@ impl Sidecar {
         Self {
             bridge: Arc::new(HostBridge::new(out.clone())),
             mode: Arc::new(std::sync::RwLock::new(crate::prompt::SessionMode::Agent)),
+            permission_mode: Arc::new(std::sync::RwLock::new("ask".to_string())),
             asks: Arc::new(crate::ask::AskBroker::new(sink)),
             out,
             provider: Mutex::new(None),
@@ -1069,7 +1077,8 @@ impl Sidecar {
             crate::prompt::SessionMode::Agent
                 | crate::prompt::SessionMode::Plan
                 | crate::prompt::SessionMode::Goal
-        ) {
+        ) && !self.is_unattended()
+        {
             extra.push(Arc::new(crate::ask::AskTool::new(self.asks.clone())));
         }
         if matches!(mode, crate::prompt::SessionMode::Agent) {
@@ -1131,6 +1140,7 @@ impl Sidecar {
         inputs.tool_activation = tool_activation;
         // `smartTurn.tier` is the host's own routing decision. Only the strong
         // half is told to orchestrate: the cheap half is the one executing.
+        inputs.unattended = self.is_unattended();
         inputs.smart_orchestrator = request
             .params
             .get("smartTurn")
@@ -1145,6 +1155,14 @@ impl Sidecar {
         inputs.custom = custom.as_ref();
         inputs.project = project.as_ref();
         crate::prompt::build_system_prompt(&fs, &inputs)
+    }
+
+    /// Whether this session runs without anyone to answer a question.
+    fn is_unattended(&self) -> bool {
+        self.permission_mode
+            .read()
+            .map(|mode| mode.as_str() == "auto")
+            .unwrap_or(false)
     }
 
     fn session(&self, session_id: &str) -> Result<Arc<Session>, RpcError> {
@@ -1345,6 +1363,14 @@ impl Sidecar {
         let tool_mode = crate::prompt::SessionMode::parse(request.str_param("mode"));
         if let Ok(mut applied) = self.mode.write() {
             *applied = tool_mode.clone();
+        }
+        // `auto` is the user saying "do not interrupt me". The gate is unchanged; what
+        // changes is that the model is not handed a tool whose only purpose is to
+        // interrupt, and is told the session is unattended.
+        if let Some(mode) = request.str_param("permissionMode") {
+            if let Ok(mut applied) = self.permission_mode.write() {
+                *applied = mode.trim().to_ascii_lowercase();
+            }
         }
         if let Some(declarations) = request.params.get("tools").and_then(Value::as_array) {
             self.install_tools(declarations, shell.as_ref(), tool_mode.wire_name())?;
@@ -1656,6 +1682,7 @@ impl Sidecar {
         // Resolved before the engine takes the registry: the policy is a function of
         // the names the host actually declared.
         let repeat_policy = repeat_policy_for(&tools);
+        let compaction_log = Arc::new(std::sync::Mutex::new(Vec::new()));
         let engine = TurnEngine::new(
             provider,
             tools,
@@ -1707,7 +1734,8 @@ impl Sidecar {
                 .get("parallelToolCalls")
                 .and_then(Value::as_bool)
                 == Some(true),
-        );
+        )
+        .with_compaction_log(compaction_log.clone());
         let engine = {
             // One ceiling, not two: merging them here is what keeps a prompt that
             // names both from silently losing the token limit to the step limit.
@@ -1792,6 +1820,8 @@ impl Sidecar {
         let review_out = self.out.clone();
         let review_turn_id = turn_id.clone();
         let review_session_id = session_id.clone();
+        let compaction_bridge = self.bridge.clone();
+        let compaction_outcomes = compaction_log.clone();
         tokio::spawn(async move {
             let mut transcript = task_session.transcript.lock().await;
             let outcome = engine
@@ -1823,6 +1853,13 @@ impl Sidecar {
                 )
                 .await;
             drop(transcript);
+            // The store keeps the checkpoint, not only the transcript: without this
+            // write the next restart rebuilds the rows the summary replaced.
+            let outcomes = match compaction_outcomes.lock() {
+                Ok(mut entries) => entries.drain(..).collect(),
+                Err(_) => Vec::new(),
+            };
+            persist_compactions(compaction_bridge, &task_session_id, outcomes).await;
             // No card survives the turn that asked it, whatever ended the turn.
             task_asks.cancel_session(&task_session_id);
             task_session.running.store(false, Ordering::SeqCst);
@@ -1940,13 +1977,15 @@ impl Sidecar {
             .lock()
             .map_err(|_| RpcError::internal("tool lock poisoned"))?
             .clone();
+        let compaction_log = Arc::new(std::sync::Mutex::new(Vec::new()));
         let engine = TurnEngine::new(
             provider,
             tools,
             Arc::new(NotificationSink {
                 out: self.out.clone(),
             }),
-        );
+        )
+        .with_compaction_log(compaction_log.clone());
         let cancel = CancelToken::new();
         let turn_config = TurnConfig {
             model: config.model.clone(),
@@ -1983,9 +2022,21 @@ impl Sidecar {
             )
             .await
             .map_err(|error| RpcError::app(error.code(), error.to_string()))?;
+        // A compaction the user asked for is the one that most needs to survive a
+        // restart: they paid for that summary deliberately.
+        let outcomes = match compaction_log.lock() {
+            Ok(mut entries) => entries.drain(..).collect(),
+            Err(_) => Vec::new(),
+        };
+        drop(transcript);
+        persist_compactions(self.bridge.clone(), &session_id, outcomes).await;
+        let message_count = {
+            let transcript = session.transcript.lock().await;
+            transcript.messages().len()
+        };
         Ok(json!({
             "compacted": true,
-            "messageCount": transcript.messages().len(),
+            "messageCount": message_count,
             "turnId": turn_id,
         }))
     }
@@ -2518,23 +2569,36 @@ impl Sidecar {
         let Some(rows) = detail.get("messages").and_then(Value::as_array) else {
             return Ok(());
         };
-        let messages = crate::restore::messages_from_history(rows);
-        // One line, deliberately: "the model forgot" is either a restore that returned
-        // nothing, a restore that returned a fraction of the rows, or a later ageing
-        // pass — and without these two numbers none of the three can be told apart.
+        // The stored checkpoint, when there is one, is the boundary: the summary
+        // plus the tail it kept plus everything written after it. Ignoring it
+        // re-sends rows the model already had summarized away, which is a
+        // different history every restart.
+        let (messages, report) = crate::restore::restore_history(rows, detail.get("compaction"));
+        // One line, deliberately: "the model forgot" is either a stored checkpoint
+        // that summarized the wrong range, a restore that returned a fraction of the
+        // rows, or a later ageing pass — and without these counts none of the three
+        // can be told apart from a log. `checkpoint=true` means the resumed history
+        // starts from the summary the model itself compacted.
         tracing::info!(
             target: "agent_core::restore",
             session = %session_id,
-            rows = rows.len(),
-            messages = messages.len(),
+            rows = report.rows,
+            messages = report.messages,
+            checkpoint = report.checkpoint,
+            dropped_summarized = report.dropped_summarized,
+            dropped_delegated = report.dropped_delegated,
+            dropped_system = report.dropped_system,
+            dropped_empty_assistant = report.dropped_empty_assistant,
+            dropped_tool_without_call = report.dropped_tool_without_call,
+            shape = %report.summary(),
             "restored conversation history"
         );
         if messages.is_empty() {
-            if !rows.is_empty() {
+            if report.rows > 0 {
                 tracing::warn!(
                     target: "agent_core::restore",
                     session = %session_id,
-                    rows = rows.len(),
+                    rows = report.rows,
                     "stored rows produced no conversation: the resumed turn starts empty"
                 );
             }
@@ -4238,6 +4302,66 @@ fn model_limits_from(request: &Request) -> Option<ModelLimits> {
         return None;
     }
     Some(limits.with_compaction_enabled(compaction_enabled_from(request)))
+}
+
+/// Store a compaction record, so a restart resumes on the history the model
+/// compacted rather than on the rows the summary replaced.
+///
+/// A failed write is a warning, not a failed turn: the conversation is already
+/// compacted in memory and the turn has to finish. What it costs is the next
+/// restart, which then restores the raw rows — so the warning names the cut point
+/// that will be lost.
+async fn persist_compactions(
+    bridge: Arc<HostBridge>,
+    session_id: &str,
+    outcomes: Vec<crate::compaction::CompactionOutcome>,
+) {
+    for outcome in outcomes {
+        let through = outcome.through_message_id.clone();
+        let retained = outcome.retained_ids.len();
+        let record = json!({
+            "id": uuid::Uuid::new_v4().to_string(),
+            "summary": outcome.summary,
+            "throughMessageId": outcome.through_message_id,
+            "tokensBefore": outcome.tokens_before,
+            "firstKeptMessageId": outcome.first_kept_message_id,
+            // Ids, not copies: the rows are the durable truth, and a restart
+            // re-reads them rather than a second serialization of them.
+            "details": {
+                "retainedMessageIds": outcome.retained_ids,
+                "source": "kernel",
+            },
+            "createdAt": crate::journal::iso8601(crate::message::now_ms()),
+        });
+        let request = json!({ "sessionId": session_id, "compaction": record });
+        match tokio::time::timeout(
+            HOST_PREPARE_TIMEOUT,
+            bridge.call("session.appendCompaction", request),
+        )
+        .await
+        {
+            Ok(Ok(_)) => tracing::info!(
+                target: "agent_core::sidecar",
+                session = %session_id,
+                through = %through,
+                retained,
+                "compaction checkpoint stored"
+            ),
+            Ok(Err(error)) => tracing::warn!(
+                target: "agent_core::sidecar",
+                session = %session_id,
+                through = %through,
+                %error,
+                "compaction checkpoint not stored: a restart will restore the summarized rows instead"
+            ),
+            Err(_) => tracing::warn!(
+                target: "agent_core::sidecar",
+                session = %session_id,
+                through = %through,
+                "compaction checkpoint write timed out: a restart will restore the summarized rows instead"
+            ),
+        }
+    }
 }
 
 /// Attributes everything a delegate emits to the `Task` call that started it, so

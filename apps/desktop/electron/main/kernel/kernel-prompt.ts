@@ -133,7 +133,6 @@ export const KNOWN_UNSUPPORTED_PROMPT_PARAMS = [
   "scratchDir",
   "visualizationsDir",
   "projectMemory",
-  "permissionMode",
   "streamRules",
   "remoteWorkspace",
   "infiniteProviderRetry",

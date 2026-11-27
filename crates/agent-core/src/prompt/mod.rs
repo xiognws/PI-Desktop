@@ -109,6 +109,9 @@ pub struct PromptInputs<'a> {
     /// The text is [`smart::SMART_ORCHESTRATOR`]; the kernel only decides whether
     /// the section belongs in this prompt.
     pub smart_orchestrator: Option<&'a str>,
+    /// The session runs unattended (`permissionMode: auto`): nobody is watching to
+    /// answer a question, so the model decides and says what it assumed.
+    pub unattended: bool,
 }
 
 impl PromptInputs<'_> {
@@ -127,9 +130,21 @@ impl PromptInputs<'_> {
             skills: &[],
             tool_activation: None,
             smart_orchestrator: None,
+            unattended: false,
         }
     }
 }
+
+/// Section that states the session is unattended.
+pub const UNATTENDED_SECTION: &str = "unattended";
+
+/// Why nothing may stop the turn to ask, and what to do instead.
+///
+/// A question in an unattended session is not a pause, it is a hang: no answer arrives
+/// until the user comes back, and the turn has already paid for the steps it took to ask.
+/// Deciding and naming the assumption costs one sentence and can be corrected; waiting
+/// costs the whole run.
+pub const UNATTENDED_INSTRUCTIONS: &str = "This session runs unattended at full automatic permission: nobody is watching to answer a question, and no approval prompt will appear. Decide with what you have, state the assumption in one line in your reply, and continue. Do not stop to ask for confirmation, and do not wait for a choice between options. If a decision is genuinely irreversible and the evidence points both ways, stop and say in your final message exactly what you would need to know — do not sit on a question.";
 
 /// Name of the composed section that keeps a turn's step count down.
 pub const WORKING_STYLE_SECTION: &str = "working_style";
@@ -233,6 +248,12 @@ pub fn compose_system_prompt(inputs: &PromptInputs<'_>) -> ComposedPrompt {
             text: context_parts.join("\n\n"),
         });
     }
+    if inputs.unattended {
+        sections.push(PromptSection {
+            name: UNATTENDED_SECTION,
+            text: UNATTENDED_INSTRUCTIONS.to_string(),
+        });
+    }
     if let Some(skills) = crate::skills::prompt_section(inputs.skills) {
         sections.push(PromptSection {
             name: "skills",
@@ -314,6 +335,23 @@ pub fn declared_tool_names(tools: &[ToolSpec]) -> Vec<&str> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn an_unattended_session_is_told_nothing_will_answer_a_question() {
+        // 全自动 means the user is not watching. A question in that session is not a
+        // pause, it is a hang: the turn has already paid for the steps it took to ask.
+        let mut inputs = PromptInputs::new(None);
+        inputs.unattended = true;
+        let composed = compose_system_prompt(&inputs);
+        let section = composed.section(UNATTENDED_SECTION).expect("an unattended section");
+        assert!(section.contains("unattended at full automatic permission"));
+        assert!(section.contains("Do not stop to ask for confirmation"));
+
+        // A normal session must not carry it: this text in an attended session would
+        // tell the model never to ask, which is exactly backwards.
+        let attended = compose_system_prompt(&PromptInputs::new(None));
+        assert!(attended.section(UNATTENDED_SECTION).is_none());
+    }
 
     #[test]
     fn the_skill_catalog_is_a_section_of_its_own() {
