@@ -1,0 +1,16 @@
+crates/agent-core/src/approval.rs
+  h_201ed4c689ac8b 193-206,380-382,386-393,404-441,573-629
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1371-1386
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f960ae7db67abe27a22d620ed2cd40700de68493",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
