@@ -1,0 +1,16 @@
+crates/agent-core/src/prompt/mod.rs
+  h_201ed4c689ac8b 112-114,133,138-148,251-256,339-355
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 405-411,458,1080-1081,1143,1160-1167,1367-1374,1685,1737-1738,1823-1824,1856-1862,1980,1987-1988,2025-2036,2039,2572-2581,2585-2593,2597,2601,4307-4366
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "70f3041658acd80e28e7e46629f490ebecf74f95",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
