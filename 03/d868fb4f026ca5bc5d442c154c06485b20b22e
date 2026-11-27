@@ -1,0 +1,24 @@
+apps/desktop/electron/autotest/service.ts
+  h_201ed4c689ac8b 4,7-11,66-87,274-304
+apps/desktop/package.json
+  h_201ed4c689ac8b 295-298
+crates/autotest-core/src/db.rs
+  h_201ed4c689ac8b 31-34,45-47,84-92
+docs/adr/0411-autotest-service-in-rust.md
+  h_201ed4c689ac8b 1-85
+docs/adr/README.md
+  h_201ed4c689ac8b 451
+scripts/package-windows.mjs
+  h_201ed4c689ac8b 305-315
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "03d868fb4f026ca5bc5d442c154c06485b20b22e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
