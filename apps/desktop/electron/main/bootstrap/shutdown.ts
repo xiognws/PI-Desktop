@@ -91,6 +91,18 @@ export function registerShutdownHandlers({
     // behavior does. Under "tray" a window destroyed for any reason must not
     // take the app down (the tray click recreates it); otherwise closing the
     // last window on Windows/Linux exits the app as before.
+    //
+    // Recorded even when it does not quit: "the app quit by itself" and "the app quit
+    // because its last window went away" are otherwise indistinguishable afterwards,
+    // and the second is an ordinary close nobody reports as a crash.
+    logger.app("lifecycle", "info", "last window closed", {
+      event: "app.windowAllClosed",
+      data: {
+        platform: process.platform,
+        closeBehavior: state.closeBehavior,
+        tray: Boolean(state.tray),
+      },
+    });
     if (process.platform === "darwin") return;
     if (state.closeBehavior === "tray" && state.tray) return;
     app.quit();
@@ -104,6 +116,13 @@ export function registerShutdownHandlers({
     if (state.shutdownComplete) return;
     event.preventDefault();
     if (state.shutdownPromise || quitConfirmationPending) return;
+    // First line of the sequence: a run marker cleared with no `app.shutdown` after this
+    // means the process died inside shutdown, which is a different bug from a crash and
+    // was previously indistinguishable from one.
+    logger.app("lifecycle", "info", "shutdown sequence started", {
+      event: "app.shutdown.start",
+      data: { closeBehavior: state.closeBehavior, quitting: state.quitting },
+    });
 
     // Show a confirmation dialog on the first explicit quit (Cmd+Q, tray quit,
     // application-menu Quit). The data-saving shutdown runs after confirmation.

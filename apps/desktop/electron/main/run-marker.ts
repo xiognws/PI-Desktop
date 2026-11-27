@@ -54,6 +54,7 @@ export function runMarkerPath(directory: string): string {
 
 export function setRunMarkerDirectory(directory: string): void {
   markerDirectory = directory;
+  installExitRecorder();
 }
 
 /** Parse a stored marker; anything unusable reads as "no marker". */
@@ -217,6 +218,24 @@ export function recordExitReason(reason: string): void {
   } catch {
     // Nothing to do: the caller is already leaving.
   }
+}
+
+/** Registered once, from the first marker directory the process gets. */
+let exitRecorderInstalled = false;
+
+/**
+ * Write one line for every process exit, whatever caused it.
+ *
+ * `exit` runs for `process.exit()`, for a drained event loop, and after a fatal handler —
+ * but not for a hard kill, so a missing line is itself evidence. Without it the 14:22:40
+ * death left no trace anywhere: no shutdown, no before-quit, no error, no dump.
+ */
+function installExitRecorder(): void {
+  if (exitRecorderInstalled) return;
+  exitRecorderInstalled = true;
+  process.on("exit", (code) => {
+    recordExitReason(`process-exit code=${code}`);
+  });
 }
 
 /** The most recent deliberate exit, for the next start's boot line. */

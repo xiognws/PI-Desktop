@@ -99,3 +99,48 @@ test("macOS does not report a missing handler, which lives inside the bundle", (
     assert.deepEqual(health, { ok: true, problems: [] });
   });
 });
+
+test("Electron 44 links Crashpad, so no handler file is expected", () => {
+  // Measured on 44.9.3: the dist ships 19 files with no chrome_crashpad_handler.exe, and
+  // electron.exe contains "crashpad". Demanding the file made every boot warn about a
+  // crash it could not capture, which is how a real report gets ignored.
+  withDirs(({ dumps, executable }) => {
+    const health = checkCrashReporterHealth({
+      crashDumpsDirectory: dumps,
+      executableDirectory: executable,
+      started: true,
+      platform: "win32",
+      electronVersion: "44.9.3",
+    });
+    assert.deepEqual(health, { ok: true, problems: [] });
+  });
+});
+
+test("an Electron that ships the handler separately still reports it missing", () => {
+  withDirs(({ dumps, executable }) => {
+    const health = checkCrashReporterHealth({
+      crashDumpsDirectory: dumps,
+      executableDirectory: executable,
+      started: true,
+      platform: "win32",
+      electronVersion: "22.3.27",
+    });
+    assert.equal(health.ok, false);
+    assert.match(health.problems[0], /crash handler is missing/);
+  });
+});
+
+test("an unreadable Electron version keeps the old expectation", () => {
+  // A check that cannot tell which layout it is looking at must not silence itself.
+  withDirs(({ dumps, executable }) => {
+    const health = checkCrashReporterHealth({
+      crashDumpsDirectory: dumps,
+      executableDirectory: executable,
+      started: true,
+      platform: "win32",
+      electronVersion: "not-a-version",
+    });
+    assert.equal(health.ok, false);
+    assert.match(health.problems[0], /crash handler is missing/);
+  });
+});

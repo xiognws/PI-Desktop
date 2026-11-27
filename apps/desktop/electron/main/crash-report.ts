@@ -315,6 +315,21 @@ export type CrashReporterHealth = {
   problems: string[];
 };
 
+/** First Electron release that links Crashpad into the main binary on Windows. */
+const BUNDLED_CRASHPAD_FROM_MAJOR = 30;
+
+/**
+ * Whether this Electron carries Crashpad inside its executable.
+ *
+ * An unreadable or absent version keeps the old expectation: a check that cannot tell
+ * must not silence itself, or the day the handler is genuinely missing nobody learns.
+ */
+function crashpadIsBundled(version: string | undefined): boolean {
+  const source = version ?? process.versions.electron ?? "";
+  const major = Number.parseInt(source.split(".")[0] ?? "", 10);
+  return Number.isFinite(major) && major >= BUNDLED_CRASHPAD_FROM_MAJOR;
+}
+
 export function checkCrashReporterHealth(options: {
   /** The dumps directory the reporter was pointed at. */
   crashDumpsDirectory: string;
@@ -323,6 +338,8 @@ export function checkCrashReporterHealth(options: {
   /** Whether `crashReporter.start()` ran without throwing. */
   started: boolean;
   platform?: NodeJS.Platform;
+  /** Runtime Electron version; defaults to the running one. */
+  electronVersion?: string;
 }): CrashReporterHealth {
   const platform = options.platform ?? process.platform;
   const problems: string[] = [];
@@ -348,7 +365,13 @@ export function checkCrashReporterHealth(options: {
 
   // macOS carries the handler inside the bundle rather than beside the executable,
   // so the check would report a false gap; the two other platforms do not.
-  if (platform === "win32" || platform === "linux") {
+  //
+  // Since Electron 30 Crashpad is linked into the main binary on Windows, so the
+  // separate handler file no longer exists and requiring it turned every boot into a
+  // false "crash handler is missing" warning — which is worse than no check, because a
+  // real report then reads as routine noise. Measured on Electron 44.9.3: the dist
+  // holds 19 files, none of them a handler, and `electron.exe` contains "crashpad".
+  if ((platform === "win32" || platform === "linux") && !crashpadIsBundled(options.electronVersion)) {
     const handler = join(
       options.executableDirectory,
       platform === "win32" ? "chrome_crashpad_handler.exe" : "chrome_crashpad_handler",
