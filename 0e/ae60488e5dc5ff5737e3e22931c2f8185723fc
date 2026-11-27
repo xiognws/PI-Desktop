@@ -1,0 +1,14 @@
+apps/desktop/electron/main/runtime/session-launch.ts
+  h_201ed4c689ac8b 15,17-36,38-40,45-46,48-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0eae60488e5dc5ff5737e3e22931c2f8185723fc",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
