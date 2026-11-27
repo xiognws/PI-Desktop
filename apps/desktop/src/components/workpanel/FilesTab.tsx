@@ -12,7 +12,6 @@ import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { Markdown } from "../Markdown";
 import { fileDirOf } from "../../lib/chat-links";
-import { languageForFilePath } from "../../lib/file-language";
 import { Button, cx } from "../ui";
 import { TooltipButton } from "../ui";
 import {
@@ -35,12 +34,44 @@ import { WorkTabEmpty } from "./WorkTabEmpty";
 
 const VIEWER_LINE_CAP = 5000;
 
+const EXT_LANG: Record<string, string> = {
+  ts: "typescript",
+  tsx: "tsx",
+  js: "javascript",
+  jsx: "jsx",
+  mjs: "javascript",
+  cjs: "javascript",
+  json: "json",
+  css: "css",
+  html: "html",
+  md: "markdown",
+  rs: "rust",
+  py: "python",
+  go: "go",
+  sh: "shellscript",
+  zsh: "shellscript",
+  bash: "shellscript",
+  yml: "yaml",
+  yaml: "yaml",
+  toml: "toml",
+  sql: "sql",
+  swift: "swift",
+  kt: "kotlin",
+  java: "java",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  hpp: "cpp",
+};
+
 function langForPath(path: string): string | null {
-  return resolveLang(languageForFilePath(path) ?? "");
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const lang = EXT_LANG[ext] ?? ext;
+  return resolveLang(lang);
 }
 
 function isMarkdownPath(path: string): boolean {
-  return /\.(?:md|markdown|mdx)$/i.test(path);
+  return /\.(?:md|markdown)$/i.test(path);
 }
 
 function isMp4(path: string, mimeType?: string): boolean {

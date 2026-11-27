@@ -3191,6 +3191,43 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": true, "count": recovered.len() }))
         }
+        "session.ledger.append" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let text = params
+                .get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "text required", "INVALID_PARAMS"))?;
+            let kind = params
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .unwrap_or("turn");
+            let turn_id = params
+                .get("turnId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty());
+            let st = state.lock().await;
+            let entry = crate::session_ledger::append(&st.db, session_id, turn_id, kind, text)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true, "entry": entry }))
+        }
+        "session.ledger.list" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let limit = params
+                .get("limit")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(40)
+                .clamp(1, 200) as usize;
+            let st = state.lock().await;
+            let entries = crate::session_ledger::recent(&st.db, session_id, limit)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "entries": entries }))
+        }
         "session.appendCompaction" => {
             let session_id = params
                 .get("sessionId")

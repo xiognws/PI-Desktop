@@ -816,6 +816,9 @@ pub(crate) fn converge_current_shape(conn: &Connection) -> Result<()> {
     // v34's shape: the session's Smart-mode snapshot. Additive and NULL-means-off,
     // so re-asserting it on a current database rewrites nothing.
     super::ensure_smart_mode_column(&tx)?;
+    // v35's shape: the session ledger. Additive, so re-asserting it on a current
+    // database creates an empty table and rewrites nothing.
+    super::ensure_session_ledger_table(&tx)?;
     tx.commit()?;
     // v28's step is a data reconciliation, not a table change: replaying it on
     // an already-reconciled database finds no groups and writes nothing. A

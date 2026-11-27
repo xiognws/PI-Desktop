@@ -437,4 +437,16 @@ CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_queue
   WHERE execution_state IN ('queued', 'running');
 CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_id
   ON plan_approvals(execution_id) WHERE execution_id IS NOT NULL;
+
+-- Schema v35: the session ledger (ADR 0412). What a session has already done,
+-- in its own words, kept where compaction and ageing cannot reach it.
+CREATE TABLE session_ledger (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  turn_id    TEXT,
+  kind       TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX session_ledger_session ON session_ledger (session_id, id);
 "#;

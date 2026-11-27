@@ -30,6 +30,7 @@ mod scheduled;
 mod scratch;
 mod secrets;
 mod session_collaboration;
+mod session_ledger;
 mod session_search;
 mod session_worktrees;
 mod sessions;

@@ -225,10 +225,10 @@ impl Database {
             // is equivalent: MEMORIES_DDL is IF NOT EXISTS. v27 is the session
             // Fast mode switch. v28 reconciles project path spellings and v29
             // adds staged mode runs, both upstream. The fork's own steps follow
-            // at v30..v34: the memory store, the reply-text repair, the trigram
-            // keyword index, the retirement of the flat entry list, and the
-            // Smart-mode session column.
-            26..=33 => {}
+            // at v30..v35: the memory store, the reply-text repair, the trigram
+            // keyword index, the retirement of the flat entry list, the
+            // Smart-mode session column, and the session ledger.
+            26..=34 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -336,6 +336,12 @@ impl Database {
         // mode). Additive — a session without a snapshot keeps one model.
         if migrated_version == 33 {
             super::migrate_v33_to_v34(&conn, path)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        }
+        // The session ledger (ADR 0410): additive, empty, and written by the
+        // kernel from the turn after it lands.
+        if migrated_version == 34 {
+            super::migrate_v34_to_v35(&conn, path)?;
         }
         // A stamp is not proof of shape. The memory branch stamped v28/v29 with
         // the memory tables but no `sessions.fast_mode`, while the merged line put

@@ -449,3 +449,4 @@ Each ADR includes:
 | 0409 | [Token budget defaults are global, and they are sized, not inherited](0409-token-budget-defaults.md) | Accepted (related 0405, 0404) |
 | 0410 | [The window has surfaces, and the chat sidebar is not the window](0410-surface-model.md) | Accepted |
 | 0411 | [The AutoTest platform service is a Rust binary, not a Python process](0411-autotest-service-in-rust.md) | Accepted |
+| 0412 | [A session keeps a ledger of what it finished](0412-session-ledger.md) | Accepted (related 0062, 0405) |

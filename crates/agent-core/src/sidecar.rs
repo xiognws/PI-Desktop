@@ -1556,6 +1556,10 @@ impl Sidecar {
         // that wants to skip it says `memoryRecall: false`. Gating recall behind
         // an opt-in flag meant memory silently stopped working the moment this
         // kernel started serving prompts, because main never sends the flag.
+        // What this session has already done, in a few lines the request carries
+        // whatever the transcript has been through. Read per turn, because the
+        // entry that matters most is the one the previous turn just wrote.
+        let ledger_prefix = self.ledger_prefix(&session_id).await;
         let memory_prefix = if matches!(mode, crate::prompt::SessionMode::Agent)
             && request.params.get("memoryRecall").and_then(Value::as_bool) != Some(false)
         {
@@ -1572,6 +1576,15 @@ impl Sidecar {
             .await
         } else {
             None
+        };
+        // One prefix, two sources: the ledger first (what this session finished),
+        // then recalled memories (what applies to this prompt). Both ride on the
+        // last user message, so the row the renderer draws stays what the user
+        // typed.
+        let memory_prefix = match (ledger_prefix, memory_prefix) {
+            (Some(ledger), Some(memory)) => Some(format!("{ledger}\n\n{memory}")),
+            (Some(ledger), None) => Some(ledger),
+            (None, memory) => memory,
         };
         // The session checklist is not rendered here. It belongs to host-core —
         // `TodoWrite` writes `session_todo`, announces `todos.changed`, and the
@@ -1836,6 +1849,9 @@ impl Sidecar {
         let review_session_id = session_id.clone();
         let compaction_bridge = self.bridge.clone();
         let compaction_outcomes = compaction_log.clone();
+        let ledger_bridge = self.bridge.clone();
+        let ledger_session_id = session_id.clone();
+        let ledger_turn_id = turn_id.clone();
         tokio::spawn(async move {
             let mut transcript = task_session.transcript.lock().await;
             let outcome = engine
@@ -1866,7 +1882,21 @@ impl Sidecar {
                     cancel,
                 )
                 .await;
+            // One entry per finished turn, written from the transcript before it is
+            // released: this is what a resumed session reads when the transcript it
+            // gets back no longer says how the turn ended.
+            let ledger_text = ledger_entry_for_turn(transcript.messages());
             drop(transcript);
+            if let Some(text) = ledger_text {
+                persist_ledger_entry(
+                    ledger_bridge.clone(),
+                    &ledger_session_id,
+                    &ledger_turn_id,
+                    "turn",
+                    text,
+                )
+                .await;
+            }
             // The store keeps the checkpoint, not only the transcript: without this
             // write the next restart rebuilds the rows the summary replaced.
             let outcomes = match compaction_outcomes.lock() {
@@ -2437,6 +2467,45 @@ impl Sidecar {
     /// wrapped in `status`, because `api.ts` destructures `{ status }` and reads
     /// `status.isRunning`. A flat object left the renderer with `undefined` and
     /// an idle session that never looked idle.
+    /// Read this session's ledger and render it as a request prefix.
+    ///
+    /// A host that does not implement the ledger, or answers slowly, yields no
+    /// block: the ledger improves a resume, and must never be a precondition for
+    /// prompting at all.
+    async fn ledger_prefix(&self, session_id: &str) -> Option<String> {
+        let request = json!({
+            "sessionId": session_id,
+            "limit": LEDGER_REQUEST_ENTRIES,
+        });
+        let response = match tokio::time::timeout(
+            HOST_PREPARE_TIMEOUT,
+            self.bridge.call("session.ledger.list", request),
+        )
+        .await
+        {
+            Ok(Ok(response)) => response,
+            Ok(Err(error)) => {
+                tracing::debug!(
+                    target: "agent_core::sidecar",
+                    session = %session_id,
+                    %error,
+                    "session ledger unavailable for this request"
+                );
+                return None;
+            }
+            Err(_) => {
+                tracing::warn!(
+                    target: "agent_core::sidecar",
+                    session = %session_id,
+                    "session ledger read timed out; continuing without it"
+                );
+                return None;
+            }
+        };
+        let entries = response.get("entries").and_then(Value::as_array)?;
+        render_ledger_block(entries)
+    }
+
     /// Record the system prompt for this turn, once per distinct prompt.
     ///
     /// A write that fails fails the request. The store would otherwise hold a
@@ -4378,6 +4447,198 @@ async fn persist_compactions(
     }
 }
 
+/// Ledger entries a request carries. Small on purpose: the ledger is the
+/// conclusion, and the transcript is where the evidence still lives.
+const LEDGER_REQUEST_ENTRIES: u64 = 24;
+/// Characters one rendered entry may take in the request.
+const LEDGER_ENTRY_REQUEST_CHARS: usize = 400;
+/// Characters the whole block may take. Twenty-four full entries would otherwise
+/// be a second transcript, which is the thing compaction was avoiding.
+const LEDGER_BLOCK_CHARS: usize = 3_000;
+/// Characters of a worker's report that survive into an entry.
+const LEDGER_REPORT_CHARS: usize = 240;
+
+/// Store one ledger entry.
+///
+/// A failed write is a warning, not a failed turn: the turn already happened, and
+/// the next one starts from whatever the store does hold.
+async fn persist_ledger_entry(
+    bridge: Arc<HostBridge>,
+    session_id: &str,
+    turn_id: &str,
+    kind: &str,
+    text: String,
+) {
+    let request = json!({
+        "sessionId": session_id,
+        "turnId": turn_id,
+        "kind": kind,
+        "text": text,
+    });
+    match tokio::time::timeout(
+        HOST_PREPARE_TIMEOUT,
+        bridge.call("session.ledger.append", request),
+    )
+    .await
+    {
+        Ok(Ok(_)) => tracing::debug!(
+            target: "agent_core::sidecar",
+            session = %session_id,
+            kind,
+            "ledger entry stored"
+        ),
+        Ok(Err(error)) => tracing::warn!(
+            target: "agent_core::sidecar",
+            session = %session_id,
+            kind,
+            %error,
+            "ledger entry not stored: a resumed session will not know how this turn ended"
+        ),
+        Err(_) => tracing::warn!(
+            target: "agent_core::sidecar",
+            session = %session_id,
+            kind,
+            "ledger entry write timed out: a resumed session will not know how this turn ended"
+        ),
+    }
+}
+
+/// Summarize a turn boundary as one ledger entry, without asking the model.
+///
+/// Rules only, because the alternative is a second paid request per turn. What it
+/// keeps is what a resumed model needs and cannot reconstruct from an aged
+/// transcript: what was asked, what was concluded, what ran, and what the workers
+/// reported — the last one matters most in smart mode, where the parent never
+/// holds a worker's transcript at all.
+fn ledger_entry_for_turn(transcript: &[Message]) -> Option<String> {
+    if transcript.is_empty() {
+        return None;
+    }
+    let tail = &transcript[transcript.len().saturating_sub(60)..];
+    let asked = tail
+        .iter()
+        .rev()
+        .find(|message| message.role == crate::message::Role::User)
+        .map(|message| head(&message.text(), 300));
+    let done = tail
+        .iter()
+        .rev()
+        .find(|message| message.role == crate::message::Role::Assistant && !message.text().trim().is_empty())
+        .map(|message| head(&message.text(), 500));
+    // Tool tally: names with a count, and how many of them failed. A model reading
+    // "Bash x12 (2 errors)" knows where to look; the twelve outputs are gone.
+    let mut tools: Vec<(String, usize)> = Vec::new();
+    let mut errors = 0usize;
+    let mut reports: Vec<String> = Vec::new();
+    for message in tail {
+        for result in message.tool_results() {
+            if result.is_error {
+                errors += 1;
+            }
+            match tools.iter_mut().find(|(name, _)| name == &result.name) {
+                Some((_, count)) => *count += 1,
+                None => tools.push((result.name.clone(), 1)),
+            }
+            if result.name == "Task" || result.name == "TaskWait" {
+                let report = head(&result.content, LEDGER_REPORT_CHARS).replace('\n', " ");
+                if !report.trim().is_empty() {
+                    reports.push(report);
+                }
+            }
+        }
+    }
+    let tool_line = if tools.is_empty() {
+        None
+    } else {
+        let names: Vec<String> = tools
+            .iter()
+            .map(|(name, count)| format!("{name} x{count}"))
+            .collect();
+        Some(format!(
+            "Ran: {}{}",
+            names.join(", "),
+            if errors > 0 {
+                format!(" ({errors} errors)")
+            } else {
+                String::new()
+            }
+        ))
+    };
+    let mut lines: Vec<String> = Vec::new();
+    if let Some(asked) = asked.filter(|text| !text.trim().is_empty()) {
+        lines.push(format!("Asked: {asked}"));
+    }
+    if let Some(done) = done.filter(|text| !text.trim().is_empty()) {
+        lines.push(format!("Said: {done}"));
+    }
+    if let Some(tool_line) = tool_line {
+        lines.push(tool_line);
+    }
+    if !reports.is_empty() {
+        lines.push(format!("Workers: {}", reports.join(" | ")));
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    Some(head(&lines.join("\n"), 1_500))
+}
+
+/// Render the stored entries as the block a request carries.
+///
+/// The newest entries win the budget: a ledger trimmed to its oldest lines tells
+/// the model what the session started as, not what it just finished.
+fn render_ledger_block(entries: &[Value]) -> Option<String> {
+    let mut rendered: Vec<String> = Vec::new();
+    let mut used = 0usize;
+    for entry in entries.iter().rev() {
+        let text = entry.get("text").and_then(Value::as_str).unwrap_or("").trim();
+        if text.is_empty() {
+            continue;
+        }
+        let kind = entry.get("kind").and_then(Value::as_str).unwrap_or("turn");
+        let stamp = entry
+            .get("createdAt")
+            .and_then(Value::as_i64)
+            .map(|ms| {
+                let iso = crate::journal::iso8601(ms);
+                iso.get(5..16).unwrap_or("").replace('T', " ")
+            })
+            .unwrap_or_default();
+        let line = format!(
+            "- [{kind}{}] {}",
+            if stamp.is_empty() {
+                String::new()
+            } else {
+                format!(" {stamp}")
+            },
+            head(text, LEDGER_ENTRY_REQUEST_CHARS)
+        );
+        if used + line.len() > LEDGER_BLOCK_CHARS && !rendered.is_empty() {
+            break;
+        }
+        used += line.len() + 1;
+        rendered.push(line);
+    }
+    if rendered.is_empty() {
+        return None;
+    }
+    rendered.reverse();
+    Some(format!(
+        "[session ledger] What this session has already done, oldest first. This record outlives restarts and compaction, so treat it as the authority on finished work: do not redo an item here, and continue from the last one.\n{}",
+        rendered.join("\n")
+    ))
+}
+
+/// First `limit` characters, on a character boundary.
+fn head(text: &str, limit: usize) -> String {
+    if text.chars().count() <= limit {
+        return text.to_string();
+    }
+    let mut out: String = text.chars().take(limit).collect();
+    out.push('…');
+    out
+}
+
 /// Attributes everything a delegate emits to the `Task` call that started it, so
 /// the renderer can nest the rows under it and the parent's history stays one
 /// stream.
@@ -5492,6 +5753,100 @@ mod prompt_parameter_tests {
             !delegate_mechanical_from(&prompt_request(params)),
             "a blank worker key is not a worker"
         );
+    }
+
+    /// A finished turn leaves one entry a resumed session can read: what was
+    /// asked, what was concluded, what ran. Those are exactly the things an aged
+    /// transcript no longer says.
+    #[test]
+    fn a_turn_boundary_becomes_one_ledger_entry() {
+        let mut transcript = vec![Message::user_text("port the compaction path")];
+        let mut assistant = Message::new(crate::message::Role::Assistant);
+        assistant.push_text("Compaction now stores its checkpoint; three tests remain.");
+        transcript.push(assistant);
+        let mut caller = Message::new(crate::message::Role::Assistant);
+        caller.push_tool_call(crate::message::ToolCall {
+            id: "c1".into(),
+            name: "Bash".into(),
+            arguments: json!({}),
+            raw_arguments: None,
+        });
+        transcript.push(caller);
+        transcript.push(Message::tool_result(crate::message::ToolResult {
+            call_id: "c1".into(),
+            name: "Bash".into(),
+            content: "ok".into(),
+            is_error: false,
+            truncated: false,
+        }));
+
+        let entry = ledger_entry_for_turn(&transcript).expect("a turn with content");
+        assert!(entry.contains("Asked: port the compaction path"), "{entry}");
+        assert!(entry.contains("Said: Compaction now stores"), "{entry}");
+        assert!(entry.contains("Ran: Bash x1"), "{entry}");
+    }
+
+    /// A worker's report is the only part of its work the parent ever held, so it
+    /// is the part that has to survive into the ledger.
+    #[test]
+    fn a_delegation_report_reaches_the_entry() {
+        let mut transcript = vec![Message::user_text("research the memory algorithm")];
+        let mut caller = Message::new(crate::message::Role::Assistant);
+        caller.push_tool_call(crate::message::ToolCall {
+            id: "c1".into(),
+            name: "Task".into(),
+            arguments: json!({}),
+            raw_arguments: None,
+        });
+        transcript.push(caller);
+        transcript.push(Message::tool_result(crate::message::ToolResult {
+            call_id: "c1".into(),
+            name: "Task".into(),
+            content: "Delegation d1 settled: the explorer found three candidate algorithms.".into(),
+            is_error: false,
+            truncated: false,
+        }));
+
+        let entry = ledger_entry_for_turn(&transcript).expect("an entry");
+        assert!(entry.contains("Workers:"), "{entry}");
+        assert!(entry.contains("three candidate algorithms"), "{entry}");
+    }
+
+    /// The block is the newest entries, and it stays inside its budget: a ledger
+    /// too big for the request is the problem it exists to solve.
+    #[test]
+    fn the_ledger_block_keeps_the_newest_entries_inside_its_budget() {
+        let filler = "x".repeat(500);
+        let entries: Vec<Value> = (0..12)
+            .map(|index| {
+                json!({
+                    "id": index,
+                    "sessionId": "s",
+                    "kind": "turn",
+                    "text": format!("entry {index} {filler}"),
+                    "createdAt": 1_763_000_000_000i64,
+                })
+            })
+            .collect();
+        let block = render_ledger_block(&entries).expect("a block");
+        assert!(block.starts_with("[session ledger]"));
+        assert!(block.contains("entry 11"), "the newest entry survives");
+        assert!(
+            !block.contains("entry 0 "),
+            "the oldest entries are the ones the budget drops"
+        );
+        assert!(
+            block.chars().count() <= LEDGER_BLOCK_CHARS + 600,
+            "block took {} chars",
+            block.chars().count()
+        );
+    }
+
+    #[test]
+    fn an_empty_ledger_adds_nothing_to_the_request() {
+        assert!(render_ledger_block(&[]).is_none());
+        assert!(render_ledger_block(&[json!({"kind": "turn", "text": "   "})]).is_none());
+        assert!(ledger_entry_for_turn(&[]).is_none());
     }
 
     /// The shape main sends: a models.dev window on the provider, and whatever the
