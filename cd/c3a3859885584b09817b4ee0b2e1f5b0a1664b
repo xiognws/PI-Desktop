@@ -1,0 +1,40 @@
+docs/adr/README.md
+  h_201ed4c689ac8b 452
+crates/host-core/src/main.rs
+  h_201ed4c689ac8b 33
+crates/host-core/src/db/session_ledger_migration.rs
+  h_201ed4c689ac8b 1-48
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 3194-3229
+  h_201ed4c689ac8b 3193
+crates/host-core/src/db/repositories.rs
+  h_201ed4c689ac8b 228-231,339-344
+crates/host-core/src/db.rs
+  h_201ed4c689ac8b 10,30,59
+crates/host-core/src/db/migrations.rs
+  h_201ed4c689ac8b 819-821
+docs/adr/0412-session-ledger.md
+  h_201ed4c689ac8b 1-92
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1559-1562,1580-1588,1852-1854,1885-1888,1890-1899,2470-2508,4450-4617,4619-4623,4625-4639,5758-5841,5843-5849
+  h_201ed4c689ac8b 4618,4624,4640-4641,5842,5850-5851
+crates/host-core/src/db/session_ledger_test.rs
+  h_201ed4c689ac8b 1-108
+crates/host-core/src/session_ledger.rs
+  h_201ed4c689ac8b 1-219
+crates/host-core/src/db/schema.rs
+  h_201ed4c689ac8b 440-451
+apps/desktop/src/components/workpanel/FilesTab.tsx
+  h_201ed4c689ac8b 37-66,68-70,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "cdc3a3859885584b09817b4ee0b2e1f5b0a1664b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
