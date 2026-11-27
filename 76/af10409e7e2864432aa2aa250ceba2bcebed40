@@ -1,0 +1,14 @@
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1800-1811,1897,1928-1937,1953-1972,4612-4624,4666,5866-5877
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "76af10409e7e2864432aa2aa250ceba2bcebed40",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
