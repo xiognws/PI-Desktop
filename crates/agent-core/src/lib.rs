@@ -74,6 +74,7 @@ pub mod tool;
 pub mod tool_activation;
 pub mod tool_use;
 pub mod turn;
+pub mod utf8_stream;
 pub mod verify;
 
 pub use ask::{AskBroker, AskRequest, AskTool, ASK_TOOL_NAME};

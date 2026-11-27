@@ -399,6 +399,11 @@ async fn pump(
     let mut chunks = 0usize;
     let mut bytes = 0usize;
     let mut tail = String::new();
+    // Chunk boundaries land inside characters: a three-byte CJK character can
+    // arrive as two or three reads. Decode with the split tail carried over
+    // instead of judging every chunk on its own — lossy-per-chunk is what wrote
+    // `���` into a transcript where a `但` belonged.
+    let mut utf8 = crate::utf8_stream::Utf8Stream::new();
 
     loop {
         if cancel.is_cancelled() {
@@ -413,7 +418,7 @@ async fn pump(
             Ok(Some(chunk_bytes)) => {
                 chunks += 1;
                 bytes += chunk_bytes.len();
-                let text = String::from_utf8_lossy(&chunk_bytes);
+                let text = utf8.push(&chunk_bytes);
                 tail.push_str(&text);
                 if tail.chars().count() > 400 {
                     let keep: String = tail.chars().rev().take(400).collect();
@@ -446,6 +451,27 @@ async fn pump(
         for event in events {
             finished |= matches!(event, StreamEvent::Finish(_));
             if tx.send(event).await.is_err() {
+                return;
+            }
+        }
+    }
+
+    // A body that stopped inside a character: the held bytes are all that is left
+    // of it, so this is the one place a replacement character is honest.
+    let remainder = utf8.finish();
+    if !remainder.is_empty() {
+        tail.push_str(&remainder);
+        match decoder.push_chunk(&remainder) {
+            Ok(events) => {
+                for event in events {
+                    finished |= matches!(event, StreamEvent::Finish(_));
+                    if tx.send(event).await.is_err() {
+                        return;
+                    }
+                }
+            }
+            Err(error) => {
+                let _ = tx.send(provider_error_event(&error)).await;
                 return;
             }
         }
