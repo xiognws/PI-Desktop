@@ -1,0 +1,92 @@
+crates/autotest-core/src/api/mod.rs
+  h_201ed4c689ac8b 135-136
+crates/autotest-core/src/knowledge/chunk.rs
+  h_201ed4c689ac8b 1-261
+crates/autotest-core/src/knowledge/extract.rs
+  h_201ed4c689ac8b 1-909
+crates/autotest-core/src/knowledge/inflate.rs
+  h_201ed4c689ac8b 1-314
+crates/autotest-core/src/knowledge/mod.rs
+  h_201ed4c689ac8b 1-30
+crates/autotest-core/src/knowledge/office_fixtures.rs
+  h_201ed4c689ac8b 1-146
+crates/autotest-core/src/knowledge/routes.rs
+  h_201ed4c689ac8b 1-772
+crates/autotest-core/src/knowledge/sha256.rs
+  h_201ed4c689ac8b 1-137
+crates/autotest-core/src/knowledge/store.rs
+  h_201ed4c689ac8b 1-515
+crates/autotest-core/src/knowledge/text.rs
+  h_201ed4c689ac8b 1-54
+crates/autotest-core/src/knowledge/zip.rs
+  h_201ed4c689ac8b 1-206
+crates/autotest-core/src/main.rs
+  h_201ed4c689ac8b 18,24
+crates/autotest-core/src/workflow/analysis.rs
+  h_201ed4c689ac8b 1-236
+crates/autotest-core/src/workflow/assertion_gen.rs
+  h_201ed4c689ac8b 1-476
+crates/autotest-core/src/workflow/bugs.rs
+  h_201ed4c689ac8b 1-234
+crates/autotest-core/src/workflow/cases.rs
+  h_201ed4c689ac8b 1-735
+crates/autotest-core/src/workflow/consistency.rs
+  h_201ed4c689ac8b 1-598
+crates/autotest-core/src/workflow/dut_contract.rs
+  h_201ed4c689ac8b 1-342
+crates/autotest-core/src/workflow/exception_matrix.rs
+  h_201ed4c689ac8b 1-429
+crates/autotest-core/src/workflow/execution.rs
+  h_201ed4c689ac8b 1-145
+crates/autotest-core/src/workflow/extract.rs
+  h_201ed4c689ac8b 1-283
+crates/autotest-core/src/workflow/grounding.rs
+  h_201ed4c689ac8b 1-407
+crates/autotest-core/src/workflow/hashes.rs
+  h_201ed4c689ac8b 1-162
+crates/autotest-core/src/workflow/knowledge_bridge.rs
+  h_201ed4c689ac8b 1-159
+crates/autotest-core/src/workflow/mod.rs
+  h_201ed4c689ac8b 1-52
+crates/autotest-core/src/workflow/persist.rs
+  h_201ed4c689ac8b 1-325
+crates/autotest-core/src/workflow/prd.rs
+  h_201ed4c689ac8b 1-349
+crates/autotest-core/src/workflow/prompts.rs
+  h_201ed4c689ac8b 1-178
+crates/autotest-core/src/workflow/pyrepr.rs
+  h_201ed4c689ac8b 1-74
+crates/autotest-core/src/workflow/report.rs
+  h_201ed4c689ac8b 1-341
+crates/autotest-core/src/workflow/review.rs
+  h_201ed4c689ac8b 1-155
+crates/autotest-core/src/workflow/routes.rs
+  h_201ed4c689ac8b 1-272
+crates/autotest-core/src/workflow/routes_author.rs
+  h_201ed4c689ac8b 1-403
+crates/autotest-core/src/workflow/routes_design.rs
+  h_201ed4c689ac8b 1-497
+crates/autotest-core/src/workflow/routes_meta.rs
+  h_201ed4c689ac8b 1-333
+crates/autotest-core/src/workflow/routes_report.rs
+  h_201ed4c689ac8b 1-369
+crates/autotest-core/src/workflow/routes_runs.rs
+  h_201ed4c689ac8b 1-502
+crates/autotest-core/src/workflow/scripts.rs
+  h_201ed4c689ac8b 1-290
+crates/autotest-core/src/workflow/store.rs
+  h_201ed4c689ac8b 1-607
+crates/autotest-core/src/workflow/vacuity.rs
+  h_201ed4c689ac8b 1-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8ab8fd76305b2d7702e44dd6deb83b717fdf53de",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
