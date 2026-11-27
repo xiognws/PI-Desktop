@@ -599,7 +599,10 @@ makes every step of a short turn pay for it. A window below the ceiling keeps it
 own ratio, so a 32k model still compacts at roughly 12k rather than being asked to
 hold 128k it cannot. The retained tail and the carried user message are clamped to
 the trigger for the same reason: a checkpoint that keeps half a 600k window cannot
-bring the transcript back under it. Thresholds, ageing and every related budget are recorded
+bring the transcript back under it. The prompt being sent is counted against that
+budget, but it is never part of the history a checkpoint rewrites: a prompt that is
+itself over the trigger compacts the history behind it and is then sent as written,
+because a summary must not become the only copy of what the user just typed. Thresholds, ageing and every related budget are recorded
 with their measured justification in [ADR 0409](../adr/0409-token-budget-defaults.md);
 they apply to single-model sessions as well as smart mode. There is no background
 pre-computation.

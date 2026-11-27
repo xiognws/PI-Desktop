@@ -2088,6 +2088,8 @@ impl Sidecar {
                 crate::turn::TurnRun {
                     config: &turn_config,
                     cancel: &cancel,
+                    // A manual compaction runs between turns: no pending prompt.
+                    pending_user: None,
                 },
             )
             .await
@@ -4549,7 +4551,9 @@ fn ledger_entry_for_turn(transcript: &[Message]) -> Option<String> {
     let done = tail
         .iter()
         .rev()
-        .find(|message| message.role == crate::message::Role::Assistant && !message.text().trim().is_empty())
+        .find(|message| {
+            message.role == crate::message::Role::Assistant && !message.text().trim().is_empty()
+        })
         .map(|message| head(&message.text(), 500));
     // Tool tally: names with a count, and how many of them failed. A model reading
     // "Bash x12 (2 errors)" knows where to look; the twelve outputs are gone.
@@ -4630,7 +4634,11 @@ fn render_ledger_block(entries: &[Value]) -> Option<String> {
     let mut rendered: Vec<String> = Vec::new();
     let mut used = 0usize;
     for entry in entries.iter().rev() {
-        let text = entry.get("text").and_then(Value::as_str).unwrap_or("").trim();
+        let text = entry
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
         if text.is_empty() {
             continue;
         }
@@ -5869,7 +5877,10 @@ mod prompt_parameter_tests {
     fn an_interrupted_turn_says_which_kind_of_interruption_it_was() {
         let paused = pause_entry_text("TURN_ABORTED", Some("Asked: port the kernel".into()));
         assert!(paused.starts_with("Interrupted (TURN_ABORTED)"));
-        assert!(paused.contains("port the kernel"), "the work in flight survives: {paused}");
+        assert!(
+            paused.contains("port the kernel"),
+            "the work in flight survives: {paused}"
+        );
 
         let failed = pause_entry_text("PROVIDER_ERROR", None);
         assert_eq!(failed, "Interrupted (PROVIDER_ERROR) before finishing.");
@@ -6180,7 +6191,8 @@ mod prompt_parameter_tests {
         assert!(!envelopes.is_empty(), "the delegate must publish something");
         for envelope in &envelopes {
             assert_eq!(
-                envelope.turn_id.as_deref(), Some(parent_turn.as_str()),
+                envelope.turn_id.as_deref(),
+                Some(parent_turn.as_str()),
                 "a worker row must name the parent turn, not the delegation ({delegation})"
             );
             assert_eq!(

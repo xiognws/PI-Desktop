@@ -153,6 +153,15 @@ pub use crate::steering::SteeringSource;
 pub struct TurnRun<'a> {
     pub config: &'a TurnConfig,
     pub cancel: &'a CancelToken,
+    /// This turn's own user row: the newest message when the turn started.
+    ///
+    /// A checkpoint rewrites the history before it and must leave it alone — the
+    /// reference estimates the budget with the pending message appended but its
+    /// `runCompaction` never sees it, because it is a local and only joins the
+    /// transcript after the request. Without that split, a prompt that is itself over
+    /// the trigger gets summarized before it is ever sent. `None` for a compaction
+    /// that runs between turns, where there is no pending prompt.
+    pub pending_user: Option<&'a str>,
 }
 
 /// The strong half of a smart-mode pair, and the evidence that hands over.
@@ -429,6 +438,20 @@ impl TurnEngine {
 
         self.emit(session_id, turn_id, AgentEvent::TurnStart);
 
+        // This turn's own user row is the newest message at entry: the prompt handler
+        // pushes it before calling `run_turn`. Compaction must not consume it — the
+        // reference estimates the budget with the pending message appended
+        // (`automaticCompactionNeeded([incomingUserMessage])`) but its `runCompaction`
+        // only rewrites the history before it, and the pending row never enters the
+        // transcript at all. Without this, a prompt that was itself over the trigger —
+        // a long document pasted into the composer — was summarized before it was ever
+        // sent, and the model answered that it never received the document.
+        let pending_user_id = transcript
+            .messages()
+            .last()
+            .filter(|message| message.role == Role::User)
+            .map(|message| message.id.clone());
+
         let mut total_usage = Usage::default();
         let mut tool_calls = 0usize;
         let mut added_ids: Vec<String> = Vec::new();
@@ -547,14 +570,12 @@ impl TurnEngine {
             // cheap attempt must not pay for another request. Once only, so a
             // strong model that also struggles ends the turn instead of looping.
             if let (Some(target), false) = (self.escalation.as_ref(), escalated) {
-                if let Some(reason) =
-                    target.trigger(
-                        consecutive_tool_errors,
-                        total_tool_errors,
-                        step,
-                        config.max_steps,
-                    )
-                {
+                if let Some(reason) = target.trigger(
+                    consecutive_tool_errors,
+                    total_tool_errors,
+                    step,
+                    config.max_steps,
+                ) {
                     tracing::warn!(
                         target: "agent_core::turn",
                         from = %active_model,
@@ -630,6 +651,7 @@ impl TurnEngine {
                         TurnRun {
                             config,
                             cancel: &cancel,
+                            pending_user: pending_user_id.as_deref(),
                         },
                     )
                     .await?;
@@ -1412,8 +1434,29 @@ impl TurnEngine {
             _ => CompactionMode::CompletedTurn,
         };
 
+        // The history a checkpoint may rewrite: everything except this turn's own user
+        // row, which has not reached the provider yet. The budget count above still
+        // includes it — that is how the reference decides to compact at all — but a
+        // summary must not be the only copy of a prompt the user just pasted.
+        let pending_message = run.pending_user.and_then(|pending| {
+            transcript
+                .messages()
+                .iter()
+                .find(|message| message.id == pending)
+                .cloned()
+        });
+        let history: Vec<Message> = match &pending_message {
+            Some(pending) => transcript
+                .messages()
+                .iter()
+                .filter(|message| message.id != pending.id)
+                .cloned()
+                .collect(),
+            None => transcript.messages().to_vec(),
+        };
+
         let tokens_before = estimate_context_tokens(transcript.messages()).tokens;
-        let Some(plan) = plan_compaction(transcript.messages(), limits, mode) else {
+        let Some(plan) = plan_compaction(&history, limits, mode) else {
             self.emit(
                 session_id,
                 turn_id,
@@ -1467,6 +1510,11 @@ impl TurnEngine {
                 let mut messages = vec![checkpoint_message(&summary)];
                 messages.extend(plan.retained.iter().cloned());
                 let first_kept = messages.get(1).map(|message| message.id.clone());
+                // This turn's own row goes back at the end: it is what the next request
+                // answers, and the checkpoint replaced only the history before it.
+                if let Some(pending) = &pending_message {
+                    messages.push(pending.clone());
+                }
                 *transcript = Transcript::from_messages(messages);
                 self.emit(
                     session_id,
@@ -1484,9 +1532,13 @@ impl TurnEngine {
                 Ok(())
             }
             Err(error) => {
-                let tail = retained_tail_fallback(transcript.messages(), limits, mode);
+                let tail = retained_tail_fallback(&history, limits, mode);
                 let mut messages = vec![Message::user_text(RETAINED_TAIL_NOTICE)];
                 messages.extend(tail);
+                // Same rule as the summary path: the pending row is not history.
+                if let Some(pending) = &pending_message {
+                    messages.push(pending.clone());
+                }
                 let recovered = Transcript::from_messages(messages);
                 let first_kept = recovered
                     .messages()
@@ -1874,7 +1926,10 @@ mod escalation_tests {
     #[test]
     fn a_single_failure_is_not_evidence() {
         assert_eq!(target(2, 0.6).trigger(1, 0, 0, Some(10)), None);
-        assert_eq!(target(2, 0.6).trigger(2, 0, 0, Some(10)), Some("tool-errors"));
+        assert_eq!(
+            target(2, 0.6).trigger(2, 0, 0, Some(10)),
+            Some("tool-errors")
+        );
     }
 
     #[test]
@@ -1890,7 +1945,10 @@ mod escalation_tests {
     #[test]
     fn either_threshold_can_be_switched_off() {
         assert_eq!(target(0, 0.0).trigger(99, 0, 9, Some(10)), None);
-        assert_eq!(target(1, 0.0).trigger(1, 0, 0, Some(10)), Some("tool-errors"));
+        assert_eq!(
+            target(1, 0.0).trigger(1, 0, 0, Some(10)),
+            Some("tool-errors")
+        );
     }
 
     #[test]

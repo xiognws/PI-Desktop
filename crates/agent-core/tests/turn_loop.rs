@@ -482,10 +482,11 @@ async fn usage_from_every_step_is_reported() {
 async fn old_tool_output_is_aged_for_the_request_and_kept_in_the_transcript() {
     use agent_core::context::ModelLimits;
 
-    // The fixture is derived from the engine's own thresholds, not hard-coded: aim
-    // between the aging threshold and the compaction trigger so this scenario
-    // exercises aging instead of compaction, and keep doing that when the
-    // threshold formula changes.
+    // The fixture is derived from the engine's own thresholds, not hard-coded: the
+    // engine ages from the lower of the policy's absolute trigger and 60% of the
+    // compaction trigger, so aim just above that effective threshold and below
+    // the compaction trigger itself. This scenario exercises aging instead of
+    // compaction, and keeps doing so when either threshold formula changes.
     let turns = 15usize;
     let policy = agent_core::aging::ToolResultAging::default();
     let context = agent_core::context::ContextLimits::for_model(ModelLimits {
@@ -493,12 +494,24 @@ async fn old_tool_output_is_aged_for_the_request_and_kept_in_the_transcript() {
         max_tokens: Some(8_000),
         ..ModelLimits::default()
     });
-    let target = (context.trigger as f64 * (policy.trigger_share + 1.0) / 2.0) as u64;
+    let effective_trigger = policy
+        .trigger_tokens
+        .min((context.trigger as f64 * 0.6) as u64);
+    let target = effective_trigger.saturating_add(1);
     let per_result = (target as f64 * agent_core::context::ESTIMATED_TEXT_CHARS_PER_TOKEN
         / turns as f64) as usize;
     assert!(
         per_result > policy.head_chars + policy.tail_chars,
         "the filler has to be worth aging: {per_result}"
+    );
+    assert!(
+        per_result <= policy.oversize_chars,
+        "the filler must not trip the absolute oversize rule: {per_result}"
+    );
+    assert!(
+        target < context.trigger,
+        "aging must be what relieves this prompt, not compaction: {target} vs trigger {}",
+        context.trigger
     );
 
     let mut transcript = agent_core::session::Transcript::new();
@@ -549,13 +562,29 @@ async fn old_tool_output_is_aged_for_the_request_and_kept_in_the_transcript() {
         .filter(|message| !message.tool_results().is_empty())
         .map(|message| message.tool_results()[0].content.as_str())
         .collect();
+    // `keep_recent` is anchored to a literal, not read back from the policy: if
+    // someone changes the default, this test must fail loudly instead of the
+    // expectations silently following the implementation. 15 results are pushed,
+    // so with `keep_recent == 1` exactly the newest result stays whole and the
+    // other 14 must be aged.
+    assert_eq!(
+        agent_core::aging::ToolResultAging::default().keep_recent,
+        1,
+        "the default working-set size is expected to be 1"
+    );
+    let working_set = 1usize.min(turns);
     assert_eq!(tool_rows.len(), 15, "every call keeps its answer");
     let aged = tool_rows
         .iter()
         .filter(|content| content.contains("not in this context"))
         .count();
-    assert_eq!(aged, 12, "the newest three stay whole: {aged} aged");
-    for recent in &tool_rows[12..] {
+    assert_eq!(
+        aged,
+        turns - working_set,
+        "expected {} aged (only the newest {working_set} stays whole), got {aged}",
+        turns - working_set
+    );
+    for recent in &tool_rows[turns - working_set..] {
         assert_eq!(
             recent.chars().count(),
             per_result,
@@ -845,5 +874,90 @@ async fn a_graceful_stop_lets_the_tool_finish_and_ends_at_the_boundary() {
             .iter()
             .any(|event| matches!(event, AgentEvent::Error { .. })),
         "nothing failed, so nothing is reported as an error"
+    );
+}
+
+/// A prompt that is itself over the trigger has to reach the provider as written.
+///
+/// The checkpoint is for history. The reference estimates the budget with the pending
+/// message appended (`automaticCompactionNeeded([incomingUserMessage])`) but its
+/// `runCompaction` never sees that message — it is a local, and only enters the
+/// transcript once the request has been made. Porting the budget check without that
+/// split made a pasted long document the thing being summarized: the model was asked
+/// about a document it had never received.
+#[tokio::test]
+async fn a_prompt_over_the_trigger_reaches_the_provider_intact() {
+    // ~318,000 characters is ~90,860 tokens at the kernel's own 3.5 chars/token: over
+    // the 83,712 trigger of a 128K window with an 8K output budget (hard limit
+    // 111,616), under that hard limit.
+    let document = "record 0: the verification code for row 0 is 00000.\n".repeat(6_000);
+    assert!(
+        document.len() > 300_000,
+        "fixture is {} characters, too short to cross the trigger",
+        document.len()
+    );
+
+    // Two scripted turns: the first answers the request. The second exists so that a
+    // regression which *does* compact has a response for its summary request too — the
+    // assertion then fails on what the provider was asked, instead of the fixture
+    // running out and reporting a misleading error.
+    let provider = Arc::new(ScriptedProvider::new(vec![
+        answer_events("READY"),
+        answer_events("READY"),
+    ]));
+    let sink = Arc::new(RecordingSink::new());
+    let engine = engine(provider.clone(), sink.clone())
+        .with_model_limits(agent_core::context::ModelLimits::new(128_000, 8_192));
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text(document.clone()));
+
+    engine
+        .run_turn(
+            "s1",
+            "t1",
+            &mut transcript,
+            &TurnConfig::new("test-model"),
+            CancelToken::new(),
+        )
+        .await
+        .expect("turn must succeed");
+
+    let requests = provider.requests();
+    assert_eq!(
+        requests.len(),
+        1,
+        "the turn made {} provider requests",
+        requests.len()
+    );
+    let sent: String = requests[0]
+        .messages
+        .iter()
+        .map(|message| message.text())
+        .collect();
+    assert!(
+        sent.contains("the verification code for row 0 is 00000"),
+        "the prompt must reach the provider, not a summary of it"
+    );
+    assert!(
+        !sent.contains("Objective:"),
+        "a checkpoint replaced the prompt instead of the history"
+    );
+
+    // With no history to compact, the trigger is crossed but there is nothing the
+    // checkpoint may rewrite — it says so instead of consuming the only message.
+    let compaction = sink.events().into_iter().find_map(|event| match event {
+        AgentEvent::CompactionEnd { ok, error, .. } => Some((ok, error)),
+        _ => None,
+    });
+    let (ok, error) = compaction.expect("the trigger was crossed, so compaction was considered");
+    assert!(!ok, "nothing could be compacted, so nothing was");
+    assert_eq!(
+        error.map(|failure| failure.code).as_deref(),
+        Some("COMPACTION_NOTHING_TO_DO")
+    );
+    assert_eq!(
+        transcript.messages().len(),
+        2,
+        "the user row and the answer: the prompt row was never dropped"
     );
 }

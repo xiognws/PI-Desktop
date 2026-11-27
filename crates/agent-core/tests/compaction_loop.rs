@@ -13,7 +13,7 @@ use agent_core::context::{ContextLimits, ModelLimits};
 use agent_core::provider::scripted::ScriptedProvider;
 use agent_core::{
     AgentError, AgentEvent, AllowAll, CancelToken, CompactionFallback, CompactionReason, EventSink,
-    Message, Provider, ProviderErrorKind, ProviderStream, RecordingSink, Result, StopReason,
+    Message, Provider, ProviderErrorKind, ProviderStream, RecordingSink, Result, Role, StopReason,
     StreamEvent, Tool, ToolCall, ToolContext, ToolRegistry, ToolSpec, TurnConfig, TurnEngine,
 };
 use serde_json::Value;
@@ -239,17 +239,25 @@ async fn a_transcript_past_the_trigger_is_summarized_before_the_next_request() {
     assert_eq!(outcome.stop_reason, StopReason::EndTurn);
     assert!(provider.summaries() >= 1, "the engine asked for a summary");
 
-    // The step after the cut must see the checkpoint and nothing else.
+    // The step after the cut must see the checkpoint in place of the history it
+    // replaced — and this turn's own user row, which was never part of that history:
+    // the checkpoint rewrites what came before the prompt, never the prompt itself.
     let requests = provider.requests();
     assert_eq!(requests.len(), 2, "tool step, then the answer step");
     let after = &requests[1].messages;
-    assert_eq!(after.len(), 1, "the checkpoint replaced the history");
+    assert_eq!(
+        after.len(),
+        2,
+        "the checkpoint plus this turn's own user row"
+    );
     assert!(
         after[0].text().starts_with(CHECKPOINT_HEADER),
         "the model continues from the checkpoint, got: {}",
         after[0].text()
     );
     assert!(after[0].text().contains("SUMMARY OF WORK"));
+    assert_eq!(after[1].role, Role::User, "the prompt survived the cut");
+    assert_eq!(after[1].text(), "compact me");
 
     // A completed-turn checkpoint carries no history forward.
     let events = sink.events();
@@ -267,7 +275,11 @@ async fn a_transcript_past_the_trigger_is_summarized_before_the_next_request() {
         })
         .expect("a compaction end event");
     assert!(end, "the summary succeeded");
-    assert_eq!(transcript.messages().len(), 2, "checkpoint plus the answer");
+    assert_eq!(
+        transcript.messages().len(),
+        3,
+        "checkpoint, the turn's own user row, and the answer"
+    );
 }
 
 /// The user's compaction switch, measured on the loop the sidecar actually runs:
