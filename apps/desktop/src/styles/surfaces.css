@@ -108,8 +108,59 @@
   height: 46px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 0 14px;
   border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+/* Collapsed: an icon column, the width the intent costs. It stays in flow (not
+   an overlay) so the embedded workbench keeps a stable, measurable rect. */
+.autotest-sidebar.is-collapsed {
+  flex: 0 0 44px;
+  width: 44px;
+  align-items: center;
+}
+
+.autotest-sidebar-rail {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.autotest-sidebar-toggle {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--ds-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.autotest-sidebar-toggle:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.autotest-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+}
+
+.autotest-sidebar-rail .autotest-service-dot {
+  width: 8px;
+  height: 8px;
 }
 
 .autotest-sidebar-title {
@@ -241,7 +292,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .surface-rail-button {
+  .surface-rail-button,
+  .autotest-sidebar-toggle {
     transition: none;
   }
   .autotest-service[data-state="starting"] .autotest-service-dot {

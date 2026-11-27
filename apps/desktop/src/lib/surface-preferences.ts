@@ -9,6 +9,8 @@ import { resolveSurfaceId, type SurfaceId } from "@pi-workspace/shared";
  * chat instead of failing a settings read.
  */
 const STORAGE_KEY = "pi.desktop.surface";
+/** The AutoTest surface's sidebar, kept apart from the chat sidebar's state. */
+const AUTOTEST_SIDEBAR_KEY = "pi.desktop.surface.autotestSidebar";
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
@@ -44,5 +46,29 @@ export function saveSurfacePreference(
   } catch {
     // A full or blocked store costs the user nothing but the next launch
     // landing on chat; it must never break navigation.
+  }
+}
+
+export function loadAutotestSidebarCollapsed(
+  target: StorageLike | null = storage(),
+): boolean {
+  if (!target) return false;
+  try {
+    const raw = target.getItem(AUTOTEST_SIDEBAR_KEY);
+    return raw === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function saveAutotestSidebarCollapsed(
+  collapsed: boolean,
+  target: StorageLike | null = storage(),
+): void {
+  if (!target) return;
+  try {
+    target.setItem(AUTOTEST_SIDEBAR_KEY, collapsed ? "true" : "false");
+  } catch {
+    // Losing this preference costs one keystroke, never a broken surface.
   }
 }

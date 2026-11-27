@@ -19,7 +19,7 @@ import type { AppState } from "../app-state";
 import type { InteractionRuntime } from "../runtime/interaction-runtime";
 import type { SessionRuntime } from "../runtime/session-runtime";
 import { resolveSettingsTab } from "../../lib/settings-search";
-import { saveSurfacePreference } from "../../lib/surface-preferences";
+import { saveSurfacePreference, saveAutotestSidebarCollapsed } from "../../lib/surface-preferences";
 import type { StoreAccess } from "./types";
 
 const PLAN_APPROVAL_TIMEOUT = "PLAN_APPROVAL_TIMEOUT";
@@ -50,6 +50,7 @@ export function createInteractionSlice({
   AppState,
   | "setPage"
   | "setSurface"
+  | "setAutotestSidebarCollapsed"
   | "setSettingsTab"
   | "setSettingsAnchor"
   | "canNavBack"
@@ -118,6 +119,19 @@ export function createInteractionSlice({
             },
       );
       if (get().surface === surface) saveSurfacePreference(surface);
+    },
+
+    /**
+     * Collapse or expand the AutoTest surface's sidebar.
+     *
+     * It is the surface's own column, so the chat sidebar's width, animation and
+     * auto-collapse record are untouched; only the test platform's navigation
+     * folds. The choice is remembered across switches and relaunches.
+     */
+    setAutotestSidebarCollapsed: (collapsed) => {
+      if (get().autotestSidebarCollapsed === collapsed) return;
+      set({ autotestSidebarCollapsed: collapsed });
+      saveAutotestSidebarCollapsed(collapsed);
     },
 
     setSettingsTab: (requested) => {

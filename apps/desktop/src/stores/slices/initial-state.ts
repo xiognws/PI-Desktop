@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS_TAB } from "../../lib/settings-search";
 import type { AppState, AppStateData } from "../app-state";
 import { projectWorkspaceFromPath } from "../../lib/sidebar-preferences";
 import { loadSidebarPreferences } from "../../lib/sidebar-preferences";
-import { loadSurfacePreference } from "../../lib/surface-preferences";
+import { loadSurfacePreference, loadAutotestSidebarCollapsed } from "../../lib/surface-preferences";
 import { loadWorkPanelWidth } from "./work-panel-slice";
 
 export const initialSidebarPreferences = loadSidebarPreferences();
@@ -25,6 +25,7 @@ export function createInitialState(): AppStateData {
     // response means a window that reopens where the user left it instead of
     // flashing chat first.
     surface: loadSurfacePreference(),
+    autotestSidebarCollapsed: loadAutotestSidebarCollapsed(),
     recentModels: loadRecentModels(),
     healthOk: false,
     sessions: [],

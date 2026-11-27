@@ -261,6 +261,15 @@ export type AppState = {
    * window, so switching surfaces leaves it.
    */
   surface: SurfaceId;
+  /**
+   * Whether the AutoTest surface's own sidebar is collapsed to its icon column.
+   *
+   * Per surface, like `surface` itself: collapsing the test platform's navigation
+   * must not touch the chat sidebar's width state or its animation, and the choice
+   * survives a surface switch and a relaunch.
+   */
+  autotestSidebarCollapsed: boolean;
+  setAutotestSidebarCollapsed: (collapsed: boolean) => void;
   /** Tab ids come from the shared settings index. */
   settingsTab: SettingsTabId;
   /** Pending row anchor (i18n key) to flash after landing on a settings tab. */

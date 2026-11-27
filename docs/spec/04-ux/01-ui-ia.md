@@ -34,6 +34,11 @@ destination, chat as the home surface, tools and permissions inline.
   sidebar. It is hidden during the Settings takeover, whose whole window it would
   otherwise divide. The rail's column is reserved in the chat shell's width
   budget, so the sidebar, main pane and work panel keep their existing floors.
+  Each surface owns its sidebar's collapsed state: `Cmd/Ctrl+B` folds the column
+  of the interface on screen — the chat sidebar or the AutoTest sidebar — and the
+  AutoTest fold is remembered across surface switches and relaunches. A collapsed
+  AutoTest column keeps its service indicator and an expand control, so a failed
+  test service is never hidden behind a fold.
 - **Sidebar**: primary navigation — path-less conversations under a compact
   **Sessions** section with new-session and sort actions, retained open-project
   groups under a following **Projects** section with a persistent new-project

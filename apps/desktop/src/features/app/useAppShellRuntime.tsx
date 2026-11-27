@@ -234,6 +234,15 @@ export function useAppShellRuntime() {
   // must never capture a stale `sidebarCollapsed`. Every invocation is a user
   // action, so it clears an automatic-collapse record before toggling.
   const toggleSidebar = useCallback(() => {
+    // The rail decides which interface is on screen, so the shortcut collapses
+    // the sidebar that belongs to it: the chat column, or the test platform's own
+    // column. Read from the store rather than a closure — a surface switch must
+    // not need this callback to be re-created before it routes correctly.
+    const store = useAppStore.getState();
+    if (store.surface === "autotest") {
+      store.setAutotestSidebarCollapsed(!store.autotestSidebarCollapsed);
+      return;
+    }
     autoCollapsedSidebarRef.current = false;
     if (sidebarCollapsedRef.current) reopenSidebar();
     else setSidebarCollapsed(true);

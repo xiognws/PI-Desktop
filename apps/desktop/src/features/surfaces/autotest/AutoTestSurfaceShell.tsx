@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AutotestWorkbenchSnapshot } from "@pi-workspace/shared";
-import { Button } from "../../../components/ui";
+import { Button, cx, TooltipButton } from "../../../components/ui";
+import { IconChevronRight, IconSidebar } from "../../../components/icons";
 import { api } from "../../../lib/api";
 import { useAppStore } from "../../../stores/app-store";
 import type { SurfaceShellProps } from "../registry";
@@ -44,10 +45,12 @@ function resolvedTheme(): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
-export function AutoTestSurfaceShell({ overlaysOpen }: SurfaceShellProps) {
+export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProps) {
   const { t } = useTranslation();
   const surface = useAppStore((s) => s.surface);
   const page = useAppStore((s) => s.page);
+  const collapsed = useAppStore((s) => s.autotestSidebarCollapsed);
+  const setCollapsed = useAppStore((s) => s.setAutotestSidebarCollapsed);
   const active = surface === "autotest" && page !== "settings";
   const paneRef = useRef<HTMLDivElement | null>(null);
   const [snapshot, setSnapshot] = useState<AutotestWorkbenchSnapshot | null>(null);
@@ -144,50 +147,96 @@ export function AutoTestSurfaceShell({ overlaysOpen }: SurfaceShellProps) {
 
   const state = snapshot?.status ?? "starting";
 
+  const serviceLabel =
+    state === "ready"
+      ? t("autotest.surface.ready", { port: snapshot?.port ?? "?" })
+      : state === "failed"
+        ? t("autotest.surface.failed")
+        : t("autotest.surface.starting");
+  // The shortcut is the chat sidebar's, because it is the same key: it collapses
+  // whichever interface is on screen.
+  const toggleShortcut = runtime.sidebarToggleShortcut;
+  const withShortcut = (label: string) =>
+    toggleShortcut ? `${label} (${toggleShortcut})` : label;
+  const collapseTooltip = withShortcut(t("nav.collapseSidebar"));
+  const expandTooltip = withShortcut(t("nav.expandSidebar"));
+
   return (
     <div
       className="app-surface-autotest"
       hidden={!active}
       inert={!active ? true : undefined}
     >
-      <aside className="autotest-sidebar no-drag">
-        <div className="autotest-sidebar-header">
-          <span className="autotest-sidebar-title">{t("surface.autotest")}</span>
-        </div>
-        <div className="autotest-sidebar-body">
-          <div className="autotest-service" data-state={state}>
-            <span className="autotest-service-dot" aria-hidden />
-            <span className="autotest-service-label">
-              {state === "ready"
-                ? t("autotest.surface.ready", { port: snapshot?.port ?? "?" })
-                : state === "failed"
-                  ? t("autotest.surface.failed")
-                  : t("autotest.surface.starting")}
-            </span>
-          </div>
-          {state === "failed" && snapshot?.error ? (
-            <p className="autotest-service-detail">{snapshot.error}</p>
-          ) : null}
-          <div className="autotest-sidebar-actions">
-            <Button
+      <aside className={cx("autotest-sidebar no-drag", collapsed && "is-collapsed")}>
+        {collapsed ? (
+          /* The folded column keeps two things reachable: the way back out, and
+             the service's state. Everything else is one keystroke away. */
+          <div className="autotest-sidebar-rail">
+            <TooltipButton
               type="button"
-              variant="secondary"
-              size="sm"
-              disabled={busy}
-              onClick={() => void restart()}
+              className="autotest-sidebar-toggle"
+              tooltip={expandTooltip}
+              ariaLabel={t("nav.expandSidebar")}
+              aria-expanded={false}
+              data-nav="autotest-expand-sidebar"
+              onClick={() => setCollapsed(false)}
             >
-              {t("autotest.surface.restart")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void api.autotestWorkbenchOpenWindow()}
-            >
-              {t("autotest.surface.openWindow")}
-            </Button>
+              <IconChevronRight size={15} />
+            </TooltipButton>
+            <span
+              className="autotest-service-dot"
+              data-state={state}
+              title={serviceLabel}
+              aria-label={serviceLabel}
+              role="status"
+            />
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="autotest-sidebar-header">
+              <span className="autotest-sidebar-title">{t("surface.autotest")}</span>
+              <TooltipButton
+                type="button"
+                className="autotest-sidebar-toggle"
+                tooltip={collapseTooltip}
+                ariaLabel={t("nav.collapseSidebar")}
+                aria-expanded
+                data-nav="autotest-collapse-sidebar"
+                onClick={() => setCollapsed(true)}
+              >
+                <IconSidebar size={15} />
+              </TooltipButton>
+            </div>
+            <div className="autotest-sidebar-body">
+              <div className="autotest-service" data-state={state}>
+                <span className="autotest-service-dot" aria-hidden />
+                <span className="autotest-service-label">{serviceLabel}</span>
+              </div>
+              {state === "failed" && snapshot?.error ? (
+                <p className="autotest-service-detail">{snapshot.error}</p>
+              ) : null}
+              <div className="autotest-sidebar-actions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void restart()}
+                >
+                  {t("autotest.surface.restart")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void api.autotestWorkbenchOpenWindow()}
+                >
+                  {t("autotest.surface.openWindow")}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </aside>
       <section className="autotest-main-pane">
         {/* One chrome, not two: once the workbench is up its own header owns the
