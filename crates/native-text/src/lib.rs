@@ -18,6 +18,20 @@
 //!      program that never chose an encoding;
 //!   3. UTF-8 with replacement, so a line that is genuinely broken still renders.
 
+/// Tell a child process to speak UTF-8, when the host is not already saying so.
+///
+/// This is the prevention half of `decode_native_text`: on a Chinese Windows box
+/// a program that is never told an encoding writes the ANSI code page, so python
+/// prints GBK and `open(path, "w")` stores GBK. An install started from Explorer
+/// has none of these variables set, which is why its scripts produced GBK files
+/// while the same scripts run from a configured shell produced UTF-8.
+///
+/// Only the variables the child reads, and only as a default: a value the user
+/// already set is passed through untouched, and a per-call override still wins
+/// because callers apply their own environment after this list.
+pub const CHILD_UTF8_ENV: [(&str, &str); 2] =
+    [("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")];
+
 /// Decode a buffer that arrived from a native program or file.
 ///
 /// A UTF-8 or UTF-16 byte-order mark decides the whole buffer; otherwise each

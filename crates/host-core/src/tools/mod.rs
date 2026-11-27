@@ -63,10 +63,22 @@ pub use output_budget::{OutputBudgetPlan, ShellBudgets, TurnOutputLedger};
 /// `site-packages`.
 pub const INHERITED_PYTHON_ENV_VARS: [&str; 3] = ["PYTHONHOME", "PYTHONPATH", "PYTHONNOUSERSITE"];
 
-/// Remove the bundled-interpreter variables from a command a user runs.
+/// Remove the bundled-interpreter variables from a command a user runs, and tell
+/// it to speak UTF-8 when this app was started without that hint.
+///
+/// The second half is the prevention side of `native_text::decode_native_text`:
+/// an install started from Explorer has no `PYTHONUTF8`, so its children printed
+/// GBK and wrote GBK files. Defaults only — a value already present in this
+/// process's environment is left alone, and `extra_env` is applied after this and
+/// still wins.
 pub fn strip_inherited_python_env(command: &mut Command) {
     for name in INHERITED_PYTHON_ENV_VARS {
         command.env_remove(name);
+    }
+    for (name, value) in native_text::CHILD_UTF8_ENV {
+        if std::env::var_os(name).is_none() {
+            command.env(name, value);
+        }
     }
 }
 
@@ -5660,6 +5672,23 @@ mod tests {
             Some(scratch.to_str().unwrap())
         );
         assert!(scratch.is_dir(), "scratch dir created for Bash");
+    }
+
+    #[tokio::test]
+    async fn bash_tells_a_child_to_speak_utf8() {
+        // The installed app is started from Explorer, so it inherits no encoding
+        // hint; without this default a python child prints GBK and writes GBK.
+        let ws = tempfile::tempdir().unwrap();
+        let result = execute_tool(
+            Some(ws.path()),
+            None,
+            "Bash",
+            &serde_json::json!({ "command": "printf '%s|%s' \"$PYTHONUTF8\" \"$PYTHONIOENCODING\"" }),
+            15_000,
+        )
+        .await;
+        assert!(result.ok, "bash failed: {:?}", result.content);
+        assert_eq!(result.content["stdout"].as_str(), Some("1|utf-8"));
     }
 
     #[tokio::test]

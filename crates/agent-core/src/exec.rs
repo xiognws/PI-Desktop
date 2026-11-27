@@ -107,6 +107,12 @@ const ENV_ALLOW: &[&str] = &[
     "RUSTUP_HOME",
     "JAVA_HOME",
     "NODE_PATH",
+    // A child that is never told an encoding writes the ANSI code page — GBK on a
+    // Chinese Windows box — and the file it then writes is GBK too. Allowing these
+    // through lets a configured host say otherwise; the defaults below cover the
+    // case where nobody did.
+    "PYTHONUTF8",
+    "PYTHONIOENCODING",
 ];
 
 /// Which shell the command text is written for.
@@ -400,6 +406,15 @@ impl LocalExecutor {
         for (key, value) in self.scrubbed_env() {
             command.env(key, value);
         }
+        // Defaults only: a host that already configured UTF-8 keeps its own value,
+        // and `request.env` below still wins over both. Without this an install
+        // started from Explorer hands its children no encoding hint at all, and
+        // python answers with GBK output and GBK files.
+        for (name, value) in native_text::CHILD_UTF8_ENV {
+            if std::env::var_os(name).is_none() {
+                command.env(name, value);
+            }
+        }
         for (key, value) in &request.env {
             command.env(key, value);
         }
@@ -644,6 +659,37 @@ mod tests {
             .expect("the command runs");
         assert_eq!(outcome.stdout.trim_end(), "但", "{outcome:?}");
         assert!(!outcome.stdout.contains('\u{FFFD}'), "{outcome:?}");
+    }
+
+    /// The install that produced the GBK transcripts was started from Explorer, so
+    /// it had no encoding hint to pass on. The kernel supplies the default itself.
+    #[tokio::test]
+    async fn a_child_is_told_to_speak_utf8() {
+        if !sh_available() {
+            eprintln!("SKIP (no working `sh` on this host: MSYS shared-memory 0xC0000022)");
+            return;
+        }
+        let outcome = executor()
+            .run(ExecRequest::new(
+                "printf '%s|%s' \"$PYTHONUTF8\" \"$PYTHONIOENCODING\"",
+            ))
+            .await
+            .expect("the command runs");
+        assert_eq!(outcome.stdout, "1|utf-8", "{outcome:?}");
+    }
+
+    /// ...and a caller that wants something else still gets it: the default is a
+    /// default, not a policy.
+    #[tokio::test]
+    async fn an_explicit_environment_still_wins_over_the_default() {
+        if !sh_available() {
+            eprintln!("SKIP (no working `sh` on this host: MSYS shared-memory 0xC0000022)");
+            return;
+        }
+        let mut request = ExecRequest::new("printf '%s' \"$PYTHONIOENCODING\"");
+        request.env.push(("PYTHONIOENCODING".into(), "gbk".into()));
+        let outcome = executor().run(request).await.expect("the command runs");
+        assert_eq!(outcome.stdout, "gbk", "{outcome:?}");
     }
 
     #[tokio::test]
