@@ -995,12 +995,15 @@ still owns the live execution segment, so work never folds away mid-run. Once th
 turn settles both nested levels fold: expanding a completed turn lists what the
 agent did instead of a wall of rows, and two opt-out switches carry the reader's
 choice. `Auto-fold finished groups` (`autoCollapseSettledGroups`, on by default)
-folds settled groups whatever their size; turned off it leaves every settled
-group open, because the four-item tier is retired. `Auto-fold finished thinking`
+folds settled groups whatever their size and reaches the turn's own process row
+as well, so turned off it leaves every settled group and the process row of every
+finished turn open - because the four-item tier is retired.
+`Auto-fold finished thinking`
 (`autoCollapseThinking`, on by default) keeps only reasoning the live turn is
-still streaming expanded. Each switch is a sub-row of the setting that gates it
-(`Show thinking`, and a non-flat `Transcript display`), it disappears with that
-parent, and hiding it never rewrites the stored value. A group does not inherit
+still streaming expanded. The groups switch is offered in every layout, `flat`
+included, because `flat` still renders the turn-level disclosure it decides; the
+thinking switch is a sub-row of `Show thinking`, disappears with that parent, and
+hiding it never rewrites the stored value. A group does not inherit
 open state from the reasoning it contains: the group and its Thinking rows each
 answer to their own switch, so closing a group hides expanded reasoning inside
 it. Explicit user choices remain authoritative, and a running turn - or a group

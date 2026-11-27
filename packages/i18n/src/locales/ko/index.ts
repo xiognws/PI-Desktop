@@ -1862,7 +1862,7 @@ sklm: {
     autoCollapseThinking: "완료된 사고 접기",
     autoCollapseThinkingDesc: "생성 중인 사고만 펼쳐 둡니다. 끄면 모든 사고 행이 펼쳐진 채로 유지됩니다.",
     autoCollapseSettledGroups: "완료된 그룹 접기",
-    autoCollapseSettledGroupsDesc: "턴이 끝나면 활동 그룹이 접힌 채로 남고, 헤더가 그룹이 한 일을 알려 줍니다. 끄면 완료된 그룹이 모두 펼쳐집니다.",
+    autoCollapseSettledGroupsDesc: "턴이 끝나면 과정 행과 그 안의 활동 그룹이 접힌 채로 남고, 헤더가 무엇을 했는지 알려 줍니다. 끄면 완료된 턴의 과정이 모두 펼쳐집니다.",
     transcriptDisplayMode: "프로세스 표시",
     transcriptDisplayModeDesc: "트랜스크립트에서 어시스턴트 프로세스를 묶는 방식을 선택합니다.",
     radialMenu: "방사형 컨텍스트 메뉴",

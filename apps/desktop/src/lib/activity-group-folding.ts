@@ -27,6 +27,24 @@ export function activityGroupStartsOpen(state: {
   return state.turnActive || state.groupActive || !state.collapseSettled;
 }
 
+/**
+ * Whether a turn's own process disclosure starts open.
+ *
+ * The outer level answers to `autoCollapseSettledGroups` too. It used to open on
+ * liveness alone, which made the switch unreachable from the level that hides
+ * the work: a reader who turned folding off still got one header per finished
+ * turn, and in the flat layout - where no nested group renders - the switch had
+ * no visible effect at all.
+ */
+export function turnProcessStartsOpen(state: {
+  /** The turn is still running. */
+  turnActive: boolean;
+  /** `resolveAutoCollapseSettledGroups` for the current settings. */
+  collapseSettled: boolean;
+}): boolean {
+  return state.turnActive || !state.collapseSettled;
+}
+
 /** Whether a rendered Thinking row starts open. */
 export function thinkingRowStartsOpen(state: {
   /** The live turn is still producing this row's reasoning. */

@@ -2,6 +2,9 @@ import { useContext, useEffect, useId, useMemo, useState, type ReactNode } from 
 import { useTranslation } from "react-i18next";
 import type { AgentActivity } from "@pi-workspace/shared";
 import type { AssistantTurnPart } from "../../../lib/assistant-turns";
+import { turnProcessStartsOpen } from "../../../lib/activity-group-folding";
+import { resolveAutoCollapseSettledGroups } from "../../../lib/transcript-folding";
+import { useAppStore } from "../../../stores/app-store";
 import { formatToolDuration } from "../../../lib/tool-display";
 import { cachedActivitySummary } from "../../../lib/transcript-activity-summary";
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
@@ -83,12 +86,21 @@ export function TurnProcess({
     processParts.flatMap((part) => part.kind === "activity" ? part.items : []),
   ), [processParts]);
   const thinkingNow = useMemo(() => isTurnThinking(turnParts, isActive), [turnParts, isActive]);
-  // Active processes start open and untouched completed ones close by default;
-  // an explicit user choice stays authoritative. This does not depend on the
-  // thinking preference, and a recorded failure keeps an untouched active
-  // process open through recovery because it stays active until the turn ends.
+  /*
+    The turn's own disclosure answers to the same switch as the groups inside it.
+
+    It used to open on `isActive` alone, so a completed turn always folded to one
+    header no matter what the reader chose: `Auto-fold finished groups` off could
+    not reach the level that actually hid the work, and the flat layout - which
+    renders no nested group at all - left that switch with nothing to act on.
+    One preference now decides both levels, and the answer is read at render
+    time so turning it off repaints every settled turn immediately.
+  */
+  const collapseSettledGroups = useAppStore((state) =>
+    resolveAutoCollapseSettledGroups(state.settings),
+  );
   const disclosure = useAutomaticDisclosure(
-    isActive,
+    turnProcessStartsOpen({ turnActive: isActive, collapseSettled: collapseSettledGroups }),
     revealRequest,
     disclosureKey("turn", turnId),
   );

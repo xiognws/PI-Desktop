@@ -18280,8 +18280,9 @@ command, a delegate, and an explicit Stop. Accepted input is delivered once.
   every settled group folded and every finished reasoning row folded, and that
   each group header names the actions it contains plus the call count
   (`搜索并读取文件 · 12 次操作`). Confirm tool and search payloads stay closed.
-  Turn `Auto-fold finished groups` off and confirm every settled group opens
-  whatever its size, then turn it back on; turn `Auto-fold finished thinking`
+  Turn `Auto-fold finished groups` off and confirm the finished turn's own
+  process row opens along with every settled group inside it, whatever its
+  size, then turn it back on; turn `Auto-fold finished thinking`
   off and confirm every reasoning row opens, then turn it back on. On a second
   turn, explicitly
   open a completed group and confirm the choice survives subsequent updates; then
@@ -18292,8 +18293,8 @@ command, a delegate, and an explicit Stop. Accepted input is delivered once.
   rows beside the groups, that a normal assistant progress message or a command
   ends the current group, adjacent calls stay separate, and only the reasoning
   row the turn is still streaming is expanded. In Flat, confirm no nested
-  activity group renders, that `Auto-fold finished groups` is absent from AI
-  settings, and the outer
+  activity group renders, that `Auto-fold finished groups` is still offered in
+  the Conversation destination, and the outer
   disclosure lists tools, commands, thinking and progress in transcript order,
   and tool details stay collapsed. In every mode confirm the turn renders exactly
   one outer disclosure and that closing it hides, then reopening restores, the
@@ -18321,7 +18322,8 @@ command, a delegate, and an explicit Stop. Accepted input is delivered once.
   pre-answer row, leaving the final answer, assistant errors, stopped trailing
   text and pending actions outside it; when no final answer text exists, the
   process header and those error or pending-action surfaces remain. An untouched
-  process closes at completion. In Flat there are no nested activity groups, and
+  process closes at completion while `Auto-fold finished groups` is on, and stays
+  open for a reader who turned it off. In Flat there are no nested activity groups, and
   active tools, commands, thinking and progress rows follow transcript order with
   tool details collapsed. In Commands first, `Bash`/run rows are standalone
   beside the groups, adjacent calls stay separate, and a normal assistant
@@ -18336,7 +18338,8 @@ command, a delegate, and an explicit Stop. Accepted input is delivered once.
   group's size. Only the reasoning a live turn is still streaming starts
   expanded when `Show thinking` is on, and a group does not inherit open state
   from the reasoning inside it, so folding a group hides expanded reasoning.
-  Turning off `Auto-fold finished groups` opens every settled group; turning off
+  Turning off `Auto-fold finished groups` opens every settled group and the
+  turn's own process row; turning off
   `Auto-fold finished thinking` opens every rendered reasoning row. A settled
   group's header names the actions it contains, capped at three with "and more",
   and appends the operation count as its own non-truncating token; reasoning is

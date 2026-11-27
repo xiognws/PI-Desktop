@@ -1852,7 +1852,7 @@ sklm: {
     "autoCollapseThinking": "Abgeschlossenes Denken einklappen",
     "autoCollapseThinkingDesc": "Nur laufendes Denken bleibt offen. Aus lässt alle Denkzeilen offen.",
     "autoCollapseSettledGroups": "Abgeschlossene Gruppen einklappen",
-    "autoCollapseSettledGroupsDesc": "Nach dem Ende eines Turns bleiben Aktivitätsgruppen eingeklappt; die Kopfzeile nennt, was die Gruppe getan hat. Aus lässt jede abgeschlossene Gruppe offen.",
+    "autoCollapseSettledGroupsDesc": "Nach dem Ende eines Turns bleiben seine Prozesszeile und die Aktivitätsgruppen darin eingeklappt; die Kopfzeile nennt, was getan wurde. Aus lässt den Prozess jedes abgeschlossenen Turns offen.",
     "transcriptDisplayMode": "Prozessanzeige",
     "transcriptDisplayModeDesc": "Legt fest, wie der Assistentenprozess im Transkript gruppiert wird.",
     "radialMenu": "Radiales Kontextmenü",

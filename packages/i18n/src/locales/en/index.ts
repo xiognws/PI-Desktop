@@ -1866,7 +1866,7 @@ sklm: {
     autoCollapseThinking: "Fold finished thinking",
     autoCollapseThinkingDesc: "Only reasoning that is still being generated stays open. Turn this off to keep every reasoning row open.",
     autoCollapseSettledGroups: "Fold finished groups",
-    autoCollapseSettledGroupsDesc: "Once a turn ends, its activity groups stay folded and each header says what the group did. Turn this off to keep every finished group open.",
+    autoCollapseSettledGroupsDesc: "Once a turn ends, its process row and the activity groups inside it stay folded, and each header says what was done. Turn this off to keep every finished turn's process open.",
     transcriptDisplayMode: "Transcript display",
     transcriptDisplayModeDesc: "Choose how the assistant process is grouped in the transcript.",
     radialMenu: "Radial context menu",

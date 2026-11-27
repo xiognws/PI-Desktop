@@ -6,7 +6,7 @@ import { readTranscriptModule } from "./helpers/source-contracts.mjs";
 
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 
-const { activityGroupStartsOpen, thinkingRowStartsOpen } = await import(
+const { activityGroupStartsOpen, thinkingRowStartsOpen, turnProcessStartsOpen } = await import(
   "../src/lib/activity-group-folding.ts"
 );
 const {
@@ -50,6 +50,26 @@ test("a settled group folds by default and follows the switch", () => {
     "turning auto-collapse off keeps every settled group open",
   );
   assert.equal(ACTIVITY_LABEL_MAX_BUCKETS, 3);
+});
+
+test("a settled turn's own process row follows the same fold switch", () => {
+  /*
+   * The outer disclosure used to open on liveness alone, so a completed turn
+   * always folded to one header and `Auto-fold finished groups` could not reach
+   * the level that actually hides the work. Both answers below are the reader's.
+   */
+  assert.equal(turnProcessStartsOpen({ turnActive: true, collapseSettled: true }), true);
+  assert.equal(turnProcessStartsOpen({ turnActive: true, collapseSettled: false }), true);
+  assert.equal(
+    turnProcessStartsOpen({ turnActive: false, collapseSettled: true }),
+    false,
+    "a settled turn folds only while the switch is on",
+  );
+  assert.equal(
+    turnProcessStartsOpen({ turnActive: false, collapseSettled: false }),
+    true,
+    "turning auto-collapse off keeps every settled turn's process open",
+  );
 });
 
 test("live work never folds", () => {

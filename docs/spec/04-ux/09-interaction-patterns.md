@@ -1145,13 +1145,15 @@ may be retained while exactly one workspace supplies the visible shell context.
   remains separate. No mode adds a second top-level disclosure or leaves a run
   row outside the process.
 - Every ordinary group of a turn stays open while that turn runs, whether or not
-  it still owns the live segment. After the turn settles, ordinary groups with at
-  most four visible items, Task topology groups and groups that still render a
-  Thinking row remain open; larger ordinary groups of plain tool rows start
-  closed. Apart from visible reasoning these defaults do not depend on the
-  thinking preference. Closing the turn's disclosure hides every group and run
-  row under it without erasing their choices; reopening restores their defaults
-  and any explicit user choices.
+  it still owns the live segment. After the turn settles, the turn's own process
+  disclosure and every group inside it start closed while `Auto-fold finished
+  groups` is on, whatever the group's size, and each finished reasoning row folds
+  while `Auto-fold finished thinking` is on; turning either switch off keeps that
+  level open. The groups switch decides the turn-level row too, so it is offered
+  in every display mode, `flat` included. Apart from visible reasoning these
+  defaults do not depend on the thinking preference. Closing the turn's
+  disclosure hides every group and run row under it without erasing their
+  choices; reopening restores their defaults and any explicit user choices.
 - The turn header reports `Failed`, `Stopped`, `Running`, or `Finished` in that
   precedence, names compaction and recovery while those stages are live, reads
   `Thinking` while the live step is reasoning, omits the duration when the

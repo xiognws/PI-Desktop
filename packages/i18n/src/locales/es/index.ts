@@ -1852,7 +1852,7 @@ sklm: {
     "autoCollapseThinking": "Plegar el razonamiento terminado",
     "autoCollapseThinkingDesc": "Solo el razonamiento en curso queda abierto. Desactívalo para dejar abiertas todas las filas de razonamiento.",
     "autoCollapseSettledGroups": "Plegar los grupos terminados",
-    "autoCollapseSettledGroupsDesc": "Al terminar el turno sus grupos de actividad quedan plegados y la cabecera indica qué hizo el grupo. Desactívalo para dejar abierto cada grupo terminado.",
+    "autoCollapseSettledGroupsDesc": "Al terminar el turno su fila de proceso y sus grupos de actividad quedan plegados, y la cabecera indica qué se hizo. Desactívalo para dejar abierto el proceso de cada turno terminado.",
     "transcriptDisplayMode": "Visualización del proceso",
     "transcriptDisplayModeDesc": "Elige cómo se agrupa el proceso del asistente en la transcripción.",
     "radialMenu": "Menú contextual radial",

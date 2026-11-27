@@ -334,15 +334,15 @@ so no row repeats it.
   insufficient, the control moves below the title and whole options wrap
   within the available pane width without horizontal overflow.
 - **Auto-fold finished groups** is an indented sub-row directly under
-  **Transcript display**, and appears only for **Commands first** and **Fully
-  folded**; **Flat** renders no activity groups, so the row is hidden there and
-  has no effect. It persists the optional `autoCollapseSettledGroups` boolean,
-  absent and `true` both meaning fold: a group whose turn has settled starts
-  closed whatever its size, while a running turn, or a group that still owns a
-  running tool or delegation, stays open. Turning it off leaves every settled
-  group open - there is no size tier. Hiding the sub-row by switching to **Flat**
-  never writes a value, so the stored choice survives and returns with the mode.
-  Settings search indexes both the row and its description.
+  **Transcript display** and is offered in all three layouts: it decides the
+  turn's own process disclosure as well as the groups inside it, and every
+  layout renders that disclosure. It persists the optional
+  `autoCollapseSettledGroups` boolean, absent and `true` both meaning fold: the
+  process row of a settled turn starts closed, and so does every settled group,
+  whatever its size, while a running turn, or a group that still owns a running
+  tool or delegation, stays open. Turning it off leaves every settled group and
+  the process row of every finished turn open - there is no size tier. Settings
+  search indexes both the row and its description.
 
 ### Agent behavior (`behavior` tab)
 

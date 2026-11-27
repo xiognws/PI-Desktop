@@ -32,8 +32,10 @@ before its answer lives inside it — the activity groups and the `Bash` run row
 alike — so a long turn collapses in one gesture instead of leaving a column of
 sibling disclosures above the answer. The answer itself stays outside it. An
 untouched process closes when the turn completes, so only the final answer
-remains; when the turn produced no final text, the process header and its error
-or pending-action surfaces remain visible.
+remains - while `Auto-fold finished groups` is on; a reader who turned that
+switch off keeps the process row of every finished turn open (2026-11-27
+amendment, D702). When the turn produced no final text, the process header and
+its error or pending-action surfaces remain visible.
 
 Inside that disclosure, the display mode decides how activity is grouped.
 `AppSettings.transcriptDisplayMode` is one of `flat`, `command-first`, or
@@ -81,9 +83,15 @@ whatever their size, and when it is off every settled group stays open - the
 four-item tier is retired, because a switch labelled auto-collapse must not still
 collapse something. `autoCollapseThinking` (`Auto-fold finished thinking`) folds
 completed reasoning, and when it is off every rendered reasoning row stays open.
-Each is a sub-row of the setting that gates it (`Show thinking`, and a non-flat
-`Transcript display`), and hiding a sub-row never writes a value, so the stored
-choice survives toggling its parent or switching layouts. The group level no
+The 2026-11-27 amendment (`D702`) extends the first switch to the level above the
+groups: the turn's own process disclosure folds a settled turn only while it is
+on, so turning it off leaves the process row of every finished turn open. That
+switch is therefore offered in every layout, `flat` included - `flat` renders no
+nested group, so the outer level is the only place it can act, and hiding a
+control that still decides what the reader sees read as a setting that does
+nothing. `Auto-fold finished thinking` remains a sub-row of `Show thinking`, and
+hiding a sub-row never writes a value, so the stored choice survives toggling its
+parent. The group level no
 longer inherits open state from the reasoning it contains: closing a group hides
 expanded reasoning inside it, and reopening restores each row's own answer, so
 the two levels never cancel each other out. Live work still never folds: a
@@ -215,10 +223,11 @@ own bounded issue summaries.
   central workflow-store concern.
 - This groups loaded transcript entries only; it does not reconstruct unloaded
   history or join turns across compaction boundaries.
-- A settled turn folds its groups and its finished reasoning by default, and the
-  two new switches are the only way to keep them open. The four-item tier and the
-  "reasoning keeps its group open" rule are gone, so the two levels cannot cancel
-  each other out.
+- A settled turn folds its own process row, its groups and its finished reasoning
+  by default, and the two switches are the only way to keep them open: the groups
+  switch reaches the turn-level row as well as the groups inside it (2026-11-27
+  amendment, D702). The four-item tier and the "reasoning keeps its group open"
+  rule are gone, so the levels cannot cancel each other out.
 - A folded group header names the actions it contains and appends the operation
   count; reasoning is named but not counted, and a failure is left to the tool
   row that reports it.
@@ -282,3 +291,10 @@ covers the resolver defaults, normalization and write validation at both
 boundaries, the sub-row gating and the settings-search index. The transcript
 disclosure E2E suites were not run for this amendment; E2E-CHAT-turn-process-and-thinking-display
 carries the synchronized scenario text for the integration candidate.
+
+For the 2026-11-27 amendment (D702),
+`apps/desktop/test/activity-group-folding.test.mjs` covers `turnProcessStartsOpen`
+(a running turn always opens; a settled turn folds only while the switch is on)
+and `apps/desktop/test/transcript-folding-settings.test.mjs` covers the wiring:
+the switch is not gated by the display mode, and `TurnProcess` reads
+`autoCollapseSettledGroups` instead of folding on liveness alone.

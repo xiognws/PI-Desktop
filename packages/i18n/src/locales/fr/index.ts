@@ -1852,7 +1852,7 @@ sklm: {
     "autoCollapseThinking": "Replier le raisonnement terminé",
     "autoCollapseThinkingDesc": "Seul le raisonnement en cours reste ouvert. Désactivez pour laisser toutes les lignes de raisonnement ouvertes.",
     "autoCollapseSettledGroups": "Replier les groupes terminés",
-    "autoCollapseSettledGroupsDesc": "À la fin du tour, ses groupes d'activité restent repliés et l'en-tête indique ce que le groupe a fait. Désactivez pour laisser chaque groupe terminé ouvert.",
+    "autoCollapseSettledGroupsDesc": "À la fin du tour, sa ligne de processus et ses groupes d'activité restent repliés, et l'en-tête indique ce qui a été fait. Désactivez pour laisser ouvert le processus de chaque tour terminé.",
     "transcriptDisplayMode": "Affichage du processus",
     "transcriptDisplayModeDesc": "Choisit comment le processus de l'assistant est regroupé dans la transcription.",
     "radialMenu": "Menu contextuel radial",

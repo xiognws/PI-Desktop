@@ -350,6 +350,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D695 | Bundled tool packages get their own page | **Add a Tools destination below Artifacts in the app-shell rail: the build's `resources/tools/<id>/tool.json` packages, rendered as one card each with name, version, description, declared tools and risk levels, and one enable switch. host-core scans the directory (`crates/host-core/src/tool_packages.rs`) and persists the enabled set in `<data>/tools/state.json`; `toolPackages.list` / `toolPackages.setEnabled` are the only surface, and a package that cannot be read keeps its row with the reason. See `04-ux/01-ui-ia.md` §3.4.1 and `03-runtime/04-data-storage.md` §2.** | Tool packages ship inside the image and need a visible, switchable roster without a plugin install/update/permission model; a separate declarative manifest keeps the marketplace surface out of it. |
 | D696 | The newest prompt stays readable while its answer scrolls | **A single-line strip at the transcript's top edge repeats the newest prompt the user sent once that row's bottom edge has passed the scrollport's top edge, and disappears as soon as any part of the row is visible again. It collapses whitespace, cuts on a word boundary, names the attachment count for an attachment-only prompt, never pins an agent-to-agent delivery, and yields the top edge to an open Find bar. Clicking it scrolls the row back into view. See `04-ux/09-interaction-patterns.md` §2.6.** | The reference client pins its human bubble to the top of the thread; a long answer otherwise pushes the question out of sight and the user has to scroll back to remember what they asked. |
 | D697 | Each session totals its tokens in the status bar | **The status bar gains a session token total, summed over every turn the session has run. The number comes from the host's turn ledger through a new `session.usageTotals` RPC rather than from the rendered transcript, whose window is bounded; the bar polls it on session switch, while a turn streams, and when one ends. The breakdown (input / output / cache read / cache write / reasoning / turns) lives in the item's tooltip, and the item can be hidden from the status bar menu like every other one. See `03-runtime/04-data-storage.md` (usage ledger).** | "How much has this conversation cost me" is a whole-session question; every existing token reading on the bar described one request or one context window. |
+| D702 | The auto-fold switch reaches the turn's own process row | **Amend D668 / D661 and the `turn-process-and-thinking-display` ADR: `autoCollapseSettledGroups` now decides the turn's own process disclosure as well as the activity groups and Thinking rows inside it. A settled turn's process row starts closed only while the switch is on; turned off, the process row of every finished turn stays open. The switch is no longer hidden in the `flat` layout: flat renders no nested group, so the outer level is the only place it can act, and hiding a switch that still decides what the reader sees made "off" look broken. Renderer only; no persisted field, IPC, host protocol, or plugin contract change. See the amended ADR, `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`, and E2E-CHAT-turn-process-and-thinking-display.** | The switch sat one level below the row that actually hid the work, so turning it off still produced one folded header per finished turn - and in the flat layout it had no target at all. A reader who changes a preference and sees nothing change reports a broken setting, not a nested scope. |
 
 
 ## M0. Model catalog decisions
@@ -8723,3 +8724,24 @@ stdio NDJSON JSON-RPC transport the Node sidecar already used. See ADR 0403.
   `node scripts/e2e-agent-kernel.mjs`, which drives host-core + kernel + adapter
   end to end (12 checks: events, persistence, history restore) without starting
   Electron and without a provider key.
+## 2026-11-27 — The auto-fold switch reaches the turn's own process row (D702)
+
+- `Auto-fold finished groups` (`autoCollapseSettledGroups`) used to decide only
+  the levels *inside* a turn's process disclosure. The disclosure itself opened
+  on liveness alone, so every completed turn folded to a single header no matter
+  what the reader chose, and the `flat` layout - which renders no nested group -
+  left the switch with no visible target at all. Changing it looked like a
+  setting that does nothing.
+- The switch now decides both levels: a settled turn's process row starts closed
+  only while it is on, and turned off every finished turn's process row stays
+  open. The decision is read while rendering, so toggling repaints the loaded
+  transcript immediately.
+- The switch is no longer hidden in `flat`. Hiding a control that still decides
+  what the reader sees is worse than showing it in a layout with one less level
+  to fold.
+- Explicit user choices still win over the default, reading protection still
+  defers an automatic close, and live work never folds.
+- Verification: `node --test apps/desktop/test/activity-group-folding.test.mjs`
+  (the new `turnProcessStartsOpen` case) and
+  `node --test apps/desktop/test/transcript-folding-settings.test.mjs` (the switch
+  is not layout-gated and `TurnProcess` reads it).

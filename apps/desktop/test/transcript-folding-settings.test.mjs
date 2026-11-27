@@ -21,6 +21,10 @@ const PAGE = new URL(
   "../src/features/settings/pages/ConversationSettings.tsx",
   import.meta.url,
 );
+const TURN_PROCESS = new URL(
+  "../src/features/chat/transcript/TurnProcess.tsx",
+  import.meta.url,
+);
 
 function withWindow(run) {
   const previous = globalThis.window;
@@ -92,20 +96,37 @@ test("non-boolean folding writes are rejected at both boundaries", () => {
   assert.equal(typeof IPC, "object");
 });
 
-test("the two switches are sub-rows of the settings that gate them", async () => {
-  const [rows, page] = await Promise.all([
+test("the fold switch is a sub-row that no layout hides, and it reaches the turn's own row", async () => {
+  const [rows, page, turnProcess] = await Promise.all([
     readFile(ROWS, "utf8"),
     readFile(PAGE, "utf8"),
+    readFile(TURN_PROCESS, "utf8"),
   ]);
-  // Hidden, never rewritten: the row bails out of rendering, so the stored value
-  // survives turning `Show thinking` off or switching to the flat layout.
+  // Hidden, never rewritten: the thinking row bails out of rendering, so the
+  // stored value survives turning `Show thinking` off.
   assert.match(rows, /if \(!resolveShowThinking\(settings\)\) return null;/);
-  assert.match(rows, /if \(resolveTranscriptDisplayMode\(settings\) === "flat"\) return null;/);
+  /*
+   * The groups switch is not gated by the display mode. It decides the turn's
+   * own process disclosure, which every layout renders, so hiding it in `flat`
+   * made a switch that still folded everything invisible.
+   */
+  assert.doesNotMatch(rows, /resolveTranscriptDisplayMode/);
   assert.match(rows, /<SettingsRow\s*\n\s*nested/);
   assert.equal(
     rows.match(/saveSettings\(/g)?.length,
     2,
     "only the two toggles write, so hiding a row can never persist a default",
+  );
+  // …and the turn-level disclosure reads that same preference.
+  assert.match(turnProcess, /resolveAutoCollapseSettledGroups\(state\.settings\)/);
+  assert.match(
+    turnProcess,
+    /turnProcessStartsOpen\(\{ turnActive: isActive, collapseSettled: collapseSettledGroups \}\)/,
+  );
+  assert.doesNotMatch(
+    turnProcess,
+    /useAutomaticDisclosure\(\s*isActive,/,
+    "a settled turn must not fold on liveness alone",
   );
   const showThinkingAt = page.indexOf("<ShowThinkingRow");
   const thinkingAt = page.indexOf("<AutoCollapseThinkingRow");

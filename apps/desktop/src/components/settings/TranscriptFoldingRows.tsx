@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "@pi-workspace/shared";
 import { resolveShowThinking } from "../../lib/thinking-visibility";
-import { resolveTranscriptDisplayMode } from "../../lib/transcript-display-mode";
 import {
   resolveAutoCollapseSettledGroups,
   resolveAutoCollapseThinking,
@@ -12,10 +11,11 @@ import { SettingsToggle } from "../ui";
 /*
  * The two switches behind a folded transcript (issue #2094).
  *
- * Both are sub-rows: each one only makes sense while the row above it is
- * offering content to fold. Hiding a sub-row never writes a value, so a reader
- * who turns `Show thinking` off and on again, or switches to the flat layout and
- * back, finds the choice they made still in place.
+ * Hiding a sub-row never writes a value, so a reader who turns `Show thinking`
+ * off and on again finds the choice they made still in place. `Auto-fold
+ * finished groups` is not hidden by any layout: it decides the turn's own
+ * process disclosure too, so it survives the mode switch and stays reachable
+ * from all three layouts.
  */
 
 /** Fold reasoning that is no longer streaming. */
@@ -55,9 +55,9 @@ export function AutoCollapseSettledGroupsRow({
   saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  // The flat layout renders rows without activity groups, so the switch has no
-  // effect there; hiding it keeps the settings page honest about the mode.
-  if (resolveTranscriptDisplayMode(settings) === "flat") return null;
+  // The switch also governs the turn's own process disclosure, which every
+  // layout renders, so it stays visible in `flat` too - a hidden switch that
+  // still decides what the reader sees is worse than no switch.
   const collapse = resolveAutoCollapseSettledGroups(settings);
   return (
     <SettingsRow

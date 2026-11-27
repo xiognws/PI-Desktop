@@ -1852,7 +1852,7 @@ sklm: {
     autoCollapseThinking: "已完成思考自动收起",
     autoCollapseThinkingDesc: "只有正在生成的思考保持展开；关闭后所有思考内容保持展开。",
     autoCollapseSettledGroups: "已完成小组自动收起",
-    autoCollapseSettledGroupsDesc: "任务结束后，过程小组默认收起，标题会说明这一组做过什么。关闭后已结束的小组全部展开。",
+    autoCollapseSettledGroupsDesc: "任务结束后，整轮过程行与其中的过程小组默认收起，标题会说明做过什么。关闭后已结束回合的过程全部展开。",
     transcriptDisplayMode: "过程显示",
     transcriptDisplayModeDesc: "选择助手过程在对话中的分组方式。",
     radialMenu: "环形右键菜单",
