@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.1-pi.5
+
+- Fix: a UTF-16 text file was judged binary and refused by the viewer with
+  「二进制文件，无法预览」. Windows tools write UTF-16 by default (PowerShell's `>`
+  and `Out-File` do), so the bytes are half NUL — and "contains a NUL = binary"
+  alone condemned every such `.txt` / `.log`. A file whose BOM says UTF-16 now
+  decodes as text (little- and big-endian, CRLF normalised the way UTF-8 files
+  already are) and opens **read-only**: the save path only writes UTF-8, so a
+  save would silently transcode the whole file. No BOM and a NUL byte still
+  reads as binary, exactly as before.
+
 ## 0.9.1-pi.4
 
 - Fix: collapsing the file list no longer hides the editor. `0.9.1-pi.3` moved

@@ -2343,6 +2343,30 @@ function asDataUri(mime, buffer) {
   return `data:${mime};base64,${buffer.toString("base64")}`;
 }
 
+/**
+ * 带 BOM 的 UTF-16 文本。
+ *
+ * PowerShell 的 `>` / `Out-File` 默认写 UTF-16LE，很多 Windows 导出工具也一样，
+ * 于是字节里遍布 NUL——只按「含 NUL 就是二进制」判，会把这类 .txt / .log 全判死
+ * （用户看到的是一句「二进制文件，无法预览」，而它明明是可读文本）。
+ * 有 BOM 就按 BOM 解，没有 BOM 才轮到 NUL 那条规则。
+ */
+function decodeBomUtf16(buffer) {
+  if (buffer.length < 2) return null;
+  const littleEndian = buffer[0] === 0xff && buffer[1] === 0xfe;
+  const bigEndian = buffer[0] === 0xfe && buffer[1] === 0xff;
+  if (!littleEndian && !bigEndian) return null;
+  const body = buffer.subarray(2);
+  // Node 只认 utf16le：大端先两两换位，不为一种稀有字节序再引一个解码依赖。
+  const bytes = bigEndian ? Buffer.from(body).swap16() : body;
+  // 末尾不足一个字符的半个字（文件被截断时）丢掉，不把它解成替换符。
+  const end = bytes.length - (bytes.length % 2);
+  return {
+    text: bytes.toString("utf16le", 0, end),
+    encoding: littleEndian ? "utf-16le" : "utf-16be",
+  };
+}
+
 async function handleRead(payload) {
   const { abs, rel } = await resolveTarget(payload, "read");
 
@@ -2415,6 +2439,22 @@ async function handleRead(payload) {
   }
 
   const buffer = await fs.readFile(abs);
+  const utf16 = decodeBomUtf16(buffer);
+  if (utf16) {
+    const eol = utf16.text.includes("\r\n") ? "crlf" : "lf";
+    return {
+      ok: true,
+      kind: "text",
+      text: eol === "crlf" ? utf16.text.split("\r\n").join("\n") : utf16.text,
+      eol,
+      // 保存路径只会写 UTF-8：把 UTF-16 文件标成只读，免得一次 Ctrl+S 就悄悄
+      // 换掉整份文件的编码（内容不丢，但按字节读它的脚本/工具会当它坏掉）。
+      bom: false,
+      readOnly: true,
+      encoding: utf16.encoding,
+      ...base,
+    };
+  }
   if (buffer.subarray(0, 4096).includes(0)) return { ok: true, kind: "binary", ...base };
 
   const bom = buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf;
