@@ -1,0 +1,14 @@
+docs/adr/0409-token-budget-defaults.md
+  h_201ed4c689ac8b 85-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ab9484642c6193d8b11fa69b29543b617baa4d7d",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
