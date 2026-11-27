@@ -1,0 +1,48 @@
+apps/desktop/resources/plugins/pi.file-manager/CHANGELOG.md
+  h_201ed4c689ac8b 3,5-14
+apps/desktop/resources/plugins/pi.file-manager/UPSTREAM.md
+  h_201ed4c689ac8b 19,29-33,84,88,91,173-176
+apps/desktop/resources/plugins/pi.file-manager/manifest.json
+  h_201ed4c689ac8b 5
+apps/desktop/resources/plugins/pi.file-manager/views/assets/index.js
+  h_201ed4c689ac8b 1
+apps/desktop/test/bundled-plugins.test.mjs
+  h_201ed4c689ac8b 84
+apps/desktop/test/file-manager-code-highlight.test.mjs
+  h_201ed4c689ac8b 7,9-13,21-22,24-26,28-43,46-49,53-61,63-64
+crates/agent-core/src/sidecar.rs
+  h_201ed4c689ac8b 1559-1562,1580-1588,1852-1854,1885-1888,1890-1899,2470-2508,4450-4641,5758-5851
+crates/host-core/src/db.rs
+  h_201ed4c689ac8b 10,30,59
+crates/host-core/src/db/migrations.rs
+  h_201ed4c689ac8b 819-821
+crates/host-core/src/db/repositories.rs
+  h_201ed4c689ac8b 228-231,339-344
+crates/host-core/src/db/schema.rs
+  h_201ed4c689ac8b 440-451
+crates/host-core/src/db/session_ledger_migration.rs
+  h_201ed4c689ac8b 1-48
+crates/host-core/src/db/session_ledger_test.rs
+  h_201ed4c689ac8b 1-108
+crates/host-core/src/main.rs
+  h_201ed4c689ac8b 33
+crates/host-core/src/rpc/mod.rs
+  h_201ed4c689ac8b 3193-3229
+crates/host-core/src/session_ledger.rs
+  h_201ed4c689ac8b 1-219
+docs/adr/0412-session-ledger.md
+  h_201ed4c689ac8b 1-92
+docs/adr/README.md
+  h_201ed4c689ac8b 452
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f905a20f184b508bee09140ff35d17eee5f73d5e",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
