@@ -1,0 +1,18 @@
+crates/agent-core/src/context.rs
+  h_201ed4c689ac8b 160-163,166,174-175,178,209-210,218-219
+crates/agent-core/tests/context_limits_parity.rs
+  h_201ed4c689ac8b 1-205
+crates/agent-core/tests/fixtures/context-budget-reference.json
+  h_201ed4c689ac8b 1-647
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "928b6730171e07bccbf646796e9be66df95aafad",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
