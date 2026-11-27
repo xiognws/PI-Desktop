@@ -1,0 +1,28 @@
+Cargo.lock
+  h_201ed4c689ac8b 45,745,1219-1225
+Cargo.toml
+  h_201ed4c689ac8b 2
+crates/agent-core/Cargo.toml
+  h_201ed4c689ac8b 18
+crates/agent-core/src/exec.rs
+  h_201ed4c689ac8b 443-445,447,449,631-648
+crates/host-core/Cargo.toml
+  h_201ed4c689ac8b 13
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 1248,2946-2949
+crates/native-text/Cargo.toml
+  h_201ed4c689ac8b 1-11
+crates/native-text/src/lib.rs
+  h_201ed4c689ac8b 1-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "7b3d1c1889294e99be6f4254f73da17863338208",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
