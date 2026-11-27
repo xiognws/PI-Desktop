@@ -36,6 +36,14 @@ export type WorkbenchViewLike = {
     /** Present on a real `WebContents`; the fake in tests may omit them. */
     insertCSS?: (css: string) => Promise<unknown> | unknown;
     executeJavaScript?: (code: string) => Promise<unknown> | unknown;
+    /**
+     * `webContents.on`. Present on a real `WebContents` only: the fake in tests
+     * omits it, and the module then relies on the `loadURL` promises alone.
+     */
+    on?: (
+      event: "did-start-loading" | "did-finish-load",
+      listener: () => void,
+    ) => void;
   };
   setBounds(bounds: WorkbenchBounds): void;
 };
@@ -95,6 +103,7 @@ export class AutotestWorkbenchView {
     if (!this.view) {
       this.view = this.deps.createView();
       this.url = url;
+      this.watchDocumentLoads(this.view);
       void Promise.resolve(this.view.webContents.loadURL(url))
         .then(() => this.applyThemeNow())
         .catch((error: unknown) => {
@@ -105,6 +114,8 @@ export class AutotestWorkbenchView {
     // A different port (a restarted service) is a different page.
     if (this.url !== url) {
       this.url = url;
+      // A new document starts without the stylesheet the old one carried.
+      this.themeCssInserted = false;
       void Promise.resolve(this.view.webContents.loadURL(url))
         .then(() => this.applyThemeNow())
         .catch((error: unknown) => {
@@ -112,6 +123,30 @@ export class AutotestWorkbenchView {
         });
     }
     return this.view;
+  }
+
+  /**
+   * Re-apply the palette whenever a document arrives.
+   *
+   * The `loadURL` promises cover the loads this module starts, but the page can
+   * also reload itself — then nothing in this module runs until the next attach,
+   * and the page wears its own chrome (its title bar, its own environment strip)
+   * in the meantime. `did-finish-load` is the one signal every document gives.
+   *
+   * The guard is cleared when a document *starts*, not when it finishes, so each
+   * document gets the stylesheet exactly once: the `loadURL` promise and the
+   * event both end up calling `applyThemeNow`, and whichever runs second finds
+   * `themeCssInserted` already true.
+   */
+  private watchDocumentLoads(view: WorkbenchViewLike): void {
+    const contents = view.webContents;
+    if (!contents.on) return;
+    contents.on("did-start-loading", () => {
+      this.themeCssInserted = false;
+    });
+    contents.on("did-finish-load", () => {
+      this.applyThemeNow();
+    });
   }
 
   /**

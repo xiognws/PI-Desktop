@@ -109,6 +109,8 @@ export const ptBR = {
     showBar: "Mostrar barra de status",
     running: "Em execução",
     pending: "Aguardando aprovação",
+    service: "Serviço",
+    pipeline: "Pipeline",
   },
   credits: {
     label: "Créditos",

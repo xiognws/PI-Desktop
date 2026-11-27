@@ -99,7 +99,10 @@ test("the surface forwards the window's resolved theme and keeps one chrome", ()
   assert.match(surface, /api\.autotestWorkbenchAttach\(\{ theme: resolvedTheme\(\) \}\)/);
   // A theme switch in the shell re-attaches the same view with the other palette.
   assert.match(surface, /attributeFilter: \["data-theme"\]/);
-  // Its own titlebar stands in only while the workbench is not up: the page's
-  // header band is the one chrome then.
-  assert.match(surface, /\{state === "ready" \? null : \(\s*<header className="autotest-titlebar no-drag">/);
+  // The window's top band is always drawn, at the chat topbar's height, and it
+  // says two things only: which project, and whether the service is up. The
+  // page's own header band stays suppressed while it is embedded.
+  assert.match(surface, /<header className="autotest-topbar no-drag">/);
+  assert.match(surface, /\{route\.projectName \|\| t\("surface\.autotest"\)\}/);
+  assert.match(surface, /className="autotest-topbar-state" data-state=\{state\}/);
 });

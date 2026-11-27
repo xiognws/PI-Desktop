@@ -109,6 +109,8 @@ export const fr = {
     showBar: "Afficher la barre d'état",
     running: "En cours",
     pending: "En attente d'approbation",
+    service: "Service",
+    pipeline: "Pipeline",
   },
   "credits": {
     "label": "Crédits",

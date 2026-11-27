@@ -6,6 +6,7 @@ import { IconChevronRight, IconSidebar } from "../../../components/icons";
 import { api } from "../../../lib/api";
 import { useAppStore } from "../../../stores/app-store";
 import type { SurfaceShellProps } from "../registry";
+import { AUTOTEST_PIPELINE } from "./pipeline";
 
 /**
  * The AutoTest surface.
@@ -25,8 +26,10 @@ import type { SurfaceShellProps } from "../registry";
  * 3. detaching hides rather than destroys, so switching interfaces and coming
  *    back leaves the workbench where the user left it.
  *
- * The sidebar column is the surface's own: the chat sidebar is keyed by
- * conversations, and a test platform navigates by tests, plans and runs.
+ * What this surface learns goes to the store, not into local state: the service
+ * and the page's route are facts the window's status bar reads too, and a switch
+ * away must not leave two versions of them. The column is navigation only — the
+ * environment strip belongs to the window.
  */
 
 /** Re-check a failed service without the user having to click anything. */
@@ -34,48 +37,6 @@ const FAILED_RETRY_MS = 25_000;
 
 /** How often the surface re-reads the page's route, to keep the menu honest. */
 const LOCATION_POLL_MS = 1_500;
-
-/**
- * The workbench's menu, mirrored from `ProjectLayout.vue`'s `NAV`.
- *
- * It is duplicated on purpose: the page cannot render into this window's sidebar,
- * so the labels live here and each click drives the page's router through the
- * navigate channel.
- */
-const NAV: { group: string; items: { path: string; name: string }[] }[] = [
-  {
-    group: "流程",
-    items: [
-      { path: "pipeline", name: "流水线" },
-      { path: "runs", name: "运行记录" },
-      { path: "approvals", name: "待审批" },
-    ],
-  },
-  {
-    group: "产物",
-    items: [
-      { path: "cases", name: "用例" },
-      { path: "scripts", name: "脚本" },
-    ],
-  },
-  {
-    group: "结果",
-    items: [
-      { path: "executions", name: "执行" },
-      { path: "reports", name: "报告" },
-      { path: "bugs", name: "缺陷" },
-    ],
-  },
-  {
-    group: "资料",
-    items: [
-      { path: "requirements", name: "项目资料" },
-      { path: "knowledge", name: "知识库" },
-      { path: "contract", name: "被测件契约" },
-    ],
-  },
-  { group: "其他", items: [{ path: "settings", name: "设置" }] },
-];
 
 /** `/project/<id>/<view>` → id and view; `/` → neither. */
 function parseLocation(path: string): { projectId: string; view: string } {
@@ -103,27 +64,47 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
   const page = useAppStore((s) => s.page);
   const collapsed = useAppStore((s) => s.autotestSidebarCollapsed);
   const setCollapsed = useAppStore((s) => s.setAutotestSidebarCollapsed);
+  const service = useAppStore((s) => s.autotestService);
+  const setService = useAppStore((s) => s.setAutotestService);
+  const route = useAppStore((s) => s.autotestRoute);
+  const setRoute = useAppStore((s) => s.setAutotestRoute);
   const active = surface === "autotest" && page !== "settings";
   const paneRef = useRef<HTMLDivElement | null>(null);
-  const [snapshot, setSnapshot] = useState<AutotestWorkbenchSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
-  const [location, setLocation] = useState("/");
-  const [projectName, setProjectName] = useState("");
+
+  // One place turns the bridge's answer into window state, so attach, restart and
+  // the failure path cannot disagree about what they publish.
+  const publish = useCallback(
+    (snapshot: AutotestWorkbenchSnapshot) => {
+      setService({
+        status: snapshot.status === "stopped" ? "idle" : snapshot.status,
+        port: snapshot.port ?? undefined,
+        error: snapshot.error || undefined,
+      });
+    },
+    [setService],
+  );
+
+  const fail = useCallback(
+    (error: unknown) => {
+      setService({
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+    [setService],
+  );
 
   const attach = useCallback(async () => {
     setBusy(true);
     try {
-      setSnapshot(await api.autotestWorkbenchAttach({ theme: resolvedTheme() }));
+      publish(await api.autotestWorkbenchAttach({ theme: resolvedTheme() }));
     } catch (error) {
-      setSnapshot({
-        status: "failed",
-        port: null,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      fail(error);
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [fail, publish]);
 
   const measure = useCallback(() => {
     const pane = paneRef.current;
@@ -158,21 +139,25 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
     };
   }, [attach, measure, visible]);
 
+  // Nothing has asked the service anything yet is one answer away from starting,
+  // so an idle row reads as starting here and everywhere else that reads it.
+  const state = service.status === "idle" ? "starting" : service.status;
+
   // The view is positioned from a measured rect, so it follows resizes.
   useEffect(() => {
-    if (!visible || snapshot?.status !== "ready") return;
+    if (!visible || state !== "ready") return;
     const pane = paneRef.current;
     if (!pane || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => measure());
     observer.observe(pane);
     return () => observer.disconnect();
-  }, [measure, snapshot?.status, visible]);
+  }, [measure, state, visible]);
 
   useEffect(() => {
-    if (!visible || snapshot?.status !== "failed") return;
+    if (!visible || state !== "failed") return;
     const timer = window.setTimeout(() => void attach(), FAILED_RETRY_MS);
     return () => window.clearTimeout(timer);
-  }, [attach, snapshot?.status, visible]);
+  }, [attach, state, visible]);
 
   // Following the window's theme is a re-attach, not a reload: the same view is
   // re-shown, and main hands it the other palette.
@@ -187,13 +172,15 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
   // The page can move on its own (a project card opens its pipeline), so the menu
   // follows the page rather than assuming the click that started it.
   useEffect(() => {
-    if (!visible || snapshot?.status !== "ready") return;
+    if (!visible || state !== "ready") return;
     let cancelled = false;
     const read = () => {
       void api
         .autotestWorkbenchLocation()
         .then((result) => {
-          if (!cancelled) setLocation(result.path);
+          if (cancelled) return;
+          const next = parseLocation(result.path);
+          setRoute({ projectId: next.projectId, view: next.view });
         })
         .catch(() => undefined);
     };
@@ -203,55 +190,55 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [snapshot?.status, visible]);
+  }, [setRoute, state, visible]);
+
+  const { projectId, view } = route;
 
   // The project name for the top band: only the service knows it, and it is on
   // loopback with permissive CORS, so the surface asks it directly.
-  const { projectId, view } = parseLocation(location);
   useEffect(() => {
-    if (!projectId || !snapshot?.port) {
-      setProjectName("");
+    if (!projectId || !service.port) {
+      setRoute({ projectName: "" });
       return;
     }
     let cancelled = false;
-    const port = snapshot.port;
+    const port = service.port;
     void fetch(`http://127.0.0.1:${port}/api/projects`)
       .then((response) => response.json())
       .then((payload: { projects?: { id: string; name: string }[] }) => {
         if (cancelled) return;
-        setProjectName(payload.projects?.find((item) => item.id === projectId)?.name ?? "");
+        setRoute({
+          projectName:
+            payload.projects?.find((item) => item.id === projectId)?.name ?? "",
+        });
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [projectId, snapshot?.port]);
+  }, [projectId, service.port, setRoute]);
 
   const go = async (target: string) => {
     const result = await api.autotestWorkbenchNavigate(target).catch(() => null);
-    if (result) setLocation(result.path);
+    if (!result) return;
+    const next = parseLocation(result.path);
+    setRoute({ projectId: next.projectId, view: next.view });
   };
 
   const restart = async () => {
     setBusy(true);
     try {
-      setSnapshot(await api.autotestWorkbenchRestart());
+      publish(await api.autotestWorkbenchRestart());
     } catch (error) {
-      setSnapshot({
-        status: "failed",
-        port: null,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      fail(error);
     } finally {
       setBusy(false);
     }
   };
 
-  const state = snapshot?.status ?? "starting";
-
   const serviceLabel =
     state === "ready"
-      ? t("autotest.surface.ready", { port: snapshot?.port ?? "?" })
+      ? t("autotest.surface.ready", { port: service.port ?? "?" })
       : state === "failed"
         ? t("autotest.surface.failed")
         : t("autotest.surface.starting");
@@ -296,7 +283,7 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
         ) : (
           <>
             <div className="autotest-sidebar-header">
-              <span className="autotest-sidebar-title">{t("surface.autotest")}</span>
+              <span className="autotest-sidebar-title">{t("autotest.surface.title")}</span>
               <TooltipButton
                 type="button"
                 className="autotest-sidebar-toggle"
@@ -310,53 +297,25 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
               </TooltipButton>
             </div>
             <div className="autotest-sidebar-body">
-              <div className="autotest-service" data-state={state}>
-                <span className="autotest-service-dot" aria-hidden />
-                <span className="autotest-service-label">{serviceLabel}</span>
-              </div>
-              {state === "failed" && snapshot?.error ? (
-                <p className="autotest-service-detail">{snapshot.error}</p>
-              ) : null}
-              <div className="autotest-sidebar-actions">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => void restart()}
-                >
-                  {t("autotest.surface.restart")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void api.autotestWorkbenchOpenWindow()}
-                >
-                  {t("autotest.surface.openWindow")}
-                </Button>
-              </div>
-              {/* The workbench's own menu, drawn here because its page cannot
+              {/* The workbench's pipeline, drawn here because its page cannot
                   reach this column. With no project open there is nothing to
-                  navigate, so the menu waits for one. */}
+                  navigate, so the menu waits for one. The service's own state is
+                  not repeated here: the window's status bar and the band above
+                  this pane carry it. */}
               {projectId ? (
                 <nav className="autotest-nav" data-nav="autotest-menu">
-                  {NAV.map((group) => (
-                    <div key={group.group} className="autotest-nav-group">
-                      <p className="autotest-nav-heading">{group.group}</p>
-                      {group.items.map((item) => (
-                        <button
-                          key={item.path}
-                          type="button"
-                          className={cx("autotest-nav-item", view === item.path && "is-active")}
-                          data-nav={`autotest-nav-${item.path}`}
-                          aria-current={view === item.path ? "page" : undefined}
-                          onClick={() => void go(`/project/${projectId}/${item.path}`)}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
-                    </div>
+                  {AUTOTEST_PIPELINE.map((item) => (
+                    <button
+                      key={item.path}
+                      type="button"
+                      className={cx("autotest-nav-item", view === item.path && "is-active")}
+                      data-nav={`autotest-nav-${item.path}`}
+                      aria-current={view === item.path ? "page" : undefined}
+                      onClick={() => void go(`/project/${projectId}/${item.path}`)}
+                    >
+                      <span className="autotest-nav-step">{item.step}</span>
+                      <span>{item.name}</span>
+                    </button>
                   ))}
                   <button
                     type="button"
@@ -368,6 +327,19 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
                   </button>
                 </nav>
               ) : null}
+              {/* The service's controls live at the foot of the column, not in the
+                  middle of it: they are maintenance, not workflow. */}
+              <div className="autotest-sidebar-footer">
+                <button
+                  type="button"
+                  className="autotest-footer-action"
+                  data-nav="autotest-restart-service"
+                  disabled={busy}
+                  onClick={() => void restart()}
+                >
+                  {t("autotest.surface.restart")}
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -375,10 +347,11 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
       <section className="autotest-main-pane">
         {/* The window's top band, at the chat surface's height. The page's own
             title bar is suppressed, so the drag region, the window buttons and
-            the status bar below keep the positions users already know. */}
+            the status bar below keep the positions users already know. It says
+            two things only: which project, and whether the service is up. */}
         <header className="autotest-topbar no-drag">
           <span className="autotest-topbar-title">
-            {projectName || t("autotest.surface.title")}
+            {route.projectName || t("surface.autotest")}
           </span>
           <span className="autotest-topbar-state" data-state={state}>
             {serviceLabel}
@@ -394,7 +367,7 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
               </p>
               <p className="autotest-pane-detail">
                 {state === "failed"
-                  ? snapshot?.error || t("autotest.surface.failedDetail")
+                  ? service.error || t("autotest.surface.failedDetail")
                   : t("autotest.surface.startingDetail")}
               </p>
               {state === "failed" ? (

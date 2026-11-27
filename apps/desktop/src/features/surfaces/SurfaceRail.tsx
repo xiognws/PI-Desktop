@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { SurfaceId } from "@pi-workspace/shared";
 import { TooltipButton } from "../../components/ui";
+import { IconSettings as SettingsIcon } from "../../components/icons";
 import { useAppStore } from "../../stores/app-store";
 import { SURFACES } from "./registry";
 
@@ -20,6 +21,7 @@ export function SurfaceRail() {
   const { t } = useTranslation();
   const surface = useAppStore((s) => s.surface);
   const setSurface = useAppStore((s) => s.setSurface);
+  const setPage = useAppStore((s) => s.setPage);
 
   return (
     <nav className="surface-rail" aria-label={t("surface.switcher")}>
@@ -43,6 +45,21 @@ export function SurfaceRail() {
           </TooltipButton>
         );
       })}
+      {/* Settings belong to the client, not to a conversation: this column is the
+          one place every interface shares, so the entry lives here and stays
+          reachable from the AutoTest surface too. */}
+      <div className="surface-rail-bottom">
+        <TooltipButton
+          type="button"
+          className="surface-rail-button no-drag"
+          data-nav="surface-settings"
+          tooltip={t("nav.settings")}
+          ariaLabel={t("nav.settings")}
+          onClick={() => setPage("settings")}
+        >
+          <SettingsIcon size={16} />
+        </TooltipButton>
+      </div>
     </nav>
   );
 }

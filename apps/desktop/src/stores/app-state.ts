@@ -154,6 +154,33 @@ export type SkillReviewNotice = {
   afterMessageId?: string;
 };
 
+/**
+ * The AutoTest service as the window last saw it.
+ *
+ * The surface's own shell is what attaches, restarts and retries the service,
+ * but the fact belongs to the window: its status bar and the surface's top band
+ * both read this row, so switching interfaces cannot leave two versions of
+ * "is the service up". `idle` means nothing has asked the service anything yet.
+ */
+export type AutotestServiceState = {
+  status: "idle" | "starting" | "ready" | "failed";
+  port?: number;
+  error?: string;
+};
+
+/**
+ * Where the embedded workbench page is, as last read from it.
+ *
+ * The page runs in its own process and owns its router; the surface polls the
+ * route and publishes it here so the window's status bar can name the project
+ * and the pipeline step without reaching into that page.
+ */
+export type AutotestRoute = {
+  projectId: string;
+  view: string;
+  projectName: string;
+};
+
 export type AppState = {
   ready: boolean;
   version?: AppVersionInfo;
@@ -270,6 +297,12 @@ export type AppState = {
    */
   autotestSidebarCollapsed: boolean;
   setAutotestSidebarCollapsed: (collapsed: boolean) => void;
+  /** The service the AutoTest surface drives, shared with the window's chrome. */
+  autotestService: AutotestServiceState;
+  setAutotestService: (service: AutotestServiceState) => void;
+  /** The workbench page's own route, and the project it is showing. */
+  autotestRoute: AutotestRoute;
+  setAutotestRoute: (route: Partial<AutotestRoute>) => void;
   /** Tab ids come from the shared settings index. */
   settingsTab: SettingsTabId;
   /** Pending row anchor (i18n key) to flash after landing on a settings tab. */

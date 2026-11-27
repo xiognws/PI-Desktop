@@ -107,6 +107,8 @@ export const en = {
     showBar: "Show status bar",
     running: "Running",
     pending: "Waiting for approval",
+    service: "Service",
+    pipeline: "Pipeline",
   },
   credits: {
     label: "Credits",

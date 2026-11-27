@@ -102,6 +102,19 @@ header.h-14,
 aside.w-60 {
   display: none !important;
 }
+
+/* The window has one theme control and it is the client's: the page's own switch
+   sat in its bottom-right corner, next to a status bar the client already draws. */
+[aria-label="主题"] {
+  display: none !important;
+}
+
+/* The page's environment strip (h-7 + bg-surface-3) repeated facts the window
+   shows in its own status bar, and being inside the page it pushed the content up
+   by its own height. The shell draws that band for the whole window. */
+.h-7.bg-surface-3 {
+  display: none !important;
+}
 `;
 
 /**

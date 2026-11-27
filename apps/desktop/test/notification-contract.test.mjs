@@ -19,6 +19,7 @@ const [
   appSource,
   shellRuntimeSource,
   sidebarSource,
+  statusBarSource,
   pluginRuntimeSource,
 ] =
   await Promise.all([
@@ -29,6 +30,7 @@ const [
     readAppSource(),
     read("../src/features/app/useAppShellRuntime.tsx"),
     read("../src/components/Sidebar.tsx"),
+    read("../src/features/shell/StatusBar.tsx"),
     read("../electron/main/plugin-runtime.ts"),
   ]);
 
@@ -67,7 +69,10 @@ test("terminal notifications flow from host completion to the renderer", () => {
   assert.match(storeSource, /receiveNotification:/);
   assert.match(storeSource, /unreadNotificationCount/);
   assert.match(appSource, /api\.onNotificationChanged/);
-  assert.match(sidebarSource, /<NotificationCenter onBeforeOpen=\{\(\) => closeMenus\(false\)\} \/>/);
+  // The notification trigger belongs to the window's status bar now; opening its
+  // panel closes whatever menu the bar had open first.
+  assert.match(statusBarSource, /<NotificationCenter onBeforeOpen=\{[^}]*\} \/>/);
+  assert.doesNotMatch(sidebarSource, /<NotificationCenter/);
   assert.doesNotMatch(appSource, /<NotificationCenter \/>/);
   const changedHandler = appSource.match(
     /api\.onNotificationChanged[\s\S]*?\n\s*\}\);/,

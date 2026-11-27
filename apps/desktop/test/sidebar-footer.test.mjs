@@ -3,8 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadStyles } from "./helpers/styles.mjs";
 
-const sidebarSource = await readFile(
-  new URL("../src/components/Sidebar.tsx", import.meta.url),
+// The bar belongs to the window now: it lives in the shell, not in the chat
+// sidebar, so every interface gets one. The assertions below read that file.
+const statusBarSource = await readFile(
+  new URL("../src/features/shell/StatusBar.tsx", import.meta.url),
   "utf8",
 );
 const globalStyles = await loadStyles();
@@ -19,10 +21,10 @@ const enLocale = await readFile(
 
 test("the sidebar footer is an action bar, not a fabricated identity", () => {
   // The app has no accounts; an avatar with a name implied one that never existed.
-  assert.doesNotMatch(sidebarSource, /footer-profile/);
-  assert.doesNotMatch(sidebarSource, /profile-menu/);
-  assert.doesNotMatch(sidebarSource, /sidebar-profile-menu/);
-  assert.doesNotMatch(sidebarSource, /IconUser/);
+  assert.doesNotMatch(statusBarSource, /footer-profile/);
+  assert.doesNotMatch(statusBarSource, /profile-menu/);
+  assert.doesNotMatch(statusBarSource, /sidebar-profile-menu/);
+  assert.doesNotMatch(statusBarSource, /IconUser/);
   assert.doesNotMatch(globalStyles, /\.footer-profile/);
   assert.doesNotMatch(globalStyles, /\.profile-menu/);
   for (const locale of [zhLocale, enLocale]) {
@@ -32,22 +34,23 @@ test("the sidebar footer is an action bar, not a fabricated identity", () => {
 });
 
 test("footer exposes settings, plugins, scheduled tasks and notifications in one row", () => {
-  assert.match(sidebarSource, /className="footer-actions"/);
-  assert.match(sidebarSource, /data-nav="settings"/);
-  assert.match(sidebarSource, /data-nav="plugins"/);
-  const pluginsAction = sidebarSource.match(
+  assert.match(statusBarSource, /className="footer-actions"/);
+  assert.match(statusBarSource, /data-nav="settings"/);
+  assert.match(statusBarSource, /data-nav="plugins"/);
+  const pluginsAction = statusBarSource.match(
     /<TooltipButton[\s\S]*?data-nav="plugins"[\s\S]*?<\/TooltipButton>/,
   )?.[0] ?? "";
   assert.match(pluginsAction, /<IconPlug size=\{14\} aria-hidden \/>/);
-  assert.doesNotMatch(sidebarSource, /data-nav="theme"/);
+  assert.doesNotMatch(statusBarSource, /data-nav="theme"/);
+  // The notification panel closes whatever menu the bar has open first.
   assert.match(
-    sidebarSource,
-    /<NotificationCenter onBeforeOpen=\{\(\) => closeMenus\(false\)\} \/>/,
+    statusBarSource,
+    /<NotificationCenter onBeforeOpen=\{[^}]*\} \/>/,
   );
   // Logs live in Settings → About; the footer stays down to daily controls.
-  assert.doesNotMatch(sidebarSource, /openLogs/);
+  assert.doesNotMatch(statusBarSource, /openLogs/);
   // Every action is icon-only, so each needs a label for pointer and AT users.
-  const actions = sidebarSource
+  const actions = statusBarSource
     .split("<TooltipButton")
     .filter((chunk) => /className=(?:"footer-action"|\{`footer-action )/.test(chunk));
   assert.equal(actions.length, 3);
@@ -59,11 +62,11 @@ test("footer exposes settings, plugins, scheduled tasks and notifications in one
   // All footer destinations report their active state to assistive tech; the
   // Plugins button also reports the Back toggle a second activation performs.
   const footerAttributes = (marker) => {
-    const at = sidebarSource.indexOf(marker);
+    const at = statusBarSource.indexOf(marker);
     if (at < 0) return "";
-    return sidebarSource.slice(
-      sidebarSource.lastIndexOf("<TooltipButton", at),
-      sidebarSource.indexOf("</TooltipButton>", at),
+    return statusBarSource.slice(
+      statusBarSource.lastIndexOf("<TooltipButton", at),
+      statusBarSource.indexOf("</TooltipButton>", at),
     );
   };
   assert.match(
@@ -102,16 +105,16 @@ test("footer action buttons share the notification trigger's hit target", () => 
 });
 
 test("build chip surfaces the version and only dots an actionable update", () => {
-  assert.match(sidebarSource, /const update = useUpdateState\(\)/);
+  assert.match(statusBarSource, /const update = useUpdateState\(\)/);
   assert.match(
-    sidebarSource,
+    statusBarSource,
     /update\?\.status === "available" \|\| update\?\.status === "downloaded"/,
   );
-  assert.match(sidebarSource, /className="footer-build-dot"/);
+  assert.match(statusBarSource, /className="footer-build-dot"/);
   // An actionable update routes to the Settings row that can act on it.
-  assert.match(sidebarSource, /setSettingsAnchor\("updates\.title"\)/);
-  assert.match(sidebarSource, /setSettingsTab\("about"\)/);
-  assert.match(sidebarSource, /api\.updatesCheck\(\)/);
+  assert.match(statusBarSource, /setSettingsAnchor\("updates\.title"\)/);
+  assert.match(statusBarSource, /setSettingsTab\("about"\)/);
+  assert.match(statusBarSource, /api\.updatesCheck\(\)/);
   const dot = globalStyles.match(/\.footer-build-dot\s*\{[^}]+\}/)?.[0] ?? "";
   assert.match(dot, /background:\s*var\(--ds-accent\)/);
 });

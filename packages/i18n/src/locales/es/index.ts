@@ -109,6 +109,8 @@ export const es = {
     showBar: "Mostrar barra de estado",
     running: "En ejecución",
     pending: "Esperando aprobación",
+    service: "Servicio",
+    pipeline: "Flujo",
   },
   "credits": {
     "label": "Créditos",

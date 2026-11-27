@@ -75,6 +75,17 @@
   color: var(--ds-text-primary);
 }
 
+/* The rail's own foot: settings belongs to the client, and the column is the one
+   place every interface shares. The padding keeps it above the status bar. */
+.surface-rail-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 38px;
+}
+
 /* The active marker is a 2px bar on the window edge, not a fill: the icon rail
    has to stay quiet next to the sidebar it sits beside. */
 .surface-rail-button.is-active::before {
@@ -125,14 +136,12 @@
   color: var(--ds-danger, #e5484d);
 }
 
-/* The workbench's menu, in the sidebar it now shares with the service row. */
+/* The column's whole body: the seven stages, then the way back out. Nothing is
+   drawn above it any more — the service's row belongs to the window's bar. */
 .autotest-nav {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--ds-border-subtle);
   overflow-y: auto;
   min-height: 0;
 }
@@ -181,6 +190,49 @@
 .autotest-nav-item.is-back {
   margin-top: 4px;
   color: var(--ds-text-muted);
+}
+
+/* Pipeline step number: the page's own vocabulary, kept so the menu reads the same
+   way as the pipeline it drives. */
+.autotest-nav-step {
+  flex: none;
+  width: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ds-text-muted);
+}
+
+.autotest-nav-item.is-active .autotest-nav-step {
+  color: var(--ds-text-primary);
+}
+
+/* Service maintenance sits at the foot of the column, out of the workflow. */
+.autotest-sidebar-footer {
+  margin-top: auto;
+  padding: 8px 0 2px;
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.autotest-footer-action {
+  width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--ds-text-muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.autotest-footer-action:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.autotest-footer-action:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .app-surface-autotest {
@@ -285,46 +337,12 @@
   padding: 12px 12px 16px;
 }
 
-.autotest-service {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md, 8px);
-  background: var(--ds-bg-chip);
-  color: var(--ds-text-secondary);
-  font-size: 12px;
-  line-height: 1.35;
-}
-
 .autotest-service-dot {
   flex: none;
   width: 7px;
   height: 7px;
   border-radius: var(--radius-round, 999px);
   background: var(--ds-text-faint);
-}
-
-.autotest-service[data-state="ready"] .autotest-service-dot {
-  background: var(--ds-success, #3fb950);
-}
-
-.autotest-service[data-state="starting"] .autotest-service-dot {
-  background: var(--ds-warning);
-  animation: pulse-soft 1.2s ease-in-out infinite;
-}
-
-.autotest-service[data-state="failed"] .autotest-service-dot {
-  background: var(--ds-error);
-}
-
-.autotest-service-detail {
-  margin: 0;
-  padding: 0 2px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--ds-text-muted);
-  word-break: break-word;
 }
 
 .autotest-sidebar-actions {
@@ -401,8 +419,5 @@
   .surface-rail-button,
   .autotest-sidebar-toggle {
     transition: none;
-  }
-  .autotest-service[data-state="starting"] .autotest-service-dot {
-    animation: none;
   }
 }

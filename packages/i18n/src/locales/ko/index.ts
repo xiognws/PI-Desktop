@@ -109,6 +109,8 @@ export const ko = {
     showBar: "상태 표시줄 표시",
     running: "실행 중",
     pending: "승인 대기",
+    service: "서비스",
+    pipeline: "파이프라인",
   },
   credits: {
     label: "크레딧",

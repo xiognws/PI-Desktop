@@ -109,6 +109,8 @@ export const zhCN = {
     showBar: "显示状态栏",
     running: "运行中",
     pending: "等待批准",
+    service: "服务",
+    pipeline: "流水线",
   },
   credits: {
     label: "积分",

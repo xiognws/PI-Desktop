@@ -109,6 +109,8 @@ export const de = {
     showBar: "Statusleiste einblenden",
     running: "Läuft",
     pending: "Wartet auf Freigabe",
+    service: "Dienst",
+    pipeline: "Pipeline",
   },
   "credits": {
     "label": "Guthaben",

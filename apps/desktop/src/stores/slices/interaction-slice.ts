@@ -51,6 +51,8 @@ export function createInteractionSlice({
   | "setPage"
   | "setSurface"
   | "setAutotestSidebarCollapsed"
+  | "setAutotestService"
+  | "setAutotestRoute"
   | "setSettingsTab"
   | "setSettingsAnchor"
   | "canNavBack"
@@ -132,6 +134,46 @@ export function createInteractionSlice({
       if (get().autotestSidebarCollapsed === collapsed) return;
       set({ autotestSidebarCollapsed: collapsed });
       saveAutotestSidebarCollapsed(collapsed);
+    },
+
+    /**
+     * Publish the AutoTest service's state to the window.
+     *
+     * The surface shell is what calls attach/restart, but the result is window
+     * state: the status bar and the surface's own top band read this row, so the
+     * two cannot disagree while the surface is being switched away from and back.
+     * An unchanged answer is a no-op — attach is retried on a timer while the
+     * service is down, and repainting the bar every retry buys nothing.
+     */
+    setAutotestService: (service) => {
+      const current = get().autotestService;
+      if (
+        current.status === service.status &&
+        current.port === service.port &&
+        current.error === service.error
+      ) {
+        return;
+      }
+      set({ autotestService: { ...service } });
+    },
+
+    /**
+     * Publish where the workbench page is.
+     *
+     * The page's route is polled, so most writes repeat what the store already
+     * holds; those are dropped here rather than re-rendering the bar.
+     */
+    setAutotestRoute: (route) => {
+      const current = get().autotestRoute;
+      const next = { ...current, ...route };
+      if (
+        current.projectId === next.projectId &&
+        current.view === next.view &&
+        current.projectName === next.projectName
+      ) {
+        return;
+      }
+      set({ autotestRoute: next });
     },
 
     setSettingsTab: (requested) => {

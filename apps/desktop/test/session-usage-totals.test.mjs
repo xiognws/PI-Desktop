@@ -108,12 +108,15 @@ test("the total comes from the host ledger, not from the loaded transcript", asy
 });
 
 test("the bar item can be hidden like every other one", async () => {
-  const sidebar = await read("../src/components/Sidebar.tsx");
-  assert.match(sidebar, /StatusBarTokens,/);
-  assert.match(sidebar, /\{ id: "tokens", label: t\("statusBar\.tokens"\) \}/);
+  const segments = await read("../src/features/shell/surface-status.ts");
+  const bar = await read("../src/features/shell/StatusBar.tsx");
+  // The token item is one segment of the chat row, and one row of the menu.
+  assert.match(segments, /\{ id: "tokens", render: StatusBarTokens \}/);
+  assert.match(segments, /\{ id: "tokens", labelKey: "statusBar\.tokens" \}/);
+  // Hiding is the bar's generic rule, not a per-item branch.
   assert.match(
-    sidebar,
-    /statusBarPrefs\.hidden\.includes\("tokens"\) \? null : <StatusBarTokens \/>/,
+    bar,
+    /SURFACE_STATUS_SEGMENTS\[surface\]\.filter\(\s*\(segment\) => !prefs\.hidden\.includes\(segment\.id\),?\s*\)/,
   );
 });
 

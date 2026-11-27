@@ -26,6 +26,10 @@ export function createInitialState(): AppStateData {
     // flashing chat first.
     surface: loadSurfacePreference(),
     autotestSidebarCollapsed: loadAutotestSidebarCollapsed(),
+    // Nothing has asked the service anything yet in this window; the surface's
+    // shell publishes the first real answer when it attaches.
+    autotestService: { status: "idle" },
+    autotestRoute: { projectId: "", view: "", projectName: "" },
     recentModels: loadRecentModels(),
     healthOk: false,
     sessions: [],

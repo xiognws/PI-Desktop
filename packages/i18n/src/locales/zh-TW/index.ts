@@ -109,6 +109,8 @@ export const zhTW = {
     showBar: "顯示狀態列",
     running: "執行中",
     pending: "等待核准",
+    service: "服務",
+    pipeline: "流水線",
   },
   credits: {
     label: "積分",

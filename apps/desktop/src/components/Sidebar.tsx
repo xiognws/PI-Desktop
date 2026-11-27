@@ -1,4 +1,3 @@
-import { IconClock } from "./icons";
 import { RemoteProjectGroups } from "./remote/RemoteProjectGroups";
 import { groupRemoteProjectSessions } from "../lib/remote-project-catalog";
 import { isRemoteSession, sessionAllows } from "../lib/remote-session-safety";
@@ -29,22 +28,6 @@ import { formatSessionLastReplyDate } from "../lib/sidebar-session-date";
 import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
 import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
-import {
-  StatusBarCache,
-  StatusBarElapsed,
-  StatusBarMetrics,
-  StatusBarScheduled,
-  StatusBarSessionAge,
-  StatusBarSpeed,
-  StatusBarTokens,
-} from "./StatusBarUsage";
-import { StatusBarCredits } from "./StatusBarCredits";
-import { StatusBarMenu, type StatusBarMenuEntry } from "./StatusBarMenu";
-import {
-  setStatusBarHidden,
-  useStatusBarPrefs,
-} from "../lib/status-bar-prefs";
-import { pendingPermissionsCount, runningSessionsCount } from "../lib/status-bar";
 import {
   getGlobalPinnedSessions,
   normalizeProjectPath,
@@ -98,7 +81,6 @@ import {
   sidebarResetWidth,
 } from "../lib/sidebar-resize";
 import { BrandLogo } from "./BrandLogo";
-import { NotificationCenter } from "./NotificationCenter";
 import {
   WorktreeBadge,
   WorktreeDialogs,
@@ -117,7 +99,6 @@ import {
   type SidebarMenuPanelContent,
 } from "../lib/sidebar-menu";
 import { useArmedDelete } from "../hooks/use-armed-delete";
-import { useUpdateState } from "../hooks/use-update-state";
 import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
 import { ProjectEditDialog } from "./ProjectEditDialog";
 import { SessionRenameDialog } from "./SessionRenameDialog";
@@ -127,7 +108,6 @@ import {
   IconArrowUpDown,
   IconFileText,
   IconWrench,
-  IconPlug,
   IconBranch,
   IconCheck,
   IconChevronDown,
@@ -140,7 +120,6 @@ import {
   IconPin,
   IconPencil,
   IconSidebar,
-  IconSettings,
   IconStar,
   IconTrash,
   IconX,
@@ -293,22 +272,6 @@ export function Sidebar({
   const runningSessions = useAppStore((s) => s.runningSessions);
   const sessionOutcomes = useAppStore((s) => s.sessionOutcomes);
   const pendingPermissions = useAppStore((s) => s.pendingPermissions);
-  const runningCount = runningSessionsCount(runningSessions);
-  const pendingCount = pendingPermissionsCount(pendingPermissions);
-  const statusBarPrefs = useStatusBarPrefs();
-  const [statusBarMenuAt, setStatusBarMenuAt] = useState<{ x: number; y: number } | null>(null);
-  const statusBarEntries: StatusBarMenuEntry[] = [
-    { id: "project", label: t("statusBar.project") },
-    { id: "context", label: t("statusBar.context") },
-    { id: "tokens", label: t("statusBar.tokens") },
-    { id: "speed", label: t("statusBar.speed") },
-    { id: "cache", label: t("statusBar.cache") },
-    { id: "sessionAge", label: t("statusBar.sessionAge") },
-    { id: "scheduled", label: t("statusBar.scheduled") },
-    { id: "timer", label: t("statusBar.running") },
-    { id: "pending", label: t("statusBar.pending") },
-    { id: "credits", label: t("statusBar.creditsUnit") },
-  ];
   const setPage = useAppStore((s) => s.setPage);
   const navBack = useAppStore((s) => s.navBack);
   const canNavBack = useAppStore((s) => s.canNavBack);
@@ -342,10 +305,6 @@ export function Sidebar({
   const setProjectSort = useAppStore((s) => s.setProjectSort);
   const reorderProjects = useAppStore((s) => s.reorderProjects);
   const showToast = useAppStore((s) => s.showToast);
-  const version = useAppStore((s) => s.version);
-  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
-  const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
-  const update = useUpdateState();
 
   const [sortOpen, setSortOpen] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
@@ -701,21 +660,6 @@ export function Sidebar({
     sortOpen,
   ]);
 
-  // An update only earns the accent dot once it is actionable — a pending
-  // check or a failed one keeps the chip quiet.
-  const updateReady =
-    update?.status === "available" || update?.status === "downloaded";
-  const appVersion = update?.currentVersion || version?.version || "";
-  const buildLabel = updateReady
-    ? `v${update?.availableVersion ?? appVersion}`
-    : update?.status === "checking"
-      ? t("updates.checking")
-      : appVersion
-        ? `v${appVersion}`
-        : t("nav.buildUnknown");
-  const buildTitle = updateReady
-    ? t("updates.available", { version: update?.availableVersion ?? "" })
-    : t("nav.checkForUpdates");
   const taskTitle = useCallback((title?: string | null) => {
     const value = (title || "").trim();
     return isDefaultSessionTitle(value) ? t("chat.untitledTask") : value;
@@ -2815,130 +2759,8 @@ export function Sidebar({
               showLastReplyDate: settings?.sidebarSessionTime === true,
             })} />
         </div>
-
-        <div
-          className={cx("sidebar-footer no-drag", statusBarPrefs.barHidden && "is-bar-hidden")}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setStatusBarMenuAt({ x: event.clientX, y: window.innerHeight - event.clientY });
-          }}
-        >
-          <div className="footer-actions">
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "settings" ? "active" : ""}`}
-              data-nav="settings"
-              tooltip={t("nav.settings")}
-              ariaLabel={t("nav.settings")}
-              onClick={() => setPage("settings")}
-              aria-pressed={page === "settings"}
-            >
-              <IconSettings size={14} aria-hidden />
-            </TooltipButton>
-            <TooltipButton
-              type="button"
-              className={`footer-action ${page === "plugins" ? "active" : ""}`}
-              data-nav="plugins"
-              tooltip={t("nav.plugins")}
-              ariaLabel={t("nav.plugins")}
-              onClick={() => page === "plugins"
-                ? (canNavBack() ? navBack() : setPage("chat"))
-                : setPage("plugins")}
-              aria-pressed={page === "plugins"}
-            >
-              <IconPlug size={14} aria-hidden />
-            </TooltipButton>
-            {settings?.scheduledTasksEnabled !== false && (
-              <TooltipButton
-                type="button"
-                className={`footer-action ${page === "scheduled" ? "active" : ""}`}
-                data-nav="scheduled"
-                tooltip={t("scheduled.title")}
-                ariaLabel={t("scheduled.title")}
-                onClick={() => setPage("scheduled")}
-                aria-pressed={page === "scheduled"}
-              >
-                <IconClock size={14} aria-hidden />
-              </TooltipButton>
-            )}
-            <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
-          </div>
-
-          <div className="statusbar-info">
-            {!statusBarPrefs.hidden.includes("project") && workspace?.name ? (
-              <span className="statusbar-metric" title={workspace.path}>
-                <span className="statusbar-label">{t("statusBar.project")}</span>
-                <span className="statusbar-value">{workspace.name}</span>
-              </span>
-            ) : null}
-            {statusBarPrefs.hidden.includes("context") ? null : <StatusBarMetrics />}
-            {statusBarPrefs.hidden.includes("credits") ? null : <StatusBarCredits />}
-            {statusBarPrefs.hidden.includes("tokens") ? null : <StatusBarTokens />}
-            {statusBarPrefs.hidden.includes("speed") ? null : <StatusBarSpeed />}
-            {statusBarPrefs.hidden.includes("cache") ? null : <StatusBarCache />}
-            {statusBarPrefs.hidden.includes("sessionAge") ? null : <StatusBarSessionAge />}
-            {statusBarPrefs.hidden.includes("scheduled") ? null : <StatusBarScheduled />}
-            {runningCount > 1 ? (
-              <span className="statusbar-metric">
-                <span className="statusbar-value">
-                  {t("statusBar.running")} {runningCount}
-                </span>
-              </span>
-            ) : null}
-            {statusBarPrefs.hidden.includes("timer") ? null : <StatusBarElapsed />}
-            {!statusBarPrefs.hidden.includes("pending") && pendingCount > 0 ? (
-              <span className="statusbar-metric statusbar-metric-warn">
-                <span className="statusbar-value">
-                  {t("statusBar.pending")} {pendingCount}
-                </span>
-              </span>
-            ) : null}
-          </div>
-
-          <TooltipButton
-            type="button"
-            className={`footer-build ${updateReady ? "has-update" : ""}`}
-            data-nav="build"
-            tooltip={buildTitle}
-            ariaLabel={buildTitle}
-            onClick={() => {
-              if (updateReady) {
-                setSettingsAnchor("updates.title");
-                setSettingsTab("about");
-                return;
-              }
-              void (async () => {
-                try {
-                  await api.updatesCheck();
-                } catch { /* ignore */ }
-              })();
-            }}
-          >
-            <span className="footer-build-version">{buildLabel}</span>
-            {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
-          </TooltipButton>
-          {statusBarPrefs.barHidden ? (
-            <button
-              type="button"
-              className="statusbar-restore no-drag"
-              onClick={() => setStatusBarHidden(false)}
-              title={t("statusBar.showBar")}
-              aria-label={t("statusBar.showBar")}
-            >
-              <IconClock size={12} aria-hidden />
-            </button>
-          ) : null}
-        </div>
       </div>
       {renderFloatingMenu()}
-      {statusBarMenuAt ? (
-        <StatusBarMenu
-          at={statusBarMenuAt}
-          entries={statusBarEntries}
-          prefs={statusBarPrefs}
-          onClose={() => setStatusBarMenuAt(null)}
-        />
-      ) : null}
       {sessionHoverCard ? (
         <SessionHoverCard
           key={sessionHoverCard.session.id}

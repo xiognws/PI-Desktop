@@ -14,6 +14,7 @@ import { lazyRoute } from "../../lib/lazy-retry";
 import { PluginRendererHost } from "../../plugins/renderer-host/PluginRendererHost";
 import { SurfaceHost } from "../surfaces/SurfaceHost";
 import { SurfaceRail } from "../surfaces/SurfaceRail";
+import { StatusBar } from "../shell/StatusBar";
 import { RoutePending } from "./chrome";
 import { useAppShellRuntime } from "./useAppShellRuntime";
 
@@ -98,6 +99,11 @@ export function AppShell() {
           {/* Settings replaces the whole window, so the rail goes with it. */}
           {page === "settings" ? null : <SurfaceRail />}
           <SurfaceHost runtime={runtime} overlaysOpen={searchOpen} />
+
+          {/* The window's bottom band. It is drawn once here, not inside a
+              surface, so it spans the whole window and every interface feeds it
+              its own segments; Settings takes the window and the band with it. */}
+          {page === "settings" ? null : <StatusBar />}
 
           {/* Backend health follows the window, not one interface: it has to be
               readable from whichever surface is on screen. */}

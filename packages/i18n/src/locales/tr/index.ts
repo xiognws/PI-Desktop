@@ -109,6 +109,8 @@ export const tr = {
     showBar: "Durum çubuğunu göster",
     running: "Çalışıyor",
     pending: "Onay bekliyor",
+    service: "Servis",
+    pipeline: "İş akışı",
   },
   credits: {
     label: "Kredi",
