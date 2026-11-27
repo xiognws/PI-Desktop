@@ -1797,6 +1797,18 @@ impl Sidecar {
             planning.0,
         );
 
+        // Written before the turn can be killed: a client that closes, a host that
+        // dies, a user who stops mid-step never reaches a boundary, and an entry with
+        // no later finish is the only record that the turn existed at all. A boundary
+        // entry follows in the spawned task.
+        persist_ledger_entry(
+            self.bridge.clone(),
+            &session_id,
+            &turn_id,
+            "turn-start",
+            format!("Asked: {}", head(&text, 300)),
+        )
+        .await;
         // The turn task announces the state it is about to run in, then the one
         // it settled in. Both carry the same shape `agent.getStatus` answers.
         self.emit_status(&session_id, &turn_id, &session);
@@ -1882,21 +1894,11 @@ impl Sidecar {
                     cancel,
                 )
                 .await;
-            // One entry per finished turn, written from the transcript before it is
+            // One entry per boundary, built from the transcript before it is
             // released: this is what a resumed session reads when the transcript it
             // gets back no longer says how the turn ended.
             let ledger_text = ledger_entry_for_turn(transcript.messages());
             drop(transcript);
-            if let Some(text) = ledger_text {
-                persist_ledger_entry(
-                    ledger_bridge.clone(),
-                    &ledger_session_id,
-                    &ledger_turn_id,
-                    "turn",
-                    text,
-                )
-                .await;
-            }
             // The store keeps the checkpoint, not only the transcript: without this
             // write the next restart rebuilds the rows the summary replaced.
             let outcomes = match compaction_outcomes.lock() {
@@ -1923,6 +1925,16 @@ impl Sidecar {
                         graceful_stop = outcome.graceful_stop,
                         "turn finished"
                     );
+                    if let Some(text) = ledger_text {
+                        persist_ledger_entry(
+                            ledger_bridge.clone(),
+                            &ledger_session_id,
+                            &ledger_turn_id,
+                            "turn",
+                            text,
+                        )
+                        .await;
+                    }
                     skill_review_pass(SkillReviewInput {
                         provider: review_provider,
                         tools: review_tools,
@@ -1938,12 +1950,26 @@ impl Sidecar {
                     })
                     .await;
                 }
-                Err(error) => tracing::debug!(
-                    target: "agent_core::sidecar",
-                    code = error.code(),
-                    %error,
-                    "turn failed"
-                ),
+                Err(error) => {
+                    tracing::debug!(
+                        target: "agent_core::sidecar",
+                        code = error.code(),
+                        %error,
+                        "turn failed"
+                    );
+                    // A stop and a provider failure both end here without a `turn`
+                    // entry, and the difference matters on resume: one means "the
+                    // user paused", the other "the model never finished".
+                    let text = pause_entry_text(error.code(), ledger_text);
+                    persist_ledger_entry(
+                        ledger_bridge.clone(),
+                        &ledger_session_id,
+                        &ledger_turn_id,
+                        "pause",
+                        text,
+                    )
+                    .await;
+                }
             }
             // Idle last, after everything the turn caused — the end event, the
             // review's notice. A client that treats this as the authoritative
@@ -4583,6 +4609,19 @@ fn ledger_entry_for_turn(transcript: &[Message]) -> Option<String> {
     Some(head(&lines.join("\n"), 1_500))
 }
 
+/// What an interrupted turn leaves behind.
+///
+/// The code is the whole difference between the two ways a turn ends here — a
+/// stop the user asked for and a provider that failed — and a resumed session that
+/// cannot tell them apart will either wait for work nobody stopped or redo work
+/// that was already finished.
+fn pause_entry_text(code: &str, boundary: Option<String>) -> String {
+    match boundary {
+        Some(text) => format!("Interrupted ({code}) before finishing.\n{text}"),
+        None => format!("Interrupted ({code}) before finishing."),
+    }
+}
+
 /// Render the stored entries as the block a request carries.
 ///
 /// The newest entries win the budget: a ledger trimmed to its oldest lines tells
@@ -4624,7 +4663,7 @@ fn render_ledger_block(entries: &[Value]) -> Option<String> {
     }
     rendered.reverse();
     Some(format!(
-        "[session ledger] What this session has already done, oldest first. This record outlives restarts and compaction, so treat it as the authority on finished work: do not redo an item here, and continue from the last one.\n{}",
+        "[session ledger] What this session has already done, oldest first. This record outlives restarts and compaction, so treat it as the authority on finished work: do not redo an item here, and continue from the last one. A `turn-start` entry with no later `turn` entry means that turn was interrupted before it finished; a `pause` entry names how.\n{}",
         rendered.join("\n")
     ))
 }
@@ -5822,6 +5861,18 @@ mod prompt_parameter_tests {
         let entry = ledger_entry_for_turn(&transcript).expect("an entry");
         assert!(entry.contains("Workers:"), "{entry}");
         assert!(entry.contains("three candidate algorithms"), "{entry}");
+    }
+
+    /// A stopped turn and a failed turn are both "no boundary entry", and the code
+    /// is what tells them apart on resume.
+    #[test]
+    fn an_interrupted_turn_says_which_kind_of_interruption_it_was() {
+        let paused = pause_entry_text("TURN_ABORTED", Some("Asked: port the kernel".into()));
+        assert!(paused.starts_with("Interrupted (TURN_ABORTED)"));
+        assert!(paused.contains("port the kernel"), "the work in flight survives: {paused}");
+
+        let failed = pause_entry_text("PROVIDER_ERROR", None);
+        assert_eq!(failed, "Interrupted (PROVIDER_ERROR) before finishing.");
     }
 
     /// The block is the newest entries, and it stays inside its budget: a ledger
