@@ -1,0 +1,52 @@
+apps/desktop/src/components/settings/TranscriptFoldingRows.tsx
+  h_201ed4c689ac8b 14-18,58-60
+apps/desktop/src/features/chat/transcript/TurnProcess.tsx
+  h_201ed4c689ac8b 5-7,89-101,103
+apps/desktop/src/lib/activity-group-folding.ts
+  h_201ed4c689ac8b 30-47
+apps/desktop/test/activity-group-folding.test.mjs
+  h_201ed4c689ac8b 9,55-74
+apps/desktop/test/transcript-folding-settings.test.mjs
+  h_201ed4c689ac8b 24-27,99-100,103,105-106,108-113,120-130
+docs/adr/turn-process-and-thinking-display.md
+  h_201ed4c689ac8b 35-38,86-94,226-230,294-300
+docs/spec/04-ux/06-settings-ia.md
+  h_201ed4c689ac8b 337-345
+docs/spec/04-ux/08-component-spec.md
+  h_201ed4c689ac8b 998-1001,1003-1006
+docs/spec/04-ux/09-interaction-patterns.md
+  h_201ed4c689ac8b 1148-1156
+docs/spec/06-delivery/04-e2e-test-plan.md
+  h_201ed4c689ac8b 18283-18285,18296-18297,18325-18326,18341-18342
+docs/spec/08-meta/decisions-log.md
+  h_201ed4c689ac8b 353,8726-8747
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 1855
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 1869
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 1855
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 1855
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 1865
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 1834
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 1865
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 1855
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 1855
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "44d43f683c45fbc66ac61a4b65de363b2ab08641",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
