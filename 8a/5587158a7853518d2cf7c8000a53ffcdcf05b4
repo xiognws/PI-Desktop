@@ -1,0 +1,24 @@
+apps/desktop/resources/plugins/pi.file-manager/CHANGELOG.md
+  h_201ed4c689ac8b 3-15
+apps/desktop/resources/plugins/pi.file-manager/UPSTREAM.md
+  h_201ed4c689ac8b 19,29-33,84,88,91,170-176
+apps/desktop/resources/plugins/pi.file-manager/manifest.json
+  h_201ed4c689ac8b 5
+apps/desktop/resources/plugins/pi.file-manager/views/assets/index.js
+  h_201ed4c689ac8b 1,33
+apps/desktop/test/bundled-plugins.test.mjs
+  h_201ed4c689ac8b 84
+apps/desktop/test/file-manager-code-highlight.test.mjs
+  h_201ed4c689ac8b 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8a5587158a7853518d2cf7c8000a53ffcdcf05b4",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
