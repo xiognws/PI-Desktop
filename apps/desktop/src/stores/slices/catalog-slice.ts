@@ -1,3 +1,4 @@
+import { retryWhileHostNotReady } from "../../lib/host-ready-retry";
 import { rememberModelInList, saveRecentModels } from "../../lib/recent-models";
 import type {
   AppNotification,
@@ -55,20 +56,31 @@ export function createCatalogSlice({
     },
     refreshProviders: async () => {
       const generation = catalogRuntime.beginProviderRefresh();
-      const [providers, sessions, settings, onboarding] = await Promise.all([
-        api.listProviders(),
-        api.listSessions(),
-        api.getSettings(),
-        api.getOnboarding(),
-      ]);
-      if (generation !== catalogRuntime.providerGeneration()) return;
-      set((state) => ({
-        providers: providers.providers,
-        providerModels: {},
-        sessions: decorateSessions(sessions.sessions, state.sessionMeta),
-        settings,
-        onboarding,
-      }));
+      // Boot calls this before the host answers IPC, and nothing awaits the promise, so
+      // a first-call rejection surfaced as `Uncaught (in promise) Error: host
+      // unavailable` and left the window without its catalogue. Waiting out the start-up
+      // window is the fix; a genuine failure is still logged rather than thrown, because
+      // every caller here is a UI path that has nothing to show a rejection with.
+      try {
+        const [providers, sessions, settings, onboarding] = await retryWhileHostNotReady(() =>
+          Promise.all([
+            api.listProviders(),
+            api.listSessions(),
+            api.getSettings(),
+            api.getOnboarding(),
+          ]),
+        );
+        if (generation !== catalogRuntime.providerGeneration()) return;
+        set((state) => ({
+          providers: providers.providers,
+          providerModels: {},
+          sessions: decorateSessions(sessions.sessions, state.sessionMeta),
+          settings,
+          onboarding,
+        }));
+      } catch (error) {
+        console.warn("provider catalogue refresh failed", error);
+      }
     },
 
     loadProviderModels: async (providerId) => {
