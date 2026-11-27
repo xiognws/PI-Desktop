@@ -1,0 +1,66 @@
+apps/desktop/electron/autotest/workbench-theme.ts
+  h_201ed4c689ac8b 105-117
+apps/desktop/electron/autotest/workbench-view.ts
+  h_201ed4c689ac8b 39-46,106,117-118,128-151
+apps/desktop/src/features/app/AppShell.tsx
+  h_201ed4c689ac8b 17,103-107
+apps/desktop/src/features/shell/StatusBar.tsx
+  h_201ed4c689ac8b 1-166
+apps/desktop/src/features/shell/status-segments.tsx
+  h_201ed4c689ac8b 1-125
+apps/desktop/src/features/shell/surface-status.ts
+  h_201ed4c689ac8b 1-95
+apps/desktop/src/features/surfaces/SurfaceRail.tsx
+  h_201ed4c689ac8b 4,24,48-62
+apps/desktop/src/features/surfaces/autotest/AutoTestSurfaceShell.tsx
+  h_201ed4c689ac8b 9,29-32,67-70,74-96,101,103,107,142-145,148,154,157,160,175,181-183,193-195,200-201,205,210-213,219,223-225,231,233,241,286,300,302-304,307-318,330-342,350-351,354,370
+apps/desktop/src/features/surfaces/autotest/pipeline.ts
+  h_201ed4c689ac8b 1-26
+apps/desktop/src/stores/app-state.ts
+  h_201ed4c689ac8b 157-183,300-305
+apps/desktop/src/stores/slices/initial-state.ts
+  h_201ed4c689ac8b 29-32
+apps/desktop/src/stores/slices/interaction-slice.ts
+  h_201ed4c689ac8b 54-55,139-178
+apps/desktop/src/styles/surfaces.css
+  h_201ed4c689ac8b 78-88,139-140,195-237
+apps/desktop/test/autotest-surface-theme.test.mjs
+  h_201ed4c689ac8b 102-107
+apps/desktop/test/notification-contract.test.mjs
+  h_201ed4c689ac8b 22,33,72-75
+apps/desktop/test/session-usage-totals.test.mjs
+  h_201ed4c689ac8b 111-116,118-119
+apps/desktop/test/shell-status-bar.test.mjs
+  h_201ed4c689ac8b 1-95
+apps/desktop/test/sidebar-footer.test.mjs
+  h_201ed4c689ac8b 6-9,24-27,37-40,44-45,47-48,51,53,65,67-69,108,110,113,115-117
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 112-113
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 110-111
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 112-113
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 112-113
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 112-113
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 112-113
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 112-113
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 112-113
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 112-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1a23975e9edacc44c743964e1b839cc25f679dd1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
