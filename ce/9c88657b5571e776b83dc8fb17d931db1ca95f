@@ -1,0 +1,18 @@
+crates/agent-core/src/exec.rs
+  h_201ed4c689ac8b 110-115,409-417,664-694
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 66-73,78-82,5677-5693
+crates/native-text/src/lib.rs
+  h_201ed4c689ac8b 21-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "ce9c88657b5571e776b83dc8fb17d931db1ca95f",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
