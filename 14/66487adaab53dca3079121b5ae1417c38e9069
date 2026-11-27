@@ -1,0 +1,24 @@
+apps/desktop/src/components/Markdown.tsx
+  h_201ed4c689ac8b 30-34,267-311,554-558
+apps/desktop/src/lib/diff-lines.ts
+  h_201ed4c689ac8b 1-73
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 1038-1039,3393-3395
+apps/desktop/src/styles/prose.css
+  h_201ed4c689ac8b 495-530
+apps/desktop/src/styles/work-panel.css
+  h_201ed4c689ac8b 682-685,687-688,696-697
+apps/desktop/test/chat-diff-fence.test.mjs
+  h_201ed4c689ac8b 1-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1466487adaab53dca3079121b5ae1417c38e9069",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
