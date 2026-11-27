@@ -48,7 +48,7 @@ export type VendorAuthResolver = (input: {
 // `provider.resolveAuth` is answered by the embedding host itself (never
 // forwarded to host-core) and only for a provider row bound to that same
 // session, so it cannot reach a credential the session was not launched with.
-const HOST_PROXY_ALLOWED = new Set([
+export const HOST_PROXY_ALLOWED = new Set([
   "tools.execute",
   "backgroundJobs.capabilities",
   "backgroundJobs.list",
@@ -65,6 +65,13 @@ const HOST_PROXY_ALLOWED = new Set([
   "session.appendMessage",
   "session.appendCompaction",
   "session.replaceMessages",
+  // The session ledger (ADR 0412). The kernel writes what a turn finished at every
+  // boundary and reads the newest entries back when it composes a request; without
+  // these two, every write is refused as "host method not allowed from sidecar" and
+  // the ledger silently stays empty — which is worse than not having it, because
+  // the feature looks deployed.
+  "session.ledger.append",
+  "session.ledger.list",
   "workspace.get",
   "plans.enter",
   "plans.submit",
