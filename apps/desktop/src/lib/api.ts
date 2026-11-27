@@ -2388,8 +2388,13 @@ export const api = {
    */
   autotestWorkbenchStatus: () =>
     invoke<AutotestWorkbenchSnapshot>(IPC.invoke.autotestWorkbenchStatus),
-  autotestWorkbenchAttach: () =>
-    invoke<AutotestWorkbenchSnapshot>(IPC.invoke.autotestWorkbenchAttach),
+  /**
+   * `theme` is the window's resolved palette: the workbench page is a separate
+   * process and cannot read the shell's `data-theme`, so the surface forwards it
+   * and main hands it to the page.
+   */
+  autotestWorkbenchAttach: (payload?: { theme?: "light" | "dark" }) =>
+    invoke<AutotestWorkbenchSnapshot>(IPC.invoke.autotestWorkbenchAttach, payload),
   autotestWorkbenchDetach: () => invoke<void>(IPC.invoke.autotestWorkbenchDetach),
   autotestWorkbenchBounds: (bounds: {
     x: number;

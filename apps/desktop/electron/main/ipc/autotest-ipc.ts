@@ -1,6 +1,7 @@
 import { IPC, type AutotestWorkbenchSnapshot } from "@pi-workspace/shared";
 import { autotestWorkbenchUrl } from "../../autotest/window";
 import type { AutotestWorkbenchView, WorkbenchBounds } from "../../autotest/workbench-view";
+import { isWorkbenchTheme } from "../../autotest/workbench-theme";
 import type { AutotestService } from "../../autotest/service";
 import type { Logger } from "../logger";
 import type { IpcRegistrar } from "./types";
@@ -42,6 +43,13 @@ function normalizeBounds(value: unknown): WorkbenchBounds | null {
   return { x, y, width, height };
 }
 
+/** The renderer's resolved theme, or null when it sent nothing usable. */
+function themeFrom(value: unknown): "light" | "dark" | null {
+  if (!value || typeof value !== "object") return null;
+  const theme = (value as { theme?: unknown }).theme;
+  return isWorkbenchTheme(theme) ? theme : null;
+}
+
 export function registerAutotestIpc({
   registrar,
   service,
@@ -61,7 +69,11 @@ export function registerAutotestIpc({
 
   registrar.handle(IPC.invoke.autotestWorkbenchStatus, async () => snapshot());
 
-  registrar.handle(IPC.invoke.autotestWorkbenchAttach, async () => {
+  registrar.handle(IPC.invoke.autotestWorkbenchAttach, async (raw: unknown) => {
+    // The surface is the only caller that knows the window's resolved theme; the
+    // page cannot read it across processes.
+    const theme = themeFrom(raw);
+    if (theme) view.applyTheme(theme);
     if (service.state().status === "stopped") {
       await service.ensureStarted();
     }

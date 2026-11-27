@@ -90,8 +90,9 @@ test("the AutoTest surface hides its native view behind every overlay", () => {
   assert.match(autotestShell, /overlaysOpen/);
   assert.match(autotestShell, /const visible = active && !overlaysOpen;/);
   assert.match(autotestShell, /autotestWorkbenchDetach/);
-  // Attaching is what starts the local service; both live in the same call.
-  assert.match(autotestShell, /api\.autotestWorkbenchAttach\(\)/);
+  // Attaching is what starts the local service; both live in the same call, and
+  // the call carries the window's resolved theme.
+  assert.match(autotestShell, /api\.autotestWorkbenchAttach\(\{ theme: resolvedTheme\(\) \}\)/);
   assert.match(autotestShell, /new ResizeObserver/);
 });
 

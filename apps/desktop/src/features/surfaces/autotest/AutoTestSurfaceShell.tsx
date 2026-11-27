@@ -31,6 +31,19 @@ import type { SurfaceShellProps } from "../registry";
 /** Re-check a failed service without the user having to click anything. */
 const FAILED_RETRY_MS = 25_000;
 
+/**
+ * The window's resolved palette.
+ *
+ * The shell publishes it on `<html data-theme>`; the workbench page lives in its
+ * own process, so this is what crosses the boundary. Falling back to the OS
+ * preference keeps the first paint correct before the attribute exists.
+ */
+function resolvedTheme(): "light" | "dark" {
+  const declared = document.documentElement.dataset.theme;
+  if (declared === "light" || declared === "dark") return declared;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
 export function AutoTestSurfaceShell({ overlaysOpen }: SurfaceShellProps) {
   const { t } = useTranslation();
   const surface = useAppStore((s) => s.surface);
@@ -43,7 +56,7 @@ export function AutoTestSurfaceShell({ overlaysOpen }: SurfaceShellProps) {
   const attach = useCallback(async () => {
     setBusy(true);
     try {
-      setSnapshot(await api.autotestWorkbenchAttach());
+      setSnapshot(await api.autotestWorkbenchAttach({ theme: resolvedTheme() }));
     } catch (error) {
       setSnapshot({
         status: "failed",
@@ -103,6 +116,16 @@ export function AutoTestSurfaceShell({ overlaysOpen }: SurfaceShellProps) {
     const timer = window.setTimeout(() => void attach(), FAILED_RETRY_MS);
     return () => window.clearTimeout(timer);
   }, [attach, snapshot?.status, visible]);
+
+  // Following the window's theme is a re-attach, not a reload: the same view is
+  // re-shown, and main hands it the other palette.
+  useEffect(() => {
+    if (!visible) return;
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => void attach());
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, [attach, visible]);
 
   const restart = async () => {
     setBusy(true);
@@ -167,11 +190,15 @@ export function AutoTestSurfaceShell({ overlaysOpen }: SurfaceShellProps) {
         </div>
       </aside>
       <section className="autotest-main-pane">
-        <header className="autotest-titlebar no-drag">
-          <span className="autotest-titlebar-title">
-            {t("autotest.surface.title")}
-          </span>
-        </header>
+        {/* One chrome, not two: once the workbench is up its own header owns the
+            top band, so this titlebar only stands in while it is not. */}
+        {state === "ready" ? null : (
+          <header className="autotest-titlebar no-drag">
+            <span className="autotest-titlebar-title">
+              {t("autotest.surface.title")}
+            </span>
+          </header>
+        )}
         <div ref={paneRef} className="autotest-pane" data-state={state}>
           {state === "ready" ? null : (
             <div className="autotest-pane-placeholder" role="status">

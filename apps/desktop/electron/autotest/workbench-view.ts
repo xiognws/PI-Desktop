@@ -18,6 +18,8 @@
  * `autotest/window.ts`).
  */
 
+import { WORKBENCH_THEME_CSS, workbenchThemeScript, type WorkbenchTheme } from "./workbench-theme";
+
 export type WorkbenchBounds = {
   x: number;
   y: number;
@@ -31,6 +33,9 @@ export type WorkbenchViewLike = {
     loadURL(url: string): Promise<unknown> | unknown;
     isDestroyed?: () => boolean;
     close?: () => void;
+    /** Present on a real `WebContents`; the fake in tests may omit them. */
+    insertCSS?: (css: string) => Promise<unknown> | unknown;
+    executeJavaScript?: (code: string) => Promise<unknown> | unknown;
   };
   setBounds(bounds: WorkbenchBounds): void;
 };
@@ -76,6 +81,8 @@ export class AutotestWorkbenchView {
   private url: string | null = null;
   private attached = false;
   private cssBounds: WorkbenchBounds | null = null;
+  private theme: WorkbenchTheme | null = null;
+  private themeCssInserted = false;
   private readonly deps: WorkbenchViewDeps;
 
   // Assigned rather than declared as a parameter property: `node --test` strips
@@ -88,23 +95,66 @@ export class AutotestWorkbenchView {
     if (!this.view) {
       this.view = this.deps.createView();
       this.url = url;
-      void Promise.resolve(this.view.webContents.loadURL(url)).catch(
-        (error: unknown) => {
+      void Promise.resolve(this.view.webContents.loadURL(url))
+        .then(() => this.applyThemeNow())
+        .catch((error: unknown) => {
           this.deps.log?.(`could not load the workbench: ${String(error)}`);
-        },
-      );
+        });
       return this.view;
     }
     // A different port (a restarted service) is a different page.
     if (this.url !== url) {
       this.url = url;
-      void Promise.resolve(this.view.webContents.loadURL(url)).catch(
-        (error: unknown) => {
+      void Promise.resolve(this.view.webContents.loadURL(url))
+        .then(() => this.applyThemeNow())
+        .catch((error: unknown) => {
           this.deps.log?.(`could not load the workbench: ${String(error)}`);
-        },
-      );
+        });
     }
     return this.view;
+  }
+
+  /**
+   * Hand the page the host's palette.
+   *
+   * The stylesheet is injected once per page — `insertCSS` persists for the
+   * webContents' lifetime — while the class toggle runs on every call, because a
+   * reload or an earlier session may have left the other theme in place.
+   */
+  applyTheme(theme: WorkbenchTheme): void {
+    this.theme = theme;
+    this.applyThemeNow();
+  }
+
+  private applyThemeNow(): void {
+    const contents = this.view?.webContents;
+    if (!contents) return;
+    if (!this.themeCssInserted && contents.insertCSS) {
+      this.themeCssInserted = true;
+      try {
+        void Promise.resolve(contents.insertCSS(WORKBENCH_THEME_CSS)).catch(
+          (error: unknown) => {
+            this.themeCssInserted = false;
+            this.deps.log?.(`could not inject the workbench palette: ${String(error)}`);
+          },
+        );
+      } catch (error) {
+        this.themeCssInserted = false;
+        this.deps.log?.(`could not inject the workbench palette: ${String(error)}`);
+      }
+    }
+    if (!contents.executeJavaScript) return;
+    const theme = this.theme;
+    if (!theme) return;
+    try {
+      void Promise.resolve(contents.executeJavaScript(workbenchThemeScript(theme))).catch(
+        (error: unknown) => {
+          this.deps.log?.(`could not apply the workbench theme: ${String(error)}`);
+        },
+      );
+    } catch (error) {
+      this.deps.log?.(`could not apply the workbench theme: ${String(error)}`);
+    }
   }
 
   /** Where the view currently sits, in CSS pixels, or null before first measure. */
@@ -140,6 +190,9 @@ export class AutotestWorkbenchView {
       this.attached = true;
     }
     view.setBounds(scaleWorkbenchBounds(bounds, this.deps.zoomFactor()));
+    // A page that reloaded itself (or was left on the other theme) is corrected
+    // here rather than only at creation time.
+    this.applyThemeNow();
   }
 
   /** Re-place the view without changing what is loaded. */
@@ -173,6 +226,8 @@ export class AutotestWorkbenchView {
     const view = this.view;
     this.view = null;
     this.url = null;
+    // The stylesheet went with the page; the next one gets it again.
+    this.themeCssInserted = false;
     try {
       const contents = view?.webContents;
       if (contents && !(contents.isDestroyed?.() ?? false)) contents.close?.();

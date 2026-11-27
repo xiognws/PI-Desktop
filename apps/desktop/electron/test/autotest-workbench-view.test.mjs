@@ -25,6 +25,8 @@ function harness({ zoom = 1 } = {}) {
   const state = { added: 0, removed: 0, attached: 0, closed: 0 };
   const loads = [];
   const bounds = [];
+  const css = [];
+  const scripts = [];
   const makeView = () => ({
     webContents: {
       loadURL(url) {
@@ -34,6 +36,14 @@ function harness({ zoom = 1 } = {}) {
       isDestroyed: () => state.closed > 0,
       close: () => {
         state.closed += 1;
+      },
+      insertCSS(text) {
+        css.push(text);
+        return Promise.resolve("key");
+      },
+      executeJavaScript(code) {
+        scripts.push(code);
+        return Promise.resolve(true);
       },
     },
     setBounds(rect) {
@@ -57,7 +67,7 @@ function harness({ zoom = 1 } = {}) {
       return next;
     },
   });
-  return { view, state, loads, bounds, created };
+  return { view, state, loads, bounds, created, css, scripts };
 }
 
 const RECT = { x: 48, y: 0, width: 900, height: 700 };
@@ -155,9 +165,62 @@ test("a load failure is reported and does not attach a broken page twice", () =>
     log: (message) => messages.push(message),
   });
   view.show("http://127.0.0.1:4000/", RECT);
-  return Promise.resolve().then(() => {
+  // The load settles through one `.then` (palette) before the rejection is
+  // reported, so let the whole microtask queue drain.
+  return new Promise((resolve) => setTimeout(resolve, 0)).then(() => {
     assert.equal(messages.length, 1);
     assert.match(messages[0], /ERR_CONNECTION_REFUSED/);
     assert.equal(view.hasView(), true);
   });
+});
+
+test("the host palette reaches the page once, and the theme flips on every show", () => {
+  const { view, css, scripts } = harness();
+  const url = "http://127.0.0.1:4000/";
+  view.applyTheme("dark");
+  // Nothing to apply to before the page exists: no crash, no phantom view.
+  assert.equal(css.length, 0);
+
+  view.show(url, RECT);
+  return Promise.resolve().then(() => {
+    assert.equal(css.length, 1, "the palette is injected once per page");
+    assert.match(css[0], /--surface: #212121/);
+    assert.ok(
+      scripts.some((code) => code.includes('classList.toggle("dark", true)')),
+      "the page is switched into dark mode",
+    );
+
+    view.applyTheme("light");
+    assert.ok(
+      scripts.some((code) => code.includes('classList.toggle("dark", false)')),
+      "a light window hands the page a light palette",
+    );
+    assert.equal(css.length, 1, "re-theming must not stack stylesheets");
+
+    // Hiding and showing again re-applies the class, because the page may have
+    // reloaded itself in between.
+    const before = scripts.length;
+    view.hide();
+    view.show(url, RECT);
+    assert.ok(scripts.length > before);
+    assert.equal(css.length, 1);
+  });
+});
+
+test("a discarded page gets the palette again", () => {
+  const { view, css } = harness();
+  const url = "http://127.0.0.1:4000/";
+  view.applyTheme("dark");
+  view.show(url, RECT);
+  return Promise.resolve()
+    .then(() => {
+      assert.equal(css.length, 1);
+      view.reload();
+      view.applyTheme("dark");
+      view.show(url, RECT);
+      return Promise.resolve();
+    })
+    .then(() => {
+      assert.equal(css.length, 2, "a new page needs its own stylesheet");
+    });
 });
