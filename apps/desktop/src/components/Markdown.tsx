@@ -28,6 +28,11 @@ import {
   markdownRemarkPlugins,
 } from "../lib/markdown-blocks";
 import {
+  diffLineSign,
+  isDiffFenceLanguage,
+  parseDiffLines,
+} from "../lib/diff-lines";
+import {
   MAX_STREAMING_MARKDOWN_TAIL_CODE_UNITS,
   MAX_SYNC_MARKDOWN_CODE_UNITS,
 } from "../lib/render-content-limits";
@@ -255,6 +260,51 @@ function CodeBlock({ code, lang, ...position }: { code: string; lang: string } &
           <HighlightedCode code={code} lang={lang} />
         </code>
       </pre>
+    </div>
+  );
+}
+
+/**
+ * A fenced `diff` / `patch` body.
+ *
+ * Assistants and reviewers paste unified diffs into a reply, and a plain code
+ * block throws away the one thing the fence carries: which lines were added and
+ * which were removed. Add/del lines here get the same tint, gutter sign and hunk
+ * header a recorded review change uses, so a pasted diff and a host-captured one
+ * read the same way (D-chat-diff).
+ */
+function DiffBlock({ code, lang, ...position }: { code: string; lang: string } & SourcePositionProps) {
+  const { t } = useTranslation();
+  const { copied, copy } = useCopy();
+  const lines = useMemo(() => parseDiffLines(code), [code]);
+  return (
+    <div className="code-block chat-diff" {...position}>
+      <div className="code-block-head">
+        <span className="code-block-lang">{lang || "diff"}</span>
+        <TooltipButton
+          className={`code-copy-btn ${copied ? "copied" : ""}`}
+          tooltip={copied ? t("chat.copied") : t("chat.copy")}
+          ariaLabel={t("chat.copy")}
+          onClick={() => copy(code)}
+        >
+          {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+        </TooltipButton>
+      </div>
+      <div className="chat-diff-body">
+        {lines.map((line, index) => (
+          <div
+            className={line.type === "context" ? "diff-line" : `diff-line ${line.type}`}
+            key={index}
+          >
+            {(line.type === "add" || line.type === "del") && (
+              <span className="diff-line-sign" aria-hidden>
+                {diffLineSign(line.type)}
+              </span>
+            )}
+            <span className="diff-line-text">{line.text || " "}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -500,6 +550,11 @@ function PreBlock({
         }
       />
     );
+  }
+  // A pasted unified diff is read line by line, not as syntax-highlighted
+  // source: add/del is the information the fence exists to carry.
+  if (isDiffFenceLanguage(info.lang)) {
+    return <DiffBlock code={info.code} lang={info.lang} {...sourcePositionProps(rest)} />;
   }
   return <CodeBlock code={info.code} lang={info.lang} {...sourcePositionProps(rest)} />;
 }

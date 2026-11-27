@@ -679,8 +679,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Add/Del is read from three things at once — the tint, the coloured sign and a
+   solid gutter bar — because a 12% tint alone is invisible on a bright panel and
+   a monochrome sign disappears at a glance. Every diff surface (work panel,
+   review card, tool row, a pasted fence) inherits these. */
 .diff-line.add {
-  background: color-mix(in oklab, var(--ds-success) 12%, transparent);
+  background: color-mix(in oklab, var(--ds-success) 16%, transparent);
+  box-shadow: inset 2px 0 var(--ds-success);
 }
 
 .diff-line.add .diff-line-sign {
@@ -688,7 +693,8 @@
 }
 
 .diff-line.del {
-  background: color-mix(in oklab, var(--ds-error) 12%, transparent);
+  background: color-mix(in oklab, var(--ds-error) 16%, transparent);
+  box-shadow: inset 2px 0 var(--ds-error);
 }
 
 .diff-line.del .diff-line-sign {

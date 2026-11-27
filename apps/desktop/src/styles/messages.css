@@ -1035,13 +1035,8 @@
   padding: 3px 10px 3px 4px;
 }
 
-.review-change-diff .diff-line.add {
-  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
-}
-
-.review-change-diff .diff-line.del {
-  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
-}
+/* The add/del tint, sign colour and gutter bar come from the shared
+   `.diff-line` rules in work-panel.css: one definition, every diff surface. */
 
 .review-change-diff .diff-line.hunk {
   padding: 4px 10px;
@@ -3395,8 +3390,9 @@
   padding: 0;
 }
 
-/* Edit diffs: a soft tile inside the tool body; add/del read from the line
-   tints alone, with no gutter bars (D297). */
+/* Edit diffs: a soft tile inside the tool body; add/del read from the shared
+   `.diff-line` tint, sign and gutter bar (work-panel.css), with no extra gutter
+   bars of its own (D297). */
 .tool-diff {
   overflow: hidden;
   border-radius: var(--radius-md);
@@ -3405,14 +3401,6 @@
 
 .tool-diff .diff-line {
   font-size: var(--text-sm);
-}
-
-.tool-diff .diff-line.add {
-  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
-}
-
-.tool-diff .diff-line.del {
-  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
 }
 
 .tool-diff .diff-line-text {
