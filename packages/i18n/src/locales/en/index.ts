@@ -672,7 +672,7 @@ export const en = {
     usageContextAriaRemaining: "remaining",
     usageContextAriaUsed: "used",
     usageTurnTotal: "This turn",
-    "usageSessionTotal": "Session total",
+    "usageSessionTotal": "Session tokens",
     "usageMainModel": "Orchestrator",
     "usageWorkerModel": "Sub-agents",
     usageTurnAria: "This turn: {{speed}}, {{count}} tokens. Show breakdown.",

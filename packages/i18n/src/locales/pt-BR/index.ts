@@ -659,7 +659,7 @@ export const ptBR = {
     usageContextAriaRemaining: "restante",
     usageContextAriaUsed: "usado",
     usageTurnTotal: "Esta rodada",
-    "usageSessionTotal": "Total da sessão",
+    "usageSessionTotal": "Tokens da sessão",
     "usageMainModel": "Modelo principal",
     "usageWorkerModel": "Subagentes",
     usageTurnAria: "Este turno: {{speed}}, {{count}} tokens. Mostrar detalhes.",

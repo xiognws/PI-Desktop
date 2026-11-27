@@ -657,7 +657,7 @@ export const fr = {
     "usageContextAriaRemaining": "restant",
     "usageContextAriaUsed": "utilisé",
     "usageTurnTotal": "Ce tour",
-    "usageSessionTotal": "Total de la session",
+    "usageSessionTotal": "Jetons de la session",
     "usageMainModel": "Modèle principal",
     "usageWorkerModel": "Sous-agents",
     "usageTurnAria": "Ce tour : {{speed}}, {{count}} tokens. Afficher le détail.",

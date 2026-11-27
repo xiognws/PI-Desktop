@@ -662,7 +662,7 @@ export const zhTW = {
     usageContextAriaRemaining: "剩餘",
     usageContextAriaUsed: "已用",
     usageTurnTotal: "本輪合計",
-    "usageSessionTotal": "會話累計",
+    "usageSessionTotal": "會話合計",
     "usageMainModel": "主模型",
     "usageWorkerModel": "副模型（子代理）",
     usageTurnAria: "本輪：平均 {{speed}}，共 {{count}} tokens，查看明細",

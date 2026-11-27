@@ -657,7 +657,7 @@ export const es = {
     "usageContextAriaRemaining": "restante",
     "usageContextAriaUsed": "usado",
     "usageTurnTotal": "Este turno",
-    "usageSessionTotal": "Total de la sesión",
+    "usageSessionTotal": "Tokens de la sesión",
     "usageMainModel": "Modelo principal",
     "usageWorkerModel": "Subagentes",
     "usageTurnAria": "Este turno: {{speed}}, {{count}} tokens. Mostrar desglose.",

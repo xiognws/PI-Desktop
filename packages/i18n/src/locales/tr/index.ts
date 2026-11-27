@@ -669,7 +669,7 @@ export const tr = {
     usageContextAriaRemaining: "kaldı",
     usageContextAriaUsed: "kullanıldı",
     usageTurnTotal: "Bu tur",
-    "usageSessionTotal": "Oturum toplamı",
+    "usageSessionTotal": "Oturum token toplamı",
     "usageMainModel": "Ana model",
     "usageWorkerModel": "Alt ajanlar",
     usageTurnAria: "Bu tur: {{speed}}, {{count}} token. Ayrıntıları göster.",

@@ -669,7 +669,7 @@ export const ko = {
     usageContextAriaRemaining: "남음",
     usageContextAriaUsed: "사용됨",
     usageTurnTotal: "이번 턴",
-    "usageSessionTotal": "세션 합계",
+    "usageSessionTotal": "세션 토큰 합계",
     "usageMainModel": "주 모델",
     "usageWorkerModel": "하위 에이전트",
     usageTurnAria: "이번 턴: {{speed}}, {{count}} tokens. 세부 정보 보기.",
