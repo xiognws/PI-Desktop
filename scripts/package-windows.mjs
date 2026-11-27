@@ -17,6 +17,7 @@
  *   node scripts/package-windows.mjs --with-python  # also re-sync resources/python
  *   node scripts/package-windows.mjs --allow-running # build while the app is open (unsafe)
  *   node scripts/package-windows.mjs --skip-verify  # iterate: skip the tree verifier
+ *   node scripts/package-windows.mjs --skip-autotest-ui # keep the AutoTest workbench dist as it is
  *   node scripts/package-windows.mjs --rebuild-rust # force the release Rust compile
  *
  * Deliberate defaults:
@@ -46,6 +47,7 @@ const skipVerify = argv.has("--skip-verify");
 const rebuildRust = argv.has("--rebuild-rust");
 const withPython = argv.has("--with-python");
 const allowRunning = argv.has("--allow-running");
+const skipAutotestUi = argv.has("--skip-autotest-ui");
 
 /**
  * Per-step wall clock.
@@ -118,7 +120,45 @@ function newestRustInputMs() {
   return newest;
 }
 
-/** The profile the binary in `target/release/` was actually built with. */
+/**
+ * Whether the built AutoTest workbench is older than its own source.
+ *
+ * `dist` is a build product and untracked, so nothing else in the pipeline
+ * notices a source change: the check is "newest file under ui/src or ui-shell
+ * versus the built entry point".
+ */
+function autotestUiIsStale() {
+  const uiRoot = join(REPO, "services", "autotest", "ui");
+  const built = join(uiRoot, "dist", "index.html");
+  if (!existsSync(built)) return true;
+  const builtAt = statSync(built).mtimeMs;
+  const roots = [join(uiRoot, "src"), join(REPO, "services", "autotest", "ui-shell")];
+  for (const root of roots) {
+    if (!existsSync(root)) continue;
+    const stack = [root];
+    while (stack.length > 0) {
+      const dir = stack.pop();
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === "node_modules" || entry.name === "dist") continue;
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(full);
+          continue;
+        }
+        // Build config counts too: a new dependency or a tailwind change alters
+        // the bundle without touching anything under src/.
+        if (!/\.(ts|vue|css|json|html)$/.test(entry.name)) continue;
+        if (statSync(full).mtimeMs > builtAt) return true;
+      }
+    }
+    for (const name of ["package.json", "vite.config.ts", "tsconfig.json"]) {
+      const file = join(uiRoot, name);
+      if (existsSync(file) && statSync(file).mtimeMs > builtAt) return true;
+    }
+  }
+  return false;
+}
+
 /** Whether a release binary already covers every Rust input. */
 function rustBinaryIsCurrent(exe) {
   if (rebuildRust || !existsSync(exe)) return false;
@@ -217,6 +257,30 @@ if (withPython) {
 step("bundle agent runtime");
 const runtime = run("pnpm", ["-C", "packages/agent-runtime", "bundle"], { shell: true });
 if (runtime !== 0) process.exit(runtime);
+
+/*
+ * The AutoTest workbench is a second front end: a Vue app under
+ * `services/autotest/ui` whose built `dist` is what `extraResources` copies into
+ * `resources/autotest/ui/dist`. Nothing else in this pipeline rebuilds it, and
+ * `dist` is not tracked, so before this step a packaged client could serve a
+ * workbench that was days older than its own source — the surface rendering an
+ * interface the repository had already moved past.
+ *
+ * The build is 40 seconds when the source moved and skipped otherwise.
+ */
+if (!skipAutotestUi) {
+  step("bundle autotest workbench UI");
+  if (autotestUiIsStale()) {
+    // `npm`, not `pnpm`: that package is built by its own npm workspace
+    // (`npm --prefix ... run build`), which is how the app's `pack` script does it.
+    const ui = run("npm", ["--prefix", "services/autotest/ui", "run", "build"], {
+      shell: true,
+    });
+    if (ui !== 0) process.exit(ui);
+  } else {
+    process.stdout.write("dist is newer than every source file — keeping it\n");
+  }
+}
 
 // Re-linking host-core for a JS-only change is minutes of a build that otherwise
 // takes seconds, so the binary is reused while it is newer than every Rust input.
