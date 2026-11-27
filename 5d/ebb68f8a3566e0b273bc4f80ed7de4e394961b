@@ -1,0 +1,50 @@
+Cargo.lock
+  h_201ed4c689ac8b 49,92-102,115-193,261-266,349-354,443-448,503-516,612,744,753,801-806,830,1146-1151,1167-1182,1194-1216,1319-1327,1351,1366,1373,1408-1418,1430-1439,1445-1447,1481,1573,1715-1725,1738-1748,1785-1790,1813-1818,1898-1906,1913-1924,2001-2012,2040,2079,2141-2158,2165-2170,2205-2210,2535-2554
+Cargo.toml
+  h_201ed4c689ac8b 2
+crates/autotest-core/Cargo.toml
+  h_201ed4c689ac8b 1-31
+crates/autotest-core/src/api/cases.rs
+  h_201ed4c689ac8b 1-382
+crates/autotest-core/src/api/executions.rs
+  h_201ed4c689ac8b 1-565
+crates/autotest-core/src/api/misc.rs
+  h_201ed4c689ac8b 1-155
+crates/autotest-core/src/api/mod.rs
+  h_201ed4c689ac8b 1-169
+crates/autotest-core/src/api/projects.rs
+  h_201ed4c689ac8b 1-194
+crates/autotest-core/src/api/scripts.rs
+  h_201ed4c689ac8b 1-499
+crates/autotest-core/src/config.rs
+  h_201ed4c689ac8b 1-155
+crates/autotest-core/src/db.rs
+  h_201ed4c689ac8b 1-187
+crates/autotest-core/src/error.rs
+  h_201ed4c689ac8b 1-64
+crates/autotest-core/src/exec.rs
+  h_201ed4c689ac8b 1-798
+crates/autotest-core/src/main.rs
+  h_201ed4c689ac8b 1-126
+crates/autotest-core/src/project.rs
+  h_201ed4c689ac8b 1-40
+crates/autotest-core/src/schema.rs
+  h_201ed4c689ac8b 1-272
+crates/autotest-core/src/script_state.rs
+  h_201ed4c689ac8b 1-151
+crates/autotest-core/src/state.rs
+  h_201ed4c689ac8b 1-85
+crates/autotest-core/src/static_assets.rs
+  h_201ed4c689ac8b 1-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5debb68f8a3566e0b273bc4f80ed7de4e394961b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
