@@ -1,0 +1,20 @@
+crates/agent-core/src/compaction.rs
+  h_201ed4c689ac8b 558-577
+crates/agent-core/src/restore.rs
+  h_201ed4c689ac8b 13-24,28,32-82,94-145,147-203,205-210,212-216,218-220,223-274,276-279,391-467
+crates/agent-core/src/turn.rs
+  h_201ed4c689ac8b 248-251,275,292-304,1414-1439
+crates/agent-core/tests/compaction_loop.rs
+  h_201ed4c689ac8b 173-217
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "5694af1f8f649293d24d9073b395e5f31ac6b822",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
