@@ -1,0 +1,30 @@
+apps/desktop/src/features/app/useAppShellRuntime.tsx
+  h_201ed4c689ac8b 237-245
+apps/desktop/src/features/surfaces/autotest/AutoTestSurfaceShell.tsx
+  h_201ed4c689ac8b 4-5,48,52-53,150-163,170-175,177-182,184-192,194-239
+apps/desktop/src/lib/surface-preferences.ts
+  h_201ed4c689ac8b 12-13,51-74
+apps/desktop/src/stores/app-state.ts
+  h_201ed4c689ac8b 264-272
+apps/desktop/src/stores/slices/initial-state.ts
+  h_201ed4c689ac8b 6,28
+apps/desktop/src/stores/slices/interaction-slice.ts
+  h_201ed4c689ac8b 22,53,124-136
+apps/desktop/src/styles/surfaces.css
+  h_201ed4c689ac8b 111-112,117-165,295-296
+apps/desktop/test/autotest-sidebar-collapse.test.mjs
+  h_201ed4c689ac8b 1-114
+docs/spec/04-ux/01-ui-ia.md
+  h_201ed4c689ac8b 37-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "15f99dcfee7cdcb47d6712b960bc14473bbbe59c",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
