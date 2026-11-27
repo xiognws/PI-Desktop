@@ -4,15 +4,13 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 /*
- * The file manager's code view classifies tokens with CodeMirror's
- * `classHighlighter` and hands them `tok-*` class names. For a long time the
- * bundle shipped those classes and no rules for them, so every language — C,
- * C++, Python, Rust, YAML, TOML — came out in one flat colour and read as plain
- * text even though the grammar was loaded.
+ * What the file manager's code view promises, held as a source contract.
  *
- * These cases hold the two halves together: every class the highlighter can emit
- * must have a rule, and the file types the view claims to know must resolve to a
- * grammar.
+ * The editor gets its syntax colours from a CodeMirror `HighlightStyle` with
+ * inline colours (the `gr.define([{tag:..., color:...}])` pair in the bundle) and
+ * its grammar from the `LanguageDescription` table `I7`. Those two are what make
+ * a `.cpp` or `.rs` file readable; a file type missing from the table is the one
+ * that renders as flat text, so the table is what this file pins.
  */
 
 const BUNDLE = resolve(
@@ -20,49 +18,50 @@ const BUNDLE = resolve(
   "../resources/plugins/pi.file-manager/views/assets/index.js",
 );
 const source = readFileSync(BUNDLE, "utf8");
+const table = () =>
+  source.slice(source.indexOf("I7=["), source.indexOf("],dl=new Map"));
 
-/** Class names the bundled `classHighlighter` can put on a token span. */
-function emittedTokenClasses() {
-  const block = source.slice(
-    source.indexOf('{tag:d.link,class:"tok-link"}'),
-    source.indexOf("])", source.indexOf('{tag:d.link,class:"tok-link"}')),
+test("every common code and config extension is bound to a grammar", () => {
+  const entries = table();
+  assert.ok(entries.length > 500, "the language table must be present");
+
+  const bound = new Set(
+    [...entries.matchAll(/extensions:\[([^\]]*)\]/g)]
+      .flatMap((match) => [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])),
   );
-  const names = [...block.matchAll(/class:"(tok-[A-Za-z-]+)"/g)].map((m) => m[1]);
-  assert.ok(names.length >= 20, `expected the highlighter table, found ${names.length}`);
-  return names;
-}
-
-/** Selector text of every CSS rule in the bundle. */
-function selectors() {
-  return [...source.matchAll(/([^{}]*)\{[^{}]*\}/g)].map((m) => m[1]);
-}
-
-test("every token class the highlighter emits has a colour rule", () => {
-  const emitted = emittedTokenClasses();
-  const all = selectors().join("\n");
-  const missing = emitted.filter((name) => !all.includes(`.${name}`));
-  assert.deepEqual(missing, [], `unstyled token classes: ${missing.join(", ")}`);
-});
-
-test("both themes define the hues the token rules reference", () => {
-  for (const needle of ["--tok-type: #e5c07b", "--tok-type: #c18401", "--tok-macro: #56b6c2", "--tok-macro: #0184bc"]) {
-    assert.ok(source.includes(needle), `missing ${needle}`);
+  for (const extension of [
+    // the languages a desktop project is actually made of
+    "c", "h", "cc", "cpp", "cxx", "hpp", "hh", "hxx", "ino",
+    "py", "pyi", "rs", "go", "java", "kt", "cs", "php", "rb", "lua", "sql",
+    // configuration
+    "json", "jsonc", "yml", "yaml", "toml", "ini", "conf", "cfg", "properties", "editorconfig", "env",
+    // scripts, docs, everything else
+    "sh", "bash", "zsh", "ps1", "diff", "patch", "md", "markdown", "mdx",
+    "html", "css", "xml", "vue",
+  ]) {
+    assert.ok(bound.has(extension), `no grammar is bound to .${extension}`);
   }
 });
 
-test("the languages the view advertises resolve to a grammar", () => {
-  // One entry per language, extension list plus a load factory; a file whose
-  // extension is missing here is what renders as flat text.
-  for (const extension of ["c", "cpp", "hpp", "py", "rs", "yml", "toml", "ini", "json", "md", "sql", "sh", "ps1", "diff"]) {
-    assert.ok(
-      source.includes(`"${extension}"`),
-      `no grammar is bound to .${extension}`,
-    );
+test("files that carry no extension still get a language by name", () => {
+  const entries = table();
+  for (const filename of ["Dockerfile", "Containerfile", "Gemfile", "Rakefile"]) {
+    assert.ok(entries.includes(`"${filename}"`), `${filename} is not mapped by name`);
   }
-  const table = source.slice(source.indexOf("I7=["), source.indexOf("],dl=new Map"));
-  const entries = table.match(/name:"[^"]+",extensions:\[[^\]]*\],(?:filenames:\[[^\]]*\],)?load:/g) ?? [];
-  assert.ok(entries.length >= 30, `expected the language table, found ${entries.length} entries`);
-  assert.equal((table.match(/load:\(\)=>/g) ?? []).length, entries.length);
+});
+
+test("the syntax colours are real, for both themes", () => {
+  // Inline colours, not CSS classes: a class table with no rules paints nothing,
+  // and this view shipped such a table once (it is dead code, not a style).
+  const dark = source.slice(source.indexOf("y$=gr.define("), source.indexOf("b$=gr.define("));
+  const light = source.slice(source.indexOf("b$=gr.define("), source.indexOf("Sb=t=>"));
+  for (const [theme, block] of [["dark", dark], ["light", light]]) {
+    assert.ok(block.length > 200, `${theme} highlight style missing`);
+    assert.match(block, /color:"#[0-9a-f]{6}"/i, `${theme} style carries no colours`);
+    assert.ok(!/class:"tok-/.test(block), `${theme} style emits classes instead of colours`);
+  }
+  // ...and the editor installs it.
+  assert.match(source, /Rb\.of\(Ub\(t\)\)/, "the editor does not install the highlight style");
 });
 
 test("markdown opens rendered, and .env is a config file with a grammar", () => {

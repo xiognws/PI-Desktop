@@ -1,17 +1,17 @@
 # Changelog
 
-## 0.9.1-pi.6
+## 0.9.1-pi.7
 
-- Code files are coloured. The view has always classified tokens with
-  CodeMirror's `classHighlighter` — which emits `tok-keyword`, `tok-string`,
-  `tok-comment` and 22 more class names — but the bundle shipped no rules for
-  those classes, so every grammar (C, C++, Python, Rust, Go, Java, YAML, TOML,
-  INI/`.env`, Dockerfile, SQL, Shell, PowerShell, Diff…) rendered as one flat
-  colour and read as plain text. The rules now exist, themed through the palette
-  the view already uses, with two new hues (`--tok-type`, `--tok-macro`) per theme.
-- Markdown opens **rendered**; the toolbar's Edit/Preview switch still shows the
-  source, and an existing preference keeps whatever a user has chosen.
-- `.env` joins the config files that get the Properties grammar.
+- Markdown opens **rendered**. Source was the default, and the stored preference
+  keeps whatever was chosen, so a `.md` file read as its own markup.
+- `.env` joins the config files that get the Properties grammar (`ini`, `conf`,
+  `cfg`, `editorconfig` already did).
+- Note on syntax highlighting: the editor was never missing it. Colours come from
+  a CodeMirror `HighlightStyle` (inline colours, one per theme) and grammars from
+  the `LanguageDescription` table — C/C++, Python, Rust, Go, Java, YAML, TOML,
+  SQL, Shell, PowerShell, Diff and the rest are all in it. A `classHighlighter`
+  table also sits in the bundle emitting `tok-*` classes that nothing styles; it
+  is dead code, not the reason a file looks uncoloured, and is left alone.
 
 ## 0.9.1-pi.5
 
