@@ -101,5 +101,7 @@ it("does not bill a worker's own steps as well as its settled delegation", () =>
   } as never);
 
   expect(delegated).toBeUndefined();
-  expect(parent?.totalTokens).toBe(1_000, "the orchestrator's own step still counts");
+  // Vitest takes the explanation as the expectation's message — `toBe`'s second
+  // argument is Jest's shape and does not type-check.
+  expect(parent?.totalTokens, "the orchestrator's own step still counts").toBe(1_000);
 });
