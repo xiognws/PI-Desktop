@@ -1,0 +1,22 @@
+apps/desktop/src/components/ReviewChangeCard.tsx
+  h_201ed4c689ac8b 169-174
+apps/desktop/src/styles/messages.css
+  h_201ed4c689ac8b 1034-1042
+apps/desktop/src/styles/tokens.css
+  h_201ed4c689ac8b 145-157,305-312
+apps/desktop/src/styles/work-panel.css
+  h_201ed4c689ac8b 683-686,688-689,693,697-698,702
+apps/desktop/test/chat-review-entry.test.mjs
+  h_201ed4c689ac8b 41-44,240-288
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3e0e6f6c9f1b4057025f0b40ad79bf82acef2ede",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
