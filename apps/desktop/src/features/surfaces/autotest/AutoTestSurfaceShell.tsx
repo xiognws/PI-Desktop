@@ -302,8 +302,10 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
                   navigate, so the menu waits for one. The service's own state is
                   not repeated here: the window's status bar and the band above
                   this pane carry it. */}
-              {projectId ? (
-                <nav className="autotest-nav" data-nav="autotest-menu">
+              {/* The pipeline, always visible: the column is where the work is
+                  ordered, and a menu that appears only once a project exists
+                  reads as an empty sidebar. Without one the steps stay inert. */}
+              <nav className="autotest-nav" data-nav="autotest-menu">
                   {AUTOTEST_PIPELINE.map((item) => (
                     <button
                       key={item.path}
@@ -311,7 +313,8 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
                       className={cx("autotest-nav-item", view === item.path && "is-active")}
                       data-nav={`autotest-nav-${item.path}`}
                       aria-current={view === item.path ? "page" : undefined}
-                      onClick={() => void go(`/project/${projectId}/${item.path}`)}
+                      aria-disabled={projectId ? undefined : true}
+                      onClick={() => projectId && void go(`/project/${projectId}/${item.path}`)}
                     >
                       <span className="autotest-nav-step">{item.step}</span>
                       <span>{item.name}</span>
@@ -326,7 +329,6 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
                     全部项目
                   </button>
                 </nav>
-              ) : null}
               {/* The service's controls live at the foot of the column, not in the
                   middle of it: they are maintenance, not workflow. */}
               <div className="autotest-sidebar-footer">
