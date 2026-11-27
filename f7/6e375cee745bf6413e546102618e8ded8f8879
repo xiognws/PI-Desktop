@@ -1,0 +1,18 @@
+crates/autotest-core/src/knowledge/extract.rs
+  h_201ed4c689ac8b 731-797,919
+scripts/package-windows.mjs
+  h_201ed4c689ac8b 52-79,384,387
+services/autotest/requirements-runtime.txt
+  h_201ed4c689ac8b 1-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f76e375cee745bf6413e546102618e8ded8f8879",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
