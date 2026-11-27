@@ -5679,6 +5679,21 @@ mod tests {
         // The installed app is started from Explorer, so it inherits no encoding
         // hint; without this default a python child prints GBK and writes GBK.
         let ws = tempfile::tempdir().unwrap();
+        // MSYS bash cannot start inside this test process on some Windows hosts
+        // (`NtCreateDirectoryObject ... 0xC0000022`, the same guard the kernel's
+        // executor tests carry). Skip rather than report the host as broken.
+        let probe = execute_tool(
+            Some(ws.path()),
+            None,
+            "Bash",
+            &serde_json::json!({ "command": "exit 0" }),
+            15_000,
+        )
+        .await;
+        if !probe.ok {
+            eprintln!("SKIP (no working shell on this host): {:?}", probe.content["stderr"]);
+            return;
+        }
         let result = execute_tool(
             Some(ws.path()),
             None,
