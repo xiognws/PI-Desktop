@@ -1031,6 +1031,15 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* In the transcript the diff is open on arrival, so it needs the bounded
+   scroll box the Hermes desktop card uses (12rem) instead of pushing the turn
+   taller. The Review panel keeps the full height — it is the panel's content. */
+.review-change-card.is-tool-row .review-change-diff {
+  max-height: 12rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 .review-change-diff .diff-line-text {
   padding: 3px 10px 3px 4px;
 }

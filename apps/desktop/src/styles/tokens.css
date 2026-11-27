@@ -142,6 +142,19 @@
   --ds-success: #40c977;
   --ds-warning: #ff8549;
   --ds-error: #ff6764;
+  /*
+    Diff rows. Ported from the Hermes desktop renderer: a changed line is read
+    from a tinted row plus a full-height rail in the semantic colour, so the
+    change survives syntax colouring and a glance — a coloured sign or a
+    coloured line number alone does not. The ink mixes toward the page (white on
+    dark, black on light) so it stays legible in the theme it sits in.
+  */
+  --ds-diff-add-bg: color-mix(in srgb, var(--ds-success) 18%, transparent);
+  --ds-diff-add-rail: var(--ds-success);
+  --ds-diff-add-ink: color-mix(in srgb, var(--ds-success) 62%, #ffffff);
+  --ds-diff-del-bg: color-mix(in srgb, var(--ds-error) 18%, transparent);
+  --ds-diff-del-rail: var(--ds-error);
+  --ds-diff-del-ink: color-mix(in srgb, var(--ds-error) 62%, #ffffff);
   --ds-info: var(--gray-300);
   --ds-purple: #c27aff;
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.55);
@@ -289,6 +302,14 @@
   --ds-success: #00a240;
   --ds-warning: #e25507;
   --ds-error: #e02e2a;
+  /* Diff rows — same derivation as the dark block, mixed toward black instead
+     of white so the row keeps contrast on a light canvas. */
+  --ds-diff-add-bg: color-mix(in srgb, var(--ds-success) 14%, transparent);
+  --ds-diff-add-rail: var(--ds-success);
+  --ds-diff-add-ink: color-mix(in srgb, var(--ds-success) 70%, #000000);
+  --ds-diff-del-bg: color-mix(in srgb, var(--ds-error) 14%, transparent);
+  --ds-diff-del-rail: var(--ds-error);
+  --ds-diff-del-ink: color-mix(in srgb, var(--ds-error) 70%, #000000);
   --ds-info: #5d5d5d;
   --ds-purple: #7c3aed;
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.12);

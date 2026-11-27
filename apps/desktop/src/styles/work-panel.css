@@ -680,25 +680,26 @@
 }
 
 /* Add/Del is read from three things at once — the tint, the coloured sign and a
-   solid gutter bar — because a 12% tint alone is invisible on a bright panel and
-   a monochrome sign disappears at a glance. Every diff surface (work panel,
-   review card, tool row, a pasted fence) inherits these. */
+   solid gutter bar — because a colour-only cue disappears at a glance and gets
+   lost the moment the row also carries syntax colours. Every diff surface (work
+   panel, review card, tool row, a pasted fence) inherits these, and the tints
+   come from the `--ds-diff-*` tokens so both themes derive them the same way. */
 .diff-line.add {
-  background: color-mix(in oklab, var(--ds-success) 16%, transparent);
-  box-shadow: inset 2px 0 var(--ds-success);
+  background: var(--ds-diff-add-bg);
+  box-shadow: inset 2px 0 var(--ds-diff-add-rail);
 }
 
 .diff-line.add .diff-line-sign {
-  color: var(--ds-success);
+  color: var(--ds-diff-add-ink);
 }
 
 .diff-line.del {
-  background: color-mix(in oklab, var(--ds-error) 16%, transparent);
-  box-shadow: inset 2px 0 var(--ds-error);
+  background: var(--ds-diff-del-bg);
+  box-shadow: inset 2px 0 var(--ds-diff-del-rail);
 }
 
 .diff-line.del .diff-line-sign {
-  color: var(--ds-error);
+  color: var(--ds-diff-del-ink);
 }
 
 .diff-line.hunk {

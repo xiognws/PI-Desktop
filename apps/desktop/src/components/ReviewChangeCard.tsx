@@ -166,7 +166,12 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
   const { t } = useTranslation();
   const change = reviewChangeFromMessage(message);
   const detailsId = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(asToolRow);
+  // In the transcript the change is open on arrival, the way the Hermes desktop
+  // renders an edit: the tinted rows are the evidence, and a row that carries
+  // only a green +N and a red −N leaves "what changed" one click away. The
+  // Review panel is a change *history* — it stays collapsed and opens on its own
+  // cue. Collapsing still works in both.
   useEffect(() => {
     if (openRequest !== undefined) setOpen(true);
   }, [openRequest]);

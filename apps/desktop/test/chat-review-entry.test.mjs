@@ -38,6 +38,10 @@ const responsiveStylesSource = await readFile(
   new URL("../src/styles/responsive.css", import.meta.url),
   "utf8",
 );
+const tokensStylesSource = await readFile(
+  new URL("../src/styles/tokens.css", import.meta.url),
+  "utf8",
+);
 const appSource = await readAppSource();
 const storeSource = await readStoreSource();
 const appStoreSource = await readStoreModule("app-store.ts");
@@ -231,6 +235,55 @@ test("a review-backed edit renders one file header and no tool header", async (t
   assert.equal(html.match(/review-change-card-header/g)?.length, 1);
   assert.match(html, /class="review-change-card is-tool-row/);
   assert.doesNotMatch(html, /tool-row-header/);
+});
+
+test("the change is visible in the turn itself, not one click away", async (t) => {
+  // A collapsed row carries only green/red counts, so "what changed" reads as
+  // coloured numbers. The transcript card arrives expanded (Hermes does the
+  // same), and the rows carry the tint that makes add/remove legible.
+  const ssr = await slotSsr(t);
+  const { ActivityItems } = await ssr.load(
+    "/src/features/chat/transcript/ActivityItems.tsx",
+  );
+  const html = ssr.render(
+    createElement(ActivityItems, {
+      items: [{ kind: "tool", message: message() }],
+      isActive: false,
+      live: false,
+      delegateItems: [],
+      delegationStatuses: new Map(),
+      delegationTimings: new Map(),
+      onUserInteraction: () => {},
+    }),
+    { sessionId: null },
+  );
+  assert.match(html, /aria-expanded="true"/);
+  assert.equal(html.match(/class="diff-line add"/g)?.length, 1);
+  assert.equal(html.match(/class="diff-line del"/g)?.length, 1);
+  assert.match(html, /class="diff-line-text">const added = true;/);
+  // Only the transcript opens by itself; the Review panel stays a scannable
+  // history and opens on its own cue (`openRequest`).
+  assert.match(cardSource, /useState\(asToolRow\)/);
+});
+
+test("diff tints come from one token derivation, in both themes", () => {
+  assert.equal(tokensStylesSource.match(/--ds-diff-add-bg:/g)?.length, 2);
+  assert.equal(tokensStylesSource.match(/--ds-diff-del-bg:/g)?.length, 2);
+  assert.match(tokensStylesSource, /--ds-diff-add-bg: color-mix\(in srgb, var\(--ds-success\) 18%/);
+  assert.match(tokensStylesSource, /--ds-diff-add-bg: color-mix\(in srgb, var\(--ds-success\) 14%/);
+  const addRule = workPanelStylesSource.match(/\n\.diff-line\.add \{[\s\S]*?\n\}/)?.[0];
+  const delRule = workPanelStylesSource.match(/\n\.diff-line\.del \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(addRule && delRule, "expected the shared .diff-line add/del rules");
+  assert.match(addRule, /background: var\(--ds-diff-add-bg\)/);
+  assert.match(addRule, /inset 2px 0 var\(--ds-diff-add-rail\)/);
+  assert.match(delRule, /background: var\(--ds-diff-del-bg\)/);
+  assert.match(delRule, /inset 2px 0 var\(--ds-diff-del-rail\)/);
+  // Open by default means bounded: the transcript scrolls the diff, the panel
+  // shows all of it.
+  assert.match(
+    messageStylesSource,
+    /\.review-change-card\.is-tool-row \.review-change-diff \{[\s\S]*?max-height: 12rem[\s\S]*?overflow: auto/,
+  );
 });
 
 test("rollback outcomes reach the toast instead of a second card row", () => {
