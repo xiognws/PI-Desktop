@@ -1,0 +1,14 @@
+scripts/package-windows.mjs
+  h_201ed4c689ac8b 344-349,351-357,362-366
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "29eed31d1679c566abbec6544873371e5b24bfa1",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
