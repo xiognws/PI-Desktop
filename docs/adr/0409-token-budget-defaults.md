@@ -82,6 +82,59 @@ in 15 steps / 259,015 tokens with no error. Declaring worker tools to an orchest
 turn cost a wasted step and half of that turn's paid tokens (19,214 → 15,943 after the
 tools stopped being declared).
 
+## Failure behaviour: the pair never silently becomes one model
+
+The token savings above assume the cheap half does the work. The failure paths matter for
+the same reason: a "saving" that quietly reruns the turn on the expensive model is not a
+saving, and a pair whose second half can be swapped without telling the caller is not a
+decision anyone can reason about. So the rule is stated once and implemented in three
+places — **a failure costs the turn it happened in, never the model identity behind it.**
+
+### The cheap tier (the model that answers conversation turns)
+
+| Stage | Behaviour | Where |
+| --- | --- | --- |
+| Dispatch | A provider that is disabled, has no base URL, does not list the model, or cannot sign a request cannot serve a turn. The turn is planned on `main` with `downgraded: true` instead of being sent to a model that would fail it. | `apps/desktop/electron/main/runtime/smart-routing.ts` `providerCanServe` / `planTurn` |
+| Turn failed or produced no text | The next `stickyMainTurns` turns (default 1) stay on `main`, then the ladder unwinds one turn at a time. Failure and silence count the same: a cheap turn that said nothing is evidence, not a guess. | `smart-routing.ts` `closeTurn`; policy in `packages/shared/src/smart-mode.ts` |
+| Tool errors / budget consumed | Routing escalates after `escalateAfterToolErrors` (default 2) tool errors, or when `escalateAfterBudgetUsed` (default 0.6) of the turn's budget is gone. | same policy object |
+| Provider error inside the turn | Retried on the retry budgets below. When they are exhausted the turn ends in error — there is **no** mid-turn swap to `main`, and no code path that re-runs the turn on it. | `crates/agent-core/src/retry.rs`, `turn.rs` |
+
+### The main model
+
+| Stage | Behaviour | Where |
+| --- | --- | --- |
+| Provider error | Same retry budgets; exhausted means the turn fails with the provider's code. | `retry.rs`, `provider/http.rs` |
+| Never | Fall back to the cheap model. `tier: "main"` is the session's own binding, not a slot that can be filled by the other half. | `smart-routing.ts` `planTurn` |
+
+### A delegated worker
+
+| Stage | Behaviour | Where |
+| --- | --- | --- |
+| Requested an unauthorized model | The `Task` call returns an error. An explicit `model` argument is a spend decision; it is never a hint for a lookup that falls through to another model. | `crates/agent-core/src/delegate.rs` |
+| Ran and failed | `DelegationStatus::Failed` (also `Aborted`, `Stopped`), settled onto the same tool-call id as `failed after N turn(s) and M tool call(s) — CODE (message)`, so the transcript, the stored snapshot and the topology badge all agree. | `delegate.rs` `settled_tool_result`, `failure_reason` |
+| Hit its step ceiling | The report says so and names the ways forward: continue it yourself, rerun with a larger `stepBudget`, or narrow the task. | `delegate.rs` `failure_reason` |
+| Finished without a report | `SUBAGENT_NO_REPORT` — an empty success would read as work nobody did. | `crates/agent-core/src/sidecar.rs` |
+| Provider error inside the worker | Inherits the session's `infiniteProviderRetry` and the same retry budgets. | `sidecar.rs` |
+
+`fallbackModels` on a subagent definition is **not** a runtime chain that swaps a worker's
+model: it exists so every pinned provider is resolved once and handed to the kernel up
+front (`packages/shared/src/subagent-definition.ts`), so an unresolvable pin is a missing
+entry rather than a silent substitution. Recovering from a failed worker is the
+orchestrator's decision — do it itself, delegate again, or narrow the task — and `TaskWait`
+/ `TaskStop` are how it converges.
+
+### Retry budgets, per failure class
+
+| Class | Attempts | Spacing | Why |
+| --- | --- | --- | --- |
+| Rate limited (429, or a bare quota body) | `PROVIDER_MAX_RETRIES` (10) | 2 s, exponential, capped at 30 s, ±25 % jitter | A quota reply is not an outage; waiting is the only cure, and jitter keeps a fleet from retrying in lockstep. |
+| Transient (dropped socket, upstream 502) | 10 | 1 s, 2 s, 4 s, 8 s, capped | Long enough to ride out a restart, short enough that a dead provider does not hold the turn. |
+| Truncated body (`INCOMPLETE_STREAM`) | `TRUNCATED_MAX_RETRIES` (4) | 2 s, 4 s, 8 s, 8 s | Measured: three attempts inside two seconds all died, while a request nine seconds later completed. Spacing matters more than the count, and each retry re-sends the prompt. |
+
+A turn that exhausts its budget fails with the provider's own code, and the user sees the
+failure rather than a silent model substitution. That is the trade this ADR accepts: the
+savings come from *what runs*, and the failure story stays one model per turn.
+
 ## Consequences
 
 * Every session — smart mode or single model — starts from these numbers. Changing one
