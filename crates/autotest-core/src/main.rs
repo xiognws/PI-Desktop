@@ -15,11 +15,13 @@ mod config;
 mod db;
 mod error;
 mod exec;
+mod knowledge;
 mod project;
 mod schema;
 mod script_state;
 mod state;
 mod static_assets;
+mod workflow;
 
 use std::sync::Arc;
 use std::time::Duration;

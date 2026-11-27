@@ -132,6 +132,8 @@ pub fn build(state: Arc<AppState>) -> Router {
             "/api/projects/:project_id/env-status",
             get(executions::env_status),
         )
+        .merge(crate::workflow::routes())
+        .merge(crate::knowledge::routes())
         .fallback(static_assets::serve)
         // Uploads carry requirement documents; the default 2 MB cap is too small
         // for a spec with embedded screenshots.
