@@ -341,13 +341,27 @@ if (rustBinaryIsCurrent(autotestExe)) {
   if (engine !== 0) process.exit(engine);
 }
 
-// The kernel ships from `target/release` too, and this script does not build it
-// (`build:agent-release` in the desktop package does). Pack a missing one is a
-// silent half-install, so it fails here instead.
+// The kernel ships from `target/release` too. This script used to only check that
+// it existed, which is the one half-install the tree cannot show: the UI and
+// host-core are fresh, the agent loop inside is days old, and every behaviour that
+// lives in the kernel silently is not the one that was just built. The same
+// fingerprint rule host-core uses applies here, and `--rebuild-rust` compiles it
+// rather than telling the caller to run a second command.
 const agentExe = join(REPO, "target", "release", "nubo-proto.exe");
-if (!existsSync(agentExe)) {
+if (rebuildRust) {
+  step("build agent kernel (release)");
+  const kernel = run("cargo", [
+    "build", "--release", "-p", "agent-core", "--bin", "nubo-proto", "--locked",
+  ]);
+  if (kernel !== 0) process.exit(kernel);
+} else if (!existsSync(agentExe)) {
   process.stderr.write(
     `missing ${agentExe}\nRun \`pnpm --filter @pi-workspace/desktop run build:agent-release\` first.\n`,
+  );
+  process.exit(3);
+} else if (!rustBinaryIsCurrent(agentExe)) {
+  process.stderr.write(
+    `stale ${agentExe}: older than the kernel sources\nRun \`pnpm --filter @pi-workspace/desktop run build:agent-release\`, or pass --rebuild-rust.\n`,
   );
   process.exit(3);
 }
