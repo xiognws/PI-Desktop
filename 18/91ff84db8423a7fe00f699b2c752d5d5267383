@@ -1,0 +1,32 @@
+apps/desktop/src/features/surfaces/autotest/AutoTestSurfaceShell.tsx
+  h_201ed4c689ac8b 305-308,316-317
+packages/i18n/src/locales/de/index.ts
+  h_201ed4c689ac8b 329,1347,1352
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 336,1357,1362
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 329,1347,1352
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 329,1347,1352
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 338,1353,1358
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 328,1331,1336
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 338,1353,1358
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 331,1344,1349
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 331,1344,1349
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "1891ff84db8423a7fe00f699b2c752d5d5267383",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
