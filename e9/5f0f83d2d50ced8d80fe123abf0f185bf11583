@@ -1,0 +1,18 @@
+crates/agent-core/src/context.rs
+  h_201ed4c689ac8b 36,40-61,85-87,89,225-235,238,425-432,439,441,444-445,449-452,462-466,497-499,501-505,508-509
+docs/adr/0409-token-budget-defaults.md
+  h_201ed4c689ac8b 46-47,148-151,155-177
+docs/spec/03-runtime/02-agent-runtime.md
+  h_201ed4c689ac8b 591,593,595-602
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "e95f0f83d2d50ced8d80fe123abf0f185bf11583",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
