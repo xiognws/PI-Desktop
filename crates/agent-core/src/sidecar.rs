@@ -1368,8 +1368,22 @@ impl Sidecar {
         // changes is that the model is not handed a tool whose only purpose is to
         // interrupt, and is told the session is unattended.
         if let Some(mode) = request.str_param("permissionMode") {
-            if let Ok(mut applied) = self.permission_mode.write() {
-                *applied = mode.trim().to_ascii_lowercase();
+            let next = mode.trim().to_ascii_lowercase();
+            let previous = self
+                .permission_mode
+                .write()
+                .map(|mut applied| std::mem::replace(&mut *applied, next.clone()))
+                .unwrap_or_else(|_| next.clone());
+            // Install on a change, and only ever the two states this owns: raising to
+            // `unattended` on `auto`, and putting the default back when a session leaves
+            // `auto`. A policy set explicitly through `agent.approvalPolicy` is left
+            // alone in every other case, because a prompt must not overwrite a rule a
+            // person just wrote.
+            if previous != next && (next == "auto" || previous == "auto") {
+                self.approval.set(
+                    crate::approval::ApprovalPolicy::for_permission_mode(&next)
+                        .with_workspace(std::env::current_dir().unwrap_or_default()),
+                );
             }
         }
         if let Some(declarations) = request.params.get("tools").and_then(Value::as_array) {

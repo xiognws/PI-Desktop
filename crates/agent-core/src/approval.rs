@@ -190,6 +190,20 @@ impl Default for ApprovalPolicy {
 }
 
 impl ApprovalPolicy {
+    /// The policy a host-named permission mode asks for.
+    ///
+    /// Only `auto` differs from the default. It is the user saying "do not interrupt
+    /// me", and a prompt nobody answers is not a pause — it is a hang, so the whole scale
+    /// is allowed through, hardline included. The other modes keep the default, where
+    /// the host owns the asking: duplicating those prompts in the kernel would ask a
+    /// person twice for one call.
+    pub fn for_permission_mode(mode: &str) -> Self {
+        match mode.trim().to_ascii_lowercase().as_str() {
+            "auto" => Self::unattended(),
+            _ => Self::default(),
+        }
+    }
+
     /// A session that may read and nothing else: every change asks.
     pub fn reviewer() -> Self {
         Self {
@@ -363,31 +377,68 @@ fn is_inside(root: &Path, path: &str) -> bool {
 
 /// Reads or writes a credential. A call that does is `hardline` whatever tool it uses.
 fn touches_credentials(tool: &str, arguments: &Value) -> bool {
-    const CREDENTIAL_MARKERS: &[&str] = &[
+    // Markers that only make sense as part of a path. Matched by substring, because the
+    // separator is what makes them unambiguous.
+    const PATH_MARKERS: &[&str] = &[
         ".ssh/id_",
         ".aws/credentials",
         ".aws/config",
+        ".git-credentials",
+        "\\windows\\system32\\config\\sam",
+    ];
+    // Bare names. These are matched against one path segment, not against the whole
+    // arguments blob: searching the blob made `.env` match `os.environ` in a file body,
+    // and every Python edit that mentions the environment variable map was then refused
+    // as a credentials write.
+    const NAME_MARKERS: &[&str] = &[
         ".npmrc",
         ".netrc",
-        ".git-credentials",
         ".gnupg",
         "id_rsa",
         "id_ed25519",
         ".env",
         "credentials.json",
-        "secrets.",
         "keystore",
         "keychain",
-        "\\windows\\system32\\config\\sam",
     ];
-    let haystack = format!(
-        "{} {}",
-        tool.to_lowercase(),
-        arguments.to_string().to_lowercase()
-    );
-    CREDENTIAL_MARKERS
-        .iter()
-        .any(|marker| haystack.contains(marker))
+
+    let mut texts: Vec<String> = Vec::new();
+    for key in ["path", "file_path", "filePath", "cwd", "glob", "pattern"] {
+        if let Some(value) = arguments.get(key).and_then(Value::as_str) {
+            texts.push(value.to_lowercase());
+        }
+    }
+    // A command is a path statement too — `cp x ~/.ssh/id_rsa` has to stay hardline —
+    // but it is only ever the command, never a file body the model quoted.
+    if let Some(command) = ExecPolicy::command_of(tool, arguments) {
+        texts.push(command.to_lowercase());
+    }
+    let _ = tool;
+
+    for text in &texts {
+        if PATH_MARKERS.iter().any(|marker| text.contains(marker)) {
+            return true;
+        }
+        // One segment at a time: `os.environ` is a single segment and ends with `iron`,
+        // while `config.env` ends with the marker and a bare `.env` is the marker.
+        for segment in text.split(|c: char| {
+            c == '/' || c == '\\' || c.is_whitespace() || c == '"' || c == '\'' || c == '=' || c == ','
+        }) {
+            if segment.is_empty() {
+                continue;
+            }
+            if NAME_MARKERS
+                .iter()
+                .any(|marker| segment == *marker || segment.ends_with(marker))
+            {
+                return true;
+            }
+            if segment.starts_with("secrets.") {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Copies this process's own binary — the one shape that gets a legitimate agent
@@ -517,6 +568,63 @@ mod tests {
             ],
             ..policy()
         }
+    }
+
+    #[test]
+    fn a_python_body_that_mentions_the_environment_is_not_a_credentials_write() {
+        // "os.environ" contains ".env" as a substring. Matching markers against the whole
+        // argument JSON turned every edit of code that reads environment variables into a
+        // `hardline` call, which asks in every mode — six refusals in one session, and the
+        // user had set 全自动.
+        let edit = json!({
+            "path": "E:/proj/tools/ci_gate.py",
+            "old_string": "def run_gate(name, cmd, desc, timeout):",
+            "new_string": "env = dict(os.environ, PYTHONIOENCODING='utf-8')",
+        });
+        assert_eq!(policy().classify("Edit", &edit), DangerLevel::Editable);
+        assert_eq!(policy().classify("Write", &edit), DangerLevel::Editable);
+
+        // Outside the session's workspace it is still an edit, not a credentials access:
+        // `dangerous`, which `auto` allows and an attending policy may ask about.
+        let outside = json!({
+            "path": "D:/Code/VVSP-Next/tools/ci_gate.py",
+            "new_string": "env = dict(os.environ, PYTHONIOENCODING='utf-8')",
+        });
+        assert_eq!(policy().classify("Edit", &outside), DangerLevel::Dangerous);
+    }
+
+    #[test]
+    fn a_real_credentials_path_is_still_hardline() {
+        // The precision must not cost the case that matters: the same marker, on a path
+        // that is actually an environment file.
+        let env_file = json!({"path": "E:/proj/config.env", "content": "A=1"});
+        assert_eq!(policy().classify("Write", &env_file), DangerLevel::Hardline);
+
+        let key = json!({"path": "C:/Users/x/.ssh/id_rsa"});
+        assert_eq!(policy().classify("Write", &key), DangerLevel::Hardline);
+
+        let copy = json!({"command": "cp ./a C:/Users/x/.ssh/id_ed25519"});
+        assert_eq!(policy().classify("Bash", &copy), DangerLevel::Hardline);
+    }
+
+    #[test]
+    fn full_automatic_does_not_stop_on_the_hardline_class() {
+        // 全自动 is the user saying "do not interrupt me". A question nobody answers is a
+        // hang, so the whole scale passes; the other modes keep the default, where the
+        // host owns the asking.
+        let unattended = ApprovalPolicy::for_permission_mode("auto");
+        let verdict = unattended.evaluate("Write", &json!({"path": "E:/proj/config.env"}));
+        assert!(
+            matches!(verdict, Verdict::Allow { .. }),
+            "auto must not ask: {verdict:?}"
+        );
+
+        let asking = ApprovalPolicy::for_permission_mode("ask");
+        let verdict = asking.evaluate("Write", &json!({"path": "E:/proj/config.env"}));
+        assert!(
+            !matches!(verdict, Verdict::Allow { .. }),
+            "ask must still stop on a credentials write: {verdict:?}"
+        );
     }
 
     #[test]
