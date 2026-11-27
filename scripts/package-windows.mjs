@@ -50,6 +50,34 @@ const allowRunning = argv.has("--allow-running");
 const skipAutotestUi = argv.has("--skip-autotest-ui");
 
 /**
+ * When this run started.
+ *
+ * A piped invocation can end with exit code 0 while a build step quietly bailed
+ * (`pnpm` refuses a redirected stdout with "… is not a tty"), and a stale
+ * `win-unpacked` from a previous run then gets verified and reported as PASS. The
+ * tree's own mtime is the only proof that *this* run produced it.
+ */
+const STARTED_AT = Date.now() - Math.round(process.uptime() * 1000);
+
+function assertPackageIsFresh() {
+  const exe = join(UNPACKED, "Pi-Workspace.exe");
+  if (!existsSync(exe)) {
+    process.stderr.write(`\nno package at ${exe}\n`);
+    process.exit(4);
+  }
+  const { mtimeMs } = statSync(exe);
+  if (mtimeMs < STARTED_AT) {
+    process.stderr.write(
+      `\nRESULT: FAIL — ${exe} was not rebuilt by this run ` +
+        `(mtime ${new Date(mtimeMs).toISOString()}, run started ${new Date(STARTED_AT).toISOString()})\n` +
+        "A build step failed or bailed out early; the tree on disk is from an earlier build.\n" +
+        "Run it again from a terminal, without piping stdout.\n",
+    );
+    process.exit(5);
+  }
+}
+
+/**
  * Per-step wall clock.
  *
  * The build is long enough that "which step is the slow one" is worth printing
@@ -353,6 +381,8 @@ if (pack !== 0) process.exit(pack);
 //    about to be installed still goes through the verifier.
 if (skipVerify) {
   step("verify packaged tree: skipped (--skip-verify)");
+  assertPackageIsFresh();
   process.exit(0);
 }
+assertPackageIsFresh();
 process.exit(verify());

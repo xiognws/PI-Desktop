@@ -728,8 +728,73 @@ fn xlsx_to_text(raw: &[u8]) -> Result<String, String> {
     Ok(parts.join("\n\n"))
 }
 
-fn pdf_to_text(_raw: &[u8]) -> Result<String, String> {
-    Err("不支持的文档格式 .pdf：Rust 服务未内置 PDF 解析（Python 服务使用 pdfplumber）".to_string())
+/// PDF text, extracted by the interpreter the app already ships.
+///
+/// A PDF is a container of compressed streams; reading one correctly (object
+/// streams, xref tables, font encodings, CID fonts) is a large piece of software,
+/// and no PDF parser is available in this build's offline crate set. The platform
+/// already carries a Python runtime for running the user's pytest scripts, and it
+/// carries `pdfplumber` for exactly this job, so the bytes are handed to a child
+/// process over **stdin** — no temp file, nothing to clean up — and the text comes
+/// back on stdout.
+fn pdf_to_text(raw: &[u8]) -> Result<String, String> {
+    const SCRIPT: &str = r#"
+import io, sys
+data = sys.stdin.buffer.read()
+import pdfplumber
+pages = []
+with pdfplumber.open(io.BytesIO(data)) as pdf:
+    for page in pdf.pages:
+        pages.append(page.extract_text() or "")
+sys.stdout.write("\n\n".join(pages))
+"#;
+    let python = interpreter_path().ok_or_else(|| {
+        "PDF 需要 PDF 解析器：本次安装里没有随包解释器，无法抽取文本".to_string()
+    })?;
+
+    let mut child = std::process::Command::new(python)
+        .arg("-c")
+        .arg(SCRIPT)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("无法启动 PDF 解析器：{error}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin
+            .write_all(raw)
+            .map_err(|error| format!("PDF 解析器写入失败：{error}"))?;
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("PDF 解析器没有返回结果：{error}"))?;
+    let text = String::from_utf8_lossy(&output.stdout).replace("\r\n", "\n");
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let reason = stderr.lines().last().unwrap_or("缺少 pdfplumber").trim().to_string();
+        return Err(format!("PDF 抽取失败：{reason}"));
+    }
+    if text.trim().is_empty() {
+        return Err("PDF 里没有可抽取的文字（可能是扫描件）".to_string());
+    }
+    Ok(text)
+}
+
+/// The interpreter that owns the PDF extractor: the host passes its path, and a
+/// packaged install keeps it next to the service.
+pub(crate) fn interpreter_path() -> Option<std::path::PathBuf> {
+    if let Ok(explicit) = std::env::var("AUTOTEST_PYTHON") {
+        let trimmed = explicit.trim();
+        if !trimmed.is_empty() && std::path::Path::new(trimmed).is_file() {
+            return Some(std::path::PathBuf::from(trimmed));
+        }
+    }
+    let service_root = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))?;
+    crate::config::python_executable(&service_root)
 }
 
 pub fn extract_text(filename: &str, raw: &[u8]) -> Result<Extracted, String> {
@@ -851,7 +916,7 @@ mod tests {
     fn pdf_says_so_explicitly() {
         assert!(extract_text("a.pdf", b"%PDF-1.4")
             .unwrap_err()
-            .starts_with("不支持的文档格式 .pdf"));
+            .starts_with("PDF "));
     }
 
     #[test]

@@ -1,0 +1,16 @@
+# What the packaged AutoTest service actually imports.
+#
+# The platform service itself is now Rust (`crates/autotest-core`); the interpreter
+# that ships alongside it exists for exactly two jobs:
+#
+#   pytest      — runs the user's test scripts (the executor)
+#   pdfplumber  — extracts text from PDF specs (no PDF parser in the Rust crate set)
+#
+# The previous `requirements.lock` was a 219-line `pip freeze` of a developer
+# machine — it pinned boto3, cohere, allure, basedpyright, matplotlib and a
+# `-e d:\code\autotestdemo` editable install, and the installer shipped 98.6 MB of
+# it. Building the runtime environment from this file instead produces the ~61 MB
+# closure of these two roots (Pillow, cryptography, pdfminer.six, pypdfium2 and the
+# pytest stack), which is what `services/autotest/.deps` now contains.
+pytest==9.2.0
+pdfplumber==0.11.10
