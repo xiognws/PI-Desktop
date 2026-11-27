@@ -170,6 +170,51 @@ thread_local! {
     static FILLER_CHARS: std::cell::RefCell<usize> = const { std::cell::RefCell::new(0) };
 }
 
+/// The checkpoint has to be durable: a compaction that is only in memory means
+/// the next restart rebuilds the rows the summary replaced, which is a different
+/// history on every restart. The engine records the cut; the sidecar stores it.
+#[tokio::test]
+async fn a_threshold_compaction_records_the_cut_it_made() {
+    let (model, _, chars) = limits();
+    FILLER_CHARS.with(|value| *value.borrow_mut() = chars);
+    let provider = Arc::new(BehaviorProvider::new());
+    let sink = Arc::new(RecordingSink::new());
+    let log = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let engine = engine(provider.clone(), sink.clone())
+        .with_model_limits(model)
+        .with_compaction_log(log.clone());
+    let mut transcript = agent_core::session::Transcript::new();
+    transcript.push(Message::user_text("compact me"));
+
+    engine
+        .run_turn(
+            "s1",
+            "t1",
+            &mut transcript,
+            &TurnConfig::new("test-model"),
+            CancelToken::new(),
+        )
+        .await
+        .expect("the turn must finish even though it compacted");
+
+    let entries = log.lock().expect("log poisoned");
+    assert_eq!(entries.len(), 1, "one compaction, one durable record");
+    let record = &entries[0];
+    assert!(
+        record.summary.contains("SUMMARY OF WORK"),
+        "the record carries the summary the model wrote: {}",
+        record.summary
+    );
+    assert!(
+        !record.through_message_id.is_empty(),
+        "the cut must name a stored row, or the store cannot mark the boundary"
+    );
+    assert!(
+        record.tokens_before > 0,
+        "the record says what it replaced, so a resume can report it"
+    );
+}
+
 #[tokio::test]
 async fn a_transcript_past_the_trigger_is_summarized_before_the_next_request() {
     let (model, _, chars) = limits();

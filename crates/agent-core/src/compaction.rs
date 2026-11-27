@@ -555,6 +555,26 @@ pub struct CompactionPlan {
     pub first_kept_message_id: Option<String>,
 }
 
+/// What a successful compaction produced, in the shape the store keeps.
+///
+/// The installed checkpoint lives in the transcript for the rest of the run, but
+/// a restart rebuilds that transcript from the store. Without this record the
+/// summary is discarded and the resumed model reads the raw rows the summary had
+/// already replaced — a different history than the one it compacted, chosen
+/// afresh on every restart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompactionOutcome {
+    pub summary: String,
+    pub tokens_before: u64,
+    /// Last message the summary replaced. The store resumes after it.
+    pub through_message_id: String,
+    /// First message kept verbatim, when the checkpoint kept any.
+    pub first_kept_message_id: Option<String>,
+    /// Every message kept verbatim, in transcript order. Stored as ids: a
+    /// restart re-reads the real rows instead of a second copy of them.
+    pub retained_ids: Vec<String>,
+}
+
 /// Decide the cut point and build the summary input for `mode`.
 ///
 /// `ActiveTurn` keeps the latest user message so the continuation never loses

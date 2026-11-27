@@ -245,6 +245,10 @@ pub struct TurnEngine {
     /// Where a smart-mode cheap turn hands over. `None` — the default — keeps
     /// the turn on one provider from its first step to its last.
     escalation: Option<EscalationTarget>,
+    /// Where a compaction's durable record goes. The engine cannot write to the
+    /// host itself — the bridge belongs to the sidecar — so it appends here and
+    /// the turn's owner drains it after `run_turn`.
+    compaction_log: Option<Arc<std::sync::Mutex<Vec<crate::compaction::CompactionOutcome>>>>,
 }
 
 impl TurnEngine {
@@ -268,6 +272,7 @@ impl TurnEngine {
             activation: None,
             extensions: None,
             escalation: None,
+            compaction_log: None,
         }
     }
 
@@ -281,6 +286,19 @@ impl TurnEngine {
         activation: Arc<crate::tool_activation::ToolActivation>,
     ) -> Self {
         self.activation = Some(activation);
+        self
+    }
+
+    /// Record every compaction this turn performs.
+    ///
+    /// The durable write stays on the sidecar's side of the bridge (the same
+    /// path that journals the system prompt), so the engine only collects the
+    /// outcomes and its owner drains them once the turn is over.
+    pub fn with_compaction_log(
+        mut self,
+        log: Arc<std::sync::Mutex<Vec<crate::compaction::CompactionOutcome>>>,
+    ) -> Self {
+        self.compaction_log = Some(log);
         self
     }
 
@@ -1393,6 +1411,32 @@ impl TurnEngine {
             .await
         {
             Ok(summary) => {
+                // Record the cut before the transcript is replaced: `plan` still
+                // names what was summarized, and the store needs those ids while
+                // they are still the ones it wrote.
+                if let Some(log) = &self.compaction_log {
+                    if let Some(through) = plan.through_message_id.clone() {
+                        let outcome = crate::compaction::CompactionOutcome {
+                            summary: summary.clone(),
+                            tokens_before: plan.tokens_before,
+                            through_message_id: through,
+                            first_kept_message_id: plan.first_kept_message_id.clone(),
+                            retained_ids: plan
+                                .retained
+                                .iter()
+                                .map(|message| message.id.clone())
+                                .filter(|id| !id.is_empty())
+                                .collect(),
+                        };
+                        match log.lock() {
+                            Ok(mut entries) => entries.push(outcome),
+                            Err(_) => tracing::warn!(
+                                target: "agent_core::turn",
+                                "compaction log lock poisoned: this checkpoint will not be stored"
+                            ),
+                        }
+                    }
+                }
                 let mut messages = vec![checkpoint_message(&summary)];
                 messages.extend(plan.retained.iter().cloned());
                 let first_kept = messages.get(1).map(|message| message.id.clone());
