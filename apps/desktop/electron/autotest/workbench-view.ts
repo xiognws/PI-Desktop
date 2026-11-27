@@ -220,6 +220,45 @@ export class AutotestWorkbenchView {
     this.attached = false;
   }
 
+  /** Where the page currently is, as a path (`/project/<id>/pipeline`). */
+  location(): string {
+    if (!this.url) return "/";
+    try {
+      return new URL(this.url).pathname || "/";
+    } catch {
+      return "/";
+    }
+  }
+
+  /**
+   * Send the page somewhere else.
+   *
+   * The workbench menu is drawn by the shell's sidebar now, but the router lives
+   * in the page, so a click loads the target route in the same view. The service
+   * answers locally, so this is a page load against loopback, not a network wait.
+   */
+  navigate(path: string): string {
+    const target = path.startsWith("/") ? path : `/${path}`;
+    if (!this.view || !this.url) return this.location();
+    try {
+      const base = new URL(this.url).origin;
+      this.url = `${base}${target}`;
+      // A navigation is a new document. `insertCSS` belongs to the document it
+      // was injected into, so the stylesheet that hides the page's own title bar
+      // and menu goes with the old one — and the "already inserted" guard would
+      // then leave the new page wearing its own chrome.
+      this.themeCssInserted = false;
+      void Promise.resolve(this.view.webContents.loadURL(this.url))
+        .then(() => this.applyThemeNow())
+        .catch((error: unknown) => {
+          this.deps.log?.(`could not navigate the workbench: ${String(error)}`);
+        });
+    } catch (error) {
+      this.deps.log?.(`could not navigate the workbench: ${String(error)}`);
+    }
+    return target;
+  }
+
   /** Hide and drop the page, so the next attach loads the current URL afresh. */
   reload(): void {
     this.hide();

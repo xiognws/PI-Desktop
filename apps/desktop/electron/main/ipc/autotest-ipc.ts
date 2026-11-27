@@ -117,6 +117,19 @@ export function registerAutotestIpc({
     return snapshot();
   });
 
+  registrar.handle(IPC.invoke.autotestWorkbenchLocation, async () => ({
+    path: view.location(),
+  }));
+
+  registrar.handleWithEvent(
+    IPC.invoke.autotestWorkbenchNavigate,
+    async (_event, raw: unknown) => {
+      const path = (raw as { path?: unknown } | null)?.path;
+      if (typeof path !== "string" || !path.startsWith("/")) return { path: view.location() };
+      return { path: view.navigate(path) };
+    },
+  );
+
   registrar.handle(IPC.invoke.autotestWorkbenchOpenWindow, async () => {
     openWindow();
   });

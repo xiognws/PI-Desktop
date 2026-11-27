@@ -2404,6 +2404,14 @@ export const api = {
   }) => invoke<void>(IPC.invoke.autotestWorkbenchBounds, bounds),
   autotestWorkbenchRestart: () =>
     invoke<AutotestWorkbenchSnapshot>(IPC.invoke.autotestWorkbenchRestart),
+  /**
+   * The workbench's own navigation lives inside its page; the surface draws the
+   * menu in its sidebar instead, so it needs to read where the page is and to
+   * send it somewhere.
+   */
+  autotestWorkbenchLocation: () => invoke<{ path: string }>(IPC.invoke.autotestWorkbenchLocation),
+  autotestWorkbenchNavigate: (path: string) =>
+    invoke<{ path: string }>(IPC.invoke.autotestWorkbenchNavigate, { path }),
   autotestWorkbenchOpenWindow: () => invoke<void>(IPC.invoke.autotestWorkbenchOpenWindow),
   onHostStatus: (listener: (status: HostStatusEvent) => void) => {
     if (!window.piDesktop?.on) return () => undefined;

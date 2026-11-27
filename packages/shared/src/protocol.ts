@@ -567,6 +567,8 @@ export const IPC = {
     autotestWorkbenchBounds: "pi-desktop/autotest/workbench/bounds",
     autotestWorkbenchStatus: "pi-desktop/autotest/workbench/status",
     autotestWorkbenchRestart: "pi-desktop/autotest/workbench/restart",
+    autotestWorkbenchNavigate: "pi-desktop/autotest/workbench/navigate",
+    autotestWorkbenchLocation: "pi-desktop/autotest/workbench/location",
     /** Pop the same workbench out into the window it used to open by itself. */
     autotestWorkbenchOpenWindow: "pi-desktop/autotest/workbench/openWindow",
   },

@@ -32,6 +32,58 @@ import type { SurfaceShellProps } from "../registry";
 /** Re-check a failed service without the user having to click anything. */
 const FAILED_RETRY_MS = 25_000;
 
+/** How often the surface re-reads the page's route, to keep the menu honest. */
+const LOCATION_POLL_MS = 1_500;
+
+/**
+ * The workbench's menu, mirrored from `ProjectLayout.vue`'s `NAV`.
+ *
+ * It is duplicated on purpose: the page cannot render into this window's sidebar,
+ * so the labels live here and each click drives the page's router through the
+ * navigate channel.
+ */
+const NAV: { group: string; items: { path: string; name: string }[] }[] = [
+  {
+    group: "流程",
+    items: [
+      { path: "pipeline", name: "流水线" },
+      { path: "runs", name: "运行记录" },
+      { path: "approvals", name: "待审批" },
+    ],
+  },
+  {
+    group: "产物",
+    items: [
+      { path: "cases", name: "用例" },
+      { path: "scripts", name: "脚本" },
+    ],
+  },
+  {
+    group: "结果",
+    items: [
+      { path: "executions", name: "执行" },
+      { path: "reports", name: "报告" },
+      { path: "bugs", name: "缺陷" },
+    ],
+  },
+  {
+    group: "资料",
+    items: [
+      { path: "requirements", name: "项目资料" },
+      { path: "knowledge", name: "知识库" },
+      { path: "contract", name: "被测件契约" },
+    ],
+  },
+  { group: "其他", items: [{ path: "settings", name: "设置" }] },
+];
+
+/** `/project/<id>/<view>` → id and view; `/` → neither. */
+function parseLocation(path: string): { projectId: string; view: string } {
+  const match = /^\/project\/([^/]+)(?:\/([^/?#]+))?/.exec(path);
+  if (!match) return { projectId: "", view: "" };
+  return { projectId: decodeURIComponent(match[1]), view: match[2] ?? "" };
+}
+
 /**
  * The window's resolved palette.
  *
@@ -55,6 +107,8 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
   const paneRef = useRef<HTMLDivElement | null>(null);
   const [snapshot, setSnapshot] = useState<AutotestWorkbenchSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  const [location, setLocation] = useState("/");
+  const [projectName, setProjectName] = useState("");
 
   const attach = useCallback(async () => {
     setBusy(true);
@@ -129,6 +183,54 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
     observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
     return () => observer.disconnect();
   }, [attach, visible]);
+
+  // The page can move on its own (a project card opens its pipeline), so the menu
+  // follows the page rather than assuming the click that started it.
+  useEffect(() => {
+    if (!visible || snapshot?.status !== "ready") return;
+    let cancelled = false;
+    const read = () => {
+      void api
+        .autotestWorkbenchLocation()
+        .then((result) => {
+          if (!cancelled) setLocation(result.path);
+        })
+        .catch(() => undefined);
+    };
+    read();
+    const timer = window.setInterval(read, LOCATION_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [snapshot?.status, visible]);
+
+  // The project name for the top band: only the service knows it, and it is on
+  // loopback with permissive CORS, so the surface asks it directly.
+  const { projectId, view } = parseLocation(location);
+  useEffect(() => {
+    if (!projectId || !snapshot?.port) {
+      setProjectName("");
+      return;
+    }
+    let cancelled = false;
+    const port = snapshot.port;
+    void fetch(`http://127.0.0.1:${port}/api/projects`)
+      .then((response) => response.json())
+      .then((payload: { projects?: { id: string; name: string }[] }) => {
+        if (cancelled) return;
+        setProjectName(payload.projects?.find((item) => item.id === projectId)?.name ?? "");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, snapshot?.port]);
+
+  const go = async (target: string) => {
+    const result = await api.autotestWorkbenchNavigate(target).catch(() => null);
+    if (result) setLocation(result.path);
+  };
 
   const restart = async () => {
     setBusy(true);
@@ -234,20 +336,54 @@ export function AutoTestSurfaceShell({ overlaysOpen, runtime }: SurfaceShellProp
                   {t("autotest.surface.openWindow")}
                 </Button>
               </div>
+              {/* The workbench's own menu, drawn here because its page cannot
+                  reach this column. With no project open there is nothing to
+                  navigate, so the menu waits for one. */}
+              {projectId ? (
+                <nav className="autotest-nav" data-nav="autotest-menu">
+                  {NAV.map((group) => (
+                    <div key={group.group} className="autotest-nav-group">
+                      <p className="autotest-nav-heading">{group.group}</p>
+                      {group.items.map((item) => (
+                        <button
+                          key={item.path}
+                          type="button"
+                          className={cx("autotest-nav-item", view === item.path && "is-active")}
+                          data-nav={`autotest-nav-${item.path}`}
+                          aria-current={view === item.path ? "page" : undefined}
+                          onClick={() => void go(`/project/${projectId}/${item.path}`)}
+                        >
+                          {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="autotest-nav-item is-back"
+                    data-nav="autotest-nav-home"
+                    onClick={() => void go("/")}
+                  >
+                    全部项目
+                  </button>
+                </nav>
+              ) : null}
             </div>
           </>
         )}
       </aside>
       <section className="autotest-main-pane">
-        {/* One chrome, not two: once the workbench is up its own header owns the
-            top band, so this titlebar only stands in while it is not. */}
-        {state === "ready" ? null : (
-          <header className="autotest-titlebar no-drag">
-            <span className="autotest-titlebar-title">
-              {t("autotest.surface.title")}
-            </span>
-          </header>
-        )}
+        {/* The window's top band, at the chat surface's height. The page's own
+            title bar is suppressed, so the drag region, the window buttons and
+            the status bar below keep the positions users already know. */}
+        <header className="autotest-topbar no-drag">
+          <span className="autotest-topbar-title">
+            {projectName || t("autotest.surface.title")}
+          </span>
+          <span className="autotest-topbar-state" data-state={state}>
+            {serviceLabel}
+          </span>
+        </header>
         <div ref={paneRef} className="autotest-pane" data-state={state}>
           {state === "ready" ? null : (
             <div className="autotest-pane-placeholder" role="status">

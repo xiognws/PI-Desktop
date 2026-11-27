@@ -81,13 +81,27 @@ const LIGHT_PALETTE = `
 `;
 
 export const WORKBENCH_THEME_CSS = `
-/* Injected by the desktop shell for the AutoTest surface. */
-:root.dark {${DARK_PALETTE}}
+/* Injected by the desktop shell for the AutoTest surface. */:root.dark {${DARK_PALETTE}}
 :root:not(.dark) {${LIGHT_PALETTE}}
 /* The pane already owns the window frame: no second page margin, and the page
    fills the rect it was given instead of reserving a viewport height. */
 :root { --pi-surface-fill: 1; }
 body { overflow: hidden; }
+
+/* One window chrome, not two.
+ *
+ * The page was written as a standalone app: it draws its own title bar (project
+ * name, theme switch, user chip) and its own left navigation. Embedded in this
+ * window those duplicate the host's title bar and eat a second navigation
+ * column, and the host's title bar is the one that carries the window buttons
+ * and the status bar. So the page keeps only its content: the host draws the
+ * top band and the menu, and drives the router in here.
+ */
+header.h-12,
+header.h-14,
+aside.w-60 {
+  display: none !important;
+}
 `;
 
 /**

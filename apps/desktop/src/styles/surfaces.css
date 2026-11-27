@@ -28,6 +28,20 @@
   -webkit-app-region: drag;
 }
 
+/* The window's left edge runs the full height.
+ *
+ * `.app-shell` reserves the status bar's 30px with padding, and the rail — being
+ * a child — ended above that band, which reads as a column that stops short of
+ * the bottom. The status bar lives in the sidebar's footer rather than across the
+ * window, so nothing is covered by letting the rail fill it: the rail keeps its
+ * content box and simply extends its edge into the reserved band.
+ */
+.surface-rail {
+  /* `height: 100%` measures the content box, so the reserved 30px stayed empty.
+     The extra 30 is that band: the rail's edge then meets the status bar. */
+  height: calc(100% + 30px);
+}
+
 .surface-rail-button {
   flex: none;
   width: 34px;
@@ -76,6 +90,98 @@
 }
 
 /* --- AutoTest surface ------------------------------------------------- */
+
+/* The window's top band for this surface. Same height as the chat topbar, so the
+   window buttons above it and the status bar below it sit where they always do;
+   the content is the project and the service, not a conversation. */
+.autotest-topbar {
+  flex: none;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--ds-border-subtle);
+  -webkit-app-region: drag;
+}
+
+.autotest-topbar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autotest-topbar-state {
+  flex: none;
+  font-size: 12px;
+  color: var(--ds-text-muted);
+}
+
+.autotest-topbar-state[data-state="failed"] {
+  color: var(--ds-danger, #e5484d);
+}
+
+/* The workbench's menu, in the sidebar it now shares with the service row. */
+.autotest-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ds-border-subtle);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.autotest-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.autotest-nav-heading {
+  margin: 0 0 2px 8px;
+  font-size: 11px;
+  color: var(--ds-text-muted);
+}
+
+.autotest-nav-item {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--ds-text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.autotest-nav-item:hover {
+  background: var(--ds-bg-hover);
+}
+
+.autotest-nav-item:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+}
+
+.autotest-nav-item.is-active {
+  background: var(--ds-bg-active);
+  font-weight: 600;
+}
+
+.autotest-nav-item.is-back {
+  margin-top: 4px;
+  color: var(--ds-text-muted);
+}
 
 .app-surface-autotest {
   flex: 1 1 auto;
