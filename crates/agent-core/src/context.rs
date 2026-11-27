@@ -33,13 +33,32 @@ pub const COMPACTION_MIN_KEEP_RECENT_TOKENS: u64 = 8_000;
 pub const COMPACTION_MAX_KEEP_RECENT_TOKENS: u64 = 64_000;
 /// Cap on a user message carried across a compaction boundary.
 pub const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS: u64 = 20_000;
-/// Absolute size that starts automatic compaction, whatever the window is.
+/// Absolute size that starts automatic compaction below the large-window threshold.
 ///
 /// A share of the window makes a large window a cost trap: the trigger sits so high
 /// that a working turn never reaches it, so the whole transcript is re-sent on every
-/// step. 60k holds a long coding turn and keeps the steps after it an order of
-/// magnitude cheaper than a 600k-token context would.
-pub const AUTO_COMPACTION_TRIGGER_CEILING_TOKENS: u64 = 60_000;
+/// step. The size is what keeps that bill bounded — but it is also the ceiling on how
+/// much of a big window a working turn can actually use, so there are two of them
+/// instead of one: this one, and
+/// [`AUTO_COMPACTION_LARGE_WINDOW_TRIGGER_CEILING_TOKENS`] for a million-token window.
+/// The previous single 60k left a 1M-window model compacting at 6% of the window the
+/// user paid for and starved long-document and large-repository turns.
+pub const AUTO_COMPACTION_TRIGGER_CEILING_TOKENS: u64 = 128_000;
+
+/// Reported window at or above which a turn may run to the larger trigger.
+///
+/// Measured on the window the model advertises, not on the planned window: the planned
+/// one is capped by [`PROMPT_BUDGET_CEILING`], so reading it here would hide every large
+/// model behind the same number.
+pub const AUTO_COMPACTION_LARGE_WINDOW_THRESHOLD_TOKENS: u64 = 1_000_000;
+
+/// Trigger ceiling for windows at or above
+/// [`AUTO_COMPACTION_LARGE_WINDOW_THRESHOLD_TOKENS`].
+///
+/// A million-token window is bought for long documents and whole-repository work, and a
+/// 128k trigger would checkpoint those turns every few steps. 256k keeps one step at a
+/// quarter of the advertised window while still bounding what a long turn re-sends.
+pub const AUTO_COMPACTION_LARGE_WINDOW_TRIGGER_CEILING_TOKENS: u64 = 256_000;
 
 /// Share of `hardLimit` that starts automatic compaction on large windows.
 pub const AUTO_COMPACTION_TRIGGER_RATIO: f64 = 0.5;
@@ -63,10 +82,11 @@ pub const DEFAULT_CONTEXT_WINDOW: u64 = 128_000;
 /// A window is what the model *can* accept; the bill is what it actually accepts. A
 /// 1M-token model with no ceiling kept 740k tokens of history in the request for every
 /// step of a turn — twelve times the same transcript — because compaction never
-/// triggered. 200k is deep enough for a long coding turn and five times cheaper per
-/// step than the advertised limit. Aging (free) starts far below this, so a turn that
+/// triggered. 400k still stays below half of the advertised limit, and it is what lets
+/// the 256k trigger of a million-token window arrive before the hard boundary instead
+/// of being clipped by this cap. Aging (free) starts far below this, so a turn that
 /// outgrows the budget loses old tool output before it ever reaches a summary request.
-pub const PROMPT_BUDGET_CEILING: u64 = 200_000;
+pub const PROMPT_BUDGET_CEILING: u64 = 400_000;
 pub const DEFAULT_MAX_TOKENS: u64 = 32_768;
 
 /// The model facts the budget needs, plus the turn's compaction switch.
@@ -202,12 +222,20 @@ impl ContextLimits {
         } else {
             AUTO_COMPACTION_TRIGGER_RATIO
         };
-        // Whichever comes first: the window's own share, or the fixed ceiling that
-        // keeps a large window from becoming the most expensive possible session.
+        // A million-token window runs to the larger ceiling: it is bought for long
+        // documents and whole-repository work, and a 128k trigger would checkpoint those
+        // turns every few steps. The class is read from the advertised window, not from
+        // the planned one, which is capped above.
+        let trigger_ceiling = if reported_window >= AUTO_COMPACTION_LARGE_WINDOW_THRESHOLD_TOKENS {
+            AUTO_COMPACTION_LARGE_WINDOW_TRIGGER_CEILING_TOKENS
+        } else {
+            AUTO_COMPACTION_TRIGGER_CEILING_TOKENS
+        };
+        // Whichever comes first: the window's own share, or the ceiling that keeps a
+        // large window from becoming the most expensive possible session.
         let trigger = std::cmp::max(
             1,
-            (hard_limit as f64 * trigger_ratio).min(AUTO_COMPACTION_TRIGGER_CEILING_TOKENS as f64)
-                as u64,
+            (hard_limit as f64 * trigger_ratio).min(trigger_ceiling as f64) as u64,
         );
 
         // The retained tail is measured against the trigger, not the window: a
@@ -394,26 +422,34 @@ mod tests {
         assert_eq!(limits.window, PROMPT_BUDGET_CEILING);
         // The model's own 32K output budget dominates the reserve floor and 5%.
         assert_eq!(limits.request_headroom, 32_768);
-        assert_eq!(limits.hard_limit, 167_232);
-        // The fixed ceiling wins over the window share: a 200k plan would otherwise
-        // compact at 125k, and every step until then re-sends 125k tokens.
-        assert_eq!(limits.trigger, AUTO_COMPACTION_TRIGGER_CEILING_TOKENS);
+        assert_eq!(limits.hard_limit, 367_232);
+        // A million-token window runs to the larger ceiling: the window share alone
+        // (367,232 x 0.75 = 275,424) would let a step carry more than a quarter of the
+        // advertised window, so the size caps it first.
+        assert_eq!(
+            limits.trigger,
+            AUTO_COMPACTION_LARGE_WINDOW_TRIGGER_CEILING_TOKENS
+        );
         assert_eq!(limits.retained_user_message_budget, 20_000);
     }
 
     #[test]
     fn a_window_edited_between_turns_moves_the_budget() {
         // The settings page writes the model row; the next turn reads it. Same
-        // model, two configurations, two budgets — no restart, no stale cap. Above
-        // the ceiling two large windows collapse onto the same budget.
+        // model, two configurations, two budgets — no restart, no stale cap.
         let small = ContextLimits::for_model(ModelLimits::new(100_000, 32_768));
-        let at_ceiling = ContextLimits::for_model(ModelLimits::new(200_000, 32_768));
+        let at_ceiling = ContextLimits::for_model(ModelLimits::new(400_000, 32_768));
         let large = ContextLimits::for_model(ModelLimits::new(1_000_000, 32_768));
         assert_eq!(small.window, 100_000);
+        // Both of these are capped, but they do not collapse onto one budget: the
+        // million-token window is the one that runs to the larger trigger.
         assert_eq!(at_ceiling.window, PROMPT_BUDGET_CEILING);
         assert_eq!(large.window, PROMPT_BUDGET_CEILING);
         assert!(at_ceiling.trigger > small.trigger);
-        assert_eq!(at_ceiling.trigger, large.trigger);
+        assert!(
+            large.trigger > at_ceiling.trigger,
+            "a million-token window must run to the larger trigger, not the same one"
+        );
     }
 
     #[test]
@@ -423,11 +459,11 @@ mod tests {
         // max(16_384 floor, min(32_768 output, window/4 = 32_000), 6_400) = 32_000.
         assert_eq!(limits.request_headroom, 32_000);
         assert_eq!(limits.hard_limit, 96_000);
-        // 96,000 x 0.75 would be 72,000; the fixed ceiling starts the checkpoint
-        // earlier, because the tail of the window is what a session pays for twice.
-        assert_eq!(limits.trigger, AUTO_COMPACTION_TRIGGER_CEILING_TOKENS);
-        // A third of the trigger, clamped by the window's own keep-recent rule.
-        assert_eq!(limits.keep_recent_tokens, 12_000);
+        // 96,000 x 0.75 = 72,000, under the 128k ceiling a sub-million window uses, so
+        // the window's own share decides here.
+        assert_eq!(limits.trigger, 72_000);
+        // A fifth of the trigger, clamped by the window's own keep-recent rule.
+        assert_eq!(limits.keep_recent_tokens, 14_400);
     }
 
     #[test]
@@ -458,14 +494,19 @@ mod tests {
                 limits.window <= PROMPT_BUDGET_CEILING,
                 "advertised {advertised} must be capped"
             );
-            // The window's own ratio, or the fixed ceiling — whichever is smaller.
-            // A planned window is never given up before it is full, and a large one
-            // is never filled just because it could be.
+            // The window's own ratio, or the ceiling for this window's class — whichever
+            // is smaller. A planned window is never given up before it is full, and a
+            // large one is never filled just because it could be.
             let by_ratio = std::cmp::max(1, (limits.hard_limit as f64 * 0.75) as u64);
+            let ceiling = if advertised >= AUTO_COMPACTION_LARGE_WINDOW_THRESHOLD_TOKENS {
+                AUTO_COMPACTION_LARGE_WINDOW_TRIGGER_CEILING_TOKENS
+            } else {
+                AUTO_COMPACTION_TRIGGER_CEILING_TOKENS
+            };
             assert_eq!(
                 limits.trigger,
-                by_ratio.min(AUTO_COMPACTION_TRIGGER_CEILING_TOKENS),
-                "advertised {advertised} must compact at the floor ratio or the ceiling"
+                by_ratio.min(ceiling),
+                "advertised {advertised} must compact at the floor ratio or its ceiling"
             );
         }
     }

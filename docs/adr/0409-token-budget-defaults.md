@@ -43,8 +43,8 @@ against a measured session, not a share of whatever window the provider advertis
 
 | Knob | Location | Value | Why this number |
 | --- | --- | --- | --- |
-| Request ceiling | `agent-core/context.rs` `PROMPT_BUDGET_CEILING` | 200,000 | A plan against a 1M window never compacted |
-| Auto-compaction trigger | `agent-core/context.rs` `AUTO_COMPACTION_TRIGGER_CEILING_TOKENS` | 60,000 (or the window's own share, whichever is smaller) | The bill is the sum of every step's context; a large window is not a licence to fill it |
+| Request ceiling | `agent-core/context.rs` `PROMPT_BUDGET_CEILING` | 400,000 | A plan against a 1M window never compacted; 400k keeps a million-token window's 256k trigger below its hard boundary (see the 2026-11-27 amendment) |
+| Auto-compaction trigger | `agent-core/context.rs` `AUTO_COMPACTION_TRIGGER_CEILING_TOKENS` / `AUTO_COMPACTION_LARGE_WINDOW_TRIGGER_CEILING_TOKENS` | 128,000 below a 1M-token window, 256,000 at or above it (or the window's own share, whichever is smaller) | The bill is the sum of every step's context; a large window is not a licence to fill it, but neither is a small ceiling a licence to starve one |
 | Retained tail | `context.rs` `COMPACTION_KEEP_RECENT_RATIO`, clamped by the trigger | 20% of trigger | A checkpoint that keeps half a 600k window cannot bring the transcript back under it |
 | Tool-result ageing | `agent-core/aging.rs` `ToolResultAging::default` | trigger 32k tokens, `keep_recent` 1, `oversize_chars` 8,000, head/tail 400 each | The system prompt alone is ~6k tokens here, so ageing has to start while the request is still small |
 | Shell output | `host-core/tools/mod.rs` `BUDGET_SHELL` / `_ERR` | 24KB / 2000 lines (stderr keeps the tail) | Every byte is re-sent on every later step; the 512KB spill file still holds the whole output |
@@ -145,11 +145,35 @@ savings come from *what runs*, and the failure story stays one model per turn.
 * Ageing and compaction change **what the model is shown**, never the stored
   transcript: a checkpoint installs a summary row, and an aged tool result keeps both
   its ends plus a path back to the spill file.
-* A 60k trigger is deliberate for large windows and irrelevant for small ones: the
-  rule is `min(window share, 60k)`, so a 32k-window model still compacts at its own
-  ratio (~12k) rather than being told to hold 60k of context it cannot.
+* The trigger is a size per window class, and irrelevant for small windows: the rule is
+  `min(window share, 128k)` below a million-token window and `min(window share, 256k)`
+  at or above it, so a 32k-window model still compacts at its own ratio (~12k) rather
+  than being told to hold 128k of context it cannot.
 * Provider-side limits stay provider-side: the kernel recognises a quota and paces to
   it, but it does not guess a provider's quota before the provider states one.
+
+## Amendment 2026-11-27: the trigger ceiling is sized per window class
+
+The single 60k ceiling was measured on coding turns, and on those it held. It also
+capped a million-token window at 6% of what the user had paid for: every turn that
+needed more than 60k of context — a long document, a whole-repository read —
+checkpointed every few steps and dropped detail it had just read. One number cannot
+bound the bill for a 32k model and still let a 1M model work.
+
+| Knob | Was | Is | What it buys, what it costs |
+| --- | --- | --- | --- |
+| Request ceiling | 200,000 | 400,000 | A step may carry twice the context it could; still under half of a 1M advertise |
+| Trigger, window < 1M | 60,000 | 128,000 | A 128k model runs to 72,000 and a 200k model to 125,424 — its own share instead of a flat 60k |
+| Trigger, window >= 1M | 60,000 | 256,000 | The million-token model runs to a quarter of its advertised window |
+
+The bill moves with it: one step of a long turn now re-sends up to 256k tokens instead
+of 60k, so a long turn on a million-token model costs about 4x what it did. That is the
+trade being accepted here — the window is bought to be used. Small windows do not move
+(a 32k window still triggers at 12k), a 128k window runs 20% longer per step and a 200k
+window 109%.
+
+Re-measure before changing these again: the shape to watch is average prompt per step
+against compaction events per turn on a real long session, not the abstract ceiling.
 
 ## References
 

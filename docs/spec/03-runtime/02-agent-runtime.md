@@ -588,15 +588,18 @@ Compaction follows Codex's mechanism (ADR 0064, amended by D623): it remains
 inline at turn boundaries, and the model can request it through `new_context`.
 The window a turn is budgeted on is the model's configured context window
 (Settings → Models) capped by the request ceiling `PROMPT_BUDGET_CEILING`
-(200,000): planning against a million meant never compacting, and a measured
+(400,000): planning against a million meant never compacting, and a measured
 session reached 755,678 tokens in a single step with no checkpoint at all.
-Automatic compaction starts at `min(window share, 60,000)` — a size, not a share,
+Automatic compaction starts at `min(window share, ceiling)` — a size, not a share,
 because the bill for a turn is the sum of every step's context and a large window
-is not a licence to fill it. A window below the ceiling keeps its own ratio, so a
-32k model still compacts at roughly 12k rather than being asked to hold 60k it
-cannot. The retained tail and the carried user message are clamped to the trigger
-for the same reason: a checkpoint that keeps half a 600k window cannot bring the
-transcript back under it. Thresholds, ageing and every related budget are recorded
+is not a licence to fill it. The ceiling is 128,000 for a configured window below
+one million tokens and 256,000 at or above it: a million-token window is bought for
+long documents and whole-repository work, and one flat size either starves it or
+makes every step of a short turn pay for it. A window below the ceiling keeps its
+own ratio, so a 32k model still compacts at roughly 12k rather than being asked to
+hold 128k it cannot. The retained tail and the carried user message are clamped to
+the trigger for the same reason: a checkpoint that keeps half a 600k window cannot
+bring the transcript back under it. Thresholds, ageing and every related budget are recorded
 with their measured justification in [ADR 0409](../adr/0409-token-budget-defaults.md);
 they apply to single-model sessions as well as smart mode. There is no background
 pre-computation.
