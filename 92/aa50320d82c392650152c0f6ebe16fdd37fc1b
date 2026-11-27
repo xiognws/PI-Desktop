@@ -1,0 +1,28 @@
+packages/i18n/src/locales/en/index.ts
+  h_201ed4c689ac8b 675
+packages/i18n/src/locales/es/index.ts
+  h_201ed4c689ac8b 660
+packages/i18n/src/locales/fr/index.ts
+  h_201ed4c689ac8b 660
+packages/i18n/src/locales/ko/index.ts
+  h_201ed4c689ac8b 672
+packages/i18n/src/locales/pt-BR/index.ts
+  h_201ed4c689ac8b 662
+packages/i18n/src/locales/tr/index.ts
+  h_201ed4c689ac8b 672
+packages/i18n/src/locales/zh-CN/index.ts
+  h_201ed4c689ac8b 665
+packages/i18n/src/locales/zh-TW/index.ts
+  h_201ed4c689ac8b 665
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "92aa50320d82c392650152c0f6ebe16fdd37fc1b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
