@@ -42,6 +42,8 @@ export type ShutdownDependencies = {
   persistenceOutbox: PersistenceOutbox;
   inflightCheckpointer: InflightCheckpointer;
   flushEventPersistence: () => Promise<void>;
+  /** Write the smart router's per-session memory; synchronous and cheap. */
+  flushSmartRouting: () => void;
   pluginPanels: Pick<PluginPanelHost, "closeAll">;
   plugins: Pick<PluginRuntime, "disposeAll">;
   userMcp: Pick<UserMcpRuntime, "disposeAll">;
@@ -70,6 +72,7 @@ export function registerShutdownHandlers({
   persistenceOutbox,
   inflightCheckpointer,
   flushEventPersistence,
+  flushSmartRouting,
   pluginPanels,
   plugins,
   userMcp,
@@ -221,6 +224,10 @@ export function registerShutdownHandlers({
       // closing it here keeps a quit from leaving a port open behind it.
       await resetPluginAgentTransport();
       await inflightCheckpointer.flushAll();
+      // The owed sticky turn is the one thing that must survive a restart, and a
+      // restart is exactly when a turn has just died. Written before the drains below,
+      // because none of them may get to run.
+      flushSmartRouting();
       let persistenceTimer: ReturnType<typeof setTimeout> | undefined;
       try {
         const settled = await Promise.race([

@@ -1091,6 +1091,11 @@ export function createSessionLaunchRuntime({
                 provider: subagentBindings.providers[smartEscalationKey],
                 policy: {
                   afterToolErrors: smartPlan.snapshot.policy.escalateAfterToolErrors,
+                  // Absolute brakes: a live turn spent 758 steps and 135 spread-out
+                  // failures without handing over, because neither the consecutive
+                  // count nor the budget share could ever fire.
+                  afterTotalToolErrors: smartPlan.snapshot.policy.escalateAfterTotalToolErrors,
+                  afterSteps: smartPlan.snapshot.policy.escalateAfterSteps,
                   afterBudgetUsed: smartPlan.snapshot.policy.escalateAfterBudgetUsed,
                 },
               },

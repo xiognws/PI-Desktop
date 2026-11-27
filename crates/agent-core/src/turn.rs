@@ -172,6 +172,14 @@ pub struct EscalationTarget {
     pub limits: Option<ModelLimits>,
     /// Consecutive tool failures that end the cheap attempt.
     pub after_tool_errors: usize,
+    /// Tool failures in the whole attempt, consecutive or not.
+    ///
+    /// The consecutive count resets on every success, so a turn that fails one call in
+    /// five never reaches it: a live turn recorded 135 failures that way and never
+    /// handed over.
+    pub after_total_tool_errors: usize,
+    /// Steps the cheap attempt may spend at all before it hands over.
+    pub after_steps: usize,
     /// Share of the step budget after which the cheap attempt ends.
     pub after_budget_used: f32,
 }
@@ -184,11 +192,22 @@ impl EscalationTarget {
     pub fn trigger(
         &self,
         consecutive_tool_errors: usize,
+        total_tool_errors: usize,
         step: usize,
         max_steps: Option<usize>,
     ) -> Option<&'static str> {
         if self.after_tool_errors > 0 && consecutive_tool_errors >= self.after_tool_errors {
             return Some("tool-errors");
+        }
+        // A turn that keeps failing with successes in between is stuck too, and this
+        // count cannot be reset by an unrelated call that happened to work.
+        if self.after_total_tool_errors > 0 && total_tool_errors >= self.after_total_tool_errors {
+            return Some("tool-errors-total");
+        }
+        // The absolute ceiling: past it the "cheap" attempt is no longer cheap, so the
+        // turn continues on the strong half with the transcript it already has.
+        if self.after_steps > 0 && step >= self.after_steps {
+            return Some("steps");
         }
         // A turn with no ceiling has no share of one to measure, so this signal
         // cannot fire; the hand-over still happens on repeated tool failures.
@@ -434,6 +453,7 @@ impl TurnEngine {
         let mut active_limits = self.model_limits;
         let mut escalated = false;
         let mut consecutive_tool_errors: usize = 0;
+        let mut total_tool_errors: usize = 0;
         // Whether a delegate has reported in this turn, which is what reopens the
         // worker's tools to the orchestrating half.
         let mut delegate_reported = false;
@@ -528,7 +548,12 @@ impl TurnEngine {
             // strong model that also struggles ends the turn instead of looping.
             if let (Some(target), false) = (self.escalation.as_ref(), escalated) {
                 if let Some(reason) =
-                    target.trigger(consecutive_tool_errors, step, config.max_steps)
+                    target.trigger(
+                        consecutive_tool_errors,
+                        total_tool_errors,
+                        step,
+                        config.max_steps,
+                    )
                 {
                     tracing::warn!(
                         target: "agent_core::turn",
@@ -545,6 +570,7 @@ impl TurnEngine {
                     // The failures that caused the hand-over belong to the other
                     // model's attempt; the strong one starts with a clean count.
                     consecutive_tool_errors = 0;
+                    total_tool_errors = 0;
                 }
             }
 
@@ -969,6 +995,7 @@ impl TurnEngine {
                 }
                 if result.is_error {
                     consecutive_tool_errors += 1;
+                    total_tool_errors += 1;
                 } else {
                     consecutive_tool_errors = 0;
                 }
@@ -1797,12 +1824,25 @@ mod escalation_tests {
     }
 
     fn target(after_tool_errors: usize, after_budget_used: f32) -> EscalationTarget {
+        // The absolute brakes off, so each existing case keeps testing the trigger it
+        // names. `brakes()` below turns them on.
         EscalationTarget {
             provider: Arc::new(UnusedProvider),
             model: "strong-1".into(),
             limits: None,
             after_tool_errors,
+            after_total_tool_errors: 0,
+            after_steps: 0,
             after_budget_used,
+        }
+    }
+
+    /// The policy as a real session gets it: every brake on.
+    fn brakes() -> EscalationTarget {
+        EscalationTarget {
+            after_total_tool_errors: 8,
+            after_steps: 120,
+            ..target(2, 0.6)
         }
     }
 
@@ -1833,23 +1873,44 @@ mod escalation_tests {
 
     #[test]
     fn a_single_failure_is_not_evidence() {
-        assert_eq!(target(2, 0.6).trigger(1, 0, Some(10)), None);
-        assert_eq!(target(2, 0.6).trigger(2, 0, Some(10)), Some("tool-errors"));
+        assert_eq!(target(2, 0.6).trigger(1, 0, 0, Some(10)), None);
+        assert_eq!(target(2, 0.6).trigger(2, 0, 0, Some(10)), Some("tool-errors"));
     }
 
     #[test]
     fn a_spent_budget_hands_over_even_without_failures() {
-        assert_eq!(target(2, 0.6).trigger(0, 5, Some(10)), None);
-        assert_eq!(target(2, 0.6).trigger(0, 6, Some(10)), Some("budget"));
+        assert_eq!(target(2, 0.6).trigger(0, 0, 5, Some(10)), None);
+        assert_eq!(target(2, 0.6).trigger(0, 0, 6, Some(10)), Some("budget"));
         // A turn with no declared ceiling never escalates on a ratio it cannot
         // compute; the tool-error threshold still applies to it.
-        assert_eq!(target(2, 0.6).trigger(0, 5, None), None);
-        assert_eq!(target(2, 0.6).trigger(3, 5, None), Some("tool-errors"));
+        assert_eq!(target(2, 0.6).trigger(0, 0, 5, None), None);
+        assert_eq!(target(2, 0.6).trigger(3, 0, 5, None), Some("tool-errors"));
     }
 
     #[test]
     fn either_threshold_can_be_switched_off() {
-        assert_eq!(target(0, 0.0).trigger(99, 9, Some(10)), None);
-        assert_eq!(target(1, 0.0).trigger(1, 0, Some(10)), Some("tool-errors"));
+        assert_eq!(target(0, 0.0).trigger(99, 0, 9, Some(10)), None);
+        assert_eq!(target(1, 0.0).trigger(1, 0, 0, Some(10)), Some("tool-errors"));
+    }
+
+    #[test]
+    fn spread_out_failures_and_a_long_attempt_both_hand_over() {
+        // The live shape: 135 failures with successes in between, so the consecutive
+        // count stayed at 1, and 758 steps in one turn.
+        assert_eq!(brakes().trigger(1, 7, 20, None), None);
+        assert_eq!(
+            brakes().trigger(1, 8, 20, None),
+            Some("tool-errors-total"),
+            "total failures are evidence even when they are not in a row"
+        );
+        assert_eq!(brakes().trigger(0, 0, 119, None), None);
+        assert_eq!(
+            brakes().trigger(0, 0, 120, None),
+            Some("steps"),
+            "past the ceiling the cheap attempt is not cheap any more"
+        );
+        // The consecutive trigger keeps its precedence, so the log names the sharper
+        // evidence when both are true.
+        assert_eq!(brakes().trigger(2, 9, 200, None), Some("tool-errors"));
     }
 }

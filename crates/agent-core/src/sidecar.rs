@@ -5413,11 +5413,23 @@ fn escalation_target_from(
         .and_then(|policy| policy.get("afterBudgetUsed"))
         .and_then(Value::as_f64)
         .unwrap_or(0.6) as f32;
+    // Absolute brakes. A host that does not send them gets the same defaults the shared
+    // policy carries, so an older renderer cannot turn the brake off by omission.
+    let after_total_tool_errors = policy
+        .and_then(|policy| policy.get("afterTotalToolErrors"))
+        .and_then(Value::as_u64)
+        .unwrap_or(8) as usize;
+    let after_steps = policy
+        .and_then(|policy| policy.get("afterSteps"))
+        .and_then(Value::as_u64)
+        .unwrap_or(120) as usize;
     Some(crate::turn::EscalationTarget {
         provider,
         model,
         limits: Some(limits),
         after_tool_errors,
+        after_total_tool_errors,
+        after_steps,
         after_budget_used,
     })
 }

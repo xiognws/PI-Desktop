@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
+import { WORK_TURN_STEPS,
   DEFAULT_SMART_POLICY,
   decideTurnTier,
   normalizeSmartPolicy,
@@ -148,6 +148,24 @@ describe("turn routing", () => {
     });
   });
 
+  it("supervises the turn after a long one, however short the prompt is", () => {
+    // The live case: "继续会话…" started a 758-step, 135-tool-error turn on the cheap
+    // half. Words cannot see that; the previous turn's step count can.
+    expect(routeTurn({ prompt: "继续", previousTurnSteps: WORK_TURN_STEPS })).toEqual({
+      tier: "main",
+      reason: "work-followup",
+    });
+    // One call short of the threshold is still a follow-up, not work.
+    expect(routeTurn({ prompt: "继续", previousTurnSteps: WORK_TURN_STEPS - 1 })).toEqual({
+      tier: "sub",
+      reason: "simple-turn",
+    });
+    // An unusable cheap half must say so rather than claim it routed there.
+    expect(
+      decideTurnTier(signals({ prompt: "继续", previousTurnSteps: WORK_TURN_STEPS, subAvailable: false }), ROUTING_ON),
+    ).toEqual({ tier: "main", reason: "work-followup", downgradedFrom: "sub" });
+  });
+
   it("pays for size only when the prompt is genuinely a big job", () => {
     expect(routeTurn({ prompt: "x".repeat(700) }).tier).toBe("sub");
     expect(routeTurn({ prompt: "x".repeat(DEFAULT_SMART_POLICY.mainPromptChars + 1) })).toEqual({
@@ -214,6 +232,21 @@ describe("in-turn escalation", () => {
     // A turn with no declared budget never escalates on a ratio it cannot compute.
     expect(shouldEscalate({ onSub: true, consecutiveToolErrors: 0, steps: 90, stepBudget: 0 }))
       .toEqual({ escalate: false });
+  });
+
+  it("stops a turn whose failures are spread out, or that simply runs too long", () => {
+    // 135 failures, none of them in a row: the consecutive trigger never fired on the
+    // live turn. Total failures and an absolute step ceiling are what can fire.
+    expect(
+      shouldEscalate({ onSub: true, consecutiveToolErrors: 1, totalToolErrors: 8, steps: 3, stepBudget: 0 }),
+    ).toEqual({ escalate: true, reason: "tool-errors-total" });
+    expect(
+      shouldEscalate({ onSub: true, consecutiveToolErrors: 0, totalToolErrors: 1, steps: 120, stepBudget: 0 }),
+    ).toEqual({ escalate: true, reason: "steps" });
+    // Under both limits the turn keeps its cheap attempt.
+    expect(
+      shouldEscalate({ onSub: true, consecutiveToolErrors: 1, totalToolErrors: 7, steps: 119, stepBudget: 0 }),
+    ).toEqual({ escalate: false });
   });
 });
 

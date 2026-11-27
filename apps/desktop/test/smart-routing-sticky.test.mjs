@@ -93,3 +93,49 @@ test("one good cheap turn spends the sticky turn", () => {
   assert.equal(plan(routing).reason, "sticky-main");
   assert.equal(plan(routing).tier, "sub", "and then the pair is back to cheap");
 });
+
+test("the owed sticky turn survives a restart", async () => {
+  // The live case: the cheap turn failed at 09:01, the app restarted at 10:40, and the
+  // next turn went cheap again because the memory was a Map. A restart is exactly when a
+  // turn has just died, so this is the one moment the memory has to be on disk.
+  const { mkdtemp, readFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "smart-routing-"));
+  const statePath = join(dir, "smart-routing.json");
+  try {
+    const before = createSmartRouting({ logger, statePath });
+    assert.equal(plan(before).tier, "sub");
+    before.observeEvent({ sessionId: SESSION, event: { type: "tool_start" } });
+    before.observeEvent({ sessionId: SESSION, event: { type: "error" } });
+    before.observeEvent({ sessionId: SESSION, event: { type: "turn_end" } });
+    before.flush();
+
+    const written = JSON.parse(await readFile(statePath, "utf8"));
+    assert.equal(written.sessions[SESSION].stickyMain, 1);
+    assert.equal(written.sessions[SESSION].previousTurnSteps, 1);
+
+    // A new process: fresh router, same file.
+    const after = createSmartRouting({ logger, statePath });
+    const next = plan(after);
+    assert.equal(next.tier, "main", "the restart must not erase an owed strong turn");
+    assert.equal(next.reason, "sticky-main");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a long turn keeps the next one supervised", () => {
+  // 758 steps once ran on the cheap half because the follow-up prompt was "继续".
+  const routing = createSmartRouting({ logger });
+  plan(routing);
+  for (let index = 0; index < 60; index += 1) {
+    routing.observeEvent({ sessionId: SESSION, event: { type: "tool_start" } });
+  }
+  routing.observeEvent({ sessionId: SESSION, event: { type: "message_end", message: { role: "assistant", content: "done" } } });
+  routing.observeEvent({ sessionId: SESSION, event: { type: "turn_end" } });
+
+  const next = plan(routing);
+  assert.equal(next.tier, "main");
+  assert.equal(next.reason, "work-followup");
+});

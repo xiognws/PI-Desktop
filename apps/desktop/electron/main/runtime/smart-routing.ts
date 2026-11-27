@@ -7,6 +7,8 @@ import {
   type SmartRouteReason,
   type SmartTier,
 } from "@pi-workspace/shared";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import type { Logger } from "../logger";
 
 /**
@@ -65,7 +67,37 @@ export type SmartPlan = {
 
 export type SmartRoutingDeps = {
   logger: Logger;
+  /**
+   * Where the per-session routing memory is kept between runs.
+   *
+   * Without it the memory is process-local, which is what the first version did: a
+   * restart erased the sticky main turn owed after a failed cheap turn, and the restart
+   * is exactly when a turn has just died. Omitted in tests, which have no data dir.
+   */
+  statePath?: string;
 };
+
+/**
+ * What one session's router remembers about its last turn.
+ *
+ * `stickyMain` outlives the turn that set it (that is the point); the rest is the
+ * evidence the next decision needs and cannot read before dispatch.
+ */
+type SessionRoutingMemory = {
+  /** Turns still owed to the strong half. */
+  stickyMain: number;
+  /** Tool calls the last closed turn spent. */
+  previousTurnSteps: number;
+  /** Whether the last closed turn used any tool at all. */
+  previousTurnUsedTools: boolean;
+  /** When this record last changed, so a stale file can be pruned. */
+  updatedAt: number;
+};
+
+/** Sessions kept in the state file. Old entries are dropped, not migrated. */
+const MAX_REMEMBERED_SESSIONS = 200;
+/** How long a write waits for more changes. A turn can end many times a minute. */
+const PERSIST_DEBOUNCE_MS = 250;
 
 /**
  * A provider can serve a turn only when it is enabled, reachable and able to
@@ -85,38 +117,90 @@ export function providerCanServe(
   return row.hasSecret === true || row.hasOauth === true;
 }
 
-export function createSmartRouting({ logger }: SmartRoutingDeps) {
-  /** Sessions whose previous turn called a tool: such a conversation is working, not chatting. */
-  const usedToolsLastTurn = new Set<string>();
-  const usedToolsThisTurn = new Set<string>();
-  /** Turns left to keep on the main model after an escalation. */
-  const stickyMainTurns = new Map<string, number>();
-  /** Assistant text seen in the turn currently closing. */
-  const producedTextThisTurn = new Set<string>();
-  /** A root failure was reported for the turn currently closing. */
-  const failedThisTurn = new Set<string>();
+/**
+ * Read the memory written by the previous run.
+ *
+ * A missing, empty or corrupt file means "nothing remembered": routing then behaves
+ * exactly as a first start does. Losing one file must never stop a turn.
+ */
+function loadMemory(statePath: string | undefined): Map<string, SessionRoutingMemory> {
+  const memory = new Map<string, SessionRoutingMemory>();
+  if (!statePath) return memory;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(statePath, "utf8"));
+  } catch {
+    return memory;
+  }
+  const sessions = (parsed as { sessions?: unknown })?.sessions;
+  if (!sessions || typeof sessions !== "object") return memory;
+  for (const [sessionId, value] of Object.entries(sessions as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const row = value as Partial<SessionRoutingMemory>;
+    memory.set(sessionId, {
+      stickyMain: Number.isFinite(row.stickyMain) ? Number(row.stickyMain) : 0,
+      previousTurnSteps: Number.isFinite(row.previousTurnSteps) ? Number(row.previousTurnSteps) : 0,
+      previousTurnUsedTools: row.previousTurnUsedTools === true,
+      updatedAt: Number.isFinite(row.updatedAt) ? Number(row.updatedAt) : 0,
+    });
+  }
+  return memory;
+}
+
+export function createSmartRouting({ logger, statePath }: SmartRoutingDeps) {
+  const memory = loadMemory(statePath);
+  /** Sessions with a turn in flight: what that turn has done so far. */
+  const inFlight = new Map<
+    string,
+    { steps: number; producedText: boolean; failed: boolean }
+  >();
+
+  function memoryOf(sessionId: string): SessionRoutingMemory {
+    return (
+      memory.get(sessionId) ?? {
+        stickyMain: 0,
+        previousTurnSteps: 0,
+        previousTurnUsedTools: false,
+        updatedAt: 0,
+      }
+    );
+  }
+
+  function remember(sessionId: string, next: SessionRoutingMemory): void {
+    memory.set(sessionId, { ...next, updatedAt: Date.now() });
+    schedulePersist();
+  }
 
   function closeTurn(sessionId: string): void {
-    if (usedToolsThisTurn.has(sessionId)) usedToolsLastTurn.add(sessionId);
-    else usedToolsLastTurn.delete(sessionId);
-    usedToolsThisTurn.delete(sessionId);
-    const failed = failedThisTurn.delete(sessionId);
-    const silent = !producedTextThisTurn.delete(sessionId);
+    const turn = inFlight.get(sessionId) ?? { steps: 0, producedText: false, failed: false };
+    inFlight.delete(sessionId);
+    const previous = memoryOf(sessionId);
     // Evidence, not a guess: a cheap turn that failed or answered nothing is
     // the case the routing rules could not see before dispatch. Keep the next
     // turns on the strong model until the conversation produces something.
-    if (failed || silent) {
-      const turns = 1;
-      stickyMainTurns.set(sessionId, Math.max(stickyMainTurns.get(sessionId) ?? 0, turns));
-    } else if ((stickyMainTurns.get(sessionId) ?? 0) > 0) {
-      stickyMainTurns.set(sessionId, (stickyMainTurns.get(sessionId) ?? 1) - 1);
-    }
+    const owed = turn.failed || !turn.producedText;
+    const stickyMain = owed ? Math.max(previous.stickyMain, 1) : Math.max(previous.stickyMain - 1, 0);
+    remember(sessionId, {
+      stickyMain,
+      previousTurnSteps: turn.steps,
+      previousTurnUsedTools: turn.steps > 0,
+      updatedAt: Date.now(),
+    });
   }
 
   /**
    * Watch the turn's own events. Everything here is already on the wire, so
    * the signals cost nothing: a tool call, a reply, a failure, a closed turn.
    */
+  function turnOf(sessionId: string) {
+    let turn = inFlight.get(sessionId);
+    if (!turn) {
+      turn = { steps: 0, producedText: false, failed: false };
+      inFlight.set(sessionId, turn);
+    }
+    return turn;
+  }
+
   function observeEvent(envelope: AgentEventEnvelope): void {
     const sessionId = envelope.sessionId.trim();
     if (!sessionId) return;
@@ -125,18 +209,18 @@ export function createSmartRouting({ logger }: SmartRoutingDeps) {
     const event = envelope.event;
     switch (event.type) {
       case "tool_start":
-        if (!delegated) usedToolsThisTurn.add(sessionId);
+        if (!delegated) turnOf(sessionId).steps += 1;
         return;
       case "message_end": {
         const message = event.message;
         const text = typeof message.content === "string" ? message.content.trim() : "";
         if (!delegated && message.role === "assistant" && text.length > 0) {
-          producedTextThisTurn.add(sessionId);
+          turnOf(sessionId).producedText = true;
         }
         return;
       }
       case "error":
-        if (!delegated) failedThisTurn.add(sessionId);
+        if (!delegated) turnOf(sessionId).failed = true;
         return;
       case "turn_end":
         closeTurn(sessionId);
@@ -164,7 +248,8 @@ export function createSmartRouting({ logger }: SmartRoutingDeps) {
       input.providers.find((row) => row.id === snapshot.sub.providerId),
       snapshot.sub.modelId,
     );
-    const sticky = stickyMainTurns.get(input.sessionId) ?? 0;
+    const remembered = memoryOf(input.sessionId);
+    const sticky = remembered.stickyMain;
     const decision = decideTurnTier(
       {
         prompt: input.prompt,
@@ -173,12 +258,15 @@ export function createSmartRouting({ logger }: SmartRoutingDeps) {
         turnIndex: input.messageCount,
         stickyMain: sticky,
         ...(input.override ? { override: input.override } : {}),
-        previousTurnUsedTools: usedToolsLastTurn.has(input.sessionId),
+        previousTurnUsedTools: remembered.previousTurnUsedTools,
+        previousTurnSteps: remembered.previousTurnSteps,
         subAvailable,
       },
       snapshot.policy,
     );
-    if (sticky > 0) stickyMainTurns.set(input.sessionId, sticky - 1);
+    if (sticky > 0) {
+      remember(input.sessionId, { ...remembered, stickyMain: sticky - 1 });
+    }
     const binding = decision.tier === "sub" ? snapshot.sub : snapshot.main;
     // The router refuses `sub` for an unusable binding itself; keeping the
     // guard here means a stale snapshot cannot dispatch a broken turn either.
@@ -209,16 +297,49 @@ export function createSmartRouting({ logger }: SmartRoutingDeps) {
     };
   }
 
-  /** Drop a session's routing state (deleted, or switched out of smart mode). */
-  function forget(sessionId: string): void {
-    usedToolsLastTurn.delete(sessionId);
-    usedToolsThisTurn.delete(sessionId);
-    stickyMainTurns.delete(sessionId);
-    producedTextThisTurn.delete(sessionId);
-    failedThisTurn.delete(sessionId);
+  let persistTimer: NodeJS.Timeout | null = null;
+
+  /** Write now, keeping the newest sessions and dropping the rest. */
+  function flush(): void {
+    if (persistTimer) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
+    if (!statePath) return;
+    const rows = [...memory.entries()]
+      .sort((left, right) => right[1].updatedAt - left[1].updatedAt)
+      .slice(0, MAX_REMEMBERED_SESSIONS);
+    try {
+      mkdirSync(dirname(statePath), { recursive: true });
+      writeFileSync(
+        statePath,
+        JSON.stringify({ version: 1, sessions: Object.fromEntries(rows) }, null, 0),
+        "utf8",
+      );
+    } catch (error) {
+      // A routing hint that cannot be saved is not worth failing a turn over.
+      logger.app("session", "warn", "smart routing state not saved", {
+        data: { error: error instanceof Error ? error.message : String(error) },
+      });
+    }
   }
 
-  return { observeEvent, planTurn, forget };
+  function schedulePersist(): void {
+    if (!statePath || persistTimer) return;
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      flush();
+    }, PERSIST_DEBOUNCE_MS);
+    persistTimer.unref?.();
+  }
+
+  /** Drop a session's routing state (deleted, or switched out of smart mode). */
+  function forget(sessionId: string): void {
+    inFlight.delete(sessionId);
+    if (memory.delete(sessionId)) schedulePersist();
+  }
+
+  return { observeEvent, planTurn, forget, flush };
 }
 
 export type SmartRouting = ReturnType<typeof createSmartRouting>;

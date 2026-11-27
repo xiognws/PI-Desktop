@@ -433,7 +433,10 @@ const {
 // Smart mode: the one router instance. It watches turn events for the signals a
 // prompt cannot carry (did the last turn call a tool, did it fail) and answers
 // the tier question for every turn of a session that runs on a pair.
-const smartRouting = createSmartRouting({ logger });
+const smartRouting = createSmartRouting({
+  logger,
+  statePath: join(dataDir, "smart-routing.json"),
+});
 
 const createdSessionLaunchRuntime = createSessionLaunchRuntime({
   runtimeState,
@@ -1349,6 +1352,7 @@ registerShutdownHandlers({
   persistenceOutbox,
   inflightCheckpointer,
   flushEventPersistence: eventPersistence.flush,
+  flushSmartRouting: smartRouting.flush,
   pluginPanels,
   plugins,
   userMcp,

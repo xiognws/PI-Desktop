@@ -68,10 +68,25 @@ export type SmartRouteReason =
   | "tool-intent"
   /** The previous turn used tools, so this one continues that work. */
   | "tool-followup"
+  /**
+   * The previous turn was long enough to be work, so this one is supervised even
+   * when the prompt is three words. `steps` is the only measure of what a turn
+   * actually cost, and it survives in the router's own state.
+   */
+  | "work-followup"
   /** Short, no tool intent, and the previous turn needed no tools either. */
   | "simple-turn"
   /** Nothing argued for the cheap model, so quality wins. */
   | "default-main";
+
+/**
+ * Tool calls in one turn above which the *next* turn is supervised.
+ *
+ * Measured, not guessed: the turn that motivated this spent 758 steps and 135 tool
+ * errors on the cheap half while the strong half never saw the work. A turn of forty
+ * calls is already a session of work, and a follow-up to it is never a chat turn.
+ */
+export const WORK_TURN_STEPS = 40;
 
 /** Turn-level policy. Every field has a default; the renderer edits a copy. */
 export type SmartModePolicy = {
@@ -85,6 +100,15 @@ export type SmartModePolicy = {
   turnRouting: boolean;
   /** Consecutive tool failures inside a sub turn that escalate it. */
   escalateAfterToolErrors: number;
+  /**
+   * Total tool failures in a sub turn that escalate it, consecutive or not.
+   *
+   * Measured on a live turn: 135 failures, none of them in a row, so the consecutive
+   * trigger never fired while the turn burned two and a half hours.
+   */
+  escalateAfterTotalToolErrors: number;
+  /** Steps a sub turn may spend at all before it hands over. */
+  escalateAfterSteps: number;
   /** Fraction of the step budget (0–1) after which a sub turn escalates. */
   escalateAfterBudgetUsed: number;
   /** Turns held on the main model after an escalation. */
@@ -122,6 +146,8 @@ export const DEFAULT_SMART_POLICY: SmartModePolicy = {
   // expensive single model. Turning this off is the explicit choice.
   turnRouting: true,
   escalateAfterToolErrors: 2,
+  escalateAfterTotalToolErrors: 8,
+  escalateAfterSteps: 120,
   escalateAfterBudgetUsed: 0.6,
   stickyMainTurns: 1,
   simplePromptChars: 600,
@@ -191,6 +217,20 @@ export function normalizeSmartPolicy(input?: Partial<SmartModePolicy> | null): S
         finiteOr(source.escalateAfterToolErrors, DEFAULT_SMART_POLICY.escalateAfterToolErrors),
         1,
         20,
+      ),
+    ),
+    escalateAfterTotalToolErrors: Math.round(
+      clamp(
+        finiteOr(source.escalateAfterTotalToolErrors, DEFAULT_SMART_POLICY.escalateAfterTotalToolErrors),
+        0,
+        500,
+      ),
+    ),
+    escalateAfterSteps: Math.round(
+      clamp(
+        finiteOr(source.escalateAfterSteps, DEFAULT_SMART_POLICY.escalateAfterSteps),
+        0,
+        5_000,
       ),
     ),
     escalateAfterBudgetUsed: clamp(
@@ -290,6 +330,8 @@ export type SmartTurnSignals = {
   override?: SmartTier;
   /** The previous turn in this session called a tool. */
   previousTurnUsedTools: boolean;
+  /** Tool calls the previous turn spent; 0 when unknown or there was none. */
+  previousTurnSteps?: number;
   /** The sub binding resolved to a usable provider, model and credential. */
   subAvailable: boolean;
 };
@@ -392,6 +434,13 @@ export function decideTurnTier(
   if (containsAny(text, TOOL_INTENT)) {
     return degraded("tool-intent");
   }
+  // What the previous turn cost outranks what this prompt says: "继续" after a long
+  // working turn is the middle of that work, not a chat message. This is the only
+  // signal that survives a short prompt, and the only one that knows how the last
+  // turn actually went.
+  if ((signals.previousTurnSteps ?? 0) >= WORK_TURN_STEPS) {
+    return degraded("work-followup");
+  }
   // Everything below starts cheap. The pair's whole point is that the strong half
   // is paid for judgement, not for running commands: a small model that gets stuck
   // escalates inside the turn, which costs one hand-over instead of a strong turn
@@ -422,6 +471,8 @@ export type SmartEscalationSignals = {
   onSub: boolean;
   /** Tool failures in a row, reset by any success. */
   consecutiveToolErrors: number;
+  /** Tool failures so far in this turn, consecutive or not. */
+  totalToolErrors?: number;
   /** Steps spent so far. */
   steps: number;
   /** Steps this turn may spend. */
@@ -430,7 +481,7 @@ export type SmartEscalationSignals = {
 
 export type SmartEscalationDecision = {
   escalate: boolean;
-  reason?: "tool-errors" | "budget";
+  reason?: "tool-errors" | "tool-errors-total" | "steps" | "budget";
 };
 
 /**
@@ -446,6 +497,15 @@ export function shouldEscalate(
   if (!signals.onSub) return { escalate: false };
   if (signals.consecutiveToolErrors >= policy.escalateAfterToolErrors) {
     return { escalate: true, reason: "tool-errors" };
+  }
+  if (
+    policy.escalateAfterTotalToolErrors > 0 &&
+    (signals.totalToolErrors ?? 0) >= policy.escalateAfterTotalToolErrors
+  ) {
+    return { escalate: true, reason: "tool-errors-total" };
+  }
+  if (policy.escalateAfterSteps > 0 && signals.steps >= policy.escalateAfterSteps) {
+    return { escalate: true, reason: "steps" };
   }
   if (signals.stepBudget > 0 && signals.steps / signals.stepBudget >= policy.escalateAfterBudgetUsed) {
     return { escalate: true, reason: "budget" };
