@@ -395,6 +395,13 @@ pub struct Sidecar {
     host_specs: Mutex<Vec<ToolSpec>>,
     gate: Arc<dyn PermissionGate>,
     bridge: Arc<HostBridge>,
+    /// The mode the most recent prompt ran under.
+    ///
+    /// Install time is the only place the mode is known, and the delegate runner needs
+    /// it later to describe the same permission to its workers. Agent until a prompt
+    /// says otherwise: a worker inheriting the permissive reading is the safe default
+    /// only because the gate, not this field, is what refuses a call.
+    mode: Arc<std::sync::RwLock<crate::prompt::SessionMode>>,
     config: Mutex<RuntimeConfig>,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
     /// The ask cards waiting for an answer. One broker per sidecar: a card is
@@ -440,6 +447,7 @@ impl Sidecar {
             crate::approval::ApprovalGate::new(gate, approval.clone());
         Self {
             bridge: Arc::new(HostBridge::new(out.clone())),
+            mode: Arc::new(std::sync::RwLock::new(crate::prompt::SessionMode::Agent)),
             asks: Arc::new(crate::ask::AskBroker::new(sink)),
             out,
             provider: Mutex::new(None),
@@ -992,6 +1000,7 @@ impl Sidecar {
                         model_limits: model_limits_from(request),
                         models: Arc::new(models),
                         guidance: Vec::new(),
+                        mode: self.mode.clone(),
                         infinite_provider_retry,
                         cache: crate::provider::CacheRetention::resolve(
                             request.str_param("cacheRetention"),
@@ -1334,6 +1343,9 @@ impl Sidecar {
         // `tools.execute` carries the mode it runs under; host-core requires it
         // and evaluates the call's permission ceiling from it.
         let tool_mode = crate::prompt::SessionMode::parse(request.str_param("mode"));
+        if let Ok(mut applied) = self.mode.write() {
+            *applied = tool_mode.clone();
+        }
         if let Some(declarations) = request.params.get("tools").and_then(Value::as_array) {
             self.install_tools(declarations, shell.as_ref(), tool_mode.wire_name())?;
         }
@@ -4510,6 +4522,8 @@ struct SidecarDelegateRunner {
     /// Delegation model overrides this turn may use, keyed by `Task.model`.
     models: Arc<std::collections::BTreeMap<String, SubagentModelBinding>>,
     guidance: Vec<String>,
+    /// The session's mode, shared with the sidecar so a mid-session switch follows.
+    mode: Arc<std::sync::RwLock<crate::prompt::SessionMode>>,
     infinite_provider_retry: bool,
     cache: crate::provider::CacheRetention,
 }
@@ -4549,10 +4563,12 @@ impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
     ) -> BoxFuture<'a, crate::delegate::DelegateOutcome> {
         Box::pin(async move {
             use crate::delegate::{DelegateOutcome, DelegationError, DelegationStatus};
+            let mode = self.mode.read().map(|mode| mode.clone()).ok();
             let prompt = crate::delegate::compose_subagent_system_prompt(
                 &request.definition,
                 &self.guidance,
                 &request.definition.tools,
+                mode,
             );
             // Depth is one: a worker gets the tools its definition lists, minus the
             // delegation verbs, so it cannot start workers of its own. The reference
@@ -5531,6 +5547,7 @@ mod prompt_parameter_tests {
             model_limits: Some(ModelLimits::new(128_000, 8_192)),
             models: Arc::new(models),
             guidance: Vec::new(),
+            mode: Arc::new(std::sync::RwLock::new(crate::prompt::SessionMode::Agent)),
             infinite_provider_retry: false,
             cache: crate::provider::CacheRetention::resolve(None, None),
         }
@@ -5593,6 +5610,7 @@ mod prompt_parameter_tests {
             model_limits: Some(ModelLimits::new(128_000, 8_192)),
             models: Arc::new(std::collections::BTreeMap::new()),
             guidance: Vec::new(),
+            mode: Arc::new(std::sync::RwLock::new(crate::prompt::SessionMode::Agent)),
             infinite_provider_retry: false,
             cache: crate::provider::CacheRetention::resolve(None, None),
         };

@@ -550,6 +550,74 @@ mod tests {
         registry
     }
 
+    /// A tool that mutates: what an approval floor actually governs.
+    struct Mutating;
+
+    impl Tool for Mutating {
+        fn spec(&self) -> ToolSpec {
+            ToolSpec::new(
+                "Write",
+                "Write a file",
+                serde_json::json!({"type": "object", "properties": {"path": {"type": "string"}}}),
+            )
+        }
+
+        fn call<'a>(
+            &'a self,
+            _call: &'a ToolCall,
+            _ctx: &'a ToolContext,
+        ) -> BoxFuture<'a, Result<String>> {
+            Box::pin(async move { Ok("written".to_string()) })
+        }
+    }
+
+    /// The worker's tool set is the parent's gate, not a second policy.
+    ///
+    /// A subagent runs on a registry derived with `restricted()`, which keeps the same
+    /// `ApprovalCell`. So a read-only session refuses the worker's write for exactly the
+    /// reason it refuses the orchestrator's, and lifting the floor mid-flight lets the
+    /// already-built worker through — a snapshot of the decision would not.
+    #[tokio::test]
+    async fn a_subagent_inherits_the_session_permission_floor_live() {
+        use crate::approval::{ApprovalCell, ApprovalGate, ApprovalPolicy};
+
+        // A session owns a workspace: a write inside it is an edit, and an edit is what
+        // the floor governs. Without one the call classifies as dangerous instead.
+        let cell = ApprovalCell::new(ApprovalPolicy::reviewer().with_workspace("E:/proj"));
+        let gate: Arc<dyn PermissionGate> = ApprovalGate::new(Arc::new(AllowAll), cell.clone());
+        let mut session = ToolRegistry::new(gate);
+        session.register(Arc::new(Mutating));
+
+        let worker_names = vec!["Write".to_string()];
+        let worker = session.restricted(&worker_names);
+        let call = call("Write", serde_json::json!({"path": "E:/proj/a.txt"}));
+
+        let refused = worker.call(&call, &ctx()).await;
+        assert!(
+            refused.is_error,
+            "a read-only session must refuse the worker's write: {}",
+            refused.content
+        );
+        assert!(
+            refused.content.to_lowercase().contains("read-only")
+                || refused.content.to_lowercase().contains("editable")
+                || refused.content.to_lowercase().contains("approval"),
+            "the refusal must name the permission, not just fail: {}",
+            refused.content
+        );
+
+        // The user switches the session window to a mode that allows edits.
+        cell.set_floor(crate::approval::DangerLevel::Editable);
+
+        let allowed = worker.call(&call, &ctx()).await;
+        assert!(
+            !allowed.is_error,
+            "the same worker must follow the session's new floor: {}",
+            allowed.content
+        );
+        assert_eq!(allowed.content, "written");
+    }
+
     /// Publishes structured details next to its text.
     struct Detailed;
 

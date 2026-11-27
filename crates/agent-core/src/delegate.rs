@@ -103,13 +103,21 @@ pub fn compose_subagent_system_prompt(
     definition: &SubagentDefinition,
     guidance: &[String],
     tool_names: &[String],
+    mode: Option<crate::prompt::SessionMode>,
 ) -> String {
     let tools = if tool_names.is_empty() {
         definition.tools_label()
     } else {
         tool_names.join(", ")
     };
-    let mutation = if definition.can_mutate {
+    // The definition says what this kind of worker may do; the session's mode says what
+    // this turn may do. A read-only session installs no mutating tool, so promising the
+    // worker that it may change files would buy it several turns of discovering
+    // otherwise, and steps are what a run costs.
+    let read_only = mode.is_some_and(|mode| !mode.is_write_capable());
+    let mutation = if read_only {
+        "This session is read-only at its current permission level: you have no tool that changes a file or runs a command. Never report an edit you could not have made. If the task cannot be done without changing something, state exactly what change is needed and stop."
+    } else if definition.can_mutate {
         "You may change files, but only the ones the task is about; leave everything else untouched. If the final report would exceed ~8,000 characters, write the full report to a file yourself and make the final message a compact summary plus the file path."
     } else {
         "You have no tools that change files or run commands, so never report an edit you could not have made."
@@ -1898,6 +1906,7 @@ mod tests {
             &definition(),
             &["Follow the repository AGENTS.md.".to_string()],
             &["Read".to_string(), "Grep".to_string()],
+            None,
         );
         assert!(prompt.starts_with("You are the \"explorer\" subagent"));
         assert!(prompt.contains("You cannot see the user, ask questions, or delegate further"));
@@ -1915,8 +1924,42 @@ mod tests {
             can_mutate: true,
             ..definition()
         };
-        let prompt = compose_subagent_system_prompt(&writable, &[], &[]);
+        let prompt = compose_subagent_system_prompt(&writable, &[], &[], None);
         assert!(prompt.contains("You may change files, but only the ones the task is about"));
+    }
+
+    #[test]
+    fn a_read_only_session_does_not_promise_the_worker_it_can_write() {
+        // Both halves share one approval cell, so the worker's write is refused either
+        // way. The prompt is the part that did not follow: a definition that may mutate
+        // was told it could change files even when the mode installs no such tool, and
+        // the turns it spent finding out are the ones a run pays for.
+        let writable = SubagentDefinition {
+            can_mutate: true,
+            ..definition()
+        };
+        let read_only = compose_subagent_system_prompt(
+            &writable,
+            &[],
+            &["Read".to_string()],
+            Some(crate::prompt::SessionMode::Plan),
+        );
+        assert!(
+            read_only.contains("read-only at its current permission level"),
+            "the worker must be told the session's permission: {read_only}"
+        );
+        assert!(
+            !read_only.contains("You may change files"),
+            "and must not be promised a write the mode does not install: {read_only}"
+        );
+        // An editable session keeps the original promise.
+        let editable = compose_subagent_system_prompt(
+            &writable,
+            &[],
+            &[],
+            Some(crate::prompt::SessionMode::Agent),
+        );
+        assert!(editable.contains("You may change files"));
     }
 
     #[test]
