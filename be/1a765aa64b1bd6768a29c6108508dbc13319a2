@@ -1,0 +1,14 @@
+docs/zh-CN/spec/04-ux/01-ui-ia.md
+  h_201ed4c689ac8b 19-27,354-355
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "be1a765aa64b1bd6768a29c6108508dbc13319a2",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
