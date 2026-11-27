@@ -1,0 +1,16 @@
+packages/host-runtime/src/agent-sidecar.ts
+  h_201ed4c689ac8b 51,68-74
+packages/host-runtime/src/sidecar-host-methods.test.ts
+  h_201ed4c689ac8b 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "05f1386d3fe5e626ceeb38495c2b20b6398edf4b",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
