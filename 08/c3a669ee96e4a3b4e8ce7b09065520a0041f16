@@ -1,0 +1,30 @@
+apps/desktop/electron/autotest/workbench-theme.ts
+  h_201ed4c689ac8b 1-107
+apps/desktop/electron/autotest/workbench-view.ts
+  h_201ed4c689ac8b 21-22,36-38,84-85,98-100,102,108-110,112-152,155-156,193-195,229-230
+apps/desktop/electron/main/ipc/autotest-ipc.ts
+  h_201ed4c689ac8b 4,46-52,72-76
+apps/desktop/electron/test/autotest-workbench-view.test.mjs
+  h_201ed4c689ac8b 28-29,40-47,70,168-170,176-226
+apps/desktop/src/features/surfaces/autotest/AutoTestSurfaceShell.tsx
+  h_201ed4c689ac8b 34-46,59,120-129,193-201
+apps/desktop/src/lib/api.ts
+  h_201ed4c689ac8b 2391-2397
+apps/desktop/src/styles/surfaces.css
+  h_201ed4c689ac8b 93-95
+apps/desktop/test/autotest-surface-theme.test.mjs
+  h_201ed4c689ac8b 1-105
+apps/desktop/test/surface-registry.test.mjs
+  h_201ed4c689ac8b 93-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "08c3a669ee96e4a3b4e8ce7b09065520a0041f16",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
