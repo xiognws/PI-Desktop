@@ -1,0 +1,14 @@
+crates/host-core/src/tools/mod.rs
+  h_201ed4c689ac8b 5682-5696
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f3bed4506f911ba761d39972c6500faf786bbbab",
+  "prompts": {},
+  "humans": {
+    "h_201ed4c689ac8b": {
+      "author": "xiognws <xiognws@users.noreply.github.com>"
+    }
+  }
+}
