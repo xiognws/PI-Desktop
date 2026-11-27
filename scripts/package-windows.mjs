@@ -302,6 +302,17 @@ if (rustBinaryIsCurrent(hostExe)) {
   if (host !== 0) process.exit(host);
 }
 
+// The AutoTest platform service is its own binary next to host-core: same
+// release profile, same reuse rule, so a JS-only change does not pay for it.
+const autotestExe = join(REPO, "target", "release", "pi-autotest.exe");
+if (rustBinaryIsCurrent(autotestExe)) {
+  step("build autotest-core (release): binary is newer than the sources");
+} else {
+  step("build autotest-core (release)");
+  const engine = run("cargo", ["build", "--release", "-p", "autotest-core", "--locked"]);
+  if (engine !== 0) process.exit(engine);
+}
+
 // The kernel ships from `target/release` too, and this script does not build it
 // (`build:agent-release` in the desktop package does). Pack a missing one is a
 // silent half-install, so it fails here instead.

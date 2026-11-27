@@ -1,8 +1,13 @@
 /**
  * Autotest 服务的生命周期（Electron main 侧）。
  *
- * 只做四件事：选目录/解释器 → 起 uvicorn → 探活 → 原子写 `runtime.json`。
+ * 只做四件事：选目录/引擎 → 起服务 → 探活 → 原子写 `runtime.json`。
  * Agent 扩展（sidecar 内）读到 `runtime.json` 后直连 loopback，不经 main 转发。
+ *
+ * 服务本体是仓库自己的 `pi-autotest`（Rust，`crates/autotest-core`）：它负责平台
+ * 的全部 73 条接口、SQLite 与工作台静态资源。解释器只在两处出现——脚本执行器
+ * 跑用户的 pytest，以及 `.docx/.xlsx` 等容器格式抽文本——所以这里仍会解析
+ * Python 运行时并把它的路径交给服务，而不是由服务自己猜。
  *
  * 失败一律 fail-soft：服务起不来时应用照常使用，只是 autotest 工具会报连接失败。
  *
@@ -56,6 +61,28 @@ function defaultLog(): void {
 /** Windows 上是 python.exe；其它平台是 bin/python3。 */
 function interpreterIn(runtimeDir: string): string {
   return process.platform === "win32" ? join(runtimeDir, "python.exe") : join(runtimeDir, "bin", "python3");
+}
+
+/**
+ * 服务二进制：打包内是 `<serviceDir>/pi-autotest(.exe)`（安装包把 `crates/autotest-core`
+ * 的产物放在 `resources/autotest/`），开发期是仓库 `target/` 下的构建产物。
+ * 找不到时返回 null，调用方退回 Python 服务。
+ */
+export function resolveEngineBinary(options: AutotestServiceOptions, serviceDir: string): string | null {
+  const moduleDir = options.moduleDir ?? MODULE_DIR;
+  const exeName = process.platform === "win32" ? "pi-autotest.exe" : "pi-autotest";
+  const repoRoot = join(moduleDir, "..", "..", "..", "..");
+  const candidates = [
+    process.env.PI_AUTOTEST_ENGINE ?? "",
+    join(serviceDir, exeName),
+    options.resourcesPath ? join(options.resourcesPath, "autotest", exeName) : "",
+    join(repoRoot, "target", "release", exeName),
+    join(repoRoot, "target", "debug", exeName),
+  ].filter((value) => value.trim().length > 0);
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 /** 服务源码目录：打包内 `<resources>/autotest`，开发期是仓库的 `services/autotest`。 */
@@ -244,16 +271,37 @@ export class AutotestService {
     this.port = port;
     mkdirSync(this.workspace, { recursive: true });
 
-    const child = spawn(
-      python.exe,
-      ["-m", "uvicorn", "autotest.api.server:app", "--host", "127.0.0.1", "--port", String(port)],
-      {
-        cwd: serviceDir,
-        env: buildServiceEnv(python, serviceDir, this.workspace, this.platformDbPath),
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
+    // The platform service is our own binary. It answers in tens of milliseconds
+    // instead of the 2.4-3.0 s an interpreter needs to import uvicorn, and it is
+    // signed by the same build as the rest of the app. `python` is handed over
+    // because the executor still runs the user's pytest scripts with it.
+    const engine = resolveEngineBinary(this.options, serviceDir);
+    const env = {
+      ...buildServiceEnv(python, serviceDir, this.workspace, this.platformDbPath),
+      AUTOTEST_PYTHON: python.exe,
+    };
+    const child = engine
+      ? spawn(engine, ["--host", "127.0.0.1", "--port", String(port)], {
+          cwd: serviceDir,
+          env,
+          windowsHide: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        })
+      : spawn(
+          python.exe,
+          ["-m", "uvicorn", "autotest.api.server:app", "--host", "127.0.0.1", "--port", String(port)],
+          {
+            cwd: serviceDir,
+            env,
+            windowsHide: true,
+            stdio: ["ignore", "pipe", "pipe"],
+          },
+        );
+    if (!engine) {
+      // Only reached when the engine binary is missing from an install: the
+      // Python sources still ship, so the workbench keeps working.
+      log("[autotest] engine binary not found; falling back to the python service");
+    }
     this.child = child;
     child.stdout?.on("data", (chunk: Buffer) => log(`[autotest] ${String(chunk).trimEnd()}`));
     child.stderr?.on("data", (chunk: Buffer) => log(`[autotest] ${String(chunk).trimEnd()}`));

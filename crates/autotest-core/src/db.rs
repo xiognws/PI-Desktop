@@ -28,7 +28,10 @@ pub fn open(path: &Path) -> ApiResult<Connection> {
 
 pub fn ensure_platform_db(path: &Path) -> ApiResult<()> {
     let conn = open(path)?;
-    conn.execute_batch(schema::PLATFORM_SCHEMA)?;
+    // One transaction, not thirteen: each bare statement commits (and fsyncs) on
+    // its own, and on a machine with a filter driver in the write path that
+    // turned start-up into hundreds of milliseconds.
+    conn.execute_batch(&transactional(schema::PLATFORM_SCHEMA))?;
     Ok(())
 }
 
@@ -39,8 +42,9 @@ pub fn ensure_project_db(project_dir: &Path) -> ApiResult<Connection> {
     std::fs::create_dir_all(project_dir)?;
     let db_path = project_dir.join("data.db");
     let conn = open(&db_path)?;
-    conn.execute_batch(schema::PROJECT_SCHEMA)?;
-    conn.execute_batch(schema::AGENT_CALL_SCHEMA)?;
+    let mut project_schema = transactional(schema::PROJECT_SCHEMA);
+    project_schema.push_str(&transactional(schema::AGENT_CALL_SCHEMA));
+    conn.execute_batch(&project_schema)?;
     migrate_project(&conn, &project_dir.join("scripts"))?;
     Ok(conn)
 }
@@ -75,6 +79,15 @@ pub fn migrate_project(conn: &Connection, scripts_dir: &Path) -> ApiResult<Vec<S
     }
 
     Ok(changes)
+}
+
+/// Wrap a script of idempotent DDL in one transaction so creating a database is
+/// a single flush instead of one per statement.
+fn transactional(sql: &str) -> String {
+    format!("BEGIN;
+{sql}
+COMMIT;
+")
 }
 
 pub fn table_columns(conn: &Connection, table: &str) -> ApiResult<Vec<String>> {

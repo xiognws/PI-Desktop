@@ -448,3 +448,4 @@ Each ADR includes:
 | 0408 | [The system proxy relay starts only when the machine routes](0408-system-proxy-relay-gate.md) | Accepted (related 0177, 0406) |
 | 0409 | [Token budget defaults are global, and they are sized, not inherited](0409-token-budget-defaults.md) | Accepted (related 0405, 0404) |
 | 0410 | [The window has surfaces, and the chat sidebar is not the window](0410-surface-model.md) | Accepted |
+| 0411 | [The AutoTest platform service is a Rust binary, not a Python process](0411-autotest-service-in-rust.md) | Accepted |

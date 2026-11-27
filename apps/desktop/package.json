@@ -292,6 +292,10 @@
         {
           "from": "build/icon.png",
           "to": "app-icon.png"
+        },
+        {
+          "from": "../../target/release/pi-autotest.exe",
+          "to": "autotest/pi-autotest.exe"
         }
       ]
     },
