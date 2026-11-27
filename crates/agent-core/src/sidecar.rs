@@ -2507,7 +2507,25 @@ impl Sidecar {
             return Ok(());
         };
         let messages = crate::restore::messages_from_history(rows);
+        // One line, deliberately: "the model forgot" is either a restore that returned
+        // nothing, a restore that returned a fraction of the rows, or a later ageing
+        // pass — and without these two numbers none of the three can be told apart.
+        tracing::info!(
+            target: "agent_core::restore",
+            session = %session_id,
+            rows = rows.len(),
+            messages = messages.len(),
+            "restored conversation history"
+        );
         if messages.is_empty() {
+            if !rows.is_empty() {
+                tracing::warn!(
+                    target: "agent_core::restore",
+                    session = %session_id,
+                    rows = rows.len(),
+                    "stored rows produced no conversation: the resumed turn starts empty"
+                );
+            }
             return Ok(());
         }
         let mut transcript = session.transcript.lock().await;
@@ -4583,7 +4601,10 @@ impl crate::delegate::DelegateRunner for SidecarDelegateRunner {
             let outcome = engine
                 .run_turn(
                     &request.session_id,
-                    &request.delegation_id,
+                    // The parent turn, not the delegation id: a delegation is not a turn
+                    // row, and host-core legitimately refuses a turn reference it cannot
+                    // resolve, which used to strip every worker row of its turn.
+                    &request.parent_turn_id,
                     &mut transcript,
                     &config,
                     request.cancel.clone(),
@@ -5553,6 +5574,47 @@ mod prompt_parameter_tests {
             parent.requests().is_empty(),
             "the session own provider must not carry the delegate"
         );
+    }
+
+    /// A worker's rows belong to the turn that asked for it.
+    ///
+    /// They used to carry the delegation id as their turn, which host-core cannot
+    /// resolve, so every one of them was stored with no turn — the session that lost its
+    /// context had 143 such rows and a warning for each.
+    #[tokio::test]
+    async fn a_delegate_reports_under_the_parent_turn() {
+        let parent = ScriptedProvider::new(vec![answer("delegated")]);
+        let sink = Arc::new(crate::event::RecordingSink::new());
+        let runner = SidecarDelegateRunner {
+            provider: Arc::new(parent.clone()),
+            tools: Arc::new(ToolRegistry::new(Arc::new(AllowAll))),
+            sink: sink.clone(),
+            model: "gw-large".into(),
+            model_limits: Some(ModelLimits::new(128_000, 8_192)),
+            models: Arc::new(std::collections::BTreeMap::new()),
+            guidance: Vec::new(),
+            infinite_provider_retry: false,
+            cache: crate::provider::CacheRetention::resolve(None, None),
+        };
+        let request = delegate_request(None);
+        let parent_turn = request.parent_turn_id.clone();
+        let delegation = request.delegation_id.clone();
+
+        runner.run(request).await;
+
+        let envelopes = sink.snapshot();
+        assert!(!envelopes.is_empty(), "the delegate must publish something");
+        for envelope in &envelopes {
+            assert_eq!(
+                envelope.turn_id.as_deref(), Some(parent_turn.as_str()),
+                "a worker row must name the parent turn, not the delegation ({delegation})"
+            );
+            assert_eq!(
+                envelope.parent_tool_call_id.as_deref(),
+                Some("call_1"),
+                "the call that started it is still what the badge groups on"
+            );
+        }
     }
 
     /// No key is the reference default: the delegate runs the session model.

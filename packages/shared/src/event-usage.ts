@@ -4,6 +4,10 @@ import { addUsage, withUsageIdentity } from "./message-usage.js";
 
 /** Physical identities, not tool ancestry, determine accounting ownership. */
 export function usageForEvent(envelope: AgentEventEnvelope): MessageUsage | undefined {
+  // A delegate's spend is accounted once, when its `Task` result settles, as an
+  // operation keyed `delegation:<id>`. Counting the worker's own per-step events as well
+  // would bill the session twice for the same request.
+  if (envelope.parentToolCallId) return undefined;
   const event = envelope.event;
   if (event.type === "usage") return event.usage;
   if (event.type === "tool_end") {

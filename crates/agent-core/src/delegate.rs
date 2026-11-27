@@ -718,12 +718,24 @@ pub fn settled_tool_result(call_id: &str, view: &DelegationView) -> (ToolResult,
             view.tool_calls
         ),
     };
+    // The report is the work. Leaving it out of the row meant a stopped turn — or a
+    // session resumed later — had no record that the worker found anything, which is
+    // exactly the context that went missing from a resumed conversation.
+    let ordinary = text;
+    let (content, truncated) = match view.report.as_deref() {
+        Some(report) if !report.trim().is_empty() => {
+            let bounded = bounded_report(report);
+            let cut = bounded.len() < report.len();
+            (format!("{ordinary}\n\n{bounded}"), cut)
+        }
+        _ => (ordinary, false),
+    };
     let result = ToolResult {
         call_id: call_id.to_string(),
         name: TASK_TOOL_NAME.to_string(),
-        content: text,
+        content,
         is_error: matches!(view.status, DelegationStatus::Failed),
-        truncated: false,
+        truncated,
     };
     (result, delegation_details(view))
 }
@@ -1969,6 +1981,67 @@ mod tests {
         assert_eq!(operation["cacheReadTokens"], 41_000);
         assert_eq!(operation["agentName"], "test-runner");
         assert_eq!(operation["modelId"], "9554");
+    }
+
+    #[test]
+    fn a_settled_delegation_carries_its_report_into_the_row() {
+        // Without this the findings lived only in the `TaskWait` delivery, so a turn
+        // that was stopped and a session resumed later both lost them.
+        let view = DelegationView {
+            delegation_id: "del-9".into(),
+            agent_name: "explorer".into(),
+            label: None,
+            status: DelegationStatus::Completed,
+            model_id: "9554".into(),
+            turns: 3,
+            tool_calls: 7,
+            started_at_ms: 0,
+            completed_at_ms: Some(1),
+            report: Some("Found it: the flag is in src/main.rs on line 42.".into()),
+            error: None,
+            report_delivered: false,
+            usage: Usage::default(),
+        };
+
+        let (result, _) = settled_tool_result("call-11", &view);
+
+        assert!(
+            result.content.contains("the flag is in src/main.rs on line 42"),
+            "the row must carry what the worker found: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("settled"),
+            "and still say what happened to the delegation"
+        );
+        assert!(!result.truncated, "a short report is not truncated");
+    }
+
+    #[test]
+    fn a_report_longer_than_the_budget_is_marked_truncated() {
+        let view = DelegationView {
+            delegation_id: "del-10".into(),
+            agent_name: "explorer".into(),
+            label: None,
+            status: DelegationStatus::Completed,
+            model_id: String::new(),
+            turns: 1,
+            tool_calls: 1,
+            started_at_ms: 0,
+            completed_at_ms: Some(1),
+            report: Some("x".repeat(MAX_SUBAGENT_REPORT_CHARS + 500)),
+            error: None,
+            report_delivered: false,
+            usage: Usage::default(),
+        };
+
+        let (result, _) = settled_tool_result("call-12", &view);
+
+        assert!(result.truncated, "the row must say it was cut");
+        assert!(
+            result.content.len() < 2 * MAX_SUBAGENT_REPORT_CHARS,
+            "and must not carry the whole thing anyway"
+        );
     }
 
     #[test]

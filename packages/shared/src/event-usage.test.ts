@@ -83,3 +83,23 @@ it("keeps one record per delegation when the settle event repeats", () => {
   expect(usage?.operations).toHaveLength(1);
   expect(usage?.inputTokens, "a replayed settle must not double the bill").toBe(12_000);
 });
+
+it("does not bill a worker's own steps as well as its settled delegation", () => {
+  // A delegate's spend is reported once, on settle, as `delegation:<id>`. Its per-step
+  // usage events now carry the parent turn (so its rows are addressable), and counting
+  // those too would charge the session twice for the same request.
+  const usage = {
+    type: "usage" as const,
+    usage: { inputTokens: 900, outputTokens: 100, totalTokens: 1_000 },
+  };
+  const delegated = usageForEvent({
+    sessionId: "session", turnId: "parent-turn", ts: 1,
+    parentToolCallId: "call_1", agentName: "explorer", event: usage,
+  } as never);
+  const parent = usageForEvent({
+    sessionId: "session", turnId: "parent-turn", ts: 1, event: usage,
+  } as never);
+
+  expect(delegated).toBeUndefined();
+  expect(parent?.totalTokens).toBe(1_000, "the orchestrator's own step still counts");
+});
