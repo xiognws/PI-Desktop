@@ -1,25 +1,5 @@
 import { join } from "node:path";
 import {
-  GEN_UI_DIRECTORY_NAME,
-  ErrorCodes as SharedErrorCodes,
-  isActiveInProject,
-  isCommandShellCatalog,
-  JEV_API_KEY_SECRET_REF,
-  imageGenerationBindings,
-  isImageGenerationModel,
-  normalizeMode,
-  trustedExtensionAgentKeyFromProviderId,
-  type CommandShellCatalog,
-  type McpServerRecord,
-  type ModelBinding,
-  type Mode,
-  type Risk,
-  type SessionThinkingLevel,
-  type SmartTier,
-  type UserSkillRecord,
-  type UserSubagentRecord,
-} from "@pi-workspace/shared";
-import {
   capabilitiesFromModelConfig,
   clampThinkingLevel,
   genericModelConfig,
@@ -31,25 +11,45 @@ import {
   resolveSubagentProviders,
   skillCatalogBudget,
   skillReviewPolicyFrom,
-  visionFromModelConfig,
   type UserSubagentDocument,
+  visionFromModelConfig,
 } from "@pi-workspace/agent-runtime";
-import { builtinSkills, effectiveDisabledBuiltinSkills, VISUALIZE_SKILL_ID } from "../builtin-skills";
-import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
+import {
+  type CommandShellCatalog,
+  GEN_UI_DIRECTORY_NAME,
+  imageGenerationBindings,
+  isActiveInProject,
+  isCommandShellCatalog,
+  isImageGenerationModel,
+  JEV_API_KEY_SECRET_REF,
+  type McpServerRecord,
+  type Mode,
+  type ModelBinding,
+  normalizeMode,
+  type Risk,
+  type SessionThinkingLevel,
+  ErrorCodes as SharedErrorCodes,
+  type SmartTier,
+  trustedExtensionAgentKeyFromProviderId,
+  type UserSkillRecord,
+  type UserSubagentRecord,
+} from "@pi-workspace/shared";
 import { kernelRuntimeRequested } from "../agent-sidecar-launch";
-import { pluginAgentTransport } from "../plugin-agent-transport";
+import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
+import { builtinSkills, effectiveDisabledBuiltinSkills, VISUALIZE_SKILL_ID } from "../builtin-skills";
+import type { Logger } from "../logger";
 import {
   catalogModelConfigFor,
   type ModelsDevCatalog,
 } from "../models-dev-catalog";
-import type { Logger } from "../logger";
+import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
+import { pluginAgentTransport } from "../plugin-agent-transport";
 import type { PluginRuntime } from "../plugin-runtime";
+import { loadRemoteWorkspaceInstructions } from "../remote/remote-workspace-instructions.js";
+import type { LoadedSkillDocument } from "../skill-document";
 import type { UserMcpRuntime } from "../user-mcp";
 import type { RuntimeState } from "./context";
 import type { RuntimeProvider } from "./provider-catalog";
-import type { LoadedSkillDocument } from "../skill-document";
-import { getActiveRemoteHostsBoot } from "../bootstrap/remote-hosts";
-import { loadRemoteWorkspaceInstructions } from "../remote/remote-workspace-instructions.js";
 import type { SmartRouting } from "./smart-routing";
 
 const ErrorCodes = {
