@@ -31,7 +31,7 @@ use crate::message::{ToolCall, ToolResult};
 use crate::provider::BoxFuture;
 use crate::rpc::{self, RpcError};
 use crate::sidecar::LineSink;
-use crate::tool::{Tool, ToolContext, ToolSpec};
+use crate::tool::{Tool, ToolContext, ToolOutcome, ToolSpec};
 
 /// Failure classes a bridge call can end in. `Timeout` and `Closed` are
 /// distinct from an RPC error because the caller must not treat them as a
@@ -212,20 +212,29 @@ impl HostTool {
 
     /// Map the host's `{ok, content, isError?, errorCode?}` answer onto the
     /// kernel's tool-result vocabulary.
-    fn interpret(&self, call: &ToolCall, value: &Value) -> Result<String> {
+    ///
+    /// `content` arrives in two shapes. A plain string is text and nothing
+    /// else. An object is the host's structured result, and it is both what the
+    /// model reads (serialized) and what a client renders: a `Write`/`Edit` row
+    /// carries `review` (path, additions, deletions, hunks, snapshot id) so the
+    /// transcript can draw the change card, a `Read` row carries the file body,
+    /// a `Bash` row carries stdout/stderr/exitCode, a `Grep` row its hits.
+    /// Returning that object as the row's details is what keeps those surfaces
+    /// alive; discarding it leaves every row text-only.
+    fn interpret(&self, call: &ToolCall, value: &Value) -> Result<(String, Option<Value>)> {
         let ok = value.get("ok").and_then(Value::as_bool).unwrap_or(true);
         let is_error = value
             .get("isError")
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        let content = match value.get("content") {
-            Some(Value::String(text)) => text.clone(),
-            Some(Value::Null) | None => String::new(),
-            Some(other) => other.to_string(),
+        let (content, details) = match value.get("content") {
+            Some(Value::String(text)) => (text.clone(), None),
+            Some(Value::Null) | None => (String::new(), None),
+            Some(other) => (other.to_string(), Some(other.clone())),
         };
 
         if ok && !is_error {
-            return Ok(content);
+            return Ok((content, details));
         }
 
         let error_code = value
@@ -299,11 +308,45 @@ impl Tool for HostTool {
         self.spec.clone()
     }
 
+    /// The text-only half of [`HostTool::invoke`].
     fn call<'a>(
         &'a self,
         call: &'a ToolCall,
         ctx: &'a ToolContext,
     ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(async move { self.invoke(call, ctx).await.map(|(content, _)| content) })
+    }
+
+    /// The whole answer, structured half included.
+    ///
+    /// The renderer reads `result.details`, not the text: the change card under
+    /// a `Write`/`Edit` row is built from `details.review`, and the structured
+    /// body of a `Read`, `Bash` or `Grep` row from the rest of the object. A row
+    /// that publishes nothing renders as a JSON dump instead, which is how the
+    /// transcript looked while this half was dropped on the floor.
+    fn call_with_details<'a>(
+        &'a self,
+        call: &'a ToolCall,
+        ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<ToolOutcome>> {
+        Box::pin(async move {
+            let (content, details) = self.invoke(call, ctx).await?;
+            Ok(match details {
+                Some(details) => ToolOutcome::with_details(content, details),
+                None => ToolOutcome::text(content),
+            })
+        })
+    }
+}
+
+impl HostTool {
+    /// One `tools.execute` exchange: what the model reads, and the structured
+    /// result object the host published alongside it, when it published one.
+    fn invoke<'a>(
+        &'a self,
+        call: &'a ToolCall,
+        ctx: &'a ToolContext,
+    ) -> BoxFuture<'a, Result<(String, Option<Value>)>> {
         Box::pin(async move {
             // Both halves of the turn identity are stamped on every call: the
             // host uses them to attribute the call to a dispatchable turn and to
@@ -658,5 +701,137 @@ mod plan_safe_action_tests {
         );
         assert_eq!(payload["toolName"], "plugin_acme_notes");
         assert_eq!(payload["mode"], "plan");
+    }
+}
+
+/// A host result is two things at once, and the renderer reads the second one.
+///
+/// `tools.execute` answers `{ok, content}`. When `content` is an object it is
+/// also the row's `details`: the transcript builds the change card under a
+/// `Write`/`Edit` row from `details.review` (the renderer's
+/// `reviewChangeFromMessage`), a `Read` row's body from `details.content`, a
+/// `Bash` row's output from `details.stdout`, a `Grep` row's hits from
+/// `details.files`. Publishing only the serialized text left every one of those
+/// surfaces empty while the row still said the call succeeded — which is
+/// exactly what "my edits never show up in the chat" looks like.
+#[cfg(test)]
+mod host_result_details_tests {
+    use super::*;
+
+    use crate::cancel::CancelToken;
+    use crate::sidecar::RecordingLines;
+
+    fn context() -> ToolContext {
+        ToolContext {
+            session_id: "s1".into(),
+            turn_id: "turn-1".into(),
+            tool_call_id: "call-1".into(),
+            steering: None,
+            cancel: CancelToken::new(),
+        }
+    }
+
+    /// Drive one `Edit` call as far as `tools.execute`, answer it, and hand back
+    /// the outcome the kernel published for that row.
+    async fn outcome_for_answer(answer: Value) -> Result<ToolOutcome> {
+        let spec = tool_spec_from_value(&json!({
+            "name": "Edit",
+            "description": "Edit a file",
+            "parameters": {"type": "object"},
+        }))
+        .expect("a declaration");
+        let lines = RecordingLines::new();
+        let bridge = Arc::new(HostBridge::new(Arc::new(lines.clone())));
+        let tool = HostTool::new(spec, bridge.clone()).with_mode("agent");
+        let call = ToolCall {
+            id: "call-1".into(),
+            name: "Edit".into(),
+            arguments: json!({"path": "a.rs", "tag": "ABCD", "ops": "PUT 1.=1:\n+x"}),
+            raw_arguments: None,
+        };
+        let ctx = context();
+        let running = tokio::spawn(async move { tool.call_with_details(&call, &ctx).await });
+
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let frame = loop {
+            let found = lines.host_calls().into_iter().find(|frame| {
+                frame.pointer("/params/method").and_then(Value::as_str) == Some("tools.execute")
+            });
+            if let Some(frame) = found {
+                break frame;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "the kernel never sent `tools.execute`"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        };
+
+        let id = frame
+            .get("id")
+            .and_then(Value::as_str)
+            .expect("the frame's id")
+            .to_string();
+        bridge.complete(&id, Ok(answer));
+        running.await.expect("the call task")
+    }
+
+    #[tokio::test]
+    async fn an_object_result_is_published_as_the_rows_details() {
+        // The shape host-core returns for a workspace edit (rpc/mod.rs inserts
+        // `review` into the result content after the write succeeds).
+        let content = json!({
+            "path": "a.rs",
+            "root": "workspace",
+            "tag": "ABCD",
+            "review": {
+                "version": 1,
+                "messageId": "call-1",
+                "snapshotId": "snap-1",
+                "path": "a.rs",
+                "root": "workspace",
+                "operation": "edit",
+                "status": "modified",
+                "state": "active",
+                "additions": 1,
+                "deletions": 0,
+                "reversible": true,
+                "hunks": [{
+                    "header": "@@ -1,1 +1,2 @@",
+                    "lines": [
+                        {"type": "context", "text": "a"},
+                        {"type": "add", "text": "x"},
+                    ],
+                }],
+            },
+        });
+        let outcome = outcome_for_answer(json!({"ok": true, "content": content}))
+            .await
+            .expect("a successful call");
+
+        let details = outcome
+            .details
+            .expect("the row must publish the host's structured result");
+        assert_eq!(
+            details, content,
+            "details is the host's content object, verbatim"
+        );
+        assert_eq!(details["review"]["snapshotId"], json!("snap-1"));
+        // The model still reads the same object, serialized.
+        let text: Value =
+            serde_json::from_str(&outcome.content).expect("the model's text stays JSON");
+        assert_eq!(text, content);
+    }
+
+    #[tokio::test]
+    async fn a_plain_text_result_stays_text_only() {
+        let outcome = outcome_for_answer(json!({"ok": true, "content": "done"}))
+            .await
+            .expect("a successful call");
+        assert_eq!(outcome.content, "done");
+        assert_eq!(
+            outcome.details, None,
+            "plain text carries no structure to render"
+        );
     }
 }
